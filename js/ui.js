@@ -1,5 +1,5 @@
 /**
- * UI 与交互 - 分享、操作面板、格式/插入/图表、导出、上传、夜间模式、云打印
+分享、操作面板、格式/插入/图表、导出、上传、夜间模式、云打印
  */
 (function(global) {
     'use strict';
@@ -197,7 +197,7 @@
         global.nightMode = !global.nightMode;
         if (global.nightMode) {
             document.body.classList.add('night-mode');
-            var modeToggle = document.getElementById('modeToggle');
+            // var modeToggle = document.getElementById('modeToggle');
             if (modeToggle) modeToggle.innerHTML = '<i class="fas fa-sun"></i>';
             localStorage.setItem('vditor_night_mode', 'true');
             if (g('vditor')) g('vditor').setTheme('dark');
@@ -668,17 +668,50 @@
             </div>
         `;
 
-        // 客户端连接状态区域
+
+// 检测操作系统并返回对应的下载信息
+        function getDownloadInfo() {
+            var ua = navigator.userAgent;
+            if (ua.indexOf('Win') !== -1) {
+                return {
+                    file: 'print_client.exe',
+                    text: '点击下载打印客户端 (Windows)'
+                };
+            } else if (ua.indexOf('Linux') !== -1 && ua.indexOf('Android') === -1) {
+                // 排除 Android 设备（如果也想支持 Android 可单独处理）
+                return {
+                    file: 'print_client.tar.gz',
+                    text: '点击下载打印客户端 (Linux)'
+                };
+            } else if (ua.indexOf('Mac') !== -1) {
+                // macOS 用户，可提示或不提供专门版本，此处仍给 Windows 并提醒
+                return {
+                    file: 'print_client.exe',
+                    text: '暂不支持macos系统，点击下载windows版本'
+                };
+            } else {
+                // 其他未知系统，默认提供 Windows 版本
+                return {
+                    file: 'print_client.exe',
+                    text: '点击下载打印客户端 (Windows版本)'
+                };
+            }
+        }
+
+        var downloadInfo = getDownloadInfo();
+        var downloadLink = '<a href="' + downloadInfo.file + '" target="_blank" style="color:#4a90e2;">' + downloadInfo.text + '</a>';
+
+// 客户端连接状态区域
         var statusSection = `
-            <div style="margin-bottom:20px;padding:15px;background:` + (nightMode ? '#3d3d3d' : '#f8f9fa') + `;border-radius:8px;">
-                <h3 style="margin-top:0;margin-bottom:10px;">打印客户端状态</h3>
-                <div id="clientStatus" style="display:flex;align-items:center;gap:10px;">
-                    <div id="statusIndicator" style="width:12px;height:12px;border-radius:50%;background:#dc3545;"></div>
-                    <span id="statusText" style="font-size:14px;">请连接打印客户端</span>
-                </div>
-                <p style="margin-top:10px;font-size:14px;color:` + (nightMode ? '#aaa' : '#666') + `;"><a href="print_client.exe" target="_blank" style="color:#4a90e2;">点击下载打印客户端</a></p>
-            </div>
-        `;
+    <div style="margin-bottom:20px;padding:15px;background:` + (nightMode ? '#3d3d3d' : '#f8f9fa') + `;border-radius:8px;">
+        <h3 style="margin-top:0;margin-bottom:10px;">打印客户端状态</h3>
+        <div id="clientStatus" style="display:flex;align-items:center;gap:10px;">
+            <div id="statusIndicator" style="width:12px;height:12px;border-radius:50%;background:#dc3545;"></div>
+            <span id="statusText" style="font-size:14px;">请连接打印客户端</span>
+        </div>
+        <p style="margin-top:10px;font-size:14px;color:` + (nightMode ? '#aaa' : '#666') + `;">` + downloadLink + `</p>
+    </div>
+`;
 
         var settingsSection = `
             <div style="margin-bottom:20px;">
@@ -1041,9 +1074,6 @@
                     <button id="retryConnectionBtn" style="flex:1;padding:12px;font-weight:bold;background:#4CAF50;color:white;border:none;border-radius:6px;cursor:pointer;">重新连接</button>
                     <button id="cancelConnectionBtn" style="flex:1;padding:12px;background:${nightMode ? '#555' : '#9E9E9E'};color:white;border:none;border-radius:6px;cursor:pointer;">取消</button>
                 </div>
-                <p style="text-align:center;margin-top:15px;font-size:14px;color:${nightMode ? '#aaa' : '#666'};">
-                    <a href="print_client.exe" target="_blank" style="color:#4a90e2;">点击下载打印客户端</a>
-                </p>
             `;
 
             connectionModal.appendChild(modalContent);
@@ -2727,8 +2757,63 @@
                     <div id="statusIndicator" style="width:12px;height:12px;border-radius:50%;background:#dc3545;"></div>
                     <span id="statusText" style="font-size:14px;">请连接打印客户端</span>
                 </div>
-                <p style="margin-top:10px;font-size:14px;color:` + (nightMode ? '#aaa' : '#666') + `;"><a href="print_client.exe" target="_blank" style="color:#4a90e2;">点击下载打印客户端</a></p>
-            </div>
+                <p style="margin-top:10px;font-size:14px;" id="download-container">
+  <a href="#" target="_blank" style="color:#4a90e2;" id="download-link">正在检测操作系统...</a>
+</p>
+
+<script>
+(function() {
+  // 定义暗色模式变量（如果项目中已定义，可省略）
+  const nightMode = false; // 或根据实际逻辑设置
+
+  // 获取链接元素
+  const link = document.getElementById('download-link');
+  const container = document.getElementById('download-container');
+
+  // 检测操作系统
+  const userAgent = navigator.userAgent || navigator.platform;
+  let os = 'windows'; // 默认 Windows
+
+  if (userAgent.indexOf('Win') !== -1) {
+    os = 'windows';
+  } else if (userAgent.indexOf('Linux') !== -1 && userAgent.indexOf('Android') === -1) {
+    // 排除 Android 设备（如果也想支持 Android，可单独处理）
+    os = 'linux';
+  } else if (userAgent.indexOf('Mac') !== -1) {
+    // macOS 可以提示或提供通用版本，这里仍给 Windows 版本或显示不支持
+    os = 'mac'; // 可自定义处理
+  }
+
+  // 根据操作系统设置下载链接
+  let downloadUrl = '';
+  let linkText = '';
+
+  switch (os) {
+    case 'windows':
+      downloadUrl = 'print_client.exe';
+      linkText = '点击下载 Windows 客户端';
+      break;
+    case 'linux':
+      downloadUrl = 'print_client.tar.gz';
+      linkText = '点击下载 Linux 客户端';
+      break;
+    default:
+      // macOS 或其他系统，默认提供 Windows 版本并提示
+      downloadUrl = 'print_client.exe';
+      linkText = '点击下载客户端 (Windows 版本，您的系统可能不兼容)';
+      break;
+  }
+
+  // 更新链接
+  link.href = downloadUrl;
+  link.textContent = linkText;
+  link.target = '_blank';
+
+  // 应用夜间模式样式（保留原逻辑）
+  container.style.color = nightMode ? '#aaa' : '#666';
+})();
+</script>
+                </div>
         `;
 
         // 文件上传区域

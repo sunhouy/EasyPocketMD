@@ -224,7 +224,7 @@
         const files = g('files');
         const file = files.find(function(f) { return f.id === fileId; });
         if (!file) return;
-        const newName = prompt('请输入新的文件名（包含扩展名，如：文档.md）：', file.name);
+        const newName = prompt('请输入新的文件名：', file.name);
         if (!newName || newName.trim() === file.name) return;
         if (files.find(function(f) { return f.id !== fileId && f.name === newName.trim(); })) {
             alert('已存在同名文件，请使用其他名称');
@@ -655,6 +655,126 @@
     function deleteHistoryVersion(filename, versionId, historyId, fileId) {
         showDeleteConfirmModal(filename, versionId, historyId, fileId);
     }
+
+    /**
+     * 导入本地文件到文件列表
+     * 支持多选，自动处理文件名冲突
+     */
+    global.importFiles = function() {
+        // 创建隐藏的文件输入元素
+        const fileInput = document.createElement('input');
+        fileInput.type = 'file';
+        fileInput.multiple = true;
+        fileInput.accept = '.md,.txt,.markdown,text/markdown,text/plain';
+
+        fileInput.addEventListener('change', async function(e) {
+            const files = Array.from(e.target.files);
+            if (files.length === 0) return;
+
+            global.showMessage(`正在导入 ${files.length} 个文件...`, 'info');
+
+            let importedCount = 0;
+            let skippedCount = 0;
+            const newFiles = [];
+
+            // 获取现有文件名列表，用于冲突检测
+            const existingNames = new Set(g('files').map(f => f.name));
+
+            for (const file of files) {
+                try {
+                    const content = await readFileAsText(file);
+                    let fileName = file.name;
+
+                    // 处理文件名冲突：如果已存在，添加数字后缀
+                    let baseName = fileName;
+                    let extension = '';
+                    const lastDotIndex = fileName.lastIndexOf('.');
+                    if (lastDotIndex !== -1) {
+                        baseName = fileName.substring(0, lastDotIndex);
+                        extension = fileName.substring(lastDotIndex);
+                    }
+
+                    let counter = 1;
+                    while (existingNames.has(fileName)) {
+                        fileName = `${baseName} (${counter})${extension}`;
+                        counter++;
+                    }
+
+                    // 创建新文件对象
+                    const newFile = {
+                        id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+                        name: fileName,
+                        content: content,
+                        lastModified: Date.now(),
+                        isSynced: false
+                    };
+
+                    newFiles.push(newFile);
+                    existingNames.add(fileName); // 更新已存在名称集合
+                    importedCount++;
+                } catch (error) {
+                    console.error(`读取文件 ${file.name} 失败:`, error);
+                    global.showMessage(`读取文件 ${file.name} 失败: ${error.message}`, 'error');
+                    skippedCount++;
+                }
+            }
+
+            if (newFiles.length > 0) {
+                // 将新文件添加到全局文件列表
+                g('files').push(...newFiles);
+                localStorage.setItem('vditor_files', JSON.stringify(g('files')));
+
+                // 初始化同步状态
+                newFiles.forEach(file => {
+                    g('lastSyncedContent')[file.id] = file.content;
+                    g('unsavedChanges')[file.id] = false;
+                });
+
+                // 刷新文件列表
+                loadFiles();
+
+                // 打开第一个导入的文件
+                if (newFiles.length > 0) {
+                    openFile(newFiles[0].id);
+                }
+
+                // 如果用户已登录，同步到服务器
+                if (g('currentUser')) {
+                    // 逐个同步新文件（避免并发过多）
+                    for (const file of newFiles) {
+                        try {
+                            await global.syncFileToServer(file.id);
+                        } catch (syncError) {
+                            console.warn(`同步文件 ${file.name} 失败`, syncError);
+                        }
+                    }
+                }
+
+                global.showMessage(`成功导入 ${importedCount} 个文件${skippedCount > 0 ? `，跳过 ${skippedCount} 个` : ''}`, 'success');
+            } else {
+                global.showMessage('没有导入任何文件', 'warning');
+            }
+
+            // 清理输入元素
+            fileInput.remove();
+        });
+
+        // 触发文件选择
+        fileInput.click();
+    };
+
+    /**
+     * 辅助函数：将 File 对象读取为文本
+     */
+    function readFileAsText(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (e) => resolve(e.target.result);
+            reader.onerror = (e) => reject(new Error('读取文件失败'));
+            reader.readAsText(file);
+        });
+    }
+
 
     // 导出到 global
     global.loadFilesFromServer = loadFilesFromServer;

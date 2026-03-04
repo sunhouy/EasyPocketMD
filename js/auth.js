@@ -1,8 +1,13 @@
 /**
  * 用户认证 - 登录、注册、登出、登录模态
+ * 添加了登录/注册按钮的防抖处理，防止重复提交
  */
 (function(global) {
     'use strict';
+
+    // 防抖标志
+    let _loginSubmitting = false;
+    let _registerSubmitting = false;
 
     function showUserInfo() {
         const mobileLoginBtn = document.getElementById('mobileLoginBtn');
@@ -93,6 +98,10 @@
     }
 
     async function login() {
+        // 防抖：如果正在提交则直接返回
+        if (_loginSubmitting) return;
+        _loginSubmitting = true;
+
         const username = document.getElementById('loginUsername')?.value.trim();
         const password = document.getElementById('loginPassword')?.value.trim();
         const message = document.getElementById('loginMessage');
@@ -102,6 +111,7 @@
                 message.textContent = '请输入用户名和密码';
                 message.className = 'modal-message error';
             }
+            _loginSubmitting = false;
             return;
         }
 
@@ -143,10 +153,17 @@
                 message.textContent = '网络错误，请稍后重试';
                 message.className = 'modal-message error';
             }
+        } finally {
+            // 无论成功或失败，都释放锁，允许再次提交
+            _loginSubmitting = false;
         }
     }
 
     async function register() {
+        // 防抖：如果正在提交则直接返回
+        if (_registerSubmitting) return;
+        _registerSubmitting = true;
+
         const username = document.getElementById('registerUsername')?.value.trim();
         const password = document.getElementById('registerPassword')?.value.trim();
         const inviteCode = document.getElementById('registerInviteCode')?.value.trim();
@@ -157,6 +174,7 @@
                 message.textContent = '请输入用户名和密码';
                 message.className = 'modal-message error';
             }
+            _registerSubmitting = false;
             return;
         }
 
@@ -201,6 +219,9 @@
                 message.textContent = '网络错误，请稍后重试';
                 message.className = 'modal-message error';
             }
+        } finally {
+            // 释放锁
+            _registerSubmitting = false;
         }
     }
 

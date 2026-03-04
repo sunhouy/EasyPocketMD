@@ -129,11 +129,11 @@ body.night-mode .mobile-bottom-bar {
     background: none;
     border: none;
     color: #666;
-    font-size: 10px; /* 字体稍微调小 */
-    padding: 3px 6px; /* 减小padding */
+    font-size: 14px; /* 字体调大 */
+    padding: 3px 6px; /* 保持padding不变 */
     border-radius: 6px;
     transition: all 0.2s ease;
-    min-width: 45px; /* 减小最小宽度 */
+    min-width: 45px; /* 保持最小宽度不变 */
     height: 36px; /* 固定高度 */
 }
 
