@@ -400,14 +400,15 @@
                 }
             }
             html += `<li class="file-item ${node.id === g('currentFileId') ?
-                'active' : ''}" data-id="${node.id || ''}" data-type="${node.type}"            
+                'active' : ''}" data-id="${node.id || ''}" data-type="${node.type}" data-path="${node.name}" draggable="true"           
  style="list-style:none;">`;
 
             // 移除原来用 level*20 计算 padding-left 的做法，仅保留微小间距
             html += `<div class="file-header" style="display:flex;             
  align-items:center; padding: 6px 4px;">`;
             html += toggleIcon;
-            html += `<span class="file-name" title="${node.name}"              
+            const nameClass = isFolder ? 'file-name folder-name' : 'file-name';
+            html += `<span class="${nameClass}" title="${node.name}"              
  style="flex:1; margin-left:5px; white-space:nowrap; overflow:hidden;           
  text-overflow:ellipsis;">${icon} ${syncIcon} ${node.basename}</span>`;
             html += `<div class="file-actions">${actions}</div>`;
@@ -453,6 +454,125 @@
         }
     }
 
+    // ---------- 拖拽相关函数 ----------
+    let draggedItem = null;
+
+    function handleDragStart(e) {
+        const item = e.target.closest('.file-item');
+        if (!item) return;
+        
+        draggedItem = item;
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', item.dataset.id);
+        item.classList.add('dragging');
+    }
+
+    function handleDragOver(e) {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        
+        const target = e.target.closest('.file-item');
+        
+        // 清理之前的高亮
+        document.querySelectorAll('.file-item.drag-over').forEach(el => {
+            if (el !== target) el.classList.remove('drag-over');
+        });
+        
+        if (target && target !== draggedItem) {
+            // 如果目标是文件夹
+            if (target.dataset.type === 'folder') {
+                target.classList.add('drag-over');
+            }
+        }
+    }
+
+    function handleDragLeave(e) {
+        const target = e.target.closest('.file-item');
+        if (target) {
+            target.classList.remove('drag-over');
+        }
+    }
+
+    function handleDrop(e) {
+        e.preventDefault();
+        
+        if (draggedItem) {
+            draggedItem.classList.remove('dragging');
+            draggedItem = null;
+        }
+        document.querySelectorAll('.file-item.drag-over').forEach(el => el.classList.remove('drag-over'));
+
+        const sourceId = e.dataTransfer.getData('text/plain');
+        if (!sourceId) return;
+
+        const targetItem = e.target.closest('.file-item');
+        let targetPath = '';
+
+        if (targetItem) {
+            if (targetItem.dataset.type === 'folder') {
+                targetPath = targetItem.dataset.path;
+            } else {
+                return; // 不允许拖到文件上
+            }
+        } else {
+            targetPath = ''; // 根目录
+        }
+
+        moveFileTo(sourceId, targetPath);
+    }
+
+    function moveFileTo(id, targetPath) {
+        const files = g('files');
+        const item = files.find(f => f.id === id);
+        if (!item) return;
+
+        const oldName = item.name;
+        const newBasename = getBasename(oldName);
+        const newName = targetPath ? targetPath + '/' + newBasename : newBasename;
+
+        if (newName === oldName) return;
+
+        if (item.type === 'folder') {
+            if (newName === oldName || newName.startsWith(oldName + '/')) {
+                alert('不能将文件夹移动到自身或其子目录中');
+                return;
+            }
+        }
+
+        if (files.some(f => f.name === newName && f.id !== id)) {
+            alert('目标位置已存在同名项');
+            return;
+        }
+
+        if (item.type === 'folder') {
+            renameFolderAndChildren(oldName, newName);
+        } else {
+            item.name = newName;
+        }
+        
+        item.lastModified = Date.now();
+        item.isSynced = false;
+
+        localStorage.setItem('vditor_files', JSON.stringify(files));
+        loadFiles();
+        global.showMessage(`${item.type === 'folder' ? '文件夹' : '文件'}已移动`);
+        
+        if (g('currentUser')) {
+             if (item.type === 'folder') {
+                const affectedFiles = files.filter(f => f.type === 'file' &&
+                    (f.name.startsWith(newName + '/') || f.name === newName));
+                affectedFiles.forEach(f => {
+                    global.deleteFileFromServer(oldName +
+                        f.name.substring(newName.length)).catch(e=>{});
+                    global.syncFileToServer(f.id);
+                });
+            } else {
+                global.deleteFileFromServer(oldName).then(() =>
+                    global.syncFileToServer(item.id));
+            }
+        }
+    }
+
     function loadFiles() {
         const fileList = document.getElementById('fileList');
         if (!fileList) return;
@@ -467,6 +587,13 @@
 
         if (!fileList._treeEventsBound) {
             fileList._treeEventsBound = true;
+            
+            // 绑定拖拽事件
+            fileList.addEventListener('dragstart', handleDragStart);
+            fileList.addEventListener('dragover', handleDragOver);
+            fileList.addEventListener('dragleave', handleDragLeave);
+            fileList.addEventListener('drop', handleDrop);
+
             fileList.addEventListener('click', function(e) {
                 const target = e.target.closest('.file-item');
                 if (!target) return;

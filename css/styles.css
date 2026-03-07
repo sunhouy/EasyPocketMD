@@ -669,14 +669,12 @@ body.night-mode .folder-header:hover {
 }
 
 .folder-name {
-    flex: 1;
-    font-weight: 500;
-    font-size: 14px;
-    color: #333;
+    color: #4a90e2; /* Blue */
+    font-weight: 600;
 }
 
 body.night-mode .folder-name {
-    color: #eee;
+    color: #66b1ff; /* Lighter blue for dark mode */
 }
 
 /* 文件夹内容（子文件列表） */
@@ -722,6 +720,11 @@ body.night-mode .file-item:hover {
 body.night-mode .file-item.active {
     background: #1e3a5f;
     /* border-left: 3px solid #4a90e2; */
+}
+
+.file-item.drag-over {
+    background-color: rgba(74, 144, 226, 0.2) !important;
+    border: 2px dashed #4a90e2;
 }
 
 .file-icon {

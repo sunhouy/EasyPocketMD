@@ -288,12 +288,26 @@
     function showAILayoutPreview(markdown, html) {
         var nightMode = g('nightMode') === true;
         
+        // Define settings to match those used in convertSimpleMarkdown
+        var settings = {
+            titleFontSize: 24,
+            bodyFontSize: 12,
+            pageMargin: 15,
+            lineHeight: 1.5,
+            paragraphSpacing: 0.8,
+            titleSpacing: 1.0,
+            alignment: 'justify',
+            titleAlignment: 'center',
+            fitToPage: false,
+            indentParagraph: true
+        };
+        
         var previewModal = document.createElement('div');
         previewModal.className = 'modal-overlay';
-        previewModal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.9);display:flex;flex-direction:column;z-index:10003;';
+        previewModal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.9);display:flex;flex-direction:column;z-index:10003;align-items:stretch;justify-content:stretch;padding:0;';
         
         var header = document.createElement('div');
-        header.style.cssText = 'padding:15px 20px;background:' + (nightMode ? '#2d2d2d' : 'white') + ';border-bottom:1px solid ' + (nightMode ? '#444' : '#ddd') + ';display:flex;justify-content:space-between;align-items:center;';
+        header.style.cssText = 'padding:15px 20px;background:' + (nightMode ? '#2d2d2d' : 'white') + ';border-bottom:1px solid ' + (nightMode ? '#444' : '#ddd') + ';display:flex;justify-content:space-between;align-items:center;z-index:100;flex-shrink:0;';
         
         header.innerHTML = `
             <div style="display:flex;align-items:center;gap:15px;">
@@ -313,30 +327,136 @@
             </div>
         `;
         
-        var contentContainer = document.createElement('div');
-        contentContainer.style.cssText = 'flex:1;display:flex;overflow:hidden;background:' + (nightMode ? '#1a1a1a' : '#f5f5f5') + ';';
+        // Document container (adapted from print.js)
+        var docContainer = document.createElement('div');
+        docContainer.style.cssText = 'flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;overflow:auto;padding:20px;min-height:0;background:' + (nightMode ? '#1a1a1a' : '#f0f0f0') + ';';
         
-        // 预览区域 - 模拟A4纸
-        var previewArea = document.createElement('div');
-        previewArea.style.cssText = 'flex:1;overflow-y:auto;padding:40px;display:flex;justify-content:center;';
-        
-        var a4Page = document.createElement('div');
-        a4Page.style.cssText = 'width:210mm;min-height:297mm;background:white;padding:15mm;box-shadow:0 5px 20px rgba(0,0,0,0.2);color:#333;box-sizing:border-box;';
-        a4Page.innerHTML = html;
-        
-        previewArea.appendChild(a4Page);
-        contentContainer.appendChild(previewArea);
+        // Scaling variables
+        var currentScale = 1.0;
+        var initialDistance = 0;
+        var a4Width = 595;
+        var a4Height = 842;
+        var a4Margin = settings.pageMargin;
+
+        // Pages wrapper
+        var pagesWrapper = document.createElement('div');
+        pagesWrapper.style.cssText = 'display:flex;flex-direction:column;gap:20px;align-items:center;transform-origin:top center;';
+
+        // Create page function
+        function createPage() {
+            var page = document.createElement('div');
+            page.className = 'a4-page';
+            page.style.cssText = 'width:' + a4Width + 'px;min-height:' + a4Height + 'px;background:white;box-shadow:0 2px 10px rgba(0,0,0,0.1);position:relative;border:1px solid #ccc;overflow:visible;';
+
+            var contentDiv = document.createElement('div');
+            contentDiv.style.cssText = 'width:100%;padding:' + a4Margin + 'mm;box-sizing:border-box;position:relative;';
+
+            // Use global.getPrintStyles if available
+            if (global.getPrintStyles) {
+                var printStyles = global.getPrintStyles(settings);
+                var styleElement = document.createElement('style');
+                styleElement.textContent = printStyles;
+                contentDiv.appendChild(styleElement);
+            }
+
+            page.appendChild(contentDiv);
+            return { page: page, contentDiv: contentDiv };
+        }
+
+        // Create first page and content
+        var { page: firstPage, contentDiv: firstContentDiv } = createPage();
+        firstContentDiv.innerHTML += html;
+        pagesWrapper.appendChild(firstPage);
+        docContainer.appendChild(pagesWrapper);
+
+        // Add page dividers
+        function addPageDividers() {
+            var marginPx = a4Margin * 3.78; // mm to px approx (1mm ≈ 3.78px)
+            var usableHeight = a4Height - (marginPx * 2);
+            var contentHeight = firstContentDiv.scrollHeight;
+            var numPages = Math.ceil(contentHeight / usableHeight);
+
+            if (numPages > 1) {
+                for (var i = 1; i < numPages; i++) {
+                    var divider = document.createElement('div');
+                    divider.style.cssText = 'position:absolute;left:0;right:0;height:2px;background:linear-gradient(to right, transparent, #ff6b6b, transparent);z-index:10;';
+                    divider.style.top = (usableHeight * i + marginPx) + 'px';
+                    firstContentDiv.appendChild(divider);
+
+                    var pageLabel = document.createElement('div');
+                    pageLabel.style.cssText = 'position:absolute;left:50%;transform:translateX(-50%);top:' + ((usableHeight * i + marginPx) - 15) + 'px;font-size:11px;color:#ff6b6b;background:white;padding:2px 8px;border-radius:3px;z-index:11;';
+                    pageLabel.textContent = '--- 第 ' + (i + 1) + '页开始 ---';
+                    firstContentDiv.appendChild(pageLabel);
+                }
+            }
+        }
+
+        // Fit to screen
+        function fitToScreen() {
+            var containerWidth = docContainer.clientWidth - 40;
+            var scale = Math.min(containerWidth / a4Width, 1.0);
+            currentScale = scale;
+            pagesWrapper.style.transform = 'scale(' + scale + ')';
+        }
+
+        // Event listeners for scaling (Touch)
+        pagesWrapper.addEventListener('touchstart', function(e) {
+            if (e.touches.length === 2) {
+                e.preventDefault();
+                var touch1 = e.touches[0];
+                var touch2 = e.touches[1];
+                initialDistance = Math.hypot(touch2.pageX - touch1.pageX, touch2.pageY - touch1.pageY);
+            }
+        });
+
+        pagesWrapper.addEventListener('touchmove', function(e) {
+            if (e.touches.length === 2 && initialDistance > 0) {
+                e.preventDefault();
+                var touch1 = e.touches[0];
+                var touch2 = e.touches[1];
+                var currentDistance = Math.hypot(touch2.pageX - touch1.pageX, touch2.pageY - touch1.pageY);
+                var scale = currentDistance / initialDistance;
+                var newScale = currentScale * scale;
+                newScale = Math.min(3.0, Math.max(0.3, newScale));
+                currentScale = newScale;
+                pagesWrapper.style.transform = 'scale(' + newScale + ')';
+            }
+        });
+
+        pagesWrapper.addEventListener('touchend', function(e) {
+            if (e.touches.length < 2) {
+                if (pagesWrapper.style.transform) {
+                    var match = pagesWrapper.style.transform.match(/scale\(([^)]+)\)/);
+                    if (match) currentScale = parseFloat(match[1]);
+                }
+                initialDistance = 0;
+            }
+        });
         
         previewModal.appendChild(header);
-        previewModal.appendChild(contentContainer);
+        previewModal.appendChild(docContainer);
         document.body.appendChild(previewModal);
+        
+        // Init layout
+        setTimeout(function() {
+            addPageDividers();
+            fitToScreen();
+        }, 100);
+        window.addEventListener('resize', fitToScreen);
+
+        // Cleanup function
+        function cleanup() {
+            window.removeEventListener('resize', fitToScreen);
+        }
         
         // 绑定事件
         header.querySelector('#closeAiPreviewBtn').onclick = function() {
+            cleanup();
             previewModal.remove();
         };
         
         header.querySelector('#regenerateBtn').onclick = function() {
+            cleanup();
             previewModal.remove();
             showAILayoutModifyDialog();
         };
@@ -349,6 +469,7 @@
                 timestamp: new Date()
             });
             
+            cleanup();
             // 直接进入打印流程
             previewModal.remove();
             printAILayout(html);
