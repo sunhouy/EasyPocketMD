@@ -26,6 +26,17 @@
 </div>
 
 ### 部署
+- 本网站通过Github Actions实现自动测试和部署。请在网页目录下添加.env文件存储敏感信息，格式如下。
+```
+DB_HOST=数据库地址
+DB_PORT=数据库端口
+DB_USER=数据库用户名
+DB_PASSWORD=数据库密码
+DB_NAME=数据库名
+ADMIN_USER=管理员用户名
+ADMIN_PASSWORD=管理员密码
+BASE_URL=网站域名，例如https://md.yhsun.cn
+```
 - print文件夹下放置Python后端和打印客户端脚本。print_server.py需要部署在服务器上。通过`python3 start_print_service.py`命令启动服务器脚本。请自行部署ssl证书，并通过反向代理映射到8770端口。
 - 运行打印客户端前需要安装`wkhtmltox`用于html转换为pdf，否则云打印客户端可能无法正确运行。
 
