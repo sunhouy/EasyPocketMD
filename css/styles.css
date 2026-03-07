@@ -1767,3 +1767,53 @@ body.night-mode .editor-container {
     from { opacity: 0; }
     to { opacity: 1; }
 }
+
+/* Radio Group 样式 */
+.radio-group {
+    display: flex;
+    gap: 15px;
+    margin-top: 5px;
+}
+
+.radio-group label {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.radio-group input {
+    margin-right: 5px;
+    cursor: pointer;
+}
+
+/* Checkbox Group 样式 */
+.checkbox-group {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    margin-top: 5px;
+}
+
+.checkbox-group label {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    font-size: 14px;
+    padding: 5px;
+    border-radius: 4px;
+    transition: background 0.2s;
+}
+
+.checkbox-group label:hover {
+    background: #f0f0f0;
+}
+
+body.night-mode .checkbox-group label:hover {
+    background: #3d3d3d;
+}
+
+.checkbox-group input {
+    margin-right: 8px;
+    cursor: pointer;
+}
