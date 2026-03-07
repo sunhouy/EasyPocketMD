@@ -89,6 +89,13 @@ document.addEventListener('DOMContentLoaded', function() {
         cache: { enable: true, id: 'vditor-mobile-optimized' },
         outline: { enable: false },
         hint: { emoji: {} },
+        preview: {
+            math: {
+                inlineDigit: true,
+                engine: 'KaTeX',
+                macros: {},
+            }
+        },
         upload: {
             accept: 'image/*,.jpg,.jpeg,.png,.gif,.bmp,.webp,.svg,.mp4,.mp3,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.rar,.7z',
             handler: function(files) { return window.uploadFiles(files, true); }

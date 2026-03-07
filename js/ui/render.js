@@ -128,7 +128,8 @@
                         katex.render(latex, tempDiv, {
                             throwOnError: false,
                             displayMode: displayMode,
-                            output: 'html'
+                            output: 'html',
+                            strict: 'ignore'
                         });
                     } catch (katexError) {
                         console.error('KaTeX渲染失败:', katexError);

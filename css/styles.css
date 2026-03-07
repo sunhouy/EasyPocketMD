@@ -691,6 +691,11 @@ body.night-mode .folder-name {
 /* 由于使用了 ul padding-left，这里不需要再为 item 单独设置 padding */
 /* 移除旧的 .folder-content 样式 */
 
+/* jstree text style */
+.jstree-default .jstree-anchor {
+    font-weight: normal !important;
+}
+
 /* 文件项样式调整 */
 .file-item {
     padding: 8px 12px;
@@ -1839,22 +1844,80 @@ body.night-mode .jstree-default .jstree-wholerow-hovered {
 body.night-mode .jstree-default .jstree-wholerow-clicked {
     background: #1e3a5f !important;
 }
-/* Context menu dark mode */
+/* Context menu adjustment */
+.vakata-context {
+    z-index: 10000 !important;
+    position: fixed !important;
+    border-radius: 8px !important;
+    padding: 5px 0 !important;
+    border: 1px solid #eee !important;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.1) !important;
+}
+
+.vakata-context ul {
+    background: #fff !important;
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 8px !important;
+}
+
+.vakata-context li {
+    background: none !important;
+}
+
+.vakata-context li > a {
+    padding: 0 15px !important;
+    line-height: 36px !important;
+    font-family: inherit !important;
+    font-size: 14px !important;
+    text-shadow: none !important;
+    color: #333 !important;
+    border: none !important;
+}
+
+.vakata-context li > a:hover, .vakata-context li > a.jstree-hovered {
+    background: #f0f0f0 !important;
+    color: #333 !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+}
+
+/* 隐藏 jstree 默认的 contextmenu 分隔符 */
+.vakata-context li > a .vakata-contextmenu-sep {
+    display: none !important;
+}
+
+.vakata-context li > a i {
+    font-size: 14px !important;
+    color: #666 !important;
+    margin-right: 8px !important;
+    width: 16px !important;
+    text-align: center !important;
+    display: inline-block !important;
+}
+
+/* Dark mode for context menu */
 body.night-mode .vakata-context {
     background: #2d2d2d !important;
     border-color: #444 !important;
-    color: #eee !important;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.5) !important;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.3) !important;
 }
+
+body.night-mode .vakata-context ul {
+    background: #2d2d2d !important;
+}
+
 body.night-mode .vakata-context li > a {
     color: #eee !important;
+    background: transparent !important;
 }
+
 body.night-mode .vakata-context li > a:hover {
     background: #3d3d3d !important;
     color: #fff !important;
 }
-body.night-mode .vakata-context .vakata-context-separator a, 
-body.night-mode .vakata-context .vakata-context-separator {
-    border-color: #444 !important;
+
+body.night-mode .vakata-context li > a i {
+    color: #aaa !important;
 }
 

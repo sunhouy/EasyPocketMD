@@ -84,12 +84,18 @@
         const folderSet = new Set(['']); // 根目录
         const files = g('files');
         files.forEach(f => {
-            let path = f.name;
-            while (path) {
-                folderSet.add(path);
-                const parent = getParentPath(path);
-                if (!parent || parent === path) break;
-                path = parent;
+            if (f.type === 'folder') {
+                folderSet.add(f.name);
+            }
+            // 对于文件，提取其所有的父路径作为文件夹
+            if (f.type === 'file') {
+                let path = f.name;
+                while (path.includes('/')) {
+                    const parent = getParentPath(path);
+                    if (!parent) break;
+                    folderSet.add(parent);
+                    path = parent;
+                }
             }
         });
         return Array.from(folderSet).sort((a, b) => a.localeCompare(b));
@@ -432,13 +438,10 @@
         }
 
         if (window.$.jstree.reference('#fileList')) {
-            const tree = window.$.jstree.reference('#fileList');
-            tree.settings.core.data = treeData;
-            tree.refresh();
-            return;
+            window.$.jstree.reference('#fileList').destroy();
         }
 
-        window.$('#fileList').jstree({
+        const tree = window.$('#fileList').jstree({
             'core': {
                 'check_callback': true, // 允许所有操作
                 'data': treeData,
@@ -452,9 +455,8 @@
             'types': {
                 'default': { 'icon': 'fas fa-folder' },
                 'file': { 'icon': 'fas fa-file' },
-                'folder': { 'icon': 'fas fa-folder' }
-            },
-            'plugins': ['types', 'dnd', 'contextmenu', 'wholerow', 'state', 'unique'],
+                'folder': { 'icon': 'fas fa-folder' } },
+            'plugins': ['types', 'contextmenu'],
             'contextmenu': {
                 'items': function(node) {
                     const items = {
@@ -463,8 +465,47 @@
                             'action': function(data) {
                                 const inst = window.$.jstree.reference(data.reference);
                                 const obj = inst.get_node(data.reference);
-                                inst.edit(obj);
+                                
+                                // 对于文件夹，如果是虚拟文件夹，则不允许重命名
+                                if (obj.data.isVirtual) {
+                                    alert('虚拟文件夹不可重命名，请先创建为实体文件夹');
+                                    return;
+                                }
+
+                                if (typeof renameFile === 'function') {
+                                    renameFile(obj.id);
+                                } else if (typeof global.renameFile === 'function') {
+                                    global.renameFile(obj.id);
+                                } else {
+                                    console.error('renameFile function not found');
+                                    alert('重命名功能不可用');
+                                }
                             }
+                        },
+                        'move': {
+                            'label': '移动',
+                            'action': function(data) {
+                                const inst = window.$.jstree.reference(data.reference);
+                                const obj = inst.get_node(data.reference);
+                                
+                                // 对于文件夹，如果是虚拟文件夹，则不允许移动
+                                if (obj.data.isVirtual) {
+                                    alert('虚拟文件夹不可移动，请先创建为实体文件夹');
+                                    return;
+                                }
+                                
+                                global.moveFile(obj.id);
+                            }
+                        },
+                        'history': {
+                             'label': '历史版本',
+                             'action': function(data) {
+                                 const inst = window.$.jstree.reference(data.reference);
+                                 const obj = inst.get_node(data.reference);
+                                 if (obj.data.type === 'file') {
+                                     global.showHistoryModal(obj.id, obj.data.path);
+                                 }
+                             }
                         },
                         'delete': {
                             'label': '删除',
@@ -477,16 +518,6 @@
                                 }
                                 global.deleteFile(obj.id);
                             }
-                        },
-                        'history': {
-                             'label': '历史版本',
-                             'action': function(data) {
-                                 const inst = window.$.jstree.reference(data.reference);
-                                 const obj = inst.get_node(data.reference);
-                                 if (obj.data.type === 'file') {
-                                     global.showHistoryModal(obj.id, obj.data.path);
-                                 }
-                             }
                         },
                         'new_file': {
                             'label': '新建文件',
@@ -547,12 +578,26 @@
              }
              renameFileInternal(data.node.id, data.text);
         })
-        .on('move_node.jstree', function (e, data) {
-             const node = data.node;
-             const parent = data.parent;
-             const parentNode = data.instance.get_node(parent);
-             const targetPath = parent === '#' ? '' : parentNode.data.path;
-             moveFileTo(node.id, targetPath);
+        .on('ready.jstree', function() {
+            // 移动端长按支持
+            let timer;
+            const touchDuration = 600; 
+
+            window.$('#fileList').on('touchstart', '.jstree-anchor', function(e) {
+                timer = setTimeout(function() {
+                    const node = window.$('#fileList').jstree(true).get_node(e.currentTarget);
+                    const touch = e.originalEvent.touches[0];
+                    window.$('#fileList').jstree(true).show_contextmenu(node, touch.pageX, touch.pageY);
+                }, touchDuration);
+            }).on('touchend touchmove', '.jstree-anchor', function() {
+                if (timer) clearTimeout(timer);
+            });
+            
+            // 禁用默认右键菜单，确保 jstree 菜单显示
+            window.$('#fileList').on('contextmenu', '.jstree-anchor', function(e) {
+                e.preventDefault();
+                return false;
+            });
         });
     }
 
@@ -741,25 +786,27 @@
         const folders = getAllFolderPaths();
 
         // 创建自定义模态框进行选择
+        const nightMode = document.body.classList.contains('night-mode');
         const modal = document.createElement('div');
         modal.className = 'modal-overlay';
         modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:10005;';
         
         const content = document.createElement('div');
         content.className = 'modal';
-        content.style.cssText = 'width:90%;max-width:400px;max-height:80vh;display:flex;flex-direction:column;padding:20px;background:white;border-radius:8px;';
+        const bgColor = nightMode ? '#2d2d2d' : 'white';
+        const textColor = nightMode ? '#eee' : '#333';
+        const borderColor = nightMode ? '#444' : '#eee';
+        const itemHoverBg = nightMode ? '#3d3d3d' : '#f0f0f0';
+        const itemNormalBg = nightMode ? '#2d2d2d' : 'white';
+        
+        content.style.cssText = `width:90%;max-width:400px;max-height:80vh;display:flex;flex-direction:column;padding:20px;background:${bgColor};color:${textColor};border-radius:8px;`;
         
         const header = document.createElement('h3');
         header.textContent = '移动到...';
         header.style.margin = '0 0 15px 0';
         
         const list = document.createElement('div');
-        list.style.cssText = 'flex:1;overflow-y:auto;border:1px solid #eee;border-radius:4px;margin-bottom:15px;';
-        
-        // 过滤逻辑：只能移动到文件夹，不能移动到文件
-        // getAllFolderPaths 已经只返回文件夹路径了，所以这里是安全的
-        // 但是我们需要确保不显示"移动到文件"的选项（尽管 getAllFolderPaths 应该已经处理了）
-        // 另外，如果是移动文件夹，需要排除自己及子目录（moveFileTo中已处理，但界面上最好也置灰）
+        list.style.cssText = `flex:1;overflow-y:auto;border:1px solid ${borderColor};border-radius:4px;margin-bottom:15px;`;
         
         const isFolder = item.type === 'folder';
         const currentPath = item.name;
@@ -769,7 +816,7 @@
             const isSelfOrChild = isFolder && (f === currentPath || f.startsWith(currentPath + '/'));
             
             const div = document.createElement('div');
-            div.style.cssText = 'padding:10px;cursor:pointer;border-bottom:1px solid #f5f5f5;display:flex;align-items:center;';
+            div.style.cssText = `padding:10px;cursor:pointer;border-bottom:1px solid ${borderColor};display:flex;align-items:center;background:${itemNormalBg};`;
             if (isSelfOrChild) {
                 div.style.color = '#ccc';
                 div.style.cursor = 'not-allowed';
@@ -778,8 +825,8 @@
             div.innerHTML = `<i class="fas fa-folder" style="color:${isSelfOrChild ? '#eee' : '#f7b731'};margin-right:10px;"></i> ${f === '' ? '根目录' : f}`;
             
             if (!isSelfOrChild) {
-                div.onmouseover = () => div.style.background = '#f0f0f0';
-                div.onmouseout = () => div.style.background = 'white';
+                div.onmouseover = () => div.style.background = itemHoverBg;
+                div.onmouseout = () => div.style.background = itemNormalBg;
                 div.onclick = () => {
                     moveFileTo(id, f);
                     modal.remove();
@@ -930,7 +977,7 @@
         }
         global.currentFileId = fileId;
         if (g('vditor')) g('vditor').setValue(file.content);
-        loadFiles();
+        expandActiveFile();
         global.startAutoSave();
         global.showMessage('已打开文件: ' + file.name);
     }
