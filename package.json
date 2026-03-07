@@ -7,6 +7,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
+    "test": "jest",
+    "check-deploy": "node scripts/check-deploy.js",
     "start": "node api/server.js"
   },
   "repository": {
@@ -33,6 +35,8 @@
     "vditor": "^3.11.2"
   },
   "devDependencies": {
+    "jest": "^30.2.0",
+    "supertest": "^7.2.2",
     "vite": "^7.3.1",
     "vite-plugin-static-copy": "^3.2.0"
   }
