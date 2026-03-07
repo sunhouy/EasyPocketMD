@@ -23,8 +23,30 @@ app.use('/fa', express.static(path.join(__dirname, '../node_modules/@fortawesome
 
 // Serve frontend static files
 // If dist folder exists (production build), serve it
-const distPath = path.join(__dirname, '../dist');
-if (fs.existsSync(distPath)) {
+console.log('Server starting...');
+console.log('Current directory (__dirname):', __dirname);
+console.log('Current working directory (process.cwd()):', process.cwd());
+
+// Try to find the dist folder in multiple locations
+const potentialDistPaths = [
+    path.join(__dirname, '../dist'),
+    path.join(process.cwd(), 'dist'),
+    path.join(__dirname, 'dist'),
+    '/www/wwwroot/js/dist'
+];
+
+let distPath = null;
+for (const p of potentialDistPaths) {
+    const indexHtmlPath = path.join(p, 'index.html');
+    console.log(`Checking for frontend build at: ${p}`);
+    if (fs.existsSync(p) && fs.existsSync(indexHtmlPath)) {
+        console.log(`Found valid frontend build at: ${p}`);
+        distPath = p;
+        break;
+    }
+}
+
+if (distPath) {
     app.use(express.static(distPath));
     // SPA catch-all handler: for any request that doesn't match an API route or static file, send index.html
     app.get('*', (req, res, next) => {
@@ -49,7 +71,14 @@ if (fs.existsSync(distPath)) {
         if (fs.existsSync(indexPath)) {
             res.sendFile(indexPath);
         } else {
-            res.status(404).send('Frontend build not found (dist folder missing) and index.html not found in root. Please run "npm run build".');
+            console.error('CRITICAL ERROR: Could not find frontend build (dist/index.html).');
+            console.error('Searched in:', potentialDistPaths);
+            res.status(404).send(`
+                <h1>404 Not Found</h1>
+                <p>Frontend build files not found on server.</p>
+                <p>Please check server logs for searched paths.</p>
+                <p>Searched paths: ${potentialDistPaths.join(', ')}</p>
+            `);
         }
     });
 }
