@@ -2,6 +2,10 @@ import 'vditor/dist/index.css';
 import '@fortawesome/fontawesome-free/css/all.min.css';
 import './css/styles.css';
 
+import './js/jquery-global.js';
+import 'jstree/dist/themes/default/style.min.css';
+import 'jstree';
+
 import Vditor from 'vditor';
 
 window.Vditor = Vditor;

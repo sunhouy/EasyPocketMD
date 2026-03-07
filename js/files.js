@@ -110,14 +110,22 @@
                 let serverFiles = result.data.files.map(f => {
                     let type = 'file';
                     let content = f.content;
-                    // 检查是否为文件夹标记
-                    if (content === '{"meta":"folder"}' || content === '{"type":"folder"}') {
+                    let name = f.name.startsWith('/') ? f.name.substring(1) : f.name;
+
+                    // 检查是否为文件夹：以 / 结尾，或者内容包含特定标记
+                    if (name.endsWith('/') || content === '{"meta":"folder"}' || content === '{"type":"folder"}') {
                         type = 'folder';
-                        content = '';
+                        if (content === '{"meta":"folder"}' || content === '{"type":"folder"}') {
+                            content = '';
+                        }
+                        if (name.endsWith('/')) {
+                            name = name.substring(0, name.length - 1);
+                        }
                     }
+                    
                     return {
                         ...f,
-                        name: f.name.startsWith('/') ? f.name.substring(1) : f.name,
+                        name: name,
                         type: type,
                         content: content
                     };
@@ -324,239 +332,317 @@
         if (firstFile) openFile(firstFile.id);
     }
 
-    // ---------- 树形渲染及交互 ----------
-    function buildTree(files) {
-        // 创建路径到条目的映射
-        const pathMap = {};
-        files.forEach(f => { pathMap[f.name] = f; });
+    // ---------- jstree 渲染及交互 ----------
 
-        // 根节点
-        const root = { name: '', basename: '/', children: [], type: 'folder', id: null };
-        const map = { '': root };
-
-        // 按路径长度排序，确保父路径先处理
-        const sorted = [...files].sort((a, b) => a.name.localeCompare(b.name));
-        sorted.forEach(f => {
-            const parts = f.name.split('/').filter(p => p);
-            let currentPath = '';
-            let parent = root;
-            for (let i = 0; i < parts.length; i++) {
-                const part = parts[i];
-                const isLast = i === parts.length - 1;
-                const fullPath = currentPath ? currentPath + '/' + part : part;
-
-                if (!map[fullPath]) {
-                    // 查找该路径是否有对应的条目
-                    const entry = pathMap[fullPath];
-                    const node = {
-                    name: fullPath,
-                    basename: part,
-                    type: 'file', 
-                    id: null,
-                    children: []
-                };
-
-                // 优先使用 pathMap 中的条目信息
-                if (entry) {
-                    node.id = entry.id;
-                    node.type = entry.type;
-                } else if (isLast) {
-                    node.id = f.id;
-                    node.type = f.type;
-                } else {
-                    node.type = 'folder';
-                }
-                
-                // 强制：只要是路径中间部分，必须是文件夹
-                if (i < parts.length - 1) {
-                    node.type = 'folder';
-                }
-
-                // 强制：如果 entry 是 folder，那它就是 folder (处理空文件夹的情况)
-                if (entry && entry.type === 'folder') {
-                    node.type = 'folder';
-                }
-                    map[fullPath] = node;
-                    parent.children.push(node);
-                }
-                parent = map[fullPath];
-                currentPath = fullPath;
-            }
-        });
-        return root.children;
-    }
-
-    function renderTree(nodes, level) {
-        let html = '';
-        nodes.forEach(node => {
-            const isFolder = node.type === 'folder' || node.children.length > 0;
-            const icon = isFolder ? '<i class="fas fa-folder"></i>' : '<i class="fas fa-file"></i>';
-            const hasChildren = node.children.length > 0;
-            const toggleIcon = ''; // 移除箭头图标
-            const syncIcon = node.type === 'file' && node.isSynced === false ?
-                '<i class="fas fa-exclamation-circle" style="color: #ff9800; margin-right:5px;" title="未同步到服务器"></i>' : '';
-            let actions = '';
-            if (node.id) {
-                if (node.type === 'file') {
-                    actions = `                                                
-                         <button class="file-action-btn history-file"           
- data-id="${node.id}" data-name="${node.name}" title="历史版本"><i class="fas   
- fa-history"></i></button>                                                      
-                         <button class="file-action-btn rename-file"            
- data-id="${node.id}" title="重命名"><i class="fas fa-edit"></i></button>       
-                         <button class="file-action-btn move-file"              
- data-id="${node.id}" title="移动"><i class="fas fa-arrows-alt"></i></button>   
-                         <button class="file-action-btn delete-file"            
- data-id="${node.id}" title="删除"><i class="fas fa-trash"></i></button>        
-                     `;
-                } else {
-                    actions = `                                                
-                         <button class="file-action-btn rename-file"            
- data-id="${node.id}" title="重命名"><i class="fas fa-edit"></i></button>       
-                         <button class="file-action-btn move-file"              
- data-id="${node.id}" title="移动"><i class="fas fa-arrows-alt"></i></button>   
-                         <button class="file-action-btn delete-file"            
- data-id="${node.id}" title="删除"><i class="fas fa-trash"></i></button>        
-                     `;
-                }
-            } else if (node.type === 'folder') {
-                // 对于虚拟文件夹，如果有对应的真实文件夹路径，我们也可以尝试操作
-                // 但目前后端只支持通过ID操作，所以这里先不显示按钮，或者需要前端生成临时ID
-                // 修正：如果文件夹没有ID（虚拟文件夹），但它是路径的一部分，我们仍然可以操作它
-                // 但需要修改 rename/move/delete 函数支持 path 参数
-                // 暂时方案：只对有ID的文件夹显示按钮。用户创建的空文件夹应该有ID。
-                // 如果是自动生成的父级文件夹（serverFiles逻辑中），可能没有ID。
-                // 检查 serverFiles 逻辑，确保生成的文件夹有ID
-            }
-
-            // 修正空文件夹显示为文件的问题：
-            // 在 buildTree 中，如果一个节点是文件夹类型，或者有子节点，它就是文件夹
-            // isFolder 变量已经处理了这个逻辑：const isFolder = node.type === 'folder' || node.children.length > 0;
-            // 但是如果 node.type 是 'file' 且没有子节点，它就会显示为文件
-            // 需要确保创建空文件夹时，type 是 'folder'
-
-            html += `<li class="file-item ${node.id === g('currentFileId') ?
-                'active' : ''}" data-id="${node.id || ''}" data-type="${node.type}" data-path="${node.name}" draggable="true"           
- style="list-style:none;">`;
-
-            // 移除原来用 level*20 计算 padding-left 的做法，仅保留微小间距
-            html += `<div class="file-header" style="display:flex;             
- align-items:center; padding: 6px 4px;">`;
-            html += toggleIcon;
-            // 只要是 folder 类型，无论有无子节点，都添加 folder-name 类（蓝色）
-            const nameClass = node.type === 'folder' ? 'file-name folder-name' : 'file-name';
-            html += `<span class="${nameClass}" title="${node.name}"              
- style="flex:1; margin-left:5px; white-space:nowrap; overflow:hidden;           
- text-overflow:ellipsis;">${icon} ${syncIcon} ${node.basename}</span>`;
-            // 始终显示操作按钮容器，通过CSS控制显隐
-            html += `<div class="file-actions" style="opacity: 1;">${actions}</div>`;
-            html += `</div>`;
-
-            if (hasChildren) {
-                // 子级向下展开，直接在这里加左边框/左边距，而不是让每行 header 无限向右偏移
-                html += `<ul class="file-sublist" style="display:none; list-style:none; padding-left: 0; margin: 0; border-left: none !important;">${renderTree(node.children, level+1)}</ul>`;
-            }
-            html += `</li>`;
-        });
-        return html;
-    }
-
-    function expandActiveFile() {
-        const currentFileId = g('currentFileId');
-        if (!currentFileId) return;
+    function getJsTreeData() {
+        const files = g('files');
+        const nodes = [];
+        const pathMap = {}; // path -> id
+        const existingPaths = new Set();
         
-        // Find the file item in the DOM
-        const fileItem = document.querySelector(`.file-item[data-id="${currentFileId}"]`);
-        if (!fileItem) return;
-
-        // Traverse up to find all parent file-sublist lists
-        let parent = fileItem.parentElement;
-        while (parent && (parent.classList.contains('file-sublist') || parent.tagName === 'LI')) {
-            if (parent.classList.contains('file-sublist')) {
-                parent.style.display = 'block';
-            }
-            parent = parent.parentElement;
-        }
-    }
-
-    function toggleFolder(item) {
-        const sublist = item.querySelector(':scope > .file-sublist'); // 只找直接子级
-        if (!sublist) return;
-        const isHidden = sublist.style.display === 'none';
-        sublist.style.display = isHidden ? 'block' : 'none'; // 使用 block 正常向下撑开
-
-        const icon = item.querySelector(':scope > .file-header .folder-toggle svg');
-        if (icon) {
-            icon.classList.toggle('fa-chevron-right', !isHidden);
-            icon.classList.toggle('fa-chevron-down', isHidden);
-        }
-    }
-
-    // ---------- 拖拽相关函数 ----------
-    let draggedItem = null;
-
-    function handleDragStart(e) {
-        const item = e.target.closest('.file-item');
-        if (!item) return;
-        
-        draggedItem = item;
-        e.dataTransfer.effectAllowed = 'move';
-        e.dataTransfer.setData('text/plain', item.dataset.id);
-        item.classList.add('dragging');
-    }
-
-    function handleDragOver(e) {
-        e.preventDefault();
-        e.dataTransfer.dropEffect = 'move';
-        
-        const target = e.target.closest('.file-item');
-        
-        // 清理之前的高亮
-        document.querySelectorAll('.file-item.drag-over').forEach(el => {
-            if (el !== target) el.classList.remove('drag-over');
+        // 1. 映射所有真实文件/文件夹的ID
+        files.forEach(f => {
+            pathMap[f.name] = f.id;
+            existingPaths.add(f.name);
         });
         
-        if (target && target !== draggedItem) {
-            // 如果目标是文件夹
-            if (target.dataset.type === 'folder') {
-                target.classList.add('drag-over');
+        // 2. 收集所有需要创建节点的路径（包括中间路径）
+        const allPaths = new Set();
+        files.forEach(f => {
+            allPaths.add(f.name);
+            let p = f.name;
+            while(p.includes('/')) {
+                p = getParentPath(p);
+                if (p) allPaths.add(p);
             }
-        }
-    }
-
-    function handleDragLeave(e) {
-        const target = e.target.closest('.file-item');
-        if (target) {
-            target.classList.remove('drag-over');
-        }
-    }
-
-    function handleDrop(e) {
-        e.preventDefault();
+        });
         
-        if (draggedItem) {
-            draggedItem.classList.remove('dragging');
-            draggedItem = null;
-        }
-        document.querySelectorAll('.file-item.drag-over').forEach(el => el.classList.remove('drag-over'));
-
-        const sourceId = e.dataTransfer.getData('text/plain');
-        if (!sourceId) return;
-
-        const targetItem = e.target.closest('.file-item');
-        let targetPath = '';
-
-        if (targetItem) {
-            if (targetItem.dataset.type === 'folder') {
-                targetPath = targetItem.dataset.path;
+        // 3. 为虚拟文件夹生成临时ID
+        allPaths.forEach(p => {
+            if (!pathMap[p]) {
+                // 使用路径哈希生成相对稳定的ID
+                let hash = 0;
+                for (let i = 0; i < p.length; i++) {
+                    hash = ((hash << 5) - hash) + p.charCodeAt(i);
+                    hash |= 0; 
+                }
+                pathMap[p] = 'v_folder_' + Math.abs(hash);
+            }
+        });
+        
+        // 4. 生成节点数据
+        const sortedPaths = Array.from(allPaths).sort();
+        
+        sortedPaths.forEach(p => {
+            const isReal = files.find(f => f.name === p);
+            const parentPath = getParentPath(p);
+            let parentId = parentPath ? pathMap[parentPath] : '#';
+            if (parentPath && !parentId) {
+                console.warn('Parent not found for path:', p, 'Parent path:', parentPath);
+                parentId = '#'; // Fallback to root to make it visible
+            }
+            const text = getBasename(p);
+            
+            if (isReal) {
+                nodes.push({
+                    id: isReal.id,
+                    parent: parentId,
+                    text: text,
+                    type: isReal.type,
+                    state: { 
+                        opened: false, // 由 state 插件管理
+                        selected: isReal.id === g('currentFileId')
+                    },
+                    data: { path: p, type: isReal.type, isVirtual: false }
+                });
             } else {
-                return; // 不允许拖到文件上
+                nodes.push({
+                    id: pathMap[p],
+                    parent: parentId,
+                    text: text,
+                    type: 'folder',
+                    state: { opened: false },
+                    data: { path: p, type: 'folder', isVirtual: true }
+                });
             }
-        } else {
-            targetPath = ''; // 根目录
+        });
+        
+        return nodes;
+    }
+
+    function initFileTree() {
+        if (!window.$ || !window.$.fn.jstree) {
+            console.error('jQuery or jstree not loaded', window.$, window.$.fn.jstree);
+            return;
         }
 
-        moveFileTo(sourceId, targetPath);
+        // 确保 jstree 插件已注册
+        if (!window.$.jstree) {
+            console.warn('jstree object missing, attempting to re-init');
+            // 这里可能无法直接重新加载，只能依赖全局加载顺序
+        }
+
+        const treeData = getJsTreeData();
+        console.log('Initializing file tree with data:', treeData);
+
+        if (treeData.length === 0) {
+            console.warn('File tree data is empty');
+            document.getElementById('fileList').innerHTML = '<div style="padding:10px;color:#999;text-align:center;">暂无文件</div>';
+            return;
+        }
+
+        if (window.$.jstree.reference('#fileList')) {
+            const tree = window.$.jstree.reference('#fileList');
+            tree.settings.core.data = treeData;
+            tree.refresh();
+            return;
+        }
+
+        window.$('#fileList').jstree({
+            'core': {
+                'check_callback': true, // 允许所有操作
+                'data': treeData,
+                'themes': {
+                    'name': 'default',
+                    'responsive': true,
+                    'dots': false,
+                    'icons': true
+                }
+            },
+            'types': {
+                'default': { 'icon': 'fas fa-folder' },
+                'file': { 'icon': 'fas fa-file' },
+                'folder': { 'icon': 'fas fa-folder' }
+            },
+            'plugins': ['types', 'dnd', 'contextmenu', 'wholerow', 'state', 'unique'],
+            'contextmenu': {
+                'items': function(node) {
+                    const items = {
+                        'rename': {
+                            'label': '重命名',
+                            'action': function(data) {
+                                const inst = window.$.jstree.reference(data.reference);
+                                const obj = inst.get_node(data.reference);
+                                inst.edit(obj);
+                            }
+                        },
+                        'delete': {
+                            'label': '删除',
+                            'action': function(data) {
+                                const inst = window.$.jstree.reference(data.reference);
+                                const obj = inst.get_node(data.reference);
+                                if (obj.data.isVirtual) {
+                                    alert('不能直接删除虚拟文件夹，请删除其子内容');
+                                    return;
+                                }
+                                global.deleteFile(obj.id);
+                            }
+                        },
+                        'history': {
+                             'label': '历史版本',
+                             'action': function(data) {
+                                 const inst = window.$.jstree.reference(data.reference);
+                                 const obj = inst.get_node(data.reference);
+                                 if (obj.data.type === 'file') {
+                                     global.showHistoryModal(obj.id, obj.data.path);
+                                 }
+                             }
+                        },
+                        'new_file': {
+                            'label': '新建文件',
+                            'separator_before': true,
+                            'action': function(data) {
+                                const inst = window.$.jstree.reference(data.reference);
+                                const obj = inst.get_node(data.reference);
+                                const path = obj.data.path;
+                                const name = prompt('请输入文件名', '新文件');
+                                if (name) {
+                                    const newPath = path + '/' + name;
+                                    createFileAtPath(newPath);
+                                }
+                            }
+                        },
+                        'new_folder': {
+                            'label': '新建文件夹',
+                            'action': function(data) {
+                                const inst = window.$.jstree.reference(data.reference);
+                                const obj = inst.get_node(data.reference);
+                                const path = obj.data.path;
+                                const name = prompt('请输入文件夹名', '新文件夹');
+                                if (name) {
+                                    const newPath = path + '/' + name;
+                                    createFolderAtPath(newPath);
+                                }
+                            }
+                        }
+                    };
+                    
+                    if (node.type === 'file') {
+                        delete items.new_file;
+                        delete items.new_folder;
+                    } else {
+                        delete items.history;
+                    }
+                    
+                    return items;
+                }
+            }
+        })
+        .on('select_node.jstree', function (e, data) {
+            if (data.node.type === 'file') {
+                if (g('currentFileId') !== data.node.id) {
+                    if (g('currentFileId')) global.saveCurrentFile(true);
+                    openFile(data.node.id);
+                }
+            } else {
+                data.instance.toggle_node(data.node);
+            }
+        })
+        .on('rename_node.jstree', function (e, data) {
+             if (data.text === data.old) return;
+             if (data.node.data.isVirtual) {
+                 alert('无法重命名虚拟文件夹，请先创建实文件夹');
+                 data.instance.refresh(); 
+                 return;
+             }
+             renameFileInternal(data.node.id, data.text);
+        })
+        .on('move_node.jstree', function (e, data) {
+             const node = data.node;
+             const parent = data.parent;
+             const parentNode = data.instance.get_node(parent);
+             const targetPath = parent === '#' ? '' : parentNode.data.path;
+             moveFileTo(node.id, targetPath);
+        });
+    }
+
+    function createFileAtPath(path) {
+        path = normalizePath(path);
+        ensureParentFolders(path);
+        
+        const files = g('files');
+        if (files.some(f => f.name === path && f.type === 'file')) {
+            alert('已存在同名文件');
+            return;
+        }
+
+        const newFile = {
+            id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+            name: path,
+            type: 'file',
+            content: '# ' + getBasename(path) + '\n\n',
+            lastModified: Date.now(),
+            isSynced: false
+        };
+        files.push(newFile);
+        localStorage.setItem('vditor_files', JSON.stringify(files));
+        openFile(newFile.id);
+        loadFiles();
+        g('lastSyncedContent')[newFile.id] = newFile.content;
+        g('unsavedChanges')[newFile.id] = false;
+        if (g('currentUser')) global.syncFileToServer(newFile.id);
+    }
+    
+    function createFolderAtPath(path) {
+        path = normalizePath(path);
+        ensureParentFolders(path);
+        const files = g('files');
+        if (files.some(f => f.name === path)) {
+            alert('该路径已存在');
+            return;
+        }
+        const newFolder = {
+            id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+            name: path,
+            type: 'folder',
+            content: '',
+            lastModified: Date.now(),
+            isSynced: false
+        };
+        files.push(newFolder);
+        localStorage.setItem('vditor_files', JSON.stringify(files));
+        loadFiles();
+        if (g('currentUser')) global.syncFileToServer(newFolder.id);
+    }
+
+    function renameFileInternal(id, newBasename) {
+        const files = g('files');
+        const item = files.find(f => f.id === id);
+        if (!item) return;
+
+        const isFolder = item.type === 'folder';
+        const oldName = item.name;
+        const parentPath = getParentPath(oldName);
+        
+        if (isNameExistsInParent(newBasename.trim(), parentPath, id)) {
+            alert('该目录下已存在同名文件或文件夹');
+            loadFiles(); 
+            return;
+        }
+
+        const newName = parentPath ? parentPath + '/' + newBasename.trim() : newBasename.trim();
+
+        if (isFolder) {
+            renameFolderAndChildren(oldName, newName);
+        } else {
+            item.name = newName;
+        }
+
+        item.lastModified = Date.now();
+        item.isSynced = false;
+        localStorage.setItem('vditor_files', JSON.stringify(files));
+        loadFiles();
+        
+        if (g('currentUser')) {
+            if (isFolder) {
+                global.deleteFileFromServer(oldName + '/').catch(e => {});
+                global.syncFileToServer(id);
+                const affectedFiles = files.filter(f => f.type === 'file' && (f.name.startsWith(newName + '/') || f.name === newName));
+                affectedFiles.forEach(f => global.syncFileToServer(f.id));
+            } else {
+                global.deleteFileFromServer(oldName).then(() => global.syncFileToServer(id));
+            }
+        }
     }
 
     function moveFileTo(id, targetPath) {
@@ -573,12 +659,14 @@
         if (item.type === 'folder') {
             if (newName === oldName || newName.startsWith(oldName + '/')) {
                 alert('不能将文件夹移动到自身或其子目录中');
+                loadFiles(); 
                 return;
             }
         }
 
         if (files.some(f => f.name === newName && f.id !== id)) {
             alert('目标位置已存在同名项');
+            loadFiles(); 
             return;
         }
 
@@ -597,6 +685,8 @@
         
         if (g('currentUser')) {
              if (item.type === 'folder') {
+                global.deleteFileFromServer(oldName + '/').catch(e => {});
+                global.syncFileToServer(id);
                 const affectedFiles = files.filter(f => f.type === 'file' &&
                     (f.name.startsWith(newName + '/') || f.name === newName));
                 affectedFiles.forEach(f => {
@@ -611,64 +701,34 @@
         }
     }
 
-    function loadFiles() {
-        const fileList = document.getElementById('fileList');
-        if (!fileList) return;
-        const files = g('files');
+    function expandActiveFile() {
         const currentFileId = g('currentFileId');
-
-        const tree = buildTree(files);
-        fileList.innerHTML = renderTree(tree, 0);
+        if (!currentFileId) return;
         
-        // 自动展开到当前文件
-        expandActiveFile();
+        // 检查 jQuery 和 jstree 是否已加载
+        if (!window.$ || !window.$.jstree) return;
 
-        if (!fileList._treeEventsBound) {
-            fileList._treeEventsBound = true;
-            
-            // 绑定拖拽事件
-            fileList.addEventListener('dragstart', handleDragStart);
-            fileList.addEventListener('dragover', handleDragOver);
-            fileList.addEventListener('dragleave', handleDragLeave);
-            fileList.addEventListener('drop', handleDrop);
-
-            fileList.addEventListener('click', function(e) {
-                const target = e.target.closest('.file-item');
-                if (!target) return;
-
-                const id = target.dataset.id;
-                const type = target.dataset.type;
-
-                // 点击箭头图标
-                if (e.target.closest('.folder-toggle')) {
-                    e.stopImmediatePropagation();
-                    toggleFolder(target);
-                    return;
+        const tree = window.$.jstree.reference('#fileList');
+        if (tree) {
+            const node = tree.get_node(currentFileId);
+            if (node) {
+                // Ensure selection
+                if (!tree.is_selected(node)) {
+                    tree.deselect_all(true);
+                    tree.select_node(node);
                 }
-
-                // 操作按钮点击
-                const btn = e.target.closest('.file-action-btn');
-                if (btn) {
-                    e.stopImmediatePropagation();
-                    if (btn.classList.contains('delete-file') && id) global.deleteFile(id);
-                    else if (btn.classList.contains('rename-file') && id) global.renameFile(id);
-                    else if (btn.classList.contains('move-file') && id) global.moveFile(id);
-                    else if (btn.classList.contains('history-file') && id) {
-                        const name = btn.dataset.name;
-                        if (id) global.showHistoryModal(id, name);
-                    }
-                    return;
+                // Ensure visible (expand parents)
+                if (node.parents) {
+                    node.parents.forEach(function(p) {
+                        tree.open_node(p);
+                    });
                 }
-
-                // 正常点击：文件打开 / 文件夹展开
-                if (type === 'file') {
-                    if (id && g('currentFileId')) global.saveCurrentFile(true);
-                    if (id) openFile(id);
-                } else if (type === 'folder') {
-                    toggleFolder(target);
-                }
-            });
+            }
         }
+    }
+
+    function loadFiles() {
+        initFileTree();
     }
 
     // ---------- 文件操作函数 ----------
@@ -915,7 +975,7 @@
                 fileNamesToDelete.forEach(name => global.deleteFileFromServer(name));
                 // 只有当文件夹本身已同步（即服务器存在记录）时，才发送删除请求
                 if (item.isSynced) {
-                    global.deleteFileFromServer(item.name);
+                    global.deleteFileFromServer(item.name + '/');
                 }
             }
 
@@ -1071,8 +1131,13 @@
         if (!file) return;
         
         let content = '';
+        let filenameToSend = file.name;
+
         if (file.type === 'folder') {
             content = '{"meta":"folder"}';
+            if (!filenameToSend.endsWith('/')) {
+                filenameToSend += '/';
+            }
         } else {
             content = (g('vditor') && file.id === g('currentFileId') ? g('vditor').getValue() : file.content);
         }
@@ -1082,7 +1147,7 @@
             const response = await fetch(api + '/files/save', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (g('currentUser').token || g('currentUser').username) },
-                body: JSON.stringify({ username: g('currentUser').username, filename: file.name, content: content })
+                body: JSON.stringify({ username: g('currentUser').username, filename: filenameToSend, content: content })
             });
             const result = global.parseJsonResponse ? await global.parseJsonResponse(response) : await response.json();
             if (result.code === 200) {
