@@ -12,9 +12,19 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Static files for uploads
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-app.use('/avatars', express.static(path.join(__dirname, 'avatars')));
-app.use('/screenshots', express.static(path.join(__dirname, 'screenshots')));
+// Note: __dirname is api/, so we need to go up one level to root
+const uploadsPath = path.join(__dirname, '../uploads');
+const avatarsPath = path.join(__dirname, '../avatars');
+const screenshotsPath = path.join(__dirname, '../screenshots');
+
+console.log('Serving static files from:');
+console.log('- Uploads:', uploadsPath);
+console.log('- Avatars:', avatarsPath);
+console.log('- Screenshots:', screenshotsPath);
+
+app.use('/uploads', express.static(uploadsPath));
+app.use('/avatars', express.static(avatarsPath));
+app.use('/screenshots', express.static(screenshotsPath));
 
 // Serve static files from node_modules for Vditor
 app.use('/vditor', express.static(path.join(__dirname, '../node_modules/vditor/dist')));
