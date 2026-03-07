@@ -349,7 +349,7 @@
                 });
 
                 // 发送文件到打印服务器
-                var response = await fetch('api/upload.php', {
+                var response = await fetch('api/external/upload', {
                     method: 'POST',
                     body: formData
                 });
@@ -497,7 +497,7 @@
                 });
 
                 // 发送文件到打印服务器
-                var response = await fetch('api/upload.php', {
+                var response = await fetch('api/external/upload', {
                     method: 'POST',
                     body: formData
                 });
@@ -1948,7 +1948,7 @@
                     });
 
                     // 发送文件到打印服务器
-                    var response = await fetch('api/upload.php', {
+                    var response = await fetch('api/external/upload', {
                         method: 'POST',
                         body: formData
                     });
