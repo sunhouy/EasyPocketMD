@@ -105,7 +105,7 @@ jobs:
         
     - name: Build with PyInstaller
       run: |
-        pyinstaller --onefile --windowed --name print_client_${{ matrix.target }} print/print_client.py
+        pyinstaller --onefile --console --name print_client_${{ matrix.target }} print/print_client.py
         
     - name: Upload artifact
       uses: actions/upload-artifact@v4
