@@ -1038,8 +1038,17 @@ function g(name) { return global[name]; }
 
     async function downloadAsPDF(content, settings) {
         var htmlContent = await preparePrintContent(content, settings);
-        // 调用 generatePDF 并提供文件名以触发下载
-        await generatePDF(htmlContent, settings, '文档.pdf');
+        // generatePDF returns a URL now
+        var pdfUrl = await generatePDF(htmlContent, settings, 'document.pdf');
+        
+        // Trigger download
+        var a = document.createElement('a');
+        a.href = pdfUrl;
+        a.download = 'document.pdf';
+        a.target = '_blank';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
     }
 
     async function showPrintPreview(settings) {
@@ -1049,13 +1058,14 @@ function g(name) { return global[name]; }
         // 显示加载状态
         var loadingModal = document.createElement('div');
         loadingModal.className = 'modal-overlay';
-        loadingModal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.9);z-index:10001;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;';
+        // Ensure z-index is higher than any mask used in generatePDF (which uses 20000)
+        loadingModal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.9);z-index:21000;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;';
         loadingModal.innerHTML = '<div style="background:' + (nightMode ? '#2d2d2d' : 'white') + ';color:' + (nightMode ? '#eee' : '#333') + ';border-radius:12px;padding:30px;text-align:center;"><div style="font-size:24px;margin-bottom:15px;"><i class="fas fa-spinner fa-spin"></i></div><div style="font-size:16px;">正在生成PDF预览...</div></div>';
         document.body.appendChild(loadingModal);
 
         try {
             var htmlContent = await preparePrintContent(content, settings);
-            var pdfBlob = await generatePDF(htmlContent, settings);
+            var pdfUrl = await generatePDF(htmlContent, settings);
 
             loadingModal.remove();
 
@@ -1078,7 +1088,7 @@ function g(name) { return global[name]; }
             
             docContainer.appendChild(pagesWrapper);
 
-            await renderPDF(pdfBlob, pagesWrapper);
+            await renderPDF(pdfUrl, pagesWrapper);
 
             var buttonContainer = document.createElement('div');
             buttonContainer.style.cssText = 'display:flex;gap:8px;padding:12px;background:' + (nightMode ? '#2d2d2d' : '#f8f9fa') + ';border-top:1px solid ' + (nightMode ? '#444' : '#eee') + ';justify-content:flex-end;';
@@ -1087,7 +1097,7 @@ function g(name) { return global[name]; }
             printBtn.innerHTML = '<i class="fas fa-print"></i> 打印';
             printBtn.style.cssText = 'padding:8px 16px;background:#4a90e2;color:white;border:none;border-radius:4px;cursor:pointer;font-size:14px;font-weight:bold;';
             printBtn.onclick = function() {
-                sendToPrint(settings, pdfBlob);
+                sendToPrint(settings, pdfUrl);
             };
 
             var pdfBtn = document.createElement('button');
@@ -1095,9 +1105,12 @@ function g(name) { return global[name]; }
             pdfBtn.style.cssText = 'padding:8px 16px;background:#dc3545;color:white;border:none;border-radius:4px;cursor:pointer;font-size:14px;font-weight:bold;';
             pdfBtn.onclick = function() {
                  var a = document.createElement('a');
-                 a.href = URL.createObjectURL(pdfBlob);
+                 a.href = pdfUrl;
                  a.download = '文档.pdf';
+                 a.target = '_blank';
+                 document.body.appendChild(a);
                  a.click();
+                 document.body.removeChild(a);
             };
 
             var cancelBtn = document.createElement('button');
@@ -1131,7 +1144,7 @@ function g(name) { return global[name]; }
         }
     }
 
-    async function sendToPrint(settings, existingPdfBlob) {
+    async function sendToPrint(settings, existingPdfUrl) {
         // 检查用户是否登录
         if (!g('currentUser')) {
             global.showMessage('请先登录后再使用云打印功能');
@@ -1222,36 +1235,16 @@ function g(name) { return global[name]; }
 
         try {
             // 1. 生成PDF (如果未提供)
-            let pdfBlob = existingPdfBlob;
-            if (!pdfBlob) {
+            let pdfUrl = existingPdfUrl;
+            if (!pdfUrl) {
                 var htmlContent = await preparePrintContent(content, settings);
                 if (isCancelled) return;
-                pdfBlob = await generatePDF(htmlContent, settings);
+                pdfUrl = await generatePDF(htmlContent, settings);
             }
             
             if (isCancelled) return;
 
-            // 2. 上传PDF
-            updateStatus('正在上传...', '正在上传PDF文件到服务器...');
-            
-            var formData = new FormData();
-            formData.append('files[]', new File([pdfBlob], 'print_job.pdf', { type: 'application/pdf' }));
-            
-            var uploadRes = await fetch('api/external/upload', {
-                method: 'POST',
-                body: formData
-            });
-            
-            if (isCancelled) return;
-            
-            var uploadResult = await uploadRes.json();
-            if (!uploadResult.success) {
-                throw new Error(uploadResult.message || '上传失败');
-            }
-            
-            var fileUrl = uploadResult.urls[0];
-
-            // 3. 连接 WebSocket
+            // 2. 连接 WebSocket (不再需要上传，因为PDF已经在服务器上)
             updateStatus('连接打印服务器...', '正在建立连接...');
             var wsUrl = 'wss://print.yhsun.cn';
             ws = new WebSocket(wsUrl);
@@ -1269,11 +1262,21 @@ function g(name) { return global[name]; }
                 }
                 updateStatus('连接成功', '正在发送打印任务...');
 
+                // Ensure fileUrl is absolute
+                var fullFileUrl = pdfUrl;
+                if (!fullFileUrl.startsWith('http://') && !fullFileUrl.startsWith('https://')) {
+                    var baseUrl = window.location.origin;
+                    if (!fullFileUrl.startsWith('/')) {
+                        baseUrl += '/' + window.location.pathname.split('/').slice(0, -1).join('/') + '/';
+                    }
+                    fullFileUrl = baseUrl + fullFileUrl;
+                }
+
                 var printData = {
                     type: 'print_request',
                     username: username,
                     password: userPassword,
-                    content: fileUrl,
+                    content: fullFileUrl,
                     content_type: 'file',
                     file_name: 'print_job.pdf',
                     settings: {
@@ -1334,7 +1337,7 @@ function g(name) { return global[name]; }
 
         } catch (error) {
             if (!isCancelled) {
-                updateStatus('连接失败', error.toString(), true);
+                updateStatus('失败', error.toString(), true);
                 cleanup();
             }
         }

@@ -40,7 +40,8 @@
     "mysql2": "^3.6.5",
     "pdfjs-dist": "^5.5.207",
     "uuid": "^9.0.1",
-    "vditor": "^3.11.2"
+    "vditor": "^3.11.2",
+    "wkhtmltopdf": "^0.4.0"
   },
   "devDependencies": {
     "jest": "^30.2.0",
