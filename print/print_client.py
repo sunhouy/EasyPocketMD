@@ -134,6 +134,27 @@ class PrintClient:
         self.load_config()
         # 用于存储当前监听任务的引用
         self.listen_task = None
+        # 存储生成的临时文件路径
+        self.temp_files = []
+
+    def clean_temp_files(self):
+        """清理临时文件"""
+        if not self.temp_files:
+            print("没有需要清理的临时文件")
+            return
+        
+        print(f"正在清理 {len(self.temp_files)} 个临时文件...")
+        cleaned_count = 0
+        for file_path in self.temp_files[:]:  # Iterate over a copy
+            try:
+                if os.path.exists(file_path):
+                    os.unlink(file_path)
+                    print(f"已删除: {file_path}")
+                    cleaned_count += 1
+                self.temp_files.remove(file_path)
+            except Exception as e:
+                print(f"删除失败 {file_path}: {e}")
+        print(f"清理完成，共删除 {cleaned_count} 个文件")
 
     def load_config(self):
         if os.path.exists(self.config_file):
@@ -213,14 +234,17 @@ class PrintClient:
         print("1. 修改用户名和密码")
         print("2. 修改默认打印机")
         print("3. 设置开机自启")
-        print("4. 返回")
-        choice = input("请选择 (1/2/3/4): ").strip()
+        print("4. 清理临时文件")
+        print("5. 返回")
+        choice = input("请选择 (1/2/3/4/5): ").strip()
         if choice == '1':
             self.set_user_credentials()
         elif choice == '2':
             self.select_printer()
         elif choice == '3':
             register_startup(force=True)
+        elif choice == '4':
+            self.clean_temp_files()
         else:
             print("保持原有配置。")
 
@@ -257,21 +281,18 @@ class PrintClient:
 
     def _print_windows(self, content, settings):
         """Windows打印实现"""
-        # 检查是否是HTML内容（这里其实不会是HTML了，因为服务器传过来的是PDF URL或HTML字符串）
-        # 如果content是HTML字符串，我们直接作为txt打印（因为不再支持客户端wkhtmltopdf）
-        # 或者提示用户不支持
 
         # 临时文件路径
         temp_file = os.path.join(os.environ.get('TEMP', '/tmp'), f'print_{datetime.now().timestamp()}')
 
-        # 如果是HTML内容，且没有pdfkit，我们无法在客户端转换
-        # 但现在的架构是服务器转换好PDF发过来，所以content通常是PDF的URL
-        
         # 备用方法：直接处理文件
         extension = '.txt'
         temp_file = temp_file + extension
         with open(temp_file, 'w', encoding='utf-8') as f:
             f.write(content)
+            
+        # 将文件添加到临时文件列表，以便后续手动清理
+        self.temp_files.append(temp_file)
 
         try:
             # 尝试使用os.startfile
@@ -304,6 +325,9 @@ class PrintClient:
         # 创建临时文件
         with tempfile.NamedTemporaryFile(suffix=file_extension, delete=False) as tmp:
             temp_file_path = tmp.name
+        
+        # 将文件添加到临时文件列表，以便后续手动清理
+        self.temp_files.append(temp_file_path)
 
         try:
             # 下载文件
@@ -332,17 +356,13 @@ class PrintClient:
                 subprocess.run(['lpr', '-P', self.printer_name, temp_file_path], check=True)
 
             print(f"文件打印成功: {temp_file_path}")
+            print(f"临时文件已保留: {temp_file_path}")
+            print("注意：如果需要清理这些文件，请在主菜单选择清理选项")
+            
         except Exception as e:
             print(f"打印文件URL时出错: {str(e)}")
             # 重新抛出异常，让调用者知道下载失败
             raise
-        finally:
-            # 清理临时文件
-            try:
-                os.unlink(temp_file_path)
-                print(f"临时文件已清理: {temp_file_path}")
-            except:
-               pass
 
     def _print_unix(self, content, settings):
         """Unix-like系统打印实现"""
@@ -357,6 +377,10 @@ class PrintClient:
         temp_file = temp_file + extension
         with open(temp_file, 'w', encoding='utf-8') as f:
             f.write(content)
+            
+        # 将文件添加到临时文件列表，以便后续手动清理
+        self.temp_files.append(temp_file)
+        
         print(f"正在打印文件: {temp_file}")
         subprocess.run(['lpr', '-P', self.printer_name, temp_file], check=True)
 

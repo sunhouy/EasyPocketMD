@@ -99,10 +99,13 @@ function g(name) { return global[name]; }
         });
     }
 
-    function showPrintDialog() {
+    function showPrintDialog(mode, callback) {
+        // Default mode is 'print'
+        mode = mode || 'print';
+        
         // 检查用户是否登录
         if (!g('currentUser')) {
-            global.showMessage('请先登录后再使用云打印功能');
+            global.showMessage('请先登录后再使用此功能');
             if (g('showLoginModal')) {
                 g('showLoginModal')();
             }
@@ -120,42 +123,52 @@ function g(name) { return global[name]; }
         var modalContent = document.createElement('div');
         modalContent.style.cssText = 'background:' + bg + ';color:' + textColor + ';border-radius:12px;padding:25px;width:90%;max-width:600px;max-height:85vh;overflow-y:auto;';
 
-        var title = '<h2 style="text-align:center;margin-bottom:20px;">云打印设置</h2>';
+        var dialogTitle = '云打印设置';
+        if (mode === 'export-pdf') dialogTitle = '导出 PDF 设置';
+        if (mode === 'export-html') dialogTitle = '导出 HTML 设置';
+        
+        var title = '<h2 style="text-align:center;margin-bottom:20px;">' + dialogTitle + '</h2>';
 
-        // AI智能排版按钮区域
-        var aiSection = `
-            <div style="margin-bottom:20px;">
-                <button id="aiLayoutBtn" style="width:100%;padding:12px;font-weight:bold;background:linear-gradient(135deg, #667eea 0%, #764ba2 100%);color:white;border:none;border-radius:6px;cursor:pointer;font-size:15px;">
-                    <i class="fas fa-magic"></i> AI智能排版
-                </button>
-            </div>
-            <div style="margin-bottom:20px;">
-                <button id="printFileBtn" style="width:100%;padding:12px;font-weight:bold;background:#4CAF50;color:white;border:none;border-radius:6px;cursor:pointer;">
-                    <i class="fas fa-file-upload"></i> 上传文件打印
-                </button>
-            </div>
-        `;
+        // AI智能排版按钮区域 (仅在打印模式显示)
+        var aiSection = '';
+        if (mode === 'print') {
+            aiSection = `
+                <div style="margin-bottom:20px;">
+                    <button id="aiLayoutBtn" style="width:100%;padding:12px;font-weight:bold;background:linear-gradient(135deg, #667eea 0%, #764ba2 100%);color:white;border:none;border-radius:6px;cursor:pointer;font-size:15px;">
+                        <i class="fas fa-magic"></i> AI智能排版
+                    </button>
+                </div>
+                <div style="margin-bottom:20px;">
+                    <button id="printFileBtn" style="width:100%;padding:12px;font-weight:bold;background:#4CAF50;color:white;border:none;border-radius:6px;cursor:pointer;">
+                        <i class="fas fa-file-upload"></i> 上传文件打印
+                    </button>
+                </div>
+            `;
+        }
 
         var downloadLink = '<a href="javascript:void(0)" id="downloadClientBtn" style="color:#4a90e2;cursor:pointer;text-decoration:underline;">点击下载打印客户端</a>';
 
-        // 客户端连接状态区域
-        var statusSection = `
-    <div style="margin-bottom:20px;padding:15px;background:` + (nightMode ? '#3d3d3d' : '#f8f9fa') + `;border-radius:8px;">
-        <h3 style="margin-top:0;margin-bottom:10px;">打印客户端状态</h3>
-        <div id="clientStatus" style="display:flex;align-items:center;gap:10px;">
-            <div id="statusIndicator" style="width:12px;height:12px;border-radius:50%;background:#dc3545;"></div>
-            <span id="statusText" style="font-size:14px;">请连接打印客户端</span>
-        </div>
-        <p style="margin-top:10px;font-size:14px;color:` + (nightMode ? '#aaa' : '#666') + `;">` + downloadLink + `</p>
-    </div>
-`;
+        // 客户端连接状态区域 (仅在打印模式显示)
+        var statusSection = '';
+        if (mode === 'print') {
+            statusSection = `
+                <div style="margin-bottom:20px;padding:15px;background:` + (nightMode ? '#3d3d3d' : '#f8f9fa') + `;border-radius:8px;">
+                    <h3 style="margin-top:0;margin-bottom:10px;">打印客户端状态</h3>
+                    <div id="clientStatus" style="display:flex;align-items:center;gap:10px;">
+                        <div id="statusIndicator" style="width:12px;height:12px;border-radius:50%;background:#dc3545;"></div>
+                        <span id="statusText" style="font-size:14px;">请连接打印客户端</span>
+                    </div>
+                    <p style="margin-top:10px;font-size:14px;color:` + (nightMode ? '#aaa' : '#666') + `;">` + downloadLink + `</p>
+                </div>
+            `;
+        }
 
         var settingsSection = `
             <div style="margin-bottom:20px;">
-                <h3 style="margin-top:0;margin-bottom:15px;">打印设置</h3>
+                <h3 style="margin-top:0;margin-bottom:15px;">基础设置</h3>
                 <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(200px, 1fr));gap:15px;">
                     <div>
-                        <label style="display:block;margin-bottom:5px;font-size:14px;">标题字号</label>
+                        <label style="display:block;margin-bottom:5px;font-size:14px;">基础标题字号 (H4)</label>
                         <div style="position:relative;">
                             <input type="number" id="titleFontSize" value="24" min="8" max="72" style="width:100%;padding:8px;border:1px solid ` + borderColor + `;border-radius:6px;background:` + (nightMode ? '#3d3d3d' : 'white') + `;color:` + textColor + `;">
                             <span style="position:absolute;right:10px;top:50%;transform:translateY(-50%);color:` + (nightMode ? '#aaa' : '#666') + `;">pt</span>
@@ -237,19 +250,129 @@ function g(name) { return global[name]; }
                     </label>
                 </div>
             </div>
-        `;
 
-        var actionButtons = `
-            <div style="display:flex;gap:10px;margin-top:20px;">
-                <button id="printPreviewBtn" style="flex:1;padding:12px;font-weight:bold;background:#4CAF50;color:white;border:none;border-radius:6px;cursor:pointer;">预览</button>
-                <button id="printSendBtn" style="flex:1;padding:12px;font-weight:bold;background:#2196F3;color:white;border:none;border-radius:6px;cursor:pointer;">发送打印</button>
-                <button id="printCancelBtn" style="flex:1;padding:12px;background:` + (nightMode ? '#555' : '#9E9E9E') + `;color:white;border:none;border-radius:6px;cursor:pointer;">取消</button>
+            <!-- Advanced Heading Settings -->
+            <div style="margin-bottom:20px;border-top:1px solid ${borderColor};padding-top:15px;">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;cursor:pointer;" onclick="var el = this.nextElementSibling; el.style.display = el.style.display === 'none' ? 'block' : 'none'; this.querySelector('i').classList.toggle('fa-chevron-down'); this.querySelector('i').classList.toggle('fa-chevron-right');">
+                    <h3 style="margin:0;font-size:16px;">高级标题字号设置</h3>
+                    <i class="fas fa-chevron-right" style="font-size:14px;color:${nightMode ? '#aaa' : '#666'};"></i>
+                </div>
+                <div id="advancedHeadingSettings" style="display:none;">
+                    <div style="margin-bottom:15px;">
+                        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;margin-bottom:10px;">
+                            <input type="checkbox" id="useCustomHeadingSizes" style="width:16px;height:16px;">
+                            <span style="font-size:14px;">启用自定义标题字号</span>
+                        </label>
+                    </div>
+                    <div id="customHeadingInputs" style="display:grid;grid-template-columns:repeat(3, 1fr);gap:15px;opacity:0.5;pointer-events:none;transition:opacity 0.2s;">
+                        <div>
+                            <label style="display:block;margin-bottom:5px;font-size:12px;">H1 字号 (pt)</label>
+                            <input type="number" id="h1Size" value="36" style="width:100%;padding:6px;border:1px solid ${borderColor};border-radius:4px;background:${nightMode ? '#3d3d3d' : 'white'};color:${textColor};">
+                        </div>
+                        <div>
+                            <label style="display:block;margin-bottom:5px;font-size:12px;">H2 字号 (pt)</label>
+                            <input type="number" id="h2Size" value="31" style="width:100%;padding:6px;border:1px solid ${borderColor};border-radius:4px;background:${nightMode ? '#3d3d3d' : 'white'};color:${textColor};">
+                        </div>
+                        <div>
+                            <label style="display:block;margin-bottom:5px;font-size:12px;">H3 字号 (pt)</label>
+                            <input type="number" id="h3Size" value="26" style="width:100%;padding:6px;border:1px solid ${borderColor};border-radius:4px;background:${nightMode ? '#3d3d3d' : 'white'};color:${textColor};">
+                        </div>
+                        <div>
+                            <label style="display:block;margin-bottom:5px;font-size:12px;">H4 字号 (pt)</label>
+                            <input type="number" id="h4Size" value="24" style="width:100%;padding:6px;border:1px solid ${borderColor};border-radius:4px;background:${nightMode ? '#3d3d3d' : 'white'};color:${textColor};">
+                        </div>
+                        <div>
+                            <label style="display:block;margin-bottom:5px;font-size:12px;">H5 字号 (pt)</label>
+                            <input type="number" id="h5Size" value="21" style="width:100%;padding:6px;border:1px solid ${borderColor};border-radius:4px;background:${nightMode ? '#3d3d3d' : 'white'};color:${textColor};">
+                        </div>
+                        <div>
+                            <label style="display:block;margin-bottom:5px;font-size:12px;">H6 字号 (pt)</label>
+                            <input type="number" id="h6Size" value="19" style="width:100%;padding:6px;border:1px solid ${borderColor};border-radius:4px;background:${nightMode ? '#3d3d3d' : 'white'};color:${textColor};">
+                        </div>
+                        <div style="grid-column:1/-1;margin-top:10px;display:flex;align-items:center;gap:10px;">
+                            <label style="font-size:12px;">快速设置递减量 (pt):</label>
+                            <input type="number" id="headingStep" value="4" style="width:60px;padding:4px;border:1px solid ${borderColor};border-radius:4px;">
+                            <button id="applyHeadingStep" style="padding:4px 8px;font-size:12px;background:#4a90e2;color:white;border:none;border-radius:4px;cursor:pointer;">应用递减</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Image Settings -->
+            <div style="margin-bottom:20px;border-top:1px solid ${borderColor};padding-top:15px;">
+                 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;cursor:pointer;" onclick="var el = this.nextElementSibling; el.style.display = el.style.display === 'none' ? 'block' : 'none'; this.querySelector('i').classList.toggle('fa-chevron-down'); this.querySelector('i').classList.toggle('fa-chevron-right');">
+                    <h3 style="margin:0;font-size:16px;">图片设置</h3>
+                    <i class="fas fa-chevron-right" style="font-size:14px;color:${nightMode ? '#aaa' : '#666'};"></i>
+                </div>
+                <div id="imageSettings" style="display:none;grid-template-columns:1fr 1fr;gap:15px;">
+                    <div>
+                        <label style="display:block;margin-bottom:5px;font-size:14px;">图片宽度</label>
+                        <input type="text" id="imgWidth" value="100%" placeholder="如 100%, 300px" style="width:100%;padding:8px;border:1px solid ${borderColor};border-radius:6px;background:${nightMode ? '#3d3d3d' : 'white'};color:${textColor};">
+                    </div>
+                    <div>
+                        <label style="display:block;margin-bottom:5px;font-size:14px;">图片高度</label>
+                        <input type="text" id="imgHeight" value="auto" placeholder="如 auto, 200px" style="width:100%;padding:8px;border:1px solid ${borderColor};border-radius:6px;background:${nightMode ? '#3d3d3d' : 'white'};color:${textColor};">
+                    </div>
+                </div>
             </div>
         `;
+
+        var actionButtons = '';
+        if (mode === 'print') {
+            actionButtons = `
+                <div style="display:flex;gap:10px;margin-top:20px;">
+                    <button id="printPreviewBtn" style="flex:1;padding:12px;font-weight:bold;background:#4CAF50;color:white;border:none;border-radius:6px;cursor:pointer;">预览</button>
+                    <button id="printSendBtn" style="flex:1;padding:12px;font-weight:bold;background:#2196F3;color:white;border:none;border-radius:6px;cursor:pointer;">发送打印</button>
+                    <button id="printCancelBtn" style="flex:1;padding:12px;background:` + (nightMode ? '#555' : '#9E9E9E') + `;color:white;border:none;border-radius:6px;cursor:pointer;">取消</button>
+                </div>
+            `;
+        } else {
+            var actionName = mode === 'export-pdf' ? '导出 PDF' : '导出 HTML';
+            actionButtons = `
+                <div style="display:flex;gap:10px;margin-top:20px;">
+                    <button id="confirmExportBtn" style="flex:1;padding:12px;font-weight:bold;background:#2196F3;color:white;border:none;border-radius:6px;cursor:pointer;">${actionName}</button>
+                    <button id="printCancelBtn" style="flex:1;padding:12px;background:` + (nightMode ? '#555' : '#9E9E9E') + `;color:white;border:none;border-radius:6px;cursor:pointer;">取消</button>
+                </div>
+            `;
+        }
 
         modalContent.innerHTML = title + aiSection + statusSection + settingsSection + actionButtons;
         printModal.appendChild(modalContent);
         document.body.appendChild(printModal);
+
+        // --- Event Listeners for New Settings ---
+        
+        // Custom Heading Sizes Toggle
+        var useCustomHeadingSizes = modalContent.querySelector('#useCustomHeadingSizes');
+        var customHeadingInputs = modalContent.querySelector('#customHeadingInputs');
+        if (useCustomHeadingSizes) {
+            useCustomHeadingSizes.onchange = function() {
+                if (this.checked) {
+                    customHeadingInputs.style.opacity = '1';
+                    customHeadingInputs.style.pointerEvents = 'auto';
+                } else {
+                    customHeadingInputs.style.opacity = '0.5';
+                    customHeadingInputs.style.pointerEvents = 'none';
+                    // Re-sync with base title size logic if unchecked? 
+                    // No, let's leave values as is, just disabled.
+                }
+            };
+        }
+
+        // Apply Heading Step
+        var applyHeadingStep = modalContent.querySelector('#applyHeadingStep');
+        if (applyHeadingStep) {
+            applyHeadingStep.onclick = function() {
+                var h1 = parseFloat(modalContent.querySelector('#h1Size').value) || 36;
+                var step = parseFloat(modalContent.querySelector('#headingStep').value) || 4;
+                
+                modalContent.querySelector('#h2Size').value = Math.max(1, h1 - step);
+                modalContent.querySelector('#h3Size').value = Math.max(1, h1 - step * 2);
+                modalContent.querySelector('#h4Size').value = Math.max(1, h1 - step * 3);
+                modalContent.querySelector('#h5Size').value = Math.max(1, h1 - step * 4);
+                modalContent.querySelector('#h6Size').value = Math.max(1, h1 - step * 5);
+            };
+        }
 
         // Download client button event
         var downloadClientBtn = modalContent.querySelector('#downloadClientBtn');
@@ -259,7 +382,8 @@ function g(name) { return global[name]; }
             };
         }
 
-        // 连接到打印服务器检查客户端状态
+        // Connect to WebSocket only if in print mode
+        if (mode === 'print') {
         var statusIndicator = modalContent.querySelector('#statusIndicator');
         var statusText = modalContent.querySelector('#statusText');
 
@@ -665,13 +789,27 @@ function g(name) { return global[name]; }
             });
         }
 
+        } // End of if (mode === 'print')
+
         // 打印模态框点击外部关闭时也需要清除定时器
         printModal.addEventListener('click', function(e) {
             if (e.target === printModal) {
-                cleanup();
+                if (typeof cleanup === 'function') cleanup();
                 printModal.remove();
             }
         });
+
+        // Export Button Logic
+        var confirmExportBtn = modalContent.querySelector('#confirmExportBtn');
+        if (confirmExportBtn) {
+            confirmExportBtn.onclick = function() {
+                if (callback) {
+                    var settings = getPrintSettings(modalContent);
+                    printModal.remove();
+                    callback(settings);
+                }
+            };
+        }
 
         // 对齐按钮切换
         var alignButtons = modalContent.querySelectorAll('.align-btn');
@@ -729,7 +867,17 @@ function g(name) { return global[name]; }
             alignment: (modalContent.querySelector('.align-btn.active')?.getAttribute('data-align')) || 'left',
             titleAlignment: (modalContent.querySelector('.title-align-btn.active')?.getAttribute('data-align')) || 'center',
             fitToPage: modalContent.querySelector('#fitToPage').checked,
-            indentParagraph: modalContent.querySelector('#indentParagraph').checked
+            indentParagraph: modalContent.querySelector('#indentParagraph').checked,
+            // New settings
+            useCustomHeadingSizes: modalContent.querySelector('#useCustomHeadingSizes') ? modalContent.querySelector('#useCustomHeadingSizes').checked : false,
+            h1Size: modalContent.querySelector('#h1Size') ? modalContent.querySelector('#h1Size').value : 36,
+            h2Size: modalContent.querySelector('#h2Size') ? modalContent.querySelector('#h2Size').value : 31,
+            h3Size: modalContent.querySelector('#h3Size') ? modalContent.querySelector('#h3Size').value : 26,
+            h4Size: modalContent.querySelector('#h4Size') ? modalContent.querySelector('#h4Size').value : 24,
+            h5Size: modalContent.querySelector('#h5Size') ? modalContent.querySelector('#h5Size').value : 21,
+            h6Size: modalContent.querySelector('#h6Size') ? modalContent.querySelector('#h6Size').value : 19,
+            imgWidth: modalContent.querySelector('#imgWidth') ? modalContent.querySelector('#imgWidth').value : '100%',
+            imgHeight: modalContent.querySelector('#imgHeight') ? modalContent.querySelector('#imgHeight').value : 'auto'
         };
     }
 
@@ -753,6 +901,28 @@ function g(name) { return global[name]; }
         var paragraphSpacing = parseFloat(settings.paragraphSpacing || '0.5');
         var titleSpacing = parseFloat(settings.titleSpacing || '0.8');
         var codeBlockLang = '';   // 声明变量用于保存代码块语言
+
+        // Calculate heading sizes
+        var headingSizes = {};
+        if (settings.useCustomHeadingSizes) {
+            headingSizes = {
+                1: parseInt(settings.h1Size) * scale,
+                2: parseInt(settings.h2Size) * scale,
+                3: parseInt(settings.h3Size) * scale,
+                4: parseInt(settings.h4Size) * scale,
+                5: parseInt(settings.h5Size) * scale,
+                6: parseInt(settings.h6Size) * scale
+            };
+        } else {
+            headingSizes = {
+                1: titleFontSize * 1.5,
+                2: titleFontSize * 1.3,
+                3: titleFontSize * 1.1,
+                4: titleFontSize,
+                5: titleFontSize * 0.9,
+                6: titleFontSize * 0.8
+            };
+        }
 
         function convertMarkdownElements(text) {
             text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
@@ -851,7 +1021,8 @@ function g(name) { return global[name]; }
                 if (!imgUrl.startsWith('http://') && !imgUrl.startsWith('https://')) {
                     imgUrl = 'https://md.yhsun.cn' + (imgUrl.startsWith('/') ? '' : '/') + imgUrl;
                 }
-                html += '<div style="text-align:center;margin:1em 0;"><img src="' + imgUrl + '" alt="' + altText + '" style="max-width:100%;height:auto;"></div>';
+                var imgStyle = 'max-width:' + (settings.imgWidth || '100%') + ';height:' + (settings.imgHeight || 'auto') + ';';
+                html += '<div style="text-align:center;margin:1em 0;"><img src="' + imgUrl + '" alt="' + altText + '" style="' + imgStyle + '"></div>';
                 processed = true;
             }
 
@@ -886,7 +1057,8 @@ function g(name) { return global[name]; }
                 var level = hMatch[1].length;
                 var titleText = hMatch[2];
                 titleText = convertMarkdownElements(titleText);
-                html += '<h' + level + ' style="text-align:' + titleAlignment + ';font-size:' + titleFontSize + 'pt;margin-top:' + titleSpacing + 'em;margin-bottom:' + titleSpacing + 'em;line-height:' + lineHeight + ';">' + titleText + '</h' + level + '>';
+                var currentHeadingSize = headingSizes[level];
+                html += '<h' + level + ' style="text-align:' + titleAlignment + ';font-size:' + currentHeadingSize + 'pt;margin-top:' + titleSpacing + 'em;margin-bottom:' + titleSpacing + 'em;line-height:' + lineHeight + ';">' + titleText + '</h' + level + '>';
                 processed = true;
             }
 
@@ -960,6 +1132,24 @@ function g(name) { return global[name]; }
         var titleAlignment = settings.titleAlignment || 'center';
         var listMargin = settings.fitToPage ? '6px' : '8px';
 
+        // Calculate heading sizes for CSS
+        var h1Size, h2Size, h3Size, h4Size, h5Size, h6Size;
+        if (settings.useCustomHeadingSizes) {
+            h1Size = parseInt(settings.h1Size) * scale;
+            h2Size = parseInt(settings.h2Size) * scale;
+            h3Size = parseInt(settings.h3Size) * scale;
+            h4Size = parseInt(settings.h4Size) * scale;
+            h5Size = parseInt(settings.h5Size) * scale;
+            h6Size = parseInt(settings.h6Size) * scale;
+        } else {
+            h1Size = titleFontSize * 1.5;
+            h2Size = titleFontSize * 1.3;
+            h3Size = titleFontSize * 1.1;
+            h4Size = titleFontSize;
+            h5Size = titleFontSize * 0.9;
+            h6Size = titleFontSize * 0.8;
+        }
+
         return `
             @page { size: A4; margin: ${margin}; }
             body { 
@@ -976,12 +1166,12 @@ function g(name) { return global[name]; }
                 margin-bottom: ${titleSpacing}em;
                 line-height: ${lineHeight};
             }
-            h1 { font-size: ${titleFontSize * 1.5}pt; }
-            h2 { font-size: ${titleFontSize * 1.3}pt; }
-            h3 { font-size: ${titleFontSize * 1.1}pt; }
-            h4 { font-size: ${titleFontSize}pt; }
-            h5 { font-size: ${titleFontSize * 0.9}pt; }
-            h6 { font-size: ${titleFontSize * 0.8}pt; }
+            h1 { font-size: ${h1Size}pt; }
+            h2 { font-size: ${h2Size}pt; }
+            h3 { font-size: ${h3Size}pt; }
+            h4 { font-size: ${h4Size}pt; }
+            h5 { font-size: ${h5Size}pt; }
+            h6 { font-size: ${h6Size}pt; }
             p { 
                 font-size: ${bodyFontSize}pt;
                 margin: 0 0 ${paragraphSpacing}em 0;
@@ -1018,8 +1208,8 @@ function g(name) { return global[name]; }
                 font-weight: bold;
             }
             img {
-                max-width: 100%;
-                height: auto;
+                max-width: ${settings.imgWidth || '100%'};
+                height: ${settings.imgHeight || 'auto'};
                 margin: 1em 0;
             }
             .mermaid-chart {
