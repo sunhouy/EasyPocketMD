@@ -41,7 +41,7 @@ export async function generatePDF(htmlContent, settings, filename) {
                 tr { page-break-inside: avoid; page-break-after: auto; }
                 th, td { border: 1px solid #ddd; padding: 8px; }
                 .katex { font-size: 1.1em; page-break-inside: avoid; display: inline-block; }
-                .katex-mathml { display: none; }
+                .katex-mathml { display: none !important; position: absolute; clip: rect(1px, 1px, 1px, 1px); padding: 0; border: 0; height: 1px; width: 1px; overflow: hidden; }
                 .mermaid { text-align: center; page-break-inside: avoid; }
                 pre { page-break-inside: avoid; white-space: pre-wrap; word-wrap: break-word; }
                 blockquote { page-break-inside: avoid; }

@@ -1221,7 +1221,14 @@ function g(name) { return global[name]; }
                 margin: 1em 0;
             }
             .katex-mathml {
-                display: none;
+                display: none !important;
+                position: absolute;
+                clip: rect(1px, 1px, 1px, 1px);
+                padding: 0;
+                border: 0;
+                height: 1px;
+                width: 1px;
+                overflow: hidden;
             }
             @media print {
                 body { -webkit-print-color-adjust: exact; }
