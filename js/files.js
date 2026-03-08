@@ -12,8 +12,12 @@
         if (path.startsWith('/')) {
             path = path.substring(1);
         }
-        if (path.endsWith('.md') || path.endsWith('.txt')) {
+        if (path.endsWith('.md')) {
             path = path.substring(0, path.length - 3);
+        } else if (path.endsWith('.txt')) {
+            path = path.substring(0, path.length - 4);
+        } else if (path.endsWith('.markdown')) {
+            path = path.substring(0, path.length - 9);
         }
         return path;
     }
@@ -579,6 +583,7 @@
              renameFileInternal(data.node.id, data.text);
         })
         .on('ready.jstree', function() {
+            expandActiveFile();
             // 移动端长按支持
             let timer;
             const touchDuration = 600; 
