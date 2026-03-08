@@ -1,8 +1,9 @@
 
-(function(global) {
-    'use strict';
+import { generatePDF, renderPDF } from './pdf-generator.js';
 
-    function g(name) { return global[name]; }
+const global = window;
+
+function g(name) { return global[name]; }
 
     function showDownloadClientModal() {
         var nightMode = g('nightMode') === true;
@@ -65,7 +66,7 @@
         var sections = [];
         
         var winSection = createSection('Windows', isWin, [
-            { name: 'print_client_windows', url: 'https://static.yhsun.cn/print_client_windows.exe' }
+            { name: '下载Windows版本', url: 'https://static.yhsun.cn/print_client_windows.exe' }
         ]);
         
         var linuxSection = createSection('Linux', isLinux, [
@@ -1037,45 +1038,8 @@
 
     async function downloadAsPDF(content, settings) {
         var htmlContent = await preparePrintContent(content, settings);
-        var printWindow = window.open('', '_blank');
-
-        // 使用更简单的方式，直接使用打印对话框让用户保存为PDF
-        printWindow.document.open();
-        printWindow.document.write('<!DOCTYPE html>');
-        printWindow.document.write('<html>');
-        printWindow.document.write('<head>');
-        printWindow.document.write('<title></title>');
-        printWindow.document.write('<style>');
-        printWindow.document.write('@page { size: A4; margin: 15mm; }');
-        printWindow.document.write('body { font-family: "SimSun", "宋体", serif; font-size: 12pt; line-height: 1.2; color: #333; padding: 0 10px; }');
-        printWindow.document.write('h1, h2, h3, h4, h5, h6 { text-align: center; font-weight: bold; margin-top: 0.8em; margin-bottom: 0.8em; line-height: 1.2; }');
-        printWindow.document.write('h1 { font-size: 18pt; }');
-        printWindow.document.write('h2 { font-size: 16pt; }');
-        printWindow.document.write('h3 { font-size: 14pt; }');
-        printWindow.document.write('h4 { font-size: 12pt; }');
-        printWindow.document.write('p { font-size: 12pt; margin: 0 0 0.5em 0; padding: 0; text-align: left; }');
-        printWindow.document.write('.code-block { background: #f8f9fa; border: 1px solid #ddd; border-radius: 4px; padding: 15px; font-family: monospace; font-size: 10pt; overflow-x: auto; margin: 0.8em 0; text-align: left; }');
-        printWindow.document.write('li { margin-bottom: 8px; text-align: left; }');
-        printWindow.document.write('img { max-width: 100%; height: auto; margin: 1em 0; }');
-        printWindow.document.write('@media print { body { -webkit-print-color-adjust: exact; } }');
-        printWindow.document.write('</style>');
-        printWindow.document.write('</head>');
-        printWindow.document.write('<body>');
-        printWindow.document.write('<div id="pdf-content">');
-        printWindow.document.write(htmlContent);
-        printWindow.document.write('</div>');
-        printWindow.document.write('<script>');
-        printWindow.document.write('window.onload = function() {');
-        printWindow.document.write('  setTimeout(function() {');
-        printWindow.document.write('    alert("请在打印对话框中选择\'保存为PDF\'选项");');
-        printWindow.document.write('    window.print();');
-        printWindow.document.write('  }, 100);');
-        printWindow.document.write('};');
-        printWindow.document.write('</script>');
-        printWindow.document.write('</body>');
-        printWindow.document.write('</html>');
-        printWindow.document.close();
-        printWindow.focus();
+        // 调用 generatePDF 并提供文件名以触发下载
+        await generatePDF(htmlContent, settings, '文档.pdf');
     }
 
     async function showPrintPreview(settings) {
@@ -1086,18 +1050,13 @@
         var loadingModal = document.createElement('div');
         loadingModal.className = 'modal-overlay';
         loadingModal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.9);z-index:10001;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;';
-
-        var loadingContent = document.createElement('div');
-        loadingContent.style.cssText = 'background:' + (nightMode ? '#2d2d2d' : 'white') + ';color:' + (nightMode ? '#eee' : '#333') + ';border-radius:12px;padding:30px;text-align:center;';
-        loadingContent.innerHTML = '<div style="font-size:24px;margin-bottom:15px;"><i class="fas fa-spinner fa-spin"></i></div><div style="font-size:16px;">加载中...</div>';
-
-        loadingModal.appendChild(loadingContent);
+        loadingModal.innerHTML = '<div style="background:' + (nightMode ? '#2d2d2d' : 'white') + ';color:' + (nightMode ? '#eee' : '#333') + ';border-radius:12px;padding:30px;text-align:center;"><div style="font-size:24px;margin-bottom:15px;"><i class="fas fa-spinner fa-spin"></i></div><div style="font-size:16px;">正在生成PDF预览...</div></div>';
         document.body.appendChild(loadingModal);
 
         try {
             var htmlContent = await preparePrintContent(content, settings);
+            var pdfBlob = await generatePDF(htmlContent, settings);
 
-            // 移除加载状态
             loadingModal.remove();
 
             var previewModal = document.createElement('div');
@@ -1106,125 +1065,21 @@
 
             var previewContent = document.createElement('div');
             previewContent.style.cssText = 'background:' + (nightMode ? '#1a1a1a' : '#f0f0f0') + ';border-radius:0;display:flex;flex-direction:column;flex:1;box-shadow:none;border:none;min-height:0;';
-            // Preview close button
+            
             var closeBtn = document.createElement('button');
             closeBtn.innerHTML = '<i class="fas fa-times"></i>';
             closeBtn.style.cssText = 'position:absolute;top:10px;right:10px;background:' + (nightMode ? '#333' : '#fff') + ';border:1px solid ' + (nightMode ? '#555' : '#ddd') + ';color:#666;font-size:16px;cursor:pointer;padding:8px;border-radius:4px;z-index:10;';
 
-            // Document container - takes up most of the space
             var docContainer = document.createElement('div');
             docContainer.style.cssText = 'flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;overflow:auto;padding:20px;min-height:0;';
 
-            // 缩放相关变量 - 只缩放整个视图，不缩放内容本身
-            var currentScale = 1.0;
-            var initialDistance = 0;
-            var a4Width = 595;
-            var a4Height = 842;
-            var a4Margin = settings.pageMargin;
-
-            // 多页内容容器 - 保持真实尺寸
             var pagesWrapper = document.createElement('div');
-            pagesWrapper.style.cssText = 'display:flex;flex-direction:column;gap:20px;align-items:center;transform-origin:top center;';
-
-            // 创建一页A4纸的函数
-            function createPage() {
-                var page = document.createElement('div');
-                page.className = 'a4-page';
-                page.style.cssText = 'width:' + a4Width + 'px;min-height:' + a4Height + 'px;background:white;box-shadow:0 2px 10px rgba(0,0,0,0.1);position:relative;border:1px solid #ccc;overflow:visible;';
-
-                var contentDiv = document.createElement('div');
-                contentDiv.style.cssText = 'width:100%;padding:' + a4Margin + 'mm;box-sizing:border-box;position:relative;';
-
-                var printStyles = getPrintStyles(settings);
-                var styleElement = document.createElement('style');
-                styleElement.textContent = printStyles;
-                contentDiv.appendChild(styleElement);
-
-                page.appendChild(contentDiv);
-                return { page: page, contentDiv: contentDiv };
-            }
-
-            // 创建第一页并放入所有内容 - 确保至少显示一个完整A4页面
-            var { page: firstPage, contentDiv: firstContentDiv } = createPage();
-            firstContentDiv.innerHTML += htmlContent;
-            pagesWrapper.appendChild(firstPage);
-
+            pagesWrapper.style.cssText = 'display:flex;flex-direction:column;gap:20px;align-items:center;width:100%;max-width:800px;';
+            
             docContainer.appendChild(pagesWrapper);
 
-            // 添加页面分割线指示
-            function addPageDividers() {
-                var marginPx = a4Margin * 3.78; // mm to px approx (1mm ≈ 3.78px)
-                var usableHeight = a4Height - (marginPx * 2);
-                var contentHeight = firstContentDiv.scrollHeight;
-                var numPages = Math.ceil(contentHeight / usableHeight);
+            await renderPDF(pdfBlob, pagesWrapper);
 
-                if (numPages > 1) {
-                    for (var i = 1; i < numPages; i++) {
-                        var divider = document.createElement('div');
-                        divider.style.cssText = 'position:absolute;left:0;right:0;height:2px;background:linear-gradient(to right, transparent, #ff6b6b, transparent);z-index:10;';
-                        divider.style.top = (usableHeight * i + marginPx) + 'px';
-                        firstContentDiv.appendChild(divider);
-
-                        var pageLabel = document.createElement('div');
-                        pageLabel.style.cssText = 'position:absolute;left:50%;transform:translateX(-50%);top:' + ((usableHeight * i + marginPx) - 15) + 'px;font-size:11px;color:#ff6b6b;background:white;padding:2px 8px;border-radius:3px;z-index:11;';
-                        pageLabel.textContent = '--- 第 ' + (i + 1) + '页开始 ---';
-                        firstContentDiv.appendChild(pageLabel);
-                    }
-                }
-            }
-
-            // 自动适配屏幕大小 - 只缩放整个视图，保持内容真实尺寸
-            function fitToScreen() {
-                var containerWidth = docContainer.clientWidth - 40;
-                var scale = Math.min(containerWidth / a4Width, 1.0);
-                currentScale = scale;
-                pagesWrapper.style.transform = 'scale(' + scale + ')';
-            }
-
-            // 触摸事件 - 只缩放整个视图
-            pagesWrapper.addEventListener('touchstart', function(e) {
-                if (e.touches.length === 2) {
-                    e.preventDefault();
-                    var touch1 = e.touches[0];
-                    var touch2 = e.touches[1];
-                    initialDistance = Math.hypot(
-                        touch2.pageX - touch1.pageX,
-                        touch2.pageY - touch1.pageY
-                    );
-                }
-            });
-
-            pagesWrapper.addEventListener('touchmove', function(e) {
-                if (e.touches.length === 2 && initialDistance > 0) {
-                    e.preventDefault();
-                    var touch1 = e.touches[0];
-                    var touch2 = e.touches[1];
-                    var currentDistance = Math.hypot(
-                        touch2.pageX - touch1.pageX,
-                        touch2.pageY - touch1.pageY
-                    );
-                    var scale = currentDistance / initialDistance;
-                    var newScale = currentScale * scale;
-                    newScale = Math.min(3.0, Math.max(0.3, newScale));
-
-                    currentScale = newScale;
-                    pagesWrapper.style.transform = 'scale(' + newScale + ')';
-                }
-            });
-
-            pagesWrapper.addEventListener('touchend', function(e) {
-                if (e.touches.length < 2) {
-                    if (pagesWrapper.style.transform) {
-                        var match = pagesWrapper.style.transform.match(/scale\(([^)]+)\)/);
-                        if (match) {
-                            currentScale = parseFloat(match[1]);
-                        }
-                    }
-                    initialDistance = 0;
-                }
-            });
-
-            // Bottom button container
             var buttonContainer = document.createElement('div');
             buttonContainer.style.cssText = 'display:flex;gap:8px;padding:12px;background:' + (nightMode ? '#2d2d2d' : '#f8f9fa') + ';border-top:1px solid ' + (nightMode ? '#444' : '#eee') + ';justify-content:flex-end;';
 
@@ -1232,14 +1087,17 @@
             printBtn.innerHTML = '<i class="fas fa-print"></i> 打印';
             printBtn.style.cssText = 'padding:8px 16px;background:#4a90e2;color:white;border:none;border-radius:4px;cursor:pointer;font-size:14px;font-weight:bold;';
             printBtn.onclick = function() {
-                sendToPrint(settings);
+                sendToPrint(settings, pdfBlob);
             };
 
             var pdfBtn = document.createElement('button');
             pdfBtn.innerHTML = '<i class="fas fa-file-pdf"></i> 下载';
             pdfBtn.style.cssText = 'padding:8px 16px;background:#dc3545;color:white;border:none;border-radius:4px;cursor:pointer;font-size:14px;font-weight:bold;';
-            pdfBtn.onclick = async function() {
-                await downloadAsPDF(content, settings);
+            pdfBtn.onclick = function() {
+                 var a = document.createElement('a');
+                 a.href = URL.createObjectURL(pdfBlob);
+                 a.download = '文档.pdf';
+                 a.click();
             };
 
             var cancelBtn = document.createElement('button');
@@ -1250,61 +1108,30 @@
             buttonContainer.appendChild(pdfBtn);
             buttonContainer.appendChild(cancelBtn);
 
-            // Assemble the preview
-            previewModal.appendChild(closeBtn);
+            previewContent.appendChild(closeBtn);
             previewContent.appendChild(docContainer);
             previewContent.appendChild(buttonContainer);
-
             previewModal.appendChild(previewContent);
             document.body.appendChild(previewModal);
 
-            // 等待DOM渲染完成后执行适配和添加分割线
-            setTimeout(function() {
-                addPageDividers();
-                fitToScreen();
-            }, 100);
-            window.addEventListener('resize', fitToScreen);
-
-            // Event listeners
+            function cleanup() {
+                previewModal.remove();
+            }
+            
+            closeBtn.onclick = cleanup;
+            cancelBtn.onclick = cleanup;
             previewModal.addEventListener('click', function(e) {
-                if (e.target === previewModal) {
-                    cleanup();
-                    previewModal.remove();
-                }
+                if (e.target === previewModal) cleanup();
             });
 
-            var handleKeydown = function(e) {
-                if (e.key === 'Escape') {
-                    cleanup();
-                    previewModal.remove();
-                    document.removeEventListener('keydown', handleKeydown);
-                }
-            };
-
-            document.addEventListener('keydown', handleKeydown);
-
-            function cleanup() {
-                window.removeEventListener('resize', fitToScreen);
-            }
-
-            closeBtn.onclick = function() {
-                cleanup();
-                previewModal.remove();
-            };
-
-            cancelBtn.onclick = function() {
-                cleanup();
-                previewModal.remove();
-            };
         } catch (error) {
             console.error('预览错误:', error);
-            // 移除加载状态
             loadingModal.remove();
             alert('预览失败: ' + error.message);
         }
     }
 
-    function sendToPrint(settings) {
+    async function sendToPrint(settings, existingPdfBlob) {
         // 检查用户是否登录
         if (!g('currentUser')) {
             global.showMessage('请先登录后再使用云打印功能');
@@ -1336,12 +1163,12 @@
 
         var statusText = document.createElement('div');
         statusText.id = 'printStatusText';
-        statusText.textContent = '正在连接到打印服务器...';
+        statusText.textContent = '正在准备打印内容...';
         statusText.style.cssText = 'font-size:16px;margin-bottom:10px;';
 
         var statusDetail = document.createElement('div');
         statusDetail.id = 'printStatusDetail';
-        statusDetail.textContent = '尝试连接到 wss://print.yhsun.cn';
+        statusDetail.textContent = '正在生成PDF文档...';
         statusDetail.style.cssText = 'font-size:13px;color:' + (nightMode ? '#aaa' : '#666') + ';';
 
         statusDiv.appendChild(statusText);
@@ -1367,8 +1194,16 @@
 
         var ws = null;
         var timeout = null;
+        var isCancelled = false;
+
+        cancelBtn.onclick = function() {
+            isCancelled = true;
+            cleanup();
+            modal.remove();
+        };
 
         function updateStatus(text, detail, isError) {
+            if (isCancelled) return;
             statusText.textContent = text;
             statusDetail.textContent = detail;
             if (isError) {
@@ -1386,116 +1221,86 @@
         }
 
         try {
-            // 生产环境使用wss://print.yhsun.cn
+            // 1. 生成PDF (如果未提供)
+            let pdfBlob = existingPdfBlob;
+            if (!pdfBlob) {
+                var htmlContent = await preparePrintContent(content, settings);
+                if (isCancelled) return;
+                pdfBlob = await generatePDF(htmlContent, settings);
+            }
+            
+            if (isCancelled) return;
+
+            // 2. 上传PDF
+            updateStatus('正在上传...', '正在上传PDF文件到服务器...');
+            
+            var formData = new FormData();
+            formData.append('files[]', new File([pdfBlob], 'print_job.pdf', { type: 'application/pdf' }));
+            
+            var uploadRes = await fetch('api/external/upload', {
+                method: 'POST',
+                body: formData
+            });
+            
+            if (isCancelled) return;
+            
+            var uploadResult = await uploadRes.json();
+            if (!uploadResult.success) {
+                throw new Error(uploadResult.message || '上传失败');
+            }
+            
+            var fileUrl = uploadResult.urls[0];
+
+            // 3. 连接 WebSocket
+            updateStatus('连接打印服务器...', '正在建立连接...');
             var wsUrl = 'wss://print.yhsun.cn';
             ws = new WebSocket(wsUrl);
 
             timeout = setTimeout(function() {
                 updateStatus('连接超时', '无法连接到打印服务器，请检查网络连接', true);
                 cleanup();
-            }, 5000);
+            }, 10000);
 
             ws.onopen = async function() {
                 clearTimeout(timeout);
-                updateStatus('连接成功', '正在准备打印内容...');
-
-                // 准备格式化的HTML内容
-                var htmlContent = await preparePrintContent(content, settings);
-
-                // 为打印客户端添加完整的HTML结构
-                var scale = settings.fitToPage ? 0.85 : 1.0;
-                var bodyFontSize = parseInt(settings.bodyFontSize) * scale;
-                var titleFontSize = parseInt(settings.titleFontSize) * scale;
-                var lineHeight = parseFloat(settings.lineHeight || '1.2');
-                var paragraphSpacing = parseFloat(settings.paragraphSpacing || '0.5');
-                var titleSpacing = parseFloat(settings.titleSpacing || '0.8');
-                var alignment = settings.alignment || 'left';
-                var titleAlignment = settings.titleAlignment || 'center';
-
-                var fullHtml = `<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>打印文档</title>
-    <style>
-        body {
-            font-family: "SimSun", "宋体", serif;
-            font-size: ${bodyFontSize}pt;
-            line-height: ${lineHeight};
-            color: #333;
-            padding: ${settings.pageMargin}mm;
-        }
-        h1, h2, h3, h4, h5, h6 {
-            text-align: ${titleAlignment};
-            font-weight: bold;
-            margin-top: ${titleSpacing};
-            margin-bottom: ${titleSpacing};
-            line-height: ${lineHeight};
-        }
-        h1 { font-size: ${titleFontSize * 1.5}; }
-        h2 { font-size: ${titleFontSize * 1.3}; }
-        h3 { font-size: ${titleFontSize * 1.1}pt; }
-        h4 { font-size: ${titleFontSize}pt; }
-        h5 { font-size: ${titleFontSize * 0.9}pt; }
-        h6 { font-size: ${titleFontSize * 0.8}pt; }
-        p {
-            font-size: ${bodyFontSize}pt;
-            margin: 0 0 ${paragraphSpacing}em 0;
-            padding: 0;
-            text-align: ${alignment};
-        }
-        .code-block {
-            background: #f8f9fa;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            padding: ${settings.fitToPage ? '10px' : '15px'};
-            font-family: monospace;
-            font-size: ${bodyFontSize * 0.9}pt;
-            overflow-x: auto;
-            margin: ${titleSpacing}em 0;
-            text-align: left;
-        }
-        img {
-            max-width: 100%;
-            height: auto;
-            margin: 1em 0;
-        }
-    </style>
-</head>
-<body>
-    ${htmlContent}
-</body>
-</html>`;
-
+                if (isCancelled) {
+                    ws.close();
+                    return;
+                }
                 updateStatus('连接成功', '正在发送打印任务...');
 
                 var printData = {
                     type: 'print_request',
                     username: username,
                     password: userPassword,
-                    content: fullHtml,
-                    settings: settings,
-                    timestamp: new Date().toISOString(),
-                    content_type: 'html' // 标记内容类型为HTML
+                    content: fileUrl,
+                    content_type: 'file',
+                    file_name: 'print_job.pdf',
+                    settings: {
+                        print_file: true
+                    },
+                    timestamp: new Date().toISOString()
                 };
 
                 ws.send(JSON.stringify(printData));
             };
 
             ws.onmessage = function(event) {
+                if (isCancelled) return;
                 try {
                     var response = JSON.parse(event.data);
                     if (response.type === 'client_status') {
-                        // 客户端状态更新
                         if (response.connected) {
-                            updateStatus('客户端已连接', '正在准备打印任务...');
+                            updateStatus('客户端已连接', '正在发送任务...');
                         } else {
-                            updateStatus('客户端未连接', '请确保打印客户端已启动并使用您的账号密码登录', true);
+                            updateStatus('客户端未连接', '请确保打印客户端已启动并登录', true);
                         }
                     } else if (response.type === 'print_queued') {
                         updateStatus('打印任务已发送', '打印任务已添加到打印队列', false);
                         cleanup();
+                        setTimeout(function() {
+                            if (!isCancelled) modal.remove();
+                        }, 2000);
                     } else if (response.type === 'error') {
                         updateStatus('打印失败: ' + response.message, response.details || '', true);
                         cleanup();
@@ -1509,32 +1314,29 @@
             ws.onerror = function(error) {
                 clearTimeout(timeout);
                 updateStatus('连接错误', '无法连接到打印服务器，请检查网络连接', true);
-                global.showMessage('网络未连接，请连接网络', 'error');
                 console.error('WebSocket错误:', error);
             };
 
             ws.onclose = function(event) {
                 clearTimeout(timeout);
-                if (!event.wasClean) {
-                    updateStatus('连接意外关闭', '代码: ' + event.code + ', 原因: ' + event.reason, true);
+                if (!event.wasClean && !isCancelled) {
+                    updateStatus('连接意外关闭', '代码: ' + event.code, true);
                 }
-            };
-
-            cancelBtn.onclick = function() {
-                cleanup();
-                modal.remove();
             };
 
             modal.addEventListener('click', function(e) {
                 if (e.target === modal) {
+                    isCancelled = true;
                     cleanup();
                     modal.remove();
                 }
             });
 
         } catch (error) {
-            updateStatus('连接失败', error.toString(), true);
-            cleanup();
+            if (!isCancelled) {
+                updateStatus('连接失败', error.toString(), true);
+                cleanup();
+            }
         }
     }
 
@@ -1556,11 +1358,14 @@
     }
 
     async function preparePrintContent(content, settings) {
+        console.log('[Print Debug] preparePrintContent start. Content length:', content ? content.length : 0);
+        
         // 生成缓存键
         var cacheKey = generateCacheKey(content, settings);
 
         // 检查缓存是否存在
         if (printContentCache[cacheKey]) {
+            console.log('[Print Debug] Using cached content');
             return printContentCache[cacheKey];
         }
 
@@ -1573,6 +1378,7 @@
             // 如果返回完整 URL, 需要拼接
             var apiUrl = api.startsWith('http') ? api + '/convert/markdown' : 'api/convert/markdown';
             
+            console.log('[Print Debug] Fetching markdown conversion from:', apiUrl);
             var response = await fetch(apiUrl, {
                 method: 'POST',
                 headers: {
@@ -1584,15 +1390,18 @@
             var result = await response.json();
             if (result.code === 200) {
                 htmlContent = result.data;
+                console.log('[Print Debug] Server conversion success. HTML length:', htmlContent.length);
             } else {
-                console.error('Markdown conversion failed:', result.message);
+                console.error('[Print Debug] Markdown conversion failed:', result.message);
                 // Fallback to local formatting if server fails
                 htmlContent = formatForPrint(content, settings);
+                console.log('[Print Debug] Fallback to local formatting. HTML length:', htmlContent.length);
             }
         } catch (e) {
-            console.error('Markdown conversion error:', e);
+            console.error('[Print Debug] Markdown conversion error:', e);
             // Fallback to local formatting
             htmlContent = formatForPrint(content, settings);
+            console.log('[Print Debug] Fallback to local formatting (error). HTML length:', htmlContent.length);
         }
 
         // Post-process HTML to match expected structure for Mermaid and others
@@ -1601,6 +1410,7 @@
 
         // Transform mermaid code blocks: <pre><code class="language-mermaid">...</code></pre> -> <div class="mermaid">...</div>
         var mermaidCodes = tempDiv.querySelectorAll('code.language-mermaid');
+        console.log('[Print Debug] Found mermaid blocks:', mermaidCodes.length);
         mermaidCodes.forEach(function(code) {
             var pre = code.parentNode;
             if (pre.tagName === 'PRE') {
@@ -1619,9 +1429,13 @@
 
         // Convert formulas and charts to images and upload
         if (!global.convertFormulasAndChartsToImages) {
+             console.error('[Print Debug] Render module not loaded');
              throw new Error('Render module not loaded');
         }
+        
+        console.log('[Print Debug] Starting convertFormulasAndChartsToImages...');
         var processedHtml = await global.convertFormulasAndChartsToImages(htmlContent);
+        console.log('[Print Debug] convertFormulasAndChartsToImages done. HTML length:', processedHtml.length);
 
         // For print, we need to ensure formulas, charts, and images are properly rendered
         // Create a temporary container to process the content
@@ -1632,6 +1446,12 @@
         processImages(tempContainer);
 
         var finalHtml = tempContainer.innerHTML;
+        
+        // Add print styles
+        const printStyle = getPrintStyles(settings);
+        finalHtml = `<style>${printStyle}</style><div class="print-content">${finalHtml}</div>`;
+        
+        console.log('[Print Debug] Final HTML prepared. Length:', finalHtml.length);
 
         // 将处理后的内容存入缓存
         printContentCache[cacheKey] = finalHtml;
@@ -2098,5 +1918,3 @@
     global.sendToPrint = sendToPrint;
     global.preparePrintContent = preparePrintContent;
     global.showFilePrintDialog = showFilePrintDialog;
-
-})(typeof window !== 'undefined' ? window : this);

@@ -34,24 +34,29 @@
     }
 
     async function convertFormulasAndChartsToImages(html) {
+        console.log('[Render Debug] convertFormulasAndChartsToImages start');
         if (!html) {
+            console.log('[Render Debug] HTML is empty, skipping');
             return html;
         }
 
-        // 动态加载 html-to-image
-        var htmlToImage;
+        // 动态加载 html2canvas
+        var html2canvas;
         try {
-            htmlToImage = await import('html-to-image');
+            html2canvas = (await import('html2canvas')).default;
+            console.log('[Render Debug] html2canvas loaded');
         } catch (e) {
-            console.error('Failed to load html-to-image', e);
+            console.error('[Render Debug] Failed to load html2canvas', e);
             return html;
         }
 
         var container = document.createElement('div');
         container.innerHTML = html;
+        console.log('[Render Debug] Container created, processing elements...');
 
         // 处理原始的Markdown公式格式
         var allElements = container.querySelectorAll('div, p, span');
+        console.log('[Render Debug] Found elements:', allElements.length);
 
         // 收集所有需要处理的元素
         var elementsToProcess = [];
@@ -106,6 +111,8 @@
                 continue;
             }
         }
+        
+        console.log('[Render Debug] Formulas to process:', elementsToProcess.length);
 
         // 处理公式元素
         for (var i = 0; i < elementsToProcess.length; i++) {
@@ -113,6 +120,8 @@
             var el = item.element;
             var latex = item.content;
             var displayMode = item.type === 'block-formula';
+            
+            console.log('[Render Debug] Processing formula:', i, latex.substring(0, 20));
 
             try {
                 // Create a temporary div for rendering
@@ -132,11 +141,11 @@
                             strict: 'ignore'
                         });
                     } catch (katexError) {
-                        console.error('KaTeX渲染失败:', katexError);
+                        console.error('[Render Debug] KaTeX渲染失败:', katexError);
                         continue;
                     }
                 } else {
-                    console.error('KaTeX库不可用，无法渲染公式');
+                    console.error('[Render Debug] KaTeX库不可用，无法渲染公式');
                     continue;
                 }
 
@@ -152,24 +161,29 @@
                 tempDiv.style.width = (formulaRect.width + 20) + 'px'; // 加上20px的padding
                 tempDiv.style.height = (formulaRect.height + 20) + 'px';
 
-                // Convert to image using html-to-image
-                if (htmlToImage) {
+                // Convert to image using html2canvas
+                if (html2canvas) {
                     try {
-                        var dataUrl = await htmlToImage.toPng(tempDiv);
+                        const canvas = await html2canvas(tempDiv, {
+                            backgroundColor: null,
+                            scale: 2
+                        });
+                        var dataUrl = canvas.toDataURL('image/png');
                         document.body.removeChild(tempDiv);
                     } catch (imageError) {
-                        console.error('图片转换失败:', imageError);
+                        console.error('[Render Debug] 图片转换失败:', imageError);
                         document.body.removeChild(tempDiv);
                         continue;
                     }
                 } else {
-                    console.error('html-to-image库不可用，无法转换为图片');
+                    console.error('[Render Debug] html2canvas库不可用，无法转换为图片');
                     document.body.removeChild(tempDiv);
                     continue;
                 }
 
                 // Upload image to server
                 var imgUrl = await global.uploadImage(dataUrl);
+                console.log('[Render Debug] Formula uploaded:', imgUrl);
 
                 if (imgUrl) {
                     // Create image container with proper styling
@@ -231,20 +245,23 @@
                         }
                     }
                 } else {
-                    console.error('图片上传失败，URL为空');
+                    console.error('[Render Debug] 图片上传失败，URL为空');
                 }
             } catch (e) {
-                console.error('公式处理错误:', e);
+                console.error('[Render Debug] 公式处理错误:', e);
             }
         }
 
         // Convert Mermaid charts to images and upload
         var mermaidElements = container.querySelectorAll('.mermaid, [data-mermaid]');
+        console.log('[Render Debug] Mermaid elements to process:', mermaidElements.length);
 
         for (var i = 0; i < mermaidElements.length; i++) {
             var el = mermaidElements[i];
             var mermaidCode = el.textContent || el.getAttribute('data-mermaid');
             if (!mermaidCode) continue;
+            
+            console.log('[Render Debug] Processing mermaid:', i);
 
             try {
                 // Create a temporary div for rendering
@@ -263,7 +280,7 @@
                     // 确保 Mermaid 库已加载
                     if (!window.mermaid) {
                         // 尝试动态加载 Mermaid
-                        console.warn('Mermaid库未加载，尝试动态加载...');
+                        console.warn('[Render Debug] Mermaid库未加载，尝试动态加载...');
                         await new Promise((resolve, reject) => {
                             const script = document.createElement('script');
                             script.src = 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js';
@@ -331,7 +348,7 @@
                         }
                     }
                 } catch (mermaidError) {
-                    console.error('Mermaid渲染失败:', mermaidError);
+                    console.error('[Render Debug] Mermaid渲染失败:', mermaidError);
                     // 渲染失败时使用占位符
                     var svgCode = `
                         <svg width="600" height="400" xmlns="http://www.w3.org/2000/svg">
@@ -341,30 +358,35 @@
                         </svg>
                     `;
                     tempDiv.innerHTML = svgCode;
-                    console.log('使用占位符替代');
+                    console.log('[Render Debug] 使用占位符替代');
                 }
 
                 // Wait a bit for rendering to complete
                 await new Promise(resolve => setTimeout(resolve, 1000)); // 增加等待时间确保渲染完成
 
-                // Convert to image using html-to-image
-                if (htmlToImage) {
+                // Convert to image using html2canvas
+                if (html2canvas) {
                     try {
-                        var dataUrl = await htmlToImage.toPng(tempDiv);
+                        const canvas = await html2canvas(tempDiv, {
+                            backgroundColor: '#ffffff',
+                            scale: 2
+                        });
+                        var dataUrl = canvas.toDataURL('image/png');
                         document.body.removeChild(tempDiv);
                     } catch (imageError) {
-                        console.error('图表图片转换失败:', imageError);
+                        console.error('[Render Debug] 图表图片转换失败:', imageError);
                         document.body.removeChild(tempDiv);
                         continue;
                     }
                 } else {
-                    console.error('html-to-image库不可用，无法转换为图片');
+                    console.error('[Render Debug] html2canvas库不可用，无法转换为图片');
                     document.body.removeChild(tempDiv);
                     continue;
                 }
 
                 // Upload image to server
                 var imgUrl = await global.uploadImage(dataUrl);
+                console.log('[Render Debug] Chart uploaded:', imgUrl);
 
                 if (imgUrl && el.parentNode) {
                     // Create image container with proper styling
@@ -378,13 +400,14 @@
                     imgContainer.appendChild(img);
                     el.parentNode.replaceChild(imgContainer, el);
                 } else {
-                    console.error('图表图片上传失败，URL为空');
+                    console.error('[Render Debug] 图表图片上传失败，URL为空');
                 }
             } catch (e) {
-                console.error('Mermaid渲染错误:', e);
+                console.error('[Render Debug] Mermaid渲染错误:', e);
             }
         }
-
+        
+        console.log('[Render Debug] convertFormulasAndChartsToImages finished. HTML length:', container.innerHTML.length);
         return container.innerHTML;
     }
 
