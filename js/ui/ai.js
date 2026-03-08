@@ -161,10 +161,10 @@
             
             // 2. 准备提示词
             var stylePrompts = {
-                academic: '请将以下Markdown内容重新排版为学术论文风格。要求：标题清晰分级，段落结构严谨，适当使用加粗强调关键概念。',
-                business: '请将以下Markdown内容重新排版为商务公文风格。要求：格式规范，条理清晰，语气正式，重点突出。',
-                creative: '请将以下Markdown内容重新排版为创意设计风格。要求：排版活泼，富有设计感，适当使用引用和列表增强可读性。',
-                simple: '请将以下Markdown内容重新排版为极简阅读风格。要求：去除冗余格式，保留核心内容，段落短小精悍，便于快速阅读。'
+                academic: '请将以下Markdown内容重新排版为学术论文风格。不得对内容文本进行任何修改。',
+                business: '请将以下Markdown内容重新排版为商务公文风格。不得对内容文本进行任何修改',
+                creative: '请将以下Markdown内容重新排版为创意设计风格。不得对内容文本进行任何修改。',
+                simple: '请将以下Markdown内容重新排版为极简阅读风格。不得对内容文本进行任何修改。'
             };
             
             var prompt = stylePrompts[currentAISettings.style] || stylePrompts.academic;
@@ -173,29 +173,25 @@
             }
             
             // 3. 调用通义千问API
-            updateAILoadingStatus('正在连接通义千问大模型...');
+            updateAILoadingStatus('AI正在排版中...');
             var aiResponse = await callQwenAPI(content, prompt);
             
-            updateAILoadingStatus('正在生成排版预览...');
+            updateAILoadingStatus('正在生成预览...');
             
             // 4. 解析AI返回的内容
             // 假设AI返回的是Markdown格式
             var optimizedMarkdown = aiResponse;
             
             // 5. 将Markdown转换为HTML用于预览
-            // 这里我们使用简单的转换或复用现有的转换逻辑
-            // 为了预览效果，我们需要将Markdown转换为HTML
-            // 这里可以使用 formatForPrint 但需要一些适配
-            
             // 简单的Markdown转HTML处理，用于快速预览
-            // 实际打印时会再次处理
+            // 打印时会再次处理
             var previewHtml = await convertSimpleMarkdown(optimizedMarkdown);
             
             // 6. 显示预览对比界面
+            showAILayoutPreview(optimizedMarkdown, previewHtml);
+            
             var loadingModal = document.getElementById('aiLoadingModal');
             if (loadingModal) loadingModal.remove();
-            
-            showAILayoutPreview(optimizedMarkdown, previewHtml);
             
         } catch (error) {
             console.error('AI排版错误:', error);
@@ -232,8 +228,6 @@
         };
 
         // 调用后端代理接口
-        // 注意：这里需要后端实现一个代理接口来转发请求到阿里云，以隐藏API Key
-        // 或者使用通用的AI处理接口
         try {
             var apiUrl = (global.getApiBaseUrl ? global.getApiBaseUrl() : 'api') + '/ai/layout';
             
@@ -261,9 +255,7 @@
                 throw new Error(result.message || 'AI服务暂时不可用');
             }
         } catch (e) {
-            // 如果后端接口不存在（开发阶段），我们可以模拟一个响应
-            // console.warn('AI接口调用失败，使用模拟数据:', e);
-            // return content + "\n\n> [AI已优化排版 - 模拟模式]";
+            // 如果后端接口不存在
              throw e;
         }
     }
@@ -289,10 +281,10 @@
         return markdown; // 降级处理
     }
 
-    function showAILayoutPreview(markdown, html) {
+    async function showAILayoutPreview(markdown, html) {
         var nightMode = g('nightMode') === true;
         
-        // Define settings to match those used in convertSimpleMarkdown
+        // Use default print settings for AI preview
         var settings = {
             titleFontSize: 24,
             bodyFontSize: 12,
@@ -306,178 +298,116 @@
             indentParagraph: true
         };
         
-        var previewModal = document.createElement('div');
-        previewModal.className = 'modal-overlay';
-        previewModal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.9);display:flex;flex-direction:column;z-index:10003;align-items:stretch;justify-content:stretch;padding:0;';
-        
-        var header = document.createElement('div');
-        header.style.cssText = 'padding:15px 20px;background:' + (nightMode ? '#2d2d2d' : 'white') + ';border-bottom:1px solid ' + (nightMode ? '#444' : '#ddd') + ';display:flex;justify-content:space-between;align-items:center;z-index:100;flex-shrink:0;';
-        
-        header.innerHTML = `
-            <div style="display:flex;align-items:center;gap:15px;">
-                <h3 style="margin:0;color:${nightMode ? '#eee' : '#333'};"><i class="fas fa-magic" style="color:#667eea;margin-right:10px;"></i>AI排版预览</h3>
-                <span style="font-size:12px;padding:3px 8px;background:${nightMode ? '#3d3d3d' : '#f0f4ff'};color:#667eea;border-radius:4px;">${currentAISettings.style === 'academic' ? '学术风格' : currentAISettings.style === 'business' ? '商务风格' : currentAISettings.style === 'creative' ? '创意风格' : '极简风格'}</span>
-            </div>
-            <div style="display:flex;gap:10px;">
-                <button id="regenerateBtn" style="padding:8px 15px;background:transparent;border:1px solid ${nightMode ? '#555' : '#ddd'};color:${nightMode ? '#eee' : '#333'};border-radius:6px;cursor:pointer;">
-                    <i class="fas fa-redo"></i> 重新生成
-                </button>
-                <button id="applyAiBtn" style="padding:8px 20px;background:linear-gradient(135deg, #667eea 0%, #764ba2 100%);color:white;border:none;border-radius:6px;cursor:pointer;font-weight:bold;">
-                    <i class="fas fa-check"></i> 应用并打印
-                </button>
-                <button id="closeAiPreviewBtn" style="padding:8px 15px;background:transparent;border:none;color:${nightMode ? '#aaa' : '#666'};cursor:pointer;font-size:18px;">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-        `;
-        
-        // Document container (adapted from print.js)
-        var docContainer = document.createElement('div');
-        docContainer.style.cssText = 'flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;overflow:auto;padding:20px;min-height:0;background:' + (nightMode ? '#1a1a1a' : '#f0f0f0') + ';';
-        
-        // Scaling variables
-        var currentScale = 1.0;
-        var initialDistance = 0;
-        var a4Width = 595;
-        var a4Height = 842;
-        var a4Margin = settings.pageMargin;
+        // Show loading modal while generating PDF
+        var loadingModal = document.createElement('div');
+        loadingModal.className = 'modal-overlay';
+        loadingModal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.9);z-index:21000;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;';
+        loadingModal.innerHTML = '<div style="background:' + (nightMode ? '#2d2d2d' : 'white') + ';color:' + (nightMode ? '#eee' : '#333') + ';border-radius:12px;padding:30px;text-align:center;"><div style="font-size:24px;margin-bottom:15px;"><i class="fas fa-spinner fa-spin"></i></div><div style="font-size:16px;">正在生成AI排版预览...</div></div>';
+        document.body.appendChild(loadingModal);
 
-        // Pages wrapper
-        var pagesWrapper = document.createElement('div');
-        pagesWrapper.style.cssText = 'display:flex;flex-direction:column;gap:20px;align-items:center;transform-origin:top center;';
-
-        // Create page function
-        function createPage() {
-            var page = document.createElement('div');
-            page.className = 'a4-page';
-            page.style.cssText = 'width:' + a4Width + 'px;min-height:' + a4Height + 'px;background:white;box-shadow:0 2px 10px rgba(0,0,0,0.1);position:relative;border:1px solid #ccc;overflow:visible;';
-
-            var contentDiv = document.createElement('div');
-            contentDiv.style.cssText = 'width:100%;padding:' + a4Margin + 'mm;box-sizing:border-box;position:relative;';
-
-            // Use global.getPrintStyles if available
-            if (global.getPrintStyles) {
-                var printStyles = global.getPrintStyles(settings);
-                var styleElement = document.createElement('style');
-                styleElement.textContent = printStyles;
-                contentDiv.appendChild(styleElement);
-            }
-
-            page.appendChild(contentDiv);
-            return { page: page, contentDiv: contentDiv };
-        }
-
-        // Create first page and content
-        var { page: firstPage, contentDiv: firstContentDiv } = createPage();
-        firstContentDiv.innerHTML += html;
-        pagesWrapper.appendChild(firstPage);
-        docContainer.appendChild(pagesWrapper);
-
-        // Add page dividers
-        function addPageDividers() {
-            var marginPx = a4Margin * 3.78; // mm to px approx (1mm ≈ 3.78px)
-            var usableHeight = a4Height - (marginPx * 2);
-            var contentHeight = firstContentDiv.scrollHeight;
-            var numPages = Math.ceil(contentHeight / usableHeight);
-
-            if (numPages > 1) {
-                for (var i = 1; i < numPages; i++) {
-                    var divider = document.createElement('div');
-                    divider.style.cssText = 'position:absolute;left:0;right:0;height:2px;background:linear-gradient(to right, transparent, #ff6b6b, transparent);z-index:10;';
-                    divider.style.top = (usableHeight * i + marginPx) + 'px';
-                    firstContentDiv.appendChild(divider);
-
-                    var pageLabel = document.createElement('div');
-                    pageLabel.style.cssText = 'position:absolute;left:50%;transform:translateX(-50%);top:' + ((usableHeight * i + marginPx) - 15) + 'px;font-size:11px;color:#ff6b6b;background:white;padding:2px 8px;border-radius:3px;z-index:11;';
-                    pageLabel.textContent = '--- 第 ' + (i + 1) + '页开始 ---';
-                    firstContentDiv.appendChild(pageLabel);
-                }
-            }
-        }
-
-        // Fit to screen
-        function fitToScreen() {
-            var containerWidth = docContainer.clientWidth - 40;
-            var scale = Math.min(containerWidth / a4Width, 1.0);
-            currentScale = scale;
-            pagesWrapper.style.transform = 'scale(' + scale + ')';
-        }
-
-        // Event listeners for scaling (Touch)
-        pagesWrapper.addEventListener('touchstart', function(e) {
-            if (e.touches.length === 2) {
-                e.preventDefault();
-                var touch1 = e.touches[0];
-                var touch2 = e.touches[1];
-                initialDistance = Math.hypot(touch2.pageX - touch1.pageX, touch2.pageY - touch1.pageY);
-            }
-        });
-
-        pagesWrapper.addEventListener('touchmove', function(e) {
-            if (e.touches.length === 2 && initialDistance > 0) {
-                e.preventDefault();
-                var touch1 = e.touches[0];
-                var touch2 = e.touches[1];
-                var currentDistance = Math.hypot(touch2.pageX - touch1.pageX, touch2.pageY - touch1.pageY);
-                var scale = currentDistance / initialDistance;
-                var newScale = currentScale * scale;
-                newScale = Math.min(3.0, Math.max(0.3, newScale));
-                currentScale = newScale;
-                pagesWrapper.style.transform = 'scale(' + newScale + ')';
-            }
-        });
-
-        pagesWrapper.addEventListener('touchend', function(e) {
-            if (e.touches.length < 2) {
-                if (pagesWrapper.style.transform) {
-                    var match = pagesWrapper.style.transform.match(/scale\(([^)]+)\)/);
-                    if (match) currentScale = parseFloat(match[1]);
-                }
-                initialDistance = 0;
-            }
-        });
-        
-        previewModal.appendChild(header);
-        previewModal.appendChild(docContainer);
-        document.body.appendChild(previewModal);
-        
-        // Init layout
-        setTimeout(function() {
-            addPageDividers();
-            fitToScreen();
-        }, 100);
-        window.addEventListener('resize', fitToScreen);
-
-        // Cleanup function
-        function cleanup() {
-            window.removeEventListener('resize', fitToScreen);
-        }
-        
-        // 绑定事件
-        header.querySelector('#closeAiPreviewBtn').onclick = function() {
-            cleanup();
-            previewModal.remove();
-        };
-        
-        header.querySelector('#regenerateBtn').onclick = function() {
-            cleanup();
-            previewModal.remove();
-            showAILayoutModifyDialog();
-        };
-        
-        header.querySelector('#applyAiBtn').onclick = function() {
-            // 保存历史记录
-            aiLayoutHistory.push({
-                markdown: markdown,
-                settings: JSON.parse(JSON.stringify(currentAISettings)),
-                timestamp: new Date()
-            });
+        try {
+            // Generate PDF URL using the new server-side generation
+            // Note: We need to use preparePrintContent logic or ensure html is processed
+            // Since we already have html from convertSimpleMarkdown, we can use it directly
+            // BUT, convertSimpleMarkdown uses preparePrintContent internally, so it should be ready.
             
-            cleanup();
-            // 直接进入打印流程
-            previewModal.remove();
-            printAILayout(html);
-        };
+            // However, we need to ensure images/formulas are processed if not already
+            // convertSimpleMarkdown calls preparePrintContent which handles this.
+            
+            var pdfUrl = await global.generatePDF(html, settings);
+            
+            loadingModal.remove();
+
+            var previewModal = document.createElement('div');
+            previewModal.className = 'modal-overlay';
+            previewModal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.9);z-index:10003;display:flex;flex-direction:column;align-items:stretch;justify-content:stretch;padding:0;';
+            
+            var previewContent = document.createElement('div');
+            previewContent.style.cssText = 'background:' + (nightMode ? '#1a1a1a' : '#f0f0f0') + ';border-radius:0;display:flex;flex-direction:column;flex:1;box-shadow:none;border:none;min-height:0;';
+            
+            var closeBtn = document.createElement('button');
+            closeBtn.innerHTML = '<i class="fas fa-times"></i>';
+            closeBtn.style.cssText = 'position:absolute;top:10px;right:10px;background:' + (nightMode ? '#333' : '#fff') + ';border:1px solid ' + (nightMode ? '#555' : '#ddd') + ';color:#666;font-size:16px;cursor:pointer;padding:8px;border-radius:4px;z-index:10;';
+
+            // Document container
+            var docContainer = document.createElement('div');
+            docContainer.style.cssText = 'flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;overflow:auto;padding:20px;min-height:0;';
+            
+            var pagesWrapper = document.createElement('div');
+            pagesWrapper.style.cssText = 'display:flex;flex-direction:column;gap:20px;align-items:center;width:100%;max-width:800px;';
+            
+            docContainer.appendChild(pagesWrapper);
+            
+            // Render PDF
+            await global.renderPDF(pdfUrl, pagesWrapper);
+            
+            // Bottom action buttons
+            var buttonContainer = document.createElement('div');
+            buttonContainer.style.cssText = 'display:flex;gap:8px;padding:12px;background:' + (nightMode ? '#2d2d2d' : '#f8f9fa') + ';border-top:1px solid ' + (nightMode ? '#444' : '#eee') + ';justify-content:flex-end;';
+
+            // 1. 补充需求 (Regenerate)
+            var refineBtn = document.createElement('button');
+            refineBtn.innerHTML = '<i class="fas fa-magic"></i> 补充需求';
+            refineBtn.style.cssText = 'padding:8px 16px;background:' + (nightMode ? '#444' : '#e0e0e0') + ';color:' + (nightMode ? '#eee' : '#333') + ';border:none;border-radius:4px;cursor:pointer;font-size:14px;';
+            refineBtn.onclick = function() {
+                cleanup();
+                showAILayoutModifyDialog();
+            };
+
+            // 2. 打印 (Print)
+            var printBtn = document.createElement('button');
+            printBtn.innerHTML = '<i class="fas fa-print"></i> 打印';
+            printBtn.style.cssText = 'padding:8px 16px;background:#4a90e2;color:white;border:none;border-radius:4px;cursor:pointer;font-size:14px;font-weight:bold;';
+            printBtn.onclick = function() {
+                // Use the new sendToPrint which accepts PDF URL
+                global.sendToPrint(settings, pdfUrl);
+            };
+
+            // 3. 下载 (Download)
+            var pdfBtn = document.createElement('button');
+            pdfBtn.innerHTML = '<i class="fas fa-file-pdf"></i> 下载';
+            pdfBtn.style.cssText = 'padding:8px 16px;background:#dc3545;color:white;border:none;border-radius:4px;cursor:pointer;font-size:14px;font-weight:bold;';
+            pdfBtn.onclick = function() {
+                 var a = document.createElement('a');
+                 a.href = pdfUrl;
+                 a.download = 'AI排版文档.pdf';
+                 a.target = '_blank';
+                 document.body.appendChild(a);
+                 a.click();
+                 document.body.removeChild(a);
+            };
+
+            // 4. 关闭 (Close)
+            var cancelBtn = document.createElement('button');
+            cancelBtn.innerHTML = '<i class="fas fa-times"></i> 关闭';
+            cancelBtn.style.cssText = 'padding:8px 16px;background:' + (nightMode ? '#555' : '#6c757d') + ';color:white;border:none;border-radius:4px;cursor:pointer;font-size:14px;';
+            cancelBtn.onclick = cleanup;
+
+            buttonContainer.appendChild(refineBtn);
+            buttonContainer.appendChild(printBtn);
+            buttonContainer.appendChild(pdfBtn);
+            buttonContainer.appendChild(cancelBtn);
+
+            previewContent.appendChild(closeBtn);
+            previewContent.appendChild(docContainer);
+            previewContent.appendChild(buttonContainer);
+            previewModal.appendChild(previewContent);
+            document.body.appendChild(previewModal);
+
+            function cleanup() {
+                previewModal.remove();
+            }
+            
+            closeBtn.onclick = cleanup;
+            previewModal.addEventListener('click', function(e) {
+                if (e.target === previewModal) cleanup();
+            });
+
+        } catch (error) {
+            console.error('AI预览生成错误:', error);
+            if (loadingModal.parentNode) loadingModal.remove();
+            global.showMessage('AI预览生成失败: ' + error.message, 'error');
+        }
     }
 
     function showAILayoutModifyDialog() {

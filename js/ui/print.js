@@ -1037,18 +1037,62 @@ function g(name) { return global[name]; }
     }
 
     async function downloadAsPDF(content, settings) {
-        var htmlContent = await preparePrintContent(content, settings);
-        // generatePDF returns a URL now
-        var pdfUrl = await generatePDF(htmlContent, settings, 'document.pdf');
-        
-        // Trigger download
-        var a = document.createElement('a');
-        a.href = pdfUrl;
-        a.download = 'document.pdf';
-        a.target = '_blank';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
+        // 显示加载状态
+        var nightMode = g('nightMode') === true;
+        var loadingModal = document.createElement('div');
+        loadingModal.className = 'modal-overlay';
+        loadingModal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.9);z-index:21000;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;';
+        loadingModal.innerHTML = '<div style="background:' + (nightMode ? '#2d2d2d' : 'white') + ';color:' + (nightMode ? '#eee' : '#333') + ';border-radius:12px;padding:30px;text-align:center;"><div style="font-size:24px;margin-bottom:15px;"><i class="fas fa-spinner fa-spin"></i></div><div style="font-size:16px;">正在生成PDF...</div></div>';
+        document.body.appendChild(loadingModal);
+
+        try {
+            var htmlContent = await preparePrintContent(content, settings);
+            // generatePDF returns a URL now
+            var pdfUrl = await generatePDF(htmlContent, settings, 'document.pdf');
+            
+            loadingModal.remove();
+
+            // 确保pdfUrl是完整的URL
+            var fullPdfUrl = pdfUrl;
+            if (!pdfUrl.startsWith('http://') && !pdfUrl.startsWith('https://')) {
+                // 构建完整的URL
+                var baseUrl = window.location.origin;
+                if (!pdfUrl.startsWith('/')) {
+                    baseUrl += '/' + window.location.pathname.split('/').slice(0, -1).join('/') + '/';
+                }
+                fullPdfUrl = baseUrl + pdfUrl;
+            }
+
+            // Trigger download using fetch and blob to force download behavior
+            // This is more reliable than simple anchor click for same-origin or CORS enabled resources
+            var response = await fetch(fullPdfUrl);
+            var blob = await response.blob();
+            var url = window.URL.createObjectURL(blob);
+            
+            var a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            // Get filename from current file name if available
+            var currentFileName = '文档';
+            var currentNode = g('currentFileId') ? g('fileTree').jstree(true).get_node(g('currentFileId')) : null;
+            if (currentNode) {
+                currentFileName = currentNode.text.replace(/\.md$/, '');
+            }
+            a.download = currentFileName + '.pdf';
+            document.body.appendChild(a);
+            a.click();
+            
+            // Cleanup
+            setTimeout(function() {
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+            }, 100);
+
+        } catch (error) {
+            console.error('PDF download error:', error);
+            loadingModal.remove();
+            alert('PDF生成失败: ' + error.message);
+        }
     }
 
     async function showPrintPreview(settings) {
