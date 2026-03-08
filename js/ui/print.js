@@ -1219,6 +1219,9 @@ function g(name) { return global[name]; }
             .katex {
                 margin: 1em 0;
             }
+            .katex-mathml {
+                display: none;
+            }
             @media print {
                 body { -webkit-print-color-adjust: exact; }
                 ${settings.fitToPage ? '@page { size: auto; margin: 5mm; }' : ''}

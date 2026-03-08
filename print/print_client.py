@@ -392,7 +392,7 @@ class PrintClient:
             async for message in websocket:
                 try:
                     data = json.loads(message)
-                    print(f"收到打印请求: {data.get('type')}")
+                    # print(f"收到打印请求: {data.get('type')}")
                     if data.get('type') == 'print_request':
                         content = data.get('content', '')
                         settings = data.get('settings', {})
