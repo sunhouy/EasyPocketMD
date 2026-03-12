@@ -101,6 +101,7 @@ document.addEventListener('DOMContentLoaded', function() {
             handler: function(files) { return window.uploadFiles(files, true); }
         },
         after: function() {
+            window.vditorReady = true;
             if (loading) loading.style.display = 'none';
             // Expose generatePDF and renderPDF to global scope from the module exports
             // Since we use ES modules for pdf-generator.js, we need to import them and attach to window

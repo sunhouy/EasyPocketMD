@@ -267,7 +267,7 @@
         if (shareId) {
             // 等待 Vditor 初始化完成后再处理分享链接
             function waitForVditor() {
-                if (window.vditor && typeof window.vditor.setValue === 'function') {
+                if (window.vditorReady && window.vditor && typeof window.vditor.setValue === 'function') {
                     // Vditor 已经完全初始化完成
                     handleShareLink(shareId, sharePassword);
                 } else {
