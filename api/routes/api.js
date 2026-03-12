@@ -5,6 +5,7 @@ const apiManager = require('../models/ApiManager');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const sharp = require('sharp');
 
 // Multer for screenshots
 const storage = multer.diskStorage({
@@ -121,15 +122,28 @@ router.post('/upload', generalUpload.array('files[]'), async (req, res) => {
             }
 
             // Move files
-            req.files.forEach(file => {
+            for (const file of req.files) {
                 const oldPath = file.path;
                 const newPath = path.join(fullTargetDir, file.filename);
                 // Check if file exists in destination (edge case with same name)
                 // Since filename includes timestamp, collision is unlikely but possible
                 fs.renameSync(oldPath, newPath);
                 
-                // Update file path in memory if needed (though we just use filename for URL)
-            });
+                // Generate thumbnail if it's an image
+                if (file.mimetype.startsWith('image/')) {
+                    try {
+                        const thumbPath = path.join(fullTargetDir, 'thumb_' + file.filename);
+                        await sharp(newPath)
+                            .resize(200, 200, {
+                                fit: 'contain',
+                                background: { r: 255, g: 255, b: 255, alpha: 0 }
+                            })
+                            .toFile(thumbPath);
+                    } catch (err) {
+                        console.error('Failed to generate thumbnail for:', file.filename, err);
+                    }
+                }
+            }
         }
     }
 

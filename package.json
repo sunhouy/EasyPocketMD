@@ -39,6 +39,7 @@
     "multer": "^1.4.5-lts.1",
     "mysql2": "^3.6.5",
     "pdfjs-dist": "^4.4.168",
+    "sharp": "^0.34.5",
     "uuid": "^9.0.1",
     "vditor": "^3.11.2",
     "wkhtmltopdf": "^0.4.0"

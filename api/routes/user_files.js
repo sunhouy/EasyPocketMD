@@ -36,13 +36,23 @@ router.post('/list', checkAuth, (req, res) => {
             const filePath = path.join(userDir, file);
             try {
                 const stats = fs.statSync(filePath);
-                if (stats.isFile()) {
+                if (stats.isFile() && !file.startsWith('thumb_')) {
                     totalSize += stats.size;
+                    const thumbName = 'thumb_' + file;
+                    const thumbPath = path.join(userDir, thumbName);
+                    let url = `${userModel.baseUrl}/user_files/${username}/${file}`;
+                    let thumbUrl = url;
+
+                    if (fs.existsSync(thumbPath)) {
+                        thumbUrl = `${userModel.baseUrl}/user_files/${username}/${thumbName}`;
+                    }
+
                     fileList.push({
                         name: file,
                         size: stats.size,
                         mtime: stats.mtime,
-                        url: `${userModel.baseUrl}/user_files/${username}/${file}`
+                        url: url,
+                        thumbUrl: thumbUrl
                     });
                 }
             } catch (e) {
@@ -80,6 +90,13 @@ router.post('/delete', checkAuth, (req, res) => {
     if (fs.existsSync(filePath)) {
         try {
             fs.unlinkSync(filePath);
+            
+            // Try delete thumbnail
+            const thumbPath = path.join(__dirname, '../../user_files', username, 'thumb_' + safeFilename);
+            if (fs.existsSync(thumbPath)) {
+                try { fs.unlinkSync(thumbPath); } catch (e) {}
+            }
+
             res.json({ code: 200, message: '删除成功' });
         } catch (err) {
             res.json({ code: 500, message: '删除失败' });

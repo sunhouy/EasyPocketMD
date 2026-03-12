@@ -98,7 +98,7 @@
                         // Preview
                         let preview = '';
                         if (/\.(jpg|jpeg|png|gif|webp|svg)$/i.test(file.name)) {
-                            preview = `<div style="width:100%;height:80px;background-image:url('${file.url}');background-size:cover;background-position:center;border-radius:4px;margin-bottom:5px;"></div>`;
+                            preview = `<div style="width:100%;height:80px;background-image:url('${file.thumbUrl || file.url}');background-size:contain;background-repeat:no-repeat;background-position:center;border-radius:4px;margin-bottom:5px;"></div>`;
                         } else {
                             preview = `<div style="width:100%;height:80px;display:flex;align-items:center;justify-content:center;background:${nightMode ? '#444' : '#eee'};border-radius:4px;margin-bottom:5px;"><i class="fas fa-file" style="font-size:32px;color:#999;"></i></div>`;
                         }
