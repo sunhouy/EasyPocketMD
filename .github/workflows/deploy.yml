@@ -38,7 +38,7 @@ jobs:
           target_dir="/www/wwwroot/js"
           if [ -d "$target_dir" ]; then
             cd "$target_dir"
-            find . -maxdepth 1 -mindepth 1 ! -name '.env' ! -name 'uploads' -exec rm -rf {} +
+            find . -maxdepth 1 -mindepth 1 ! -name '.env' ! -name 'uploads' ! -name 'user_uploads' -exec rm -rf {} +
           fi
 
     - name: Upload files to server

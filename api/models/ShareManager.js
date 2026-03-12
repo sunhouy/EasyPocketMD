@@ -26,50 +26,41 @@ class ShareManager {
 
             // 3. Calculate expiration
             let expiresAt = null;
-            if (expireDays > 0) {
+            // 确保 expireDays 是数字
+            expireDays = parseInt(expireDays);
+            if (!isNaN(expireDays) && expireDays > 0) {
                 const date = new Date();
                 date.setDate(date.getDate() + expireDays);
                 expiresAt = date.toISOString().slice(0, 19).replace('T', ' ');
             }
 
-            // 4. Check existing share
-            const [shareRows] = await connection.execute('SELECT share_id FROM file_shares WHERE username = ? AND filename = ?', [username, filename]);
-            
-            if (shareRows.length > 0) {
-                const shareId = shareRows[0].share_id;
-                await connection.execute('UPDATE file_shares SET mode = ?, password = ?, expires_at = ? WHERE share_id = ?', [mode, sharePassword, expiresAt, shareId]);
-                return {
-                    code: 200,
-                    message: '分享更新成功',
-                    data: {
-                        share_id: shareId,
-                        share_url: this.getShareUrl(shareId),
-                        mode,
-                        expires_at: expiresAt,
-                        has_password: !!sharePassword
-                    }
-                };
-            }
+
 
             // 5. Generate unique share_id and insert
             let shareId;
-            let attempts = 0;
-            while (attempts < 10) {
-                shareId = crypto.randomBytes(8).toString('hex');
-                try {
-                    await connection.execute('INSERT INTO file_shares (share_id, username, filename, mode, password, expires_at) VALUES (?, ?, ?, ?, ?, ?)', [shareId, username, filename, mode, sharePassword, expiresAt]);
-                    break;
-                } catch (err) {
-                    if (!err.message.includes('Duplicate entry')) throw err;
-                    attempts++;
+            // 如果存在已有分享，直接使用已有ID，并更新信息
+            const [existingRows] = await connection.execute('SELECT share_id FROM file_shares WHERE username = ? AND filename = ?', [username, filename]);
+            if (existingRows.length > 0) {
+                shareId = existingRows[0].share_id;
+                await connection.execute('UPDATE file_shares SET mode = ?, password = ?, expires_at = ? WHERE share_id = ?', [mode, sharePassword, expiresAt, shareId]);
+            } else {
+                let attempts = 0;
+                while (attempts < 10) {
+                    shareId = crypto.randomUUID().replace(/-/g, '').substring(0, 16);
+                    try {
+                        await connection.execute('INSERT INTO file_shares (share_id, username, filename, mode, password, expires_at) VALUES (?, ?, ?, ?, ?, ?)', [shareId, username, filename, mode, sharePassword, expiresAt]);
+                        break;
+                    } catch (err) {
+                        if (err.code !== 'ER_DUP_ENTRY') throw err;
+                        attempts++;
+                    }
                 }
+                if (attempts === 10) throw new Error('无法生成唯一的分享ID');
             }
-
-            if (attempts === 10) throw new Error('无法生成唯一的分享ID');
 
             return {
                 code: 200,
-                message: '分享创建成功',
+                message: existingRows.length > 0 ? '分享更新成功' : '分享创建成功',
                 data: {
                     share_id: shareId,
                     share_url: this.getShareUrl(shareId),
@@ -200,7 +191,8 @@ class ShareManager {
             if (rows.length === 0) return { code: 404, message: '分享不存在或无权操作' };
 
             let expiresAt = null;
-            if (expireDays > 0) {
+            expireDays = parseInt(expireDays);
+            if (!isNaN(expireDays) && expireDays > 0) {
                 const date = new Date();
                 date.setDate(date.getDate() + expireDays);
                 expiresAt = date.toISOString().slice(0, 19).replace('T', ' ');
