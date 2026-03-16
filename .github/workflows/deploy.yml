@@ -114,9 +114,18 @@ jobs:
           name: md-h5pack-web
           path: artifacts/md-h5pack-web.zip
 
-  # 打包 Electron 桌面应用（需在 package.json 中提供对应打包脚本）
+  # 打包 Electron 桌面应用（Windows exe + Linux 安装包），Artifacts 可在 Actions 中下载
   build-electron:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            script: build:electron:win
+            artifactName: md-electron-win
+          - os: ubuntu-latest
+            script: build:electron:linux
+            artifactName: md-electron-linux
+    runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
@@ -130,14 +139,13 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      # 假设你在 package.json 中添加了 "build:electron" 脚本（例如使用 electron-builder）
-      - name: Build Electron app
-        run: npm run build:electron
+      - name: Build Electron app (${{ matrix.script }})
+        run: npm run ${{ matrix.script }}
 
       - name: Upload Electron artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: md-electron-desktop
+          name: ${{ matrix.artifactName }}
           path: |
             dist-electron/**
             release/**

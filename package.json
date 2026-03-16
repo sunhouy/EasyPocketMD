@@ -10,7 +10,8 @@
     "test": "jest",
     "check-deploy": "node scripts/check-deploy.js",
     "start": "node api/server.js",
-    "build:electron": "electron-builder -l"
+    "build:electron:win": "electron-builder -w --x64",
+    "build:electron:linux": "electron-builder -l AppImage deb --x64"
   },
   "repository": {
     "type": "git",
@@ -59,13 +60,20 @@
     "directories": {
       "output": "dist-electron"
     },
+    "npmRebuild": false,
     "files": [
       "dist/**/*",
       "package.json"
     ],
     "linux": {
       "target": [
-        "AppImage"
+        "AppImage",
+        "deb"
+      ]
+    },
+    "win": {
+      "target": [
+        "nsis"
       ]
     }
   }
