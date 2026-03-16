@@ -24,7 +24,7 @@ jobs:
         rm -rf **/node_modules || true
 
     - name: Install dependencies
-      run: npm ci
+      run: npm install
 
     # - name: Run tests
       # run: npm test
@@ -67,8 +67,8 @@ jobs:
           cd /www/wwwroot/js
           # 确保不会因为历史残留导致安装异常
           rm -rf node_modules
-          # npm v7+ 推荐用 --omit=dev 替代 --production
-          npm ci --omit=dev
+          # 安装生产依赖
+          npm install --omit=dev
           
           # PM2 启动/重启服务
           if pm2 describe md-server > /dev/null; then
@@ -97,7 +97,7 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci
+        run: npm install
 
       - name: Build web app for mobile H5Pack
         run: npm run build
@@ -128,7 +128,7 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci
+        run: npm install
 
       # 假设你在 package.json 中添加了 "build:electron" 脚本（例如使用 electron-builder）
       - name: Build Electron app
