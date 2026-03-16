@@ -15,8 +15,7 @@ jobs:
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        # 建议使用 LTS，避免生态包对最新版本兼容问题
-        node-version: '20'
+        node-version: '24'
         cache: 'npm'
 
     - name: Clean workspace (node_modules)
@@ -53,7 +52,8 @@ jobs:
         host: ${{ secrets.SERVER_HOST }}
         username: ${{ secrets.SERVER_USER }}
         password: ${{ secrets.SERVER_PASSWORD }}
-        source: "dist,api,package.json,package-lock.json,nginx.conf"
+        # PWA 资源（sw.js / manifest / icons）必须部署到站点根目录，否则 /sw.js 会回退为 index.html 导致 MIME 错误
+        source: "dist,api,package.json,package-lock.json,nginx.conf,sw.js,manifest.webmanifest,icon-192.png,icon-512.png"
         target: "/www/wwwroot/js"
         strip_components: 0
 

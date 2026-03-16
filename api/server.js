@@ -41,6 +41,27 @@ console.log('Server starting...');
 console.log('Current directory (__dirname):', __dirname);
 console.log('Current working directory (process.cwd()):', process.cwd());
 
+// PWA assets (must NOT fall back to index.html)
+// These files live in project root and are deployed alongside dist/
+const rootPath = path.join(__dirname, '../');
+app.get('/sw.js', (req, res) => {
+    res.type('application/javascript');
+    res.sendFile(path.join(rootPath, 'sw.js'));
+});
+app.get('/manifest.webmanifest', (req, res) => {
+    // Some browsers expect application/manifest+json; Express doesn't have a built-in shortcut for it.
+    res.setHeader('Content-Type', 'application/manifest+json; charset=utf-8');
+    res.sendFile(path.join(rootPath, 'manifest.webmanifest'));
+});
+app.get('/icon-192.png', (req, res) => {
+    res.type('image/png');
+    res.sendFile(path.join(rootPath, 'icon-192.png'));
+});
+app.get('/icon-512.png', (req, res) => {
+    res.type('image/png');
+    res.sendFile(path.join(rootPath, 'icon-512.png'));
+});
+
 // Try to find the dist folder in multiple locations
 const potentialDistPaths = [
     path.join(__dirname, '../dist'),
@@ -73,7 +94,6 @@ if (distPath) {
     // Fallback to serving root for development (though Vite is recommended)
     // Note: Root index.html now uses modules, so it won't work directly without Vite
     console.log('Frontend build (dist) not found. Serving from root directory.');
-    const rootPath = path.join(__dirname, '../');
     app.use(express.static(rootPath));
     
     // SPA catch-all handler for root fallback

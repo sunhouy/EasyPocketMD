@@ -343,8 +343,12 @@ document.addEventListener('DOMContentLoaded', function() {
         if (hasUnsaved) {
             e.preventDefault();
             e.returnValue = '您有未保存的文件，确定要离开吗？';
-            window.saveCurrentFile(true);
-            if (window.currentUser) window.syncAllFiles();
+            // beforeunload 中的异步操作通常不会可靠执行，改为使用 sendBeacon 进行服务器同步
+            try {
+                if (window.currentUser && typeof window.syncCurrentFileWithBeacon === 'function') {
+                    window.syncCurrentFileWithBeacon();
+                }
+            } catch (e) {}
         }
     });
 

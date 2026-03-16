@@ -6,6 +6,36 @@
 
     function g(name) { return global[name]; }
 
+    // ---------- 服务器同步一致性：待同步标记 ----------
+    // 记录“本地已保存但服务器尚未确认保存”的文件，避免本地/服务器长期不一致
+    function loadPendingServerSync() {
+        try {
+            return JSON.parse(localStorage.getItem('vditor_pending_server_sync') || '{}') || {};
+        } catch (e) {
+            return {};
+        }
+    }
+
+    function persistPendingServerSync(map) {
+        try {
+            localStorage.setItem('vditor_pending_server_sync', JSON.stringify(map || {}));
+        } catch (e) {}
+    }
+
+    function markPendingServerSync(fileId, pending) {
+        if (!fileId) return;
+        const map = g('pendingServerSync') || {};
+        if (pending) map[fileId] = true;
+        else delete map[fileId];
+        global.pendingServerSync = map;
+        persistPendingServerSync(map);
+    }
+
+    // 初始化 pendingServerSync（脚本加载即生效）
+    if (!global.pendingServerSync) {
+        global.pendingServerSync = loadPendingServerSync();
+    }
+
     // ---------- 辅助函数：路径处理 ----------
     function normalizePath(input) {
         let path = input.trim();
@@ -306,6 +336,18 @@
         if (!file || file.type !== 'file') return false;
 
         const content = vditor.getValue();
+
+        // 关闭页面场景：也要本地落盘，保持“保存即同步保存（本地 + 服务器）”的一致性
+        try {
+            file.content = content;
+            file.lastModified = Date.now();
+            localStorage.setItem('vditor_files', JSON.stringify(files));
+            g('unsavedChanges')[currentFileId] = false;
+        } catch (e) {}
+
+        // sendBeacon 无法等待响应，因此统一标记为 pending，后续会自动补齐同步
+        markPendingServerSync(currentFileId, true);
+
         const body = {
             username: g('currentUser').username,
             token: g('currentUser').token || g('currentUser').username,
@@ -1190,9 +1232,16 @@
         localStorage.setItem('vditor_files', JSON.stringify(files));
         g('unsavedChanges')[currentFileId] = false;
         if (g('currentUser')) {
-            const saveResult = await global.syncFileToServer(currentFileId);
-            if (isManual && contentChanged && saveResult) {
-                try { await global.createHistoryVersion(file.name, content); } catch (e) { console.warn('创建历史版本失败', e); }
+            // 保存即触发服务器同步；失败则保留 pending 标记，稍后会自动补齐同步
+            markPendingServerSync(currentFileId, true);
+            try {
+                const saveResult = await global.syncFileToServer(currentFileId);
+                if (isManual && contentChanged && saveResult) {
+                    try { await global.createHistoryVersion(file.name, content); } catch (e) { console.warn('创建历史版本失败', e); }
+                }
+                if (saveResult) markPendingServerSync(currentFileId, false);
+            } catch (e) {
+                // 保持 pending
             }
         }
         global.showMessage('文件已保存' + (isManual && contentChanged ? '' : ''));
@@ -1288,10 +1337,11 @@
         const currentFileId = g('currentFileId');
         const vditor = g('vditor');
         const lastSyncedContent = g('lastSyncedContent');
+        const pendingServerSync = g('pendingServerSync') || {};
         const filesToSync = files.filter(function(file) {
             if (file.type !== 'file') return false;
             const currentContent = vditor && file.id === currentFileId ? vditor.getValue() : file.content;
-            return !file.isSynced || currentContent !== lastSyncedContent[file.id];
+            return pendingServerSync[file.id] || !file.isSynced || currentContent !== lastSyncedContent[file.id];
         });
         if (filesToSync.length === 0) return;
         global.showSyncStatus('正在同步 ' + filesToSync.length + ' 个文件...');
@@ -1338,6 +1388,7 @@
                     localStorage.setItem('vditor_files', JSON.stringify(files));
                     g('lastSyncedContent')[fileId] = file.type === 'folder' ? '' : content;
                     g('unsavedChanges')[fileId] = false;
+                    markPendingServerSync(fileId, false);
                 }
                 return true;
             }
@@ -1670,6 +1721,7 @@
     global.syncFileToServer = syncFileToServer;
     global.deleteFileFromServer = deleteFileFromServer;
     global.syncCurrentFileWithBeacon = syncCurrentFileWithBeacon;
+    global.markPendingServerSync = markPendingServerSync;
     global.previewHistoryVersion = previewHistoryVersion;
     global.restoreFromHistory = restoreFromHistory;
     global.deleteHistoryVersion = deleteHistoryVersion;
