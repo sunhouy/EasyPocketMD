@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Markdown编辑器</title>
     <link rel="icon" type="image/x-icon" href="icon.png">
+    <!-- PWA: manifest & theme color -->
+    <link rel="manifest" href="/manifest.webmanifest">
+    <meta name="theme-color" content="#0366d6">
     <!-- Cookies 提示样式 -->
     <style>
         .cookie-consent-banner {
@@ -516,6 +519,19 @@
             toast.style.opacity = '0';
         }, 3000);
     }
+></script>
+
+<!-- PWA 注册脚本 -->
+<script>
+    (function() {
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function() {
+                navigator.serviceWorker.register('/sw.js').catch(function(err) {
+                    console.warn('ServiceWorker registration failed:', err);
+                });
+            });
+        }
+    })();
 </script>
 
 <!-- Cookies 提示脚本 -->
