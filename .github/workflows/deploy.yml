@@ -83,7 +83,7 @@ jobs:
             service nginx reload
           fi
 
-  # 打包 H5Pack 移动应用资源（供下载）
+  # 打包 H5Pack 移动应用资源（供下载）- 仅构建并上传 artifact
   build-h5pack:
     runs-on: ubuntu-latest
     steps:
@@ -114,26 +114,7 @@ jobs:
           name: md-h5pack-web
           path: artifacts/md-h5pack-web.zip
 
-      # 新增：创建服务器目标目录并上传 H5Pack 产物
-      - name: Create static/h5pack directory on server
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SERVER_USER }}
-          password: ${{ secrets.SERVER_PASSWORD }}
-          script: mkdir -p /www/wwwroot/static/h5pack
-
-      - name: Upload H5Pack bundle to server
-        uses: appleboy/scp-action@master
-        with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SERVER_USER }}
-          password: ${{ secrets.SERVER_PASSWORD }}
-          source: "artifacts/md-h5pack-web.zip"
-          target: "/www/wwwroot/static/h5pack"
-          strip_components: 1
-
-  # 打包 Electron 桌面应用（Windows exe + Linux 安装包），Artifacts 可在 Actions 中下载
+  # 打包 Electron 桌面应用 - 仅构建并上传 artifact
   build-electron:
     strategy:
       matrix:
@@ -173,25 +154,7 @@ jobs:
             release/**
           if-no-files-found: warn
 
-      # 新增：根据操作系统创建不同的子目录并上传 Electron 产物
-      - name: Create static/electron directory on server
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SERVER_USER }}
-          password: ${{ secrets.SERVER_PASSWORD }}
-          script: mkdir -p /www/wwwroot/static/electron/${{ matrix.os == 'windows-latest' && 'win' || 'linux' }}
-
-      - name: Upload Electron artifacts to server
-        uses: appleboy/scp-action@master
-        with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SERVER_USER }}
-          password: ${{ secrets.SERVER_PASSWORD }}
-          source: "release/*"
-          target: "/www/wwwroot/static/electron/${{ matrix.os == 'windows-latest' && 'win' || 'linux' }}"
-          strip_components: 1
-
+  # 检查 print_client.py 是否变更
   check-print-changes:
     runs-on: ubuntu-latest
     outputs:
@@ -205,6 +168,7 @@ jobs:
           print:
             - 'print/print_client.py'
 
+  # 构建打印客户端（条件执行）
   build-print-client:
     needs: check-print-changes
     if: needs.check-print-changes.outputs.changed == 'true'
@@ -244,6 +208,7 @@ jobs:
         name: print_client_${{ matrix.target }}
         path: dist/print_client_${{ matrix.target }}${{ matrix.ext }}
 
+  # 部署打印客户端到服务器
   deploy-print-client:
     needs: build-print-client
     runs-on: ubuntu-latest
@@ -283,3 +248,84 @@ jobs:
         source: "downloads/*"
         target: "/www/wwwroot/static"
         strip_components: 1
+
+  # 新增：部署 H5Pack 资源到服务器
+  deploy-h5pack:
+    needs: build-h5pack
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download H5Pack artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: md-h5pack-web
+          path: downloads/h5pack
+
+      - name: Create target directory on server
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          password: ${{ secrets.SERVER_PASSWORD }}
+          script: mkdir -p /www/wwwroot/static/h5pack
+
+      - name: Upload H5Pack bundle to server
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          password: ${{ secrets.SERVER_PASSWORD }}
+          source: "downloads/h5pack/*"
+          target: "/www/wwwroot/static/h5pack"
+          strip_components: 2   # 去除 downloads/h5pack/前缀
+
+  # 新增：部署 Electron 应用安装包到服务器
+  deploy-electron:
+    needs: build-electron
+    runs-on: ubuntu-latest
+    steps:
+      # 下载 Windows 产物
+      - name: Download Windows Electron artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: md-electron-win
+          path: downloads/electron/win
+
+      # 下载 Linux 产物
+      - name: Download Linux Electron artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: md-electron-linux
+          path: downloads/electron/linux
+
+      # 在服务器上创建对应目录
+      - name: Create electron directories on server
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          password: ${{ secrets.SERVER_PASSWORD }}
+          script: |
+            mkdir -p /www/wwwroot/static/electron/win
+            mkdir -p /www/wwwroot/static/electron/linux
+
+      # 上传 Windows 产物
+      - name: Upload Windows Electron artifacts
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          password: ${{ secrets.SERVER_PASSWORD }}
+          source: "downloads/electron/win/*"
+          target: "/www/wwwroot/static/electron/win"
+          strip_components: 3   # 去除 downloads/electron/win/ 前缀
+
+      # 上传 Linux 产物
+      - name: Upload Linux Electron artifacts
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          password: ${{ secrets.SERVER_PASSWORD }}
+          source: "downloads/electron/linux/*"
+          target: "/www/wwwroot/static/electron/linux"
+          strip_components: 3   # 去除 downloads/electron/linux/ 前缀
