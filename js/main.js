@@ -226,6 +226,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // 顶部提示横幅相关函数
     let currentNoticeType = null;
+    let networkMonitoringInitialized = false;
     
     function initTopNoticeBanner() {
         const banner = document.getElementById('topNoticeBanner');
@@ -240,6 +241,29 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
         }
+        
+        // 初始化网络状态监听
+        initNetworkMonitoring();
+    }
+    
+    function initNetworkMonitoring() {
+        if (networkMonitoringInitialized) return;
+        networkMonitoringInitialized = true;
+        
+        // 监听网络恢复事件
+        window.addEventListener('online', function() {
+            console.log('Network connected');
+            // 如果当前显示的是网络错误提示，则自动关闭
+            if (currentNoticeType === 'network-error') {
+                hideTopNoticeBanner();
+            }
+        });
+        
+        // 监听网络断开事件（可选，用于调试）
+        window.addEventListener('offline', function() {
+            console.log('Network disconnected');
+            // 可以在这里主动显示网络错误提示
+        });
     }
 
     function showTopNoticeBanner(type, text, icon) {

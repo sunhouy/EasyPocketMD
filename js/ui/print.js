@@ -109,8 +109,8 @@ function t(key) { return window.i18n ? window.i18n.t(key) : key; }
         // Define cleanup function at top level to avoid ReferenceError
         var cleanup = function() {};
 
-        // 检查用户是否登录
-        if (!g('currentUser')) {
+        // 检查用户是否登录 - 只有打印模式需要登录，导出模式不需要
+        if (mode === 'print' && !g('currentUser')) {
             global.showMessage(isEn() ? 'Please log in first to use this feature' : '请先登录后再使用此功能');
             if (g('showLoginModal')) {
                 g('showLoginModal')();

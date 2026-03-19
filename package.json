@@ -5,13 +5,14 @@
   "main": "electron-main.js",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "node version.js && vite build",
     "preview": "vite preview",
     "test": "jest",
     "check-deploy": "node scripts/check-deploy.js",
     "start": "node api/server.js",
     "build:electron:win": "electron-builder -w --x64 --publish=never",
-    "build:electron:linux": "electron-builder -l AppImage deb --x64 --publish=never"
+    "build:electron:linux": "electron-builder -l AppImage deb --x64 --publish=never",
+    "bump-version": "node version.js"
   },
   "repository": {
     "type": "git",

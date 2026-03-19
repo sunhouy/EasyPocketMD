@@ -1,5 +1,75 @@
 import { defineConfig } from 'vite';
 import { viteStaticCopy } from 'vite-plugin-static-copy';
+import { readFileSync, existsSync, writeFileSync, readFile } from 'node:fs';
+import { join } from 'node:path';
+
+const versionPath = join(__dirname, 'version.json');
+let cacheVersion = 'v1';
+if (existsSync(versionPath)) {
+  try {
+    const versionData = JSON.parse(readFileSync(versionPath, 'utf8'));
+    cacheVersion = versionData.version || 'v1';
+  } catch (e) {
+    console.warn('Failed to read version:', e);
+  }
+}
+
+const swContent = `const CACHE_VERSION = '${cacheVersion}';
+const CACHE_NAME = \`md-editor-cache-\${CACHE_VERSION}\`;
+
+self.addEventListener('install', event => {
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', event => {
+  event.waitUntil(
+    caches.keys().then(keys =>
+      Promise.all(
+        keys.map(key => {
+          if (key !== CACHE_NAME) {
+            return caches.delete(key);
+          }
+        })
+      )
+    ).then(() => self.clients.claim())
+  );
+});
+
+self.addEventListener('fetch', event => {
+  const request = event.request;
+
+  if (request.method !== 'GET') {
+    return;
+  }
+
+  const url = new URL(request.url);
+
+  if (url.pathname.startsWith('/api/')) {
+    return;
+  }
+
+  event.respondWith(
+    (async () => {
+      const cache = await caches.open(CACHE_NAME);
+      
+      try {
+        const networkResponse = await fetch(request);
+        await cache.put(request, networkResponse.clone());
+        return networkResponse;
+      } catch (error) {
+        const cachedResponse = await cache.match(request);
+        if (cachedResponse) {
+          return cachedResponse;
+        }
+        return new Response('Network error happened', {
+          status: 408,
+          headers: { 'Content-Type': 'text/plain' }
+        });
+      }
+    })()
+  );
+});
+`;
 
 export default defineConfig({
   server: {
@@ -21,6 +91,9 @@ export default defineConfig({
     assetsDir: 'assets',
     rollupOptions: {
       output: {
+        entryFileNames: 'assets/[name]-[hash].js',
+        chunkFileNames: 'assets/[name]-[hash].js',
+        assetFileNames: 'assets/[name]-[hash].[ext]',
         manualChunks: {
           vditor: ['vditor']
         }
@@ -35,6 +108,15 @@ export default defineConfig({
           dest: 'vditor'
         }
       ]
-    })
+    }),
+    {
+      name: 'generate-sw',
+      writeBundle(options, bundle) {
+        const fs = require('fs');
+        const path = require('path');
+        const swPath = path.join(options.dir || 'dist', 'sw.js');
+        fs.writeFileSync(swPath, swContent);
+      }
+    }
   ]
 });

@@ -1,26 +1,8 @@
-const CACHE_NAME = 'md-editor-cache-v1';
-
-// 可以按需调整需要缓存的静态资源
-const CORE_ASSETS = [
-  '/',
-  '/index.html',
-  '/css/styles.css',
-  '/js/main.js',
-  '/js/files.js',
-  '/js/auth.js',
-  '/js/ui/print.js',
-  '/js/ui/render.js',
-  '/js/ui/upload.js',
-  '/js/ui/file-manager.js',
-  '/vditor@3.11.2/dist/index.css'
-];
+const CACHE_VERSION = 'v1';
+const CACHE_NAME = `md-editor-cache-${CACHE_VERSION}`;
 
 self.addEventListener('install', event => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => cache.addAll(CORE_ASSETS)).then(() => {
-      return self.skipWaiting();
-    })
-  );
+  self.skipWaiting();
 });
 
 self.addEventListener('activate', event => {
@@ -40,37 +22,35 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   const request = event.request;
 
-  // 只处理 GET 请求
   if (request.method !== 'GET') {
     return;
   }
 
   const url = new URL(request.url);
 
-  // 对 API 请求采用网络优先，避免缓存接口数据
   if (url.pathname.startsWith('/api/')) {
     return;
   }
 
   event.respondWith(
-    caches.match(request).then(cached => {
-      if (cached) {
-        // 后台更新
-        fetch(request).then(response => {
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then(cache => cache.put(request, clone));
-        }).catch(() => {});
-        return cached;
+    (async () => {
+      const cache = await caches.open(CACHE_NAME);
+      
+      try {
+        const networkResponse = await fetch(request);
+        await cache.put(request, networkResponse.clone());
+        return networkResponse;
+      } catch (error) {
+        const cachedResponse = await cache.match(request);
+        if (cachedResponse) {
+          return cachedResponse;
+        }
+        return new Response('Network error happened', {
+          status: 408,
+          headers: { 'Content-Type': 'text/plain' }
+        });
       }
-
-      return fetch(request)
-        .then(response => {
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then(cache => cache.put(request, clone));
-          return response;
-        })
-        .catch(() => cached || Response.error());
-    })
+    })()
   );
 });
 
