@@ -625,9 +625,9 @@
 <!-- PWA 注册脚本 -->
 <script>
     (function() {
-        if ('serviceWorker' in navigator) {
+        if ('serviceWorker' in navigator && !window.electron) {
             window.addEventListener('load', function() {
-                navigator.serviceWorker.register('/sw.js').catch(function(err) {
+                navigator.serviceWorker.register('./sw.js').catch(function(err) {
                     console.warn('ServiceWorker registration failed:', err);
                 });
             });

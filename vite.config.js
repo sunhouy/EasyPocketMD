@@ -72,6 +72,7 @@ self.addEventListener('fetch', event => {
 `;
 
 export default defineConfig({
+  base: './',
   server: {
     port: 8080,
     proxy: {
@@ -106,6 +107,26 @@ export default defineConfig({
         {
           src: 'node_modules/vditor/dist',
           dest: 'vditor'
+        },
+        {
+          src: 'sw.js',
+          dest: '.'
+        },
+        {
+          src: 'manifest.webmanifest',
+          dest: '.'
+        },
+        {
+          src: 'icon.png',
+          dest: '.'
+        },
+        {
+          src: 'icon-192.png',
+          dest: '.'
+        },
+        {
+          src: 'icon-512.png',
+          dest: '.'
         }
       ]
     }),

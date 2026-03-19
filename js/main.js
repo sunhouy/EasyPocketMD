@@ -259,10 +259,11 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
         
-        // 监听网络断开事件（可选，用于调试）
+        // 监听网络断开事件，主动显示网络错误提示
         window.addEventListener('offline', function() {
             console.log('Network disconnected');
-            // 可以在这里主动显示网络错误提示
+            // 网络断开时，显示网络错误提示
+            showNetworkErrorBanner();
         });
     }
 
@@ -270,7 +271,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const banner = document.getElementById('topNoticeBanner');
         if (!banner) return;
         
-        // 检查未登录提示是否已被关闭
+        // 只有未登录提示检查是否已被关闭，网络错误提示始终显示
         if (type === 'guest' && localStorage.getItem('guestNoticeDismissed') === 'true') {
             return;
         }

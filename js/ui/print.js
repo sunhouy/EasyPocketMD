@@ -1426,12 +1426,8 @@ function t(key) { return window.i18n ? window.i18n.t(key) : key; }
             var htmlContent = await preparePrintContent(content, settings);
             pdfUrl = await generatePDF(htmlContent, settings);
 
-            // PDF生成完成，更新加载窗口提示
-            loadingIcon.innerHTML = '<i class="fas fa-check" style="color:#4CAF50;"></i>';
-            loadingText.textContent = isEn() ? 'PDF preview generated successfully! Click × to view.' : 'PDF预览已生成！点击×查看。';
-            
-            // 设置关闭按钮的事件：点击后显示预览
-            closeBtnLoading.onclick = showPreview;
+            // PDF生成完成，直接显示预览
+            showPreview();
 
         } catch (error) {
             console.error('预览错误:', error);
