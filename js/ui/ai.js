@@ -1,8 +1,8 @@
-
 (function(global) {
     'use strict';
 
     function g(name) { return global[name]; }
+    function isEn() { return window.i18n && window.i18n.getLanguage() === 'en'; }
 
     // AI智能排版历史记录
     var aiLayoutHistory = [];
@@ -32,42 +32,42 @@
                 <div style="font-size:40px;margin-bottom:10px;background:linear-gradient(135deg, #667eea 0%, #764ba2 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">
                     <i class="fas fa-magic"></i>
                 </div>
-                <h2 style="margin:0;">AI智能排版</h2>
-                <p style="margin-top:5px;font-size:14px;color:${nightMode ? '#aaa' : '#666'};">基于通义千问大模型，一键优化文档排版</p>
+                <h2 style="margin:0;">${isEn() ? 'AI Smart Layout' : 'AI智能排版'}</h2>
+                <p style="margin-top:5px;font-size:14px;color:${nightMode ? '#aaa' : '#666'};">${isEn() ? 'Based on Qwen model, one-click document layout optimization' : '基于通义千问大模型，一键优化文档排版'}</p>
             </div>
             
             <div style="margin-bottom:20px;">
-                <label style="display:block;margin-bottom:8px;font-weight:bold;">排版风格</label>
+                <label style="display:block;margin-bottom:8px;font-weight:bold;">${isEn() ? 'Layout Style' : '排版风格'}</label>
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
                     <div class="ai-style-option selected" data-value="academic" style="border:2px solid #667eea;border-radius:8px;padding:10px;cursor:pointer;background:${nightMode ? '#3d3d3d' : '#f0f4ff'};">
-                        <div style="font-weight:bold;margin-bottom:5px;"><i class="fas fa-graduation-cap"></i> 学术论文</div>
-                        <div style="font-size:12px;color:${nightMode ? '#bbb' : '#666'};">严谨规范，适合论文、报告</div>
+                        <div style="font-weight:bold;margin-bottom:5px;"><i class="fas fa-graduation-cap"></i> ${isEn() ? 'Academic' : '学术论文'}</div>
+                        <div style="font-size:12px;color:${nightMode ? '#bbb' : '#666'};">${isEn() ? 'Rigorous and standardized, suitable for papers and reports' : '严谨规范，适合论文、报告'}</div>
                     </div>
                     <div class="ai-style-option" data-value="business" style="border:1px solid ${borderColor};border-radius:8px;padding:10px;cursor:pointer;">
-                        <div style="font-weight:bold;margin-bottom:5px;"><i class="fas fa-briefcase"></i> 商务公文</div>
-                        <div style="font-size:12px;color:${nightMode ? '#bbb' : '#666'};">正式专业，适合公文、标书</div>
+                        <div style="font-weight:bold;margin-bottom:5px;"><i class="fas fa-briefcase"></i> ${isEn() ? 'Business' : '商务公文'}</div>
+                        <div style="font-size:12px;color:${nightMode ? '#bbb' : '#666'};">${isEn() ? 'Formal and professional, suitable for documents and bids' : '正式专业，适合公文、标书'}</div>
                     </div>
                     <div class="ai-style-option" data-value="creative" style="border:1px solid ${borderColor};border-radius:8px;padding:10px;cursor:pointer;">
-                        <div style="font-weight:bold;margin-bottom:5px;"><i class="fas fa-paint-brush"></i> 创意设计</div>
-                        <div style="font-size:12px;color:${nightMode ? '#bbb' : '#666'};">美观大方，适合文章、博客</div>
+                        <div style="font-weight:bold;margin-bottom:5px;"><i class="fas fa-paint-brush"></i> ${isEn() ? 'Creative' : '创意设计'}</div>
+                        <div style="font-size:12px;color:${nightMode ? '#bbb' : '#666'};">${isEn() ? 'Beautiful and elegant, suitable for articles and blogs' : '美观大方，适合文章、博客'}</div>
                     </div>
                     <div class="ai-style-option" data-value="simple" style="border:1px solid ${borderColor};border-radius:8px;padding:10px;cursor:pointer;">
-                        <div style="font-weight:bold;margin-bottom:5px;"><i class="fas fa-feather"></i> 极简阅读</div>
-                        <div style="font-size:12px;color:${nightMode ? '#bbb' : '#666'};">清晰易读，适合阅读、笔记</div>
+                        <div style="font-weight:bold;margin-bottom:5px;"><i class="fas fa-feather"></i> ${isEn() ? 'Simple' : '极简阅读'}</div>
+                        <div style="font-size:12px;color:${nightMode ? '#bbb' : '#666'};">${isEn() ? 'Clear and readable, suitable for reading and notes' : '清晰易读，适合阅读、笔记'}</div>
                     </div>
                 </div>
             </div>
             
             <div style="margin-bottom:20px;">
-                <label style="display:block;margin-bottom:8px;font-weight:bold;">排版要求（可选）</label>
-                <textarea id="aiRequirements" placeholder="例如：请将所有一级标题居中，段落首行缩进，使用宋体..." style="width:100%;padding:10px;border:1px solid ${borderColor};border-radius:8px;background:${nightMode ? '#3d3d3d' : 'white'};color:${textColor};height:80px;resize:none;"></textarea>
+                <label style="display:block;margin-bottom:8px;font-weight:bold;">${isEn() ? 'Layout Requirements (Optional)' : '排版要求（可选）'}</label>
+                <textarea id="aiRequirements" placeholder="${isEn() ? 'For example: Please center all level 1 headings, indent first line of paragraphs, use Song font...' : '例如：请将所有一级标题居中，段落首行缩进，使用宋体...'}" style="width:100%;padding:10px;border:1px solid ${borderColor};border-radius:8px;background:${nightMode ? '#3d3d3d' : 'white'};color:${textColor};height:80px;resize:none;"></textarea>
             </div>
             
             <div style="display:flex;gap:10px;margin-top:25px;">
                 <button id="startAILayoutBtn" style="flex:2;padding:12px;font-weight:bold;background:linear-gradient(135deg, #667eea 0%, #764ba2 100%);color:white;border:none;border-radius:6px;cursor:pointer;font-size:16px;">
-                    <i class="fas fa-sparkles"></i> 开始智能排版
+                    <i class="fas fa-sparkles"></i> ${isEn() ? 'Start Smart Layout' : '开始智能排版'}
                 </button>
-                <button id="cancelAIBtn" style="flex:1;padding:12px;background:${nightMode ? '#555' : '#9E9E9E'};color:white;border:none;border-radius:6px;cursor:pointer;">取消</button>
+                <button id="cancelAIBtn" style="flex:1;padding:12px;background:${nightMode ? '#555' : '#9E9E9E'};color:white;border:none;border-radius:6px;cursor:pointer;">${isEn() ? 'Cancel' : '取消'}</button>
             </div>
         `;
         
@@ -135,8 +135,8 @@
                 <div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:30px;height:30px;border-radius:50%;border:3px solid transparent;border-top-color:#764ba2;animation:spin 1.5s linear infinite reverse;"></div>
                 <i class="fas fa-magic" style="font-size:20px;color:#667eea;position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);"></i>
             </div>
-            <h3 style="margin:0 0 10px 0;font-size:20px;">AI正在思考中...</h3>
-            <p id="aiLoadingStatus" style="margin:0;color:${nightMode ? '#aaa' : '#666'};font-size:14px;">正在分析文档结构</p>
+            <h3 style="margin:0 0 10px 0;font-size:20px;">${isEn() ? 'AI is thinking...' : 'AI正在思考中...'}</h3>
+            <p id="aiLoadingStatus" style="margin:0;color:${nightMode ? '#aaa' : '#666'};font-size:14px;">${isEn() ? 'Analyzing document structure' : '正在分析文档结构'}</p>
             <style>@keyframes spin { 0% { transform: translate(-50%,-50%) rotate(0deg); } 100% { transform: translate(-50%,-50%) rotate(360deg); } }</style>
         `;
         
@@ -156,27 +156,27 @@
             // 1. 获取当前文档内容
             var content = g('vditor') ? g('vditor').getValue() : '';
             if (!content) {
-                throw new Error('文档内容为空');
+                throw new Error(isEn() ? 'Document content is empty' : '文档内容为空');
             }
             
             // 2. 准备提示词
             var stylePrompts = {
-                academic: '请将以下Markdown内容重新排版为学术论文风格。不得对内容文本进行任何修改，无论内容多么随意。',
-                business: '请将以下Markdown内容重新排版为商务公文风格。不得对内容文本进行任何修改，无论内容多么随意。',
-                creative: '请将以下Markdown内容重新排版为创意设计风格。不得对内容文本进行任何修改，无论内容多么随意。',
-                simple: '请将以下Markdown内容重新排版为极简阅读风格。不得对内容文本进行任何修改，无论内容多么随意。'
+                academic: isEn() ? 'Please reformat the following Markdown content into academic paper style. Do not modify the content text in any way, no matter how casual the content is.' : '请将以下Markdown内容重新排版为学术论文风格。不得对内容文本进行任何修改，无论内容多么随意。',
+                business: isEn() ? 'Please reformat the following Markdown content into business document style. Do not modify the content text in any way, no matter how casual the content is.' : '请将以下Markdown内容重新排版为商务公文风格。不得对内容文本进行任何修改，无论内容多么随意。',
+                creative: isEn() ? 'Please reformat the following Markdown content into creative design style. Do not modify the content text in any way, no matter how casual the content is.' : '请将以下Markdown内容重新排版为创意设计风格。不得对内容文本进行任何修改，无论内容多么随意。',
+                simple: isEn() ? 'Please reformat the following Markdown content into simple reading style. Do not modify the content text in any way, no matter how casual the content is.' : '请将以下Markdown内容重新排版为极简阅读风格。不得对内容文本进行任何修改，无论内容多么随意。'
             };
             
             var prompt = stylePrompts[currentAISettings.style] || stylePrompts.academic;
             if (currentAISettings.requirements) {
-                prompt += '\n额外要求：' + currentAISettings.requirements;
+                prompt += '\n' + (isEn() ? 'Additional requirements: ' : '额外要求：') + currentAISettings.requirements;
             }
             
             // 3. 调用通义千问API
-            updateAILoadingStatus('AI正在排版中...');
+            updateAILoadingStatus(isEn() ? 'AI is formatting...' : 'AI正在排版中...');
             var aiResponse = await callQwenAPI(content, prompt);
             
-            updateAILoadingStatus('正在生成预览...');
+            updateAILoadingStatus(isEn() ? 'Generating preview...' : '正在生成预览...');
             
             // 4. 解析AI返回的内容
             // 假设AI返回的是Markdown格式
@@ -199,9 +199,13 @@
             if (loadingModal) loadingModal.remove();
             
             if (error.message === 'Failed to fetch' || error.message.includes('NetworkError')) {
-                global.showMessage('网络未连接，请连接网络', 'error');
+                if (global.showNetworkErrorBanner) {
+                    global.showNetworkErrorBanner();
+                } else {
+                    global.showMessage(isEn() ? 'Network not connected, please connect to the network' : '网络未连接，请连接网络', 'error');
+                }
             } else {
-                global.showMessage('AI排版失败: ' + error.message, 'error');
+                global.showMessage((isEn() ? 'AI layout failed: ' : 'AI排版失败: ') + error.message, 'error');
             }
         }
     }
@@ -214,7 +218,7 @@
                 messages: [
                     {
                         role: "system",
-                        content: systemPrompt + "\n请直接返回排版后的Markdown内容，不得对内容文本进行任何修改，无论内容多么随意。不要包含任何解释、前言或后语。不要使用代码块包裹。"
+                        content: systemPrompt + "\n" + (isEn() ? 'Please directly return the formatted Markdown content. Do not modify the content text in any way, no matter how casual the content is. Do not include any explanations, preambles, or postscripts. Do not wrap with code blocks.' : '请直接返回排版后的Markdown内容，不得对内容文本进行任何修改，无论内容多么随意。不要包含任何解释、前言或后语。不要使用代码块包裹。')
                     },
                     {
                         role: "user",
@@ -252,7 +256,7 @@
                 return result.data;
             } else {
                 // 如果API调用失败，抛出错误
-                throw new Error(result.message || 'AI服务暂时不可用');
+                throw new Error(result.message || (isEn() ? 'AI service temporarily unavailable' : 'AI服务暂时不可用'));
             }
         } catch (e) {
             // 如果后端接口不存在
@@ -307,7 +311,7 @@
         var loadingModal = document.createElement('div');
         loadingModal.className = 'modal-overlay';
         loadingModal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.9);z-index:21000;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;';
-        loadingModal.innerHTML = '<div style="background:' + (nightMode ? '#2d2d2d' : 'white') + ';color:' + (nightMode ? '#eee' : '#333') + ';border-radius:12px;padding:30px;text-align:center;"><div style="font-size:24px;margin-bottom:15px;"><i class="fas fa-spinner fa-spin"></i></div><div style="font-size:16px;">正在生成AI排版预览...</div></div>';
+        loadingModal.innerHTML = '<div style="background:' + (nightMode ? '#2d2d2d' : 'white') + ';color:' + (nightMode ? '#eee' : '#333') + ';border-radius:12px;padding:30px;text-align:center;"><div style="font-size:24px;margin-bottom:15px;"><i class="fas fa-spinner fa-spin"></i></div><div style="font-size:16px;">' + (isEn() ? 'Generating AI layout preview...' : '正在生成AI排版预览...') + '</div></div>';
         document.body.appendChild(loadingModal);
 
         try {
@@ -315,7 +319,7 @@
             if (!global.generatePDF) {
                 
                 console.error('generatePDF not found on global object');
-                throw new Error('PDF生成模块未加载');
+                throw new Error(isEn() ? 'PDF generation module not loaded' : 'PDF生成模块未加载');
             }
 
             var pdfUrl = await global.generatePDF(html, settings);
@@ -351,7 +355,7 @@
 
             // 1. 补充需求 (Regenerate)
             var refineBtn = document.createElement('button');
-            refineBtn.innerHTML = '<i class="fas fa-magic"></i> 补充需求';
+            refineBtn.innerHTML = '<i class="fas fa-magic"></i> ' + (isEn() ? 'Refine' : '补充需求');
             refineBtn.style.cssText = 'padding:8px 16px;background:' + (nightMode ? '#444' : '#e0e0e0') + ';color:' + (nightMode ? '#eee' : '#333') + ';border:none;border-radius:4px;cursor:pointer;font-size:14px;';
             refineBtn.onclick = function() {
                 cleanup();
@@ -360,7 +364,7 @@
 
             // 2. 打印 (Print)
             var printBtn = document.createElement('button');
-            printBtn.innerHTML = '<i class="fas fa-print"></i> 打印';
+            printBtn.innerHTML = '<i class="fas fa-print"></i> ' + (isEn() ? 'Print' : '打印');
             printBtn.style.cssText = 'padding:8px 16px;background:#4a90e2;color:white;border:none;border-radius:4px;cursor:pointer;font-size:14px;font-weight:bold;';
             printBtn.onclick = function() {
                 // Use the new sendToPrint which accepts PDF URL
@@ -369,12 +373,12 @@
 
             // 3. 下载 (Download)
             var pdfBtn = document.createElement('button');
-            pdfBtn.innerHTML = '<i class="fas fa-file-pdf"></i> 下载';
+            pdfBtn.innerHTML = '<i class="fas fa-file-pdf"></i> ' + (isEn() ? 'Download' : '下载');
             pdfBtn.style.cssText = 'padding:8px 16px;background:#dc3545;color:white;border:none;border-radius:4px;cursor:pointer;font-size:14px;font-weight:bold;';
             pdfBtn.onclick = function() {
                  var a = document.createElement('a');
                  a.href = pdfUrl;
-                 a.download = 'AI排版文档.pdf';
+                 a.download = isEn() ? 'AI_Layout_Document.pdf' : 'AI排版文档.pdf';
                  a.target = '_blank';
                  document.body.appendChild(a);
                  a.click();
@@ -383,7 +387,7 @@
 
             // 4. 关闭 (Close)
             var cancelBtn = document.createElement('button');
-            cancelBtn.innerHTML = '<i class="fas fa-times"></i> 关闭';
+            cancelBtn.innerHTML = '<i class="fas fa-times"></i> ' + (isEn() ? 'Close' : '关闭');
             cancelBtn.style.cssText = 'padding:8px 16px;background:' + (nightMode ? '#555' : '#6c757d') + ';color:white;border:none;border-radius:4px;cursor:pointer;font-size:14px;';
             cancelBtn.onclick = cleanup;
 
@@ -406,7 +410,7 @@
         } catch (error) {
             console.error('AI预览生成错误:', error);
             if (loadingModal.parentNode) loadingModal.remove();
-            global.showMessage('AI预览生成失败: ' + error.message, 'error');
+            global.showMessage((isEn() ? 'AI preview generation failed: ' : 'AI预览生成失败: ') + error.message, 'error');
         }
     }
 

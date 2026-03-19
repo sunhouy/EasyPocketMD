@@ -1,7 +1,7 @@
 {
-  "name": "Markdown 编辑器",
-  "short_name": "MD 编辑器",
-  "description": "支持云同步和打印的 Markdown 编辑器",
+  "name": "EasyPocketMD",
+  "short_name": "EasyPocketMD",
+  "description": "A completely free and open-source lightweight online Markdown editor for mobile devices. ",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

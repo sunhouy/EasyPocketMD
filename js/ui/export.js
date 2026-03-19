@@ -4,20 +4,22 @@ import { generatePDF } from './pdf-generator.js';
 const global = window;
 
 function g(name) { return global[name]; }
+function isEn() { return window.i18n && window.i18n.getLanguage() === 'en'; }
+function t(key) { return window.i18n ? window.i18n.t(key) : key; }
 
 function exportContent() {
     if (!g('vditor')) return;
     var content = g('vditor').getValue();
     var formats = [
-        { name: 'Markdown文件 (.md)', ext: 'md' }, 
-        { name: '纯文本文件 (.txt)', ext: 'txt' }, 
-        { name: 'HTML文件 (.html)', ext: 'html' },
-        { name: 'PDF文件 (.pdf)', ext: 'pdf' }
+        { name: isEn() ? 'Markdown File (.md)' : 'Markdown文件 (.md)', ext: 'md' }, 
+        { name: isEn() ? 'Plain Text File (.txt)' : '纯文本文件 (.txt)', ext: 'txt' }, 
+        { name: isEn() ? 'HTML File (.html)' : 'HTML文件 (.html)', ext: 'html' },
+        { name: isEn() ? 'PDF File (.pdf)' : 'PDF文件 (.pdf)', ext: 'pdf' }
     ];
     var exportOptions = formats.map(function(f) {
         return { icon: '<i class="fas fa-file-download"></i>', text: f.name, action: async function() { await exportFile(content, f.ext); } };
     });
-    global.showMobileActionSheet('导出格式', exportOptions);
+    global.showMobileActionSheet(isEn() ? 'Export Format' : '导出格式', exportOptions);
 }
 
 async function exportFile(content, ext) {
@@ -33,11 +35,11 @@ async function exportFile(content, ext) {
                     var loadingModal = document.createElement('div');
                     loadingModal.className = 'modal-overlay';
                     loadingModal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.9);z-index:10001;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;';
-                    loadingModal.innerHTML = '<div style="background:white;color:#333;border-radius:12px;padding:30px;text-align:center;"><div style="font-size:24px;margin-bottom:15px;"><i class="fas fa-spinner fa-spin"></i></div><div style="font-size:16px;">生成PDF中...</div></div>';
+                    loadingModal.innerHTML = '<div style="background:white;color:#333;border-radius:12px;padding:30px;text-align:center;"><div style="font-size:24px;margin-bottom:15px;"><i class="fas fa-spinner fa-spin"></i></div><div style="font-size:16px;">' + (isEn() ? 'Generating PDF...' : '生成PDF中...') + '</div></div>';
                     document.body.appendChild(loadingModal);
 
                     if (!global.preparePrintContent) {
-                         throw new Error('Print module not loaded');
+                         throw new Error(isEn() ? 'Print module not loaded' : '打印模块未加载');
                     }
                     var htmlContent = await global.preparePrintContent(content, settings);
                     
@@ -68,10 +70,10 @@ async function exportFile(content, ext) {
                     }, 100);
                     
                     loadingModal.remove();
-                    global.showMessage('文档已导出为.pdf格式');
+                    global.showMessage(isEn() ? 'Document exported as .pdf' : '文档已导出为.pdf格式');
                  } catch (error) {
                     console.error('PDF导出错误:', error);
-                    global.showMessage('PDF导出失败: ' + error.message);
+                    global.showMessage((isEn() ? 'PDF export failed: ' : 'PDF导出失败: ') + error.message);
                     if (loadingModal) loadingModal.remove();
                  }
              });
@@ -88,11 +90,11 @@ async function exportFile(content, ext) {
                     var loadingModal = document.createElement('div');
                     loadingModal.className = 'modal-overlay';
                     loadingModal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.9);z-index:10001;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;';
-                    loadingModal.innerHTML = '<div style="background:white;color:#333;border-radius:12px;padding:30px;text-align:center;"><div style="font-size:24px;margin-bottom:15px;"><i class="fas fa-spinner fa-spin"></i></div><div style="font-size:16px;">处理中...</div></div>';
+                    loadingModal.innerHTML = '<div style="background:white;color:#333;border-radius:12px;padding:30px;text-align:center;"><div style="font-size:24px;margin-bottom:15px;"><i class="fas fa-spinner fa-spin"></i></div><div style="font-size:16px;">' + (isEn() ? 'Processing...' : '处理中...') + '</div></div>';
                     document.body.appendChild(loadingModal);
 
                     if (!global.preparePrintContent) {
-                         throw new Error('Print module not loaded');
+                         throw new Error(isEn() ? 'Print module not loaded' : '打印模块未加载');
                     }
                     var htmlContent = await global.preparePrintContent(content, settings);
 
@@ -102,7 +104,7 @@ async function exportFile(content, ext) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>导出文档</title>
+    <title>` + (window.i18n ? 'Exported Document' : '导出文档') + `</title>
 </head>
 <body>
     ${htmlContent}
@@ -125,10 +127,10 @@ async function exportFile(content, ext) {
                     }, 100);
                     
                     loadingModal.remove();
-                    global.showMessage('文档已导出为.html格式');
+                    global.showMessage(isEn() ? 'Document exported as .html' : '文档已导出为.html格式');
                  } catch (error) {
                     console.error('HTML导出错误:', error);
-                    global.showMessage('HTML导出失败: ' + error.message);
+                    global.showMessage((isEn() ? 'HTML export failed: ' : 'HTML导出失败: ') + error.message);
                     if (loadingModal) loadingModal.remove();
                  }
              });
@@ -143,7 +145,7 @@ async function exportFile(content, ext) {
     a.download = '文档_' + new Date().toISOString().slice(0, 10) + '.' + ext;
     a.click();
     global.hideMobileActionSheet();
-    global.showMessage('文档已导出为.' + ext + '格式');
+    global.showMessage(isEn() ? 'Document exported as .' + ext : '文档已导出为.' + ext + '格式');
 }
 
 global.exportContent = exportContent;

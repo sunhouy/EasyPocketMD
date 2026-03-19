@@ -10,6 +10,8 @@ import Vditor from 'vditor';
 
 window.Vditor = Vditor;
 
+
+import './js/translations.js';
 import './js/utils.js';
 import './js/auth.js';
 import './js/files.js';

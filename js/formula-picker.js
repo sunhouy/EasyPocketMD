@@ -1,8 +1,10 @@
 // 公式选择器
 function showFormulaPicker() {
+    function isEn() { return window.i18n && window.i18n.getLanguage() === 'en'; }
+    
     // 增强的LaTeX公式分类
     const formulaCategories = {
-        '基础运算': [
+        [isEn() ? 'Basic Operations' : '基础运算']: [
             {display: '+', latex: '+'},
             {display: '-', latex: '-'},
             {display: '×', latex: '\\times'},
@@ -13,7 +15,7 @@ function showFormulaPicker() {
             {display: '±', latex: '\\pm'},
             {display: '∓', latex: '\\mp'}
         ],
-        '关系符号': [
+        [isEn() ? 'Relational Symbols' : '关系符号']: [
             {display: '<', latex: '<'},
             {display: '>', latex: '>'},
             {display: '≤', latex: '\\leq'},
@@ -25,7 +27,7 @@ function showFormulaPicker() {
             {display: '≡', latex: '\\equiv'},
             {display: '≢', latex: '\\not\\equiv'}
         ],
-        '集合符号': [
+        [isEn() ? 'Set Symbols' : '集合符号']: [
             {display: '∈', latex: '\\in'},
             {display: '∉', latex: '\\notin'},
             {display: '⊂', latex: '\\subset'},
@@ -37,7 +39,7 @@ function showFormulaPicker() {
             {display: '∅', latex: '\\emptyset'},
             {display: '∞', latex: '\\infty'}
         ],
-        '希腊字母': [
+        [isEn() ? 'Greek Letters' : '希腊字母']: [
             {display: 'α', latex: '\\alpha'},
             {display: 'β', latex: '\\beta'},
             {display: 'γ', latex: '\\gamma'},
@@ -59,7 +61,7 @@ function showFormulaPicker() {
             {display: 'ψ', latex: '\\psi'},
             {display: 'ω', latex: '\\omega'}
         ],
-        '微积分': [
+        [isEn() ? 'Calculus' : '微积分']: [
             {display: '∫', latex: '\\int'},
             {display: '∮', latex: '\\oint'},
             {display: '∬', latex: '\\iint'},
@@ -75,7 +77,7 @@ function showFormulaPicker() {
             {display: 'dy/dx', latex: '\\frac{dy}{dx}'},
             {display: '∫ f(x) dx', latex: '\\int f(x) \\,dx'}
         ],
-        '逻辑符号': [
+        [isEn() ? 'Logic Symbols' : '逻辑符号']: [
             {display: '∀', latex: '\\forall'},
             {display: '∃', latex: '\\exists'},
             {display: '∄', latex: '\\nexists'},
@@ -86,7 +88,7 @@ function showFormulaPicker() {
             {display: '∵', latex: '\\because'},
             {display: '∎', latex: '\\blacksquare'}
         ],
-        '箭头符号': [
+        [isEn() ? 'Arrow Symbols' : '箭头符号']: [
             {display: '→', latex: '\\to'},
             {display: '←', latex: '\\leftarrow'},
             {display: '↔', latex: '\\leftrightarrow'},
@@ -97,7 +99,7 @@ function showFormulaPicker() {
             {display: '⇑', latex: '\\Uparrow'},
             {display: '⇓', latex: '\\Downarrow'}
         ],
-        '几何符号': [
+        [isEn() ? 'Geometry Symbols' : '几何符号']: [
             {display: '∠', latex: '\\angle'},
             {display: '⊥', latex: '\\perp'},
             {display: '∥', latex: '\\parallel'},
@@ -108,7 +110,7 @@ function showFormulaPicker() {
             {display: '∘', latex: '\\circ'},
             {display: '•', latex: '\\bullet'}
         ],
-        '分数指数': [
+        [isEn() ? 'Fractions & Exponents' : '分数指数']: [
             {display: '½', latex: '\\frac{1}{2}'},
             {display: '⅓', latex: '\\frac{1}{3}'},
             {display: '¼', latex: '\\frac{1}{4}'},
@@ -120,7 +122,7 @@ function showFormulaPicker() {
             {display: 'aⁿ', latex: 'a^{n}'},
             {display: '√a', latex: '\\sqrt{a}'}
         ],
-        '线性代数': [
+        [isEn() ? 'Linear Algebra' : '线性代数']: [
             {display: 'Aᵀ', latex: 'A^{T}'},
             {display: 'det(A)', latex: '\\det(A)'},
             {display: 'tr(A)', latex: '\\operatorname{tr}(A)'},
@@ -130,11 +132,11 @@ function showFormulaPicker() {
             {display: 'u·v', latex: '\\mathbf{u} \\cdot \\mathbf{v}'},
             {display: 'u×v', latex: '\\mathbf{u} \\times \\mathbf{v}'},
             {display: '‖v‖', latex: '\\|\\mathbf{v}\\|'},
-            {display: '矩阵', latex: '\\begin{pmatrix} a & b \\\\ c & d \\end{pmatrix}'},
-            {display: '行列式', latex: '\\begin{vmatrix} a & b \\\\ c & d \\end{vmatrix}'},
-            {display: '向量', latex: '\\begin{bmatrix} x \\\\ y \\\\ z \\end{bmatrix}'}
+            {display: isEn() ? 'Matrix' : '矩阵', latex: '\\begin{pmatrix} a & b \\\\ c & d \\end{pmatrix}'},
+            {display: isEn() ? 'Determinant' : '行列式', latex: '\\begin{vmatrix} a & b \\\\ c & d \\end{vmatrix}'},
+            {display: isEn() ? 'Vector' : '向量', latex: '\\begin{bmatrix} x \\\\ y \\\\ z \\end{bmatrix}'}
         ],
-        '化学符号': [
+        [isEn() ? 'Chemistry Symbols' : '化学符号']: [
             {display: '→', latex: '\\rightarrow'},
             {display: '⇌', latex: '\\rightleftharpoons'},
             {display: '↑', latex: '\\uparrow'},
@@ -144,10 +146,10 @@ function showFormulaPicker() {
             {display: 'H⁺', latex: '\\mathrm{H^+}'},
             {display: 'OH⁻', latex: '\\mathrm{OH^-}'},
             {display: 'ΔH', latex: '\\Delta H'},
-            {display: '⇌ 平衡', latex: '\\mathrm{A} + \\mathrm{B} \\rightleftharpoons \\mathrm{C}'},
-            {display: '→ 反应', latex: '2\\mathrm{H_2} + \\mathrm{O_2} \\rightarrow 2\\mathrm{H_2O}'}
+            {display: isEn() ? '⇌ Equilibrium' : '⇌ 平衡', latex: '\\mathrm{A} + \\mathrm{B} \\rightleftharpoons \\mathrm{C}'},
+            {display: isEn() ? '→ Reaction' : '→ 反应', latex: '2\\mathrm{H_2} + \\mathrm{O_2} \\rightarrow 2\\mathrm{H_2O}'}
         ],
-        '函数运算': [
+        [isEn() ? 'Function Operations' : '函数运算']: [
             {display: 'sin', latex: '\\sin'},
             {display: 'cos', latex: '\\cos'},
             {display: 'tan', latex: '\\tan'},
@@ -159,7 +161,7 @@ function showFormulaPicker() {
             {display: 'argmax', latex: '\\arg\\max'},
             {display: 'argmin', latex: '\\arg\\min'}
         ],
-        '括号': [
+        [isEn() ? 'Brackets' : '括号']: [
             {display: '( )', latex: '()'},
             {display: '[ ]', latex: '[]'},
             {display: '{ }', latex: '\\{\\}'},
@@ -169,17 +171,17 @@ function showFormulaPicker() {
             {display: '∣ ∣', latex: '| |'},
             {display: '∥ ∥', latex: '\\| \\|'}
         ],
-        '上下标': [
+        [isEn() ? 'Subscripts & Superscripts' : '上下标']: [
             {display: 'a₁', latex: 'a_{1}'},
             {display: 'x²', latex: 'x^{2}'},
             {display: 'x̄', latex: '\\bar{x}'},
             {display: 'x̂', latex: '\\hat{x}'},
             {display: 'x̃', latex: '\\tilde{x}'},
-            {display: 'ẋ', latex: '\\dot{x}'},
-            {display: 'ẍ', latex: '\\ddot{x}'},
+            {display: 'ẋ', latex: '\\dot{x}'},
+            {display: 'ẍ', latex: '\\ddot{x}'},
             {display: 'Aᵢⱼ', latex: 'A_{ij}'}
         ],
-        '特殊符号': [
+        [isEn() ? 'Special Symbols' : '特殊符号']: [
             {display: 'ℕ', latex: '\\mathbb{N}'},
             {display: 'ℤ', latex: '\\mathbb{Z}'},
             {display: 'ℚ', latex: '\\mathbb{Q}'},
@@ -191,13 +193,13 @@ function showFormulaPicker() {
             {display: '∇×', latex: '\\nabla \\times'},
             {display: '□', latex: '\\Box'}
         ],
-        '常用公式模板': [
-            {display: '二次公式', latex: 'x = \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}'},
-            {display: '欧拉公式', latex: 'e^{i\\theta} = \\cos\\theta + i\\sin\\theta'},
-            {display: '分部积分', latex: '\\int u \\, dv = uv - \\int v \\, du'},
-            {display: '链式法则', latex: '\\frac{dy}{dx} = \\frac{dy}{du} \\cdot \\frac{du}{dx}'},
-            {display: '傅里叶变换', latex: 'F(\\omega) = \\int_{-\\infty}^{\\infty} f(t) e^{-i\\omega t} dt'},
-            {display: '薛定谔方程', latex: 'i\\hbar\\frac{\\partial}{\\partial t}\\Psi = \\hat{H}\\Psi'}
+        [isEn() ? 'Common Formula Templates' : '常用公式模板']: [
+            {display: isEn() ? 'Quadratic Formula' : '二次公式', latex: 'x = \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}'},
+            {display: isEn() ? 'Euler\'s Formula' : '欧拉公式', latex: 'e^{i\\theta} = \\cos\\theta + i\\sin\\theta'},
+            {display: isEn() ? 'Integration by Parts' : '分部积分', latex: '\\int u \\, dv = uv - \\int v \\, du'},
+            {display: isEn() ? 'Chain Rule' : '链式法则', latex: '\\frac{dy}{dx} = \\frac{dy}{du} \\cdot \\frac{du}{dx}'},
+            {display: isEn() ? 'Fourier Transform' : '傅里叶变换', latex: 'F(\\omega) = \\int_{-\\infty}^{\\infty} f(t) e^{-i\\omega t} dt'},
+            {display: isEn() ? 'Schrödinger Equation' : '薛定谔方程', latex: 'i\\hbar\\frac{\\partial}{\\partial t}\\Psi = \\hat{H}\\Psi'}
         ]
     };
 
@@ -234,7 +236,7 @@ function showFormulaPicker() {
 
     // 创建标题
     const title = document.createElement('div');
-    title.textContent = '插入LaTeX公式';
+    title.textContent = isEn() ? 'Insert LaTeX Formula' : '插入LaTeX公式';
     title.style.cssText = `
         font-size: 18px;
         font-weight: 600;
@@ -279,7 +281,7 @@ function showFormulaPicker() {
     `;
 
     const insertBtn = document.createElement('button');
-    insertBtn.textContent = '插入LaTeX';
+    insertBtn.textContent = isEn() ? 'Insert LaTeX' : '插入LaTeX';
     insertBtn.style.cssText = `
         padding: 10px 20px;
         background: #4a90e2;
@@ -291,7 +293,7 @@ function showFormulaPicker() {
     `;
 
     const cancelBtn = document.createElement('button');
-    cancelBtn.textContent = '取消';
+    cancelBtn.textContent = isEn() ? 'Cancel' : '取消';
     cancelBtn.style.cssText = `
         padding: 10px 20px;
         background: ${(window.nightMode === true) ? '#444' : '#f5f5f5'};
@@ -303,7 +305,7 @@ function showFormulaPicker() {
     `;
 
     const wrapInDollarBtn = document.createElement('button');
-    wrapInDollarBtn.textContent = '插入行内公式';
+    wrapInDollarBtn.textContent = isEn() ? 'Insert Inline' : '插入行内公式';
     wrapInDollarBtn.style.cssText = `
         padding: 10px 20px;
         background: #4a90e2;
@@ -316,7 +318,7 @@ function showFormulaPicker() {
     `;
 
     const wrapInDoubleDollarBtn = document.createElement('button');
-    wrapInDoubleDollarBtn.textContent = '插入多行公式';
+    wrapInDoubleDollarBtn.textContent = isEn() ? 'Insert Block' : '插入多行公式';
     wrapInDoubleDollarBtn.style.cssText = `
         padding: 10px 20px;
         background: #4a90e2;
@@ -464,9 +466,9 @@ function showFormulaPicker() {
         if (selectedFormula && vditor) {
             vditor.insertValue(selectedFormula.latex + '\n\n');
             closeFormulaPicker();
-            showMessage('LaTeX公式已插入');
+            showMessage(isEn() ? 'LaTeX formula inserted' : 'LaTeX公式已插入');
         } else {
-            showMessage('请先选择一个公式', 'error');
+            showMessage(isEn() ? 'Please select a formula first' : '请先选择一个公式', 'error');
         }
     });
 
@@ -475,9 +477,9 @@ function showFormulaPicker() {
         if (selectedFormula && vditor) {
             vditor.insertValue(`$${selectedFormula.latex}$` + '\n\n');
             closeFormulaPicker();
-            showMessage('行内公式已插入');
+            showMessage(isEn() ? 'Inline formula inserted' : '行内公式已插入');
         } else {
-            showMessage('请先选择一个公式', 'error');
+            showMessage(isEn() ? 'Please select a formula first' : '请先选择一个公式', 'error');
         }
     });
 
@@ -486,9 +488,9 @@ function showFormulaPicker() {
         if (selectedFormula && vditor) {
             vditor.insertValue(`$$${selectedFormula.latex}$$` + '\n\n');
             closeFormulaPicker();
-            showMessage('块级公式已插入');
+            showMessage(isEn() ? 'Block formula inserted' : '块级公式已插入');
         } else {
-            showMessage('请先选择一个公式', 'error');
+            showMessage(isEn() ? 'Please select a formula first' : '请先选择一个公式', 'error');
         }
     });
 

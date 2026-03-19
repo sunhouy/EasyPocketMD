@@ -1,0 +1,729 @@
+/**
+ * 翻译管理器 - 统一管理所有中英文翻译文本
+ */
+
+(function(window) {
+    'use strict';
+
+    // 所有翻译文本
+    const translations = {
+        zh: {
+            // 页面标题和头部
+            pageTitle: 'EasyPocketMD',
+            mobileTitle: 'EasyPocketMD',
+            loading: '正在启动编辑器...',
+
+            // 同步状态
+            syncing: '正在同步...',
+
+            // 文件列表
+            fileListTitle: '文件列表',
+            fileListHelp: '右键或长按显示更多功能',
+            newFile: '新建文件',
+            newFolder: '新建文件夹',
+            fileListHelpText: '文件列表功能提示：\n\n• 点击文件：打开文件\n• 点击文件夹：展开/收起子内容\n• 右键点击或长按：显示更多操作菜单（重命名、移动、删除等）',
+
+            // 登录/注册
+            loginRegister: '登录/注册',
+            loginSubtitle: '登录后文档将保存至服务器',
+            login: '登录',
+            register: '注册',
+            username: '用户名',
+            enterUsername: '请输入用户名',
+            password: '密码',
+            enterPassword: '请输入密码',
+            inviteCode: '邀请码 (可选)',
+            enterInviteCode: '请输入邀请码',
+            cancel: '取消',
+
+            // 冲突解决
+            fileConflict: '发现文件冲突',
+            conflictSubtitle: '以下文件在本地和服务器上存在不同版本',
+            resolveConflictInfo: '请为每个冲突的文件选择保留哪个版本',
+            resolveConflicts: '确认解决冲突',
+
+            // 历史版本
+            historyTitle: '历史版本',
+            historyCount: '最多保留1000个历史版本',
+            loadingHistory: '正在加载历史版本...',
+            close: '关闭',
+
+            // 设置
+            settings: '设置',
+            defaultEditorMode: '默认编辑器模式',
+            wysiwyg: '所见即所得',
+            instantRender: '即时渲染',
+            splitPreview: '分屏预览',
+            themeMode: '主题模式',
+            lightMode: '日间模式',
+            darkMode: '夜间模式',
+            followSystem: '跟随系统',
+            bottomToolbarButtons: '底部工具栏按钮 (5-7个)',
+            save: '保存',
+            buttonCountError: '底部工具栏按钮数量必须在 5 到 7 个之间',
+            settingsSaved: '设置已保存',
+            language: '语言',
+            chinese: '中文',
+            english: 'English',
+            fontSize: '字体大小',
+            showOutline: '显示大纲视图（需刷新页面）',
+
+            // 关于
+            about: '关于',
+            author: '作者：孙厚运',
+            description: '完全免费且开源的移动端轻量级在线 Markdown 编辑器，基于 Vditor 构建，支持多文件管理。提供可视化的格式插入方式，支持图片和文件上传、LaTeX 公式引用、Mermaid 图表绘制，降低学习与操作门槛。同时，编辑器还支持多端文件同步、文件夹创建、历史版本管理、文件分享，以及日间/夜间模式切换。提供三种编辑模式（所见即所得 / 及时渲染 / 分屏预览），并支持文档的导入、导出和文件云打印功能',
+            github: 'GitHub地址',
+            acknowledgments: '致谢',
+            icp: '京ICP备2025154249号',
+
+            // 菜单
+            share: '分享',
+            myFiles: '我的文件',
+            cloudPrint: '云打印',
+            switchMode: '切换模式',
+            import: '导入',
+            export: '导出',
+            clear: '清空',
+            clearConfirm: '确定要清空当前文件的内容吗？',
+            contentCleared: '内容已清空',
+
+            // 编辑器
+            startEditing: '开始编辑...支持 Markdown 语法',
+            format: '格式',
+            insert: '插入',
+            formula: '公式',
+            chart: '图表',
+            undo: '撤销',
+            redo: '重做',
+            save: '保存',
+
+            // 编辑器模式
+            selectEditorMode: '选择编辑器模式',
+            switchedTo: '已切换到',
+            switchFailed: '切换失败: ',
+
+            // 用户菜单
+            logout: '退出登录',
+
+            // Cookie提示
+            cookieMessage: '🍪 本网站使用 Cookies 以提升您的体验。继续使用即表示您同意我们的隐私政策。',
+            accept: '接受',
+
+            // 分享链接
+            shareLinkExpired: '分享链接已过期，无法编辑',
+            getShareFailed: '获取分享内容失败: ',
+            networkError: '网络错误，请重试',
+            shareDocument: '分享文档',
+            expired: '已过期',
+            expiresAt: '有效期至',
+            mode: '模式',
+            viewOnly: '仅查看',
+            editable: '可编辑',
+
+            // 文件操作
+            notLoggedIn: '未登录',
+            confirmLeave: '您有未保存的文件，确定要离开吗？',
+
+            // 用户菜单
+            userMenu: '用户菜单',
+            pleaseLoginToSave: '请登录以保存您的文档',
+            registerNewAccount: '注册新账户以保存文档至服务器',
+            enterUsernameAndPassword: '请输入用户名和密码',
+            loginSuccessSyncing: '登录成功！正在同步文件...',
+            loginSuccessStartSync: '登录成功，开始同步文件',
+            loginFailed: '登录失败',
+            networkErrorPleaseRetry: '网络错误，请稍后重试',
+            registerSuccessAutoLogin: '注册成功！自动登录中...',
+            registerSuccessStartSync: '注册成功，开始同步文件',
+            registerFailed: '注册失败',
+            unsavedFilesSave: '有文件尚未保存，是否保存？',
+            loggedOut: '已退出登录',
+            
+            // 格式菜单
+            heading1: '标题 1',
+            heading2: '标题 2',
+            heading3: '标题 3',
+            bold: '粗体',
+            italic: '斜体',
+            strikethrough: '删除线',
+            codeBlock: '代码块',
+            quote: '引用',
+            selectFormat: '选择格式',
+            
+            // 插入菜单
+            insertContent: '插入内容',
+            link: '链接',
+            uploadImage: '上传图片',
+            uploadFile: '上传文件',
+            webImage: '网络图片',
+            table: '表格',
+            unorderedList: '无序列表',
+            orderedList: '有序列表',
+            taskList: '任务列表',
+            divider: '分割线',
+            emoji: '表情符号',
+            
+            // 表格
+            tableInserted: '表格已插入，可编辑表格内容',
+            insertFailed: '插入失败，请重试',
+            insertTableFailed: '插入表格失败，请重试',
+            
+            // 主题模式
+            switchedToNight: '已切换到夜间模式',
+            switchedToDay: '已切换到日间模式',
+            
+            // 我的文件
+            pleaseLoginFirst: '请先登录',
+            loading: '正在加载...',
+            usedSpace: '已用空间',
+            totalFiles: '共 {count} 个文件',
+            noFiles: '暂无文件',
+            copy: '复制',
+            delete: '删除',
+            linkCopied: '链接已复制',
+            confirmDeleteFile: '确定要删除 {name} 吗？',
+            deleteSuccess: '删除成功',
+            deleteFailed: '删除失败',
+            loadFailed: '加载失败',
+            loadError: '加载出错',
+            
+            // 文件操作（右键菜单）
+            rename: '重命名',
+            move: '移动',
+            history: '历史版本',
+            newFile: '新建文件',
+            newFolder: '新建文件夹',
+            virtualFolderRenameNotAllowed: '虚拟文件夹不可重命名，请先创建为实体文件夹',
+            renameNotAvailable: '重命名功能不可用',
+            virtualFolderMoveNotAllowed: '虚拟文件夹不可移动，请先创建为实体文件夹',
+            virtualFolderDeleteNotAllowed: '不能直接删除虚拟文件夹，请删除其子内容',
+            enterFileName: '请输入文件名',
+            enterFolderName: '请输入文件夹名',
+            renameVirtualFolderError: '无法重命名虚拟文件夹，请先创建实文件夹',
+            fileExists: '已存在同名文件',
+            pathExists: '该路径已存在',
+            enterNewFileName: '请输入新的文件名',
+            enterNewFolderName: '请输入新的文件夹名',
+            fileOrFolderExists: '该目录下已存在同名文件或文件夹',
+            fileOrFolderExistsPleaseUseOther: '该目录下已存在同名文件或文件夹，请使用其他名称',
+            fileRenamed: '文件已重命名',
+            folderRenamed: '文件夹已重命名',
+            moveTo: '移动到...',
+            rootDirectory: '根目录',
+            cancel: '取消',
+            cannotMoveToSelf: '不能将文件夹移动到自身或其子目录中',
+            targetExists: '目标位置已存在同名项',
+            fileMoved: '文件已移动',
+            folderMoved: '文件夹已移动',
+            cannotOpenFolder: '无法打开文件夹',
+            fileOpened: '已打开文件',
+            atLeastOneFile: '至少需要保留一个文件',
+            confirmDeleteFileQuestion: '确定要删除这个文件吗？',
+            fileDeleted: '已删除文件',
+            confirmDeleteFolderQuestion: '确定要删除文件夹"{name}"及其所有内容吗？',
+            folderDeleted: '已删除文件夹',
+            fileCreated: '已创建文件',
+            folderCreated: '已创建文件夹',
+            parentFolderNotExists: '父文件夹 "{path}" 不存在，请先使用"新建文件夹"功能创建',
+            fileExistsPleaseUseOther: '已存在同名文件，请使用其他名称',
+            newDocument: '新文档',
+            newFolderDefault: '新文件夹',
+            untitledDocument: '未命名文档',
+            
+            // 欢迎文档
+            welcomeTitle: '欢迎使用 EasyPocketMD',
+            welcomeContent: '这是一个新的文档。',
+            features: '功能特性',
+            featureMarkdown: '支持 Markdown 语法',
+            featurePreview: '实时预览',
+            featureAutoSave: '自动保存',
+            featureMultiFile: '多文件管理',
+            startWriting: '开始编写吧！',
+            startWritingContent: '开始编写您的内容...',
+            
+            // 云打印
+            downloadPrintClient: '下载打印客户端',
+            downloadWindows: '下载Windows版本',
+            recommendedCurrentSystem: '推荐 (当前系统)',
+            windows: 'Windows',
+            linux: 'Linux',
+            macos: 'macOS',
+            pleaseLoginToUse: '请先登录后再使用此功能',
+            cloudPrintSettings: '云打印设置',
+            exportPdfSettings: '导出 PDF 设置',
+            exportHtmlSettings: '导出 HTML 设置',
+            aiLayout: 'AI智能排版',
+            uploadFileToPrint: '上传文件打印',
+            clickToDownloadClient: '点击下载打印客户端',
+            printClientStatus: '打印客户端状态',
+            pleaseConnectClient: '请连接打印客户端',
+            clientConnected: '打印客户端已连接',
+            basicSettings: '基础设置',
+            titleFontSize: '基础标题字号 (H4)',
+            bodyFontSize: '正文字号',
+            pageMargin: '页边距',
+            small: '小',
+            default: '默认',
+            large: '大',
+            extraLarge: '特大',
+            lineHeight: '行距',
+            paragraphSpacing: '段落间距',
+            titleSpacing: '标题间距',
+            titleAlignment: '标题对齐',
+            leftAlign: '居左',
+            centerAlign: '居中',
+            rightAlign: '居右',
+            contentAlignment: '内容对齐',
+            indentParagraph: '每段段首自动空两格',
+            fitToPage: '自动排版至一页',
+            advancedHeadingSettings: '高级标题字号设置',
+            enableCustomHeadingSizes: '启用自定义标题字号',
+            h1Size: 'H1 字号 (pt)',
+            h2Size: 'H2 字号 (pt)',
+            h3Size: 'H3 字号 (pt)',
+            h4Size: 'H4 字号 (pt)',
+            h5Size: 'H5 字号 (pt)',
+            h6Size: 'H6 字号 (pt)',
+            quickSetDecrement: '快速设置递减量 (pt)',
+            applyDecrement: '应用递减',
+            imageSettings: '图片设置',
+            imageWidth: '图片宽度',
+            imageHeight: '图片高度',
+            example: '如',
+            preview: '预览',
+            sendPrint: '发送打印',
+            exportPdf: '导出 PDF',
+            exportHtml: '导出 HTML',
+            parsingResponseError: '响应解析错误',
+            websocketError: 'WebSocket错误',
+            networkNotConnected: '网络未连接，请连接网络',
+            printClientConnection: '打印客户端连接',
+            cannotConnectToClient: '无法连接到打印客户端',
+            pleaseEnsureClientStarted: '请确保打印客户端已启动并使用您的账号密码绑定',
+            retryConnection: '重新连接',
+            connecting: '连接中...',
+            connectionFailed: '连接失败，请确保打印客户端已启动并使用正确的账号密码登录',
+            processingUploadedFiles: '正在处理上传的文件...',
+            filePrintTaskSent: '文件打印任务已发送',
+            fileUploadFailed: '文件上传失败',
+            unknownError: '未知错误',
+            filePrintFailed: '文件打印失败',
+            connectionTimeout: '连接超时',
+            printFailed: '打印失败',
+            
+            // 同步状态
+            loadingFilesFromServer: '正在从服务器加载文件...',
+            syncComplete: '文件同步完成',
+            noFilesOnServer: '服务器没有文件，使用本地文件',
+            syncFailedUseLocal: '同步失败，使用本地文件',
+            detectingLocalNewFiles: '检测到本地新文件，正在自动上传 {count} 个...',
+            conflictResolvedFilesSynced: '冲突已解决，文件已同步',
+            conflictResolutionCancelled: '冲突解决已取消，使用本地文件',
+            
+            // 冲突解决
+            fileConflictWarning: '⚠️ {filename}',
+            fileDeletedOnServer: '该文件在服务器上已经删除',
+            localModifiedTime: '本地修改时间',
+            serverModifiedTime: '服务器修改时间',
+            reuploadToServer: '重新上传到服务器',
+            deleteLocalFile: '删除本地文件',
+            useLocalVersion: '使用本地版本',
+            useServerVersion: '使用服务器版本',
+            
+            // 历史版本
+            historyTitle: '历史版本',
+            historyCount: '最多保留1000个历史版本',
+            loadingHistory: '正在加载历史版本...',
+            close: '关闭'
+        },
+        en: {
+            // Page title and header
+            pageTitle: 'Markdown Editor',
+            mobileTitle: 'Markdown Editor',
+            loading: 'Starting editor...',
+
+            // Sync status
+            syncing: 'Syncing...',
+
+            // File list
+            fileListTitle: 'File List',
+            fileListHelp: 'Right-click or long-press for more functions',
+            newFile: 'New File',
+            newFolder: 'New Folder',
+            fileListHelpText: 'File List Tips:\n\n• Click file: Open file\n• Click folder: Expand/collapse\n• Right-click or long-press: Show more options (rename, move, delete, etc.)',
+
+            // Login/Register
+            loginRegister: 'Login/Register',
+            loginSubtitle: 'Documents will be saved to server after login',
+            login: 'Login',
+            register: 'Register',
+            username: 'Username',
+            enterUsername: 'Enter username',
+            password: 'Password',
+            enterPassword: 'Enter password',
+            inviteCode: 'Invite Code (Optional)',
+            enterInviteCode: 'Enter invite code',
+            cancel: 'Cancel',
+
+            // Conflict resolution
+            fileConflict: 'File Conflict Detected',
+            conflictSubtitle: 'The following files have different versions locally and on the server',
+            resolveConflictInfo: 'Please choose which version to keep for each conflicting file',
+            resolveConflicts: 'Resolve Conflicts',
+
+            // History versions
+            historyTitle: 'History Versions',
+            historyCount: 'Up to 1000 history versions are kept',
+            loadingHistory: 'Loading history versions...',
+            close: 'Close',
+
+            // Settings
+            settings: 'Settings',
+            defaultEditorMode: 'Default Editor Mode',
+            wysiwyg: 'WYSIWYG',
+            instantRender: 'Instant Render',
+            splitPreview: 'Split Preview',
+            themeMode: 'Theme Mode',
+            lightMode: 'Light Mode',
+            darkMode: 'Dark Mode',
+            followSystem: 'Follow System',
+            bottomToolbarButtons: 'Bottom Toolbar Buttons (5-7)',
+            save: 'Save',
+            buttonCountError: 'Bottom toolbar buttons must be between 5 and 7',
+            settingsSaved: 'Settings saved',
+            language: 'Language',
+            chinese: '中文',
+            english: 'English',
+            fontSize: 'Font Size',
+            showOutline: 'Show Outline View',
+
+            // About
+            about: 'About',
+            author: 'Author: Sun Houyun',
+            description: 'A completely free and open-source lightweight online Markdown editor for mobile, built on Vditor with multi-file management. Provides visual format insertion, supports image and file uploads, LaTeX formula references, Mermaid diagram rendering, lowering the learning and operation barrier. The editor also supports multi-device file sync, folder creation, history version management, file sharing, and day/night mode switching. Provides three editing modes (WYSIWYG / Instant Render / Split Preview), and supports document import, export, and cloud printing functionality.',
+            github: 'GitHub',
+            acknowledgments: 'Acknowledgments',
+            icp: '京ICP备2025154249号',
+
+            // Menu
+            share: 'Share',
+            myFiles: 'My Files',
+            cloudPrint: 'Cloud Print',
+            switchMode: 'Switch Mode',
+            import: 'Import',
+            export: 'Export',
+            clear: 'Clear',
+            clearConfirm: 'Are you sure you want to clear the current file content?',
+            contentCleared: 'Content cleared',
+
+            // Editor
+            startEditing: 'Start editing... Supports Markdown syntax',
+            format: 'Format',
+            insert: 'Insert',
+            formula: 'Formula',
+            chart: 'Chart',
+            undo: 'Undo',
+            redo: 'Redo',
+            save: 'Save',
+
+            // Editor modes
+            selectEditorMode: 'Select Editor Mode',
+            switchedTo: 'Switched to ',
+            switchFailed: 'Switch failed: ',
+
+            // User menu
+            logout: 'Logout',
+
+            // Cookie notice
+            cookieMessage: '🍪 This website uses cookies to enhance your experience. By continuing to use this site, you agree to our privacy policy.',
+            accept: 'Accept',
+
+            // Share link
+            shareLinkExpired: 'Share link has expired, cannot edit',
+            getShareFailed: 'Failed to get share content: ',
+            networkError: 'Network error, please try again',
+            shareDocument: 'Share document',
+            expired: 'Expired',
+            expiresAt: 'Expires at',
+            mode: 'Mode',
+            viewOnly: 'View only',
+            editable: 'Editable',
+
+            // File operations
+            notLoggedIn: 'Not logged in',
+            confirmLeave: 'You have unsaved files, are you sure you want to leave?',
+
+            // User menu
+            userMenu: 'User Menu',
+            pleaseLoginToSave: 'Please login to save your documents',
+            registerNewAccount: 'Register new account to save documents to server',
+            enterUsernameAndPassword: 'Please enter username and password',
+            loginSuccessSyncing: 'Login successful! Syncing files...',
+            loginSuccessStartSync: 'Login successful, starting file sync',
+            loginFailed: 'Login failed',
+            networkErrorPleaseRetry: 'Network error, please try again later',
+            registerSuccessAutoLogin: 'Registration successful! Logging in automatically...',
+            registerSuccessStartSync: 'Registration successful, starting file sync',
+            registerFailed: 'Registration failed',
+            unsavedFilesSave: 'You have unsaved files, do you want to save?',
+            loggedOut: 'Logged out',
+            
+            // Format menu
+            heading1: 'Heading 1',
+            heading2: 'Heading 2',
+            heading3: 'Heading 3',
+            bold: 'Bold',
+            italic: 'Italic',
+            strikethrough: 'Strikethrough',
+            codeBlock: 'Code Block',
+            quote: 'Quote',
+            selectFormat: 'Select Format',
+            
+            // Insert menu
+            insertContent: 'Insert Content',
+            link: 'Link',
+            uploadImage: 'Upload Image',
+            uploadFile: 'Upload File',
+            webImage: 'Web Image',
+            table: 'Table',
+            unorderedList: 'Unordered List',
+            orderedList: 'Ordered List',
+            taskList: 'Task List',
+            divider: 'Divider',
+            emoji: 'Emoji',
+            
+            // Table
+            tableInserted: 'Table inserted, you can edit the content',
+            insertFailed: 'Insert failed, please try again',
+            insertTableFailed: 'Failed to insert table, please try again',
+            
+            // Theme mode
+            switchedToNight: 'Switched to night mode',
+            switchedToDay: 'Switched to day mode',
+            
+            // My Files
+            pleaseLoginFirst: 'Please login first',
+            loading: 'Loading...',
+            usedSpace: 'Used Space',
+            totalFiles: '{count} files total',
+            noFiles: 'No files',
+            copy: 'Copy',
+            delete: 'Delete',
+            linkCopied: 'Link copied',
+            confirmDeleteFile: 'Are you sure you want to delete {name}?',
+            deleteSuccess: 'Deleted successfully',
+            deleteFailed: 'Delete failed',
+            loadFailed: 'Load failed',
+            loadError: 'Load error',
+            
+            // File operations (context menu)
+            rename: 'Rename',
+            move: 'Move',
+            history: 'History',
+            newFile: 'New File',
+            newFolder: 'New Folder',
+            virtualFolderRenameNotAllowed: 'Virtual folders cannot be renamed, please create a real folder first',
+            renameNotAvailable: 'Rename function not available',
+            virtualFolderMoveNotAllowed: 'Virtual folders cannot be moved, please create a real folder first',
+            virtualFolderDeleteNotAllowed: 'Cannot delete virtual folders directly, please delete their contents',
+            enterFileName: 'Enter file name',
+            enterFolderName: 'Enter folder name',
+            renameVirtualFolderError: 'Cannot rename virtual folder, please create a real folder first',
+            fileExists: 'File with same name already exists',
+            pathExists: 'Path already exists',
+            enterNewFileName: 'Enter new file name',
+            enterNewFolderName: 'Enter new folder name',
+            fileOrFolderExists: 'File or folder with same name already exists in this directory',
+            fileOrFolderExistsPleaseUseOther: 'File or folder with same name already exists in this directory, please use another name',
+            fileRenamed: 'File renamed',
+            folderRenamed: 'Folder renamed',
+            moveTo: 'Move to...',
+            rootDirectory: 'Root',
+            cancel: 'Cancel',
+            cannotMoveToSelf: 'Cannot move folder to itself or its subdirectories',
+            targetExists: 'Item with same name already exists at target location',
+            fileMoved: 'File moved',
+            folderMoved: 'Folder moved',
+            cannotOpenFolder: 'Cannot open folder',
+            fileOpened: 'Opened file',
+            atLeastOneFile: 'At least one file must be kept',
+            confirmDeleteFileQuestion: 'Are you sure you want to delete this file?',
+            fileDeleted: 'File deleted',
+            confirmDeleteFolderQuestion: 'Are you sure you want to delete folder "{name}" and all its contents?',
+            folderDeleted: 'Folder deleted',
+            fileCreated: 'File created',
+            folderCreated: 'Folder created',
+            parentFolderNotExists: 'Parent folder "{path}" does not exist, please use "New Folder" function first',
+            fileExistsPleaseUseOther: 'File with same name already exists, please use another name',
+            newDocument: 'New Document',
+            newFolderDefault: 'New Folder',
+            untitledDocument: 'Untitled',
+            
+            // Welcome document
+            welcomeTitle: 'Welcome to Markdown Editor',
+            welcomeContent: 'This is a new document.',
+            features: 'Features',
+            featureMarkdown: 'Supports Markdown syntax',
+            featurePreview: 'Live preview',
+            featureAutoSave: 'Auto save',
+            featureMultiFile: 'Multi-file management',
+            startWriting: 'Start writing!',
+            startWritingContent: 'Start writing your content...',
+            
+            // Cloud Print
+            downloadPrintClient: 'Download Print Client',
+            downloadWindows: 'Download Windows Version',
+            recommendedCurrentSystem: 'Recommended (Current System)',
+            windows: 'Windows',
+            linux: 'Linux',
+            macos: 'macOS',
+            pleaseLoginToUse: 'Please login first to use this feature',
+            cloudPrintSettings: 'Cloud Print Settings',
+            exportPdfSettings: 'Export PDF Settings',
+            exportHtmlSettings: 'Export HTML Settings',
+            aiLayout: 'AI Smart Layout',
+            uploadFileToPrint: 'Upload File to Print',
+            clickToDownloadClient: 'Click to download print client',
+            printClientStatus: 'Print Client Status',
+            pleaseConnectClient: 'Please connect print client',
+            clientConnected: 'Print client connected',
+            basicSettings: 'Basic Settings',
+            titleFontSize: 'Base Title Font Size (H4)',
+            bodyFontSize: 'Body Font Size',
+            pageMargin: 'Page Margin',
+            small: 'Small',
+            default: 'Default',
+            large: 'Large',
+            extraLarge: 'Extra Large',
+            lineHeight: 'Line Height',
+            paragraphSpacing: 'Paragraph Spacing',
+            titleSpacing: 'Title Spacing',
+            titleAlignment: 'Title Alignment',
+            leftAlign: 'Left',
+            centerAlign: 'Center',
+            rightAlign: 'Right',
+            contentAlignment: 'Content Alignment',
+            indentParagraph: 'Auto indent first line of paragraphs',
+            fitToPage: 'Auto fit to one page',
+            advancedHeadingSettings: 'Advanced Heading Size Settings',
+            enableCustomHeadingSizes: 'Enable custom heading sizes',
+            h1Size: 'H1 Size (pt)',
+            h2Size: 'H2 Size (pt)',
+            h3Size: 'H3 Size (pt)',
+            h4Size: 'H4 Size (pt)',
+            h5Size: 'H5 Size (pt)',
+            h6Size: 'H6 Size (pt)',
+            quickSetDecrement: 'Quick set decrement (pt)',
+            applyDecrement: 'Apply Decrement',
+            imageSettings: 'Image Settings',
+            imageWidth: 'Image Width',
+            imageHeight: 'Image Height',
+            example: 'e.g.',
+            preview: 'Preview',
+            sendPrint: 'Send Print',
+            exportPdf: 'Export PDF',
+            exportHtml: 'Export HTML',
+            parsingResponseError: 'Response parsing error',
+            websocketError: 'WebSocket error',
+            networkNotConnected: 'Network not connected, please connect to network',
+            printClientConnection: 'Print Client Connection',
+            cannotConnectToClient: 'Cannot connect to print client',
+            pleaseEnsureClientStarted: 'Please ensure print client is started and bound with your account password',
+            retryConnection: 'Retry Connection',
+            connecting: 'Connecting...',
+            connectionFailed: 'Connection failed, please ensure print client is started and logged in with correct credentials',
+            processingUploadedFiles: 'Processing uploaded files...',
+            filePrintTaskSent: 'File print task sent',
+            fileUploadFailed: 'File upload failed',
+            unknownError: 'Unknown error',
+            filePrintFailed: 'File print failed',
+            connectionTimeout: 'Connection timeout',
+            printFailed: 'Print failed',
+            
+            // Sync status
+            loadingFilesFromServer: 'Loading files from server...',
+            syncComplete: 'File sync complete',
+            noFilesOnServer: 'No files on server, using local files',
+            syncFailedUseLocal: 'Sync failed, using local files',
+            detectingLocalNewFiles: 'Detected local new files, auto uploading {count}...',
+            conflictResolvedFilesSynced: 'Conflict resolved, files synced',
+            conflictResolutionCancelled: 'Conflict resolution cancelled, using local files',
+            
+            // Conflict resolution
+            fileConflictWarning: '⚠️ {filename}',
+            fileDeletedOnServer: 'This file has been deleted on the server',
+            localModifiedTime: 'Local modified time',
+            serverModifiedTime: 'Server modified time',
+            reuploadToServer: 'Reupload to server',
+            deleteLocalFile: 'Delete local file',
+            useLocalVersion: 'Use local version',
+            useServerVersion: 'Use server version',
+            
+            // History versions
+            historyTitle: 'History Versions',
+            historyCount: 'Up to 1000 history versions are kept',
+            loadingHistory: 'Loading history versions...',
+            close: 'Close'
+        }
+    };
+
+    // 当前语言
+    let currentLanguage = 'zh';
+
+    // 语言管理器
+    const i18n = {
+        // 初始化语言
+        init: function() {
+            // 从本地存储获取语言设置，或使用浏览器语言
+            const savedLanguage = localStorage.getItem('vditor_language');
+            if (savedLanguage && (savedLanguage === 'zh' || savedLanguage === 'en')) {
+                currentLanguage = savedLanguage;
+            } else {
+                // 检测浏览器语言
+                const browserLang = navigator.language || navigator.userLanguage;
+                if (browserLang.startsWith('zh')) {
+                    currentLanguage = 'zh';
+                } else {
+                    currentLanguage = 'en';
+                }
+            }
+            return currentLanguage;
+        },
+
+        // 获取当前语言
+        getLanguage: function() {
+            return currentLanguage;
+        },
+
+        // 设置语言
+        setLanguage: function(lang) {
+            if (lang !== 'zh' && lang !== 'en') {
+                console.warn('Invalid language:', lang);
+                return;
+            }
+            currentLanguage = lang;
+            localStorage.setItem('vditor_language', lang);
+            document.documentElement.lang = lang === 'zh' ? 'zh-CN' : 'en';
+        },
+
+        // 获取翻译文本
+        t: function(key) {
+            const langTranslations = translations[currentLanguage];
+            if (langTranslations && langTranslations[key]) {
+                return langTranslations[key];
+            }
+            // 如果没有找到翻译，返回键名
+            console.warn('Translation not found for key:', key);
+            return key;
+        },
+
+        // 获取所有翻译对象（用于调试）
+        getTranslations: function() {
+            return translations;
+        }
+    };
+
+    // 暴露到全局
+    window.i18n = i18n;
+
+})(window);

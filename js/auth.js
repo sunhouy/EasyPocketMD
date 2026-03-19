@@ -9,15 +9,20 @@
     let _loginSubmitting = false;
     let _registerSubmitting = false;
 
+    // 辅助函数：获取翻译
+    function t(key) {
+        return global.i18n ? global.i18n.t(key) : key;
+    }
+
     function showUserInfo() {
         const mobileLoginBtn = document.getElementById('mobileLoginBtn');
         if (mobileLoginBtn) {
             if (global.currentUser) {
                 mobileLoginBtn.classList.add('logged-in');
-                mobileLoginBtn.title = '用户菜单';
+                mobileLoginBtn.title = t('userMenu');
             } else {
                 mobileLoginBtn.classList.remove('logged-in');
-                mobileLoginBtn.title = '登录';
+                mobileLoginBtn.title = t('login');
             }
         }
     }
@@ -78,8 +83,8 @@
         if (registerTabBtn) registerTabBtn.classList.remove('active');
         if (loginForm) loginForm.style.display = 'flex';
         if (registerForm) registerForm.style.display = 'none';
-        if (modalTitle) modalTitle.textContent = '登录';
-        if (modalSubtitle) modalSubtitle.textContent = '请登录以保存您的文档';
+        if (modalTitle) modalTitle.textContent = t('login');
+        if (modalSubtitle) modalSubtitle.textContent = t('pleaseLoginToSave');
     }
 
     function switchToRegisterTab() {
@@ -93,8 +98,8 @@
         if (loginTabBtn) loginTabBtn.classList.remove('active');
         if (loginForm) loginForm.style.display = 'none';
         if (registerForm) registerForm.style.display = 'flex';
-        if (modalTitle) modalTitle.textContent = '注册';
-        if (modalSubtitle) modalSubtitle.textContent = '注册新账户以保存文档至服务器';
+        if (modalTitle) modalTitle.textContent = t('register');
+        if (modalSubtitle) modalSubtitle.textContent = t('registerNewAccount');
     }
 
     async function login() {
@@ -108,7 +113,7 @@
 
         if (!username || !password) {
             if (message) {
-                message.textContent = '请输入用户名和密码';
+                message.textContent = t('enterUsernameAndPassword');
                 message.className = 'modal-message error';
             }
             _loginSubmitting = false;
@@ -132,25 +137,27 @@
                         password: password
                     };
                     localStorage.setItem('vditor_user', JSON.stringify(global.currentUser));
-                    message.textContent = '登录成功！正在同步文件...';
+                    message.textContent = t('loginSuccessSyncing');
                     message.className = 'modal-message success';
 
                     setTimeout(() => {
                         hideLoginModal();
                         showUserInfo();
-                        global.showMessage('登录成功，开始同步文件');
+                        global.showMessage(t('loginSuccessStartSync'));
                         if (global.startAutoSync) global.startAutoSync();
                         if (global.loadFilesFromServer) global.loadFilesFromServer();
+                        // 隐藏顶部提示横幅
+                        if (global.hideTopNoticeBanner) global.hideTopNoticeBanner();
                     }, 1500);
                 } else {
-                    message.textContent = result.message || '登录失败';
+                    message.textContent = result.message || t('loginFailed');
                     message.className = 'modal-message error';
                 }
             }
         } catch (error) {
             console.error('登录错误:', error);
             if (message) {
-                message.textContent = '网络错误，请稍后重试';
+                message.textContent = t('networkErrorPleaseRetry');
                 message.className = 'modal-message error';
             }
         } finally {
@@ -171,7 +178,7 @@
 
         if (!username || !password) {
             if (message) {
-                message.textContent = '请输入用户名和密码';
+                message.textContent = t('enterUsernameAndPassword');
                 message.className = 'modal-message error';
             }
             _registerSubmitting = false;
@@ -198,25 +205,25 @@
                         password: password
                     };
                     localStorage.setItem('vditor_user', JSON.stringify(global.currentUser));
-                    message.textContent = '注册成功！自动登录中...';
+                    message.textContent = t('registerSuccessAutoLogin');
                     message.className = 'modal-message success';
 
                     setTimeout(() => {
                         hideLoginModal();
                         showUserInfo();
-                        global.showMessage('注册成功，开始同步文件');
+                        global.showMessage(t('registerSuccessStartSync'));
                         if (global.startAutoSync) global.startAutoSync();
                         if (global.loadFilesFromServer) global.loadFilesFromServer();
                     }, 1500);
                 } else {
-                    message.textContent = result.message || '注册失败';
+                    message.textContent = result.message || t('registerFailed');
                     message.className = 'modal-message error';
                 }
             }
         } catch (error) {
             console.error('注册错误:', error);
             if (message) {
-                message.textContent = '网络错误，请稍后重试';
+                message.textContent = t('networkErrorPleaseRetry');
                 message.className = 'modal-message error';
             }
         } finally {
@@ -234,7 +241,7 @@
         });
 
         if (hasUnsaved) {
-            if (!confirm('有文件尚未保存，是否保存？')) {
+            if (!confirm(t('unsavedFilesSave'))) {
                 // 不保存
             } else {
                 if (global.syncAllFiles) await global.syncAllFiles();
@@ -244,10 +251,14 @@
         if (global.stopAutoSync) global.stopAutoSync();
         global.currentUser = null;
         localStorage.removeItem('vditor_user');
+        // 清除未登录提示横幅的关闭状态，让下次打开时重新显示
+        localStorage.removeItem('guestNoticeDismissed');
         showUserInfo();
         if (global.clearAutoSave) global.clearAutoSave();
         showLoginModal();
-        global.showMessage('已退出登录');
+        global.showMessage(t('loggedOut'));
+        // 显示未登录用户提示横幅
+        if (global.showGuestNoticeBanner) global.showGuestNoticeBanner();
     }
 
     function handleLoginButtonClick(e) {

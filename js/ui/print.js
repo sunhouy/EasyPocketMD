@@ -5,6 +5,9 @@ const global = window;
 
 function g(name) { return global[name]; }
 
+function isEn() { return window.i18n && window.i18n.getLanguage() === 'en'; }
+function t(key) { return window.i18n ? window.i18n.t(key) : key; }
+
     function showDownloadClientModal() {
         var nightMode = g('nightMode') === true;
         var modal = document.createElement('div');
@@ -25,7 +28,7 @@ function g(name) { return global[name]; }
         content.appendChild(closeBtn);
 
         var title = document.createElement('h3');
-        title.textContent = '下载打印客户端';
+        title.textContent = isEn() ? 'Download Print Client' : '下载打印客户端';
         title.style.cssText = 'margin-top:0;margin-bottom:20px;text-align:center;font-size:18px;';
         content.appendChild(title);
 
@@ -46,7 +49,7 @@ function g(name) { return global[name]; }
             
             var headerHtml = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">' +
                 '<span style="font-weight:bold;font-size:16px;">' + osName + '</span>' + 
-                (isRecommended ? '<span style="font-size:12px;background:#2196F3;color:white;padding:2px 8px;border-radius:4px;">推荐 (当前系统)</span>' : '') +
+                (isRecommended ? '<span style="font-size:12px;background:#2196F3;color:white;padding:2px 8px;border-radius:4px;">' + (isEn() ? 'Recommended (Current System)' : '推荐 (当前系统)') + '</span>' : '') +
                 '</div>';
             
             var linksHtml = '<div style="display:flex;flex-wrap:wrap;gap:10px;">';
@@ -66,7 +69,7 @@ function g(name) { return global[name]; }
         var sections = [];
         
         var winSection = createSection('Windows', isWin, [
-            { name: '下载Windows版本', url: 'https://static.yhsun.cn/print_client_windows.exe' }
+            { name: isEn() ? 'Download Windows Version' : '下载Windows版本', url: 'https://static.yhsun.cn/print_client_windows.exe' }
         ]);
         
         var linuxSection = createSection('Linux', isLinux, [
@@ -108,7 +111,7 @@ function g(name) { return global[name]; }
 
         // 检查用户是否登录
         if (!g('currentUser')) {
-            global.showMessage('请先登录后再使用此功能');
+            global.showMessage(isEn() ? 'Please log in first to use this feature' : '请先登录后再使用此功能');
             if (g('showLoginModal')) {
                 g('showLoginModal')();
             }
@@ -126,9 +129,9 @@ function g(name) { return global[name]; }
         var modalContent = document.createElement('div');
         modalContent.style.cssText = 'background:' + bg + ';color:' + textColor + ';border-radius:12px;padding:25px;width:90%;max-width:600px;max-height:85vh;overflow-y:auto;';
 
-        var dialogTitle = '云打印设置';
-        if (mode === 'export-pdf') dialogTitle = '导出 PDF 设置';
-        if (mode === 'export-html') dialogTitle = '导出 HTML 设置';
+        var dialogTitle = isEn() ? 'Cloud Print Settings' : '云打印设置';
+        if (mode === 'export-pdf') dialogTitle = isEn() ? 'Export PDF Settings' : '导出 PDF 设置';
+        if (mode === 'export-html') dialogTitle = isEn() ? 'Export HTML Settings' : '导出 HTML 设置';
         
         var title = '<h2 style="text-align:center;margin-bottom:20px;">' + dialogTitle + '</h2>';
 
@@ -138,28 +141,28 @@ function g(name) { return global[name]; }
             aiSection = `
                 <div style="margin-bottom:20px;">
                     <button id="aiLayoutBtn" style="width:100%;padding:12px;font-weight:bold;background:linear-gradient(135deg, #667eea 0%, #764ba2 100%);color:white;border:none;border-radius:6px;cursor:pointer;font-size:15px;">
-                        <i class="fas fa-magic"></i> AI智能排版
+                        <i class="fas fa-magic"></i> ${isEn() ? 'AI Smart Layout' : 'AI智能排版'}
                     </button>
                 </div>
                 <div style="margin-bottom:20px;">
                     <button id="printFileBtn" style="width:100%;padding:12px;font-weight:bold;background:#4CAF50;color:white;border:none;border-radius:6px;cursor:pointer;">
-                        <i class="fas fa-file-upload"></i> 上传文件打印
+                        <i class="fas fa-file-upload"></i> ${isEn() ? 'Upload File to Print' : '上传文件打印'}
                     </button>
                 </div>
             `;
         }
 
-        var downloadLink = '<a href="javascript:void(0)" id="downloadClientBtn" style="color:#4a90e2;cursor:pointer;text-decoration:underline;">点击下载打印客户端</a>';
+        var downloadLink = '<a href="javascript:void(0)" id="downloadClientBtn" style="color:#4a90e2;cursor:pointer;text-decoration:underline;">' + (isEn() ? 'Click to download print client' : '点击下载打印客户端') + '</a>';
 
         // 客户端连接状态区域 (仅在打印模式显示)
         var statusSection = '';
         if (mode === 'print') {
             statusSection = `
                 <div style="margin-bottom:20px;padding:15px;background:` + (nightMode ? '#3d3d3d' : '#f8f9fa') + `;border-radius:8px;">
-                    <h3 style="margin-top:0;margin-bottom:10px;">打印客户端状态</h3>
+                    <h3 style="margin-top:0;margin-bottom:10px;">${isEn() ? 'Print Client Status' : '打印客户端状态'}</h3>
                     <div id="clientStatus" style="display:flex;align-items:center;gap:10px;">
                         <div id="statusIndicator" style="width:12px;height:12px;border-radius:50%;background:#dc3545;"></div>
-                        <span id="statusText" style="font-size:14px;">请连接打印客户端</span>
+                        <span id="statusText" style="font-size:14px;">${isEn() ? 'Please connect print client' : '请连接打印客户端'}</span>
                     </div>
                     <p style="margin-top:10px;font-size:14px;color:` + (nightMode ? '#aaa' : '#666') + `;">` + downloadLink + `</p>
                 </div>
@@ -168,80 +171,80 @@ function g(name) { return global[name]; }
 
         var settingsSection = `
             <div style="margin-bottom:20px;">
-                <h3 style="margin-top:0;margin-bottom:15px;">基础设置</h3>
+                <h3 style="margin-top:0;margin-bottom:15px;">${isEn() ? 'Basic Settings' : '基础设置'}</h3>
                 <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(200px, 1fr));gap:15px;">
                     <div>
-                        <label style="display:block;margin-bottom:5px;font-size:14px;">基础标题字号 (H4)</label>
+                        <label style="display:block;margin-bottom:5px;font-size:14px;">${isEn() ? 'Base Title Font Size (H4)' : '基础标题字号 (H4)'}</label>
                         <div style="position:relative;">
                             <input type="number" id="titleFontSize" value="24" min="8" max="72" style="width:100%;padding:8px;border:1px solid ` + borderColor + `;border-radius:6px;background:` + (nightMode ? '#3d3d3d' : 'white') + `;color:` + textColor + `;">
                             <span style="position:absolute;right:10px;top:50%;transform:translateY(-50%);color:` + (nightMode ? '#aaa' : '#666') + `;">pt</span>
                         </div>
                     </div>
                     <div>
-                        <label style="display:block;margin-bottom:5px;font-size:14px;">正文字号</label>
+                        <label style="display:block;margin-bottom:5px;font-size:14px;">${isEn() ? 'Body Font Size' : '正文字号'}</label>
                         <div style="position:relative;">
                             <input type="number" id="bodyFontSize" value="12" min="6" max="48" style="width:100%;padding:8px;border:1px solid ` + borderColor + `;border-radius:6px;background:` + (nightMode ? '#3d3d3d' : 'white') + `;color:` + textColor + `;">
                             <span style="position:absolute;right:10px;top:50%;transform:translateY(-50%);color:` + (nightMode ? '#aaa' : '#666') + `;">pt</span>
                         </div>
                     </div>
                     <div>
-                        <label style="display:block;margin-bottom:5px;font-size:14px;">页边距</label>
+                        <label style="display:block;margin-bottom:5px;font-size:14px;">${isEn() ? 'Page Margin' : '页边距'}</label>
                         <select id="pageMargin" style="width:100%;padding:8px;border:1px solid ` + borderColor + `;border-radius:6px;background:` + (nightMode ? '#3d3d3d' : 'white') + `;color:` + textColor + `;">
-                            <option value="10">10mm (小)</option>
-                            <option value="15" selected>15mm (默认)</option>
-                            <option value="20">20mm (大)</option>
-                            <option value="25">25mm (特大)</option>
+                            <option value="10">10mm (${isEn() ? 'Small' : '小'})</option>
+                            <option value="15" selected>15mm (${isEn() ? 'Default' : '默认'})</option>
+                            <option value="20">20mm (${isEn() ? 'Large' : '大'})</option>
+                            <option value="25">25mm (${isEn() ? 'Extra Large' : '特大'})</option>
                         </select>
                     </div>
                     <div>
-                        <label style="display:block;margin-bottom:5px;font-size:14px;">行距</label>
+                        <label style="display:block;margin-bottom:5px;font-size:14px;">${isEn() ? 'Line Height' : '行距'}</label>
                         <select id="lineHeight" style="width:100%;padding:8px;border:1px solid ` + borderColor + `;border-radius:6px;background:` + (nightMode ? '#3d3d3d' : 'white') + `;color:` + textColor + `;">
-                            <option value="1.0">1.0倍</option>
-                            <option value="1.2" selected>1.2倍 (默认)</option>
-                            <option value="1.4">1.4倍</option>
-                            <option value="1.5">1.5倍</option>
-                            <option value="2.0">2.0倍</option>
+                            <option value="1.0">1.0${isEn() ? 'x' : '倍'}</option>
+                            <option value="1.2" selected>1.2${isEn() ? 'x' : '倍'} (${isEn() ? 'Default' : '默认'})</option>
+                            <option value="1.4">1.4${isEn() ? 'x' : '倍'}</option>
+                            <option value="1.5">1.5${isEn() ? 'x' : '倍'}</option>
+                            <option value="2.0">2.0${isEn() ? 'x' : '倍'}</option>
                         </select>
                     </div>
                     <div>
-                        <label style="display:block;margin-bottom:5px;font-size:14px;">段落间距</label>
+                        <label style="display:block;margin-bottom:5px;font-size:14px;">${isEn() ? 'Paragraph Spacing' : '段落间距'}</label>
                         <select id="paragraphSpacing" style="width:100%;padding:8px;border:1px solid ` + borderColor + `;border-radius:6px;background:` + (nightMode ? '#3d3d3d' : 'white') + `;color:` + textColor + `;">
-                            <option value="0.2">0.2倍 (小)</option>
-                            <option value="0.5" selected>0.5倍 (默认)</option>
-                            <option value="0.8">0.8倍</option>
-                            <option value="1.0">1.0倍</option>
-                            <option value="1.2">1.2倍 (大)</option>
+                            <option value="0.2">0.2${isEn() ? 'x' : '倍'} (${isEn() ? 'Small' : '小'})</option>
+                            <option value="0.5" selected>0.5${isEn() ? 'x' : '倍'} (${isEn() ? 'Default' : '默认'})</option>
+                            <option value="0.8">0.8${isEn() ? 'x' : '倍'}</option>
+                            <option value="1.0">1.0${isEn() ? 'x' : '倍'}</option>
+                            <option value="1.2">1.2${isEn() ? 'x' : '倍'} (${isEn() ? 'Large' : '大'})</option>
                         </select>
                     </div>
                     <div>
-                        <label style="display:block;margin-bottom:5px;font-size:14px;">标题间距</label>
+                        <label style="display:block;margin-bottom:5px;font-size:14px;">${isEn() ? 'Title Spacing' : '标题间距'}</label>
                         <select id="titleSpacing" style="width:100%;padding:8px;border:1px solid ` + borderColor + `;border-radius:6px;background:` + (nightMode ? '#3d3d3d' : 'white') + `;color:` + textColor + `;">
-                            <option value="0.5">0.5倍 (小)</option>
-                            <option value="0.8" selected>0.8倍 (默认)</option>
-                            <option value="1.0">1.0倍</option>
-                            <option value="1.2">1.2倍</option>
-                            <option value="1.5">1.5倍 (大)</option>
+                            <option value="0.5">0.5${isEn() ? 'x' : '倍'} (${isEn() ? 'Small' : '小'})</option>
+                            <option value="0.8" selected>0.8${isEn() ? 'x' : '倍'} (${isEn() ? 'Default' : '默认'})</option>
+                            <option value="1.0">1.0${isEn() ? 'x' : '倍'}</option>
+                            <option value="1.2">1.2${isEn() ? 'x' : '倍'}</option>
+                            <option value="1.5">1.5${isEn() ? 'x' : '倍'} (${isEn() ? 'Large' : '大'})</option>
                         </select>
                     </div>
                     <div>
-        <label style="display:block;margin-bottom:5px;font-size:14px;">标题对齐</label>
+        <label style="display:block;margin-bottom:5px;font-size:14px;">${isEn() ? 'Title Alignment' : '标题对齐'}</label>
         <div style="display:flex;gap:8px;">
-            <button class="title-align-btn" data-align="left" style="flex:1;padding:8px;background:${nightMode ? '#424242' : '#E0E0E0'};color:${textColor};border:none;border-radius:6px;cursor:pointer;">居左</button>
-            <button class="title-align-btn active" data-align="center" style="flex:1;padding:8px;background:#2196F3;color:white;border:none;border-radius:6px;cursor:pointer;">居中</button>
-            <button class="title-align-btn" data-align="right" style="flex:1;padding:8px;background:${nightMode ? '#424242' : '#E0E0E0'};color:${textColor};border:none;border-radius:6px;cursor:pointer;">居右</button>
+            <button class="title-align-btn" data-align="left" style="flex:1;padding:8px;background:${nightMode ? '#424242' : '#E0E0E0'};color:${textColor};border:none;border-radius:6px;cursor:pointer;">${isEn() ? 'Left' : '居左'}</button>
+            <button class="title-align-btn active" data-align="center" style="flex:1;padding:8px;background:#2196F3;color:white;border:none;border-radius:6px;cursor:pointer;">${isEn() ? 'Center' : '居中'}</button>
+            <button class="title-align-btn" data-align="right" style="flex:1;padding:8px;background:${nightMode ? '#424242' : '#E0E0E0'};color:${textColor};border:none;border-radius:6px;cursor:pointer;">${isEn() ? 'Right' : '居右'}</button>
         </div>
     </div>
                     <div>
-        <label style="display:block;margin-bottom:5px;font-size:14px;">内容对齐</label>
+        <label style="display:block;margin-bottom:5px;font-size:14px;">${isEn() ? 'Content Alignment' : '内容对齐'}</label>
         <div style="display:flex;gap:8px;">
-            <button class="align-btn active" data-align="left" style="flex:1;padding:8px;background:#2196F3;color:white;border:none;border-radius:6px;cursor:pointer;">居左</button>
-            <button class="align-btn" data-align="center" style="flex:1;padding:8px;background:${nightMode ? '#424242' : '#E0E0E0'};color:${textColor};border:none;border-radius:6px;cursor:pointer;">居中</button>
-            <button class="align-btn" data-align="right" style="flex:1;padding:8px;background:${nightMode ? '#424242' : '#E0E0E0'};color:${textColor};border:none;border-radius:6px;cursor:pointer;">居右</button>
+            <button class="align-btn active" data-align="left" style="flex:1;padding:8px;background:#2196F3;color:white;border:none;border-radius:6px;cursor:pointer;">${isEn() ? 'Left' : '居左'}</button>
+            <button class="align-btn" data-align="center" style="flex:1;padding:8px;background:${nightMode ? '#424242' : '#E0E0E0'};color:${textColor};border:none;border-radius:6px;cursor:pointer;">${isEn() ? 'Center' : '居中'}</button>
+            <button class="align-btn" data-align="right" style="flex:1;padding:8px;background:${nightMode ? '#424242' : '#E0E0E0'};color:${textColor};border:none;border-radius:6px;cursor:pointer;">${isEn() ? 'Right' : '居右'}</button>
         </div>
                         <div style="margin-top:10px;">
                             <label style="display:flex;align-items:center;gap:10px;cursor:pointer;">
                                 <input type="checkbox" id="indentParagraph" checked style="width:18px;height:18px;">
-                                <span style="font-size:14px;">每段段首自动空两格</span>
+                                <span style="font-size:14px;">${isEn() ? 'Auto indent first line of each paragraph' : '每段段首自动空两格'}</span>
                             </label>
                         </div>
                     </div>
@@ -249,7 +252,7 @@ function g(name) { return global[name]; }
                 <div style="margin-top:15px;">
                     <label style="display:flex;align-items:center;gap:10px;cursor:pointer;">
                         <input type="checkbox" id="fitToPage" style="width:18px;height:18px;">
-                        <span style="font-size:14px;">自动排版至一页</span>
+                        <span style="font-size:14px;">${isEn() ? 'Auto fit to one page' : '自动排版至一页'}</span>
                     </label>
                 </div>
             </div>
@@ -257,45 +260,45 @@ function g(name) { return global[name]; }
             <!-- Advanced Heading Settings -->
             <div style="margin-bottom:20px;border-top:1px solid ${borderColor};padding-top:15px;">
                 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;cursor:pointer;" onclick="var el = this.nextElementSibling; el.style.display = el.style.display === 'none' ? 'block' : 'none'; this.querySelector('i').classList.toggle('fa-chevron-down'); this.querySelector('i').classList.toggle('fa-chevron-right');">
-                    <h3 style="margin:0;font-size:16px;">高级标题字号设置</h3>
+                    <h3 style="margin:0;font-size:16px;">${isEn() ? 'Advanced Heading Size Settings' : '高级标题字号设置'}</h3>
                     <i class="fas fa-chevron-right" style="font-size:14px;color:${nightMode ? '#aaa' : '#666'};"></i>
                 </div>
                 <div id="advancedHeadingSettings" style="display:none;">
                     <div style="margin-bottom:15px;">
                         <label style="display:flex;align-items:center;gap:10px;cursor:pointer;margin-bottom:10px;">
                             <input type="checkbox" id="useCustomHeadingSizes" style="width:16px;height:16px;">
-                            <span style="font-size:14px;">启用自定义标题字号</span>
+                            <span style="font-size:14px;">${isEn() ? 'Enable custom heading sizes' : '启用自定义标题字号'}</span>
                         </label>
                     </div>
                     <div id="customHeadingInputs" style="display:grid;grid-template-columns:repeat(3, 1fr);gap:15px;opacity:0.5;pointer-events:none;transition:opacity 0.2s;">
                         <div>
-                            <label style="display:block;margin-bottom:5px;font-size:12px;">H1 字号 (pt)</label>
+                            <label style="display:block;margin-bottom:5px;font-size:12px;">H1 ${isEn() ? 'Font Size' : '字号'} (pt)</label>
                             <input type="number" id="h1Size" value="36" style="width:100%;padding:6px;border:1px solid ${borderColor};border-radius:4px;background:${nightMode ? '#3d3d3d' : 'white'};color:${textColor};">
                         </div>
                         <div>
-                            <label style="display:block;margin-bottom:5px;font-size:12px;">H2 字号 (pt)</label>
+                            <label style="display:block;margin-bottom:5px;font-size:12px;">H2 ${isEn() ? 'Font Size' : '字号'} (pt)</label>
                             <input type="number" id="h2Size" value="31" style="width:100%;padding:6px;border:1px solid ${borderColor};border-radius:4px;background:${nightMode ? '#3d3d3d' : 'white'};color:${textColor};">
                         </div>
                         <div>
-                            <label style="display:block;margin-bottom:5px;font-size:12px;">H3 字号 (pt)</label>
+                            <label style="display:block;margin-bottom:5px;font-size:12px;">H3 ${isEn() ? 'Font Size' : '字号'} (pt)</label>
                             <input type="number" id="h3Size" value="26" style="width:100%;padding:6px;border:1px solid ${borderColor};border-radius:4px;background:${nightMode ? '#3d3d3d' : 'white'};color:${textColor};">
                         </div>
                         <div>
-                            <label style="display:block;margin-bottom:5px;font-size:12px;">H4 字号 (pt)</label>
+                            <label style="display:block;margin-bottom:5px;font-size:12px;">H4 ${isEn() ? 'Font Size' : '字号'} (pt)</label>
                             <input type="number" id="h4Size" value="24" style="width:100%;padding:6px;border:1px solid ${borderColor};border-radius:4px;background:${nightMode ? '#3d3d3d' : 'white'};color:${textColor};">
                         </div>
                         <div>
-                            <label style="display:block;margin-bottom:5px;font-size:12px;">H5 字号 (pt)</label>
+                            <label style="display:block;margin-bottom:5px;font-size:12px;">H5 ${isEn() ? 'Font Size' : '字号'} (pt)</label>
                             <input type="number" id="h5Size" value="21" style="width:100%;padding:6px;border:1px solid ${borderColor};border-radius:4px;background:${nightMode ? '#3d3d3d' : 'white'};color:${textColor};">
                         </div>
                         <div>
-                            <label style="display:block;margin-bottom:5px;font-size:12px;">H6 字号 (pt)</label>
+                            <label style="display:block;margin-bottom:5px;font-size:12px;">H6 ${isEn() ? 'Font Size' : '字号'} (pt)</label>
                             <input type="number" id="h6Size" value="19" style="width:100%;padding:6px;border:1px solid ${borderColor};border-radius:4px;background:${nightMode ? '#3d3d3d' : 'white'};color:${textColor};">
                         </div>
                         <div style="grid-column:1/-1;margin-top:10px;display:flex;align-items:center;gap:10px;">
-                            <label style="font-size:12px;">快速设置递减量 (pt):</label>
+                            <label style="font-size:12px;">${isEn() ? 'Quick set decrement (pt)' : '快速设置递减量 (pt)'}:</label>
                             <input type="number" id="headingStep" value="4" style="width:60px;padding:4px;border:1px solid ${borderColor};border-radius:4px;">
-                            <button id="applyHeadingStep" style="padding:4px 8px;font-size:12px;background:#4a90e2;color:white;border:none;border-radius:4px;cursor:pointer;">应用递减</button>
+                            <button id="applyHeadingStep" style="padding:4px 8px;font-size:12px;background:#4a90e2;color:white;border:none;border-radius:4px;cursor:pointer;">${isEn() ? 'Apply Decrement' : '应用递减'}</button>
                         </div>
                     </div>
                 </div>
@@ -304,17 +307,17 @@ function g(name) { return global[name]; }
             <!-- Image Settings -->
             <div style="margin-bottom:20px;border-top:1px solid ${borderColor};padding-top:15px;">
                  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;cursor:pointer;" onclick="var el = this.nextElementSibling; el.style.display = el.style.display === 'none' ? 'block' : 'none'; this.querySelector('i').classList.toggle('fa-chevron-down'); this.querySelector('i').classList.toggle('fa-chevron-right');">
-                    <h3 style="margin:0;font-size:16px;">图片设置</h3>
+                    <h3 style="margin:0;font-size:16px;">${isEn() ? 'Image Settings' : '图片设置'}</h3>
                     <i class="fas fa-chevron-right" style="font-size:14px;color:${nightMode ? '#aaa' : '#666'};"></i>
                 </div>
                 <div id="imageSettings" style="display:none;grid-template-columns:1fr 1fr;gap:15px;">
                     <div>
-                        <label style="display:block;margin-bottom:5px;font-size:14px;">图片宽度</label>
-                        <input type="text" id="imgWidth" value="100%" placeholder="如 100%, 300px" style="width:100%;padding:8px;border:1px solid ${borderColor};border-radius:6px;background:${nightMode ? '#3d3d3d' : 'white'};color:${textColor};">
+                        <label style="display:block;margin-bottom:5px;font-size:14px;">${isEn() ? 'Image Width' : '图片宽度'}</label>
+                        <input type="text" id="imgWidth" value="100%" placeholder="${isEn() ? 'e.g. 100%, 300px' : '如 100%, 300px'}" style="width:100%;padding:8px;border:1px solid ${borderColor};border-radius:6px;background:${nightMode ? '#3d3d3d' : 'white'};color:${textColor};">
                     </div>
                     <div>
-                        <label style="display:block;margin-bottom:5px;font-size:14px;">图片高度</label>
-                        <input type="text" id="imgHeight" value="auto" placeholder="如 auto, 200px" style="width:100%;padding:8px;border:1px solid ${borderColor};border-radius:6px;background:${nightMode ? '#3d3d3d' : 'white'};color:${textColor};">
+                        <label style="display:block;margin-bottom:5px;font-size:14px;">${isEn() ? 'Image Height' : '图片高度'}</label>
+                        <input type="text" id="imgHeight" value="auto" placeholder="${isEn() ? 'e.g. auto, 200px' : '如 auto, 200px'}" style="width:100%;padding:8px;border:1px solid ${borderColor};border-radius:6px;background:${nightMode ? '#3d3d3d' : 'white'};color:${textColor};">
                     </div>
                 </div>
             </div>
@@ -324,17 +327,17 @@ function g(name) { return global[name]; }
         if (mode === 'print') {
             actionButtons = `
                 <div style="display:flex;gap:10px;margin-top:20px;">
-                    <button id="printPreviewBtn" style="flex:1;padding:12px;font-weight:bold;background:#4CAF50;color:white;border:none;border-radius:6px;cursor:pointer;">预览</button>
-                    <button id="printSendBtn" style="flex:1;padding:12px;font-weight:bold;background:#2196F3;color:white;border:none;border-radius:6px;cursor:pointer;">发送打印</button>
-                    <button id="printCancelBtn" style="flex:1;padding:12px;background:` + (nightMode ? '#555' : '#9E9E9E') + `;color:white;border:none;border-radius:6px;cursor:pointer;">取消</button>
+                    <button id="printPreviewBtn" style="flex:1;padding:12px;font-weight:bold;background:#4CAF50;color:white;border:none;border-radius:6px;cursor:pointer;">${isEn() ? 'Preview' : '预览'}</button>
+                    <button id="printSendBtn" style="flex:1;padding:12px;font-weight:bold;background:#2196F3;color:white;border:none;border-radius:6px;cursor:pointer;">${isEn() ? 'Send to Print' : '发送打印'}</button>
+                    <button id="printCancelBtn" style="flex:1;padding:12px;background:` + (nightMode ? '#555' : '#9E9E9E') + `;color:white;border:none;border-radius:6px;cursor:pointer;">${isEn() ? 'Cancel' : '取消'}</button>
                 </div>
             `;
         } else {
-            var actionName = mode === 'export-pdf' ? '导出 PDF' : '导出 HTML';
+            var actionName = mode === 'export-pdf' ? (isEn() ? 'Export PDF' : '导出 PDF') : (isEn() ? 'Export HTML' : '导出 HTML');
             actionButtons = `
                 <div style="display:flex;gap:10px;margin-top:20px;">
                     <button id="confirmExportBtn" style="flex:1;padding:12px;font-weight:bold;background:#2196F3;color:white;border:none;border-radius:6px;cursor:pointer;">${actionName}</button>
-                    <button id="printCancelBtn" style="flex:1;padding:12px;background:` + (nightMode ? '#555' : '#9E9E9E') + `;color:white;border:none;border-radius:6px;cursor:pointer;">取消</button>
+                    <button id="printCancelBtn" style="flex:1;padding:12px;background:` + (nightMode ? '#555' : '#9E9E9E') + `;color:white;border:none;border-radius:6px;cursor:pointer;">${isEn() ? 'Cancel' : '取消'}</button>
                 </div>
             `;
         }
@@ -408,10 +411,10 @@ function g(name) { return global[name]; }
         function updateClientStatus(connected) {
             if (connected) {
                 statusIndicator.style.backgroundColor = '#28a745';
-                statusText.textContent = '打印客户端已连接';
+                statusText.textContent = isEn() ? 'Print client connected' : '打印客户端已连接';
             } else {
                 statusIndicator.style.backgroundColor = '#dc3545';
-                statusText.textContent = '请连接打印客户端';
+                statusText.textContent = isEn() ? 'Please connect print client' : '请连接打印客户端';
             }
         }
 
@@ -519,7 +522,7 @@ function g(name) { return global[name]; }
         async function handleSelectedFiles(files) {
 
             if (!g('currentUser')) {
-                global.showMessage('请先登录后再使用文件打印功能');
+                global.showMessage(isEn() ? 'Please log in first to use file print feature' : '请先登录后再使用文件打印功能');
                 if (g('showLoginModal')) {
                     g('showLoginModal')();
                 }
@@ -535,7 +538,7 @@ function g(name) { return global[name]; }
             }
 
             try {
-                global.showMessage('正在处理上传的文件...');
+                global.showMessage(isEn() ? 'Processing uploaded files...' : '正在处理上传的文件...');
 
                 // 上传文件到服务器
                 var formData = new FormData();
@@ -555,13 +558,13 @@ function g(name) { return global[name]; }
                     for (var i = 0; i < result.urls.length; i++) {
                         await sendFileToPrint(result.urls[i], files[i].name);
                     }
-                    global.showMessage('文件打印任务已发送');
+                    global.showMessage(isEn() ? 'File print task sent' : '文件打印任务已发送');
                 } else {
-                    global.showMessage('文件上传失败: ' + (result.message || '未知错误'), 'error');
+                    global.showMessage(isEn() ? 'File upload failed: ' + (result.message || 'Unknown error') : '文件上传失败: ' + (result.message || '未知错误'), 'error');
                 }
             } catch (error) {
                 console.error('文件打印失败:', error);
-                global.showMessage('文件打印失败: ' + error.message, 'error');
+                global.showMessage(isEn() ? 'File print failed: ' + error.message : '文件打印失败: ' + error.message, 'error');
             }
         }
 
@@ -603,7 +606,11 @@ function g(name) { return global[name]; }
 
                 ws.onerror = function() {
                     clearTimeout(timeout);
-                    global.showMessage('网络未连接，请连接网络', 'error');
+                    if (global.showNetworkErrorBanner) {
+                        global.showNetworkErrorBanner();
+                    } else {
+                        global.showMessage(isEn() ? 'Network not connected, please connect to the network' : '网络未连接，请连接网络', 'error');
+                    }
                     resolve(false);
                     if (ws) ws.close();
                 };
@@ -629,15 +636,15 @@ function g(name) { return global[name]; }
             modalContent.style.cssText = 'background:' + bg + ';color:' + textColor + ';border-radius:12px;padding:25px;width:90%;max-width:500px;';
 
             modalContent.innerHTML = `
-                <h2 style="text-align:center;margin-top:0;margin-bottom:20px;">打印客户端连接</h2>
+                <h2 style="text-align:center;margin-top:0;margin-bottom:20px;">${isEn() ? 'Print Client Connection' : '打印客户端连接'}</h2>
                 <div style="text-align:center;margin-bottom:20px;">
                     <i class="fas fa-exclamation-circle" style="font-size:48px;color:#ff9800;margin-bottom:15px;"></i>
-                    <p style="font-size:16px;">无法连接到打印客户端</p>
-                    <p style="font-size:14px;color:${nightMode ? '#aaa' : '#666'};margin-top:10px;">请确保打印客户端已启动并使用您的账号密码绑定</p>
+                    <p style="font-size:16px;">${isEn() ? 'Cannot connect to print client' : '无法连接到打印客户端'}</p>
+                    <p style="font-size:14px;color:${nightMode ? '#aaa' : '#666'};margin-top:10px;">${isEn() ? 'Please ensure print client is running and bound with your credentials' : '请确保打印客户端已启动并使用您的账号密码绑定'}</p>
                 </div>
                 <div style="display:flex;gap:10px;margin-top:20px;">
-                    <button id="retryConnectionBtn" style="flex:1;padding:12px;font-weight:bold;background:#4CAF50;color:white;border:none;border-radius:6px;cursor:pointer;">重新连接</button>
-                    <button id="cancelConnectionBtn" style="flex:1;padding:12px;background:${nightMode ? '#555' : '#9E9E9E'};color:white;border:none;border-radius:6px;cursor:pointer;">取消</button>
+                    <button id="retryConnectionBtn" style="flex:1;padding:12px;font-weight:bold;background:#4CAF50;color:white;border:none;border-radius:6px;cursor:pointer;">${isEn() ? 'Reconnect' : '重新连接'}</button>
+                    <button id="cancelConnectionBtn" style="flex:1;padding:12px;background:${nightMode ? '#555' : '#9E9E9E'};color:white;border:none;border-radius:6px;cursor:pointer;">${isEn() ? 'Cancel' : '取消'}</button>
                 </div>
             `;
 
@@ -649,7 +656,7 @@ function g(name) { return global[name]; }
             if (retryBtn) {
                 retryBtn.onclick = async function() {
                     retryBtn.disabled = true;
-                    retryBtn.textContent = '连接中...';
+                    retryBtn.textContent = isEn() ? 'Connecting...' : '连接中...';
 
                     var isConnected = await checkPrintClientConnection();
                     if (isConnected) {
@@ -658,9 +665,9 @@ function g(name) { return global[name]; }
                         await handleFilesAfterConnection(files);
                     } else {
                         // 连接失败，继续显示对话框
-                        global.showMessage('连接失败，请确保打印客户端已启动并使用正确的账号密码登录', 'error');
+                        global.showMessage(isEn() ? 'Connection failed, please ensure print client is running and logged in with correct credentials' : '连接失败，请确保打印客户端已启动并使用正确的账号密码登录', 'error');
                         retryBtn.disabled = false;
-                        retryBtn.textContent = '重新连接';
+                        retryBtn.textContent = isEn() ? 'Reconnect' : '重新连接';
                     }
                 };
             }
@@ -684,7 +691,7 @@ function g(name) { return global[name]; }
         // 连接成功后处理文件
         async function handleFilesAfterConnection(files) {
             try {
-                global.showMessage('正在处理上传的文件...');
+                global.showMessage(isEn() ? 'Processing uploaded files...' : '正在处理上传的文件...');
 
                 // 上传文件到服务器
                 var formData = new FormData();
@@ -704,13 +711,13 @@ function g(name) { return global[name]; }
                     for (var i = 0; i < result.urls.length; i++) {
                         await sendFileToPrint(result.urls[i], files[i].name);
                     }
-                    global.showMessage('文件打印任务已发送');
+                    global.showMessage(isEn() ? 'File print task sent' : '文件打印任务已发送');
                 } else {
-                    global.showMessage('文件上传失败: ' + (result.message || '未知错误'), 'error');
+                    global.showMessage(isEn() ? 'File upload failed: ' + (result.message || 'Unknown error') : '文件上传失败: ' + (result.message || '未知错误'), 'error');
                 }
             } catch (error) {
                 console.error('文件打印失败:', error);
-                global.showMessage('文件打印失败: ' + error.message, 'error');
+                global.showMessage(isEn() ? 'File print failed: ' + error.message : '文件打印失败: ' + error.message, 'error');
             }
         }
 
@@ -723,7 +730,7 @@ function g(name) { return global[name]; }
                 var wsUrl = 'wss://print.yhsun.cn';
                 var ws = new WebSocket(wsUrl);
                 var timeout = setTimeout(function() {
-                    reject(new Error('连接超时'));
+                    reject(new Error(isEn() ? 'Connection timeout' : '连接超时'));
                 }, 5000);
 
                 ws.onopen = function() {
@@ -762,7 +769,7 @@ function g(name) { return global[name]; }
                         if (response.type === 'print_queued') {
                             resolve();
                         } else if (response.type === 'error') {
-                            reject(new Error(response.message || '打印失败'));
+                            reject(new Error(response.message || (isEn() ? 'Print failed' : '打印失败')));
                         }
                     } catch (e) {
                         reject(e);
@@ -773,7 +780,11 @@ function g(name) { return global[name]; }
 
                 ws.onerror = function(error) {
                 clearTimeout(timeout);
-                global.showMessage('网络未连接，请连接网络', 'error');
+                if (global.showNetworkErrorBanner) {
+                    global.showNetworkErrorBanner();
+                } else {
+                    global.showMessage(isEn() ? 'Network not connected, please connect to the network' : '网络未连接，请连接网络', 'error');
+                }
                 reject(error);
                 ws.close();
             };
@@ -1246,7 +1257,7 @@ function g(name) { return global[name]; }
         var loadingModal = document.createElement('div');
         loadingModal.className = 'modal-overlay';
         loadingModal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.9);z-index:21000;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;';
-        loadingModal.innerHTML = '<div style="background:' + (nightMode ? '#2d2d2d' : 'white') + ';color:' + (nightMode ? '#eee' : '#333') + ';border-radius:12px;padding:30px;text-align:center;"><div style="font-size:24px;margin-bottom:15px;"><i class="fas fa-spinner fa-spin"></i></div><div style="font-size:16px;">正在生成PDF...</div></div>';
+        loadingModal.innerHTML = '<div style="background:' + (nightMode ? '#2d2d2d' : 'white') + ';color:' + (nightMode ? '#eee' : '#333') + ';border-radius:12px;padding:30px;text-align:center;"><div style="font-size:24px;margin-bottom:15px;"><i class="fas fa-spinner fa-spin"></i></div><div style="font-size:16px;">' + (isEn() ? 'Generating PDF...' : '正在生成PDF...') + '</div></div>';
         document.body.appendChild(loadingModal);
 
         try {
@@ -1277,7 +1288,7 @@ function g(name) { return global[name]; }
             a.style.display = 'none';
             a.href = url;
             // Get filename from current file name if available
-            var currentFileName = '文档';
+            var currentFileName = isEn() ? 'document' : '文档';
             var currentNode = g('currentFileId') ? g('fileTree').jstree(true).get_node(g('currentFileId')) : null;
             if (currentNode) {
                 currentFileName = currentNode.text.replace(/\.md$/, '');
@@ -1295,7 +1306,7 @@ function g(name) { return global[name]; }
         } catch (error) {
             console.error('PDF download error:', error);
             loadingModal.remove();
-            alert('PDF生成失败: ' + error.message);
+            alert((isEn() ? 'PDF generation failed: ' : 'PDF生成失败: ') + error.message);
         }
     }
 
@@ -1305,24 +1316,47 @@ function g(name) { return global[name]; }
 
         // Pre-define cleanup function to avoid scoping issues
         var previewModal = null;
+        var loadingModal = null;
+        var pdfUrl = null;
+        
         var cleanup = function() {
             if (previewModal) previewModal.remove();
         };
 
         // 显示加载状态
-        var loadingModal = document.createElement('div');
+        loadingModal = document.createElement('div');
         loadingModal.className = 'modal-overlay';
         // Ensure z-index is higher than any mask used in generatePDF (which uses 20000)
         loadingModal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.9);z-index:21000;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;';
-        loadingModal.innerHTML = '<div style="background:' + (nightMode ? '#2d2d2d' : 'white') + ';color:' + (nightMode ? '#eee' : '#333') + ';border-radius:12px;padding:30px;text-align:center;"><div style="font-size:24px;margin-bottom:15px;"><i class="fas fa-spinner fa-spin"></i></div><div style="font-size:16px;">正在生成PDF预览...</div></div>';
+        
+        // 创建带关闭按钮的加载窗口
+        var loadingContent = document.createElement('div');
+        loadingContent.style.cssText = 'background:' + (nightMode ? '#2d2d2d' : 'white') + ';color:' + (nightMode ? '#eee' : '#333') + ';border-radius:12px;padding:30px;text-align:center;position:relative;';
+        
+        var closeBtnLoading = document.createElement('button');
+        closeBtnLoading.innerHTML = '<i class="fas fa-times"></i>';
+        closeBtnLoading.style.cssText = 'position:absolute;top:10px;right:10px;background:none;border:none;color:' + (nightMode ? '#aaa' : '#666') + ';font-size:16px;cursor:pointer;padding:5px;';
+        
+        var loadingIcon = document.createElement('div');
+        loadingIcon.style.cssText = 'font-size:24px;margin-bottom:15px;';
+        loadingIcon.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        
+        var loadingText = document.createElement('div');
+        loadingText.style.cssText = 'font-size:16px;';
+        loadingText.textContent = isEn() ? 'Generating PDF preview...' : '正在生成PDF预览...';
+        
+        loadingContent.appendChild(closeBtnLoading);
+        loadingContent.appendChild(loadingIcon);
+        loadingContent.appendChild(loadingText);
+        loadingModal.appendChild(loadingContent);
         document.body.appendChild(loadingModal);
-
-        try {
-            var htmlContent = await preparePrintContent(content, settings);
-            var pdfUrl = await generatePDF(htmlContent, settings);
-
+        
+        // 函数：显示预览页面
+        var showPreview = function() {
+            if (!pdfUrl) return;
+            
             loadingModal.remove();
-
+            
             previewModal = document.createElement('div');
             previewModal.className = 'modal-overlay';
             previewModal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.9);z-index:10001;display:flex;flex-direction:column;align-items:stretch;justify-content:stretch;padding:0;';
@@ -1342,25 +1376,25 @@ function g(name) { return global[name]; }
             
             docContainer.appendChild(pagesWrapper);
 
-            await renderPDF(pdfUrl, pagesWrapper);
+            renderPDF(pdfUrl, pagesWrapper);
 
             var buttonContainer = document.createElement('div');
             buttonContainer.style.cssText = 'display:flex;gap:8px;padding:12px;background:' + (nightMode ? '#2d2d2d' : '#f8f9fa') + ';border-top:1px solid ' + (nightMode ? '#444' : '#eee') + ';justify-content:flex-end;';
 
             var printBtn = document.createElement('button');
-            printBtn.innerHTML = '<i class="fas fa-print"></i> 打印';
+            printBtn.innerHTML = '<i class="fas fa-print"></i> ' + (isEn() ? 'Print' : '打印');
             printBtn.style.cssText = 'padding:8px 16px;background:#4a90e2;color:white;border:none;border-radius:4px;cursor:pointer;font-size:14px;font-weight:bold;';
             printBtn.onclick = function() {
                 sendToPrint(settings, pdfUrl);
             };
 
             var pdfBtn = document.createElement('button');
-            pdfBtn.innerHTML = '<i class="fas fa-file-pdf"></i> 下载';
+            pdfBtn.innerHTML = '<i class="fas fa-file-pdf"></i> ' + (isEn() ? 'Download' : '下载');
             pdfBtn.style.cssText = 'padding:8px 16px;background:#dc3545;color:white;border:none;border-radius:4px;cursor:pointer;font-size:14px;font-weight:bold;';
             pdfBtn.onclick = function() {
                  var a = document.createElement('a');
                  a.href = pdfUrl;
-                 a.download = '文档.pdf';
+                 a.download = (isEn() ? 'document' : '文档') + '.pdf';
                  a.target = '_blank';
                  document.body.appendChild(a);
                  a.click();
@@ -1368,7 +1402,7 @@ function g(name) { return global[name]; }
             };
 
             var cancelBtn = document.createElement('button');
-            cancelBtn.innerHTML = '<i class="fas fa-times"></i> 关闭';
+            cancelBtn.innerHTML = '<i class="fas fa-times"></i> ' + (isEn() ? 'Close' : '关闭');
             cancelBtn.style.cssText = 'padding:8px 16px;background:' + (nightMode ? '#555' : '#6c757d') + ';color:white;border:none;border-radius:4px;cursor:pointer;font-size:14px;';
 
             buttonContainer.appendChild(printBtn);
@@ -1386,6 +1420,18 @@ function g(name) { return global[name]; }
             previewModal.addEventListener('click', function(e) {
                 if (e.target === previewModal) cleanup();
             });
+        };
+
+        try {
+            var htmlContent = await preparePrintContent(content, settings);
+            pdfUrl = await generatePDF(htmlContent, settings);
+
+            // PDF生成完成，更新加载窗口提示
+            loadingIcon.innerHTML = '<i class="fas fa-check" style="color:#4CAF50;"></i>';
+            loadingText.textContent = isEn() ? 'PDF preview generated successfully! Click × to view.' : 'PDF预览已生成！点击×查看。';
+            
+            // 设置关闭按钮的事件：点击后显示预览
+            closeBtnLoading.onclick = showPreview;
 
         } catch (error) {
             console.error('预览错误:', error);
@@ -1397,7 +1443,7 @@ function g(name) { return global[name]; }
     async function sendToPrint(settings, existingPdfUrl) {
         // 检查用户是否登录
         if (!g('currentUser')) {
-            global.showMessage('请先登录后再使用云打印功能');
+            global.showMessage(isEn() ? 'Please log in first to use cloud print feature' : '请先登录后再使用云打印功能');
             if (g('showLoginModal')) {
                 g('showLoginModal')();
             }
@@ -1417,7 +1463,7 @@ function g(name) { return global[name]; }
         dialog.style.cssText = 'background:' + (nightMode ? '#2d2d2d' : 'white') + ';color:' + (nightMode ? '#eee' : '#333') + ';border-radius:12px;padding:25px;width:90%;max-width:500px;';
 
         var title = document.createElement('h3');
-        title.textContent = '发送到云打印客户端';
+        title.textContent = isEn() ? 'Send to Cloud Print Client' : '发送到云打印客户端';
         title.style.cssText = 'margin-top:0;margin-bottom:20px;text-align:center;';
 
         var statusDiv = document.createElement('div');
@@ -1426,12 +1472,12 @@ function g(name) { return global[name]; }
 
         var statusText = document.createElement('div');
         statusText.id = 'printStatusText';
-        statusText.textContent = '正在准备打印内容...';
+        statusText.textContent = isEn() ? 'Preparing print content...' : '正在准备打印内容...';
         statusText.style.cssText = 'font-size:16px;margin-bottom:10px;';
 
         var statusDetail = document.createElement('div');
         statusDetail.id = 'printStatusDetail';
-        statusDetail.textContent = '正在生成PDF文档...';
+        statusDetail.textContent = isEn() ? 'Generating PDF document...' : '正在生成PDF文档...';
         statusDetail.style.cssText = 'font-size:13px;color:' + (nightMode ? '#aaa' : '#666') + ';';
 
         statusDiv.appendChild(statusText);
@@ -1441,7 +1487,7 @@ function g(name) { return global[name]; }
         buttonContainer.style.cssText = 'display:flex;gap:10px;margin-top:20px;';
 
         var cancelBtn = document.createElement('button');
-        cancelBtn.textContent = '取消';
+        cancelBtn.textContent = isEn() ? 'Cancel' : '取消';
         cancelBtn.style.cssText = 'flex:1;padding:12px;background:' + (nightMode ? '#555' : '#6c757d') + ';color:white;border:none;border-radius:6px;cursor:pointer;';
         cancelBtn.onclick = function() {
             modal.remove();
@@ -1495,12 +1541,12 @@ function g(name) { return global[name]; }
             if (isCancelled) return;
 
             // 2. 连接 WebSocket (不再需要上传，因为PDF已经在服务器上)
-            updateStatus('连接打印服务器...', '正在建立连接...');
+            updateStatus(isEn() ? 'Connecting to print server...' : '连接打印服务器...', isEn() ? 'Establishing connection...' : '正在建立连接...');
             var wsUrl = 'wss://print.yhsun.cn';
             ws = new WebSocket(wsUrl);
 
             timeout = setTimeout(function() {
-                updateStatus('连接超时', '无法连接到打印服务器，请检查网络连接', true);
+                updateStatus(isEn() ? 'Connection timeout' : '连接超时', isEn() ? 'Cannot connect to print server, please check network connection' : '无法连接到打印服务器，请检查网络连接', true);
                 cleanup();
             }, 10000);
 
@@ -1510,7 +1556,7 @@ function g(name) { return global[name]; }
                     ws.close();
                     return;
                 }
-                updateStatus('连接成功', '正在发送打印任务...');
+                updateStatus(isEn() ? 'Connected successfully' : '连接成功', isEn() ? 'Sending print job...' : '正在发送打印任务...');
 
                 // Ensure fileUrl is absolute
                 var fullFileUrl = pdfUrl;
@@ -1544,36 +1590,36 @@ function g(name) { return global[name]; }
                     var response = JSON.parse(event.data);
                     if (response.type === 'client_status') {
                         if (response.connected) {
-                            updateStatus('客户端已连接', '正在发送任务...');
+                            updateStatus(isEn() ? 'Client connected' : '客户端已连接', isEn() ? 'Sending job...' : '正在发送任务...');
                         } else {
-                            updateStatus('客户端未连接', '请确保打印客户端已启动并登录', true);
+                            updateStatus(isEn() ? 'Client not connected' : '客户端未连接', isEn() ? 'Please ensure print client is running and logged in' : '请确保打印客户端已启动并登录', true);
                         }
                     } else if (response.type === 'print_queued') {
-                        updateStatus('打印任务已发送', '打印任务已添加到打印队列', false);
+                        updateStatus(isEn() ? 'Print job sent' : '打印任务已发送', isEn() ? 'Print job added to print queue' : '打印任务已添加到打印队列', false);
                         cleanup();
                         setTimeout(function() {
                             if (!isCancelled) modal.remove();
                         }, 2000);
                     } else if (response.type === 'error') {
-                        updateStatus('打印失败: ' + response.message, response.details || '', true);
+                        updateStatus(isEn() ? 'Print failed: ' + response.message : '打印失败: ' + response.message, response.details || '', true);
                         cleanup();
                     }
                 } catch (e) {
-                    updateStatus('响应解析错误', e.toString(), true);
+                    updateStatus(isEn() ? 'Response parse error' : '响应解析错误', e.toString(), true);
                     cleanup();
                 }
             };
 
             ws.onerror = function(error) {
                 clearTimeout(timeout);
-                updateStatus('连接错误', '无法连接到打印服务器，请检查网络连接', true);
+                updateStatus(isEn() ? 'Connection error' : '连接错误', isEn() ? 'Cannot connect to print server, please check network connection' : '无法连接到打印服务器，请检查网络连接', true);
                 console.error('WebSocket错误:', error);
             };
 
             ws.onclose = function(event) {
                 clearTimeout(timeout);
                 if (!event.wasClean && !isCancelled) {
-                    updateStatus('连接意外关闭', '代码: ' + event.code, true);
+                    updateStatus(isEn() ? 'Connection closed unexpectedly' : '连接意外关闭', isEn() ? 'Code: ' + event.code : '代码: ' + event.code, true);
                 }
             };
 
@@ -1779,7 +1825,7 @@ function g(name) { return global[name]; }
     function showFilePrintDialog() {
         // 检查用户是否登录
         if (!g('currentUser')) {
-            alert('请先登录后再使用文件打印功能');
+            alert(isEn() ? 'Please log in first to use file print feature' : '请先登录后再使用文件打印功能');
             if (g('showLoginModal')) {
                 g('showLoginModal')();
             }
@@ -1797,18 +1843,18 @@ function g(name) { return global[name]; }
         var modalContent = document.createElement('div');
         modalContent.style.cssText = 'background:' + bg + ';color:' + textColor + ';border-radius:12px;padding:25px;width:90%;max-width:600px;max-height:85vh;overflow-y:auto;';
 
-        var title = '<h2 style="text-align:center;margin-bottom:20px;">文件上传打印</h2>';
+        var title = '<h2 style="text-align:center;margin-bottom:20px;">' + (isEn() ? 'File Upload Print' : '文件上传打印') + '</h2>';
 
         // 客户端连接状态区域
         var statusSection = `
             <div style="margin-bottom:20px;padding:15px;background:` + (nightMode ? '#3d3d3d' : '#f8f9fa') + `;border-radius:8px;">
-                <h3 style="margin-top:0;margin-bottom:10px;">打印客户端状态</h3>
+                <h3 style="margin-top:0;margin-bottom:10px;">${isEn() ? 'Print Client Status' : '打印客户端状态'}</h3>
                 <div id="clientStatus" style="display:flex;align-items:center;gap:10px;">
                     <div id="statusIndicator" style="width:12px;height:12px;border-radius:50%;background:#dc3545;"></div>
-                    <span id="statusText" style="font-size:14px;">请连接打印客户端</span>
+                    <span id="statusText" style="font-size:14px;">${isEn() ? 'Please connect print client' : '请连接打印客户端'}</span>
                 </div>
                 <p style="margin-top:10px;font-size:14px;">
-                    <a href="javascript:void(0)" id="fileDownloadClientBtn" style="color:#4a90e2;cursor:pointer;text-decoration:underline;">点击下载打印客户端</a>
+                    <a href="javascript:void(0)" id="fileDownloadClientBtn" style="color:#4a90e2;cursor:pointer;text-decoration:underline;">${isEn() ? 'Click to download print client' : '点击下载打印客户端'}</a>
                 </p>
             </div>
         `;
@@ -1816,21 +1862,21 @@ function g(name) { return global[name]; }
         // 文件上传区域
         var fileUploadSection = `
             <div style="margin-bottom:20px;padding:20px;background:` + (nightMode ? '#3d3d3d' : '#f8f9fa') + `;border-radius:8px;">
-                <h3 style="margin-top:0;margin-bottom:15px;">上传文件</h3>
-                <p style="margin-bottom:20px;font-size:14px;color:` + (nightMode ? '#aaa' : '#666') + `;">支持上传 PDF、DOC、DOCX、XLS、XLSX、TXT、PPT、PPTX、PNG、JPG 等格式的文件</p>
+                <h3 style="margin-top:0;margin-bottom:15px;">${isEn() ? 'Upload File' : '上传文件'}</h3>
+                <p style="margin-bottom:20px;font-size:14px;color:` + (nightMode ? '#aaa' : '#666') + `;">${isEn() ? 'Supports PDF, DOC, DOCX, XLS, XLSX, TXT, PPT, PPTX, PNG, JPG files' : '支持上传 PDF、DOC、DOCX、XLS、XLSX、TXT、PPT、PPTX、PNG、JPG 等格式的文件'}</p>
                 <div style="margin-bottom:20px;">
                     <input type="file" id="printFileUpload" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.ppt,.pptx,.png,.jpg,.jpeg" style="width:100%;padding:12px;border:2px dashed ` + borderColor + `;border-radius:6px;background:` + (nightMode ? '#3d3d3d' : 'white') + `;color:` + textColor + `;cursor:pointer;">
                 </div>
                 <div id="uploadedFilesList" style="margin-top:15px;">
-                    <!-- 上传文件列表将在这里显示 -->
+                    <!-- ${isEn() ? 'Uploaded files list will display here' : '上传文件列表将在这里显示'} -->
                 </div>
             </div>
         `;
 
         var actionButtons = `
             <div style="display:flex;gap:10px;margin-top:20px;">
-                <button id="filePrintBtn" style="flex:1;padding:12px;font-weight:bold;background:#2196F3;color:white;border:none;border-radius:6px;cursor:pointer;">打印文件</button>
-                <button id="filePrintCancelBtn" style="flex:1;padding:12px;background:` + (nightMode ? '#555' : '#9E9E9E') + `;color:white;border:none;border-radius:6px;cursor:pointer;">取消</button>
+                <button id="filePrintBtn" style="flex:1;padding:12px;font-weight:bold;background:#2196F3;color:white;border:none;border-radius:6px;cursor:pointer;">${isEn() ? 'Print File' : '打印文件'}</button>
+                <button id="filePrintCancelBtn" style="flex:1;padding:12px;background:` + (nightMode ? '#555' : '#9E9E9E') + `;color:white;border:none;border-radius:6px;cursor:pointer;">${isEn() ? 'Cancel' : '取消'}</button>
             </div>
         `;
 
@@ -1868,10 +1914,10 @@ function g(name) { return global[name]; }
         function updateClientStatus(connected) {
             if (connected) {
                 statusIndicator.style.backgroundColor = '#28a745';
-                statusText.textContent = '打印客户端已连接';
+                statusText.textContent = isEn() ? 'Print client connected' : '打印客户端已连接';
             } else {
                 statusIndicator.style.backgroundColor = '#dc3545';
-                statusText.textContent = '请连接打印客户端';
+                statusText.textContent = isEn() ? 'Please connect print client' : '请连接打印客户端';
             }
         }
 
@@ -1989,7 +2035,7 @@ function g(name) { return global[name]; }
 
             uploadedFilesList.innerHTML = '';
             if (uploadedFiles.length === 0) {
-                uploadedFilesList.innerHTML = '<p style="text-align:center;color:' + (nightMode ? '#aaa' : '#666') + ';padding:20px;">暂无上传文件</p>';
+                uploadedFilesList.innerHTML = '<p style="text-align:center;color:' + (nightMode ? '#aaa' : '#666') + ';padding:20px;">' + (isEn() ? 'No uploaded files' : '暂无上传文件') + '</p>';
                 return;
             }
 
@@ -2038,16 +2084,16 @@ function g(name) { return global[name]; }
                 var userPassword = g('currentUser').password;
 
                 if (uploadedFiles.length === 0) {
-                    alert('请先上传文件');
+                    alert(isEn() ? 'Please upload a file first' : '请先上传文件');
                     return;
                 }
 
                 var btn = this;
                 btn.disabled = true;
-                btn.textContent = '打印中...';
+                btn.textContent = isEn() ? 'Printing...' : '打印中...';
 
                 try {
-                    global.showMessage('正在处理上传的文件...');
+                    global.showMessage(isEn() ? 'Processing uploaded files...' : '正在处理上传的文件...');
 
                     // 上传文件到服务器
                     var formData = new FormData();
@@ -2067,18 +2113,18 @@ function g(name) { return global[name]; }
                         for (var i = 0; i < result.urls.length; i++) {
                             await sendFileToPrint(result.urls[i], uploadedFiles[i].name);
                         }
-                        global.showMessage('文件打印任务已发送');
+                        global.showMessage(isEn() ? 'File print task sent' : '文件打印任务已发送');
                         printModal.remove();
                     } else {
-                        global.showMessage('文件上传失败: ' + (result.message || '未知错误'), 'error');
+                        global.showMessage(isEn() ? 'File upload failed: ' + (result.message || 'Unknown error') : '文件上传失败: ' + (result.message || '未知错误'), 'error');
                         btn.disabled = false;
-                        btn.textContent = '打印文件';
+                        btn.textContent = isEn() ? 'Print File' : '打印文件';
                     }
                 } catch (error) {
                     console.error('文件打印失败:', error);
-                    global.showMessage('文件打印失败: ' + error.message, 'error');
+                    global.showMessage(isEn() ? 'File print failed: ' + error.message : '文件打印失败: ' + error.message, 'error');
                     btn.disabled = false;
-                    btn.textContent = '打印文件';
+                    btn.textContent = isEn() ? 'Print File' : '打印文件';
                 }
             }, 500);
         }
@@ -2105,7 +2151,7 @@ function g(name) { return global[name]; }
                 var wsUrl = 'wss://print.yhsun.cn';
                 var ws = new WebSocket(wsUrl);
                 var timeout = setTimeout(function() {
-                    reject(new Error('连接超时'));
+                    reject(new Error(isEn() ? 'Connection timeout' : '连接超时'));
                 }, 5000);
 
                 ws.onopen = function() {
@@ -2144,7 +2190,7 @@ function g(name) { return global[name]; }
                         if (response.type === 'print_queued') {
                             resolve();
                         } else if (response.type === 'error') {
-                            reject(new Error(response.message || '打印失败'));
+                            reject(new Error(response.message || (isEn() ? 'Print failed' : '打印失败')));
                         }
                     } catch (e) {
                         reject(e);

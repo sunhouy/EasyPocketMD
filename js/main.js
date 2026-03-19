@@ -4,6 +4,15 @@
 document.addEventListener('DOMContentLoaded', function() {
     'use strict';
 
+    // 记录页面加载开始时间
+    const pageLoadStartTime = performance.now();
+
+    // 初始化翻译系统
+    if (window.i18n) {
+        window.i18n.init();
+        applyTranslations();
+    }
+
     var isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
     var loading = document.getElementById('loading');
     if (loading) loading.style.display = 'block';
@@ -19,15 +28,15 @@ document.addEventListener('DOMContentLoaded', function() {
     window.unsavedChanges = {};
     window.vditor = null;
 
-    // 工具栏配置
+    // 工具栏配置（使用翻译函数）
     window.allToolbarButtons = [
-        { id: 'mobileFormatBtn', icon: 'fas fa-font', text: '格式', fn: function() { window.showFormatMenu(); } },
-        { id: 'mobileInsertBtn', icon: 'fas fa-plus', text: '插入', fn: function() { window.showInsertMenu(); } },
-        { id: 'mobileFormulaBtn', icon: 'fas fa-superscript', text: '公式', fn: function() { if (typeof window.showFormulaPicker === 'function') window.showFormulaPicker(); } },
-        { id: 'mobileChartBtn', icon: 'fas fa-chart-bar', text: '图表', fn: function() { window.showChartPicker(); } },
-        { id: 'mobileUndoBtn', icon: 'fas fa-undo', text: '撤销', fn: function() { if (window.vditor && window.vditor.vditor && window.vditor.vditor.undo) window.vditor.vditor.undo.undo(window.vditor.vditor); } },
-        { id: 'mobileRedoBtn', icon: 'fas fa-redo', text: '重做', fn: function() { if (window.vditor && window.vditor.vditor && window.vditor.vditor.undo) window.vditor.vditor.undo.redo(window.vditor.vditor); } },
-        { id: 'mobileSaveBottomBtn', icon: 'fas fa-save', text: '保存', fn: function() { window.saveCurrentFile(true); } }
+        { id: 'mobileFormatBtn', icon: 'fas fa-font', textKey: 'format', fn: function() { window.showFormatMenu(); } },
+        { id: 'mobileInsertBtn', icon: 'fas fa-plus', textKey: 'insert', fn: function() { window.showInsertMenu(); } },
+        { id: 'mobileFormulaBtn', icon: 'fas fa-superscript', textKey: 'formula', fn: function() { if (typeof window.showFormulaPicker === 'function') window.showFormulaPicker(); } },
+        { id: 'mobileChartBtn', icon: 'fas fa-chart-bar', textKey: 'chart', fn: function() { if (typeof window.showChartPicker === 'function') window.showChartPicker(); } },
+        { id: 'mobileUndoBtn', icon: 'fas fa-undo', textKey: 'undo', fn: function() { if (window.vditor && window.vditor.vditor && window.vditor.vditor.undo) window.vditor.vditor.undo.undo(window.vditor.vditor); } },
+        { id: 'mobileRedoBtn', icon: 'fas fa-redo', textKey: 'redo', fn: function() { if (window.vditor && window.vditor.vditor && window.vditor.vditor.undo) window.vditor.vditor.undo.redo(window.vditor.vditor); } },
+        { id: 'mobileSaveBottomBtn', icon: 'fas fa-save', textKey: 'save', fn: function() { window.saveCurrentFile(true); } }
     ];
 
     // 默认配置
@@ -40,6 +49,12 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     if (!window.userSettings.themeMode) {
         window.userSettings.themeMode = 'system'; // system, light, dark
+    }
+    if (!window.userSettings.fontSize) {
+        window.userSettings.fontSize = '16px'; // 默认字体大小
+    }
+    if (typeof window.userSettings.showOutline !== 'boolean') {
+        window.userSettings.showOutline = false; // 默认不显示大纲
     }
     
     // 初始化主题
@@ -71,23 +86,73 @@ document.addEventListener('DOMContentLoaded', function() {
         if (modeToggleEl) modeToggleEl.innerHTML = '<i class="fas fa-sun"></i>';
     }
 
+    // 应用翻译到页面元素
+    function applyTranslations() {
+        if (!window.i18n) return;
+
+        // 翻译普通文本
+        var elements = document.querySelectorAll('[data-i18n]');
+        elements.forEach(function(el) {
+            var key = el.getAttribute('data-i18n');
+            if (key && window.i18n.t(key)) {
+                el.textContent = window.i18n.t(key);
+            }
+        });
+
+        // 翻译 title 属性
+        elements = document.querySelectorAll('[data-i18n-title]');
+        elements.forEach(function(el) {
+            var key = el.getAttribute('data-i18n-title');
+            if (key && window.i18n.t(key)) {
+                el.setAttribute('title', window.i18n.t(key));
+            }
+        });
+
+        // 翻译 placeholder 属性
+        elements = document.querySelectorAll('[data-i18n-placeholder]');
+        elements.forEach(function(el) {
+            var key = el.getAttribute('data-i18n-placeholder');
+            if (key && window.i18n.t(key)) {
+                el.setAttribute('placeholder', window.i18n.t(key));
+            }
+        });
+    }
+
+    // 获取模式名称的翻译
+    function getModeName(mode) {
+        if (!window.i18n) {
+            var names = {
+                wysiwyg: '所见即所得',
+                ir: '即时渲染',
+                sv: '分屏预览'
+            };
+            return names[mode] || mode;
+        }
+        var keys = {
+            wysiwyg: 'wysiwyg',
+            ir: 'instantRender',
+            sv: 'splitPreview'
+        };
+        return window.i18n.t(keys[mode]) || mode;
+    }
+
     var modeMap = {
-        wysiwyg: { name: '所见即所得', icon: 'fas fa-eye' },
-        ir: { name: '即时渲染', icon: 'fas fa-bolt' },
-        sv: { name: '分屏预览', icon: 'fas fa-columns' }
+        wysiwyg: { name: getModeName('wysiwyg'), icon: 'fas fa-eye' },
+        ir: { name: getModeName('ir'), icon: 'fas fa-bolt' },
+        sv: { name: getModeName('sv'), icon: 'fas fa-columns' }
     };
 
     var editorConfig = {
         height: '100%',
         width: '100%',
-        placeholder: '开始编辑...支持 Markdown 语法',
+        placeholder: window.i18n ? window.i18n.t('startEditing') : '开始编辑...支持 Markdown 语法',
         cdn: '/vditor', // 使用本地目录
         toolbar: ['emoji', 'br', 'bold', 'italic', 'strike', '|', 'line', 'quote', 'list', 'ordered-list', 'check', 'outdent', 'indent', 'code', 'inline-code', 'insert-after', 'insert-before', 'upload', 'link', 'table', 'record', 'edit-mode', 'both', 'preview', 'fullscreen', 'outline', 'code-theme', 'content-theme', 'export', 'info', 'help', 'br'],
         customWysiwygToolbar: function() {}, // 修复报错
         theme: window.nightMode ? 'dark' : 'classic',
         mode: localStorage.getItem('vditor_editor_mode') || 'ir',
         cache: { enable: true, id: 'vditor-mobile-optimized' },
-        outline: { enable: false },
+        outline: { enable: window.userSettings.showOutline },
         hint: { emoji: {} },
         preview: {
             math: {
@@ -103,22 +168,32 @@ document.addEventListener('DOMContentLoaded', function() {
         after: function() {
             window.vditorReady = true;
             if (loading) loading.style.display = 'none';
-            // Expose generatePDF and renderPDF to global scope from the module exports
-            // Since we use ES modules for pdf-generator.js, we need to import them and attach to window
-            // But we can't do dynamic import here easily if not an async context or module script
             
-            // We rely on the fact that pdf-generator.js is imported in index.html as a module
-            // and attaches itself to window.
+            // 计算加载时间
+            const loadTime = Math.round(performance.now() - pageLoadStartTime);
             
-            // Wait for modules to load
-            import('./ui/pdf-generator.js').then(module => {
-                window.generatePDF = module.generatePDF;
-                window.renderPDF = module.renderPDF;
-                console.log('PDF modules loaded');
-            }).catch(err => console.error('Failed to load PDF modules', err));
+            // 打印EasyPocketMD大字
+            console.log('%c%s', 'font-size: 48px; font-weight: bold; color: #4a90e2; text-shadow: 2px 2px 4px rgba(0,0,0,0.2);', 'EasyPocketMD');
+            console.log('%cLoad time: %dms', 'font-size: 16px; font-weight: bold; color: #27ae60;', loadTime);
             
+            // 应用字体大小设置
+            applyFontSize(window.userSettings.fontSize);
+            
+            // 应用大纲视图设置
+            applyOutline(window.userSettings.showOutline);
+            
+            // 初始化用户界面和移动特性
             initUserInterface();
             initMobileFeatures();
+            
+            // 延迟加载PDF库，不阻塞首屏
+            setTimeout(function() {
+                import('./ui/pdf-generator.js').then(module => {
+                    window.generatePDF = module.generatePDF;
+                    window.renderPDF = module.renderPDF;
+                    // console.log('PDF modules loaded');
+                }).catch(err => console.error('Failed to load PDF modules', err));
+            }, 100);
             document.addEventListener('keydown', function(e) {
                 if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); window.saveCurrentFile(true); }
                 if (e.ctrlKey && e.shiftKey && e.key === 'L') { e.preventDefault(); window.toggleNightMode(); }
@@ -149,24 +224,121 @@ document.addEventListener('DOMContentLoaded', function() {
 
     window.vditor = new Vditor('vditor', editorConfig);
 
+    // 顶部提示横幅相关函数
+    let currentNoticeType = null;
+    
+    function initTopNoticeBanner() {
+        const banner = document.getElementById('topNoticeBanner');
+        const closeBtn = document.getElementById('topNoticeClose');
+        
+        if (closeBtn) {
+            closeBtn.addEventListener('click', function() {
+                hideTopNoticeBanner();
+                // 根据横幅类型保存状态
+                if (currentNoticeType === 'guest') {
+                    localStorage.setItem('guestNoticeDismissed', 'true');
+                }
+            });
+        }
+    }
+
+    function showTopNoticeBanner(type, text, icon) {
+        const banner = document.getElementById('topNoticeBanner');
+        if (!banner) return;
+        
+        // 检查未登录提示是否已被关闭
+        if (type === 'guest' && localStorage.getItem('guestNoticeDismissed') === 'true') {
+            return;
+        }
+        
+        // 移除旧的类型类
+        banner.classList.remove('type-guest', 'type-network-error');
+        // 添加新的类型类
+        banner.classList.add('type-' + type);
+        
+        // 设置图标
+        const iconEl = banner.querySelector('.notice-icon');
+        if (iconEl) {
+            iconEl.className = 'notice-icon ' + icon;
+        }
+        
+        // 设置文本
+        const textEl = banner.querySelector('.notice-text');
+        if (textEl) {
+            textEl.textContent = text;
+        }
+        
+        // 显示横幅
+        banner.style.display = 'flex';
+        document.body.classList.add('has-top-notice');
+        currentNoticeType = type;
+    }
+
+    function hideTopNoticeBanner() {
+        const banner = document.getElementById('topNoticeBanner');
+        if (banner) {
+            banner.style.display = 'none';
+            document.body.classList.remove('has-top-notice');
+            currentNoticeType = null;
+        }
+    }
+    
+    // 便捷函数：显示未登录提示
+    function showGuestNoticeBanner() {
+        showTopNoticeBanner(
+            'guest',
+            '未登录用户，上传的图片和文件仅保证保存2小时，登录后永久保存，且文件自动同步到服务器。',
+            'fas fa-info-circle'
+        );
+    }
+    
+    // 便捷函数：显示网络错误提示
+    function showNetworkErrorBanner() {
+        showTopNoticeBanner(
+            'network-error',
+            '网络异常，请检查网络连接',
+            'fas fa-exclamation-triangle'
+        );
+    }
+
+    // 暴露到全局
+    window.initTopNoticeBanner = initTopNoticeBanner;
+    window.showTopNoticeBanner = showTopNoticeBanner;
+    window.hideTopNoticeBanner = hideTopNoticeBanner;
+    window.showGuestNoticeBanner = showGuestNoticeBanner;
+    window.showNetworkErrorBanner = showNetworkErrorBanner;
+
     function initUserInterface() {
+        // 初始化顶部提示横幅
+        initTopNoticeBanner();
+        
         if (window.currentUser) {
             window.showUserInfo();
             window.startAutoSync();
             window.loadFilesFromServer();
+            hideTopNoticeBanner();
         } else {
             // 检查是否是分享链接
             const urlParams = new URLSearchParams(window.location.search);
             const shareId = urlParams.get('share_id');
             
             if (!shareId) {
-                // 不是分享链接，显示未登录提示
-                window.showMessage('未登录');
+                // 不是分享链接，显示未登录提示横幅
+                showGuestNoticeBanner();
             }
             window.loadLocalFiles();
         }
         var fileListClose = document.getElementById('fileListClose');
         if (fileListClose) fileListClose.addEventListener('click', function() { document.getElementById('fileListSidebar').classList.remove('show'); });
+        
+        // 文件列表帮助图标
+        var fileListHelp = document.getElementById('fileListHelp');
+        if (fileListHelp) {
+            fileListHelp.addEventListener('click', function() {
+                alert(window.i18n ? window.i18n.t('fileListHelpText') : '文件列表功能提示：\n\n• 点击文件：打开文件\n• 点击文件夹：展开/收起子内容\n• 右键点击或长按：显示更多操作菜单（重命名、移动、删除等）');
+            });
+        }
+        
         var addFileBtn = document.getElementById('addFileBtn');
         if (addFileBtn) addFileBtn.addEventListener('click', window.createNewFile);
         var addFolderBtn = document.getElementById('addFolderBtn');
@@ -201,9 +373,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
         var mobileClearBtn = document.getElementById('mobileClearBtn');
         if (mobileClearBtn) mobileClearBtn.addEventListener('click', function() {
-            if (confirm('确定要清空当前文件的内容吗？')) {
+            if (confirm(window.i18n ? window.i18n.t('clearConfirm') : '确定要清空当前文件的内容吗？')) {
                 if (window.vditor) window.vditor.setValue('');
-                window.showMessage('内容已清空');
+                window.showMessage(window.i18n ? window.i18n.t('contentCleared') : '内容已清空');
             }
             closeDrop();
         });
@@ -224,9 +396,9 @@ document.addEventListener('DOMContentLoaded', function() {
         var currentMode = window.vditor && window.vditor.vditor ? window.vditor.vditor.mode : 'ir';
         var nightMode = window.nightMode === true;
         var modeOptions = [
-            { icon: '<i class="fas fa-eye"></i>', text: '所见即所得', value: 'wysiwyg', current: currentMode === 'wysiwyg' },
-            { icon: '<i class="fas fa-bolt"></i>', text: '即时渲染', value: 'ir', current: currentMode === 'ir' },
-            { icon: '<i class="fas fa-columns"></i>', text: '分屏预览', value: 'sv', current: currentMode === 'sv' }
+            { icon: '<i class="fas fa-eye"></i>', text: getModeName('wysiwyg'), value: 'wysiwyg', current: currentMode === 'wysiwyg' },
+            { icon: '<i class="fas fa-bolt"></i>', text: getModeName('ir'), value: 'ir', current: currentMode === 'ir' },
+            { icon: '<i class="fas fa-columns"></i>', text: getModeName('sv'), value: 'sv', current: currentMode === 'sv' }
         ];
         var options = modeOptions.map(function(opt) {
             return {
@@ -235,7 +407,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 action: function() { setEditorMode(opt.value); }
             };
         });
-        window.showMobileActionSheet('选择编辑器模式', options);
+        window.showMobileActionSheet(window.i18n ? window.i18n.t('selectEditorMode') : '选择编辑器模式', options);
     }
 
     function setEditorMode(mode) {
@@ -247,7 +419,7 @@ document.addEventListener('DOMContentLoaded', function() {
             var newConfig = {
                 height: editorConfig.height,
                 width: editorConfig.width,
-                placeholder: editorConfig.placeholder,
+                placeholder: window.i18n ? window.i18n.t('startEditing') : '开始编辑...支持 Markdown 语法',
                 cdn: '/vditor', // 使用本地目录
                 toolbar: ['emoji', 'br', 'bold', 'italic', 'strike', '|', 'line', 'quote', 'list', 'ordered-list', 'check', 'outdent', 'indent', 'code', 'inline-code', 'insert-after', 'insert-before', 'upload', 'link', 'table', 'record', 'edit-mode', 'both', 'preview', 'fullscreen', 'outline', 'code-theme', 'content-theme', 'export', 'info', 'help', 'br'],
                 customWysiwygToolbar: function() {},
@@ -262,15 +434,19 @@ document.addEventListener('DOMContentLoaded', function() {
                     reinitEditorEvents();
                     reinitMenuEvents();
                     reinitMobileFeatures();
+                    // 应用字体大小设置
+                    applyFontSize(window.userSettings.fontSize);
+                    // 应用大纲视图设置
+                    applyOutline(window.userSettings.showOutline);
                 }
             };
             window.vditor = new Vditor('vditor', newConfig);
-            window.showMessage('已切换到' + modeMap[mode].name, 'success');
+            window.showMessage((window.i18n ? window.i18n.t('switchedTo') : '已切换到') + modeMap[mode].name, 'success');
             var mobileModeBtn = document.getElementById('mobileModeBtn');
             if (mobileModeBtn) mobileModeBtn.innerHTML = '<i class="' + modeMap[mode].icon + '"></i> <span>当前: ' + modeMap[mode].name + '</span>';
         } catch (error) {
             console.error('切换编辑器模式失败', error);
-            window.showMessage('切换失败: ' + error.message, 'error');
+            window.showMessage((window.i18n ? window.i18n.t('switchFailed') : '切换失败: ') + error.message, 'error');
             window.vditor = new Vditor('vditor', editorConfig);
         }
     }
@@ -298,7 +474,7 @@ document.addEventListener('DOMContentLoaded', function() {
             { id: 'mobileMenuBtn', fn: function(e) { e.stopPropagation(); if (dropdown) dropdown.classList.toggle('show'); } },
             { id: 'mobileModeBtn', fn: function() { showModeSelection(); closeDrop(); } },
             { id: 'mobileExportBtn', fn: function() { window.exportContent(); closeDrop(); } },
-            { id: 'mobileClearBtn', fn: function() { if (confirm('确定要清空当前文件的内容吗？')) { if (window.vditor) window.vditor.setValue(''); window.showMessage('内容已清空'); } closeDrop(); } },
+            { id: 'mobileClearBtn', fn: function() { if (confirm(window.i18n ? window.i18n.t('clearConfirm') : '确定要清空当前文件的内容吗？')) { if (window.vditor) window.vditor.setValue(''); window.showMessage(window.i18n ? window.i18n.t('contentCleared') : '内容已清空'); } closeDrop(); } },
             { id: 'mobileSettingsBtn', fn: function() { window.showSettingsDialog(); closeDrop(); } },
             { id: 'aboutBtn', fn: function() { window.showAboutDialog(); closeDrop(); } }
         ];
@@ -342,7 +518,7 @@ document.addEventListener('DOMContentLoaded', function() {
         (window.files || []).forEach(function(file) { if (unsaved[file.id]) hasUnsaved = true; });
         if (hasUnsaved) {
             e.preventDefault();
-            e.returnValue = '您有未保存的文件，确定要离开吗？';
+            e.returnValue = window.i18n ? window.i18n.t('confirmLeave') : '您有未保存的文件，确定要离开吗？';
             // beforeunload 中的异步操作通常不会可靠执行，改为使用 sendBeacon 进行服务器同步
             try {
                 if (window.currentUser && typeof window.syncCurrentFileWithBeacon === 'function') {
@@ -381,7 +557,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 var btn = document.createElement('button');
                 btn.className = 'bottom-btn';
                 btn.id = btnConfig.id;
-                btn.innerHTML = '<i class="' + btnConfig.icon + '"></i><span>' + btnConfig.text + '</span>';
+                var buttonText = (window.i18n && btnConfig.textKey) ? window.i18n.t(btnConfig.textKey) : btnConfig.text;
+                btn.innerHTML = '<i class="' + btnConfig.icon + '"></i><span>' + buttonText + '</span>';
                 btn.addEventListener('click', btnConfig.fn);
                 toolbarContainer.appendChild(btn);
             }
@@ -411,6 +588,29 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
         
+        // 设置当前语言
+        if (window.i18n) {
+            var currentLang = window.i18n.getLanguage();
+            var langRadios = document.getElementsByName('language');
+            for (var i = 0; i < langRadios.length; i++) {
+                if (langRadios[i].value === currentLang) {
+                    langRadios[i].checked = true;
+                }
+            }
+        }
+        
+        // 设置字体大小
+        var fontSizeSelect = document.getElementById('fontSizeSelect');
+        if (fontSizeSelect) {
+            fontSizeSelect.value = window.userSettings.fontSize || '16px';
+        }
+        
+        // 设置大纲视图
+        var showOutlineCheckbox = document.getElementById('showOutlineCheckbox');
+        if (showOutlineCheckbox) {
+            showOutlineCheckbox.checked = window.userSettings.showOutline || false;
+        }
+        
         // 生成工具栏按钮选择
         var toolbarSettings = document.getElementById('toolbarButtonsSettings');
         toolbarSettings.innerHTML = '';
@@ -424,7 +624,8 @@ document.addEventListener('DOMContentLoaded', function() {
             checkbox.checked = currentButtons.includes(btnConfig.id);
             
             label.appendChild(checkbox);
-            label.appendChild(document.createTextNode(' ' + btnConfig.text));
+            var buttonText = (window.i18n && btnConfig.textKey) ? window.i18n.t(btnConfig.textKey) : btnConfig.text;
+            label.appendChild(document.createTextNode(' ' + buttonText));
             toolbarSettings.appendChild(label);
         });
         
@@ -436,7 +637,9 @@ document.addEventListener('DOMContentLoaded', function() {
     if(saveSettingsBtn) saveSettingsBtn.addEventListener('click', function() {
         var newSettings = {
             toolbarButtons: [],
-            themeMode: 'system'
+            themeMode: 'system',
+            fontSize: '16px',
+            showOutline: false
         };
         
         // 获取选中的编辑器模式
@@ -460,6 +663,22 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
         
+        // 获取选中的语言
+        var languageChanged = false;
+        var newLanguage = null;
+        if (window.i18n) {
+            var langRadios = document.getElementsByName('language');
+            for (var i = 0; i < langRadios.length; i++) {
+                if (langRadios[i].checked) {
+                    newLanguage = langRadios[i].value;
+                    if (newLanguage !== window.i18n.getLanguage()) {
+                        languageChanged = true;
+                    }
+                    break;
+                }
+            }
+        }
+        
         // 获取选中的工具栏按钮
         var toolbarCheckboxes = document.querySelectorAll('#toolbarButtonsSettings input[type="checkbox"]');
         toolbarCheckboxes.forEach(function(cb) {
@@ -468,15 +687,38 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
         
+        // 获取字体大小
+        var fontSizeSelect = document.getElementById('fontSizeSelect');
+        if (fontSizeSelect) {
+            newSettings.fontSize = fontSizeSelect.value;
+        }
+        
+        // 获取大纲视图设置
+        var showOutlineCheckbox = document.getElementById('showOutlineCheckbox');
+        if (showOutlineCheckbox) {
+            newSettings.showOutline = showOutlineCheckbox.checked;
+        }
+        
         // 验证按钮数量
         if (newSettings.toolbarButtons.length < 5 || newSettings.toolbarButtons.length > 7) {
-            alert('底部工具栏按钮数量必须在 5 到 7 个之间');
+            alert(window.i18n ? window.i18n.t('buttonCountError') : '底部工具栏按钮数量必须在 5 到 7 个之间');
             return;
         }
+        
+        // 检查是否需要重新初始化编辑器来应用大纲视图设置
+        var needReinitForOutline = window.userSettings.showOutline !== newSettings.showOutline;
         
         // 保存设置
         window.userSettings = newSettings;
         localStorage.setItem('vditor_settings', JSON.stringify(window.userSettings));
+        
+        // 应用字体大小设置
+        applyFontSize(newSettings.fontSize);
+        
+        // 如果大纲视图设置改变，重新初始化编辑器
+        if (needReinitForOutline) {
+            applyOutline(newSettings.showOutline);
+        }
         
         // 应用主题
         var oldNightMode = window.nightMode;
@@ -492,12 +734,24 @@ document.addEventListener('DOMContentLoaded', function() {
             window.nightMode = false;
         }
         
-        if (oldNightMode !== window.nightMode) {
-             window.location.reload(); // 重新加载以应用主题更改（最简单的方法）
+        // 应用语言更改
+        if (languageChanged && window.i18n && newLanguage) {
+            window.i18n.setLanguage(newLanguage);
+            // 更新 modeMap
+            modeMap = {
+                wysiwyg: { name: getModeName('wysiwyg'), icon: 'fas fa-eye' },
+                ir: { name: getModeName('ir'), icon: 'fas fa-bolt' },
+                sv: { name: getModeName('sv'), icon: 'fas fa-columns' }
+            };
+        }
+        
+        if (oldNightMode !== window.nightMode || languageChanged) {
+             window.location.reload(); // 重新加载以应用主题或语言更改
         } else {
+             applyTranslations();
              window.renderBottomToolbar();
              document.getElementById('settingsModalOverlay').classList.remove('show');
-             window.showMessage('设置已保存', 'success');
+             window.showMessage(window.i18n ? window.i18n.t('settingsSaved') : '设置已保存', 'success');
         }
     });
     
@@ -527,4 +781,84 @@ document.addEventListener('DOMContentLoaded', function() {
     if (aboutModalOverlay) aboutModalOverlay.addEventListener('click', function(e) {
         if (e.target === this) this.classList.remove('show');
     });
+    
+    // 应用字体大小设置
+    function applyFontSize(fontSize) {
+        if (!window.vditor) return;
+        
+        var vditorElement = document.getElementById('vditor');
+        if (vditorElement) {
+            // 设置编辑器整体字体大小
+            var contentElements = vditorElement.querySelectorAll('.vditor-wysiwyg__pre, .vditor-ir__preview, .vditor-reset, .vditor-ir__input, .vditor-sv');
+            contentElements.forEach(function(el) {
+                el.style.fontSize = fontSize;
+                el.style.lineHeight = '1.6';
+            });
+            
+            // 设置输入区字体大小
+            var inputElements = vditorElement.querySelectorAll('.vditor-ir__input, textarea, .vditor-wysiwyg');
+            inputElements.forEach(function(el) {
+                el.style.fontSize = fontSize;
+            });
+            
+            // 添加样式标签来覆盖默认样式
+            var styleId = 'vditor-font-size-style';
+            var existingStyle = document.getElementById(styleId);
+            if (existingStyle) {
+                existingStyle.remove();
+            }
+            
+            var style = document.createElement('style');
+            style.id = styleId;
+            style.textContent = `
+                .vditor-ir, .vditor-ir pre.vditor-reset,
+                .vditor-wysiwyg, .vditor-wysiwyg pre.vditor-reset,
+                .vditor-sv, .vditor-content,
+                .vditor-reset {
+                    font-size: ${fontSize} !important;
+                    line-height: 1.6 !important;
+                }
+            `;
+            document.head.appendChild(style);
+        }
+    }
+    
+    // 应用大纲视图设置
+    function applyOutline(show) {
+        if (!window.vditor) return;
+        
+        // 如果需要，重新初始化编辑器以应用大纲视图设置
+        if (window.userSettings.showOutline !== show) {
+            window.userSettings.showOutline = show;
+            localStorage.setItem('vditor_settings', JSON.stringify(window.userSettings));
+            
+            // 重新初始化编辑器
+            var currentContent = window.vditor.getValue();
+            var currentMode = window.vditor.vditor ? window.vditor.vditor.mode : 'ir';
+            if (window.vditor.destroy) window.vditor.destroy();
+            
+            var newConfig = {
+                height: editorConfig.height,
+                width: editorConfig.width,
+                placeholder: window.i18n ? window.i18n.t('startEditing') : '开始编辑...支持 Markdown 语法',
+                cdn: '/vditor',
+                toolbar: ['emoji', 'br', 'bold', 'italic', 'strike', '|', 'line', 'quote', 'list', 'ordered-list', 'check', 'outdent', 'indent', 'code', 'inline-code', 'insert-after', 'insert-before', 'upload', 'link', 'table', 'record', 'edit-mode', 'both', 'preview', 'fullscreen', 'outline', 'code-theme', 'content-theme', 'export', 'info', 'help', 'br'],
+                customWysiwygToolbar: function() {},
+                theme: window.nightMode ? 'dark' : 'classic',
+                mode: currentMode,
+                value: currentContent,
+                cache: editorConfig.cache,
+                outline: { enable: show },
+                hint: editorConfig.hint,
+                upload: editorConfig.upload,
+                after: function() {
+                    reinitEditorEvents();
+                    reinitMenuEvents();
+                    reinitMobileFeatures();
+                    applyFontSize(window.userSettings.fontSize);
+                }
+            };
+            window.vditor = new Vditor('vditor', newConfig);
+        }
+    }
 });

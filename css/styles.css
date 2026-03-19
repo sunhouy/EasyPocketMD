@@ -29,6 +29,27 @@ body {
     /* margin-top: 60px; */
 }
 
+/* 当显示顶部提示横幅时，调整编辑器容器和工具栏的位置 */
+body.has-top-notice .editor-container {
+    top: calc(50px + 40px); /* 顶部工具栏高度 + 提示横幅高度 */
+}
+
+body.has-top-notice .mobile-toolbar-container {
+    top: 40px; /* 提示横幅高度 */
+}
+
+body.has-top-notice .sync-status {
+    top: calc(70px + 40px); /* 原位置 + 提示横幅高度 */
+}
+
+body.has-top-notice .editor-mode-toggle {
+    top: calc(7px + 40px); /* 原位置 + 提示横幅高度 */
+}
+
+body.has-top-notice .custom-fullscreen-btn {
+    top: calc(7px + 40px); /* 原位置 + 提示横幅高度 */
+}
+
 #vditor {
     width: 100%;
     height: 100%;
@@ -596,6 +617,7 @@ body.night-mode .file-list-sidebar {
     margin-bottom: 15px;
     padding-bottom: 10px;
     border-bottom: 1px solid #eaeaea;
+    position: relative;
 }
 
 body.night-mode .file-list-header {
@@ -611,6 +633,39 @@ body.night-mode .file-list-header {
 
 body.night-mode .file-list-title {
     color: #eee;
+}
+
+.file-list-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-right: 10px;
+}
+
+.file-list-help {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    cursor: pointer;
+    color: #999;
+    transition: all 0.2s;
+}
+
+.file-list-help:hover {
+    background: #f0f0f0;
+    color: #4a90e2;
+}
+
+body.night-mode .file-list-help {
+    color: #aaa;
+}
+
+body.night-mode .file-list-help:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #4a90e2;
 }
 
 .file-list-close {
@@ -932,17 +987,19 @@ body.night-mode .conflict-details {
 /* 同步状态指示器 */
 .sync-status {
     position: fixed;
-    bottom: 20px;
-    left: 20px;
+    top: 70px;
+    left: 50%;
+    transform: translateX(-50%);
     background: white;
-    padding: 8px 12px;
+    padding: 10px 20px;
     border-radius: 6px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-    font-size: 12px;
-    z-index: 999;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+    font-size: 14px;
+    z-index: 9999;
     display: none;
     align-items: center;
     gap: 8px;
+    max-width: 400px;
 }
 
 body.night-mode .sync-status {
@@ -1086,16 +1143,18 @@ body.night-mode .vditor-toolbar__item:hover {
 /* 上传状态提示 */
 .upload-status {
     position: fixed;
-    bottom: 80px;
-    right: 20px;
+    top: 120px;
+    left: 50%;
+    transform: translateX(-50%);
     background: rgba(0, 0, 0, 0.8);
     color: white;
-    padding: 10px 15px;
+    padding: 12px 24px;
     border-radius: 8px;
     font-size: 14px;
-    z-index: 1000;
-    max-width: 300px;
+    z-index: 9999;
+    max-width: 400px;
     word-break: break-all;
+    text-align: center;
 }
 
 .upload-status.success {
@@ -1833,6 +1892,33 @@ body.night-mode .checkbox-group label:hover {
 .checkbox-group input {
     margin-right: 8px;
     cursor: pointer;
+}
+
+/* Select Group 样式 */
+.select-group {
+    margin-top: 5px;
+}
+
+.form-control {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 16px;
+    transition: border 0.3s ease;
+    background: white;
+    color: #333;
+}
+
+body.night-mode .form-control {
+    background: #3d3d3d;
+    border: 1px solid #555;
+    color: #eee;
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: #4a90e2;
 }
 
 /* jstree dark mode support */

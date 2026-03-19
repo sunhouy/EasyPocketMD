@@ -12,8 +12,10 @@
     }
 
     async function showFileManager() {
+        var t = function(key) { return window.i18n ? window.i18n.t(key) : key; };
+        
         if (!g('currentUser')) {
-            global.showMessage('请先登录', 'error');
+            global.showMessage(t('pleaseLoginFirst'), 'error');
             return;
         }
 
@@ -38,14 +40,14 @@
 
         // Header
         const header = document.createElement('h2');
-        header.textContent = '我的文件';
+        header.textContent = t('myFiles');
         header.style.cssText = 'margin-top:0;margin-bottom:20px;text-align:center;';
         content.appendChild(header);
 
         // Usage Info
         const usageInfo = document.createElement('div');
         usageInfo.style.cssText = `margin-bottom:20px;padding:15px;background:${nightMode ? '#3d3d3d' : '#f8f9fa'};border-radius:8px;text-align:center;`;
-        usageInfo.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 正在加载...';
+        usageInfo.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ' + t('loading');
         content.appendChild(usageInfo);
 
         // File List
@@ -75,13 +77,13 @@
             if (result.code === 200) {
                 // Update Usage
                 usageInfo.innerHTML = `
-                    <div style="font-size:16px;margin-bottom:5px;">已用空间: <strong>${formatSize(result.totalSize)}</strong></div>
-                    <div style="font-size:12px;color:${nightMode ? '#aaa' : '#666'};">共 ${result.data.length} 个文件</div>
+                    <div style="font-size:16px;margin-bottom:5px;">${t('usedSpace')}: <strong>${formatSize(result.totalSize)}</strong></div>
+                    <div style="font-size:12px;color:${nightMode ? '#aaa' : '#666'};">${t('totalFiles').replace('{count}', result.data.length)}</div>
                 `;
 
                 // Render Files
                 if (result.data.length === 0) {
-                    fileListContainer.innerHTML = `<div style="text-align:center;padding:40px;color:${nightMode ? '#aaa' : '#666'};">暂无文件</div>`;
+                    fileListContainer.innerHTML = `<div style="text-align:center;padding:40px;color:${nightMode ? '#aaa' : '#666'};">${t('noFiles')}</div>`;
                 } else {
                     const list = document.createElement('div');
                     list.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill, minmax(100px, 1fr));gap:10px;';
@@ -108,8 +110,8 @@
                             <div style="font-size:12px;width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center;margin-bottom:2px;" title="${displayName}">${displayName}</div>
                             <div style="font-size:10px;color:${nightMode ? '#aaa' : '#666'};">${formatSize(file.size)}</div>
                             <div style="display:flex;gap:5px;margin-top:5px;width:100%;">
-                                <button class="copy-btn" style="flex:1;background:#2196F3;color:white;border:none;border-radius:3px;padding:2px;font-size:10px;cursor:pointer;">复制</button>
-                                <button class="del-btn" style="flex:1;background:#dc3545;color:white;border:none;border-radius:3px;padding:2px;font-size:10px;cursor:pointer;">删除</button>
+                                <button class="copy-btn" style="flex:1;background:#2196F3;color:white;border:none;border-radius:3px;padding:2px;font-size:10px;cursor:pointer;">${t('copy')}</button>
+                                <button class="del-btn" style="flex:1;background:#dc3545;color:white;border:none;border-radius:3px;padding:2px;font-size:10px;cursor:pointer;">${t('delete')}</button>
                             </div>
                         `;
 
@@ -123,13 +125,13 @@
                                 link = `[${displayName}](${file.url})`;
                             }
                             navigator.clipboard.writeText(link).then(() => {
-                                global.showMessage('链接已复制', 'success');
+                                global.showMessage(t('linkCopied'), 'success');
                             });
                         };
 
                         const delBtn = item.querySelector('.del-btn');
                         delBtn.onclick = async () => {
-                            if (confirm(`确定要删除 ${displayName} 吗？`)) {
+                            if (confirm(t('confirmDeleteFile').replace('{name}', displayName))) {
                                 try {
                                     const delRes = await fetch('api/user_files/delete', {
                                         method: 'POST',
@@ -143,13 +145,17 @@
                                     const delResult = await delRes.json();
                                     if (delResult.code === 200) {
                                         item.remove();
-                                        global.showMessage('删除成功', 'success');
+                                        global.showMessage(t('deleteSuccess'), 'success');
                                         // Update usage visually if needed, or just let it be until refresh
                                     } else {
-                                        global.showMessage(delResult.message || '删除失败', 'error');
+                                        global.showMessage(delResult.message || t('deleteFailed'), 'error');
                                     }
                                 } catch (err) {
-                                    global.showMessage('网络错误', 'error');
+                                    if (global.showNetworkErrorBanner) {
+                                        global.showNetworkErrorBanner();
+                                    } else {
+                                        global.showMessage(t('networkError'), 'error');
+                                    }
                                 }
                             }
                         };
@@ -159,11 +165,11 @@
                     fileListContainer.appendChild(list);
                 }
             } else {
-                usageInfo.innerHTML = `<span style="color:#dc3545;">加载失败: ${result.message}</span>`;
+                usageInfo.innerHTML = `<span style="color:#dc3545;">${t('loadFailed')}: ${result.message}</span>`;
             }
         } catch (err) {
             console.error(err);
-            usageInfo.innerHTML = `<span style="color:#dc3545;">加载出错</span>`;
+            usageInfo.innerHTML = `<span style="color:#dc3545;">${t('loadError')}</span>`;
         }
     }
 

@@ -34,8 +34,6 @@ class ShareManager {
                 expiresAt = date.toISOString().slice(0, 19).replace('T', ' ');
             }
 
-
-
             // 5. Generate unique share_id and insert
             let shareId;
             // 如果存在已有分享，直接使用已有ID，并更新信息

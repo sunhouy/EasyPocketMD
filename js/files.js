@@ -5,6 +5,9 @@
     'use strict';
 
     function g(name) { return global[name]; }
+    
+    function isEn() { return window.i18n && window.i18n.getLanguage() === 'en'; }
+    function t(key) { return window.i18n ? window.i18n.t(key) : key; }
 
     // ---------- 服务器同步一致性：待同步标记 ----------
     // 记录“本地已保存但服务器尚未确认保存”的文件，避免本地/服务器长期不一致
@@ -139,7 +142,7 @@
     async function loadFilesFromServer() {
         if (!g('currentUser')) return;
         try {
-            global.showSyncStatus('正在从服务器加载文件...');
+            global.showSyncStatus(isEn() ? 'Loading files from server...' : '正在从服务器加载文件...');
             var api = global.getApiBaseUrl ? global.getApiBaseUrl() : 'api';
             const response = await fetch(api + '/files?username=' + encodeURIComponent(g('currentUser').username), {
                 headers: { 'Authorization': 'Bearer ' + g('currentUser').token }
@@ -209,15 +212,15 @@
                     loadFiles();
                     if (g('files').length > 0) openFirstFile();
                     else createDefaultFile();
-                    global.showSyncStatus('文件同步完成', 'success');
+                    global.showSyncStatus(isEn() ? 'File sync completed' : '文件同步完成', 'success');
                 }
             } else {
                 loadLocalFiles();
-                global.showSyncStatus('服务器没有文件，使用本地文件', 'success');
+                global.showSyncStatus(isEn() ? 'No files on server, using local files' : '服务器没有文件，使用本地文件', 'success');
             }
         } catch (error) {
             console.error('从服务器加载文件失败:', error);
-            global.showSyncStatus('同步失败，使用本地文件', 'error');
+            global.showSyncStatus(isEn() ? 'Sync failed, using local files' : '同步失败，使用本地文件', 'error');
             loadLocalFiles();
         }
     }
@@ -273,7 +276,7 @@
         if (toUpload.length === 0) return;
 
         try {
-            global.showSyncStatus('检测到本地新文件，正在自动上传 ' + toUpload.length + ' 个...');
+            global.showSyncStatus(isEn() ? 'Detected local new files, automatically uploading ' + toUpload.length + '...' : '检测到本地新文件，正在自动上传 ' + toUpload.length + ' 个...');
         } catch (e) {}
 
         // 逐个上传，确保顺序和稳定性
@@ -337,7 +340,7 @@
 
         const content = vditor.getValue();
 
-        // 关闭页面场景：也要本地落盘，保持“保存即同步保存（本地 + 服务器）”的一致性
+        // 关闭页面，保持“保存即同步保存（本地 + 服务器）”的一致性
         try {
             file.content = content;
             file.lastModified = Date.now();
@@ -387,9 +390,9 @@
             conflictItem.className = 'conflict-option';
 
             if (conflict.type === 'delete') {
-                conflictItem.innerHTML = '<div><strong style="color: #dc3545;">⚠️ ' + conflict.filename + '</strong><div class="conflict-details"><div style="color: #dc3545;">该文件在服务器上已经删除</div><div>本地修改时间: ' + new Date(conflict.localModified).toLocaleString() + '</div></div><div style="margin-top: 8px;"><label style="margin-right: 15px;"><input type="radio" name="conflict-' + index + '" value="upload">重新上传到服务器</label><label><input type="radio" name="conflict-' + index + '" value="delete" checked>删除本地文件</label></div></div>';
+                conflictItem.innerHTML = '<div><strong style="color: #dc3545;">⚠️ ' + conflict.filename + '</strong><div class="conflict-details"><div style="color: #dc3545;">' + (isEn() ? 'This file has been deleted on the server' : '该文件在服务器上已经删除') + '</div><div>' + (isEn() ? 'Local modified time: ' : '本地修改时间: ') + new Date(conflict.localModified).toLocaleString() + '</div></div><div style="margin-top: 8px;"><label style="margin-right: 15px;"><input type="radio" name="conflict-' + index + '" value="upload">' + (isEn() ? 'Re-upload to server' : '重新上传到服务器') + '</label><label><input type="radio" name="conflict-' + index + '" value="delete" checked>' + (isEn() ? 'Delete local file' : '删除本地文件') + '</label></div></div>';
             } else {
-                conflictItem.innerHTML = '<div><strong>' + conflict.filename + '</strong><div class="conflict-details"><div>本地修改时间: ' + new Date(conflict.localModified).toLocaleString() + '</div><div>服务器修改时间: ' + new Date(conflict.serverModified).toLocaleString() + '</div></div><div style="margin-top: 8px;"><label style="margin-right: 15px;"><input type="radio" name="conflict-' + index + '" value="local">使用本地版本</label><label><input type="radio" name="conflict-' + index + '" value="server" checked>使用服务器版本</label></div></div>';
+                conflictItem.innerHTML = '<div><strong>' + conflict.filename + '</strong><div class="conflict-details"><div>' + (isEn() ? 'Local modified time: ' : '本地修改时间: ') + new Date(conflict.localModified).toLocaleString() + '</div><div>' + (isEn() ? 'Server modified time: ' : '服务器修改时间: ') + new Date(conflict.serverModified).toLocaleString() + '</div></div><div style="margin-top: 8px;"><label style="margin-right: 15px;"><input type="radio" name="conflict-' + index + '" value="local">' + (isEn() ? 'Use local version' : '使用本地版本') + '</label><label><input type="radio" name="conflict-' + index + '" value="server" checked>' + (isEn() ? 'Use server version' : '使用服务器版本') + '</label></div></div>';
             }
             conflictList.appendChild(conflictItem);
         });
@@ -397,7 +400,7 @@
         var resolveBtn = document.getElementById('resolveConflictsBtn');
         var cancelBtn = document.getElementById('cancelConflictBtn');
         if (resolveBtn) resolveBtn.onclick = function() { resolveConflicts(conflicts, serverFiles); conflictModal.classList.remove('show'); };
-        if (cancelBtn) cancelBtn.onclick = function() { conflictModal.classList.remove('show'); loadLocalFiles(); global.showMessage('冲突解决已取消，使用本地文件'); };
+        if (cancelBtn) cancelBtn.onclick = function() { conflictModal.classList.remove('show'); loadLocalFiles(); global.showMessage(isEn() ? 'Conflict resolution cancelled, using local files' : '冲突解决已取消，使用本地文件'); };
     }
 
     function resolveConflicts(conflicts, serverFiles) {
@@ -453,8 +456,8 @@
 
         loadFiles();
         if (g('files').length > 0) openFirstFile();
-        global.showMessage('冲突已解决，文件已同步');
-        global.showSyncStatus('文件同步完成', 'success');
+        global.showMessage(isEn() ? 'Conflict resolved, files synced' : '冲突已解决，文件已同步');
+        global.showSyncStatus(isEn() ? 'File sync completed' : '文件同步完成', 'success');
     }
 
     function mergeFiles(localFiles, serverFiles) {
@@ -593,11 +596,11 @@
         }
 
         const treeData = getJsTreeData();
-        console.log('Initializing file tree with data:', treeData);
+        // console.log('Initializing file tree with data:', treeData);
 
         if (treeData.length === 0) {
             console.warn('File tree data is empty');
-            document.getElementById('fileList').innerHTML = '<div style="padding:10px;color:#999;text-align:center;">暂无文件</div>';
+            document.getElementById('fileList').innerHTML = '<div style="padding:10px;color:#999;text-align:center;">' + (isEn() ? 'No files' : '暂无文件') + '</div>';
             return;
         }
 
@@ -625,14 +628,14 @@
                 'items': function(node) {
                     const items = {
                         'rename': {
-                            'label': '重命名',
+                            'label': isEn() ? 'Rename' : '重命名',
                             'action': function(data) {
                                 const inst = window.$.jstree.reference(data.reference);
                                 const obj = inst.get_node(data.reference);
                                 
                                 // 对于文件夹，如果是虚拟文件夹，则不允许重命名
                                 if (obj.data.isVirtual) {
-                                    alert('虚拟文件夹不可重命名，请先创建为实体文件夹');
+                                    alert(isEn() ? 'Virtual folder cannot be renamed, please create as real folder first' : '虚拟文件夹不可重命名，请先创建为实体文件夹');
                                     return;
                                 }
 
@@ -642,19 +645,19 @@
                                     global.renameFile(obj.id);
                                 } else {
                                     console.error('renameFile function not found');
-                                    alert('重命名功能不可用');
+                                    alert(isEn() ? 'Rename function not available' : '重命名功能不可用');
                                 }
                             }
                         },
                         'move': {
-                            'label': '移动',
+                            'label': isEn() ? 'Move' : '移动',
                             'action': function(data) {
                                 const inst = window.$.jstree.reference(data.reference);
                                 const obj = inst.get_node(data.reference);
                                 
                                 // 对于文件夹，如果是虚拟文件夹，则不允许移动
                                 if (obj.data.isVirtual) {
-                                    alert('虚拟文件夹不可移动，请先创建为实体文件夹');
+                                    alert(isEn() ? 'Virtual folder cannot be moved, please create as real folder first' : '虚拟文件夹不可移动，请先创建为实体文件夹');
                                     return;
                                 }
                                 
@@ -662,7 +665,7 @@
                             }
                         },
                         'history': {
-                             'label': '历史版本',
+                             'label': isEn() ? 'History Versions' : '历史版本',
                              'action': function(data) {
                                  const inst = window.$.jstree.reference(data.reference);
                                  const obj = inst.get_node(data.reference);
@@ -672,25 +675,25 @@
                              }
                         },
                         'delete': {
-                            'label': '删除',
+                            'label': isEn() ? 'Delete' : '删除',
                             'action': function(data) {
                                 const inst = window.$.jstree.reference(data.reference);
                                 const obj = inst.get_node(data.reference);
                                 if (obj.data.isVirtual) {
-                                    alert('不能直接删除虚拟文件夹，请删除其子内容');
+                                    alert(isEn() ? 'Cannot delete virtual folder directly, please delete its contents' : '不能直接删除虚拟文件夹，请删除其子内容');
                                     return;
                                 }
                                 global.deleteFile(obj.id);
                             }
                         },
                         'new_file': {
-                            'label': '新建文件',
+                            'label': isEn() ? 'New File' : '新建文件',
                             'separator_before': true,
                             'action': function(data) {
                                 const inst = window.$.jstree.reference(data.reference);
                                 const obj = inst.get_node(data.reference);
                                 const path = obj.data.path;
-                                const name = prompt('请输入文件名', '新文件');
+                                const name = prompt(isEn() ? 'Please enter filename' : '请输入文件名', isEn() ? 'New File' : '新文件');
                                 if (name) {
                                     const newPath = path + '/' + name;
                                     createFileAtPath(newPath);
@@ -698,12 +701,12 @@
                             }
                         },
                         'new_folder': {
-                            'label': '新建文件夹',
+                            'label': isEn() ? 'New Folder' : '新建文件夹',
                             'action': function(data) {
                                 const inst = window.$.jstree.reference(data.reference);
                                 const obj = inst.get_node(data.reference);
                                 const path = obj.data.path;
-                                const name = prompt('请输入文件夹名', '新文件夹');
+                                const name = prompt(isEn() ? 'Please enter folder name' : '请输入文件夹名', isEn() ? 'New Folder' : '新文件夹');
                                 if (name) {
                                     const newPath = path + '/' + name;
                                     createFolderAtPath(newPath);
@@ -736,7 +739,7 @@
         .on('rename_node.jstree', function (e, data) {
              if (data.text === data.old) return;
              if (data.node.data.isVirtual) {
-                 alert('无法重命名虚拟文件夹，请先创建实文件夹');
+                 alert(isEn() ? 'Cannot rename virtual folder, please create as real folder first' : '无法重命名虚拟文件夹，请先创建实文件夹');
                  data.instance.refresh(); 
                  return;
              }
@@ -772,7 +775,7 @@
         
         const files = g('files');
         if (files.some(f => f.name === path && f.type === 'file')) {
-            alert('已存在同名文件');
+            alert(isEn() ? 'File with the same name already exists' : '已存在同名文件');
             return;
         }
 
@@ -798,7 +801,7 @@
         ensureParentFolders(path);
         const files = g('files');
         if (files.some(f => f.name === path)) {
-            alert('该路径已存在');
+            alert(isEn() ? 'This path already exists' : '该路径已存在');
             return;
         }
         const newFolder = {
@@ -825,7 +828,7 @@
         const parentPath = getParentPath(oldName);
         
         if (isNameExistsInParent(newBasename.trim(), parentPath, id)) {
-            alert('该目录下已存在同名文件或文件夹');
+            alert(isEn() ? 'A file or folder with the same name already exists in this directory' : '该目录下已存在同名文件或文件夹');
             loadFiles(); 
             return;
         }
@@ -868,14 +871,14 @@
 
         if (item.type === 'folder') {
             if (newName === oldName || newName.startsWith(oldName + '/')) {
-                alert('不能将文件夹移动到自身或其子目录中');
+                alert(isEn() ? 'Cannot move folder to itself or its subdirectory' : '不能将文件夹移动到自身或其子目录中');
                 loadFiles(); 
                 return;
             }
         }
 
         if (files.some(f => f.name === newName && f.id !== id)) {
-            alert('目标位置已存在同名项');
+            alert(isEn() ? 'An item with the same name already exists at the target location' : '目标位置已存在同名项');
             loadFiles(); 
             return;
         }
@@ -891,7 +894,7 @@
 
         localStorage.setItem('vditor_files', JSON.stringify(files));
         loadFiles();
-        global.showMessage(`${item.type === 'folder' ? '文件夹' : '文件'}已移动`);
+        global.showMessage(isEn() ? `${item.type === 'folder' ? 'Folder' : 'File'} moved` : `${item.type === 'folder' ? '文件夹' : '文件'}已移动`);
         
         if (g('currentUser')) {
              if (item.type === 'folder') {
@@ -967,7 +970,7 @@
         content.style.cssText = `width:90%;max-width:400px;max-height:80vh;display:flex;flex-direction:column;padding:20px;background:${bgColor};color:${textColor};border-radius:8px;`;
         
         const header = document.createElement('h3');
-        header.textContent = '移动到...';
+        header.textContent = isEn() ? 'Move to...' : '移动到...';
         header.style.margin = '0 0 15px 0';
         
         const list = document.createElement('div');
@@ -987,7 +990,7 @@
                 div.style.cursor = 'not-allowed';
             }
             
-            div.innerHTML = `<i class="fas fa-folder" style="color:${isSelfOrChild ? '#eee' : '#f7b731'};margin-right:10px;"></i> ${f === '' ? '根目录' : f}`;
+            div.innerHTML = `<i class="fas fa-folder" style="color:${isSelfOrChild ? '#eee' : '#f7b731'};margin-right:10px;"></i> ${f === '' ? (isEn() ? 'Root' : '根目录') : f}`;
             
             if (!isSelfOrChild) {
                 div.onmouseover = () => div.style.background = itemHoverBg;
@@ -1001,7 +1004,7 @@
         });
         
         const closeBtn = document.createElement('button');
-        closeBtn.textContent = '取消';
+        closeBtn.textContent = isEn() ? 'Cancel' : '取消';
         closeBtn.className = 'modal-btn secondary';
         closeBtn.style.alignSelf = 'flex-end';
         closeBtn.onclick = () => modal.remove();
@@ -1023,11 +1026,11 @@
         const parentPath = getParentPath(oldName);
         const oldBasename = getBasename(oldName);
 
-        const newBasename = prompt(`请输入新的${isFolder ? '文件夹' : '文件'}名：`, oldBasename);
+        const newBasename = prompt(isEn() ? `Please enter the new ${isFolder ? 'folder' : 'file'} name:` : `请输入新的${isFolder ? '文件夹' : '文件'}名：`, oldBasename);
         if (!newBasename || newBasename.trim() === oldBasename) return;
 
         if (isNameExistsInParent(newBasename.trim(), parentPath, id)) {
-            alert('该目录下已存在同名文件或文件夹，请使用其他名称');
+            alert(isEn() ? 'A file or folder with the same name already exists in this directory, please use another name' : '该目录下已存在同名文件或文件夹，请使用其他名称');
             return;
         }
 
@@ -1043,7 +1046,7 @@
         item.isSynced = false;
         localStorage.setItem('vditor_files', JSON.stringify(files));
         loadFiles();
-        global.showMessage(`${isFolder ? '文件夹' : '文件'}已重命名`);
+        global.showMessage(isEn() ? `${isFolder ? 'Folder' : 'File'} renamed` : `${isFolder ? '文件夹' : '文件'}已重命名`);
         if (g('currentUser')) {
             if (isFolder) {
                 const affectedFiles = files.filter(f => f.type === 'file' && (f.name.startsWith(newName + '/') || f.name === newName));
@@ -1057,9 +1060,9 @@
     function createDefaultFile() {
         const defaultFile = {
             id: Date.now().toString(),
-            name: '未命名文档', // 无前导斜杠
+            name: isEn() ? 'Untitled' : '未命名文档', // 无前导斜杠
             type: 'file',
-            content: '# 欢迎使用 Markdown 编辑器\n\n这是一个新的文档。\n\n## 功能特性\n\n- 支持 Markdown 语法\n- 实时预览\n- 自动保存\n- 多文件管理\n\n开始编写吧！',
+            content: isEn() ? '# Welcome to Markdown Editor\n\nThis is a new document.\n\n## Features\n\n- Markdown syntax support\n- Real-time preview\n- Auto-save\n- Multi-file management\n\nStart writing!' : '# 欢迎使用 Markdown 编辑器\n\n这是一个新的文档。\n\n## 功能特性\n\n- 支持 Markdown 语法\n- 实时预览\n- 自动保存\n- 多文件管理\n\n开始编写吧！',
             lastModified: Date.now(),
             isSynced: false
         };
@@ -1073,7 +1076,7 @@
     }
 
     function createNewFile() {
-        const input = prompt('请输入文件名（如需在文件夹中创建，请确保文件夹已存在，例如 docs/note）', '新文档');
+        const input = prompt(isEn() ? 'Please enter filename (to create in a folder, ensure the folder exists, e.g., docs/note)' : '请输入文件名（如需在文件夹中创建，请确保文件夹已存在，例如 docs/note）', isEn() ? 'New Document' : '新文档');
         if (!input) return;
 
         let path = normalizePath(input);
@@ -1085,13 +1088,13 @@
         if (parentPath) {
             const parentExists = files.some(f => f.name === parentPath && f.type === 'folder');
             if (!parentExists) {
-                alert('父文件夹 "' + parentPath + '" 不存在，请先使用“新建文件夹”功能创建');
+                alert(isEn() ? 'Parent folder "' + parentPath + '" does not exist, please create it first using "New Folder"' : '父文件夹 "' + parentPath + '" 不存在，请先使用“新建文件夹”功能创建');
                 return;
             }
         }
 
         if (files.some(f => f.name === path && f.type === 'file')) {
-            alert('已存在同名文件，请使用其他名称');
+            alert(isEn() ? 'File with the same name already exists, please use another name' : '已存在同名文件，请使用其他名称');
             return;
         }
 
@@ -1110,11 +1113,11 @@
         g('lastSyncedContent')[newFile.id] = newFile.content;
         g('unsavedChanges')[newFile.id] = false;
         if (g('currentUser')) global.syncFileToServer(newFile.id);
-        global.showMessage('已创建文件: ' + path);
+        global.showMessage(isEn() ? 'File created: ' + path : '已创建文件: ' + path);
     }
 
     function createNewFolder() {
-        const input = prompt('请输入文件夹路径（例如 docs/notes）', '新文件夹');
+        const input = prompt(isEn() ? 'Please enter folder path (e.g., docs/notes)' : '请输入文件夹路径（例如 docs/notes）', isEn() ? 'New Folder' : '新文件夹');
         if (!input) return;
 
         let path = normalizePath(input);
@@ -1122,7 +1125,7 @@
 
         const files = g('files');
         if (files.some(f => f.name === path)) {
-            alert('该路径已存在');
+            alert(isEn() ? 'This path already exists' : '该路径已存在');
             return;
         }
 
@@ -1140,21 +1143,21 @@
         if (g('currentUser')) {
             global.syncFileToServer(newFolder.id);
         }
-        global.showMessage('已创建文件夹: ' + path);
+        global.showMessage(isEn() ? 'Folder created: ' + path : '已创建文件夹: ' + path);
     }
 
     function openFile(fileId) {
         const files = g('files');
         const file = files.find(f => f.id === fileId && f.type === 'file');
         if (!file) {
-            alert('无法打开文件夹');
+            alert(isEn() ? 'Cannot open folder' : '无法打开文件夹');
             return;
         }
         global.currentFileId = fileId;
         if (g('vditor')) g('vditor').setValue(file.content);
         expandActiveFile();
         global.startAutoSave();
-        global.showMessage('已打开文件: ' + file.name);
+        global.showMessage(isEn() ? 'File opened: ' + file.name : '已打开文件: ' + file.name);
     }
 
     function deleteFile(id) {
@@ -1164,10 +1167,10 @@
 
         if (item.type === 'file') {
             if (files.filter(f => f.type === 'file').length <= 1) {
-                alert('至少需要保留一个文件');
+                alert(isEn() ? 'At least one file must be kept' : '至少需要保留一个文件');
                 return;
             }
-            if (!confirm('确定要删除这个文件吗？')) return;
+            if (!confirm(isEn() ? 'Are you sure you want to delete this file?' : '确定要删除这个文件吗？')) return;
 
             const idx = files.findIndex(f => f.id === id);
             files.splice(idx, 1);
@@ -1183,9 +1186,9 @@
                 else createDefaultFile();
             }
             loadFiles();
-            global.showMessage('已删除文件: ' + item.name);
+            global.showMessage(isEn() ? 'File deleted: ' + item.name : '已删除文件: ' + item.name);
         } else {
-            if (!confirm(`确定要删除文件夹“${item.name}”及其所有内容吗？`)) return;
+            if (!confirm(isEn() ? `Are you sure you want to delete the folder "${item.name}" and all its contents?` : `确定要删除文件夹“${item.name}”及其所有内容吗？`)) return;
 
             const toDelete = files.filter(f => f.name === item.name || f.name.startsWith(item.name + '/'));
             const fileNamesToDelete = toDelete.filter(f => f.type === 'file').map(f => f.name);
@@ -1212,7 +1215,7 @@
                 else createDefaultFile();
             }
             loadFiles();
-            global.showMessage('已删除文件夹: ' + item.name);
+            global.showMessage(isEn() ? 'Folder deleted: ' + item.name : '已删除文件夹: ' + item.name);
         }
     }
 
@@ -1244,7 +1247,7 @@
                 // 保持 pending
             }
         }
-        global.showMessage('文件已保存' + (isManual && contentChanged ? '' : ''));
+        global.showMessage(isEn() ? 'File saved' + (isManual && contentChanged ? '' : '') : '文件已保存' + (isManual && contentChanged ? '' : ''));
     }
 
     async function createHistoryVersion(filename, content) {
@@ -1281,11 +1284,11 @@
         if (!modal || !historyList || !historyFileName) return;
         historyFileName.textContent = filename;
         modal.classList.add('show');
-        historyList.innerHTML = '<div class="history-loading"><i class="fas fa-spinner fa-spin"></i> 正在加载历史版本...</div>';
+        historyList.innerHTML = '<div class="history-loading"><i class="fas fa-spinner fa-spin"></i> ' + (isEn() ? 'Loading history versions...' : '正在加载历史版本...') + '</div>';
         try {
             const history = await getFileHistory(filename);
             if (history.length === 0) {
-                historyList.innerHTML = '<div class="history-loading">暂无历史版本</div>';
+                historyList.innerHTML = '<div class="history-loading">' + (isEn() ? 'No history versions' : '暂无历史版本') + '</div>';
                 return;
             }
             const files = g('files');
@@ -1297,7 +1300,7 @@
                 versionEl.className = 'history-version' + (index === 0 ? ' history-version-current' : '');
                 const date = new Date(version.timestamp).toLocaleString();
                 const contentPreview = version.content.substring(0, 200) + (version.content.length > 200 ? '...' : '');
-                versionEl.innerHTML = '<div class="history-version-header"><div class="history-version-title">版本 ' + version.version_id + (index === 0 ? ' <span style="color:#4CAF50;font-size:12px;">(当前)</span>' : '') + '</div><div class="history-version-date">' + date + '</div></div><div class="history-version-content">' + global.escapeHtml(contentPreview) + '</div><div class="history-version-actions"><button class="modal-btn small preview-btn"><i class="fas fa-eye"></i> 预览</button>' + (index > 0 ? '<button class="modal-btn small primary restore-btn"><i class="fas fa-history"></i> 恢复</button>' : '') + '<button class="modal-btn small delete-history-btn"><i class="fas fa-trash"></i> 删除</button></div>';
+                versionEl.innerHTML = '<div class="history-version-header"><div class="history-version-title">' + (isEn() ? 'Version ' : '版本 ') + version.version_id + (index === 0 ? ' <span style="color:#4CAF50;font-size:12px;">(' + (isEn() ? 'Current' : '当前') + ')</span>' : '') + '</div><div class="history-version-date">' + date + '</div></div><div class="history-version-content">' + global.escapeHtml(contentPreview) + '</div><div class="history-version-actions"><button class="modal-btn small preview-btn"><i class="fas fa-eye"></i> ' + (isEn() ? 'Preview' : '预览') + '</button>' + (index > 0 ? '<button class="modal-btn small primary restore-btn"><i class="fas fa-history"></i> ' + (isEn() ? 'Restore' : '恢复') + '</button>' : '') + '<button class="modal-btn small delete-history-btn"><i class="fas fa-trash"></i> ' + (isEn() ? 'Delete' : '删除') + '</button></div>';
                 var previewBtn = versionEl.querySelector('.preview-btn');
                 if (previewBtn) previewBtn.addEventListener('click', function(e) { e.stopPropagation(); global.previewHistoryVersion(filename, version.version_id, version.content, version.timestamp); });
                 if (index > 0) {
@@ -1309,7 +1312,7 @@
                 historyList.appendChild(versionEl);
             });
         } catch (error) {
-            historyList.innerHTML = '<div class="history-loading">加载失败: ' + error.message + '</div>';
+            historyList.innerHTML = '<div class="history-loading">' + (isEn() ? 'Load failed: ' : '加载失败: ') + error.message + '</div>';
         }
     }
 
@@ -1344,13 +1347,13 @@
             return pendingServerSync[file.id] || !file.isSynced || currentContent !== lastSyncedContent[file.id];
         });
         if (filesToSync.length === 0) return;
-        global.showSyncStatus('正在同步 ' + filesToSync.length + ' 个文件...');
+        global.showSyncStatus(isEn() ? 'Syncing ' + filesToSync.length + ' files...' : '正在同步 ' + filesToSync.length + ' 个文件...');
         try {
             for (var i = 0; i < filesToSync.length; i++) await global.syncFileToServer(filesToSync[i].id);
-            global.showSyncStatus('所有文件同步完成', 'success');
+            global.showSyncStatus(isEn() ? 'All files synced' : '所有文件同步完成', 'success');
         } catch (error) {
             console.error('同步失败', error);
-            global.showSyncStatus('同步失败', 'error');
+            global.showSyncStatus(isEn() ? 'Sync failed' : '同步失败', 'error');
         }
     }
 
@@ -1392,11 +1395,15 @@
                 }
                 return true;
             }
-            throw new Error(result.message || '保存失败');
+            throw new Error(result.message || (isEn() ? 'Save failed' : '保存失败'));
         } catch (error) {
             console.error('同步文件失败:', error);
             if (error.message === 'Failed to fetch' || error.message.includes('NetworkError')) {
-                global.showMessage('网络未连接，请连接网络', 'error');
+                if (global.showNetworkErrorBanner) {
+                    global.showNetworkErrorBanner();
+                } else {
+                    global.showMessage(isEn() ? 'Network not connected, please connect to the network' : '网络未连接，请连接网络', 'error');
+                }
             }
             throw error;
         }
@@ -1412,13 +1419,13 @@
                 body: JSON.stringify({ username: g('currentUser').username, filename: filename })
             });
             const text = await response.text();
-            if (!response.ok) throw new Error('HTTP ' + response.status + ': 删除失败');
+            if (!response.ok) throw new Error('HTTP ' + response.status + ': ' + (isEn() ? 'Delete failed' : '删除失败'));
             var result;
-            try { result = JSON.parse(text); } catch (e) { throw new Error('服务器响应格式错误'); }
-            if (result.code !== 200) console.error('删除失败', result.message);
+            try { result = JSON.parse(text); } catch (e) { throw new Error(isEn() ? 'Server response format error' : '服务器响应格式错误'); }
+            if (result.code !== 200) console.error(isEn() ? 'Delete failed' : '删除失败', result.message);
         } catch (error) {
             console.error('从服务器删除文件失败', error);
-            alert('删除文件失败: ' + error.message);
+            alert((isEn() ? 'Delete file failed: ' : '删除文件失败: ') + error.message);
         }
     }
 
@@ -1446,10 +1453,10 @@
         previewHeader.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:20px;border-bottom:1px solid ' + (nightMode ? '#444' : '#eee') + ';background:' + (nightMode ? '#1e1e1e' : '#f8f9fa') + ';';
         var headerLeft = document.createElement('div');
         var previewTitle = document.createElement('h3');
-        previewTitle.textContent = '预览历史版本 (ID: ' + versionId + ')';
+        previewTitle.textContent = (isEn() ? 'Preview History Version (ID: ' : '预览历史版本 (ID: ') + versionId + ')';
         previewTitle.style.cssText = 'margin:0 0 5px 0;color:' + (nightMode ? '#eee' : '#333') + ';font-size:18px;';
         var previewSubtitle = document.createElement('div');
-        previewSubtitle.textContent = '文件: ' + filename + ' | 保存时间: ' + new Date(timestamp).toLocaleString();
+        previewSubtitle.textContent = (isEn() ? 'File: ' : '文件: ') + filename + ' | ' + (isEn() ? 'Saved at: ' : '保存时间: ') + new Date(timestamp).toLocaleString();
         previewSubtitle.style.cssText = 'color:' + (nightMode ? '#aaa' : '#666') + ';font-size:13px;';
         headerLeft.appendChild(previewTitle);
         headerLeft.appendChild(previewSubtitle);
@@ -1486,7 +1493,7 @@
     }
 
     function compareVersions(originalContent, newContent) {
-        if (originalContent === newContent) return { hasChanges: false, message: '内容完全相同' };
+        if (originalContent === newContent) return { hasChanges: false, message: isEn() ? 'Content is identical' : '内容完全相同' };
         var originalLines = originalContent.split('\n');
         var newLines = newContent.split('\n');
         var maxLines = Math.max(originalLines.length, newLines.length);
@@ -1496,32 +1503,32 @@
             else if (i >= newLines.length) removed++;
             else if (originalLines[i] !== newLines[i]) changed++;
         }
-        return { hasChanges: true, message: '行数变化: 新增 ' + added + ' 行，删除 ' + removed + ' 行，修改 ' + changed + ' 行', added: added, removed: removed, changed: changed };
+        return { hasChanges: true, message: (isEn() ? 'Line changes: added ' : '行数变化: 新增 ') + added + (isEn() ? ' lines, removed ' : ' 行，删除 ') + removed + (isEn() ? ' lines, modified ' : ' 行，修改 ') + changed + (isEn() ? ' lines' : ' 行'), added: added, removed: removed, changed: changed };
     }
 
     async function restoreFromHistory(filename, versionId, content, fileId) {
-        if (!confirm('确定要恢复到此版本吗？\n当前编辑器的内容将被替换。')) return;
+        if (!confirm(isEn() ? 'Are you sure you want to restore to this version?\nThe current editor content will be replaced.' : '确定要恢复到此版本吗？\n当前编辑器的内容将被替换。')) return;
         try {
-            global.showMessage('正在恢复历史版本...', 'info');
+            global.showMessage(isEn() ? 'Restoring history version...' : '正在恢复历史版本...', 'info');
             var vditor = g('vditor');
             var currentContent = vditor ? vditor.getValue() : '';
             var diff = compareVersions(currentContent, content);
-            if (!diff.hasChanges) { global.showMessage('当前内容与所选版本相同，无需恢复', 'info'); return; }
-            if (!confirm('即将恢复历史版本，以下是变化摘要：\n' + diff.message + '\n\n确定要恢复吗？')) return;
+            if (!diff.hasChanges) { global.showMessage(isEn() ? 'Current content is the same as the selected version, no need to restore' : '当前内容与所选版本相同，无需恢复', 'info'); return; }
+            if (!confirm(isEn() ? 'About to restore history version, here is the change summary:\n' + diff.message + '\n\nAre you sure you want to restore?' : '即将恢复历史版本，以下是变化摘要：\n' + diff.message + '\n\n确定要恢复吗？')) return;
             if (g('currentUser')) {
                 var success = await restoreHistoryVersion(filename, versionId, content);
-                if (!success) global.showMessage('服务器恢复失败，将在本地恢复', 'warning');
+                if (!success) global.showMessage(isEn() ? 'Server restore failed, will restore locally' : '服务器恢复失败，将在本地恢复', 'warning');
             }
             var files = g('files');
             var fileIndex = files.findIndex(function(f) { return f.id === fileId; });
-            if (fileIndex === -1) throw new Error('文件不存在');
+            if (fileIndex === -1) throw new Error(isEn() ? 'File not found' : '文件不存在');
             files[fileIndex].content = content;
             files[fileIndex].lastModified = Date.now();
             files[fileIndex].isSynced = g('currentUser') ? false : true;
             localStorage.setItem('vditor_files', JSON.stringify(files));
             if (vditor && g('currentFileId') === fileId) {
                 vditor.setValue(content);
-                global.showMessage('已恢复到此版本（版本ID: ' + versionId + '）', 'success');
+                global.showMessage((isEn() ? 'Restored to this version (Version ID: ' : '已恢复到此版本（版本ID: ') + versionId + '）', 'success');
                 g('unsavedChanges')[fileId] = true;
                 setTimeout(function() { global.saveCurrentFile(true); }, 1000);
             }
@@ -1531,7 +1538,7 @@
             if (g('currentUser')) setTimeout(function() { global.syncFileToServer(fileId); }, 2000);
         } catch (error) {
             console.error('恢复失败', error);
-            global.showMessage('恢复失败: ' + error.message, 'error');
+            global.showMessage((isEn() ? 'Restore failed: ' : '恢复失败: ') + error.message, 'error');
         }
     }
 
@@ -1561,7 +1568,7 @@
         var lightBg = nightMode ? '#3d3d3d' : '#f5f5f5';
         var borderColor = nightMode ? '#444' : '#eee';
         modalContent.style.cssText = 'background:' + bgColor + ';color:' + textColor + ';border-radius:12px;padding:25px;max-width:90%;';
-        modalContent.innerHTML = '<div class="modal-header" style="text-align:center;margin-bottom:20px;"><h2 style="margin:0 0 10px 0;color:#dc3545;">删除确认</h2><p style="color:' + secondaryTextColor + ';margin:0;">请确认是否要删除此历史版本</p></div><div style="margin:15px 0;">文件：' + global.escapeHtml(filename) + '</div><div style="display:flex;gap:10px;justify-content:center;margin-top:25px;"><button class="delete-confirm-cancel" style="padding:10px 24px;background:' + (nightMode ? '#555' : '#6c757d') + ';color:white;border:none;border-radius:6px;cursor:pointer;">取消</button><button class="delete-confirm-ok" style="padding:10px 24px;background:#dc3545;color:white;border:none;border-radius:6px;cursor:pointer;">确认删除</button></div>';
+        modalContent.innerHTML = '<div class="modal-header" style="text-align:center;margin-bottom:20px;"><h2 style="margin:0 0 10px 0;color:#dc3545;">' + (isEn() ? 'Delete Confirmation' : '删除确认') + '</h2><p style="color:' + secondaryTextColor + ';margin:0;">' + (isEn() ? 'Please confirm you want to delete this history version' : '请确认是否要删除此历史版本') + '</p></div><div style="margin:15px 0;">' + (isEn() ? 'File: ' : '文件：') + global.escapeHtml(filename) + '</div><div style="display:flex;gap:10px;justify-content:center;margin-top:25px;"><button class="delete-confirm-cancel" style="padding:10px 24px;background:' + (nightMode ? '#555' : '#6c757d') + ';color:white;border:none;border-radius:6px;cursor:pointer;">' + (isEn() ? 'Cancel' : '取消') + '</button><button class="delete-confirm-ok" style="padding:10px 24px;background:#dc3545;color:white;border:none;border-radius:6px;cursor:pointer;">' + (isEn() ? 'Confirm Delete' : '确认删除') + '</button></div>';
         confirmModal.appendChild(modalContent);
         document.body.appendChild(confirmModal);
         var cancelBtn = modalContent.querySelector('.delete-confirm-cancel');
@@ -1569,7 +1576,7 @@
         cancelBtn.onclick = function() { global.removeModal(confirmModal); };
         confirmBtn.onclick = function() {
             confirmBtn.disabled = true;
-            confirmBtn.textContent = '删除中...';
+            confirmBtn.textContent = isEn() ? 'Deleting...' : '删除中...';
             performDeleteHistory(filename, versionId, historyId, fileId, confirmModal);
         };
         confirmModal.addEventListener('click', function(e) { if (e.target === confirmModal) global.removeModal(confirmModal); });
@@ -1583,14 +1590,14 @@
             var success = await deleteHistoryVersionAPI(filename, versionId);
             if (success) {
                 global.removeModal(modalElement);
-                global.showMessage('历史版本 ' + versionId + ' 已删除', 'success');
+                global.showMessage((isEn() ? 'History version ' : '历史版本 ') + versionId + (isEn() ? ' deleted' : ' 已删除'), 'success');
                 var historyModal = document.getElementById('historyModalOverlay');
                 if (historyModal) historyModal.classList.remove('show');
                 setTimeout(function() { global.showHistoryModal(fileId, filename); }, 1000);
-            } else throw new Error('删除失败');
+            } else throw new Error(isEn() ? 'Delete failed' : '删除失败');
         } catch (error) {
             console.error('删除历史版本失败', error);
-            global.showMessage('删除失败: ' + error.message, 'error');
+            global.showMessage((isEn() ? 'Delete failed: ' : '删除失败: ') + error.message, 'error');
         }
     }
 
@@ -1611,7 +1618,7 @@
             const files = Array.from(e.target.files);
             if (files.length === 0) return;
 
-            global.showMessage(`正在导入 ${files.length} 个文件...`, 'info');
+            global.showMessage((isEn() ? `Importing ${files.length} files...` : `正在导入 ${files.length} 个文件...`), 'info');
 
             let importedCount = 0;
             let skippedCount = 0;
@@ -1650,7 +1657,7 @@
                     importedCount++;
                 } catch (error) {
                     console.error(`读取文件 ${file.name} 失败:`, error);
-                    global.showMessage(`读取文件 ${file.name} 失败: ${error.message}`, 'error');
+                    global.showMessage((isEn() ? `Failed to read file ${file.name}: ` : `读取文件 ${file.name} 失败: `) + error.message, 'error');
                     skippedCount++;
                 }
             }
@@ -1678,9 +1685,9 @@
                     }
                 }
 
-                global.showMessage(`成功导入 ${importedCount} 个文件${skippedCount > 0 ? `，跳过 ${skippedCount} 个` : ''}`, 'success');
+                global.showMessage((isEn() ? `Successfully imported ${importedCount} file${importedCount !== 1 ? 's' : ''}${skippedCount > 0 ? (isEn() ? `, skipped ${skippedCount}` : `，跳过 ${skippedCount} 个`) : ''}` : `成功导入 ${importedCount} 个文件${skippedCount > 0 ? `，跳过 ${skippedCount} 个` : ''}`), 'success');
             } else {
-                global.showMessage('没有导入任何文件', 'warning');
+                global.showMessage(isEn() ? 'No files imported' : '没有导入任何文件', 'warning');
             }
 
             fileInput.remove();
@@ -1693,7 +1700,7 @@
         return new Promise((resolve, reject) => {
             const reader = new FileReader();
             reader.onload = (e) => resolve(e.target.result);
-            reader.onerror = (e) => reject(new Error('读取文件失败'));
+            reader.onerror = (e) => reject(new Error(isEn() ? 'Failed to read file' : '读取文件失败'));
             reader.readAsText(file);
         });
     }

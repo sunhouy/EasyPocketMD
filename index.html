@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Markdown编辑器</title>
+    <title data-i18n="pageTitle">EasyPocketMD</title>
     <link rel="icon" type="image/x-icon" href="icon.png">
     <!-- PWA: manifest & theme color -->
     <link rel="manifest" href="/manifest.webmanifest">
@@ -49,6 +49,50 @@
         .cookie-consent-banner button:hover {
             background: #0353b0;
         }
+        /* 顶部提示横幅 - 通用样式 */
+        .top-notice-banner {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            color: white;
+            padding: 10px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            z-index: 9999;
+            font-size: 13px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            transition: all 0.3s ease;
+        }
+        /* 未登录用户提示横幅 - 红色渐变 */
+        .top-notice-banner.type-guest {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a5a 100%);
+        }
+        /* 网络错误提示横幅 - 橙色渐变 */
+        .top-notice-banner.type-network-error {
+            background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%);
+        }
+        .top-notice-banner .notice-content {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .top-notice-banner .notice-icon {
+            font-size: 14px;
+        }
+        .top-notice-banner .notice-close {
+            background: transparent;
+            border: none;
+            color: white;
+            cursor: pointer;
+            padding: 4px 8px;
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        .top-notice-banner .notice-close:hover {
+            opacity: 1;
+        }
         /* 跟随系统暗色模式 */
         @media (prefers-color-scheme: dark) {
             .cookie-consent-banner {
@@ -75,6 +119,10 @@
                 padding: 6px 12px;
                 font-size: 13px;
             }
+            .top-notice-banner {
+                font-size: 12px;
+                padding: 8px 12px;
+            }
         }
     </style>
     <script>
@@ -90,31 +138,46 @@
 </head>
 
 <body>
-<div class="loading" id="loading">正在启动编辑器...</div>
+<!-- 顶部提示横幅 -->
+<div id="topNoticeBanner" class="top-notice-banner" style="display: none;">
+    <div class="notice-content">
+        <i class="notice-icon"></i>
+        <span class="notice-text"></span>
+    </div>
+    <button class="notice-close" id="topNoticeClose">
+        <i class="fas fa-times"></i>
+    </button>
+</div>
+<div class="loading" id="loading" data-i18n="loading">正在启动编辑器...</div>
 
 <!-- 同步状态指示器 -->
 <div class="sync-status" id="syncStatus">
     <i class="fas fa-sync-alt sync-icon"></i>
-    <span id="syncText">正在同步...</span>
+    <span id="syncText" data-i18n="syncing">正在同步...</span>
 </div>
 
 <!-- 文件列表侧边栏 -->
 <div class="file-list-sidebar" id="fileListSidebar">
     <div class="file-list-header">
-        <h3 class="file-list-title">文件列表</h3>
-        <button class="file-list-close" id="fileListClose">
-            <i class="fas fa-times"></i>
-        </button>
+        <h3 class="file-list-title" data-i18n="fileListTitle">文件列表</h3>
+        <div class="file-list-header-actions">
+            <div class="file-list-help" id="fileListHelp" data-i18n-title="fileListHelp" title="右键或长按显示更多功能">
+                <i class="fas fa-question-circle"></i>
+            </div>
+            <button class="file-list-close" id="fileListClose">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
     </div>
     <div id="fileList">
         <!-- 文件列表将在这里动态生成 -->
     </div>
     <div class="file-list-actions">
         <button class="add-file-btn" id="addFileBtn">
-            <i class="fas fa-plus"></i> 新建文件
+            <i class="fas fa-plus"></i> <span data-i18n="newFile">新建文件</span>
         </button>
         <button class="add-file-btn folder" id="addFolderBtn">
-            <i class="fas fa-folder-plus"></i> 新建文件夹
+            <i class="fas fa-folder-plus"></i> <span data-i18n="newFolder">新建文件夹</span>
         </button>
     </div>
 </div>
@@ -123,48 +186,48 @@
 <div class="modal-overlay" id="loginModalOverlay">
     <div class="modal">
         <div class="modal-header">
-            <h2 id="modalTitle">登录/注册</h2>
-            <p id="modalSubtitle">登录后文档将保存至服务器</p>
+            <h2 id="modalTitle" data-i18n="loginRegister">登录/注册</h2>
+            <p id="modalSubtitle" data-i18n="loginSubtitle">登录后文档将保存至服务器</p>
         </div>
 
         <div class="modal-tabs">
-            <button class="tab-btn active" id="loginTabBtn">登录</button>
-            <button class="tab-btn" id="registerTabBtn">注册</button>
+            <button class="tab-btn active" id="loginTabBtn" data-i18n="login">登录</button>
+            <button class="tab-btn" id="registerTabBtn" data-i18n="register">注册</button>
         </div>
 
         <div class="modal-form" id="loginForm">
             <div class="form-group">
-                <label for="loginUsername">用户名</label>
-                <input type="text" id="loginUsername" placeholder="请输入用户名">
+                <label for="loginUsername" data-i18n="username">用户名</label>
+                <input type="text" id="loginUsername" data-i18n-placeholder="enterUsername" placeholder="请输入用户名">
             </div>
             <div class="form-group">
-                <label for="loginPassword">密码</label>
-                <input type="password" id="loginPassword" placeholder="请输入密码">
+                <label for="loginPassword" data-i18n="password">密码</label>
+                <input type="password" id="loginPassword" data-i18n-placeholder="enterPassword" placeholder="请输入密码">
             </div>
             <div class="modal-message" id="loginMessage"></div>
             <div class="modal-actions">
-                <button class="modal-btn primary" id="loginSubmitBtn">登录</button>
-                <button class="modal-btn secondary" id="loginCancelBtn">取消</button>
+                <button class="modal-btn primary" id="loginSubmitBtn" data-i18n="login">登录</button>
+                <button class="modal-btn secondary" id="loginCancelBtn" data-i18n="cancel">取消</button>
             </div>
         </div>
 
         <div class="modal-form" id="registerForm" style="display: none;">
             <div class="form-group">
-                <label for="registerUsername">用户名</label>
-                <input type="text" id="registerUsername" placeholder="请输入用户名">
+                <label for="registerUsername" data-i18n="username">用户名</label>
+                <input type="text" id="registerUsername" data-i18n-placeholder="enterUsername" placeholder="请输入用户名">
             </div>
             <div class="form-group">
-                <label for="registerPassword">密码</label>
-                <input type="password" id="registerPassword" placeholder="请输入密码">
+                <label for="registerPassword" data-i18n="password">密码</label>
+                <input type="password" id="registerPassword" data-i18n-placeholder="enterPassword" placeholder="请输入密码">
             </div>
             <div class="form-group">
-                <label for="registerInviteCode">邀请码 (可选)</label>
-                <input type="text" id="registerInviteCode" placeholder="请输入邀请码">
+                <label for="registerInviteCode" data-i18n="inviteCode">邀请码 (可选)</label>
+                <input type="text" id="registerInviteCode" data-i18n-placeholder="enterInviteCode" placeholder="请输入邀请码">
             </div>
             <div class="modal-message" id="registerMessage"></div>
             <div class="modal-actions">
-                <button class="modal-btn primary" id="registerSubmitBtn">注册</button>
-                <button class="modal-btn secondary" id="registerCancelBtn">取消</button>
+                <button class="modal-btn primary" id="registerSubmitBtn" data-i18n="register">注册</button>
+                <button class="modal-btn secondary" id="registerCancelBtn" data-i18n="cancel">取消</button>
             </div>
         </div>
     </div>
@@ -174,13 +237,13 @@
 <div class="modal-overlay" id="conflictModalOverlay">
     <div class="modal conflict-modal">
         <div class="modal-header">
-            <h2>发现文件冲突</h2>
-            <p>以下文件在本地和服务器上存在不同版本</p>
+            <h2 data-i18n="fileConflict">发现文件冲突</h2>
+            <p data-i18n="conflictSubtitle">以下文件在本地和服务器上存在不同版本</p>
         </div>
 
         <div class="conflict-info">
             <i class="fas fa-exclamation-triangle"></i>
-            请为每个冲突的文件选择保留哪个版本
+            <span data-i18n="resolveConflictInfo">请为每个冲突的文件选择保留哪个版本</span>
         </div>
 
         <div id="conflictList" class="conflict-options">
@@ -188,8 +251,8 @@
         </div>
 
         <div class="modal-actions">
-            <button class="modal-btn primary" id="resolveConflictsBtn">确认解决冲突</button>
-            <button class="modal-btn secondary" id="cancelConflictBtn">取消</button>
+            <button class="modal-btn primary" id="resolveConflictsBtn" data-i18n="resolveConflicts">确认解决冲突</button>
+            <button class="modal-btn secondary" id="cancelConflictBtn" data-i18n="cancel">取消</button>
         </div>
     </div>
 </div>
@@ -203,18 +266,18 @@
 
         <div class="history-info">
             <i class="fas fa-info-circle"></i>
-            最多保留1000个历史版本
+            <span data-i18n="historyCount">最多保留1000个历史版本</span>
         </div>
 
         <div id="historyList" class="history-list">
             <!-- 历史版本列表将动态生成 -->
             <div class="history-loading">
-                <i class="fas fa-spinner fa-spin"></i> 正在加载历史版本...
+                <i class="fas fa-spinner fa-spin"></i> <span data-i18n="loadingHistory">正在加载历史版本...</span>
             </div>
         </div>
 
         <div class="modal-actions">
-            <button class="modal-btn secondary" id="closeHistoryBtn">关闭</button>
+            <button class="modal-btn secondary" id="closeHistoryBtn" data-i18n="close">关闭</button>
         </div>
     </div>
 </div>
@@ -223,34 +286,59 @@
 <div class="modal-overlay" id="settingsModalOverlay">
     <div class="modal">
         <div class="modal-header">
-            <h2>设置</h2>
+            <h2 data-i18n="settings">设置</h2>
         </div>
         <div class="modal-form">
             <div class="form-group">
-                <label>默认编辑器模式</label>
+                <label data-i18n="defaultEditorMode">默认编辑器模式</label>
                 <div class="radio-group" id="defaultEditorMode">
-                    <label><input type="radio" name="editorMode" value="wysiwyg"> 所见即所得</label>
-                    <label><input type="radio" name="editorMode" value="ir"> 即时渲染</label>
-                    <label><input type="radio" name="editorMode" value="sv"> 分屏预览</label>
+                    <label><input type="radio" name="editorMode" value="wysiwyg"> <span data-i18n="wysiwyg">所见即所得</span></label>
+                    <label><input type="radio" name="editorMode" value="ir"> <span data-i18n="instantRender">即时渲染</span></label>
+                    <label><input type="radio" name="editorMode" value="sv"> <span data-i18n="splitPreview">分屏预览</span></label>
                 </div>
             </div>
             <div class="form-group">
-                <label>主题模式</label>
+                <label data-i18n="themeMode">主题模式</label>
                 <div class="radio-group" id="themeMode">
-                    <label><input type="radio" name="themeMode" value="light"> 日间模式</label>
-                    <label><input type="radio" name="themeMode" value="dark"> 夜间模式</label>
-                    <label><input type="radio" name="themeMode" value="system"> 跟随系统</label>
+                    <label><input type="radio" name="themeMode" value="light"> <span data-i18n="lightMode">日间模式</span></label>
+                    <label><input type="radio" name="themeMode" value="dark"> <span data-i18n="darkMode">夜间模式</span></label>
+                    <label><input type="radio" name="themeMode" value="system"> <span data-i18n="followSystem">跟随系统</span></label>
                 </div>
             </div>
             <div class="form-group">
-                <label>底部工具栏按钮 (5-7个)</label>
+                <label data-i18n="language">语言</label>
+                <div class="radio-group" id="languageMode">
+                    <label><input type="radio" name="language" value="zh"> <span data-i18n="chinese">中文</span></label>
+                    <label><input type="radio" name="language" value="en"> <span data-i18n="english">English</span></label>
+                </div>
+            </div>
+            <div class="form-group">
+                <label data-i18n="fontSize">字体大小</label>
+                <div class="select-group" id="fontSizeGroup">
+                    <select id="fontSizeSelect" class="form-control">
+                        <option value="12px">12px</option>
+                        <option value="14px">14px</option>
+                        <option value="16px" selected>16px</option>
+                        <option value="18px">18px</option>
+                        <option value="20px">20px</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label data-i18n="showOutline">显示大纲视图</label>
+                <div class="checkbox-group">
+                    <label><input type="checkbox" id="showOutlineCheckbox"> <span></span></label>
+                </div>
+            </div>
+            <div class="form-group">
+                <label data-i18n="bottomToolbarButtons">底部工具栏按钮 (5-7个)</label>
                 <div class="checkbox-group" id="toolbarButtonsSettings">
                     <!-- 动态生成 -->
                 </div>
             </div>
             <div class="modal-actions">
-                <button class="modal-btn primary" id="saveSettingsBtn">保存</button>
-                <button class="modal-btn secondary" id="cancelSettingsBtn">取消</button>
+                <button class="modal-btn primary" id="saveSettingsBtn" data-i18n="save">保存</button>
+                <button class="modal-btn secondary" id="cancelSettingsBtn" data-i18n="cancel">取消</button>
             </div>
         </div>
     </div>
@@ -260,20 +348,20 @@
 <div class="modal-overlay" id="aboutModalOverlay">
     <div class="modal">
         <div class="modal-header">
-            <h2>关于</h2>
+            <h2 data-i18n="about">关于</h2>
         </div>
         <div class="modal-content" style="text-align: center;">
-            <p><strong>Markdown编辑器</strong></p>
-            <p>作者：孙厚运</p>
-            <p>完全免费且开源的移动端轻量级在线 Markdown 编辑器，基于 Vditor 构建，支持多文件管理。提供可视化的格式插入方式，支持图片和文件上传、LaTeX 公式引用、Mermaid 图表绘制，降低学习与操作门槛。同时，编辑器还支持多端文件同步、文件夹创建、历史版本管理、文件分享，以及日间/夜间模式切换。提供三种编辑模式（所见即所得 / 及时渲染 / 分屏预览），并支持文档的导入、导出和文件云打印功能</p>
-            <p><a href="https://github.com/sunhouy/markdown" target="_blank">GitHub地址</a></p>
+            <p><strong data-i18n="pageTitle">EasyPocketMD</strong></p>
+            <p data-i18n="author">作者：孙厚运</p>
+            <p data-i18n="description">完全免费且开源的移动端轻量级在线 Markdown 编辑器，基于 Vditor 构建，支持多文件管理。提供可视化的格式插入方式，支持图片和文件上传、LaTeX 公式引用、Mermaid 图表绘制，降低学习与操作门槛。同时，编辑器还支持多端文件同步、文件夹创建、历史版本管理、文件分享，以及日间/夜间模式切换。提供三种编辑模式（所见即所得 / 及时渲染 / 分屏预览），并支持文档的导入、导出和文件云打印功能</p>
+            <p><a href="https://github.com/sunhouy/markdown" target="_blank" data-i18n="github">GitHub地址</a></p>
             <hr>
-            <p><strong>致谢</strong></p>
+            <p><strong data-i18n="acknowledgments">致谢</strong></p>
             <p>vditor, fortawesome, bcryptjs, cors, dotenv, express, html-to-image, markdown-it, multer, mysql2, uuid</p>
-            <p><a href="https://beian.miit.gov.cn/" target="_blank">京ICP备2025154249号</a></p>
+            <p><a href="https://beian.miit.gov.cn/" target="_blank" data-i18n="icp">京ICP备2025154249号</a></p>
         </div>
         <div class="modal-actions">
-            <button class="modal-btn secondary" id="closeAboutBtn">关闭</button>
+            <button class="modal-btn secondary" id="closeAboutBtn" data-i18n="close">关闭</button>
         </div>
     </div>
 </div>
@@ -287,29 +375,29 @@
 <div class="mobile-toolbar-container">
     <div class="mobile-toolbar">
         <!-- 文件列表按钮 -->
-        <button class="mobile-action-btn" id="mobileFileBtn" title="文件列表">
+        <button class="mobile-action-btn" id="mobileFileBtn" data-i18n-title="fileListTitle" title="文件列表">
             <i class="fas fa-folder-open"></i>
         </button>
         <!-- 登录按钮 -->
-        <button class="mobile-action-btn" id="mobileLoginBtn" title="登录">
+        <button class="mobile-action-btn" id="mobileLoginBtn" data-i18n-title="login" title="登录">
             <i class="fas fa-user"></i>
         </button>
-        <h1 class="mobile-title">Markdown编辑器</h1>
+        <h1 class="mobile-title" data-i18n="mobileTitle">EasyPocketMD</h1>
         <div class="mobile-dropdown">
-            <button class="mobile-action-btn" id="mobileMenuBtn" title="菜单">
+            <button class="mobile-action-btn" id="mobileMenuBtn" data-i18n-title="settings" title="菜单">
                 <i class="fas fa-ellipsis-v"></i>
             </button>
             <div class="mobile-dropdown-content" id="mobileDropdown">
 
-                <button class="dropdown-item" id="mobileShareBtn"><i class="fas fa-share-alt"></i>  分享</button>
-                <button class="dropdown-item" id="mobileFileManagerBtn"><i class="fas fa-folder"></i>  我的文件</button>
-                <button class="dropdown-item" id="mobilePrintBtn"><i class="fas fa-print"></i>  云打印</button>
-                <button class="dropdown-item" id="mobileModeBtn"><i class="fas fa-exchange-alt"></i>  切换模式</button>
-                <button class="dropdown-item" id="mobileImportBtn"><i class="fas fa-file-import"></i>  导入</button>
-                <button class="dropdown-item" id="mobileExportBtn"><i class="fas fa-file-export"></i>  导出</button>
-                <button class="dropdown-item" id="mobileClearBtn"><i class="fas fa-trash-alt"></i>  清空</button>
-                <button class="dropdown-item" id="mobileSettingsBtn"><i class="fas fa-cog"></i>  设置</button>
-                <button class="dropdown-item" id="aboutBtn"><i class="fas fa-info-circle"></i>  关于</button>
+                <button class="dropdown-item" id="mobileShareBtn"><i class="fas fa-share-alt"></i>  <span data-i18n="share">分享</span></button>
+                <button class="dropdown-item" id="mobileFileManagerBtn"><i class="fas fa-folder"></i>  <span data-i18n="myFiles">我的文件</span></button>
+                <button class="dropdown-item" id="mobilePrintBtn"><i class="fas fa-print"></i>  <span data-i18n="cloudPrint">云打印</span></button>
+                <button class="dropdown-item" id="mobileModeBtn"><i class="fas fa-exchange-alt"></i>  <span data-i18n="switchMode">切换模式</span></button>
+                <button class="dropdown-item" id="mobileImportBtn"><i class="fas fa-file-import"></i>  <span data-i18n="import">导入</span></button>
+                <button class="dropdown-item" id="mobileExportBtn"><i class="fas fa-file-export"></i>  <span data-i18n="export">导出</span></button>
+                <button class="dropdown-item" id="mobileClearBtn"><i class="fas fa-trash-alt"></i>  <span data-i18n="clear">清空</span></button>
+                <button class="dropdown-item" id="mobileSettingsBtn"><i class="fas fa-cog"></i>  <span data-i18n="settings">设置</span></button>
+                <button class="dropdown-item" id="aboutBtn"><i class="fas fa-info-circle"></i>  <span data-i18n="about">关于</span></button>
             </div>
         </div>
     </div>
@@ -334,13 +422,13 @@
 <!-- 用户菜单下拉 -->
 <div class="user-menu-dropdown" id="userMenuDropdown">
     <div class="dropdown-item" id="userInfoItem"></div>
-    <button class="dropdown-item" id="logoutItem"><i class="fas fa-sign-out-alt"></i> 退出登录</button>
+    <button class="dropdown-item" id="logoutItem"><i class="fas fa-sign-out-alt"></i> <span data-i18n="logout">退出登录</span></button>
 </div>
 
 <!-- Cookies 同意提示横幅 -->
 <div id="cookieConsentBanner" class="cookie-consent-banner" style="display: none;">
-    <span>🍪 本网站使用 Cookies 以提升您的体验。继续使用即表示您同意我们的隐私政策。</span>
-    <button id="acceptCookiesBtn">接受</button>
+    <span data-i18n="cookieMessage">本网站使用 Cookies 以提升您的体验，我们仅会使用必要cookies使网站正常运行。继续使用即表示您同意我们的隐私政策。</span>
+    <button id="acceptCookiesBtn" data-i18n="accept">接受</button>
 </div>
 
 <script type="module" src="/entry.js"></script>
@@ -400,7 +488,7 @@
                     // 检查是否过期
                     if (shareData.is_expired) {
                         hideEditElements();
-                        showToast('分享链接已过期，无法编辑', 'error');
+                        showToast(window.i18n ? window.i18n.t('shareLinkExpired') : '分享链接已过期，无法编辑', 'error');
                     }
                 }
 
@@ -413,7 +501,7 @@
                 // 显示分享信息
                 showShareInfo(shareData);
             } else {
-                showToast('获取分享内容失败: ' + (result.message || '未知错误'), 'error');
+                showToast((window.i18n ? window.i18n.t('getShareFailed') : '获取分享内容失败: ') + (result.message || '未知错误'), 'error');
                 // 重定向到密码页面或错误页面
                 if (result.code === 401) {
                     window.location.href = 'api/share/view?share_id=' + shareId;
@@ -421,7 +509,7 @@
             }
         } catch (error) {
             console.error('处理分享链接失败:', error);
-            showToast('网络错误，请重试', 'error');
+            showToast(window.i18n ? window.i18n.t('networkError') : '网络错误，请重试', 'error');
         }
     }
 
@@ -472,16 +560,17 @@
 
     function showShareInfo(shareData) {
         // 显示分享信息提示
-        let infoMessage = `分享文档: ${shareData.filename}`;
+        const t = (key) => window.i18n ? window.i18n.t(key) : key;
+        let infoMessage = `${t('shareDocument')}: ${shareData.filename}`;
         if (shareData.expires_at) {
             const expiryDate = new Date(shareData.expires_at);
             if (shareData.is_expired) {
-                infoMessage += ` (已过期: ${expiryDate.toLocaleString()})`;
+                infoMessage += ` (${t('expired')}: ${expiryDate.toLocaleString()})`;
             } else {
-                infoMessage += ` (有效期至: ${expiryDate.toLocaleString()})`;
+                infoMessage += ` (${t('expiresAt')}: ${expiryDate.toLocaleString()})`;
             }
         }
-        infoMessage += ` (模式: ${shareData.mode === 'view' ? '仅查看' : '可编辑'})`;
+        infoMessage += ` (${t('mode')}: ${shareData.mode === 'view' ? t('viewOnly') : t('editable')})`;
 
         showToast(infoMessage, 'info');
     }
@@ -498,18 +587,20 @@
 
         // 设置样式
         toast.style.position = 'fixed';
-        toast.style.bottom = '24px';
-        toast.style.right = '24px';
+        toast.style.top = '170px';
+        toast.style.left = '50%';
+        toast.style.transform = 'translate(-50%, -20px)';
         toast.style.padding = '12px 24px';
         toast.style.borderRadius = '6px';
         toast.style.background = '#24292e';
         toast.style.color = 'white';
         toast.style.fontSize = '14px';
         toast.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
-        toast.style.transform = 'translateY(100px)';
         toast.style.opacity = '0';
         toast.style.transition = 'all 0.3s';
         toast.style.zIndex = '10000';
+        toast.style.maxWidth = '400px';
+        toast.style.textAlign = 'center';
 
         if (type === 'success') {
             toast.style.background = '#2da44e';
@@ -520,12 +611,12 @@
         // 显示消息
         toast.textContent = message;
         toast.classList.add('show');
-        toast.style.transform = 'translateY(0)';
+        toast.style.transform = 'translate(-50%, 0)';
         toast.style.opacity = '1';
 
         // 3秒后隐藏
         setTimeout(() => {
-            toast.style.transform = 'translateY(100px)';
+            toast.style.transform = 'translate(-50%, -20px)';
             toast.style.opacity = '0';
         }, 3000);
     }
