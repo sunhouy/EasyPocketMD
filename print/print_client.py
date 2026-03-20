@@ -16,6 +16,7 @@ import subprocess
 import ssl
 import urllib.request
 import tempfile
+import argparse
 from datetime import datetime
 
 # Windows specific imports
@@ -128,6 +129,7 @@ class PrintClient:
         self.config_file = os.path.join(os.path.expanduser('~'), '.print_client_config.ini')
         self.username = None
         self.password = None
+        self.server_url = None
         self.connected = False
         self.printer_name = None
         self.config = configparser.ConfigParser()
@@ -167,6 +169,7 @@ class PrintClient:
                 self.username = self.config['print_client'].get('username')
                 self.password = self.config['print_client'].get('password')
                 self.printer_name = self.config['print_client'].get('printer')
+                self.server_url = self.config['print_client'].get('server_url', 'wss://print.yhsun.cn')
 
     def save_config(self):
         if 'print_client' not in self.config:
@@ -177,6 +180,8 @@ class PrintClient:
             self.config['print_client']['password'] = self.password
         if self.printer_name:
             self.config['print_client']['printer'] = self.printer_name
+        if self.server_url:
+            self.config['print_client']['server_url'] = self.server_url
         with open(self.config_file, 'w', encoding='utf-8') as f:
             self.config.write(f)
 
@@ -228,22 +233,37 @@ class PrintClient:
             except ValueError:
                 print("错误: 请输入数字")
 
+    def set_server_url(self):
+        """设置服务器地址"""
+        print(f"\n当前服务器地址: {self.server_url or 'wss://print.yhsun.cn'}")
+        print("输入新的服务器地址（例如 ws://localhost:8770 或 wss://print.yhsun.cn）")
+        new_url = input("请输入服务器地址（留空保持当前值）: ").strip()
+        if new_url:
+            self.server_url = new_url
+            self.save_config()
+            print(f"服务器地址已设置为: {self.server_url}")
+        else:
+            print("保持当前服务器地址不变")
+    
     def modify_config(self):
         """运行中修改配置的菜单"""
         print("\n=== 配置修改菜单 ===")
         print("1. 修改用户名和密码")
         print("2. 修改默认打印机")
-        print("3. 设置开机自启")
-        print("4. 清理临时文件")
-        print("5. 返回")
-        choice = input("请选择 (1/2/3/4/5): ").strip()
+        print("3. 修改服务器地址")
+        print("4. 设置开机自启")
+        print("5. 清理临时文件")
+        print("6. 返回")
+        choice = input("请选择 (1/2/3/4/5/6): ").strip()
         if choice == '1':
             self.set_user_credentials()
         elif choice == '2':
             self.select_printer()
         elif choice == '3':
-            register_startup(force=True)
+            self.set_server_url()
         elif choice == '4':
+            register_startup(force=True)
+        elif choice == '5':
             self.clean_temp_files()
         else:
             print("保持原有配置。")
@@ -426,17 +446,26 @@ class PrintClient:
 
     async def connect_and_listen(self):
         """连接到服务器，认证成功后持续监听"""
-        server_url = "wss://print.yhsun.cn"
+        server_url = self.server_url or "wss://print.yhsun.cn"
         print(f"连接到打印服务器: {server_url}")
         try:
-            ssl_context = ssl.create_default_context()
-            ssl_context.check_hostname = False
-            ssl_context.verify_mode = ssl.CERT_NONE
-
-            websocket = await asyncio.wait_for(
-                websockets.connect(server_url, ssl=ssl_context),
-                timeout=10
-            )
+            # 判断是否需要使用 SSL
+            use_ssl = server_url.startswith('wss://')
+            
+            if use_ssl:
+                ssl_context = ssl.create_default_context()
+                ssl_context.check_hostname = False
+                ssl_context.verify_mode = ssl.CERT_NONE
+                websocket = await asyncio.wait_for(
+                    websockets.connect(server_url, ssl=ssl_context),
+                    timeout=10
+                )
+            else:
+                # 连接本地服务器，不使用 SSL
+                websocket = await asyncio.wait_for(
+                    websockets.connect(server_url),
+                    timeout=10
+                )
             print("✅ 已连接到打印服务器")
 
             client_id = f"client_{datetime.now().timestamp()}"
@@ -552,6 +581,12 @@ class PrintClient:
 async def main():
     print("=== 云打印客户端 ===")
     
+    # 解析命令行参数
+    parser = argparse.ArgumentParser(description='云打印客户端')
+    parser.add_argument('--server', type=str, help='打印服务器地址 (例如: ws://localhost:8770)')
+    parser.add_argument('--local', action='store_true', help='使用本地服务器 (ws://localhost:8770)')
+    args = parser.parse_args()
+    
     # 检查wkhtmltopdf (已废弃，无需检查)
     # check_wkhtmltopdf()
     
@@ -584,6 +619,16 @@ async def main():
         register_startup(force=False)
     
     client = PrintClient()
+    
+    # 处理命令行参数
+    if args.local:
+        client.server_url = 'ws://localhost:8770'
+        print(f"使用本地服务器: {client.server_url}")
+        client.save_config()
+    elif args.server:
+        client.server_url = args.server
+        print(f"使用指定服务器: {client.server_url}")
+        client.save_config()
     
     # 如果缺少凭证或打印机，则必须设置
     if not client.username or not client.password:
