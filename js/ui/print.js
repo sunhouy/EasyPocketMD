@@ -111,7 +111,7 @@ function t(key) { return window.i18n ? window.i18n.t(key) : key; }
 
         // 检查用户是否登录 - 只有打印模式需要登录，导出模式不需要
         if (mode === 'print' && !g('currentUser')) {
-            global.showMessage(isEn() ? 'Please log in first to use this feature' : '请先登录后再使用此功能');
+            global.showMessage(t('pleaseLoginFirst'), 'info');
             if (g('showLoginModal')) {
                 g('showLoginModal')();
             }
@@ -127,13 +127,23 @@ function t(key) { return window.i18n ? window.i18n.t(key) : key; }
         var textColor = nightMode ? '#eee' : '#333';
         var borderColor = nightMode ? '#444' : '#ddd';
         var modalContent = document.createElement('div');
-        modalContent.style.cssText = 'background:' + bg + ';color:' + textColor + ';border-radius:12px;padding:25px;width:90%;max-width:600px;max-height:85vh;overflow-y:auto;';
+        modalContent.style.cssText = 'background:' + bg + ';color:' + textColor + ';border-radius:12px;padding:25px;width:90%;max-width:600px;max-height:85vh;overflow-y:auto;position:relative;';
+
+        // 右上角关闭按钮
+        var closeBtn = document.createElement('button');
+        closeBtn.innerHTML = '<i class="fas fa-times"></i>';
+        closeBtn.style.cssText = 'position:absolute;top:15px;right:15px;background:none;border:none;color:' + textColor + ';font-size:20px;cursor:pointer;z-index:10;';
+        closeBtn.onclick = function() { 
+            if (typeof cleanup === 'function') cleanup();
+            printModal.remove(); 
+        };
+        modalContent.appendChild(closeBtn);
 
         var dialogTitle = isEn() ? 'Cloud Print Settings' : '云打印设置';
         if (mode === 'export-pdf') dialogTitle = isEn() ? 'Export PDF Settings' : '导出 PDF 设置';
         if (mode === 'export-html') dialogTitle = isEn() ? 'Export HTML Settings' : '导出 HTML 设置';
         
-        var title = '<h2 style="text-align:center;margin-bottom:20px;">' + dialogTitle + '</h2>';
+        var title = '<h2 style="text-align:center;margin-bottom:20px;margin-top:0;">' + dialogTitle + '</h2>';
 
         // AI智能排版按钮区域 (仅在打印模式显示)
         var aiSection = '';
@@ -329,7 +339,6 @@ function t(key) { return window.i18n ? window.i18n.t(key) : key; }
                 <div style="display:flex;gap:10px;margin-top:20px;">
                     <button id="printPreviewBtn" style="flex:1;padding:12px;font-weight:bold;background:#4CAF50;color:white;border:none;border-radius:6px;cursor:pointer;">${isEn() ? 'Preview' : '预览'}</button>
                     <button id="printSendBtn" style="flex:1;padding:12px;font-weight:bold;background:#2196F3;color:white;border:none;border-radius:6px;cursor:pointer;">${isEn() ? 'Send to Print' : '发送打印'}</button>
-                    <button id="printCancelBtn" style="flex:1;padding:12px;background:` + (nightMode ? '#555' : '#9E9E9E') + `;color:white;border:none;border-radius:6px;cursor:pointer;">${isEn() ? 'Cancel' : '取消'}</button>
                 </div>
             `;
         } else {
@@ -337,12 +346,17 @@ function t(key) { return window.i18n ? window.i18n.t(key) : key; }
             actionButtons = `
                 <div style="display:flex;gap:10px;margin-top:20px;">
                     <button id="confirmExportBtn" style="flex:1;padding:12px;font-weight:bold;background:#2196F3;color:white;border:none;border-radius:6px;cursor:pointer;">${actionName}</button>
-                    <button id="printCancelBtn" style="flex:1;padding:12px;background:` + (nightMode ? '#555' : '#9E9E9E') + `;color:white;border:none;border-radius:6px;cursor:pointer;">${isEn() ? 'Cancel' : '取消'}</button>
                 </div>
             `;
         }
 
-        modalContent.innerHTML = title + aiSection + statusSection + settingsSection + actionButtons;
+        // 先添加title等内容
+        var tempDiv = document.createElement('div');
+        tempDiv.innerHTML = title + aiSection + statusSection + settingsSection + actionButtons;
+        while (tempDiv.firstChild) {
+            modalContent.appendChild(tempDiv.firstChild);
+        }
+        
         printModal.appendChild(modalContent);
         document.body.appendChild(printModal);
 
@@ -547,7 +561,8 @@ function t(key) { return window.i18n ? window.i18n.t(key) : key; }
                 });
 
                 // 发送文件到打印服务器
-                var response = await fetch('api/external/upload', {
+                var apiUrl = (window.getApiBaseUrl ? window.getApiBaseUrl() : 'api') + '/external/upload';
+                var response = await fetch(apiUrl, {
                     method: 'POST',
                     body: formData
                 });
@@ -700,7 +715,8 @@ function t(key) { return window.i18n ? window.i18n.t(key) : key; }
                 });
 
                 // 发送文件到打印服务器
-                var response = await fetch('api/external/upload', {
+                var apiUrl = (window.getApiBaseUrl ? window.getApiBaseUrl() : 'api') + '/external/upload';
+                var response = await fetch(apiUrl, {
                     method: 'POST',
                     body: formData
                 });
@@ -2098,7 +2114,8 @@ function t(key) { return window.i18n ? window.i18n.t(key) : key; }
                     });
 
                     // 发送文件到打印服务器
-                    var response = await fetch('api/external/upload', {
+                    var apiUrl = (window.getApiBaseUrl ? window.getApiBaseUrl() : 'api') + '/external/upload';
+                    var response = await fetch(apiUrl, {
                         method: 'POST',
                         body: formData
                     });

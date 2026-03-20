@@ -80,10 +80,16 @@
 
     /** 获取本地 API 根地址（同源 api/index.php），保证 origin 与 api 之间必有 / */
     function getApiBaseUrl() {
-        if (typeof window !== 'undefined' && window.location && window.location.origin) {
-            var path = (window.location.pathname || '').replace(/\/[^/]*$/, '');
-            var base = window.location.origin + path;
-            return base.replace(/\/?$/, '/') + 'api';
+        if (typeof window !== 'undefined') {
+            // 在 Electron 应用或本地 file:// 协议下运行，直接请求远程服务器
+            if (window.electron || (window.location && window.location.protocol === 'file:')) {
+                return 'https://md.yhsun.cn/api';
+            }
+            if (window.location && window.location.origin) {
+                var path = (window.location.pathname || '').replace(/\/[^/]*$/, '');
+                var base = window.location.origin + path;
+                return base.replace(/\/?$/, '/') + 'api';
+            }
         }
         return 'api';
     }

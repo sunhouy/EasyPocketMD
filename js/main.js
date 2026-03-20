@@ -5,7 +5,7 @@ document.addEventListener('DOMContentLoaded', function() {
     'use strict';
 
     // 记录页面加载开始时间
-    const pageLoadStartTime = performance.now();
+    // const pageLoadStartTime = performance.now();
 
     // 初始化翻译系统
     if (window.i18n) {
@@ -146,7 +146,8 @@ document.addEventListener('DOMContentLoaded', function() {
         height: '100%',
         width: '100%',
         placeholder: window.i18n ? window.i18n.t('startEditing') : '开始编辑...支持 Markdown 语法',
-        cdn: '/vditor', // 使用本地目录
+        cdn: window.electron ? './vditor' : (window.location.protocol === 'file:' ? './vditor' : '/vditor'), // 兼容 Electron 和 Web 环境的本地目录
+        lang: 'en_US', // 彻底禁用中文语言文件，使用默认英语
         toolbar: ['emoji', 'br', 'bold', 'italic', 'strike', '|', 'line', 'quote', 'list', 'ordered-list', 'check', 'outdent', 'indent', 'code', 'inline-code', 'insert-after', 'insert-before', 'upload', 'link', 'table', 'record', 'edit-mode', 'both', 'preview', 'fullscreen', 'outline', 'code-theme', 'content-theme', 'export', 'info', 'help', 'br'],
         customWysiwygToolbar: function() {}, // 修复报错
         theme: window.nightMode ? 'dark' : 'classic',
@@ -170,11 +171,11 @@ document.addEventListener('DOMContentLoaded', function() {
             if (loading) loading.style.display = 'none';
             
             // 计算加载时间
-            const loadTime = Math.round(performance.now() - pageLoadStartTime);
+            // const loadTime = Math.round(performance.now() - pageLoadStartTime);
             
-            // 打印EasyPocketMD大字
+            // 打印EasyPocketMD
             console.log('%c%s', 'font-size: 48px; font-weight: bold; color: #4a90e2; text-shadow: 2px 2px 4px rgba(0,0,0,0.2);', 'EasyPocketMD');
-            console.log('%cLoad time: %dms', 'font-size: 16px; font-weight: bold; color: #27ae60;', loadTime);
+            // console.log('%cLoad time: %dms', 'font-size: 16px; font-weight: bold; color: #27ae60;', loadTime);
             
             // 应用字体大小设置
             applyFontSize(window.userSettings.fontSize);
@@ -267,7 +268,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    function showTopNoticeBanner(type, text, icon) {
+    function showTopNoticeBanner(type, text, icon, isHtml) {
         const banner = document.getElementById('topNoticeBanner');
         if (!banner) return;
         
@@ -290,7 +291,11 @@ document.addEventListener('DOMContentLoaded', function() {
         // 设置文本
         const textEl = banner.querySelector('.notice-text');
         if (textEl) {
-            textEl.textContent = text;
+            if (isHtml) {
+                textEl.innerHTML = text;
+            } else {
+                textEl.textContent = text;
+            }
         }
         
         // 显示横幅
@@ -310,11 +315,26 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // 便捷函数：显示未登录提示
     function showGuestNoticeBanner() {
+        const text = '未登录用户，上传的图片和文件仅保证保存2小时，<a href="#" id="guestBannerLoginLink" style="color: white; text-decoration: underline; cursor: pointer;">登录</a>后永久保存，且文件自动同步到服务器。';
         showTopNoticeBanner(
             'guest',
-            '未登录用户，上传的图片和文件仅保证保存2小时，登录后永久保存，且文件自动同步到服务器。',
-            'fas fa-info-circle'
+            text,
+            'fas fa-info-circle',
+            true
         );
+        
+        // 添加登录链接的点击事件
+        setTimeout(function() {
+            const loginLink = document.getElementById('guestBannerLoginLink');
+            if (loginLink) {
+                loginLink.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    if (window.showLoginModal) {
+                        window.showLoginModal();
+                    }
+                });
+            }
+        }, 100);
     }
     
     // 便捷函数：显示网络错误提示
@@ -445,7 +465,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 height: editorConfig.height,
                 width: editorConfig.width,
                 placeholder: window.i18n ? window.i18n.t('startEditing') : '开始编辑...支持 Markdown 语法',
-                cdn: '/vditor', // 使用本地目录
+                cdn: window.electron ? './vditor' : (window.location.protocol === 'file:' ? './vditor' : '/vditor'), // 兼容 Electron 和 Web 环境的本地目录
+                lang: 'en_US', // 彻底禁用中文语言文件，使用默认英语
                 toolbar: ['emoji', 'br', 'bold', 'italic', 'strike', '|', 'line', 'quote', 'list', 'ordered-list', 'check', 'outdent', 'indent', 'code', 'inline-code', 'insert-after', 'insert-before', 'upload', 'link', 'table', 'record', 'edit-mode', 'both', 'preview', 'fullscreen', 'outline', 'code-theme', 'content-theme', 'export', 'info', 'help', 'br'],
                 customWysiwygToolbar: function() {},
                 theme: window.nightMode ? 'dark' : 'classic',
@@ -740,11 +761,6 @@ document.addEventListener('DOMContentLoaded', function() {
         // 应用字体大小设置
         applyFontSize(newSettings.fontSize);
         
-        // 如果大纲视图设置改变，重新初始化编辑器
-        if (needReinitForOutline) {
-            applyOutline(newSettings.showOutline);
-        }
-        
         // 应用主题
         var oldNightMode = window.nightMode;
         if (newSettings.themeMode === 'system') {
@@ -770,8 +786,8 @@ document.addEventListener('DOMContentLoaded', function() {
             };
         }
         
-        if (oldNightMode !== window.nightMode || languageChanged) {
-             window.location.reload(); // 重新加载以应用主题或语言更改
+        if (oldNightMode !== window.nightMode || languageChanged || needReinitForOutline) {
+             window.location.reload(); // 重新加载以应用主题、语言或大纲视图更改
         } else {
              applyTranslations();
              window.renderBottomToolbar();
@@ -866,7 +882,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 height: editorConfig.height,
                 width: editorConfig.width,
                 placeholder: window.i18n ? window.i18n.t('startEditing') : '开始编辑...支持 Markdown 语法',
-                cdn: '/vditor',
+                cdn: window.electron ? './vditor' : (window.location.protocol === 'file:' ? './vditor' : '/vditor'),
+                lang: 'en_US', // 彻底禁用中文语言文件，使用默认英语
                 toolbar: ['emoji', 'br', 'bold', 'italic', 'strike', '|', 'line', 'quote', 'list', 'ordered-list', 'check', 'outdent', 'indent', 'code', 'inline-code', 'insert-after', 'insert-before', 'upload', 'link', 'table', 'record', 'edit-mode', 'both', 'preview', 'fullscreen', 'outline', 'code-theme', 'content-theme', 'export', 'info', 'help', 'br'],
                 customWysiwygToolbar: function() {},
                 theme: window.nightMode ? 'dark' : 'classic',

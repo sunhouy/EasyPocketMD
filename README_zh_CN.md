@@ -1,6 +1,9 @@
 # EasyPocketMD
 [![Build and Deploy](https://github.com/sunhouy/markdown/actions/workflows/deploy.yml/badge.svg)](https://github.com/sunhouy/markdown/actions/workflows/deploy.yml)
 <p align="center"><a href="README.md">English</a> &nbsp;|&nbsp; <a href="https://md.yhsun.cn/">Demo</a></p>
+
+这个项目是我投入了大量时间和心血的作品，我希望它能真正帮助到大家。如果你觉得它有用，或者认可我的努力，请给一个 ⭐️ Star 支持我！你的每一个 Star 都是我持续改进的动力，也是对我最大的鼓励。
+
 完全免费且开源的移动端轻量级在线 Markdown 编辑器，基于 Vditor 构建，支持多文件管理。提供可视化的格式插入方式，支持图片和文件上传、LaTeX 公式引用、Mermaid 图表绘制，降低学习与操作门槛。同时，编辑器还支持多端文件同步、文件夹创建、历史版本管理、文件分享，以及日间/夜间模式切换。提供三种编辑模式（所见即所得 / 及时渲染 / 分屏预览），并支持文档的导入、导出和文件云打印功能
 
 项目采用JavaScript+Python架构，登录注册、文件上传、分享、历史版本等后端使用node实现，云打印服务端和客户端使用Python实现。

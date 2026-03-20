@@ -364,11 +364,79 @@ body.night-mode .mobile-action-sheet {
     max-width: 400px;
     box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
     animation: modalFadeIn 0.3s ease;
+    position: relative;
 }
 
 body.night-mode .modal {
     background: #2d2d2d;
     color: #eee;
+}
+
+/* 模态框右上角关闭按钮样式 */
+.modal-close-btn {
+    color: #666;
+    padding: 5px;
+    border-radius: 4px;
+    transition: all 0.2s;
+}
+
+.modal-close-btn:hover {
+    color: #333;
+    background: rgba(0,0,0,0.05);
+}
+
+body.night-mode .modal-close-btn {
+    color: #ccc;
+}
+
+body.night-mode .modal-close-btn:hover {
+    color: #fff;
+    background: rgba(255,255,255,0.15);
+}
+
+/* 自定义滚动条样式 */
+.modal-form::-webkit-scrollbar,
+.history-list::-webkit-scrollbar,
+.modal-content::-webkit-scrollbar {
+    width: 6px;
+}
+
+.modal-form::-webkit-scrollbar-track,
+.history-list::-webkit-scrollbar-track,
+.modal-content::-webkit-scrollbar-track {
+    background: rgba(0,0,0,0.05);
+    border-radius: 3px;
+}
+
+.modal-form::-webkit-scrollbar-thumb,
+.history-list::-webkit-scrollbar-thumb,
+.modal-content::-webkit-scrollbar-thumb {
+    background: #ccc;
+    border-radius: 3px;
+}
+
+.modal-form::-webkit-scrollbar-thumb:hover,
+.history-list::-webkit-scrollbar-thumb:hover,
+.modal-content::-webkit-scrollbar-thumb:hover {
+    background: #aaa;
+}
+
+body.night-mode .modal-form::-webkit-scrollbar-track,
+body.night-mode .history-list::-webkit-scrollbar-track,
+body.night-mode .modal-content::-webkit-scrollbar-track {
+    background: rgba(255,255,255,0.05);
+}
+
+body.night-mode .modal-form::-webkit-scrollbar-thumb,
+body.night-mode .history-list::-webkit-scrollbar-thumb,
+body.night-mode .modal-content::-webkit-scrollbar-thumb {
+    background: #555;
+}
+
+body.night-mode .modal-form::-webkit-scrollbar-thumb:hover,
+body.night-mode .history-list::-webkit-scrollbar-thumb:hover,
+body.night-mode .modal-content::-webkit-scrollbar-thumb:hover {
+    background: #666;
 }
 
 @keyframes modalFadeIn {
@@ -594,7 +662,7 @@ body.night-mode .user-info {
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
     z-index: 1000;
     width: 300px;
-    max-height: calc(100vh - 100px);
+    max-height: calc(100vh - 140px);
     overflow-y: auto;
     display: none;
     padding: 8px;
@@ -1938,6 +2006,114 @@ body.night-mode .jstree-default .jstree-wholerow-hovered {
 }
 body.night-mode .jstree-default .jstree-wholerow-clicked {
     background: #1e3a5f !important;
+}
+
+/* 自定义文件菜单按钮样式 */
+.jstree-node {
+    /* 移除 relative，防止影响展开的高度计算 */
+}
+.jstree-anchor {
+    display: inline-block !important;
+    width: calc(100% - 28px) !important; /* Leave space for the ocl icon */
+    position: relative !important;
+    padding-right: 30px !important; /* Leave space for absolute button */
+    box-sizing: border-box !important;
+    vertical-align: middle !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+}
+
+.file-menu-btn {
+    position: absolute !important;
+    right: 5px !important;
+    top: 50% !important;
+    transform: translateY(-50%) !important;
+    margin-left: 0 !important;
+    cursor: pointer !important;
+    opacity: 0;
+    transition: opacity 0.2s;
+    color: #999;
+    padding: 4px 6px;
+    border-radius: 4px;
+    font-size: 14px;
+    z-index: 2;
+    background: inherit;
+}
+
+.jstree-anchor:hover .file-menu-btn,
+.jstree-wholerow-hovered ~ .jstree-anchor .file-menu-btn {
+    opacity: 1;
+}
+
+.file-menu-btn:hover {
+    color: #333;
+    background: rgba(0,0,0,0.05);
+}
+
+body.night-mode .file-menu-btn {
+    color: #aaa;
+}
+
+body.night-mode .file-menu-btn:hover {
+    color: #fff;
+    background: rgba(255,255,255,0.1);
+}
+
+/* 确保文件列表容器不会溢出 */
+#fileList {
+    overflow-x: hidden !important;
+    overflow-y: auto;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+/* 移除空行 */
+.jstree-node {
+    margin: 0 !important;
+    padding: 0 !important;
+    line-height: normal !important;
+}
+
+.jstree-children {
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+/* 确保文件夹展开/折叠箭头正确显示 */
+.jstree-default .jstree-ocl {
+    display: inline-block !important;
+    vertical-align: middle !important;
+    margin-right: 2px !important;
+}
+
+.jstree-default .jstree-icon {
+    display: inline-block !important;
+    vertical-align: middle !important;
+}
+
+.jstree-anchor > a,
+.jstree-anchor > ins,
+.jstree-anchor > i {
+    display: inline-flex !important;
+    align-items: center !important;
+    vertical-align: middle !important;
+}
+
+/* 确保文件名不会溢出 */
+.jstree-anchor > .jstree-icon {
+    flex-shrink: 0;
+}
+
+.jstree-anchor > .jstree-ocl {
+    flex-shrink: 0;
+}
+
+/* 移动端始终显示三个点按钮 */
+@media (max-width: 768px) {
+    .file-menu-btn {
+        opacity: 1 !important;
+    }
 }
 /* Context menu adjustment */
 .vakata-context {

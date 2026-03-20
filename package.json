@@ -62,7 +62,7 @@
     "appId": "cn.yhsun.md",
     "productName": "MarkdownEditor",
     "directories": {
-      "output": "dist-electron"
+      "output": "dist-electron-new"
     },
     "npmRebuild": false,
     "files": [

@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite';
 import { viteStaticCopy } from 'vite-plugin-static-copy';
-import { readFileSync, existsSync, writeFileSync, readFile } from 'node:fs';
-import { join } from 'node:path';
+import { readFileSync, existsSync, writeFileSync, readFile, cpSync } from 'node:fs';
+import { join, resolve } from 'node:path';
 
 const versionPath = join(__dirname, 'version.json');
 let cacheVersion = 'v1';
@@ -130,6 +130,47 @@ export default defineConfig({
         }
       ]
     }),
+    {
+      name: 'copy-vditor-files',
+      writeBundle(options) {
+        const fs = require('fs');
+        const path = require('path');
+        const sourceDir = path.join(__dirname, 'node_modules', 'vditor', 'dist');
+        const targetDir = path.join(options.dir || 'dist', 'vditor');
+        
+        try {
+          if (fs.existsSync(sourceDir)) {
+            console.log('Copying Vditor files from:', sourceDir);
+            console.log('To:', targetDir);
+            
+            if (!fs.existsSync(targetDir)) {
+              fs.mkdirSync(targetDir, { recursive: true });
+            }
+            
+            function copyDir(src, dest) {
+              const entries = fs.readdirSync(src, { withFileTypes: true });
+              for (const entry of entries) {
+                const srcPath = path.join(src, entry.name);
+                const destPath = path.join(dest, entry.name);
+                if (entry.isDirectory()) {
+                  if (!fs.existsSync(destPath)) {
+                    fs.mkdirSync(destPath, { recursive: true });
+                  }
+                  copyDir(srcPath, destPath);
+                } else {
+                  fs.copyFileSync(srcPath, destPath);
+                }
+              }
+            }
+            
+            copyDir(sourceDir, targetDir);
+            console.log('Vditor files copied successfully!');
+          }
+        } catch (error) {
+          console.error('Error copying Vditor files:', error);
+        }
+      }
+    },
     {
       name: 'generate-sw',
       writeBundle(options, bundle) {

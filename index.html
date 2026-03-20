@@ -259,36 +259,38 @@
 
 <!-- 历史版本模态窗口 -->
 <div class="modal-overlay" id="historyModalOverlay">
-    <div class="modal history-modal">
-        <div class="modal-header">
+    <div class="modal history-modal" style="position:relative;max-height:85vh;overflow:hidden;display:flex;flex-direction:column;">
+        <button class="modal-close-btn" id="closeHistoryBtn" style="position:absolute;top:15px;right:15px;background:none;border:none;font-size:20px;cursor:pointer;z-index:10;">
+            <i class="fas fa-times"></i>
+        </button>
+        <div class="modal-header" style="padding-right:40px;flex-shrink:0;">
             <p id="historyFileName"></p>
         </div>
 
-        <div class="history-info">
+        <div class="history-info" style="flex-shrink:0;">
             <i class="fas fa-info-circle"></i>
             <span data-i18n="historyCount">最多保留1000个历史版本</span>
         </div>
 
-        <div id="historyList" class="history-list">
+        <div id="historyList" class="history-list" style="flex:1;overflow-y:auto;">
             <!-- 历史版本列表将动态生成 -->
             <div class="history-loading">
                 <i class="fas fa-spinner fa-spin"></i> <span data-i18n="loadingHistory">正在加载历史版本...</span>
             </div>
-        </div>
-
-        <div class="modal-actions">
-            <button class="modal-btn secondary" id="closeHistoryBtn" data-i18n="close">关闭</button>
         </div>
     </div>
 </div>
 
 <!-- 设置模态窗口 -->
 <div class="modal-overlay" id="settingsModalOverlay">
-    <div class="modal">
-        <div class="modal-header">
+    <div class="modal" style="position:relative;max-height:85vh;overflow:hidden;display:flex;flex-direction:column;">
+        <button class="modal-close-btn" id="cancelSettingsBtn" style="position:absolute;top:15px;right:15px;background:none;border:none;font-size:20px;cursor:pointer;z-index:10;">
+            <i class="fas fa-times"></i>
+        </button>
+        <div class="modal-header" style="padding-right:40px;flex-shrink:0;">
             <h2 data-i18n="settings">设置</h2>
         </div>
-        <div class="modal-form">
+        <div class="modal-form" style="flex:1;overflow-y:auto;padding-right:5px;">
             <div class="form-group">
                 <label data-i18n="defaultEditorMode">默认编辑器模式</label>
                 <div class="radio-group" id="defaultEditorMode">
@@ -336,9 +338,8 @@
                     <!-- 动态生成 -->
                 </div>
             </div>
-            <div class="modal-actions">
+            <div class="modal-actions" style="flex-shrink:0;padding-top:10px;">
                 <button class="modal-btn primary" id="saveSettingsBtn" data-i18n="save">保存</button>
-                <button class="modal-btn secondary" id="cancelSettingsBtn" data-i18n="cancel">取消</button>
             </div>
         </div>
     </div>
@@ -346,11 +347,14 @@
 
 <!-- 关于模态窗口 -->
 <div class="modal-overlay" id="aboutModalOverlay">
-    <div class="modal">
-        <div class="modal-header">
+    <div class="modal" style="position:relative;max-height:85vh;overflow:hidden;display:flex;flex-direction:column;">
+        <button class="modal-close-btn" id="closeAboutBtn" style="position:absolute;top:15px;right:15px;background:none;border:none;font-size:20px;cursor:pointer;z-index:10;">
+            <i class="fas fa-times"></i>
+        </button>
+        <div class="modal-header" style="padding-right:40px;flex-shrink:0;">
             <h2 data-i18n="about">关于</h2>
         </div>
-        <div class="modal-content" style="text-align: center;">
+        <div class="modal-content" style="text-align: center;flex:1;overflow-y:auto;">
             <p><strong data-i18n="pageTitle">EasyPocketMD</strong></p>
             <p data-i18n="author">作者：孙厚运</p>
             <p data-i18n="description">完全免费且开源的移动端轻量级在线 Markdown 编辑器，基于 Vditor 构建，支持多文件管理。提供可视化的格式插入方式，支持图片和文件上传、LaTeX 公式引用、Mermaid 图表绘制，降低学习与操作门槛。同时，编辑器还支持多端文件同步、文件夹创建、历史版本管理、文件分享，以及日间/夜间模式切换。提供三种编辑模式（所见即所得 / 及时渲染 / 分屏预览），并支持文档的导入、导出和文件云打印功能</p>
@@ -359,9 +363,6 @@
             <p><strong data-i18n="acknowledgments">致谢</strong></p>
             <p>vditor, fortawesome, bcryptjs, cors, dotenv, express, html-to-image, markdown-it, multer, mysql2, uuid</p>
             <p><a href="https://beian.miit.gov.cn/" target="_blank" data-i18n="icp">京ICP备2025154249号</a></p>
-        </div>
-        <div class="modal-actions">
-            <button class="modal-btn secondary" id="closeAboutBtn" data-i18n="close">关闭</button>
         </div>
     </div>
 </div>
@@ -458,7 +459,8 @@
     async function handleShareLink(shareId, password) {
         try {
             // 从API获取分享的文档内容
-            const response = await fetch('api/share/get', {
+            var apiUrl = (window.getApiBaseUrl ? window.getApiBaseUrl() : 'api') + '/share/get';
+            const response = await fetch(apiUrl, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -504,7 +506,8 @@
                 showToast((window.i18n ? window.i18n.t('getShareFailed') : '获取分享内容失败: ') + (result.message || '未知错误'), 'error');
                 // 重定向到密码页面或错误页面
                 if (result.code === 401) {
-                    window.location.href = 'api/share/view?share_id=' + shareId;
+                    var viewUrl = (window.getApiBaseUrl ? window.getApiBaseUrl() : 'api') + '/share/view?share_id=' + shareId;
+                    window.location.href = viewUrl;
                 }
             }
         } catch (error) {
@@ -635,21 +638,52 @@
     })();
 </script>
 
-<!-- Cookies 提示脚本 -->
+
+<!-- Cookie 提示脚本（基于时区判断） -->
 <script>
     (function() {
+        const euTimeZones = [
+            'Europe/London', 'Europe/Dublin', 'Europe/Lisbon', 'Europe/Madrid',
+            'Europe/Paris', 'Europe/Berlin', 'Europe/Rome', 'Europe/Warsaw',
+            'Europe/Athens', 'Europe/Helsinki', 'Europe/Riga', 'Europe/Vilnius',
+            'Europe/Tallinn', 'Europe/Bucharest', 'Europe/Sofia', 'Europe/Zagreb',
+            'Europe/Budapest', 'Europe/Prague', 'Europe/Bratislava', 'Europe/Ljubljana',
+            'Europe/Vienna', 'Europe/Brussels', 'Europe/Amsterdam', 'Europe/Luxembourg',
+            'Europe/Copenhagen', 'Europe/Stockholm', 'Europe/Malta', 'Europe/Nicosia'
+        ];
+
+        // 判断用户是否位于欧盟时区
+        function isEUUser() {
+            try {
+                const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+                return timeZone && euTimeZones.includes(timeZone);
+            } catch (e) {
+                console.warn('获取时区失败，默认视为非欧盟用户', e);
+                return false;   // 无法获取时区时，不显示横幅
+            }
+        }
+
+        // 初始化 Cookie 同意逻辑
         function initCookieConsent() {
             const banner = document.getElementById('cookieConsentBanner');
             if (!banner) return;
 
-            // 检查是否已经同意过
-            const hasConsent = localStorage.getItem('cookieConsent');
-            if (hasConsent === 'true') {
+            const hasConsent = localStorage.getItem('cookieConsent') === 'true';
+
+            // 若已同意，直接隐藏横幅
+            if (hasConsent) {
                 banner.style.display = 'none';
-            } else {
-                banner.style.display = 'flex'; // 显示横幅
+                return;
             }
 
+            // 未同意时：仅当用户位于欧盟时区才显示横幅
+            if (isEUUser()) {
+                banner.style.display = 'flex';  
+            } else {
+                banner.style.display = 'none';
+            }
+
+            // 绑定“接受”按钮事件
             const acceptBtn = document.getElementById('acceptCookiesBtn');
             if (acceptBtn) {
                 acceptBtn.addEventListener('click', function() {

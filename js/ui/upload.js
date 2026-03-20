@@ -57,7 +57,8 @@
         formData.append('uploadDir', 'uploads');
         try {
             global.showUploadStatus('正在上传文件...', 'info');
-            var response = await fetch('api/external/upload', { method: 'POST', body: formData });
+            var apiUrl = (window.getApiBaseUrl ? window.getApiBaseUrl() : 'api') + '/external/upload';
+            var response = await fetch(apiUrl, { method: 'POST', body: formData });
             var result = await response.json();
             if (result.success) {
                 global.showUploadStatus('上传成功！共' + result.count + '个文件', 'success');
@@ -108,7 +109,8 @@
             }
 
             // Upload to server
-            fetch('api/external/upload', {
+            var apiUrl = (window.getApiBaseUrl ? window.getApiBaseUrl() : 'api') + '/external/upload';
+            fetch(apiUrl, {
                 method: 'POST',
                 body: formData
             })

@@ -8,9 +8,11 @@ function createWindow() {
     height: 800,
     minWidth: 800,
     minHeight: 600,
+    autoHideMenuBar: true, // 隐藏顶部的默认菜单栏
     webPreferences: {
       nodeIntegration: false,
-      contextIsolation: true
+      contextIsolation: true,
+      preload: path.join(__dirname, 'preload.js')
     }
   });
 
@@ -20,7 +22,7 @@ function createWindow() {
 
   // Optional: open DevTools in development
   if (!app.isPackaged) {
-    mainWindow.webContents.openDevTools({ mode: 'detach' });
+    mainWindow.webContents.openDevTools({ mode: 'detached' });
   }
 }
 

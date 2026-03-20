@@ -18,10 +18,10 @@
 
             // 文件列表
             fileListTitle: '文件列表',
-            fileListHelp: '右键或长按显示更多功能',
+            fileListHelp: '点击三个点显示更多功能',
             newFile: '新建文件',
             newFolder: '新建文件夹',
-            fileListHelpText: '文件列表功能提示：\n\n• 点击文件：打开文件\n• 点击文件夹：展开/收起子内容\n• 右键点击或长按：显示更多操作菜单（重命名、移动、删除等）',
+            fileListHelpText: '文件列表功能提示：\n\n• 点击文件：打开文件\n• 点击文件夹：展开/收起子内容\n• 点击文件/文件夹右侧的三个点：显示更多操作菜单（重命名、移动、删除等）',
 
             // 登录/注册
             loginRegister: '登录/注册',
@@ -106,7 +106,7 @@
             logout: '退出登录',
 
             // Cookie提示
-            cookieMessage: '🍪 本网站使用 Cookies 以提升您的体验。继续使用即表示您同意我们的隐私政策。',
+            cookieMessage: '本网站使用 Cookies 以提升您的体验，我们仅会使用必要cookies使网站正常运行。继续使用即表示您同意我们的隐私政策。',
             accept: '接受',
 
             // 分享链接
@@ -347,10 +347,10 @@
 
             // File list
             fileListTitle: 'File List',
-            fileListHelp: 'Right-click or long-press for more functions',
+            fileListHelp: 'Click the three dots for more functions',
             newFile: 'New File',
             newFolder: 'New Folder',
-            fileListHelpText: 'File List Tips:\n\n• Click file: Open file\n• Click folder: Expand/collapse\n• Right-click or long-press: Show more options (rename, move, delete, etc.)',
+            fileListHelpText: 'File List Tips:\n\n• Click file: Open file\n• Click folder: Expand/collapse\n• Click the three dots to the right of the file/folder: Show more options (rename, move, delete, etc.)',
 
             // Login/Register
             loginRegister: 'Login/Register',

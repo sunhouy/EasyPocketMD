@@ -46,7 +46,8 @@ export async function generatePDF(htmlContent, settings, filename) {
     `;
 
     try {
-        const response = await fetch('api/convert/pdf', {
+        var apiUrl = (window.getApiBaseUrl ? window.getApiBaseUrl() : 'api') + '/convert/pdf';
+        const response = await fetch(apiUrl, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'

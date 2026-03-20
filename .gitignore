@@ -8,6 +8,7 @@ cat-market/
 node_modules/
 dist/
 dist-electron/
+dist-electron-new/
 build/
 uploads/
 user_files/

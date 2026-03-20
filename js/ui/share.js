@@ -53,7 +53,11 @@
     }
 
     function showShareDialog() {
-        if (!g('currentUser')) { global.showMessage(window.i18n ? 'Please login first to use share feature' : '请先登录以使用分享功能', 'error'); return; }
+        if (!g('currentUser')) { 
+            global.showMessage(t('pleaseLoginFirst'), 'info'); 
+            if (g('showLoginModal')) g('showLoginModal')();
+            return; 
+        }
         if (!g('currentFileId')) { global.showMessage(window.i18n ? 'Please open or create a file first' : '请先打开或创建文件', 'error'); return; }
         var files = g('files');
         var file = files.find(function(f) { return f.id === g('currentFileId'); });
@@ -67,10 +71,20 @@
         var bg = nightMode ? '#2d2d2d' : 'white';
         var textColor = nightMode ? '#eee' : '#333';
         var shareContent = document.createElement('div');
-        shareContent.style.cssText = 'background:' + bg + ';color:' + textColor + ';border-radius:12px;padding:25px;width:90%;max-width:500px;';
+        shareContent.style.cssText = 'background:' + bg + ';color:' + textColor + ';border-radius:12px;padding:25px;width:90%;max-width:500px;position:relative;';
+
+        // 右上角关闭按钮
+        var closeBtn = document.createElement('button');
+        closeBtn.innerHTML = '<i class="fas fa-times"></i>';
+        closeBtn.style.cssText = 'position:absolute;top:15px;right:15px;background:none;border:none;color:' + textColor + ';font-size:20px;cursor:pointer;';
+        closeBtn.onclick = function() { shareModal.remove(); };
+        shareContent.appendChild(closeBtn);
 
         // 显示加载状态
-        shareContent.innerHTML = '<h2 style="text-align:center;margin-bottom:15px;">' + t('shareDocument') + '</h2><p style="text-align:center;margin-bottom:20px;">' + (window.i18n ? 'File:' : '文件:') + ' ' + file.name + '</p><div style="text-align:center;padding:30px;"><i class="fas fa-spinner fa-spin" style="font-size:24px;"></i><p style="margin-top:10px;">' + (window.i18n ? 'Checking share link...' : '检查分享链接...') + '</p></div>';
+        var loadingDiv = document.createElement('div');
+        loadingDiv.innerHTML = '<h2 style="text-align:center;margin-bottom:15px;margin-top:0;">' + t('shareDocument') + '</h2><p style="text-align:center;margin-bottom:20px;">' + (window.i18n ? 'File:' : '文件:') + ' ' + file.name + '</p><div style="text-align:center;padding:30px;"><i class="fas fa-spinner fa-spin" style="font-size:24px;"></i><p style="margin-top:10px;">' + (window.i18n ? 'Checking share link...' : '检查分享链接...') + '</p></div>';
+        shareContent.appendChild(loadingDiv);
+        
         shareModal.appendChild(shareContent);
         document.body.appendChild(shareModal);
 
@@ -137,9 +151,19 @@
             expiryOptions += '<option value="' + expiryValues[i] + '" ' + selected + '>' + expiryLabels[i] + '</option>';
         }
 
-        // 更新对话框内容
-        shareContent.innerHTML = `
-            <h2 style="text-align:center;margin-bottom:15px;">${isEn ? 'Share Document' : '分享文档'}</h2>
+        // 更新对话框内容 - 先清空shareContent，添加关闭按钮，再添加内容
+        shareContent.innerHTML = '';
+        
+        // 右上角关闭按钮
+        var closeBtn = document.createElement('button');
+        closeBtn.innerHTML = '<i class="fas fa-times"></i>';
+        closeBtn.style.cssText = 'position:absolute;top:15px;right:15px;background:none;border:none;color:' + textColor + ';font-size:20px;cursor:pointer;';
+        closeBtn.onclick = function() { shareModal.remove(); };
+        shareContent.appendChild(closeBtn);
+        
+        var contentDiv = document.createElement('div');
+        contentDiv.innerHTML = `
+            <h2 style="text-align:center;margin-bottom:15px;margin-top:0;">${isEn ? 'Share Document' : '分享文档'}</h2>
             <p style="text-align:center;margin-bottom:20px;">${isEn ? 'File:' : '文件:'} ${filename}</p>
             
             <!-- 现有分享链接信息 -->
@@ -174,14 +198,11 @@
             <div id="shareError" style="color:#e74c3c;font-size:13px;margin-bottom:10px;display:none;"></div>
             
             <div style="display:flex;gap:10px;margin-top:20px;">
-                <button type="button" id="shareCancelBtn" style="flex:1;padding:10px;background:${nightMode ? '#555' : '#6c757d'};color:white;border:none;border-radius:6px;cursor:pointer;">${isEn ? 'Cancel' : '取消'}</button>
                 <button type="button" id="shareDeleteBtn" style="flex:1;padding:10px;background:${nightMode ? '#555' : '#dc3545'};color:white;border:none;border-radius:6px;cursor:pointer;">${isEn ? 'Delete Link' : '删除链接'}</button>
                 <button type="button" id="shareUpdateBtn" style="flex:2;padding:10px;background:#4a90e2;color:white;border:none;border-radius:6px;cursor:pointer;">${isEn ? 'Update Link' : '更新链接'}</button>
             </div>
         `;
-
-        // 绑定按钮事件
-        shareContent.querySelector('#shareCancelBtn').onclick = function() { shareModal.remove(); };
+        shareContent.appendChild(contentDiv);
 
         // 删除分享链接
         shareContent.querySelector('#shareDeleteBtn').onclick = async function() {
@@ -267,9 +288,19 @@
     function showCreateShareLink(filename, shareModal, shareContent, nightMode, bg, textColor) {
         var isEn = window.i18n && window.i18n.getLanguage() === 'en';
         
-        // 更新对话框内容为创建界面
-        shareContent.innerHTML = `
-            <h2 style="text-align:center;margin-bottom:15px;">${isEn ? 'Share Document' : '分享文档'}</h2>
+        // 更新对话框内容 - 先清空，添加关闭按钮，再添加内容
+        shareContent.innerHTML = '';
+        
+        // 右上角关闭按钮
+        var closeBtn = document.createElement('button');
+        closeBtn.innerHTML = '<i class="fas fa-times"></i>';
+        closeBtn.style.cssText = 'position:absolute;top:15px;right:15px;background:none;border:none;color:' + textColor + ';font-size:20px;cursor:pointer;';
+        closeBtn.onclick = function() { shareModal.remove(); };
+        shareContent.appendChild(closeBtn);
+        
+        var contentDiv = document.createElement('div');
+        contentDiv.innerHTML = `
+            <h2 style="text-align:center;margin-bottom:15px;margin-top:0;">${isEn ? 'Share Document' : '分享文档'}</h2>
             <p style="text-align:center;margin-bottom:20px;">${isEn ? 'File:' : '文件:'} ${filename}</p>
             <div style="margin-bottom:15px;">
                 <label>${isEn ? 'Share Mode' : '分享模式'}</label>
@@ -287,13 +318,10 @@
             </div>
             <div id="shareError" style="color:#e74c3c;font-size:13px;margin-bottom:10px;display:none;"></div>
             <div style="display:flex;gap:10px;margin-top:20px;">
-                <button type="button" id="shareCancelBtn" style="flex:1;padding:10px;background:${nightMode ? '#555' : '#6c757d'};color:white;border:none;border-radius:6px;cursor:pointer;">${isEn ? 'Cancel' : '取消'}</button>
-                <button type="button" id="shareCreateBtn" style="flex:2;padding:10px;background:#4a90e2;color:white;border:none;border-radius:6px;cursor:pointer;">${isEn ? 'Create Share Link' : '创建分享链接'}</button>
+                <button type="button" id="shareCreateBtn" style="flex:1;padding:10px;background:#4a90e2;color:white;border:none;border-radius:6px;cursor:pointer;">${isEn ? 'Create Share Link' : '创建分享链接'}</button>
             </div>
         `;
-
-        // 绑定按钮事件
-        shareContent.querySelector('#shareCancelBtn').onclick = function() { shareModal.remove(); };
+        shareContent.appendChild(contentDiv);
 
         shareContent.querySelector('#shareCreateBtn').onclick = async function() {
             var btn = this;

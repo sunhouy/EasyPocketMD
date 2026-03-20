@@ -15,7 +15,8 @@
         var t = function(key) { return window.i18n ? window.i18n.t(key) : key; };
         
         if (!g('currentUser')) {
-            global.showMessage(t('pleaseLoginFirst'), 'error');
+            global.showMessage(t('pleaseLoginFirst'), 'info');
+            if (g('showLoginModal')) g('showLoginModal')();
             return;
         }
 
@@ -64,7 +65,8 @@
 
         // Fetch Data
         try {
-            const response = await fetch('api/user_files/list', {
+            var apiUrl = (window.getApiBaseUrl ? window.getApiBaseUrl() : 'api') + '/user_files/list';
+            const response = await fetch(apiUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -133,7 +135,8 @@
                         delBtn.onclick = async () => {
                             if (confirm(t('confirmDeleteFile').replace('{name}', displayName))) {
                                 try {
-                                    const delRes = await fetch('api/user_files/delete', {
+                                    var apiUrl = (window.getApiBaseUrl ? window.getApiBaseUrl() : 'api') + '/user_files/delete';
+                                    const delRes = await fetch(apiUrl, {
                                         method: 'POST',
                                         headers: { 'Content-Type': 'application/json' },
                                         body: JSON.stringify({

@@ -505,6 +505,137 @@
         if (firstFile) openFile(firstFile.id);
     }
 
+    function loadOrders() {
+        const files = g('files');
+        const orderFile = files.find(f => f.name === '.easypocketmd_orders');
+        global.fileOrders = {};
+        if (orderFile && orderFile.content) {
+            try {
+                global.fileOrders = JSON.parse(orderFile.content);
+                files.forEach(f => {
+                    if (global.fileOrders[f.name] !== undefined) {
+                        f.order = global.fileOrders[f.name];
+                    }
+                });
+            } catch (e) {
+                console.error('Failed to parse orders file', e);
+            }
+        }
+    }
+
+    function saveOrdersFromPaths(pathOrders) {
+        const files = g('files');
+        let orderFile = files.find(f => f.name === '.easypocketmd_orders');
+        if (!orderFile) {
+            orderFile = {
+                id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+                name: '.easypocketmd_orders',
+                type: 'file',
+                content: '{}',
+                lastModified: Date.now(),
+                isSynced: false
+            };
+            files.push(orderFile);
+        }
+        
+        if (!global.fileOrders) global.fileOrders = {};
+        Object.assign(global.fileOrders, pathOrders);
+        
+        orderFile.content = JSON.stringify(global.fileOrders);
+        orderFile.lastModified = Date.now();
+        orderFile.isSynced = false;
+        
+        localStorage.setItem('vditor_files', JSON.stringify(files));
+        
+        if (g('currentUser')) {
+            global.syncFileToServer(orderFile.id);
+        }
+    }
+
+    function moveNodeOrder(nodeId, direction) {
+        const tree = window.$.jstree.reference('#fileList');
+        if (!tree) return;
+        const node = tree.get_node(nodeId);
+        if (!node) return;
+        
+        const parentId = node.parent;
+        const parentNode = tree.get_node(parentId);
+        const siblings = parentNode.children;
+        const index = siblings.indexOf(nodeId);
+        
+        let targetIndex = -1;
+        if (direction === 'up' && index > 0) {
+            targetIndex = index - 1;
+        } else if (direction === 'down' && index < siblings.length - 1) {
+            targetIndex = index + 1;
+        }
+        
+        if (targetIndex !== -1) {
+            const pathOrders = {};
+            // Assign base orders to spread them out
+            siblings.forEach((id, i) => {
+                const child = tree.get_node(id);
+                child.data.order = i * 10;
+            });
+            
+            // Swap
+            const targetId = siblings[targetIndex];
+            const targetNode = tree.get_node(targetId);
+            
+            const temp = node.data.order;
+            node.data.order = targetNode.data.order;
+            targetNode.data.order = temp;
+            
+            // Collect path orders
+            siblings.forEach(id => {
+                const child = tree.get_node(id);
+                pathOrders[child.data.path] = child.data.order;
+                const file = g('files').find(f => f.name === child.data.path);
+                if (file) file.order = child.data.order;
+            });
+            
+            saveOrdersFromPaths(pathOrders);
+            loadFiles();
+        }
+    }
+
+    function saveOrders() {
+        const files = g('files');
+        let orderFile = files.find(f => f.name === '.easypocketmd_orders');
+        if (!orderFile) {
+            orderFile = {
+                id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+                name: '.easypocketmd_orders',
+                type: 'file',
+                content: '{}',
+                lastModified: Date.now(),
+                isSynced: false
+            };
+            files.push(orderFile);
+        }
+        
+        const orders = {};
+        if (global.fileOrders) {
+            Object.assign(orders, global.fileOrders);
+        }
+        
+        files.forEach(f => {
+            if (f.name !== '.easypocketmd_orders') {
+                orders[f.name] = f.order || 0;
+            }
+        });
+        
+        orderFile.content = JSON.stringify(orders);
+        orderFile.lastModified = Date.now();
+        orderFile.isSynced = false;
+        
+        localStorage.setItem('vditor_files', JSON.stringify(files));
+        
+        if (g('currentUser')) {
+            global.syncFileToServer(orderFile.id);
+        }
+    }
+
     // ---------- jstree 渲染及交互 ----------
 
     function getJsTreeData() {
@@ -522,6 +653,7 @@
         // 2. 收集所有需要创建节点的路径（包括中间路径）
         const allPaths = new Set();
         files.forEach(f => {
+            if (f.name === '.easypocketmd_orders') return;
             allPaths.add(f.name);
             let p = f.name;
             while(p.includes('/')) {
@@ -544,9 +676,7 @@
         });
         
         // 4. 生成节点数据
-        const sortedPaths = Array.from(allPaths).sort();
-        
-        sortedPaths.forEach(p => {
+        allPaths.forEach(p => {
             const isReal = files.find(f => f.name === p);
             const parentPath = getParentPath(p);
             let parentId = parentPath ? pathMap[parentPath] : '#';
@@ -566,7 +696,7 @@
                         opened: false, // 由 state 插件管理
                         selected: isReal.id === g('currentFileId')
                     },
-                    data: { path: p, type: isReal.type, isVirtual: false }
+                    data: { path: p, type: isReal.type, isVirtual: false, order: isReal.order || 0 }
                 });
             } else {
                 nodes.push({
@@ -575,9 +705,20 @@
                     text: text,
                     type: 'folder',
                     state: { opened: false },
-                    data: { path: p, type: 'folder', isVirtual: true }
+                    data: { path: p, type: 'folder', isVirtual: true, order: (global.fileOrders && global.fileOrders[p] !== undefined) ? global.fileOrders[p] : 0 }
                 });
             }
+        });
+
+        // 按照 order 排序，同级元素比较
+        nodes.sort((a, b) => {
+            const orderA = a.data.order;
+            const orderB = b.data.order;
+            if (orderA !== orderB) return orderA - orderB;
+            // 如果 order 相同，文件夹排前面，然后按名称排序
+            if (a.data.type === 'folder' && b.data.type === 'file') return -1;
+            if (a.data.type === 'file' && b.data.type === 'folder') return 1;
+            return a.text.localeCompare(b.text);
         });
         
         return nodes;
@@ -623,7 +764,7 @@
                 'default': { 'icon': 'fas fa-folder' },
                 'file': { 'icon': 'fas fa-file' },
                 'folder': { 'icon': 'fas fa-folder' } },
-            'plugins': ['types', 'contextmenu'],
+            'plugins': ['types', 'contextmenu', 'wholerow'],
             'contextmenu': {
                 'items': function(node) {
                     const items = {
@@ -647,6 +788,22 @@
                                     console.error('renameFile function not found');
                                     alert(isEn() ? 'Rename function not available' : '重命名功能不可用');
                                 }
+                            }
+                        },
+                        'move_up': {
+                            'label': isEn() ? 'Move Up' : '上移',
+                            'action': function(data) {
+                                const inst = window.$.jstree.reference(data.reference);
+                                const obj = inst.get_node(data.reference);
+                                moveNodeOrder(obj.id, 'up');
+                            }
+                        },
+                        'move_down': {
+                            'label': isEn() ? 'Move Down' : '下移',
+                            'action': function(data) {
+                                const inst = window.$.jstree.reference(data.reference);
+                                const obj = inst.get_node(data.reference);
+                                moveNodeOrder(obj.id, 'down');
                             }
                         },
                         'move': {
@@ -745,22 +902,62 @@
              }
              renameFileInternal(data.node.id, data.text);
         })
+        .on('loaded.jstree refresh.jstree', function() {
+            window.$('.jstree-anchor').each(function() {
+                const nodeId = window.$(this).attr('id').replace('jstree_anchor_', '');
+                if (!window.$(this).find('.file-menu-btn').length) {
+                    const menuBtn = window.$('<i class="fas fa-ellipsis-v file-menu-btn"></i>');
+                    menuBtn.click(function(e) {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        const node = window.$('#fileList').jstree(true).get_node(nodeId);
+                        if (node) {
+                            const rect = e.target.getBoundingClientRect();
+                            let x = rect.left;
+                            const y = rect.bottom;
+                            
+                            // 确保菜单不会超出屏幕右侧
+                            const menuWidth = 200; // 估算的菜单宽度
+                            if (x + menuWidth > window.innerWidth) {
+                                x = window.innerWidth - menuWidth - 10;
+                            }
+                            
+                            // 先移除已存在的菜单
+                            window.$('.vakata-context').remove();
+                            
+                            // 显示上下文菜单
+                            window.$('#fileList').jstree(true).show_contextmenu(node, x, y);
+                            
+                            // 多次尝试设置位置，确保正确
+                            const setPosition = function() {
+                                const $context = window.$('.vakata-context');
+                                if ($context.length) {
+                                    // 再次检查和调整位置
+                                    let finalX = x;
+                                    const finalMenuWidth = $context.outerWidth() || 200;
+                                    if (finalX + finalMenuWidth > window.innerWidth) {
+                                        finalX = window.innerWidth - finalMenuWidth - 10;
+                                    }
+                                    
+                                    $context.css({
+                                        left: finalX,
+                                        top: y,
+                                        position: 'fixed',
+                                        'z-index': 99999
+                                    });
+                                }
+                            };
+                            setPosition();
+                            setTimeout(setPosition, 5);
+                            setTimeout(setPosition, 50);
+                        }
+                    });
+                    window.$(this).append(menuBtn);
+                }
+            });
+        })
         .on('ready.jstree', function() {
             expandActiveFile();
-            // 移动端长按支持
-            let timer;
-            const touchDuration = 600; 
-
-            window.$('#fileList').on('touchstart', '.jstree-anchor', function(e) {
-                timer = setTimeout(function() {
-                    const node = window.$('#fileList').jstree(true).get_node(e.currentTarget);
-                    const touch = e.originalEvent.touches[0];
-                    window.$('#fileList').jstree(true).show_contextmenu(node, touch.pageX, touch.pageY);
-                }, touchDuration);
-            }).on('touchend touchmove', '.jstree-anchor', function() {
-                if (timer) clearTimeout(timer);
-            });
-            
             // 禁用默认右键菜单，确保 jstree 菜单显示
             window.$('#fileList').on('contextmenu', '.jstree-anchor', function(e) {
                 e.preventDefault();
@@ -851,7 +1048,10 @@
                 global.deleteFileFromServer(oldName + '/').catch(e => {});
                 global.syncFileToServer(id);
                 const affectedFiles = files.filter(f => f.type === 'file' && (f.name.startsWith(newName + '/') || f.name === newName));
-                affectedFiles.forEach(f => global.syncFileToServer(f.id));
+                affectedFiles.forEach(f => {
+                    global.deleteFileFromServer(oldName + f.name.substring(newName.length)).catch(e=>{});
+                    global.syncFileToServer(f.id);
+                });
             } else {
                 global.deleteFileFromServer(oldName).then(() => global.syncFileToServer(id));
             }
@@ -941,6 +1141,7 @@
     }
 
     function loadFiles() {
+        loadOrders();
         initFileTree();
     }
 
@@ -1075,8 +1276,27 @@
         g('unsavedChanges')[defaultFile.id] = false;
     }
 
+    function getSelectedFolderPath() {
+        if (!window.$ || !window.$.jstree) return '';
+        const tree = window.$.jstree.reference('#fileList');
+        if (!tree) return '';
+        const selected = tree.get_selected(true);
+        if (selected && selected.length > 0) {
+            const node = selected[0];
+            if (node.data.type === 'folder') {
+                return node.data.path + '/';
+            } else if (node.data.type === 'file') {
+                const parentPath = getParentPath(node.data.path);
+                return parentPath ? parentPath + '/' : '';
+            }
+        }
+        return '';
+    }
+
     function createNewFile() {
-        const input = prompt(isEn() ? 'Please enter filename (to create in a folder, ensure the folder exists, e.g., docs/note)' : '请输入文件名（如需在文件夹中创建，请确保文件夹已存在，例如 docs/note）', isEn() ? 'New Document' : '新文档');
+        const defaultName = isEn() ? 'New Document' : '新文档';
+        const defaultPath = getSelectedFolderPath() + defaultName;
+        const input = prompt(isEn() ? 'Please enter filename (to create in a folder, ensure the folder exists, e.g., docs/note)' : '请输入文件名（如需在文件夹中创建，请确保文件夹已存在，例如 docs/note）', defaultPath);
         if (!input) return;
 
         let path = normalizePath(input);
@@ -1104,7 +1324,8 @@
             type: 'file',
             content: '# ' + getBasename(path) + '\n\n开始编写您的内容...',
             lastModified: Date.now(),
-            isSynced: false
+            isSynced: false,
+            order: 0
         };
         files.push(newFile);
         localStorage.setItem('vditor_files', JSON.stringify(files));
@@ -1117,7 +1338,9 @@
     }
 
     function createNewFolder() {
-        const input = prompt(isEn() ? 'Please enter folder path (e.g., docs/notes)' : '请输入文件夹路径（例如 docs/notes）', isEn() ? 'New Folder' : '新文件夹');
+        const defaultName = isEn() ? 'New Folder' : '新文件夹';
+        const defaultPath = getSelectedFolderPath() + defaultName;
+        const input = prompt(isEn() ? 'Please enter folder path (e.g., docs/notes)' : '请输入文件夹路径（例如 docs/notes）', defaultPath);
         if (!input) return;
 
         let path = normalizePath(input);
@@ -1135,7 +1358,8 @@
             type: 'folder',
             content: '',
             lastModified: Date.now(),
-            isSynced: false
+            isSynced: false,
+            order: 0
         };
         files.push(newFolder);
         localStorage.setItem('vditor_files', JSON.stringify(files));
