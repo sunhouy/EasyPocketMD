@@ -12,7 +12,12 @@
     "start": "node api/server.js",
     "build:electron:win": "electron-builder -w --x64 --publish=never",
     "build:electron:linux": "electron-builder -l AppImage deb --x64 --publish=never",
-    "bump-version": "node version.js"
+    "bump-version": "node version.js",
+    "cap:init": "cap init",
+    "cap:add:android": "cap add android",
+    "cap:sync": "npm run build && cap sync",
+    "cap:open:android": "cap open android",
+    "cap:build:android": "npm run cap:sync && cd android && ./gradlew assembleRelease"
   },
   "repository": {
     "type": "git",
@@ -51,6 +56,9 @@
     "wkhtmltopdf": "^0.4.0"
   },
   "devDependencies": {
+    "@capacitor/android": "^6.1.2",
+    "@capacitor/cli": "^6.1.2",
+    "@capacitor/core": "^6.1.2",
     "electron": "^30.0.0",
     "electron-builder": "^24.13.3",
     "jest": "^30.2.0",

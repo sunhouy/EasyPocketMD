@@ -83,36 +83,7 @@ jobs:
             service nginx reload
           fi
 
-  # 打包 H5Pack 移动应用资源（供下载）- 仅构建并上传 artifact
-  build-h5pack:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout source
-        uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm install
-
-      - name: Build web app for mobile H5Pack
-        run: npm run build
-
-      - name: Archive dist as H5Pack bundle
-        run: |
-          mkdir -p artifacts
-          cd dist
-          zip -r ../artifacts/md-h5pack-web.zip .
-
-      - name: Upload H5Pack bundle artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: md-h5pack-web
-          path: artifacts/md-h5pack-web.zip
 
   # 打包 Electron 桌面应用 - 仅构建并上传 artifact
   build-electron:
@@ -248,34 +219,7 @@ jobs:
         target: "/www/wwwroot/static"
         strip_components: 1
 
-  # 新增：部署 H5Pack 资源到服务器
-  deploy-h5pack:
-    needs: build-h5pack
-    runs-on: ubuntu-latest
-    steps:
-      - name: Download H5Pack artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: md-h5pack-web
-          path: downloads/h5pack
 
-      - name: Create target directory on server
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SERVER_USER }}
-          password: ${{ secrets.SERVER_PASSWORD }}
-          script: mkdir -p /www/wwwroot/static/h5pack
-
-      - name: Upload H5Pack bundle to server
-        uses: appleboy/scp-action@master
-        with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SERVER_USER }}
-          password: ${{ secrets.SERVER_PASSWORD }}
-          source: "downloads/h5pack/*"
-          target: "/www/wwwroot/static/h5pack"
-          strip_components: 2   # 去除 downloads/h5pack/前缀
 
   # 新增：部署 Electron 应用安装包到服务器
   deploy-electron:
