@@ -91,8 +91,7 @@ class PrintServer:
             except Exception as e:
                 print(f"通知前端客户端时出错: {str(e)}")
 
-    async def handle_client(self, websocket):
-        path = websocket.request.path
+    async def handle_client(self, websocket, path):
         """处理客户端连接（前端或打印客户端）"""
         self.connections.add(websocket)
         client_type = "前端客户端"
