@@ -390,6 +390,16 @@ document.addEventListener('DOMContentLoaded', function() {
         if (addFolderBtn) addFolderBtn.addEventListener('click', window.createNewFolder);
         var mobileFileBtn = document.getElementById('mobileFileBtn');
         if (mobileFileBtn) mobileFileBtn.addEventListener('click', function() { document.getElementById('fileListSidebar').classList.toggle('show'); });
+        
+        // 演示模式按钮仅在桌面端显示
+        var mobilePresentationBtn = document.getElementById('mobilePresentationBtn');
+        if (mobilePresentationBtn) {
+            if (isMobile) {
+                mobilePresentationBtn.style.display = 'none';
+            } else {
+                mobilePresentationBtn.style.display = '';
+            }
+        }
     }
 
     function initMobileFeatures() {
@@ -536,6 +546,16 @@ document.addEventListener('DOMContentLoaded', function() {
                 neu.addEventListener('click', b.fn);
             }
         });
+        
+        // 演示模式按钮仅在桌面端显示
+        var mobilePresentationBtn = document.getElementById('mobilePresentationBtn');
+        if (mobilePresentationBtn) {
+            if (isMobile) {
+                mobilePresentationBtn.style.display = 'none';
+            } else {
+                mobilePresentationBtn.style.display = '';
+            }
+        }
     }
 
     function reinitMobileFeatures() {
