@@ -338,7 +338,13 @@ def main():
     server = PrintServer(host=args.host, port=args.port, auto_find_port=not args.no_auto_port)
     server.local_client_url = f"ws://localhost:{args.local_port}"
 
-    asyncio.run(server.start_server())
+    try:
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(server.start_server())
+    except (KeyboardInterrupt, EOFError):
+        pass
+    except Exception as e:
+        print(f"服务器运行出错: {str(e)}")
 
 
 if __name__ == "__main__":

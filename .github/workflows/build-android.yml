@@ -108,7 +108,7 @@ jobs:
           dependencies {
               implementation fileTree(dir: 'libs', include: ['*.jar'])
               implementation "androidx.appcompat:appcompat:1.6.1"
-              implementation "com.getcapacitor:android:6.1.2"
+              implementation "com.getcapacitor:capacitor:6.1.2"
               implementation project(':capacitor-android')
               testImplementation 'junit:junit:4.13.2'
               androidTestImplementation 'androidx.test.ext:junit:1.1.5'
@@ -128,6 +128,8 @@ jobs:
           EOF
           
           cat > android/gradle.properties << EOF
+          android.useAndroidX=true
+          android.enableJetifier=true
           RELEASE_STORE_FILE=release.keystore
           RELEASE_STORE_PASSWORD=${{ steps.generate-key.outputs.KEYSTORE_PASSWORD }}
           RELEASE_KEY_ALIAS=${{ steps.generate-key.outputs.KEY_ALIAS }}
