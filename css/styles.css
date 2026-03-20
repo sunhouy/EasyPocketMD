@@ -820,14 +820,28 @@ body.night-mode .folder-name {
     transition: all 0.2s;
     border-radius: 4px;
     padding: 0 4px;
-    margin: 2px 0;
+    margin: 0;
     line-height: 28px;
     height: 28px;
+    border: none !important;
+}
+
+.jstree-default .jstree-node {
+    border: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+.jstree-default .jstree-children {
+    border: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
 }
 
 .jstree-default .jstree-hovered {
     background: transparent !important;
     box-shadow: none !important;
+    border: none !important;
 }
 
 .jstree-default .jstree-clicked {
@@ -835,18 +849,22 @@ body.night-mode .folder-name {
     box-shadow: none !important;
     color: #0366d6 !important;
     font-weight: 500;
+    border: none !important;
 }
 
 .jstree-default .jstree-wholerow {
     background: transparent !important;
+    border: none !important;
 }
 
 .jstree-default .jstree-wholerow-hovered {
     background: transparent !important;
+    border: none !important;
 }
 
 .jstree-default .jstree-wholerow-clicked {
     background: transparent !important;
+    border: none !important;
 }
 
 /* 文件项样式调整 */
@@ -2023,24 +2041,36 @@ body.night-mode .form-control {
 body.night-mode .jstree-default .jstree-anchor {
     color: #eee;
     text-shadow: none !important;
+    border: none !important;
 }
 body.night-mode .jstree-default .jstree-hovered {
     background: transparent !important;
     box-shadow: none !important;
+    border: none !important;
 }
 body.night-mode .jstree-default .jstree-clicked {
     background: transparent !important;
     box-shadow: none !important;
     color: #58a6ff !important;
+    border: none !important;
 }
 body.night-mode .jstree-default .jstree-wholerow {
     background: transparent !important;
+    border: none !important;
 }
 body.night-mode .jstree-default .jstree-wholerow-hovered {
     background: transparent !important;
+    border: none !important;
 }
 body.night-mode .jstree-default .jstree-wholerow-clicked {
     background: transparent !important;
+    border: none !important;
+}
+body.night-mode .jstree-default .jstree-node {
+    border: none !important;
+}
+body.night-mode .jstree-default .jstree-children {
+    border: none !important;
 }
 body.night-mode .jstree-default .jstree-icon {
     /* 移除之前的全局 filter: invert(1)，因为我们现在用单独的样式控制了 */

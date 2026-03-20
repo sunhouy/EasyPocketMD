@@ -11,6 +11,26 @@ import sys
 import subprocess
 import time
 import platform
+import socket
+
+def is_port_available(host, port):
+    """检查端口是否可用"""
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.settimeout(1)
+            s.bind((host, port))
+        return True
+    except OSError:
+        return False
+
+
+def find_available_port(host, start_port, max_port=9000):
+    """查找可用端口"""
+    for port in range(start_port, max_port + 1):
+        if is_port_available(host, port):
+            return port
+    raise Exception(f"无法在 {start_port}-{max_port} 范围内找到可用端口")
+
 
 class PrintServiceManager:
     def __init__(self):
@@ -18,6 +38,11 @@ class PrintServiceManager:
         self.print_server_path = os.path.join(self.scripts_dir, 'print_server.py')
         self.processes = []
         self.server_port = 8770  # 新的服务器端口
+        # 检查端口是否可用，不可用则自动查找
+        if not is_port_available('0.0.0.0', self.server_port):
+            original_port = self.server_port
+            self.server_port = find_available_port('0.0.0.0', self.server_port)
+            print(f"端口 {original_port} 已被占用，自动使用可用端口: {self.server_port}")
     
     def check_python(self):
         """检查Python环境"""

@@ -894,6 +894,14 @@
                 data.instance.toggle_node(data.node);
             }
         })
+        .on('click.jstree', function (e, data) {
+            if (!data) return;
+            const node = data.node;
+            if (node && node.type === 'folder') {
+                e.preventDefault();
+                data.instance.toggle_node(node);
+            }
+        })
         .on('rename_node.jstree', function (e, data) {
              if (data.text === data.old) return;
              if (data.node.data.isVirtual) {
