@@ -387,19 +387,25 @@ class PrintClient:
     async def handle_connection(self, websocket):
         """处理WebSocket连接（消息监听循环）"""
         self.connected = True
-        print("开始监听打印任务...")
+        print("=== 开始监听打印任务...")
         try:
             async for message in websocket:
+                print(f"=== 收到来自服务器的消息！ ===")
                 try:
                     data = json.loads(message)
-                    # print(f"收到打印请求: {data.get('type')}")
+                    print(f"消息类型: {data.get('type')}")
+                    print(f"完整消息内容: {data}")
+                    
                     if data.get('type') == 'print_request':
+                        print("✅ 收到打印请求！开始处理...")
                         content = data.get('content', '')
                         settings = data.get('settings', {})
                         # 添加content_type到settings中
                         if 'content_type' in data:
                             settings['content_type'] = data['content_type']
+                        print(f"准备打印内容: {content[:50]}...")
                         success = self.print_content(content, settings)
+                        print(f"打印结果: {'成功' if success else '失败'}")
                         await websocket.send(json.dumps({
                             'type': 'print_queued' if success else 'error',
                             'message': '打印任务已添加到队列' if success else '打印失败'
@@ -431,28 +437,30 @@ class PrintClient:
                 websockets.connect(server_url, ssl=ssl_context),
                 timeout=10
             )
-            print("已连接到打印服务器")
+            print("✅ 已连接到打印服务器")
 
+            client_id = f"client_{datetime.now().timestamp()}"
             auth_data = {
                 'type': 'client_auth',
                 'username': self.username,
                 'password': self.password,
-                'client_id': f"client_{datetime.now().timestamp()}"
+                'client_id': client_id
             }
             await websocket.send(json.dumps(auth_data, ensure_ascii=False))
             print(f"发送认证请求，用户名: {self.username}")
+            print(f"客户端ID: {client_id}")
 
             response = await asyncio.wait_for(websocket.recv(), timeout=5)
             response_data = json.loads(response)
             print(f"收到服务器响应: {response_data.get('type')}")
 
             if response_data.get('type') == 'auth_success':
-                print("认证成功，已连接到打印服务器并永久绑定")
+                print("✅ 认证成功，已连接到打印服务器并永久绑定")
                 self.save_config()
                 await self.handle_connection(websocket)  # 保持连接，处理消息
                 return True
             else:
-                print(f"认证失败: {response_data.get('message')}")
+                print(f"❌ 认证失败: {response_data.get('message')}")
                 return False
         except asyncio.TimeoutError:
             print("连接超时")

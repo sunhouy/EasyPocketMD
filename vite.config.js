@@ -109,10 +109,6 @@ export default defineConfig({
           dest: 'vditor'
         },
         {
-          src: 'sw.js',
-          dest: '.'
-        },
-        {
           src: 'manifest.webmanifest',
           dest: '.'
         },
