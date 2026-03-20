@@ -30,9 +30,6 @@ if platform.system() == 'Windows':
     except ImportError:
         print("警告: 未安装pywin32或Pillow库，Windows下无法打印，请退出程序并联系开发者")
 
-# Global configuration for pdfkit (Removed as we don't use pdfkit anymore)
-# pdfkit_available = False
-# wkhtmltopdf_config = None
 
 def register_startup(force=False):
     """注册开机自启"""

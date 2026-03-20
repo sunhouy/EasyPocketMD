@@ -32,12 +32,11 @@ jobs:
       - name: Build web app
         run: npm run build
 
-      - name: Initialize Capacitor
-        run: |
-          npx cap init "EasyPocketMD" "cn.yhsun.md" --web-dir=dist
-
       - name: Add Android platform
-        run: npx cap add android
+        run: |
+          if [ ! -d "android" ]; then
+            npx cap add android
+          fi
 
       - name: Sync Capacitor
         run: npx cap sync
@@ -108,11 +107,12 @@ jobs:
 
           dependencies {
               implementation fileTree(dir: 'libs', include: ['*.jar'])
+              implementation "androidx.appcompat:appcompat:1.6.1"
+              implementation "com.getcapacitor:android:6.1.2"
+              implementation project(':capacitor-android')
               testImplementation 'junit:junit:4.13.2'
               androidTestImplementation 'androidx.test.ext:junit:1.1.5'
               androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
-              implementation project(':capacitor-android')
-              implementation "com.getcapacitor:capacitor:6.+"
           }
 
           apply from: 'capacitor.build.gradle'
