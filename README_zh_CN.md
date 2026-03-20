@@ -1,5 +1,6 @@
 # EasyPocketMD
-[![Build and Deploy](https://github.com/sunhouy/markdown/actions/workflows/deploy.yml/badge.svg)](https://github.com/sunhouy/markdown/actions/workflows/deploy.yml)
+[![Build and Deploy](https://github.com/sunhouy/EasyPocketMD/actions/workflows/deploy.yml/badge.svg)](https://github.com/sunhouy/EasyPocketMD/actions/workflows/deploy.yml)
+
 <p align="center"><a href="README.md">English</a> &nbsp;|&nbsp; <a href="https://md.yhsun.cn/">Demo</a></p>
 
 这个项目是我投入了大量时间和心血的作品，我希望它能真正帮助到大家。如果你觉得它有用，或者认可我的努力，请给一个 ⭐️ Star 支持我！你的每一个 Star 都是我持续改进的动力，也是对我最大的鼓励。

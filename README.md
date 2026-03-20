@@ -1,6 +1,6 @@
 # EasyPocketMD
 
-[!\[Build and Deploy\](https://github.com/sunhouy/markdown/actions/workflows/deploy.yml/badge.svg null)](https://github.com/sunhouy/markdown/actions/workflows/deploy.yml)
+[![Build and Deploy](https://github.com/sunhouy/EasyPocketMD/actions/workflows/deploy.yml/badge.svg)](https://github.com/sunhouy/EasyPocketMD/actions/workflows/deploy.yml)
 
 <p align="center"><a href="README_zh_CN.md">中文</a> &nbsp;|&nbsp; <a href="https://md.yhsun.cn/">Demo</a></p>
 
