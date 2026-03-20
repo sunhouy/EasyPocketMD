@@ -521,12 +521,14 @@ class PrintClient:
                 try:
                     result = self.listen_task.result()
                     if result is False:
-                        print("连接失败，将尝试重新连接...")
+                        print("连接失败，5秒后将尝试重新连接...")
+                        await asyncio.sleep(5)
                 except asyncio.CancelledError:
                     # 可能被用户取消，忽略
                     pass
                 except Exception as e:
-                    print(f"监听任务异常: {e}")
+                    print(f"监听任务异常: {e}，5秒后重试...")
+                    await asyncio.sleep(5)
                 # 继续循环，重新创建连接任务
                 continue
 

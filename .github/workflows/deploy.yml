@@ -77,11 +77,17 @@ jobs:
             pm2 start api/server.js --name "md-server"
           fi
           
-          # 配置 Nginx
+          # 配置 Nginx (md.yhsun.cn)
           if [ -f "nginx.conf" ]; then
             mv nginx.conf /www/server/panel/vhost/nginx/md.yhsun.cn.conf
-            service nginx reload
           fi
+          
+          # 配置 Nginx (print.yhsun.cn)
+          if [ -f "print/nginx_print_server.conf" ]; then
+            mv print/nginx_print_server.conf /www/server/panel/vhost/nginx/print.yhsun.cn.conf
+          fi
+          
+          service nginx reload
           
     - name: Setup and start print server
       uses: appleboy/ssh-action@master
@@ -116,19 +122,20 @@ jobs:
           
           # 停止旧的打印服务器（如果存在）
           if pm2 describe print-server > /dev/null 2>&1; then
-            echo "停止旧的打印服务器..."
+            echo "正在重新启动打印服务器..."
             pm2 stop print-server
             pm2 delete print-server
           fi
           
           # 启动新的打印服务器
+          # 使用 --host 0.0.0.0 和 --port 8770，默认禁用自动偏移以确保 Nginx 代理正确
           echo "启动打印服务器在 0.0.0.0:8770..."
           pm2 start print_server.py --name "print-server" --interpreter "$PYTHON_CMD" -- --host 0.0.0.0 --port 8770
           
           # 保存 PM2 配置
           pm2 save
           
-          echo "打印服务器已启动！"
+          echo "打印服务器已成功启动或重连！"
           pm2 list
 
 

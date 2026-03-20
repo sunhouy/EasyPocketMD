@@ -629,7 +629,12 @@
 <!-- PWA 注册脚本 -->
 <script>
     (function() {
-        if ('serviceWorker' in navigator && !window.electron) {
+        // 在 Electron 环境下 (window.electron 已定义)、Capacitor 环境或本地文件协议 (file://) 下不注册 Service Worker
+        const isElectron = !!(window.electron || (window.process && window.process.type));
+        const isCapacitor = !!window.Capacitor;
+        const isLocalFile = window.location.protocol === 'file:';
+        
+        if ('serviceWorker' in navigator && !isElectron && !isCapacitor && !isLocalFile) {
             window.addEventListener('load', function() {
                 navigator.serviceWorker.register('./sw.js').catch(function(err) {
                     console.warn('ServiceWorker registration failed:', err);

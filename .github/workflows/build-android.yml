@@ -44,18 +44,17 @@ jobs:
       - name: Generate Android signing key
         id: generate-key
         run: |
-          KEYSTORE_PASSWORD=$(openssl rand -base64 16)
+          # 使用 head -c 16 截取纯字母数字密码，避免特殊字符导致 gradle.properties 解析失败
+          RAW_PASSWORD=$(openssl rand -base64 24 | tr -dc 'a-zA-Z0-9' | head -c 16)
           KEY_ALIAS="easypocketmd"
-          KEY_PASSWORD=$(openssl rand -base64 16)
           
-          echo "KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD" >> $GITHUB_OUTPUT
+          echo "KEY_PASSWORD=$RAW_PASSWORD" >> $GITHUB_OUTPUT
           echo "KEY_ALIAS=$KEY_ALIAS" >> $GITHUB_OUTPUT
-          echo "KEY_PASSWORD=$KEY_PASSWORD" >> $GITHUB_OUTPUT
           
           keytool -genkey -v -keystore android/app/release.keystore \
-            -storepass "$KEYSTORE_PASSWORD" \
+            -storepass "$RAW_PASSWORD" \
             -alias "$KEY_ALIAS" \
-            -keypass "$KEY_PASSWORD" \
+            -keypass "$RAW_PASSWORD" \
             -keyalg RSA \
             -keysize 2048 \
             -validity 10000 \
@@ -134,7 +133,7 @@ jobs:
           android.useAndroidX=true
           android.enableJetifier=true
           RELEASE_STORE_FILE=release.keystore
-          RELEASE_STORE_PASSWORD=${{ steps.generate-key.outputs.KEYSTORE_PASSWORD }}
+          RELEASE_STORE_PASSWORD=${{ steps.generate-key.outputs.KEY_PASSWORD }}
           RELEASE_KEY_ALIAS=${{ steps.generate-key.outputs.KEY_ALIAS }}
           RELEASE_KEY_PASSWORD=${{ steps.generate-key.outputs.KEY_PASSWORD }}
           EOF

@@ -76,6 +76,8 @@
     "files": [
       "dist/**/*",
       "electron-main.js",
+      "preload.js",
+      "icon.png",
       "package.json"
     ],
     "linux": {
