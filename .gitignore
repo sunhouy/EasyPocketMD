@@ -19,3 +19,7 @@ js/ui.js.bak
 *.tgz
 *.tar.gz
 *.exe
+
+# Capacitor
+android/
+ios/
