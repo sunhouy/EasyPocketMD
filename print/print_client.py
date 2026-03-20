@@ -503,7 +503,7 @@ class PrintClient:
             # 确保监听任务存在且正在运行
             if self.listen_task is None or self.listen_task.done():
                 # 如果任务已结束，重新创建
-                self.listen_task = asyncio.create_task(self.connect_and_listen())
+                self.listen_task = asyncio.ensure_future(self.connect_and_listen())
 
             # 创建输入监听future
             input_future = loop.run_in_executor(None, input, "\n按回车键修改配置，或输入 quit 退出: ")
@@ -639,7 +639,8 @@ async def main():
 
 if __name__ == "__main__":
     try:
-        asyncio.run(main())
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(main())
     except KeyboardInterrupt:
         print("\n程序已终止")
     except Exception as e:
