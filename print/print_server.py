@@ -24,6 +24,8 @@ def is_port_available(host, port):
     """检查端口是否可用"""
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            # 设置 SO_REUSEADDR 允许立即重用处于 TIME_WAIT 状态的端口
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             s.settimeout(1)
             s.bind((host, port))
         return True
@@ -40,13 +42,25 @@ def find_available_port(host, start_port, max_port=9000):
 
 
 class PrintServer:
-    def __init__(self, host='127.0.0.1', port=8770, auto_find_port=True):
+    def __init__(self, host='127.0.0.1', port=8770, auto_find_port=False):
         self.host = host
-        # 如果指定了自动查找端口且端口被占用，则查找可用端口
-        if auto_find_port and not is_port_available(host, port):
-            original_port = port
-            port = find_available_port(host, port)
-            print(f"端口 {original_port} 已被占用，自动使用可用端口: {port}")
+        # 如果端口被占用且允许自动查找，则查找可用端口
+        if not is_port_available(host, port):
+            if auto_find_port:
+                original_port = port
+                port = find_available_port(host, port)
+                print(f"端口 {original_port} 已被占用，自动使用可用端口: {port}")
+            else:
+                # 即使不允许自动查找，也尝试等待一下（可能是 PM2 快速重启导致旧进程还没释放）
+                print(f"端口 {port} 已被占用，等待 2 秒后重试...")
+                import time
+                time.sleep(2)
+                if not is_port_available(host, port):
+                    print(f"❌ 端口 {port} 仍然被占用，请检查是否有其他进程正在使用该端口。")
+                    print(f"可以使用 'lsof -i :{port}' 或 'netstat -nlp | grep {port}' 检查。")
+                    # 抛出异常，让程序失败而不是静默切换到错误端口
+                    raise OSError(f"端口 {port} 已被占用")
+        
         self.port = port
         self.local_client_url = "ws://localhost:8771"  # 默认新客户端端口
         self.connections = set()
@@ -331,11 +345,12 @@ def main():
     parser.add_argument('--host', type=str, default='127.0.0.1', help='服务器监听地址')
     parser.add_argument('--port', type=int, default=8770, help='服务器监听端口')
     parser.add_argument('--local-port', type=int, default=8771, help='本地客户端端口')
-    parser.add_argument('--no-auto-port', action='store_true', help='禁用自动查找可用端口')
+    parser.add_argument('--auto-port', action='store_true', help='启用自动查找可用端口')
 
     args = parser.parse_args()
 
-    server = PrintServer(host=args.host, port=args.port, auto_find_port=not args.no_auto_port)
+    # 默认禁用自动寻找端口，除非明确指定了 --auto-port
+    server = PrintServer(host=args.host, port=args.port, auto_find_port=args.auto_port)
     server.local_client_url = f"ws://localhost:{args.local_port}"
 
     try:

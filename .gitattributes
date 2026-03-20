@@ -35,3 +35,4 @@ build/               linguist-generated
 coverage/            linguist-generated
 *.log                 linguist-generated
 
+.github/workflows/*.yml linguist-detectable=true
