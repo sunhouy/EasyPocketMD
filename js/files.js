@@ -330,7 +330,6 @@
     }
 
     function syncCurrentFileWithBeacon() {
-        if (!g('currentUser')) return false;
         const currentFileId = g('currentFileId');
         const vditor = g('vditor');
         if (!currentFileId || !vditor) return false;
@@ -347,6 +346,8 @@
             localStorage.setItem('vditor_files', JSON.stringify(files));
             g('unsavedChanges')[currentFileId] = false;
         } catch (e) {}
+
+        if (!g('currentUser')) return true;
 
         // sendBeacon 无法等待响应，因此统一标记为 pending，后续会自动补齐同步
         markPendingServerSync(currentFileId, true);
@@ -375,7 +376,7 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(body),
                 keepalive: true
-            });
+            }).catch(e => console.warn('Beacon fetch failed:', e));
         } catch (e) {}
         return true;
     }
@@ -902,7 +903,7 @@
              }
              renameFileInternal(data.node.id, data.text);
         })
-        .on('loaded.jstree refresh.jstree', function() {
+        .on('loaded.jstree refresh.jstree open_node.jstree', function() {
             window.$('.jstree-anchor').each(function() {
                 const nodeId = window.$(this).attr('id').replace('jstree_anchor_', '');
                 if (!window.$(this).find('.file-menu-btn').length) {

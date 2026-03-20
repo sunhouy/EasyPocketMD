@@ -816,7 +816,37 @@ body.night-mode .folder-name {
 
 /* jstree text style */
 .jstree-default .jstree-anchor {
-    font-weight: normal !important;
+    color: #333;
+    transition: all 0.2s;
+    border-radius: 4px;
+    padding: 0 4px;
+    margin: 2px 0;
+    line-height: 28px;
+    height: 28px;
+}
+
+.jstree-default .jstree-hovered {
+    background: transparent !important;
+    box-shadow: none !important;
+}
+
+.jstree-default .jstree-clicked {
+    background: transparent !important;
+    box-shadow: none !important;
+    color: #0366d6 !important;
+    font-weight: 500;
+}
+
+.jstree-default .jstree-wholerow {
+    background: transparent !important;
+}
+
+.jstree-default .jstree-wholerow-hovered {
+    background: transparent !important;
+}
+
+.jstree-default .jstree-wholerow-clicked {
+    background: transparent !important;
 }
 
 /* 文件项样式调整 */
@@ -1991,21 +2021,29 @@ body.night-mode .form-control {
 
 /* jstree dark mode support */
 body.night-mode .jstree-default .jstree-anchor {
-    color: #eee !important;
+    color: #eee;
+    text-shadow: none !important;
 }
 body.night-mode .jstree-default .jstree-hovered {
-    background: #3d3d3d !important;
-    color: #fff !important;
+    background: transparent !important;
+    box-shadow: none !important;
 }
 body.night-mode .jstree-default .jstree-clicked {
-    background: #1e3a5f !important;
-    color: #fff !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    color: #58a6ff !important;
+}
+body.night-mode .jstree-default .jstree-wholerow {
+    background: transparent !important;
 }
 body.night-mode .jstree-default .jstree-wholerow-hovered {
-    background: #3d3d3d !important;
+    background: transparent !important;
 }
 body.night-mode .jstree-default .jstree-wholerow-clicked {
-    background: #1e3a5f !important;
+    background: transparent !important;
+}
+body.night-mode .jstree-default .jstree-icon {
+    /* 移除之前的全局 filter: invert(1)，因为我们现在用单独的样式控制了 */
 }
 
 /* 自定义文件菜单按钮样式 */
@@ -2013,32 +2051,30 @@ body.night-mode .jstree-default .jstree-wholerow-clicked {
     /* 移除 relative，防止影响展开的高度计算 */
 }
 .jstree-anchor {
-    display: inline-block !important;
-    width: calc(100% - 28px) !important; /* Leave space for the ocl icon */
-    position: relative !important;
-    padding-right: 30px !important; /* Leave space for absolute button */
+    display: inline-flex !important;
+    align-items: center !important;
+    width: auto !important; /* 让宽度根据内容自适应 */
+    max-width: calc(100% - 28px) !important; /* 限制最大宽度 */
+    padding-right: 4px !important; 
     box-sizing: border-box !important;
     vertical-align: middle !important;
-    white-space: nowrap !important;
-    overflow: hidden !important;
-    text-overflow: ellipsis !important;
 }
 
 .file-menu-btn {
-    position: absolute !important;
-    right: 5px !important;
-    top: 50% !important;
-    transform: translateY(-50%) !important;
-    margin-left: 0 !important;
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    margin-left: 5px !important; /* 紧贴在文本右侧，留出一点间距 */
     cursor: pointer !important;
     opacity: 0;
-    transition: opacity 0.2s;
-    color: #999;
-    padding: 4px 6px;
+    transition: all 0.2s;
+    color: #333; /* 默认深黑色，更清晰 */
+    padding: 4px;
     border-radius: 4px;
     font-size: 14px;
     z-index: 2;
     background: inherit;
+    flex-shrink: 0; /* 防止按钮被挤压 */
 }
 
 .jstree-anchor:hover .file-menu-btn,
@@ -2047,17 +2083,30 @@ body.night-mode .jstree-default .jstree-wholerow-clicked {
 }
 
 .file-menu-btn:hover {
-    color: #333;
-    background: rgba(0,0,0,0.05);
+    color: #000;
+    background: rgba(0,0,0,0.1);
 }
 
 body.night-mode .file-menu-btn {
-    color: #aaa;
+    color: #eee;
 }
 
 body.night-mode .file-menu-btn:hover {
     color: #fff;
-    background: rgba(255,255,255,0.1);
+    background: rgba(255,255,255,0.2);
+}
+
+/* 移除根目录文件前的占位，使其紧靠左侧 */
+.jstree-default > ul > .jstree-node.jstree-leaf > .jstree-ocl {
+    display: none !important;
+}
+
+.jstree-default .jstree-node {
+    margin-left: 15px !important;
+}
+
+.jstree-default > ul > .jstree-node {
+    margin-left: 0 !important;
 }
 
 /* 确保文件列表容器不会溢出 */
@@ -2080,11 +2129,48 @@ body.night-mode .file-menu-btn:hover {
     padding: 0 !important;
 }
 
-/* 确保文件夹展开/折叠箭头正确显示 */
+/* 确保文件夹展开/折叠箭头正确显示，并修改其样式使其更小、更精致 */
 .jstree-default .jstree-ocl {
     display: inline-block !important;
     vertical-align: middle !important;
     margin-right: 2px !important;
+    background-image: none !important; /* 移除默认的精灵图背景 */
+    width: 16px !important;
+    height: 24px !important;
+    line-height: 24px !important;
+    text-align: center !important;
+    font-family: "Font Awesome 5 Free";
+    font-weight: 900;
+    font-size: 13px !important; /* 稍微调大一点字号 */
+    color: #000; /* 日间模式纯黑色 */
+}
+
+/* 折叠状态（向右的箭头） */
+.jstree-default .jstree-closed > .jstree-ocl::before {
+    content: "\f0da"; /* fas fa-caret-right */
+}
+
+/* 展开状态（向下的箭头） */
+.jstree-default .jstree-open > .jstree-ocl::before {
+    content: "\f0d7"; /* fas fa-caret-down */
+}
+
+/* 叶子节点不需要箭头 */
+.jstree-default .jstree-leaf > .jstree-ocl::before {
+    content: "";
+}
+
+/* 夜间模式下的箭头颜色 */
+body.night-mode .jstree-default .jstree-ocl {
+    color: #fff !important; /* 夜间模式纯白色 */
+}
+
+/* 因为不再使用精灵图，去掉之前设置的 invert 滤镜，防止影响其他正常图标 */
+body.night-mode .jstree-default .jstree-icon.jstree-themeicon {
+    filter: invert(1);
+}
+body.night-mode .jstree-default .jstree-icon.jstree-ocl {
+    filter: none !important;
 }
 
 .jstree-default .jstree-icon {

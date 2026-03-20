@@ -1,0 +1,37 @@
+* text=auto
+*.js    text eol=lf
+*.ts    text eol=lf
+*.json  text eol=lf
+*.yml   text eol=lf
+*.yaml  text eol=lf
+*.md    text eol=lf
+*.html  text eol=lf
+*.css   text eol=lf
+*.scss  text eol=lf
+*.graphql text eol=lf
+*.sh    text eol=lf
+
+# 标记二进制文件
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.ico   binary
+*.svg   binary
+*.eot   binary
+*.ttf   binary
+*.woff  binary
+*.woff2 binary
+*.zip   binary
+*.tar   binary
+*.gz    binary
+
+# 标记生成的文件，让 GitHub 在 PR 中默认折叠它们
+package-lock.json    linguist-generated
+yarn.lock            linguist-generated
+pnpm-lock.yaml       linguist-generated
+dist/                linguist-generated
+build/               linguist-generated
+coverage/            linguist-generated
+*.log                 linguist-generated
+

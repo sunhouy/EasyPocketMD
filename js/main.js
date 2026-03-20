@@ -567,7 +567,7 @@ document.addEventListener('DOMContentLoaded', function() {
             e.returnValue = window.i18n ? window.i18n.t('confirmLeave') : '您有未保存的文件，确定要离开吗？';
             // beforeunload 中的异步操作通常不会可靠执行，改为使用 sendBeacon 进行服务器同步
             try {
-                if (window.currentUser && typeof window.syncCurrentFileWithBeacon === 'function') {
+                if (typeof window.syncCurrentFileWithBeacon === 'function') {
                     window.syncCurrentFileWithBeacon();
                 }
             } catch (e) {}
@@ -577,7 +577,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // 页面关闭/切后台时，使用 sendBeacon 尽最大努力保存当前文件到服务器
     function tryBeaconSaveOnLeave() {
         try {
-            if (window.currentUser && typeof window.syncCurrentFileWithBeacon === 'function') {
+            if (typeof window.syncCurrentFileWithBeacon === 'function') {
                 window.syncCurrentFileWithBeacon();
             }
         } catch (e) {}
