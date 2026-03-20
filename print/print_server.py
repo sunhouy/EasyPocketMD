@@ -90,6 +90,7 @@ class PrintServer:
                     print(f"收到请求: {data.get('type')}")
 
                     if data.get('type') == 'client_auth':
+                        print(f"=== 收到打印客户端认证请求 ===")
                         # 处理打印客户端认证
                         try:
                             client_type = "打印客户端"
@@ -97,9 +98,11 @@ class PrintServer:
                             password = data.get('password')
                             client_id = data.get('client_id')
 
-                            print(f"收到打印客户端认证请求，客户端ID: {client_id}, 用户名: {username}")
+                            print(f"客户端ID: {client_id}")
+                            print(f"用户名: {username}")
 
                             if self.validate_user_credentials(username, password):
+                                print(f"✅ 用户凭证验证成功")
                                 # 认证成功，建立永久绑定
                                 self.clients[client_id] = {
                                     'websocket': websocket,
@@ -109,23 +112,27 @@ class PrintServer:
                                 }
                                 # 建立用户与客户端的永久绑定
                                 self.user_bindings[username] = client_id
+                                print(f"✅ 客户端已添加到 clients 字典")
+                                print(f"✅ 用户绑定关系已更新: {self.user_bindings}")
 
                                 await websocket.send(json.dumps({
                                     'type': 'auth_success',
                                     'message': '认证成功，已连接到打印服务器并永久绑定'
                                 }, ensure_ascii=False))
-                                print(f"打印客户端认证成功: {client_id}")
-                                print(f"客户端绑定关系已建立: 用户 {username} -> 客户端 {client_id}")
+                                print(f"✅ 打印客户端认证成功: {client_id}")
+                                print(f"✅ 客户端绑定关系已建立: 用户 {username} -> 客户端 {client_id}")
+                                print(f"当前所有绑定关系: {self.user_bindings}")
 
                                 # 通知所有前端客户端
                                 await self.notify_frontend_clients()
                             else:
+                                print(f"❌ 用户凭证验证失败")
                                 # 认证失败
                                 await websocket.send(json.dumps({
                                     'type': 'auth_error',
                                     'message': '用户名或密码错误，请使用Markdown编辑器的账号密码'
                                 }, ensure_ascii=False))
-                                print(f"打印客户端认证失败，用户名: {username}")
+                                print(f"❌ 打印客户端认证失败，用户名: {username}")
                         except Exception as e:
                             print(f"处理客户端认证时出错: {str(e)}")
                             await websocket.send(json.dumps({
@@ -163,14 +170,19 @@ class PrintServer:
                             }, ensure_ascii=False))
 
                     elif data.get('type') == 'print_request':
-
+                        print(f"=== 收到打印请求 ===")
+                        
                         try:
-
                             username = data.get('username')
                             password = data.get('password')
+                            
+                            print(f"用户: {username}")
+                            print(f"当前用户绑定关系: {self.user_bindings}")
+                            print(f"当前已连接的客户端: {list(self.clients.keys())}")
 
                             # 验证用户凭证
                             if not self.validate_user_credentials(username, password):
+                                print(f"用户凭证验证失败: {username}")
                                 await websocket.send(json.dumps({
                                     'type': 'error',
                                     'message': '用户名或密码错误'
@@ -178,41 +190,33 @@ class PrintServer:
                                 return
 
                             # 通过用户名映射找到客户端ID
-
                             client_id = self.user_bindings.get(username)
+                            print(f"查找用户 {username} 绑定的客户端: {client_id}")
 
                             if client_id and client_id in self.clients:
-
                                 client_info = self.clients[client_id]
+                                print(f"找到客户端 {client_id}，准备发送打印任务...")
 
                                 try:
-
                                     await client_info['websocket'].send(json.dumps(data, ensure_ascii=False))
+                                    print(f"✅ 打印任务已成功发送到客户端: {client_id}")
 
                                     await websocket.send(json.dumps({
-
                                         'type': 'print_queued',
-
                                         'message': '打印任务已发送到绑定的打印客户端'
-
                                     }, ensure_ascii=False))
 
-                                    print(f"打印任务已发送到客户端: {client_id}")
-
                                 except Exception as e:
-
-                                    print(f"发送打印任务失败: {str(e)}")
-
+                                    print(f"❌ 发送打印任务失败: {str(e)}")
+                                    import traceback
+                                    traceback.print_exc()
                                     await websocket.send(json.dumps({
-
                                         'type': 'error',
-
                                         'message': '发送打印任务失败'
-
                                     }, ensure_ascii=False))
 
                             else:
-
+                                print(f"❌ 未找到用户 {username} 绑定的客户端！")
                                 # 没有找到绑定的客户端
 
                                 await websocket.send(json.dumps({

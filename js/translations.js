@@ -80,6 +80,9 @@
             share: '分享',
             myFiles: '我的文件',
             cloudPrint: '云打印',
+            presentationMode: '演示模式',
+            presentationModeStarted: '已进入演示模式，按 ESC 键退出',
+            presentationModeEnded: '已退出演示模式',
             switchMode: '切换模式',
             import: '导入',
             export: '导出',
@@ -409,6 +412,9 @@
             share: 'Share',
             myFiles: 'My Files',
             cloudPrint: 'Cloud Print',
+            presentationMode: 'Presentation Mode',
+            presentationModeStarted: 'Entered presentation mode, press ESC to exit',
+            presentationModeEnded: 'Exited presentation mode',
             switchMode: 'Switch Mode',
             import: 'Import',
             export: 'Export',
@@ -674,19 +680,16 @@
     const i18n = {
         // 初始化语言
         init: function() {
-            // 从本地存储获取语言设置，或使用浏览器语言
+            // 从本地存储获取语言设置，默认使用中文
             const savedLanguage = localStorage.getItem('vditor_language');
             if (savedLanguage && (savedLanguage === 'zh' || savedLanguage === 'en')) {
                 currentLanguage = savedLanguage;
             } else {
-                // 检测浏览器语言
-                const browserLang = navigator.language || navigator.userLanguage;
-                if (browserLang.startsWith('zh')) {
-                    currentLanguage = 'zh';
-                } else {
-                    currentLanguage = 'en';
-                }
+                // 默认设置为中文
+                currentLanguage = 'zh';
+                localStorage.setItem('vditor_language', 'zh');
             }
+            document.documentElement.lang = currentLanguage === 'zh' ? 'zh-CN' : 'en';
             return currentLanguage;
         },
 

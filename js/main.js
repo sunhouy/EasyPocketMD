@@ -403,6 +403,9 @@ document.addEventListener('DOMContentLoaded', function() {
         var mobilePrintBtn = document.getElementById('mobilePrintBtn');
         if (mobilePrintBtn) mobilePrintBtn.addEventListener('click', function() { window.showPrintDialog(); closeDrop(); });
         
+        var mobilePresentationBtn = document.getElementById('mobilePresentationBtn');
+        if (mobilePresentationBtn) mobilePresentationBtn.addEventListener('click', function() { enterPresentationMode(); closeDrop(); });
+        
         var mobileMenuBtn = document.getElementById('mobileMenuBtn');
         if (mobileMenuBtn) mobileMenuBtn.addEventListener('click', function(e) { e.stopPropagation(); if (dropdown) dropdown.classList.toggle('show'); });
         var mobileModeBtn = document.getElementById('mobileModeBtn');
@@ -517,6 +520,7 @@ document.addEventListener('DOMContentLoaded', function() {
             { id: 'mobileShareBtn', fn: function() { window.showShareDialog(); closeDrop(); } },
             { id: 'mobileFileManagerBtn', fn: function() { window.showFileManager(); closeDrop(); } },
             { id: 'mobilePrintBtn', fn: function() { window.showPrintDialog(); closeDrop(); } },
+            { id: 'mobilePresentationBtn', fn: function() { enterPresentationMode(); closeDrop(); } },
             { id: 'mobileMenuBtn', fn: function(e) { e.stopPropagation(); if (dropdown) dropdown.classList.toggle('show'); } },
             { id: 'mobileModeBtn', fn: function() { showModeSelection(); closeDrop(); } },
             { id: 'mobileExportBtn', fn: function() { window.exportContent(); closeDrop(); } },
@@ -901,6 +905,66 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             };
             window.vditor = new Vditor('vditor', newConfig);
+        }
+    }
+    
+    function enterPresentationMode() {
+        var mobileToolbar = document.querySelector('.mobile-toolbar-container');
+        var mobileBottomBar = document.querySelector('.mobile-bottom-bar');
+        var editorContainer = document.querySelector('.editor-container');
+        
+        if (mobileToolbar) {
+            mobileToolbar.style.display = 'none';
+        }
+        if (mobileBottomBar) {
+            mobileBottomBar.style.display = 'none';
+        }
+        if (editorContainer) {
+            editorContainer.style.top = '0';
+            editorContainer.style.height = '100vh';
+        }
+        
+        if (document.documentElement.requestFullscreen) {
+            document.documentElement.requestFullscreen();
+        } else if (document.documentElement.webkitRequestFullscreen) {
+            document.documentElement.webkitRequestFullscreen();
+        } else if (document.documentElement.msRequestFullscreen) {
+            document.documentElement.msRequestFullscreen();
+        }
+        
+        document.addEventListener('fullscreenchange', handleFullscreenChange);
+        document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+        document.addEventListener('msfullscreenchange', handleFullscreenChange);
+        
+        window.showMessage(window.i18n ? window.i18n.t('presentationModeStarted') : '已进入演示模式，按 ESC 键退出', 'info');
+    }
+    
+    function exitPresentationMode() {
+        var mobileToolbar = document.querySelector('.mobile-toolbar-container');
+        var mobileBottomBar = document.querySelector('.mobile-bottom-bar');
+        var editorContainer = document.querySelector('.editor-container');
+        
+        if (mobileToolbar) {
+            mobileToolbar.style.display = '';
+        }
+        if (mobileBottomBar) {
+            mobileBottomBar.style.display = '';
+        }
+        if (editorContainer) {
+            editorContainer.style.top = '';
+            editorContainer.style.height = '';
+        }
+        
+        document.removeEventListener('fullscreenchange', handleFullscreenChange);
+        document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+        document.removeEventListener('msfullscreenchange', handleFullscreenChange);
+        
+        window.showMessage(window.i18n ? window.i18n.t('presentationModeEnded') : '已退出演示模式', 'info');
+    }
+    
+    function handleFullscreenChange() {
+        if (!document.fullscreenElement && !document.webkitFullscreenElement && !document.msFullscreenElement) {
+            exitPresentationMode();
         }
     }
 });

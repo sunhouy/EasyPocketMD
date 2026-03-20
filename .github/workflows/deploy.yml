@@ -150,8 +150,7 @@ jobs:
         with:
           name: ${{ matrix.artifactName }}
           path: |
-            dist-electron/**
-            release/**
+            dist-electron-new/**
           if-no-files-found: warn
 
   # 检查 print_client.py 是否变更
