@@ -17,7 +17,8 @@
     "cap:add:android": "cap add android",
     "cap:sync": "npm run build && cap sync",
     "cap:open:android": "cap open android",
-    "cap:build:android": "npm run cap:sync && cd android && ./gradlew assembleRelease"
+    "cap:build:android": "npm run cap:sync && cd android && ./gradlew assembleRelease",
+    "cap:assets": "npx capacitor-assets generate --android"
   },
   "repository": {
     "type": "git",
@@ -57,8 +58,11 @@
   },
   "devDependencies": {
     "@capacitor/android": "^6.1.2",
+    "@capacitor/assets": "^3.0.0",
     "@capacitor/cli": "^6.1.2",
     "@capacitor/core": "^6.1.2",
+    "@capacitor/filesystem": "^6.0.0",
+    "@capacitor/share": "^6.0.0",
     "electron": "^35.7.5",
     "electron-builder": "^26.8.1",
     "jest": "^30.2.0",

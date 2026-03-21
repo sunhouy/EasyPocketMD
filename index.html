@@ -333,6 +333,13 @@
                 </div>
             </div>
             <div class="form-group">
+                <label data-i18n="defaultStorageLocation">默认存储位置</label>
+                <div class="radio-group" id="storageLocationSetting">
+                    <label><input type="radio" name="storageLocation" value="cloud"> <span data-i18n="storageCloud">云端存储</span></label>
+                    <label><input type="radio" name="storageLocation" value="local"> <span data-i18n="storageLocal">本地存储</span></label>
+                </div>
+            </div>
+            <div class="form-group">
                 <label data-i18n="bottomToolbarButtons">底部工具栏按钮 (5-7个)</label>
                 <div class="checkbox-group" id="toolbarButtonsSettings">
                     <!-- 动态生成 -->

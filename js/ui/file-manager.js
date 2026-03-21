@@ -2,6 +2,8 @@
     'use strict';
 
     function g(name) { return global[name]; }
+    function isEn() { return window.i18n && window.i18n.getLanguage() === 'en'; }
+    function t(key) { return window.i18n ? window.i18n.t(key) : key; }
 
     function formatSize(bytes) {
         if (bytes === 0) return '0 B';
@@ -51,6 +53,25 @@
         usageInfo.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ' + t('loading');
         content.appendChild(usageInfo);
 
+        // Settings (Default Storage)
+        const settingsDiv = document.createElement('div');
+        settingsDiv.style.cssText = `margin-bottom:15px;padding:10px;background:${nightMode ? '#3d3d3d' : '#f8f9fa'};border-radius:8px;display:flex;align-items:center;justify-content:space-between;font-size:14px;`;
+        const currentLoc = window.userSettings.storageLocation || 'cloud';
+        settingsDiv.innerHTML = `
+            <span>${t('defaultStorageLocation')}:</span>
+            <select id="storage-location-select" style="background:${bg};color:${textColor};border:1px solid ${borderColor};border-radius:4px;padding:3px 8px;">
+                <option value="cloud" ${currentLoc === 'cloud' ? 'selected' : ''}>${t('storageCloud')}</option>
+                <option value="local" ${currentLoc === 'local' ? 'selected' : ''}>${t('storageLocal')}</option>
+            </select>
+        `;
+        content.appendChild(settingsDiv);
+        const select = settingsDiv.querySelector('#storage-location-select');
+        select.onchange = (e) => {
+            window.userSettings.storageLocation = e.target.value;
+            localStorage.setItem('vditor_settings', JSON.stringify(window.userSettings));
+            global.showMessage(t('saveSuccess') || '保存成功', 'success');
+        };
+
         // File List
         const fileListContainer = document.createElement('div');
         fileListContainer.style.cssText = 'flex:1;overflow-y:auto;min-height:200px;border:1px solid ' + borderColor + ';border-radius:8px;padding:10px;';
@@ -77,27 +98,36 @@
             const result = await response.json();
 
             if (result.code === 200) {
+                // Combine with local files
+                const localFiles = JSON.parse(localStorage.getItem('vditor_local_files') || '[]').map(f => ({...f, isLocal: true}));
+                const allFiles = [...localFiles, ...result.data];
+
                 // Update Usage
                 usageInfo.innerHTML = `
                     <div style="font-size:16px;margin-bottom:5px;">${t('usedSpace')}: <strong>${formatSize(result.totalSize)}</strong></div>
-                    <div style="font-size:12px;color:${nightMode ? '#aaa' : '#666'};">${t('totalFiles').replace('{count}', result.data.length)}</div>
+                    <div style="font-size:12px;color:${nightMode ? '#aaa' : '#666'};">${t('totalFiles').replace('{count}', allFiles.length)}</div>
                 `;
 
                 // Render Files
-                if (result.data.length === 0) {
+                if (allFiles.length === 0) {
                     fileListContainer.innerHTML = `<div style="text-align:center;padding:40px;color:${nightMode ? '#aaa' : '#666'};">${t('noFiles')}</div>`;
                 } else {
                     const list = document.createElement('div');
                     list.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill, minmax(100px, 1fr));gap:10px;';
                     
-                    result.data.forEach(file => {
+                    allFiles.forEach(file => {
                         const item = document.createElement('div');
                         item.style.cssText = `border:1px solid ${borderColor};border-radius:6px;padding:8px;position:relative;display:flex;flex-direction:column;align-items:center;transition:all 0.2s;`;
                         item.onmouseover = () => item.style.borderColor = '#2196F3';
                         item.onmouseout = () => item.style.borderColor = borderColor;
 
                         // Display name logic: remove timestamp prefix (digits + underscore)
-                        const displayName = file.name.replace(/^\d+_/, '');
+                        const displayName = (file.originalName || file.name).replace(/^\d+_/, '');
+
+                        // Local indicator
+                        const locIndicator = file.isLocal 
+                            ? `<i class="fas fa-hdd" style="position:absolute;top:5px;left:5px;font-size:10px;color:#2196F3;" title="${t('localFile')}"></i>`
+                            : `<i class="fas fa-cloud" style="position:absolute;top:5px;left:5px;font-size:10px;color:#4CAF50;" title="${t('cloudFile')}"></i>`;
 
                         // Preview
                         let preview = '';
@@ -108,12 +138,16 @@
                         }
 
                         item.innerHTML = `
+                            ${locIndicator}
                             ${preview}
                             <div style="font-size:12px;width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center;margin-bottom:2px;" title="${displayName}">${displayName}</div>
                             <div style="font-size:10px;color:${nightMode ? '#aaa' : '#666'};">${formatSize(file.size)}</div>
-                            <div style="display:flex;gap:5px;margin-top:5px;width:100%;">
-                                <button class="copy-btn" style="flex:1;background:#2196F3;color:white;border:none;border-radius:3px;padding:2px;font-size:10px;cursor:pointer;">${t('copy')}</button>
-                                <button class="del-btn" style="flex:1;background:#dc3545;color:white;border:none;border-radius:3px;padding:2px;font-size:10px;cursor:pointer;">${t('delete')}</button>
+                            <div style="display:flex;flex-direction:column;gap:5px;margin-top:5px;width:100%;">
+                                <div style="display:flex;gap:5px;width:100%;">
+                                    <button class="copy-btn" style="flex:1;background:#2196F3;color:white;border:none;border-radius:3px;padding:2px;font-size:10px;cursor:pointer;">${t('copy')}</button>
+                                    <button class="del-btn" style="flex:1;background:#dc3545;color:white;border:none;border-radius:3px;padding:2px;font-size:10px;cursor:pointer;">${t('delete')}</button>
+                                </div>
+                                ${file.isLocal ? `<button class="convert-btn" style="width:100%;background:#4CAF50;color:white;border:none;border-radius:3px;padding:2px;font-size:10px;cursor:pointer;">${t('convertToCloud')}</button>` : ''}
                             </div>
                         `;
 
@@ -134,6 +168,14 @@
                         const delBtn = item.querySelector('.del-btn');
                         delBtn.onclick = async () => {
                             if (confirm(t('confirmDeleteFile').replace('{name}', displayName))) {
+                                if (file.isLocal) {
+                                    const locals = JSON.parse(localStorage.getItem('vditor_local_files') || '[]');
+                                    const filtered = locals.filter(f => f.name !== file.name);
+                                    localStorage.setItem('vditor_local_files', JSON.stringify(filtered));
+                                    item.remove();
+                                    global.showMessage(t('deleteSuccess'), 'success');
+                                    return;
+                                }
                                 try {
                                     var apiUrl = (window.getApiBaseUrl ? window.getApiBaseUrl() : 'api') + '/user_files/delete';
                                     const delRes = await fetch(apiUrl, {
@@ -149,19 +191,75 @@
                                     if (delResult.code === 200) {
                                         item.remove();
                                         global.showMessage(t('deleteSuccess'), 'success');
-                                        // Update usage visually if needed, or just let it be until refresh
                                     } else {
                                         global.showMessage(delResult.message || t('deleteFailed'), 'error');
                                     }
                                 } catch (err) {
-                                    if (global.showNetworkErrorBanner) {
-                                        global.showNetworkErrorBanner();
-                                    } else {
-                                        global.showMessage(t('networkError'), 'error');
-                                    }
+                                    global.showMessage(t('networkError'), 'error');
                                 }
                             }
                         };
+
+                        if (file.isLocal) {
+                            const convertBtn = item.querySelector('.convert-btn');
+                            convertBtn.onclick = async () => {
+                                try {
+                                    global.showMessage(isEn() ? 'Uploading...' : '正在上传...', 'info');
+                                    
+                                    // Fetch the file content if it's a file:// URL or data: URL
+                                    // 自动对 URL 进行编码处理，支持包含空格的本地文件路径
+                                    const fetchUrl = file.url.includes(' ') ? encodeURI(file.url) : file.url;
+                                    const response = await fetch(fetchUrl);
+                                    const blob = await response.blob();
+                                    const fileToUpload = new File([blob], file.originalName || file.name, { type: file.type });
+                                    
+                                    // Set temp location to cloud to ensure it goes to server
+                                    const oldTemp = window.tempStorageLocation;
+                                    window.tempStorageLocation = 'cloud';
+                                    
+                                    const cloudLink = await global.uploadFiles([fileToUpload], false);
+                                    
+                                    window.tempStorageLocation = oldTemp;
+                                    
+                                    if (cloudLink) {
+                                        const cloudUrl = cloudLink.match(/\((.*?)\)/)[1];
+                                        // Replace in editor if found
+                                        if (g('vditor')) {
+                                            const editorValue = g('vditor').getValue();
+                                            // 同时支持替换原始 URL 和已编码的 URL，防止因空格导致匹配失败
+                                            const rawUrl = file.url;
+                                            const encodedUrl = encodeURI(rawUrl);
+                                            
+                                            let newEditorValue = editorValue;
+                                            const escapedRaw = rawUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                                            const escapedEncoded = encodedUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                                            
+                                            newEditorValue = newEditorValue.replace(new RegExp(escapedRaw, 'g'), cloudUrl);
+                                            if (escapedEncoded !== escapedRaw) {
+                                                newEditorValue = newEditorValue.replace(new RegExp(escapedEncoded, 'g'), cloudUrl);
+                                            }
+
+                                            if (newEditorValue !== editorValue) {
+                                                g('vditor').setValue(newEditorValue);
+                                            }
+                                        }
+
+                                        // Remove from local list
+                                        const locals = JSON.parse(localStorage.getItem('vditor_local_files') || '[]');
+                                        const filtered = locals.filter(f => f.name !== file.name);
+                                        localStorage.setItem('vditor_local_files', JSON.stringify(filtered));
+                                        
+                                        global.showMessage(t('uploadSuccess') || '上传成功', 'success');
+                                        // Refresh file manager
+                                        modal.remove();
+                                        showFileManager();
+                                    }
+                                } catch (err) {
+                                    console.error('Conversion failed', err);
+                                    global.showMessage(t('uploadFailed') || '上传失败', 'error');
+                                }
+                            };
+                        }
 
                         list.appendChild(item);
                     });

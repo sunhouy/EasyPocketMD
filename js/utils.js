@@ -81,8 +81,10 @@
     /** 获取本地 API 根地址（同源 api/index.php），保证 origin 与 api 之间必有 / */
     function getApiBaseUrl() {
         if (typeof window !== 'undefined') {
-            // 在 Electron 应用或本地 file:// 协议下运行，直接请求远程服务器
-            if (window.electron || (window.location && window.location.protocol === 'file:')) {
+            // 在 Electron 应用、Capacitor 应用或本地 file:// 协议下运行，直接请求远程服务器
+            if (window.electron || 
+                (window.location && (window.location.protocol === 'file:' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) ||
+                (window.Capacitor && window.Capacitor.isNativePlatform())) {
                 return 'https://md.yhsun.cn/api';
             }
             if (window.location && window.location.origin) {
@@ -92,6 +94,19 @@
             }
         }
         return 'api';
+    }
+
+    /** 获取应用的基础域名（用于拼接绝对路径） */
+    function getAppOrigin() {
+        if (typeof window !== 'undefined') {
+            if (window.electron || 
+                (window.location && (window.location.protocol === 'file:' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) ||
+                (window.Capacitor && window.Capacitor.isNativePlatform())) {
+                return 'https://md.yhsun.cn';
+            }
+            return window.location.origin;
+        }
+        return '';
     }
 
     /** 安全解析接口响应为 JSON，若返回 HTML 或非 JSON 则返回错误对象并附带详情便于排查 */
@@ -135,6 +150,7 @@
     global.escapeHtml = escapeHtml;
     global.removeModal = removeModal;
     global.getApiBaseUrl = getApiBaseUrl;
+    global.getAppOrigin = getAppOrigin;
     global.parseJsonResponse = parseJsonResponse;
 
 })(typeof window !== 'undefined' ? window : this);

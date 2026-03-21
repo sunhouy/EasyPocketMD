@@ -8,6 +8,81 @@ function g(name) { return global[name]; }
 function isEn() { return window.i18n && window.i18n.getLanguage() === 'en'; }
 function t(key) { return window.i18n ? window.i18n.t(key) : key; }
 
+    /**
+     * 创建统一的打印状态显示模态框
+     * @param {string} initialTitle 初始标题
+     * @returns {object} 包含 updateStatus, setFinished, remove 方法的对象
+     */
+    function createPrintStatusModal(initialTitle) {
+        var nightMode = g('nightMode') === true;
+        var modal = document.createElement('div');
+        modal.className = 'modal-overlay';
+        modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:10010;display:flex;align-items:center;justify-content:center;';
+
+        var dialog = document.createElement('div');
+        dialog.style.cssText = 'background:' + (nightMode ? '#2d2d2d' : 'white') + ';color:' + (nightMode ? '#eee' : '#333') + ';border-radius:12px;padding:25px;width:90%;max-width:500px;box-shadow:0 10px 25px rgba(0,0,0,0.3);';
+
+        var title = document.createElement('h3');
+        title.textContent = initialTitle;
+        title.style.cssText = 'margin-top:0;margin-bottom:20px;text-align:center;font-size:16px;font-weight:600;';
+
+        var statusDiv = document.createElement('div');
+        statusDiv.style.cssText = 'text-align:center;margin:20px 0;padding:20px;background:' + (nightMode ? '#3d3d3d' : '#f8f9fa') + ';border-radius:8px;border:1px solid ' + (nightMode ? '#444' : '#eee') + ';';
+
+        var statusText = document.createElement('div');
+        statusText.textContent = isEn() ? 'Connecting...' : '正在连接...';
+        statusText.style.cssText = 'font-size:16px;margin-bottom:12px;font-weight:500;';
+
+        var statusDetail = document.createElement('div');
+        statusDetail.textContent = isEn() ? 'Establishing connection to print server...' : '正在建立与打印服务器的连接...';
+        statusDetail.style.cssText = 'font-size:13px;line-height:1.5;color:' + (nightMode ? '#aaa' : '#666') + ';min-height:40px;';
+
+        statusDiv.appendChild(statusText);
+        statusDiv.appendChild(statusDetail);
+
+        var actionBtn = document.createElement('button');
+        actionBtn.textContent = isEn() ? 'Cancel' : '取消';
+        actionBtn.style.cssText = 'width:100%;padding:12px;background:' + (nightMode ? '#444' : '#6c757d') + ';color:white;border:none;border-radius:6px;cursor:pointer;font-weight:500;transition:background 0.2s;';
+        
+        actionBtn.onmouseover = function() { this.style.opacity = '0.9'; };
+        actionBtn.onmouseout = function() { this.style.opacity = '1'; };
+
+        dialog.appendChild(title);
+        dialog.appendChild(statusDiv);
+        dialog.appendChild(actionBtn);
+        modal.appendChild(dialog);
+        document.body.appendChild(modal);
+
+        var isFinished = false;
+
+        return {
+            modal: modal,
+            actionBtn: actionBtn,
+            updateStatus: function(text, detail, isError) {
+                statusText.textContent = text;
+                statusDetail.textContent = detail || '';
+                if (isError) {
+                    statusText.style.color = '#dc3545';
+                    statusDetail.style.color = '#dc3545';
+                } else {
+                    statusText.style.color = nightMode ? '#eee' : '#333';
+                    statusDetail.style.color = nightMode ? '#aaa' : '#666';
+                }
+            },
+            setFinished: function() {
+                isFinished = true;
+                actionBtn.textContent = isEn() ? 'Close' : '关闭';
+                actionBtn.style.background = '#0078d4';
+            },
+            remove: function() {
+                modal.remove();
+            },
+            isFinished: function() {
+                return isFinished;
+            }
+        };
+    }
+
     function showDownloadClientModal() {
         var nightMode = g('nightMode') === true;
         var modal = document.createElement('div');
@@ -742,21 +817,50 @@ function t(key) { return window.i18n ? window.i18n.t(key) : key; }
             var username = g('currentUser').username;
             var userPassword = g('currentUser').password;
 
-            return new Promise(function(resolve, reject) {
+            // 使用统一的状态模态框
+            var statusUI = createPrintStatusModal(isEn() ? 'File Print: ' + fileName : '文件打印: ' + fileName);
+
+            var ws = null;
+            var timeout = null;
+            var isCancelled = false;
+
+            statusUI.actionBtn.onclick = function() {
+                isCancelled = true;
+                cleanup();
+                statusUI.remove();
+            };
+
+            function cleanup() {
+                if (ws && ws.readyState === WebSocket.OPEN) ws.close();
+                if (timeout) clearTimeout(timeout);
+            }
+
+            return new Promise(function(resolve) {
                 var wsUrl = 'wss://print.yhsun.cn';
-                var ws = new WebSocket(wsUrl);
-                var timeout = setTimeout(function() {
-                    reject(new Error(isEn() ? 'Connection timeout' : '连接超时'));
-                }, 5000);
+                ws = new WebSocket(wsUrl);
+                
+                timeout = setTimeout(function() {
+                    statusUI.updateStatus(isEn() ? 'Connection timeout' : '连接超时', '', true);
+                    statusUI.setFinished();
+                    cleanup();
+                    resolve();
+                }, 15000);
 
                 ws.onopen = function() {
                     clearTimeout(timeout);
+                    if (isCancelled) {
+                        ws.close();
+                        return;
+                    }
+                    
+                    statusUI.updateStatus(isEn() ? 'Connected' : '已连接', isEn() ? 'Sending print request...' : '正在发送打印请求...');
 
                     // 确保fileUrl是完整的URL
                     var fullFileUrl = fileUrl;
                     if (!fileUrl.startsWith('http://') && !fileUrl.startsWith('https://')) {
                         // 构建完整的URL
-                        var baseUrl = window.location.origin;
+                        var origin = window.getAppOrigin ? window.getAppOrigin() : window.location.origin;
+                        var baseUrl = origin;
                         if (!fileUrl.startsWith('/')) {
                             baseUrl += '/' + window.location.pathname.split('/').slice(0, -1).join('/') + '/';
                         }
@@ -770,6 +874,7 @@ function t(key) { return window.i18n ? window.i18n.t(key) : key; }
                         content: fullFileUrl,
                         content_type: 'file',
                         file_name: fileName,
+                        job_id: 'job_' + Date.now(),
                         settings: {
                             print_file: true
                         },
@@ -780,34 +885,51 @@ function t(key) { return window.i18n ? window.i18n.t(key) : key; }
                 };
 
                 ws.onmessage = function(event) {
+                    if (isCancelled) return;
                     try {
                         var response = JSON.parse(event.data);
-                        if (response.type === 'print_queued') {
+                        if (response.type === 'print_status') {
+                            statusUI.updateStatus(isEn() ? 'Printing...' : '正在打印...', response.message, false);
+                        } else if (response.type === 'print_queued') {
+                            statusUI.updateStatus(isEn() ? 'Job sent' : '打印已发送', response.message || (isEn() ? 'Task added to queue' : '任务已添加到队列'), false);
+                            statusUI.setFinished();
+                            cleanup();
                             resolve();
                         } else if (response.type === 'error') {
-                            reject(new Error(response.message || (isEn() ? 'Print failed' : '打印失败')));
+                            statusUI.updateStatus(isEn() ? 'Print failed' : '打印失败', response.message || '', true);
+                            statusUI.setFinished();
+                            cleanup();
+                            resolve();
                         }
                     } catch (e) {
-                        reject(e);
-                    } finally {
-                        ws.close();
+                        statusUI.updateStatus(isEn() ? 'Error' : '错误', e.toString(), true);
+                        statusUI.setFinished();
+                        cleanup();
+                        resolve();
                     }
                 };
 
                 ws.onerror = function(error) {
-                clearTimeout(timeout);
-                if (global.showNetworkErrorBanner) {
-                    global.showNetworkErrorBanner();
-                } else {
-                    global.showMessage(isEn() ? 'Network not connected, please connect to the network' : '网络未连接，请连接网络', 'error');
-                }
-                reject(error);
-                ws.close();
-            };
+                    clearTimeout(timeout);
+                    statusUI.updateStatus(isEn() ? 'Connection error' : '连接错误', '', true);
+                    statusUI.setFinished();
+                    cleanup();
+                    resolve();
+                };
 
                 ws.onclose = function() {
                     clearTimeout(timeout);
+                    if (!isCancelled && !statusUI.isFinished()) {
+                        statusUI.setFinished();
+                        resolve();
+                    }
                 };
+
+                statusUI.modal.addEventListener('click', function(e) {
+                    if (e.target === statusUI.modal && statusUI.isFinished()) {
+                        statusUI.remove();
+                    }
+                });
             });
         }
 
@@ -1268,6 +1390,14 @@ function t(key) { return window.i18n ? window.i18n.t(key) : key; }
     }
 
     async function downloadAsPDF(content, settings) {
+        // Check for local files first
+        if (global.checkAndUploadLocalFiles) {
+            const ok = await global.checkAndUploadLocalFiles();
+            if (!ok) return; // User cancelled upload
+            // Refresh content in case it was replaced with cloud links
+            content = g('vditor').getValue();
+        }
+
         // 显示加载状态
         var nightMode = g('nightMode') === true;
         var loadingModal = document.createElement('div');
@@ -1287,7 +1417,8 @@ function t(key) { return window.i18n ? window.i18n.t(key) : key; }
             var fullPdfUrl = pdfUrl;
             if (!pdfUrl.startsWith('http://') && !pdfUrl.startsWith('https://')) {
                 // 构建完整的URL
-                var baseUrl = window.location.origin;
+                var origin = window.getAppOrigin ? window.getAppOrigin() : window.location.origin;
+                var baseUrl = origin;
                 if (!pdfUrl.startsWith('/')) {
                     baseUrl += '/' + window.location.pathname.split('/').slice(0, -1).join('/') + '/';
                 }
@@ -1327,6 +1458,12 @@ function t(key) { return window.i18n ? window.i18n.t(key) : key; }
     }
 
     async function showPrintPreview(settings) {
+        // Check for local files first
+        if (global.checkAndUploadLocalFiles) {
+            const ok = await global.checkAndUploadLocalFiles();
+            if (!ok) return; // User cancelled upload
+        }
+
         var nightMode = g('nightMode') === true;
         var content = g('vditor') ? g('vditor').getValue() : '';
 
@@ -1371,6 +1508,7 @@ function t(key) { return window.i18n ? window.i18n.t(key) : key; }
         var showPreview = function() {
             if (!pdfUrl) return;
             
+            console.log('[PDF Debug] Showing preview for URL:', pdfUrl);
             loadingModal.remove();
             
             previewModal = document.createElement('div');
@@ -1453,6 +1591,12 @@ function t(key) { return window.i18n ? window.i18n.t(key) : key; }
     }
 
     async function sendToPrint(settings, existingPdfUrl) {
+        // Check for local files first
+        if (global.checkAndUploadLocalFiles) {
+            const ok = await global.checkAndUploadLocalFiles();
+            if (!ok) return; // User cancelled upload
+        }
+
         // 检查用户是否登录
         if (!g('currentUser')) {
             global.showMessage(isEn() ? 'Please log in first to use cloud print feature' : '请先登录后再使用云打印功能');
@@ -1462,79 +1606,22 @@ function t(key) { return window.i18n ? window.i18n.t(key) : key; }
             return;
         }
 
-        var nightMode = g('nightMode') === true;
         var content = g('vditor') ? g('vditor').getValue() : '';
         var username = g('currentUser').username;
         var userPassword = g('currentUser').password;
 
-        var modal = document.createElement('div');
-        modal.className = 'modal-overlay';
-        modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:10002;display:flex;align-items:center;justify-content:center;';
-
-        var dialog = document.createElement('div');
-        dialog.style.cssText = 'background:' + (nightMode ? '#2d2d2d' : 'white') + ';color:' + (nightMode ? '#eee' : '#333') + ';border-radius:12px;padding:25px;width:90%;max-width:500px;';
-
-        var title = document.createElement('h3');
-        title.textContent = isEn() ? 'Send to Cloud Print Client' : '发送到云打印客户端';
-        title.style.cssText = 'margin-top:0;margin-bottom:20px;text-align:center;';
-
-        var statusDiv = document.createElement('div');
-        statusDiv.id = 'printStatus';
-        statusDiv.style.cssText = 'text-align:center;margin:20px 0;padding:15px;background:' + (nightMode ? '#3d3d3d' : '#f8f9fa') + ';border-radius:8px;';
-
-        var statusText = document.createElement('div');
-        statusText.id = 'printStatusText';
-        statusText.textContent = isEn() ? 'Preparing print content...' : '正在准备打印内容...';
-        statusText.style.cssText = 'font-size:16px;margin-bottom:10px;';
-
-        var statusDetail = document.createElement('div');
-        statusDetail.id = 'printStatusDetail';
-        statusDetail.textContent = isEn() ? 'Generating PDF document...' : '正在生成PDF文档...';
-        statusDetail.style.cssText = 'font-size:13px;color:' + (nightMode ? '#aaa' : '#666') + ';';
-
-        statusDiv.appendChild(statusText);
-        statusDiv.appendChild(statusDetail);
-
-        var buttonContainer = document.createElement('div');
-        buttonContainer.style.cssText = 'display:flex;gap:10px;margin-top:20px;';
-
-        var cancelBtn = document.createElement('button');
-        cancelBtn.textContent = isEn() ? 'Cancel' : '取消';
-        cancelBtn.style.cssText = 'flex:1;padding:12px;background:' + (nightMode ? '#555' : '#6c757d') + ';color:white;border:none;border-radius:6px;cursor:pointer;';
-        cancelBtn.onclick = function() {
-            modal.remove();
-        };
-
-        buttonContainer.appendChild(cancelBtn);
-
-        dialog.appendChild(title);
-        dialog.appendChild(statusDiv);
-        dialog.appendChild(buttonContainer);
-        modal.appendChild(dialog);
-        document.body.appendChild(modal);
-
+        // 使用统一的状态模态框
+        var statusUI = createPrintStatusModal(isEn() ? 'Cloud Print' : '云打印');
+        
         var ws = null;
         var timeout = null;
         var isCancelled = false;
 
-        cancelBtn.onclick = function() {
+        statusUI.actionBtn.onclick = function() {
             isCancelled = true;
             cleanup();
-            modal.remove();
+            statusUI.remove();
         };
-
-        function updateStatus(text, detail, isError) {
-            if (isCancelled) return;
-            statusText.textContent = text;
-            statusDetail.textContent = detail;
-            if (isError) {
-                statusText.style.color = '#dc3545';
-                statusDetail.style.color = '#dc3545';
-            } else {
-                statusText.style.color = nightMode ? '#eee' : '#333';
-                statusDetail.style.color = nightMode ? '#aaa' : '#666';
-            }
-        }
 
         function cleanup() {
             if (ws && ws.readyState === WebSocket.OPEN) ws.close();
@@ -1545,6 +1632,7 @@ function t(key) { return window.i18n ? window.i18n.t(key) : key; }
             // 1. 生成PDF (如果未提供)
             let pdfUrl = existingPdfUrl;
             if (!pdfUrl) {
+                statusUI.updateStatus(isEn() ? 'Preparing content...' : '正在准备内容...', isEn() ? 'Generating PDF document...' : '正在生成PDF文档...');
                 var htmlContent = await preparePrintContent(content, settings);
                 if (isCancelled) return;
                 pdfUrl = await generatePDF(htmlContent, settings);
@@ -1552,15 +1640,16 @@ function t(key) { return window.i18n ? window.i18n.t(key) : key; }
             
             if (isCancelled) return;
 
-            // 2. 连接 WebSocket (不再需要上传，因为PDF已经在服务器上)
-            updateStatus(isEn() ? 'Connecting to print server...' : '连接打印服务器...', isEn() ? 'Establishing connection...' : '正在建立连接...');
+            // 2. 连接 WebSocket
+            statusUI.updateStatus(isEn() ? 'Connecting...' : '正在连接...', isEn() ? 'Establishing connection to print server...' : '正在建立与打印服务器的连接...');
             var wsUrl = 'wss://print.yhsun.cn';
             ws = new WebSocket(wsUrl);
 
             timeout = setTimeout(function() {
-                updateStatus(isEn() ? 'Connection timeout' : '连接超时', isEn() ? 'Cannot connect to print server, please check network connection' : '无法连接到打印服务器，请检查网络连接', true);
+                statusUI.updateStatus(isEn() ? 'Connection timeout' : '连接超时', isEn() ? 'Cannot connect to print server, please check network' : '无法连接到打印服务器，请检查网络', true);
+                statusUI.setFinished();
                 cleanup();
-            }, 10000);
+            }, 15000);
 
             ws.onopen = async function() {
                 clearTimeout(timeout);
@@ -1568,12 +1657,12 @@ function t(key) { return window.i18n ? window.i18n.t(key) : key; }
                     ws.close();
                     return;
                 }
-                updateStatus(isEn() ? 'Connected successfully' : '连接成功', isEn() ? 'Sending print job...' : '正在发送打印任务...');
+                statusUI.updateStatus(isEn() ? 'Connected' : '已连接', isEn() ? 'Sending print job...' : '正在发送打印任务...');
 
-                // Ensure fileUrl is absolute
                 var fullFileUrl = pdfUrl;
                 if (!fullFileUrl.startsWith('http://') && !fullFileUrl.startsWith('https://')) {
-                    var baseUrl = window.location.origin;
+                    var origin = window.getAppOrigin ? window.getAppOrigin() : window.location.origin;
+                    var baseUrl = origin;
                     if (!fullFileUrl.startsWith('/')) {
                         baseUrl += '/' + window.location.pathname.split('/').slice(0, -1).join('/') + '/';
                     }
@@ -1587,6 +1676,7 @@ function t(key) { return window.i18n ? window.i18n.t(key) : key; }
                     content: fullFileUrl,
                     content_type: 'file',
                     file_name: 'print_job.pdf',
+                    job_id: 'job_' + Date.now(),
                     settings: {
                         print_file: true
                     },
@@ -1602,50 +1692,60 @@ function t(key) { return window.i18n ? window.i18n.t(key) : key; }
                     var response = JSON.parse(event.data);
                     if (response.type === 'client_status') {
                         if (response.connected) {
-                            updateStatus(isEn() ? 'Client connected' : '客户端已连接', isEn() ? 'Sending job...' : '正在发送任务...');
+                            statusUI.updateStatus(isEn() ? 'Client connected' : '客户端已连接', isEn() ? 'Waiting for task to start...' : '等待打印任务开始...');
                         } else {
-                            updateStatus(isEn() ? 'Client not connected' : '客户端未连接', isEn() ? 'Please ensure print client is running and logged in' : '请确保打印客户端已启动并登录', true);
+                            statusUI.updateStatus(isEn() ? 'Client not connected' : '客户端未连接', isEn() ? 'Please ensure print client is running and logged in' : '请确保打印客户端已启动并登录', true);
+                            statusUI.setFinished();
                         }
+                    } else if (response.type === 'print_status') {
+                        statusUI.updateStatus(isEn() ? 'Printing...' : '正在打印...', response.message, false);
                     } else if (response.type === 'print_queued') {
-                        updateStatus(isEn() ? 'Print job sent' : '打印任务已发送', isEn() ? 'Print job added to print queue' : '打印任务已添加到打印队列', false);
+                        statusUI.updateStatus(isEn() ? 'Job sent' : '打印已发送', response.message || (isEn() ? 'Added to queue' : '已添加到打印队列'), false);
+                        statusUI.setFinished();
                         cleanup();
-                        setTimeout(function() {
-                            if (!isCancelled) modal.remove();
-                        }, 2000);
                     } else if (response.type === 'error') {
-                        updateStatus(isEn() ? 'Print failed: ' + response.message : '打印失败: ' + response.message, response.details || '', true);
+                        statusUI.updateStatus(isEn() ? 'Print failed' : '打印失败', response.message || '', true);
+                        statusUI.setFinished();
                         cleanup();
                     }
                 } catch (e) {
-                    updateStatus(isEn() ? 'Response parse error' : '响应解析错误', e.toString(), true);
+                    statusUI.updateStatus(isEn() ? 'Error' : '错误', e.toString(), true);
+                    statusUI.setFinished();
                     cleanup();
                 }
             };
 
             ws.onerror = function(error) {
                 clearTimeout(timeout);
-                updateStatus(isEn() ? 'Connection error' : '连接错误', isEn() ? 'Cannot connect to print server, please check network connection' : '无法连接到打印服务器，请检查网络连接', true);
-                console.error('WebSocket错误:', error);
+                statusUI.updateStatus(isEn() ? 'Connection error' : '连接错误', '', true);
+                statusUI.setFinished();
             };
 
             ws.onclose = function(event) {
                 clearTimeout(timeout);
-                if (!event.wasClean && !isCancelled) {
-                    updateStatus(isEn() ? 'Connection closed unexpectedly' : '连接意外关闭', isEn() ? 'Code: ' + event.code : '代码: ' + event.code, true);
+                if (!event.wasClean && !isCancelled && !statusUI.isFinished()) {
+                    statusUI.updateStatus(isEn() ? 'Connection closed' : '连接关闭', isEn() ? 'Code: ' + event.code : '代码: ' + event.code, true);
+                    statusUI.setFinished();
                 }
             };
 
-            modal.addEventListener('click', function(e) {
-                if (e.target === modal) {
-                    isCancelled = true;
-                    cleanup();
-                    modal.remove();
+            statusUI.modal.addEventListener('click', function(e) {
+                if (e.target === statusUI.modal) {
+                    if (statusUI.isFinished()) {
+                        statusUI.remove();
+                    } else {
+                        // 如果未完成，提示是否取消？或者直接允许取消
+                        isCancelled = true;
+                        cleanup();
+                        statusUI.remove();
+                    }
                 }
             });
 
         } catch (error) {
             if (!isCancelled) {
-                updateStatus('失败', error.toString(), true);
+                statusUI.updateStatus(isEn() ? 'Failed' : '失败', error.toString(), true);
+                statusUI.setFinished();
                 cleanup();
             }
         }
@@ -2160,20 +2260,47 @@ function t(key) { return window.i18n ? window.i18n.t(key) : key; }
             var username = g('currentUser').username;
             var userPassword = g('currentUser').password;
 
-            return new Promise(function(resolve, reject) {
+            // 使用统一的状态模态框
+            var statusUI = createPrintStatusModal(isEn() ? 'File Print: ' + fileName : '文件打印: ' + fileName);
+
+            var ws = null;
+            var timeout = null;
+            var isCancelled = false;
+
+            statusUI.actionBtn.onclick = function() {
+                isCancelled = true;
+                cleanup();
+                statusUI.remove();
+            };
+
+            function cleanup() {
+                if (ws && ws.readyState === WebSocket.OPEN) ws.close();
+                if (timeout) clearTimeout(timeout);
+            }
+
+            return new Promise(function(resolve) {
                 var wsUrl = 'wss://print.yhsun.cn';
-                var ws = new WebSocket(wsUrl);
-                var timeout = setTimeout(function() {
-                    reject(new Error(isEn() ? 'Connection timeout' : '连接超时'));
-                }, 5000);
+                ws = new WebSocket(wsUrl);
+                
+                timeout = setTimeout(function() {
+                    statusUI.updateStatus(isEn() ? 'Connection timeout' : '连接超时', '', true);
+                    statusUI.setFinished();
+                    cleanup();
+                    resolve();
+                }, 15000);
 
                 ws.onopen = function() {
                     clearTimeout(timeout);
+                    if (isCancelled) {
+                        ws.close();
+                        return;
+                    }
+                    
+                    statusUI.updateStatus(isEn() ? 'Connected' : '已连接', isEn() ? 'Sending print request...' : '正在发送打印请求...');
 
                     // 确保fileUrl是完整的URL
                     var fullFileUrl = fileUrl;
                     if (!fileUrl.startsWith('http://') && !fileUrl.startsWith('https://')) {
-                        // 构建完整的URL
                         var baseUrl = window.location.origin;
                         if (!fileUrl.startsWith('/')) {
                             baseUrl += '/' + window.location.pathname.split('/').slice(0, -1).join('/') + '/';
@@ -2188,6 +2315,7 @@ function t(key) { return window.i18n ? window.i18n.t(key) : key; }
                         content: fullFileUrl,
                         content_type: 'file',
                         file_name: fileName,
+                        job_id: 'job_' + Date.now(),
                         settings: {
                             print_file: true
                         },
@@ -2198,30 +2326,51 @@ function t(key) { return window.i18n ? window.i18n.t(key) : key; }
                 };
 
                 ws.onmessage = function(event) {
+                    if (isCancelled) return;
                     try {
                         var response = JSON.parse(event.data);
-                        if (response.type === 'print_queued') {
+                        if (response.type === 'print_status') {
+                            statusUI.updateStatus(isEn() ? 'Printing...' : '正在打印...', response.message, false);
+                        } else if (response.type === 'print_queued') {
+                            statusUI.updateStatus(isEn() ? 'Job sent' : '打印已发送', response.message || (isEn() ? 'Task added to queue' : '任务已添加到队列'), false);
+                            statusUI.setFinished();
+                            cleanup();
                             resolve();
                         } else if (response.type === 'error') {
-                            reject(new Error(response.message || (isEn() ? 'Print failed' : '打印失败')));
+                            statusUI.updateStatus(isEn() ? 'Print failed' : '打印失败', response.message || '', true);
+                            statusUI.setFinished();
+                            cleanup();
+                            resolve();
                         }
                     } catch (e) {
-                        reject(e);
-                    } finally {
-                        ws.close();
+                        statusUI.updateStatus(isEn() ? 'Error' : '错误', e.toString(), true);
+                        statusUI.setFinished();
+                        cleanup();
+                        resolve();
                     }
                 };
 
                 ws.onerror = function(error) {
                     clearTimeout(timeout);
-                    global.showMessage('网络未连接，请连接网络', 'error');
-                    reject(error);
-                    ws.close();
+                    statusUI.updateStatus(isEn() ? 'Connection error' : '连接错误', '', true);
+                    statusUI.setFinished();
+                    cleanup();
+                    resolve();
                 };
 
-                ws.onclose = function(event) {
+                ws.onclose = function() {
                     clearTimeout(timeout);
+                    if (!isCancelled && !statusUI.isFinished()) {
+                        statusUI.setFinished();
+                        resolve();
+                    }
                 };
+
+                statusUI.modal.addEventListener('click', function(e) {
+                    if (e.target === statusUI.modal && statusUI.isFinished()) {
+                        statusUI.remove();
+                    }
+                });
             });
         }
     }

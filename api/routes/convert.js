@@ -91,23 +91,63 @@ router.post('/pdf', (req, res) => {
         
         const writeStream = fs.createWriteStream(filePath);
         
-        wkhtmltopdf(html, options)
-            .pipe(writeStream)
-            .on('finish', () => {
-                console.log('PDF generation successful');
-                res.json({
-                    code: 200,
-                    message: 'PDF generated successfully',
-                    url: fileUrl
-                });
-            })
-            .on('error', (err) => {
-                console.error('wkhtmltopdf error:', err);
+        console.log('[PDF Debug] Starting wkhtmltopdf for filename:', filename);
+        
+        const pdfStream = wkhtmltopdf(html, options);
+        
+        pdfStream.on('error', (err) => {
+            console.error('[PDF Debug] wkhtmltopdf command error:', err);
+            if (!res.headersSent) {
                 res.status(500).json({
                     code: 500,
-                    message: 'PDF generation failed',
+                    message: 'PDF generation failed (command error)',
                     error: err.message
                 });
+            }
+        });
+
+        pdfStream.pipe(writeStream)
+            .on('finish', () => {
+                // Check if file exists and has content
+                if (fs.existsSync(filePath)) {
+                    const stats = fs.statSync(filePath);
+                    if (stats.size > 0) {
+                        console.log('[PDF Debug] PDF generation successful, size:', stats.size);
+                        if (!res.headersSent) {
+                            res.json({
+                                code: 200,
+                                message: 'PDF generated successfully',
+                                url: fileUrl
+                            });
+                        }
+                    } else {
+                        console.error('[PDF Debug] PDF generation failed: file is empty');
+                        if (!res.headersSent) {
+                            res.status(500).json({
+                                code: 500,
+                                message: 'PDF generation failed: file is empty'
+                            });
+                        }
+                    }
+                } else {
+                    console.error('[PDF Debug] PDF generation failed: file not found');
+                    if (!res.headersSent) {
+                        res.status(500).json({
+                            code: 500,
+                            message: 'PDF generation failed: file not found'
+                        });
+                    }
+                }
+            })
+            .on('error', (err) => {
+                console.error('[PDF Debug] writeStream error:', err);
+                if (!res.headersSent) {
+                    res.status(500).json({
+                        code: 500,
+                        message: 'PDF generation failed (stream error)',
+                        error: err.message
+                    });
+                }
             });
 
     } catch (error) {

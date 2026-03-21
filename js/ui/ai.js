@@ -315,6 +315,14 @@
         document.body.appendChild(loadingModal);
 
         try {
+            // Check for local files first
+            if (global.checkAndUploadLocalFiles) {
+                const ok = await global.checkAndUploadLocalFiles();
+                if (!ok) return; // User cancelled upload
+                // Update html if content changed
+                html = g('vditor').getValue();
+            }
+
             // Ensure generatePDF and renderPDF are available
             if (!global.generatePDF) {
                 
