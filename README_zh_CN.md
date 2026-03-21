@@ -2,10 +2,10 @@
 
 极速，跨平台，易上手的 Markdown 编辑器，支持Windows/Linux/Android/ios以及网页端。
 
-[!\[Build and Deploy\](https://github.com/sunhouy/EasyPocketMD/actions/workflows/deploy.yml/badge.svg null)](https://github.com/sunhouy/EasyPocketMD/actions/workflows/deploy.yml)
-[!\[Build Android APK\](https://github.com/sunhouy/EasyPocketMD/actions/workflows/build-android.yml/badge.svg null)](https://github.com/sunhouy/EasyPocketMD/actions/workflows/build-android.yml)
+[!\[Build and Deploy\](https://github.com/sunhouy/EasyPocketMD/actions/workflows/deploy.yml/badge.svg)](https://github.com/sunhouy/EasyPocketMD/actions/workflows/deploy.yml)
+[!\[Build Android APK\](https://github.com/sunhouy/EasyPocketMD/actions/workflows/build-android.yml/badge.svg)](https://github.com/sunhouy/EasyPocketMD/actions/workflows/build-android.yml)
 [![Build Electron App](https://github.com/sunhouy/EasyPocketMD/actions/workflows/build-electron.yml/badge.svg)](https://github.com/sunhouy/EasyPocketMD/actions/workflows/build-electron.yml)
-[!\[Dependabot Updates\](https://github.com/sunhouy/EasyPocketMD/actions/workflows/dependabot/dependabot-updates/badge.svg null)](https://github.com/sunhouy/EasyPocketMD/actions/workflows/dependabot/dependabot-updates)
+[!\[Dependabot Updates\](https://github.com/sunhouy/EasyPocketMD/actions/workflows/dependabot/dependabot-updates/badge.svg)](https://github.com/sunhouy/EasyPocketMD/actions/workflows/dependabot/dependabot-updates)
 
 <p align="center"><a href="README.md">English</a> &nbsp;|&nbsp; <a href="https://md.yhsun.cn/">Demo</a></p>
 
@@ -20,7 +20,7 @@
 无论是手机还是电脑，都可以使用 EasyPocketMD 来编辑 Markdown 文档。多平台界面采用统一的设计风格，给您一致的操作体验。
 
 <div style="display: flex; justify-content: center; gap: 20px;">
-  <img src="readme/1_1.png" width="200"/>
+  <img src="readme/1_1.png" width="500"/>
   <img src="readme/1_2.png" width="200"/>
 </div>
 
@@ -29,7 +29,7 @@
 不需记忆任何 Markdown 语法，底部的工具栏提供了常用的格式插入按钮，如加粗、斜体、标题、列表、引用、代码块、链接、图片等，一键即可插入。支持所见即所得 / 即时渲染 / 分屏预览三种操作模式，总有一个选择适合您。
 
 <div style="display: flex; justify-content: center; gap: 20px;">
-  <img src="readme/2_1.png" width="200"/>
+  <img src="readme/2_1.png" width="500"/>
   <img src="readme/2_2.png" width="200"/>
 </div>
 
@@ -47,8 +47,8 @@
 所有编辑的文档都将自动保存到本地数据库，如果登陆了账户，会自动与服务器同步，并跨设备同步所有内容。如果不同设备的文件冲突了，我们会提示您决定使用哪个版本。我们会实时保存您做的任何修改，即使突然关闭编辑器或重启电脑，也不会丢失任何数据。我们还会记录历史版本，您可以随时查看和恢复到之前的状态。
 
 <div style="display: flex; justify-content: center; gap: 20px;">
-  <img src="readme/4_1.png" width="200"/>
-  <img src="readme/4_2.png" width="200"/>
+  <img src="readme/4_1.png" width="400"/>
+  <img src="readme/4_2.png" width="400"/>
 </div>
 
 ### 领先的云打印功能
@@ -66,7 +66,7 @@
 
 <div style="display: flex; justify-content: center; gap: 20px;">
   <img src="readme/6_1.png" width="200"/>
-  <img src="readme/6_2.png" width="200"/>
+  <img src="readme/6_2.png" width="500"/>
 </div>
 
 ### 高度个性化的体验
