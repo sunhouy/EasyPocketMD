@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-启动云打印服务脚本
-- 启动本地打印客户端
-- 启动打印服务器
+启动打印服务器
 """
 
 import os
