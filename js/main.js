@@ -34,6 +34,7 @@ document.addEventListener('DOMContentLoaded', function() {
         { id: 'mobileInsertBtn', icon: 'fas fa-plus', textKey: 'insert', fn: function() { window.showInsertMenu(); } },
         { id: 'mobileFormulaBtn', icon: 'fas fa-superscript', textKey: 'formula', fn: function() { if (typeof window.showFormulaPicker === 'function') window.showFormulaPicker(); } },
         { id: 'mobileChartBtn', icon: 'fas fa-chart-bar', textKey: 'chart', fn: function() { if (typeof window.showChartPicker === 'function') window.showChartPicker(); } },
+        { id: 'mobileUncertaintyBtn', icon: 'fas fa-calculator', textKey: 'uncertainty', fn: function() { if (typeof window.showUncertaintyCalculator === 'function') window.showUncertaintyCalculator(); } },
         { id: 'mobileUndoBtn', icon: 'fas fa-undo', textKey: 'undo', fn: function() { if (window.vditor && window.vditor.vditor && window.vditor.vditor.undo) window.vditor.vditor.undo.undo(window.vditor.vditor); } },
         { id: 'mobileRedoBtn', icon: 'fas fa-redo', textKey: 'redo', fn: function() { if (window.vditor && window.vditor.vditor && window.vditor.vditor.undo) window.vditor.vditor.undo.redo(window.vditor.vditor); } },
         { id: 'mobileSaveBottomBtn', icon: 'fas fa-save', textKey: 'save', fn: function() { window.saveCurrentFile(true); } }
@@ -423,6 +424,9 @@ document.addEventListener('DOMContentLoaded', function() {
         var mobileExportBtn = document.getElementById('mobileExportBtn');
         if (mobileExportBtn) mobileExportBtn.addEventListener('click', function() { window.exportContent(); closeDrop(); });
 
+        var mobileUncertaintyBtn = document.getElementById('mobileUncertaintyBtn');
+        if (mobileUncertaintyBtn) mobileUncertaintyBtn.addEventListener('click', function() { if (typeof window.showUncertaintyCalculator === 'function') window.showUncertaintyCalculator(); closeDrop(); });
+
         var mobileImportBtn = document.getElementById('mobileImportBtn');
         if (mobileImportBtn) mobileImportBtn.addEventListener('click', function() { window.importFiles(); closeDrop(); });
 
@@ -534,6 +538,7 @@ document.addEventListener('DOMContentLoaded', function() {
             { id: 'mobileMenuBtn', fn: function(e) { e.stopPropagation(); if (dropdown) dropdown.classList.toggle('show'); } },
             { id: 'mobileModeBtn', fn: function() { showModeSelection(); closeDrop(); } },
             { id: 'mobileExportBtn', fn: function() { window.exportContent(); closeDrop(); } },
+            { id: 'mobileUncertaintyBtn', fn: function() { if (typeof window.showUncertaintyCalculator === 'function') window.showUncertaintyCalculator(); closeDrop(); } },
             { id: 'mobileClearBtn', fn: function() { if (confirm(window.i18n ? window.i18n.t('clearConfirm') : '确定要清空当前文件的内容吗？')) { if (window.vditor) window.vditor.setValue(''); window.showMessage(window.i18n ? window.i18n.t('contentCleared') : '内容已清空'); } closeDrop(); } },
             { id: 'mobileSettingsBtn', fn: function() { window.showSettingsDialog(); closeDrop(); } },
             { id: 'aboutBtn', fn: function() { window.showAboutDialog(); closeDrop(); } }
