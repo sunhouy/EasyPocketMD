@@ -1,0 +1,134 @@
+name: Build Electron App
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: '要发布到 GitHub Release 的 tag（例如 v1.2.3；留空则使用当前 ref 的 tag）'
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  build-electron:
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            script: build:electron:win
+            artifactName: md-electron-win
+          - os: ubuntu-latest
+            script: build:electron:linux
+            artifactName: md-electron-linux
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build web app (Vite)
+        run: npm run build
+
+      - name: Build Electron app (${{ matrix.script }})
+        run: npm run ${{ matrix.script }}
+
+      - name: Upload Electron artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifactName }}
+          path: |
+            dist-electron-new/**
+          if-no-files-found: warn
+
+  publish-electron-release:
+    needs: build-electron
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && github.event.inputs.release_tag != '')
+    concurrency:
+      group: gh-release-${{ github.repository }}-${{ github.event_name == 'workflow_dispatch' && github.event.inputs.release_tag != '' && github.event.inputs.release_tag || github.ref_name }}
+      cancel-in-progress: false
+
+    steps:
+      - name: Download Windows Electron artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: md-electron-win
+          path: downloads/electron/win
+
+      - name: Download Linux Electron artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: md-electron-linux
+          path: downloads/electron/linux
+
+      - name: Upload Electron assets to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.release_tag != '' && github.event.inputs.release_tag || github.ref_name }}
+          files: |
+            downloads/electron/**/*.exe
+            downloads/electron/**/*.deb
+
+  deploy-electron:
+    needs: build-electron
+    runs-on: ubuntu-latest
+    steps:
+      # 下载 Windows 产物
+      - name: Download Windows Electron artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: md-electron-win
+          path: downloads/electron/win
+
+      # 下载 Linux 产物
+      - name: Download Linux Electron artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: md-electron-linux
+          path: downloads/electron/linux
+
+      # 在服务器上创建对应目录
+      - name: Create electron directories on server
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          password: ${{ secrets.SERVER_PASSWORD }}
+          script: |
+            mkdir -p /www/wwwroot/static/electron/win
+            mkdir -p /www/wwwroot/static/electron/linux
+
+      # 上传 Windows 产物
+      - name: Upload Windows Electron artifacts
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          password: ${{ secrets.SERVER_PASSWORD }}
+          source: "downloads/electron/win/*"
+          target: "/www/wwwroot/static/electron/win"
+          strip_components: 3   # 去除 downloads/electron/win/ 前缀
+
+      # 上传 Linux 产物
+      - name: Upload Linux Electron artifacts
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          password: ${{ secrets.SERVER_PASSWORD }}
+          source: "downloads/electron/linux/*"
+          target: "/www/wwwroot/static/electron/linux"
+          strip_components: 3   # 去除 downloads/electron/linux/ 前缀
