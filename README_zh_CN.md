@@ -2,10 +2,9 @@
 
 极速，跨平台，易上手的 Markdown 编辑器，支持Windows/Linux/Android/ios以及网页端。
 
-[!\[Build and Deploy\](https://github.com/sunhouy/EasyPocketMD/actions/workflows/deploy.yml/badge.svg)](https://github.com/sunhouy/EasyPocketMD/actions/workflows/deploy.yml)
-[!\[Build Android APK\](https://github.com/sunhouy/EasyPocketMD/actions/workflows/build-android.yml/badge.svg)](https://github.com/sunhouy/EasyPocketMD/actions/workflows/build-android.yml)
+[![Build and Deploy](https://github.com/sunhouy/EasyPocketMD/actions/workflows/deploy.yml/badge.svg)](https://github.com/sunhouy/EasyPocketMD/actions/workflows/deploy.yml)
+[![Build Android APK](https://github.com/sunhouy/EasyPocketMD/actions/workflows/build-android.yml/badge.svg)](https://github.com/sunhouy/EasyPocketMD/actions/workflows/build-android.yml)
 [![Build Electron App](https://github.com/sunhouy/EasyPocketMD/actions/workflows/build-electron.yml/badge.svg)](https://github.com/sunhouy/EasyPocketMD/actions/workflows/build-electron.yml)
-[!\[Dependabot Updates\](https://github.com/sunhouy/EasyPocketMD/actions/workflows/dependabot/dependabot-updates/badge.svg)](https://github.com/sunhouy/EasyPocketMD/actions/workflows/dependabot/dependabot-updates)
 
 <p align="center"><a href="README.md">English</a> &nbsp;|&nbsp; <a href="https://md.yhsun.cn/">Demo</a></p>
 
