@@ -5,6 +5,14 @@ on:
     tags:
       - 'v*'
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: '要发布到 GitHub Release 的 tag（例如 v1.2.3；留空则使用当前 ref 的 tag）'
+        required: false
+        type: string
+
+permissions:
+  contents: write
 
 jobs:
   build-android:
@@ -51,26 +59,18 @@ jobs:
           # 生成 Android 资源文件
           npm run cap:assets
 
-      - name: Generate Android signing key
-        id: generate-key
+      - name: Setup Android signing keystore (from secrets)
+        env:
+          JKS_BASE64: ${{ secrets.JKS_BASE64 }}
         run: |
-          # 使用 head -c 16 截取纯字母数字密码，避免特殊字符导致 gradle.properties 解析失败
-          RAW_PASSWORD=$(openssl rand -base64 24 | tr -dc 'a-zA-Z0-9' | head -c 16)
-          KEY_ALIAS="easypocketmd"
-          
-          echo "KEY_PASSWORD=$RAW_PASSWORD" >> $GITHUB_OUTPUT
-          echo "KEY_ALIAS=$KEY_ALIAS" >> $GITHUB_OUTPUT
-          
-          keytool -genkey -v -keystore android/app/release.keystore \
-            -storepass "$RAW_PASSWORD" \
-            -alias "$KEY_ALIAS" \
-            -keypass "$RAW_PASSWORD" \
-            -keyalg RSA \
-            -keysize 2048 \
-            -validity 10000 \
-            -dname "CN=EasyPocketMD, OU=Development, O=EasyPocketMD, L=Beijing, ST=Beijing, C=CN"
+          mkdir -p android/app
+          printf '%s' "$JKS_BASE64" | base64 --decode > android/app/release.keystore
+          chmod 600 android/app/release.keystore
 
       - name: Configure Gradle for signing
+        env:
+          JKS_ALIAS: ${{ secrets.JKS_ALIAS }}
+          JKS_PASSWORD: ${{ secrets.JKS_PASSWORD }}
         run: |
           cat > android/app/build.gradle << 'EOF'
           apply plugin: 'com.android.application'
@@ -143,9 +143,9 @@ jobs:
           android.useAndroidX=true
           android.enableJetifier=true
           RELEASE_STORE_FILE=release.keystore
-          RELEASE_STORE_PASSWORD=${{ steps.generate-key.outputs.KEY_PASSWORD }}
-          RELEASE_KEY_ALIAS=${{ steps.generate-key.outputs.KEY_ALIAS }}
-          RELEASE_KEY_PASSWORD=${{ steps.generate-key.outputs.KEY_PASSWORD }}
+          RELEASE_STORE_PASSWORD=$JKS_PASSWORD
+          RELEASE_KEY_ALIAS=$JKS_ALIAS
+          RELEASE_KEY_PASSWORD=$JKS_PASSWORD
           EOF
 
       - name: Build Android APK
@@ -160,13 +160,31 @@ jobs:
           name: easypocketmd-android-apk
           path: android/app/build/outputs/apk/release/app-release.apk
 
-      - name: Upload keystore as artifact (keep for future reference)
-        uses: actions/upload-artifact@v4
+  publish-release:
+    needs: build-android
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && github.event.inputs.release_tag != '')
+
+    steps:
+      - name: Download APK artifact
+        uses: actions/download-artifact@v4
         with:
-          name: android-keystore
-          path: |
-            android/app/release.keystore
-            android/gradle.properties
+          name: easypocketmd-android-apk
+          path: downloads/android
+
+      - name: Prepare release asset
+        env:
+          RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.release_tag != '' && github.event.inputs.release_tag || github.ref_name }}
+        run: |
+          mkdir -p release-assets
+          cp downloads/android/app-release.apk "release-assets/easypocketmd-android-${RELEASE_TAG}.apk"
+
+      - name: Upload APK to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.release_tag != '' && github.event.inputs.release_tag || github.ref_name }}
+          files: |
+            release-assets/*.apk
 
   deploy-android:
     needs: build-android
