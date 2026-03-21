@@ -182,6 +182,28 @@ class PrintServer:
                                 'message': '检查状态失败'
                             }, ensure_ascii=False))
 
+                    elif data.get('type') in ['print_status', 'print_queued', 'error'] and client_type == "打印客户端":
+                        # 打印客户端发来的任务状态，需要转发给对应的所有前端
+                        print(f"=== 转发打印客户端状态消息: {data.get('type')} ===")
+                        # 找到当前 client_id
+                        current_client_id = None
+                        for cid, info in self.clients.items():
+                            if info['websocket'] == websocket:
+                                current_client_id = cid
+                                break
+                        
+                        if current_client_id:
+                            username = self.clients[current_client_id].get('username')
+                            if username:
+                                print(f"转发消息到用户 {username} 的所有连接...")
+                                # 广播给所有可能是这个用户的连接 (这里简单处理为广播，前端会根据 job_id 过滤)
+                                for connection in list(self.connections):
+                                    if connection != websocket: # 不发回给客户端自己
+                                        try:
+                                            await connection.send(json.dumps(data, ensure_ascii=False))
+                                        except Exception as e:
+                                            print(f"转发消息到连接出错: {e}")
+
                     elif data.get('type') == 'print_request':
                         print(f"=== 收到打印请求 ===")
                         
@@ -214,9 +236,11 @@ class PrintServer:
                                     await client_info['websocket'].send(json.dumps(data, ensure_ascii=False))
                                     print(f"✅ 打印任务已成功发送到客户端: {client_id}")
 
+                                    # 发送一个初始状态给前端，而不是直接发送 print_queued
                                     await websocket.send(json.dumps({
-                                        'type': 'print_queued',
-                                        'message': '打印任务已发送到绑定的打印客户端'
+                                        'type': 'print_status',
+                                        'job_id': data.get('job_id'),
+                                        'message': '打印任务已成功发送到绑定的打印客户端，等待处理...'
                                     }, ensure_ascii=False))
 
                                 except Exception as e:

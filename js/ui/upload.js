@@ -3,6 +3,8 @@
     'use strict';
 
     function g(name) { return global[name]; }
+    function isEn() { return window.i18n && window.i18n.getLanguage() === 'en'; }
+    function t(key) { return window.i18n ? window.i18n.t(key) : key; }
 
     function triggerFileUpload() {
         var input = document.createElement('input');
@@ -43,6 +45,27 @@
 
     async function uploadFiles(filesArray, autoInsert) {
         autoInsert = autoInsert !== false;
+        
+        // Check storage settings
+        if (!window.userSettings.storageLocation && !window.tempStorageLocation) {
+            const choice = await showStorageChoicePopup();
+            if (!choice) return; // User cancelled or closed
+            
+            if (choice.permanent) {
+                window.userSettings.storageLocation = choice.location;
+                localStorage.setItem('vditor_settings', JSON.stringify(window.userSettings));
+            } else {
+                // Temporary choice for this session
+                window.tempStorageLocation = choice.location;
+            }
+        }
+
+        const location = window.tempStorageLocation || window.userSettings.storageLocation || 'cloud';
+
+        if (location === 'local') {
+            return await saveFilesLocally(filesArray, autoInsert);
+        }
+
         var formData = new FormData();
         for (var i = 0; i < filesArray.length; i++) {
             formData.append('files[]', filesArray[i]);
@@ -64,7 +87,9 @@
                 global.showUploadStatus('上传成功！共' + result.count + '个文件', 'success');
                 var markdownLinks = result.urls.map(function(url) {
                     var fileName = url.split('/').pop();
-                    return /\.(jpg|jpeg|png|gif|bmp|webp|svg)$/i.test(fileName) ? '![' + fileName + '](' + url + ')' : '[' + fileName + '](' + url + ')';
+                    // 处理 URL 中的空格，使用 encodeURI 保持其有效性
+                    var encodedUrl = url.includes(' ') ? encodeURI(url) : url;
+                    return /\.(jpg|jpeg|png|gif|bmp|webp|svg)$/i.test(fileName) ? '![' + fileName + '](' + encodedUrl + ')' : '[' + fileName + '](' + encodedUrl + ')';
                 });
                 if (autoInsert && markdownLinks.length > 0 && g('vditor')) {
                     g('vditor').insertValue(markdownLinks.join('\n\n') + '\n\n');
@@ -125,7 +150,8 @@
                         // 确保返回的是绝对地址
                         if (imgUrl && !imgUrl.startsWith('http://') && !imgUrl.startsWith('https://')) {
                             // 构建完整的绝对地址
-                            var absoluteUrl = window.location.origin + (imgUrl.startsWith('/') ? '' : '/') + imgUrl;
+                            var origin = window.getAppOrigin ? window.getAppOrigin() : window.location.origin;
+                            var absoluteUrl = origin + (imgUrl.startsWith('/') ? '' : '/') + imgUrl;
                             resolve(absoluteUrl);
                         } else {
                             resolve(imgUrl);
@@ -142,9 +168,207 @@
         });
     }
 
+    async function showStorageChoicePopup() {
+        var t = function(key) { return window.i18n ? window.i18n.t(key) : key; };
+        return new Promise(resolve => {
+            const nightMode = g('nightMode') === true;
+            const modal = document.createElement('div');
+            modal.className = 'modal-overlay';
+            modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:20000;';
+
+            const bg = nightMode ? '#2d2d2d' : 'white';
+            const textColor = nightMode ? '#eee' : '#333';
+            const cardBg = nightMode ? '#3d3d3d' : '#f8f9fa';
+
+            const content = document.createElement('div');
+            content.style.cssText = `background:${bg};color:${textColor};border-radius:12px;padding:25px;width:90%;max-width:450px;text-align:center;box-shadow: 0 4px 20px rgba(0,0,0,0.3);`;
+
+            content.innerHTML = `
+                <h3 style="margin-top:0;">${t('storageChoiceTitle')}</h3>
+                <p style="margin-bottom:25px;font-size:14px;color:${nightMode ? '#aaa' : '#666'};">${t('storageChoiceMessage')}</p>
+                
+                <div style="display:flex;gap:15px;margin-bottom:25px;">
+                    <div id="choice-local" style="flex:1;padding:15px;background:${cardBg};border:2px solid transparent;border-radius:10px;cursor:pointer;transition:all 0.2s;">
+                        <i class="fas fa-hdd" style="font-size:24px;margin-bottom:10px;color:#2196F3;"></i>
+                        <div style="font-weight:bold;">${t('storageLocal')}</div>
+                        <div style="font-size:11px;margin-top:5px;color:${nightMode ? '#aaa' : '#888'};">${t('storageLocalDesc')}</div>
+                    </div>
+                    <div id="choice-cloud" style="flex:1;padding:15px;background:${cardBg};border:2px solid transparent;border-radius:10px;cursor:pointer;transition:all 0.2s;">
+                        <i class="fas fa-cloud" style="font-size:24px;margin-bottom:10px;color:#4CAF50;"></i>
+                        <div style="font-weight:bold;">${t('storageCloud')}</div>
+                        <div style="font-size:11px;margin-top:5px;color:${nightMode ? '#aaa' : '#888'};">${t('storageCloudDesc')}</div>
+                    </div>
+                </div>
+
+                <div style="display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:20px;font-size:14px;">
+                    <input type="checkbox" id="storage-permanent" style="cursor:pointer;">
+                    <label for="storage-permanent" style="cursor:pointer;">${t('storagePermanent')}</label>
+                </div>
+
+                <button id="storage-confirm" style="width:100%;padding:12px;background:#2196F3;color:white;border:none;border-radius:8px;font-weight:bold;cursor:pointer;">确定</button>
+            `;
+
+            modal.appendChild(content);
+            document.body.appendChild(modal);
+
+            let selectedLocation = 'cloud'; // Default to cloud
+            const localCard = content.querySelector('#choice-local');
+            const cloudCard = content.querySelector('#choice-cloud');
+            const confirmBtn = content.querySelector('#storage-confirm');
+            const permanentCheckbox = content.querySelector('#storage-permanent');
+
+            // Set initial state
+            cloudCard.style.borderColor = '#4CAF50';
+            cloudCard.style.background = nightMode ? '#2e4a30' : '#e8f5e9';
+
+            localCard.onclick = () => {
+                selectedLocation = 'local';
+                localCard.style.borderColor = '#2196F3';
+                localCard.style.background = nightMode ? '#263d4d' : '#e3f2fd';
+                cloudCard.style.borderColor = 'transparent';
+                cloudCard.style.background = cardBg;
+            };
+
+            cloudCard.onclick = () => {
+                selectedLocation = 'cloud';
+                cloudCard.style.borderColor = '#4CAF50';
+                cloudCard.style.background = nightMode ? '#2e4a30' : '#e8f5e9';
+                localCard.style.borderColor = 'transparent';
+                localCard.style.background = cardBg;
+            };
+
+            confirmBtn.onclick = () => {
+                modal.remove();
+                resolve({
+                    location: selectedLocation,
+                    permanent: permanentCheckbox.checked
+                });
+            };
+
+            modal.onclick = (e) => {
+                if (e.target === modal) {
+                    modal.remove();
+                    resolve(null);
+                }
+            };
+        });
+    }
+
+    async function saveFilesLocally(filesArray, autoInsert) {
+        autoInsert = autoInsert !== false;
+        const markdownLinks = [];
+        const localFiles = JSON.parse(localStorage.getItem('vditor_local_files') || '[]');
+
+        for (const file of filesArray) {
+            try {
+                const dataUrl = await readFileAsDataURL(file);
+                let fileUrl = dataUrl;
+                const fileName = `${Date.now()}_${file.name}`;
+
+                // If in Electron, save to disk
+                if (window.electron && window.electron.saveLocalFile) {
+                    fileUrl = await window.electron.saveLocalFile(fileName, dataUrl);
+                }
+
+                // Add to local files registry
+                localFiles.push({
+                    name: fileName,
+                    originalName: file.name,
+                    url: fileUrl,
+                    type: file.type,
+                    size: file.size,
+                    date: new Date().toISOString()
+                });
+
+                const encodedUrl = fileUrl.includes(' ') ? encodeURI(fileUrl) : fileUrl;
+                const link = /\.(jpg|jpeg|png|gif|bmp|webp|svg)$/i.test(file.name) ? `![${file.name}](${encodedUrl})` : `[${file.name}](${encodedUrl})`;
+                markdownLinks.push(link);
+            } catch (err) {
+                console.error('Failed to read local file', err);
+            }
+        }
+
+        localStorage.setItem('vditor_local_files', JSON.stringify(localFiles));
+
+        if (autoInsert && markdownLinks.length > 0 && g('vditor')) {
+            g('vditor').insertValue(markdownLinks.join('\n\n') + '\n\n');
+        }
+        return markdownLinks.join('\n\n');
+    }
+
+    function readFileAsDataURL(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+        });
+    }
+
+    async function checkAndUploadLocalFiles() {
+        if (!g('vditor')) return true;
+        var content = g('vditor').getValue();
+        // Regex for local file URLs: file:// or data: (excluding data:image/svg+xml for mermaid)
+        const localRegex = /(!?\[.*?\]\((file:\/\/|data:(?!image\/svg\+xml)).*?\))/g;
+        const matches = content.match(localRegex);
+        
+        if (!matches || matches.length === 0) return true;
+
+        var t = function(key) { return window.i18n ? window.i18n.t(key) : key; };
+        const confirmed = confirm(t('storageUploadRequired'));
+        if (!confirmed) return false;
+
+        global.showUploadStatus(isEn() ? 'Uploading local files...' : '正在上传本地文件...', 'info');
+        
+        let newContent = content;
+        for (const match of matches) {
+            try {
+                const urlMatch = match.match(/\((.*?)\)/);
+                if (!urlMatch) continue;
+                const url = urlMatch[1];
+                
+                // Fetch the file content - 自动对 URL 进行编码处理，支持包含空格的 URL
+                const response = await fetch(url.includes(' ') ? encodeURI(url) : url);
+                const blob = await response.blob();
+                
+                // Try to get original filename from local registry
+                const localFiles = JSON.parse(localStorage.getItem('vditor_local_files') || '[]');
+                const localFile = localFiles.find(f => f.url === url || encodeURI(f.url) === url);
+                const fileName = localFile ? localFile.originalName : (url.split('/').pop() || 'image.png');
+                
+                const fileToUpload = new File([blob], fileName, { type: blob.type });
+                const cloudLink = await global.uploadFiles([fileToUpload], false);
+                
+                if (cloudLink) {
+                    const cloudUrl = cloudLink.match(/\((.*?)\)/)[1];
+                    // Replace all occurrences of this local URL with the cloud URL
+                    // 同时尝试替换原始 URL 和已编码的 URL
+                    newContent = newContent.split(url).join(cloudUrl);
+                    const encodedLocalUrl = encodeURI(url);
+                    if (encodedLocalUrl !== url) {
+                        newContent = newContent.split(encodedLocalUrl).join(cloudUrl);
+                    }
+                    
+                    // Remove from local registry if it was there
+                    if (localFile) {
+                        const filtered = localFiles.filter(f => f.url !== localFile.url);
+                        localStorage.setItem('vditor_local_files', JSON.stringify(filtered));
+                    }
+                }
+            } catch (err) {
+                console.error('Failed to upload local file during export', err);
+            }
+        }
+
+        g('vditor').setValue(newContent);
+        global.showUploadStatus(isEn() ? 'Upload complete' : '上传完成', 'success');
+        return true;
+    }
+
     global.triggerFileUpload = triggerFileUpload;
     global.triggerImageUpload = triggerImageUpload;
     global.uploadFiles = uploadFiles;
     global.uploadImage = uploadImage;
+    global.checkAndUploadLocalFiles = checkAndUploadLocalFiles;
 
 })(typeof window !== 'undefined' ? window : this);

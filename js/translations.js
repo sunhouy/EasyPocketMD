@@ -164,7 +164,24 @@
             orderedList: '有序列表',
             taskList: '任务列表',
             divider: '分割线',
-            emoji: '表情符号',
+            emoji: '表情',
+
+            // 存储选择
+            storageChoiceTitle: '选择存储位置',
+            storageChoiceMessage: '您是首次插入图片或文件，请选择存储方式：',
+            storageLocal: '本地存储',
+            storageCloud: '云端存储',
+            storageThisTime: '仅本次生效',
+            storagePermanent: '永久保存',
+            storageLocalDesc: '文件将缓存在本地路径，导出或云打印时需上传。',
+            storageCloudDesc: '文件将直接上传至云端服务器。',
+            storageUploadRequired: '检测到本地图片/文件，需上传至云端才能进行转换或导出。是否立即上传并继续？',
+            uploadAndContinue: '上传并继续',
+            cancelExport: '取消',
+            convertToCloud: '转为云端',
+            defaultStorageLocation: '默认存储位置',
+            localFile: '本地文件',
+            cloudFile: '云端文件',
             
             // 表格
             tableInserted: '表格已插入，可编辑表格内容',
@@ -497,6 +514,23 @@
             taskList: 'Task List',
             divider: 'Divider',
             emoji: 'Emoji',
+
+            // Storage Choice
+            storageChoiceTitle: 'Storage Location',
+            storageChoiceMessage: 'This is your first time inserting a file. Please choose where to store it:',
+            storageLocal: 'Local Storage',
+            storageCloud: 'Cloud Storage',
+            storageThisTime: 'Only this time',
+            storagePermanent: 'Save permanently',
+            storageLocalDesc: 'Files will be cached locally. You will need to upload them when exporting or printing.',
+            storageCloudDesc: 'Files will be uploaded directly to the cloud server.',
+            storageUploadRequired: 'Local files detected. They must be uploaded to the cloud for conversion or export. Upload now?',
+            uploadAndContinue: 'Upload and Continue',
+            cancelExport: 'Cancel',
+            convertToCloud: 'Convert to Cloud',
+            defaultStorageLocation: 'Default Storage Location',
+            localFile: 'Local File',
+            cloudFile: 'Cloud File',
             
             // Table
             tableInserted: 'Table inserted, you can edit the content',

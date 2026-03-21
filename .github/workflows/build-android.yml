@@ -41,6 +41,16 @@ jobs:
       - name: Sync Capacitor
         run: npx cap sync
 
+      - name: Generate Android Assets (Icons & Splash)
+        run: |
+          # 确保 assets 目录存在并包含图标
+          mkdir -p assets
+          if [ -f "icon.png" ]; then
+            cp icon.png assets/icon.png
+          fi
+          # 生成 Android 资源文件
+          npm run cap:assets
+
       - name: Generate Android signing key
         id: generate-key
         run: |

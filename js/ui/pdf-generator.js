@@ -79,6 +79,15 @@ export async function generatePDF(htmlContent, settings, filename) {
  */
 export async function renderPDF(pdfUrl, container) {
     try {
+        console.log('[PDF Debug] Rendering PDF from URL:', pdfUrl);
+        
+        // Ensure absolute URL
+        if (pdfUrl && !pdfUrl.startsWith('http://') && !pdfUrl.startsWith('https://') && !pdfUrl.startsWith('blob:')) {
+            const origin = window.getAppOrigin ? window.getAppOrigin() : window.location.origin;
+            pdfUrl = origin + (pdfUrl.startsWith('/') ? '' : '/') + pdfUrl;
+            console.log('[PDF Debug] Converted to absolute URL:', pdfUrl);
+        }
+
         const loadingTask = pdfjsLib.getDocument(pdfUrl);
         const pdf = await loadingTask.promise;
         

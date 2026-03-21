@@ -11,7 +11,9 @@ dist-electron/
 dist-electron-new/
 build/
 uploads/
+temp_uploads/
 user_files/
+print/.venv/
 
 js/ui.js.bak
 *.tmp

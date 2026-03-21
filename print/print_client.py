@@ -122,7 +122,7 @@ Comment=Start Cloud Print Client
 
 
 class PrintClient:
-    def __init__(self):
+    def __init__(self, log_callback=None, status_callback=None):
         self.config_file = os.path.join(os.path.expanduser('~'), '.print_client_config.ini')
         self.username = None
         self.password = None
@@ -130,30 +130,66 @@ class PrintClient:
         self.connected = False
         self.printer_name = None
         self.config = configparser.ConfigParser()
+        self.log_callback = log_callback
+        self.status_callback = status_callback
         self.load_config()
         # 用于存储当前监听任务的引用
         self.listen_task = None
-        # 存储生成的临时文件路径
+        # 存储生成的临时文件路径（使用锁保证线程安全）
         self.temp_files = []
+        import threading
+        self.temp_files_lock = threading.Lock()
+
+    def _log(self, message):
+        """通用日志记录方法"""
+        if self.log_callback:
+            self.log_callback(message)
+        else:
+            print(message)
 
     def clean_temp_files(self):
-        """清理临时文件"""
-        if not self.temp_files:
-            print("没有需要清理的临时文件")
-            return
+        """清理临时文件（包括当前会话和历史遗留）"""
+        temp_dir = os.environ.get('TEMP') or os.environ.get('TMPDIR') or '/tmp'
+        self._log(f"正在扫描临时目录: {temp_dir}")
         
-        print(f"正在清理 {len(self.temp_files)} 个临时文件...")
+        # 1. 获取当前会话记录的文件（线程安全）
+        with self.temp_files_lock:
+            session_files = set(self.temp_files)
+        
+        # 2. 扫描目录下符合模式的历史文件
+        pattern_prefix = "print_"
+        historical_files = []
+        try:
+            for filename in os.listdir(temp_dir):
+                if filename.startswith(pattern_prefix) and (filename.endswith('.txt') or filename.endswith('.pdf') or filename.endswith('.jpg') or filename.endswith('.png')):
+                    full_path = os.path.join(temp_dir, filename)
+                    if full_path not in session_files:
+                        historical_files.append(full_path)
+        except Exception as e:
+            self._log(f"扫描历史临时文件失败: {e}")
+
+        all_to_clean = list(session_files) + historical_files
+        
+        if not all_to_clean:
+            self._log("没有需要清理的临时文件")
+            return 0
+        
+        self._log(f"发现 {len(all_to_clean)} 个临时文件，正在清理...")
         cleaned_count = 0
-        for file_path in self.temp_files[:]:  # Iterate over a copy
+        for file_path in all_to_clean:
             try:
                 if os.path.exists(file_path):
                     os.unlink(file_path)
-                    print(f"已删除: {file_path}")
+                    # self._log(f"已删除: {file_path}")
                     cleaned_count += 1
-                self.temp_files.remove(file_path)
+                with self.temp_files_lock:
+                    if file_path in self.temp_files:
+                        self.temp_files.remove(file_path)
             except Exception as e:
-                print(f"删除失败 {file_path}: {e}")
-        print(f"清理完成，共删除 {cleaned_count} 个文件")
+                self._log(f"删除失败 {file_path}: {e}")
+        
+        self._log(f"清理完成，共删除 {cleaned_count} 个文件")
+        return cleaned_count
 
     def load_config(self):
         if os.path.exists(self.config_file):
@@ -161,7 +197,7 @@ class PrintClient:
                 with open(self.config_file, 'r', encoding='utf-8') as f:
                     self.config.read_file(f)
             except Exception as e:
-                print(f"读取配置文件失败: {e}")
+                self._log(f"读取配置文件失败: {e}")
             if 'print_client' in self.config:
                 self.username = self.config['print_client'].get('username')
                 self.password = self.config['print_client'].get('password')
@@ -191,28 +227,34 @@ class PrintClient:
         self.username = username
         self.password = password
         self.save_config()
-        print(f"用户凭证已设置: {username}")
+        self._log(f"用户凭证已设置: {username}")
 
     def get_printers(self):
         """获取系统可用打印机列表"""
         printers = []
         if platform.system() == 'Windows':
-            printers = [printer[2] for printer in
-                        win32print.EnumPrinters(win32print.PRINTER_ENUM_LOCAL | win32print.PRINTER_ENUM_CONNECTIONS)]
+            try:
+                printers = [printer[2] for printer in
+                            win32print.EnumPrinters(win32print.PRINTER_ENUM_LOCAL | win32print.PRINTER_ENUM_CONNECTIONS)]
+            except Exception as e:
+                self._log(f"获取打印机列表失败: {e}")
         elif platform.system() in ('Darwin', 'Linux'):
-            result = subprocess.run(['lpstat', '-p'], capture_output=True, text=True)
-            lines = result.stdout.strip().split('\n')
-            for line in lines:
-                if line.startswith('printer '):
-                    printer_name = line.split(' ')[1]
-                    printers.append(printer_name)
+            try:
+                result = subprocess.run(['lpstat', '-p'], capture_output=True, text=True)
+                lines = result.stdout.strip().split('\n')
+                for line in lines:
+                    if line.startswith('printer '):
+                        printer_name = line.split(' ')[1]
+                        printers.append(printer_name)
+            except Exception as e:
+                self._log(f"获取打印机列表失败: {e}")
         return printers
 
     def select_printer(self):
         """选择打印机"""
         printers = self.get_printers()
         if not printers:
-            print("没有找到可用的打印机")
+            self._log("没有找到可用的打印机")
             return
         print("可用打印机:")
         for i, printer in enumerate(printers, 1):
@@ -223,7 +265,7 @@ class PrintClient:
                 if 1 <= choice <= len(printers):
                     self.printer_name = printers[choice - 1]
                     self.save_config()
-                    print(f"已选择打印机: {self.printer_name}")
+                    self._log(f"已选择打印机: {self.printer_name}")
                     break
                 else:
                     print("错误: 无效的选择")
@@ -232,15 +274,15 @@ class PrintClient:
 
     def set_server_url(self):
         """设置服务器地址"""
-        print(f"\n当前服务器地址: {self.server_url or 'wss://print.yhsun.cn'}")
+        self._log(f"\n当前服务器地址: {self.server_url or 'wss://print.yhsun.cn'}")
         print("输入新的服务器地址（例如 ws://localhost:8770 或 wss://print.yhsun.cn）")
         new_url = input("请输入服务器地址（留空保持当前值）: ").strip()
         if new_url:
             self.server_url = new_url
             self.save_config()
-            print(f"服务器地址已设置为: {self.server_url}")
+            self._log(f"服务器地址已设置为: {self.server_url}")
         else:
-            print("保持当前服务器地址不变")
+            self._log("保持当前服务器地址不变")
     
     def modify_config(self):
         """运行中修改配置的菜单"""
@@ -265,13 +307,20 @@ class PrintClient:
         else:
             print("保持原有配置。")
 
-    def print_content(self, content, settings):
+    def print_content(self, content, settings, status_callback=None):
         """打印内容"""
+        def report_status(msg):
+            self._log(msg)
+            if status_callback:
+                status_callback(msg)
+
         if not self.printer_name:
-            print("请先选择打印机")
-            self.select_printer()
-        print(f"开始打印到打印机: {self.printer_name}")
-        print(f"打印设置: {json.dumps(settings, ensure_ascii=False)}")
+            error_msg = "未配置打印机，请先在客户端设置中选择打印机"
+            report_status(f"打印失败: {error_msg}")
+            return False, error_msg
+        
+        report_status(f"开始打印到打印机: {self.printer_name}")
+        report_status(f"打印设置: {json.dumps(settings, ensure_ascii=False)}")
 
         try:
             # 检查是否是文件URL
@@ -281,20 +330,23 @@ class PrintClient:
 
             if is_file_url:
                 # 处理文件URL
-                print(f"处理文件URL: {content}")
+                report_status(f"处理文件URL: {content}")
                 # 下载文件并打印
-                self._print_file_url(content, settings)
+                self._print_file_url(content, settings, report_status)
             else:
                 # 处理普通内容
                 if platform.system() == 'Windows':
                     self._print_windows(content, settings)
                 elif platform.system() in ('Darwin', 'Linux'):
                     self._print_unix(content, settings)
-            print("打印成功")
-            return True
+            
+            success_msg = "打印任务已成功提交到系统打印队列"
+            report_status(success_msg)
+            return True, success_msg
         except Exception as e:
-            print(f"打印失败: {str(e)}")
-            return False
+            error_detail = str(e)
+            report_status(f"打印失败: {error_detail}")
+            return False, error_detail
 
     def _print_windows(self, content, settings):
         """Windows打印实现"""
@@ -309,30 +361,33 @@ class PrintClient:
             f.write(content)
             
         # 将文件添加到临时文件列表，以便后续手动清理
-        self.temp_files.append(temp_file)
+        with self.temp_files_lock:
+            self.temp_files.append(temp_file)
 
         try:
             # 尝试使用os.startfile
             os.startfile(temp_file, "print")
         except Exception as e:
-            print(f"os.startfile 失败: {e}")
+            self._log(f"os.startfile 失败: {e}")
             try:
                 # 尝试使用subprocess.run
                 subprocess.run(['start', 'print', temp_file], shell=True, check=True)
             except Exception as e:
-                print(f"subprocess.run 失败: {e}")
+                self._log(f"subprocess.run 失败: {e}")
                 try:
                     # 尝试使用默认文本编辑器打开文本文件
-                    print("尝试使用默认文本编辑器打开文本文件")
+                    self._log("尝试使用默认文本编辑器打开文本文件")
                     win32api.ShellExecute(0, "open", temp_file, None, ".", 1)
                 except Exception as e:
-                    print(f"打开文件失败: {e}")
+                    self._log(f"打开文件失败: {e}")
 
-    def _print_file_url(self, file_url, settings):
+    def _print_file_url(self, file_url, settings, report_status=None):
         """打印文件URL"""
 
+        if not report_status:
+            report_status = self._log
 
-        print(f"正在下载文件: {file_url}")
+        report_status(f"正在下载文件: {file_url}")
 
         # 获取文件扩展名
         file_extension = ''
@@ -344,40 +399,37 @@ class PrintClient:
             temp_file_path = tmp.name
         
         # 将文件添加到临时文件列表，以便后续手动清理
-        self.temp_files.append(temp_file_path)
+        with self.temp_files_lock:
+            self.temp_files.append(temp_file_path)
 
         try:
             # 下载文件
-            print(f"开始下载文件: {file_url} 到 {temp_file_path}")
+            report_status(f"开始下载文件: {file_url} 到 {temp_file_path}")
             urllib.request.urlretrieve(file_url, temp_file_path)
-            print(f"文件已下载到: {temp_file_path}")
+            report_status(f"文件已下载到: {temp_file_path}")
 
             # 检查文件是否下载成功
             if not os.path.exists(temp_file_path) or os.path.getsize(temp_file_path) == 0:
                 raise Exception(f"文件下载失败，文件不存在或为空: {temp_file_path}")
 
-            print(f"下载的文件大小: {os.path.getsize(temp_file_path)} 字节")
+            report_status(f"下载的文件大小: {os.path.getsize(temp_file_path)} 字节")
 
             # 根据系统平台打印文件
             if platform.system() == 'Windows':
                 # 在Windows上使用默认应用程序打印
-                print(f"在Windows上打印文件: {temp_file_path}")
+                report_status(f"在Windows上打印文件: {temp_file_path}")
                 os.startfile(temp_file_path, "print")
-            elif platform.system() == 'Darwin':  # macOS
-                # 在macOS上使用lpr命令打印
-                print(f"在macOS上打印文件: {temp_file_path} 到打印机: {self.printer_name}")
-                subprocess.run(['lpr', '-P', self.printer_name, temp_file_path], check=True)
-            elif platform.system() == 'Linux':
-                # 在Linux上使用lpr命令打印
-                print(f"在Linux上打印文件: {temp_file_path} 到打印机: {self.printer_name}")
+            elif platform.system() in ('Darwin', 'Linux'):
+                # 在Unix系统上使用lpr命令打印
+                report_status(f"在 {platform.system()} 上打印文件: {temp_file_path} 到打印机: {self.printer_name}")
                 subprocess.run(['lpr', '-P', self.printer_name, temp_file_path], check=True)
 
-            print(f"文件打印成功: {temp_file_path}")
-            print(f"临时文件已保留: {temp_file_path}")
-            print("注意：如果需要清理这些文件，请在主菜单选择清理选项")
+            report_status(f"文件打印成功: {temp_file_path}")
+            report_status(f"临时文件已保留: {temp_file_path}")
+            report_status("注意：如果需要清理这些文件，请在主菜单选择清理选项")
             
         except Exception as e:
-            print(f"打印文件URL时出错: {str(e)}")
+            report_status(f"打印文件URL时出错: {str(e)}")
             # 重新抛出异常，让调用者知道下载失败
             raise
 
@@ -396,74 +448,108 @@ class PrintClient:
             f.write(content)
             
         # 将文件添加到临时文件列表，以便后续手动清理
-        self.temp_files.append(temp_file)
+        with self.temp_files_lock:
+            self.temp_files.append(temp_file)
         
-        print(f"正在打印文件: {temp_file}")
+        self._log(f"正在打印文件: {temp_file}")
         subprocess.run(['lpr', '-P', self.printer_name, temp_file], check=True)
 
     async def handle_connection(self, websocket):
         """处理WebSocket连接（消息监听循环）"""
         self.connected = True
-        print("=== 开始监听打印任务...")
+        self._log("=== 开始监听打印任务...")
         try:
             async for message in websocket:
-                print(f"=== 收到来自服务器的消息！ ===")
+                self._log(f"=== 收到来自服务器的消息！ ===")
                 try:
                     data = json.loads(message)
-                    print(f"消息类型: {data.get('type')}")
-                    print(f"完整消息内容: {data}")
+                    self._log(f"消息类型: {data.get('type')}")
+                    self._log(f"完整消息内容: {data}")
                     
                     if data.get('type') == 'print_request':
-                        print("✅ 收到打印请求！开始处理...")
+                        self._log("✅ 收到打印请求！开始处理...")
                         content = data.get('content', '')
                         settings = data.get('settings', {})
+                        job_id = data.get('job_id', 'unknown')
+                        
                         # 添加content_type到settings中
                         if 'content_type' in data:
                             settings['content_type'] = data['content_type']
-                        print(f"准备打印内容: {content[:50]}...")
-                        success = self.print_content(content, settings)
-                        print(f"打印结果: {'成功' if success else '失败'}")
+                        
+                        # 定义一个内部回调函数，用于发送状态更新回服务器
+                        async def send_status(msg):
+                            await websocket.send(json.dumps({
+                                'type': 'print_status',
+                                'job_id': job_id,
+                                'message': msg
+                            }, ensure_ascii=False))
+
+                        self._log(f"准备打印内容: {content[:50]}...")
+                        
+                        # 同步调用打印逻辑，传入发送状态的回调
+                        # 注意：print_content 是同步的，但我们可以通过线程安全的方式或者简单的同步回调
+                        # 为了在同步代码中调用异步 websocket.send，我们需要一个特殊的处理
+                        
+                        def sync_status_callback(msg):
+                            # 使用 asyncio.get_event_loop().create_task 在异步循环中执行发送
+                            try:
+                                loop = asyncio.get_event_loop()
+                                if loop.is_running():
+                                    loop.create_task(send_status(msg))
+                            except Exception as e:
+                                self._log(f"发送状态更新失败: {e}")
+
+                        success, result_msg = self.print_content(content, settings, sync_status_callback)
+                        
+                        self._log(f"打印结果: {'成功' if success else '失败'} - {result_msg}")
                         await websocket.send(json.dumps({
                             'type': 'print_queued' if success else 'error',
-                            'message': '打印任务已添加到队列' if success else '打印失败'
+                            'job_id': job_id,
+                            'message': result_msg
                         }, ensure_ascii=False))
                 except json.JSONDecodeError:
-                    print("错误: 无效的JSON数据")
+                    self._log("错误: 无效的JSON数据")
                 except Exception as e:
-                    print(f"处理消息时出错: {str(e)}")
+                    self._log(f"处理消息时出错: {str(e)}")
                     await websocket.send(json.dumps({
                         'type': 'error',
                         'message': str(e)
                     }, ensure_ascii=False))
         except Exception as e:
-            print(f"连接错误: {str(e)}")
+            self._log(f"连接错误: {str(e)}")
         finally:
             self.connected = False
-            print("客户端已断开连接")
+            self._log("客户端已断开连接")
+            if self.status_callback:
+                self.status_callback(False, "连接已断开")
 
     async def connect_and_listen(self):
         """连接到服务器，认证成功后持续监听"""
         server_url = self.server_url or "wss://print.yhsun.cn"
-        print(f"连接到打印服务器: {server_url}")
+        self._log(f"正在尝试建立连接: {server_url}")
         try:
             # 判断是否需要使用 SSL
             use_ssl = server_url.startswith('wss://')
             
             if use_ssl:
+                self._log("正在初始化 SSL 上下文...")
                 ssl_context = ssl.create_default_context()
                 ssl_context.check_hostname = False
                 ssl_context.verify_mode = ssl.CERT_NONE
+                self._log("正在发起 WSS 连接请求...")
                 websocket = await asyncio.wait_for(
                     websockets.connect(server_url, ssl=ssl_context),
-                    timeout=10
+                    timeout=15
                 )
             else:
+                self._log("正在发起 WS 连接请求...")
                 # 连接本地服务器，不使用 SSL
                 websocket = await asyncio.wait_for(
                     websockets.connect(server_url),
-                    timeout=10
+                    timeout=15
                 )
-            print("✅ 已连接到打印服务器")
+            
+            self._log("✅ WebSocket 网络连接已建立")
 
             client_id = f"client_{datetime.now().timestamp()}"
             auth_data = {
@@ -472,28 +558,30 @@ class PrintClient:
                 'password': self.password,
                 'client_id': client_id
             }
+            self._log(f"正在发送认证请求 (用户: {self.username})...")
             await websocket.send(json.dumps(auth_data, ensure_ascii=False))
-            print(f"发送认证请求，用户名: {self.username}")
-            print(f"客户端ID: {client_id}")
-
-            response = await asyncio.wait_for(websocket.recv(), timeout=5)
+            
+            self._log("正在等待服务器响应认证结果...")
+            response = await asyncio.wait_for(websocket.recv(), timeout=10)
             response_data = json.loads(response)
-            print(f"收到服务器响应: {response_data.get('type')}")
-
+            
             if response_data.get('type') == 'auth_success':
-                print("✅ 认证成功，已连接到打印服务器并永久绑定")
+                self._log("✅ 身份认证成功！已开启实时监听模式")
+                if self.status_callback:
+                    self.status_callback(True, "已连接")
                 self.save_config()
                 await self.handle_connection(websocket)  # 保持连接，处理消息
                 return True
             else:
-                print(f"❌ 认证失败: {response_data.get('message')}")
+                error_msg = response_data.get('message', '未知错误')
+                self._log(f"❌ 认证被服务器拒绝: {error_msg}")
                 return False
         except asyncio.TimeoutError:
-            print("连接超时")
+            self._log("❌ 连接过程超时 (请检查网络状况或服务器地址是否正确)")
             return False
         except Exception as e:
-            print(f"连接服务器时出错: {str(e)}")
-            print(traceback.format_exc())
+            self._log(f"❌ 连接发生异常: {str(e)}")
+            # self._log(traceback.format_exc())
             return False
 
     async def input_listener(self):

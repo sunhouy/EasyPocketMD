@@ -680,6 +680,15 @@ document.addEventListener('DOMContentLoaded', function() {
         if (showOutlineCheckbox) {
             showOutlineCheckbox.checked = window.userSettings.showOutline || false;
         }
+
+        // 设置存储位置
+        var currentStorageLoc = window.userSettings.storageLocation || 'cloud';
+        var storageRadios = document.getElementsByName('storageLocation');
+        for (var i = 0; i < storageRadios.length; i++) {
+            if (storageRadios[i].value === currentStorageLoc) {
+                storageRadios[i].checked = true;
+            }
+        }
         
         // 生成工具栏按钮选择
         var toolbarSettings = document.getElementById('toolbarButtonsSettings');
@@ -709,7 +718,8 @@ document.addEventListener('DOMContentLoaded', function() {
             toolbarButtons: [],
             themeMode: 'system',
             fontSize: '16px',
-            showOutline: false
+            showOutline: false,
+            storageLocation: 'cloud'
         };
         
         // 获取选中的编辑器模式
@@ -767,6 +777,15 @@ document.addEventListener('DOMContentLoaded', function() {
         var showOutlineCheckbox = document.getElementById('showOutlineCheckbox');
         if (showOutlineCheckbox) {
             newSettings.showOutline = showOutlineCheckbox.checked;
+        }
+
+        // 获取选中的存储位置
+        var storageRadios = document.getElementsByName('storageLocation');
+        for (var i = 0; i < storageRadios.length; i++) {
+            if (storageRadios[i].checked) {
+                newSettings.storageLocation = storageRadios[i].value;
+                break;
+            }
         }
         
         // 验证按钮数量
