@@ -173,7 +173,7 @@
             }
             
             // 3. 调用通义千问API
-            updateAILoadingStatus(isEn() ? 'AI is formatting...' : 'AI正在排版中...');
+            updateAILoadingStatus(isEn() ? 'AI may modify the document content, please review carefully' : 'AI可能会改变文档内容，请仔细审查后使用');
             var aiResponse = await callQwenAPI(content, prompt);
             
             updateAILoadingStatus(isEn() ? 'Generating preview...' : '正在生成预览...');

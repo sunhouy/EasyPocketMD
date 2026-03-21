@@ -74,13 +74,33 @@ jobs:
           name: md-electron-linux
           path: downloads/electron/linux
 
+      - name: Prepare release assets
+        run: |
+          # Extract version from tag (e.g., v1.2.3 -> 1.2.3)
+          TAG_NAME="${{ github.event_name == 'workflow_dispatch' && github.event.inputs.release_tag != '' && github.event.inputs.release_tag || github.ref_name }}"
+          VERSION="${TAG_NAME#v}"
+          
+          # Create release directory
+          mkdir -p release
+          
+          # Find and copy only the setup file, excluding elevate.exe
+          for file in downloads/electron/win/*.exe; do
+            if [[ "$(basename "$file")" != "elevate.exe" ]] && [[ "$(basename "$file")" == *"Setup"* ]]; then
+              cp "$file" "release/easypocketmd-${VERSION}.exe"
+              echo "Copied setup file: $(basename "$file") -> easypocketmd-${VERSION}.exe"
+            fi
+          done
+          
+          # Copy Linux deb files
+          cp downloads/electron/linux/*.deb release/ || true
+
       - name: Upload Electron assets to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.release_tag != '' && github.event.inputs.release_tag || github.ref_name }}
           files: |
-            downloads/electron/**/*.exe
-            downloads/electron/**/*.deb
+            release/easypocketmd-*.exe
+            release/*.deb
 
   deploy-electron:
     needs: build-electron
@@ -111,6 +131,20 @@ jobs:
             mkdir -p /www/wwwroot/static/electron/win
             mkdir -p /www/wwwroot/static/electron/linux
 
+      # 准备 Windows 产物（排除 elevate.exe，只保留安装文件）
+      - name: Prepare Windows deployment files
+        run: |
+          # Create deployment directory
+          mkdir -p deploy/win
+          
+          # Find and copy only the setup file, excluding elevate.exe
+          for file in downloads/electron/win/*.exe; do
+            if [[ "$(basename "$file")" != "elevate.exe" ]] && [[ "$(basename "$file")" == *"Setup"* ]]; then
+              cp "$file" deploy/win/$(basename "$file")
+              echo "Copied setup file: $(basename "$file")"
+            fi
+          done
+
       # 上传 Windows 产物
       - name: Upload Windows Electron artifacts
         uses: appleboy/scp-action@master
@@ -118,9 +152,9 @@ jobs:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           password: ${{ secrets.SERVER_PASSWORD }}
-          source: "downloads/electron/win/*"
+          source: "deploy/win/*"
           target: "/www/wwwroot/static/electron/win"
-          strip_components: 3   # 去除 downloads/electron/win/ 前缀
+          strip_components: 2   # 去除 deploy/win/ 前缀
 
       # 上传 Linux 产物
       - name: Upload Linux Electron artifacts

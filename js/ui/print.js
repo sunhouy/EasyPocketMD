@@ -8,6 +8,58 @@ function g(name) { return global[name]; }
 function isEn() { return window.i18n && window.i18n.getLanguage() === 'en'; }
 function t(key) { return window.i18n ? window.i18n.t(key) : key; }
 
+/**
+ * 在 Capacitor 中处理文件下载/分享
+ * @param {string} data 数据内容（可以是 URL 也可以是纯文本/HTML）
+ * @param {string} filename 文件名
+ * @param {string} mimeType MIME 类型
+ * @param {boolean} isRawData 是否是原始数据（不是 URL）
+ */
+async function downloadInCapacitor(data, filename, mimeType, isRawData = false) {
+    try {
+        const { Filesystem, Directory } = await import('@capacitor/filesystem');
+        const { Share } = await import('@capacitor/share');
+
+        let base64Data = '';
+        if (isRawData) {
+            // 原始文本数据转 base64
+            base64Data = btoa(unescape(encodeURIComponent(data)));
+        } else {
+            // 如果是 URL，尝试获取并转为 base64
+            const response = await fetch(data);
+            const blob = await response.blob();
+            base64Data = await new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                    const base64 = reader.result.split(',')[1];
+                    resolve(base64);
+                };
+                reader.readAsDataURL(blob);
+            });
+        }
+
+        // 写入临时文件
+        const writeResult = await Filesystem.writeFile({
+            path: filename,
+            data: base64Data,
+            directory: Directory.Cache
+        });
+
+        // 分享文件（这在移动端通常是保存到文件的最佳方式）
+        await Share.share({
+            title: filename,
+            text: filename,
+            url: writeResult.uri,
+            dialogTitle: isEn() ? 'Save or Share File' : '保存或分享文件'
+        });
+
+        global.showMessage(isEn() ? 'File ready to save' : '文件已就绪，请选择保存位置');
+    } catch (error) {
+        console.error('Capacitor download error:', error);
+        global.showMessage((isEn() ? 'Download failed: ' : '下载失败: ') + error.message, 'error');
+    }
+}
+
     /**
      * 创建统一的打印状态显示模态框
      * @param {string} initialTitle 初始标题
@@ -1417,6 +1469,18 @@ function t(key) { return window.i18n ? window.i18n.t(key) : key; }
                 fullPdfUrl = baseUrl + pdfUrl;
             }
 
+            // 如果是 Capacitor 环境，使用特殊的下载逻辑
+            if (window.Capacitor && window.Capacitor.isNativePlatform()) {
+                // Get filename from current file name if available
+                var currentFileName = isEn() ? 'document' : '文档';
+                var currentNode = g('currentFileId') ? g('fileTree').jstree(true).get_node(g('currentFileId')) : null;
+                if (currentNode) {
+                    currentFileName = currentNode.text.replace(/\.md$/, '');
+                }
+                await downloadInCapacitor(fullPdfUrl, currentFileName + '.pdf', 'application/pdf');
+                return;
+            }
+
             // Trigger download using fetch and blob to force download behavior
             // This is more reliable than simple anchor click for same-origin or CORS enabled resources
             var response = await fetch(fullPdfUrl);
@@ -1531,14 +1595,37 @@ function t(key) { return window.i18n ? window.i18n.t(key) : key; }
             var pdfBtn = document.createElement('button');
             pdfBtn.innerHTML = '<i class="fas fa-file-pdf"></i> ' + (isEn() ? 'Download' : '下载');
             pdfBtn.style.cssText = 'padding:8px 16px;background:#dc3545;color:white;border:none;border-radius:4px;cursor:pointer;font-size:14px;font-weight:bold;';
-            pdfBtn.onclick = function() {
-                 var a = document.createElement('a');
-                 a.href = pdfUrl;
-                 a.download = (isEn() ? 'document' : '文档') + '.pdf';
-                 a.target = '_blank';
-                 document.body.appendChild(a);
-                 a.click();
-                 document.body.removeChild(a);
+            pdfBtn.onclick = async function() {
+                try {
+                    // 确保pdfUrl是完整的URL
+                    var fullPdfUrl = pdfUrl;
+                    if (!pdfUrl.startsWith('http://') && !pdfUrl.startsWith('https://')) {
+                        // 构建完整的URL
+                        var origin = window.getAppOrigin ? window.getAppOrigin() : window.location.origin;
+                        var baseUrl = origin;
+                        fullPdfUrl = new URL(pdfUrl, baseUrl).href;
+                    }
+                    
+                    // 如果是 Capacitor 环境，使用特殊的下载逻辑
+                    if (window.Capacitor && window.Capacitor.isNativePlatform()) {
+                        await downloadInCapacitor(fullPdfUrl, (isEn() ? 'document' : '文档') + '.pdf', 'application/pdf');
+                        return;
+                    }
+                    
+                    // 创建下载链接
+                    var a = document.createElement('a');
+                    a.href = fullPdfUrl;
+                    a.download = (isEn() ? 'document' : '文档') + '.pdf';
+                    a.target = '_blank';
+                    document.body.appendChild(a);
+                    a.click();
+                    setTimeout(function() {
+                        document.body.removeChild(a);
+                    }, 100);
+                } catch (error) {
+                    console.error('下载失败:', error);
+                    global.showMessage((isEn() ? 'Download failed: ' : '下载失败: ') + error.message, 'error');
+                }
             };
 
             var cancelBtn = document.createElement('button');

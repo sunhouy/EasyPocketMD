@@ -8,7 +8,8 @@
     async function createShareLink(filename, mode, sharePassword, expireDays) {
         mode = mode || 'view';
         expireDays = expireDays || 7;
-        if (!g('currentUser')) throw new Error(window.i18n ? 'User not logged in' : '用户未登录');
+        var isEn = window.i18n && window.i18n.getLanguage() === 'en';
+        if (!g('currentUser')) throw new Error(isEn ? 'User not logged in' : '用户未登录');
         try {
             var body = { username: g('currentUser').username, token: g('currentUser').token, password: g('currentUser').password, filename: filename, mode: mode, expire_days: expireDays };
             if (sharePassword && sharePassword.trim()) body.share_password = sharePassword.trim();
@@ -20,27 +21,28 @@
             });
             if (global.parseJsonResponse) return await global.parseJsonResponse(response);
             var text = await response.text();
-            if ((text || '').trim().charAt(0) === '<') return { code: 500, message: window.i18n ? 'API returned non-JSON content, please check API and backend service' : '接口返回了非 JSON 内容，请检查 API 与后端服务' };
-            try { return JSON.parse(text); } catch (e) { return { code: 500, message: window.i18n ? 'Response parsing failed' : '响应解析失败' }; }
+            if ((text || '').trim().charAt(0) === '<') return { code: 500, message: isEn ? 'API returned non-JSON content, please check API and backend service' : '接口返回了非 JSON 内容，请检查 API 与后端服务' };
+            try { return JSON.parse(text); } catch (e) { return { code: 500, message: isEn ? 'Response parsing failed' : '响应解析失败' }; }
         } catch (e) {
             console.error('创建分享链接失败', e);
             if (e.message === 'Failed to fetch' || e.message.includes('NetworkError')) {
                 global.showMessage(t('networkNotConnected'), 'error');
                 return { code: 500, message: t('networkNotConnected') };
             }
-            return { code: 500, message: (window.i18n ? 'Network error: ' : '网络错误: ') + (e.message || '') };
+            return { code: 500, message: (isEn ? 'Network error: ' : '网络错误: ') + (e.message || '') };
         }
     }
 
     function showShareResult(shareData, oldModal) {
         if (oldModal) oldModal.remove();
         var nightMode = g('nightMode') === true;
+        var isEn = window.i18n && window.i18n.getLanguage() === 'en';
         var resultModal = document.createElement('div');
         resultModal.className = 'modal-overlay';
         resultModal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:10000;';
         var modalContent = document.createElement('div');
         modalContent.style.cssText = 'background:' + (nightMode ? '#2d2d2d' : 'white') + ';color:' + (nightMode ? '#eee' : '#333') + ';border-radius:12px;padding:25px;width:90%;max-width:500px;';
-        modalContent.innerHTML = '<div style="text-align:center;margin-bottom:20px;color:#2ecc71;"><i class="fas fa-check-circle" style="font-size:48px;"></i></div><h2 style="text-align:center;margin-bottom:15px;">' + (window.i18n ? 'Share link created successfully' : '分享链接创建成功') + '</h2><div style="background:' + (nightMode ? '#3d3d3d' : '#f5f5f5') + ';padding:15px;border-radius:8px;margin-bottom:20px;"><div style="font-size:12px;margin-bottom:5px;">' + (window.i18n ? 'Share link:' : '分享链接：') + '</div><div style="word-break:break-all;font-size:14px;padding:8px;">' + shareData.share_url + '</div></div><div style="display:flex;gap:10px;"><button class="share-copy-btn" style="flex:1;padding:12px;background:#4a90e2;color:white;border:none;border-radius:6px;cursor:pointer;">' + (window.i18n ? 'Copy Link' : '复制链接') + '</button><button class="share-close-btn" style="flex:1;padding:12px;background:' + (nightMode ? '#555' : '#6c757d') + ';color:white;border:none;border-radius:6px;cursor:pointer;">' + (window.i18n ? 'Done' : '完成') + '</button></div>';
+        modalContent.innerHTML = '<div style="text-align:center;margin-bottom:20px;color:#2ecc71;"><i class="fas fa-check-circle" style="font-size:48px;"></i></div><h2 style="text-align:center;margin-bottom:15px;">' + (isEn ? 'Share link created successfully' : '分享链接创建成功') + '</h2><div style="background:' + (nightMode ? '#3d3d3d' : '#f5f5f5') + ';padding:15px;border-radius:8px;margin-bottom:20px;"><div style="font-size:12px;margin-bottom:5px;">' + (isEn ? 'Share link:' : '分享链接：') + '</div><div style="word-break:break-all;font-size:14px;padding:8px;">' + shareData.share_url + '</div></div><div style="display:flex;gap:10px;"><button class="share-copy-btn" style="flex:1;padding:12px;background:#4a90e2;color:white;border:none;border-radius:6px;cursor:pointer;">' + (isEn ? 'Copy Link' : '复制链接') + '</button><button class="share-close-btn" style="flex:1;padding:12px;background:' + (nightMode ? '#555' : '#6c757d') + ';color:white;border:none;border-radius:6px;cursor:pointer;">' + (isEn ? 'Done' : '完成') + '</button></div>';
         resultModal.appendChild(modalContent);
         document.body.appendChild(resultModal);
         modalContent.querySelector('.share-copy-btn').onclick = function() {
@@ -53,15 +55,16 @@
     }
 
     function showShareDialog() {
+        var isEn = window.i18n && window.i18n.getLanguage() === 'en';
         if (!g('currentUser')) { 
             global.showMessage(t('pleaseLoginFirst'), 'info'); 
             if (g('showLoginModal')) g('showLoginModal')();
             return; 
         }
-        if (!g('currentFileId')) { global.showMessage(window.i18n ? 'Please open or create a file first' : '请先打开或创建文件', 'error'); return; }
+        if (!g('currentFileId')) { global.showMessage(isEn ? 'Please open or create a file first' : '请先打开或创建文件', 'error'); return; }
         var files = g('files');
         var file = files.find(function(f) { return f.id === g('currentFileId'); });
-        if (!file) { global.showMessage(window.i18n ? 'Current file not found' : '未找到当前文件', 'error'); return; }
+        if (!file) { global.showMessage(isEn ? 'Current file not found' : '未找到当前文件', 'error'); return; }
         var nightMode = g('nightMode') === true;
 
         // 创建分享对话框
@@ -82,7 +85,7 @@
 
         // 显示加载状态
         var loadingDiv = document.createElement('div');
-        loadingDiv.innerHTML = '<h2 style="text-align:center;margin-bottom:15px;margin-top:0;">' + t('shareDocument') + '</h2><p style="text-align:center;margin-bottom:20px;">' + (window.i18n ? 'File:' : '文件:') + ' ' + file.name + '</p><div style="text-align:center;padding:30px;"><i class="fas fa-spinner fa-spin" style="font-size:24px;"></i><p style="margin-top:10px;">' + (window.i18n ? 'Checking share link...' : '检查分享链接...') + '</p></div>';
+        loadingDiv.innerHTML = '<h2 style="text-align:center;margin-bottom:15px;margin-top:0;">' + t('shareDocument') + '</h2><p style="text-align:center;margin-bottom:20px;">' + (isEn ? 'File:' : '文件:') + ' ' + file.name + '</p><div style="text-align:center;padding:30px;"><i class="fas fa-spinner fa-spin" style="font-size:24px;"></i><p style="margin-top:10px;">' + (isEn ? 'Checking share link...' : '检查分享链接...') + '</p></div>';
         shareContent.appendChild(loadingDiv);
         
         shareModal.appendChild(shareContent);

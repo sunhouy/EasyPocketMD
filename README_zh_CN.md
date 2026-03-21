@@ -4,6 +4,7 @@
 
 [!\[Build and Deploy\](https://github.com/sunhouy/EasyPocketMD/actions/workflows/deploy.yml/badge.svg null)](https://github.com/sunhouy/EasyPocketMD/actions/workflows/deploy.yml)
 [!\[Build Android APK\](https://github.com/sunhouy/EasyPocketMD/actions/workflows/build-android.yml/badge.svg null)](https://github.com/sunhouy/EasyPocketMD/actions/workflows/build-android.yml)
+[![Build Electron App](https://github.com/sunhouy/EasyPocketMD/actions/workflows/build-electron.yml/badge.svg)](https://github.com/sunhouy/EasyPocketMD/actions/workflows/build-electron.yml)
 [!\[Dependabot Updates\](https://github.com/sunhouy/EasyPocketMD/actions/workflows/dependabot/dependabot-updates/badge.svg null)](https://github.com/sunhouy/EasyPocketMD/actions/workflows/dependabot/dependabot-updates)
 
 <p align="center"><a href="README.md">English</a> &nbsp;|&nbsp; <a href="https://md.yhsun.cn/">Demo</a></p>
@@ -98,7 +99,11 @@ ADMIN_PASSWORD=管理员密码
 BASE_URL=网站域名，例如https://md.yhsun.cn
 ```
 
-每次push都会触发自动构建上传代码到服务器，electron应用安卓ying y
+每次push都会触发自动构建上传代码到服务器，electron应用安卓应用通过打tag触发：
+```bash
+git tag v1.2.3
+git push origin v1.2.3
+```
 
 ## Demo
 
