@@ -306,62 +306,6 @@
     }
 
     async function checkAndUploadLocalFiles() {
-        if (!g('vditor')) return true;
-        var content = g('vditor').getValue();
-        // Regex for local file URLs: file:// or data: (excluding data:image/svg+xml for mermaid)
-        const localRegex = /(!?\[.*?\]\((file:\/\/|data:(?!image\/svg\+xml)).*?\))/g;
-        const matches = content.match(localRegex);
-        
-        if (!matches || matches.length === 0) return true;
-
-        var t = function(key) { return window.i18n ? window.i18n.t(key) : key; };
-        const confirmed = confirm(t('storageUploadRequired'));
-        if (!confirmed) return false;
-
-        global.showUploadStatus(isEn() ? 'Uploading local files...' : '正在上传本地文件...', 'info');
-        
-        let newContent = content;
-        for (const match of matches) {
-            try {
-                const urlMatch = match.match(/\((.*?)\)/);
-                if (!urlMatch) continue;
-                const url = urlMatch[1];
-                
-                // Fetch the file content - 自动对 URL 进行编码处理，支持包含空格的 URL
-                const response = await fetch(url.includes(' ') ? encodeURI(url) : url);
-                const blob = await response.blob();
-                
-                // Try to get original filename from local registry
-                const localFiles = JSON.parse(localStorage.getItem('vditor_local_files') || '[]');
-                const localFile = localFiles.find(f => f.url === url || encodeURI(f.url) === url);
-                const fileName = localFile ? localFile.originalName : (url.split('/').pop() || 'image.png');
-                
-                const fileToUpload = new File([blob], fileName, { type: blob.type });
-                const cloudLink = await global.uploadFiles([fileToUpload], false);
-                
-                if (cloudLink) {
-                    const cloudUrl = cloudLink.match(/\((.*?)\)/)[1];
-                    // Replace all occurrences of this local URL with the cloud URL
-                    // 同时尝试替换原始 URL 和已编码的 URL
-                    newContent = newContent.split(url).join(cloudUrl);
-                    const encodedLocalUrl = encodeURI(url);
-                    if (encodedLocalUrl !== url) {
-                        newContent = newContent.split(encodedLocalUrl).join(cloudUrl);
-                    }
-                    
-                    // Remove from local registry if it was there
-                    if (localFile) {
-                        const filtered = localFiles.filter(f => f.url !== localFile.url);
-                        localStorage.setItem('vditor_local_files', JSON.stringify(filtered));
-                    }
-                }
-            } catch (err) {
-                console.error('Failed to upload local file during export', err);
-            }
-        }
-
-        g('vditor').setValue(newContent);
-        global.showUploadStatus(isEn() ? 'Upload complete' : '上传完成', 'success');
         return true;
     }
 

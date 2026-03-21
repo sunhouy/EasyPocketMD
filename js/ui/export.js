@@ -24,14 +24,6 @@ function exportContent() {
 
 
 async function exportFile(content, ext) {
-    // Check for local files first
-    if (global.checkAndUploadLocalFiles) {
-        const ok = await global.checkAndUploadLocalFiles();
-        if (!ok) return; // User cancelled upload
-        // Refresh content in case it was replaced with cloud links
-        content = g('vditor').getValue();
-    }
-
     var mimeTypes = { md: 'text/markdown', txt: 'text/plain', html: 'text/html', pdf: 'application/pdf' };
     var fileContent = content;
 

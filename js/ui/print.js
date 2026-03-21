@@ -1390,14 +1390,6 @@ function t(key) { return window.i18n ? window.i18n.t(key) : key; }
     }
 
     async function downloadAsPDF(content, settings) {
-        // Check for local files first
-        if (global.checkAndUploadLocalFiles) {
-            const ok = await global.checkAndUploadLocalFiles();
-            if (!ok) return; // User cancelled upload
-            // Refresh content in case it was replaced with cloud links
-            content = g('vditor').getValue();
-        }
-
         // 显示加载状态
         var nightMode = g('nightMode') === true;
         var loadingModal = document.createElement('div');
@@ -1458,12 +1450,6 @@ function t(key) { return window.i18n ? window.i18n.t(key) : key; }
     }
 
     async function showPrintPreview(settings) {
-        // Check for local files first
-        if (global.checkAndUploadLocalFiles) {
-            const ok = await global.checkAndUploadLocalFiles();
-            if (!ok) return; // User cancelled upload
-        }
-
         var nightMode = g('nightMode') === true;
         var content = g('vditor') ? g('vditor').getValue() : '';
 
@@ -1591,12 +1577,6 @@ function t(key) { return window.i18n ? window.i18n.t(key) : key; }
     }
 
     async function sendToPrint(settings, existingPdfUrl) {
-        // Check for local files first
-        if (global.checkAndUploadLocalFiles) {
-            const ok = await global.checkAndUploadLocalFiles();
-            if (!ok) return; // User cancelled upload
-        }
-
         // 检查用户是否登录
         if (!g('currentUser')) {
             global.showMessage(isEn() ? 'Please log in first to use cloud print feature' : '请先登录后再使用云打印功能');
