@@ -77,27 +77,26 @@ jobs:
       - name: Prepare release assets
         run: |
           # Extract version from tag (e.g., v1.2.3 -> 1.2.3)
-          TAG_NAME="${{ github.event_name == 'workflow_dispatch' && github.event.inputs.release_tag != '' && github.event.inputs.release_tag || github.ref_name }}"
-          VERSION="${TAG_NAME#v}"
+          TAG_NAME=${{ github.event_name == 'workflow_dispatch' && github.event.inputs.release_tag != '' && github.event.inputs.release_tag || github.ref_name }}
+          VERSION=$(echo "$TAG_NAME" | sed 's/^v//')
           
           # Create release directory
           mkdir -p release
           
           # Find and copy only the setup file, excluding elevate.exe
-          find downloads/electron/win -name "*.exe" -not -name "elevate.exe" | while read file; do
-            if [[ "$(basename "$file")" == *"Setup"* ]]; then
-              cp "$file" "release/easypocketmd-${VERSION}.exe"
-              echo "Copied setup file: $(basename "$file") -> easypocketmd-${VERSION}.exe"
-              break
+          setup_file=$(find downloads/electron/win -name "*.exe" -not -name "elevate.exe" | grep -i setup | head -1)
+          if [ -n "$setup_file" ]; then
+            cp "$setup_file" "release/easypocketmd-$VERSION.exe"
+            echo "Copied setup file: $(basename "$setup_file") -> easypocketmd-$VERSION.exe"
+          else
+            # If no setup file found, try to find any exe file
+            exe_file=$(find downloads/electron/win -name "*.exe" -not -name "elevate.exe" | head -1)
+            if [ -n "$exe_file" ]; then
+              cp "$exe_file" "release/easypocketmd-$VERSION.exe"
+              echo "Copied exe file: $(basename "$exe_file") -> easypocketmd-$VERSION.exe"
+            else
+              echo "No exe files found"
             fi
-          done
-          
-          # If no setup file found, try to find any exe file
-          if [ ! -f "release/easypocketmd-${VERSION}.exe" ]; then
-            find downloads/electron/win -name "*.exe" -not -name "elevate.exe" | head -1 | while read file; do
-              cp "$file" "release/easypocketmd-${VERSION}.exe"
-              echo "Copied exe file: $(basename "$file") -> easypocketmd-${VERSION}.exe"
-            done
           fi
           
           # Copy Linux deb files
@@ -147,20 +146,19 @@ jobs:
           mkdir -p deploy/win
           
           # Find and copy only the setup file, excluding elevate.exe
-          find downloads/electron/win -name "*.exe" -not -name "elevate.exe" | while read file; do
-            if [[ "$(basename "$file")" == *"Setup"* ]]; then
-              cp "$file" deploy/win/$(basename "$file")
-              echo "Copied setup file: $(basename "$file")"
-              break
+          setup_file=$(find downloads/electron/win -name "*.exe" -not -name "elevate.exe" | grep -i setup | head -1)
+          if [ -n "$setup_file" ]; then
+            cp "$setup_file" "deploy/win/$(basename "$setup_file")"
+            echo "Copied setup file: $(basename "$setup_file")"
+          else
+            # If no setup file found, try to find any exe file
+            exe_file=$(find downloads/electron/win -name "*.exe" -not -name "elevate.exe" | head -1)
+            if [ -n "$exe_file" ]; then
+              cp "$exe_file" "deploy/win/$(basename "$exe_file")"
+              echo "Copied exe file: $(basename "$exe_file")"
+            else
+              echo "No exe files found"
             fi
-          done
-          
-          # If no setup file found, try to find any exe file
-          if [ -z "$(ls -A deploy/win)" ]; then
-            find downloads/electron/win -name "*.exe" -not -name "elevate.exe" | head -1 | while read file; do
-              cp "$file" deploy/win/$(basename "$file")
-              echo "Copied exe file: $(basename "$file")"
-            done
           fi
 
       # 上传 Windows 产物
