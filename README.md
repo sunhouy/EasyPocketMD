@@ -2,10 +2,9 @@
 
 A fast, cross-platform, and user-friendly Markdown editor that supports Windows, Linux, Android, iOS, and the web.
 
-[!\[Build and Deploy\](https://github.com/sunhouy/EasyPocketMD/actions/workflows/deploy.yml/badge.svg)](https://github.com/sunhouy/EasyPocketMD/actions/workflows/deploy.yml)
-[!\[Build Android APK\](https://github.com/sunhouy/EasyPocketMD/actions/workflows/build-android.yml/badge.svg)](https://github.com/sunhouy/EasyPocketMD/actions/workflows/build-android.yml)
-[!\[Build Electron App\](https://github.com/sunhouy/EasyPocketMD/actions/workflows/build-electron.yml/badge.svg)](https://github.com/sunhouy/EasyPocketMD/actions/workflows/build-electron.yml)
-[!\[Dependabot Updates\](https://github.com/sunhouy/EasyPocketMD/actions/workflows/dependabot/dependabot-updates/badge.svg)](https://github.com/sunhouy/EasyPocketMD/actions/workflows/dependabot/dependabot-updates)
+[![Build and Deploy](https://github.com/sunhouy/EasyPocketMD/actions/workflows/deploy.yml/badge.svg)](https://github.com/sunhouy/EasyPocketMD/actions/workflows/deploy.yml)
+[![Build Android APK](https://github.com/sunhouy/EasyPocketMD/actions/workflows/build-android.yml/badge.svg)](https://github.com/sunhouy/EasyPocketMD/actions/workflows/build-android.yml)
+[![Build Electron App](https://github.com/sunhouy/EasyPocketMD/actions/workflows/build-electron.yml/badge.svg)](https://github.com/sunhouy/EasyPocketMD/actions/workflows/build-electron.yml)
 
 <p align="center"><a href="README_zh_CN.md">中文</a> &nbsp;|&nbsp; <a href="https://md.yhsun.cn/">Demo</a></p>
 

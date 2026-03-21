@@ -84,12 +84,21 @@ jobs:
           mkdir -p release
           
           # Find and copy only the setup file, excluding elevate.exe
-          for file in downloads/electron/win/*.exe; do
-            if [[ "$(basename "$file")" != "elevate.exe" ]] && [[ "$(basename "$file")" == *"Setup"* ]]; then
+          find downloads/electron/win -name "*.exe" -not -name "elevate.exe" | while read file; do
+            if [[ "$(basename "$file")" == *"Setup"* ]]; then
               cp "$file" "release/easypocketmd-${VERSION}.exe"
               echo "Copied setup file: $(basename "$file") -> easypocketmd-${VERSION}.exe"
+              break
             fi
           done
+          
+          # If no setup file found, try to find any exe file
+          if [ ! -f "release/easypocketmd-${VERSION}.exe" ]; then
+            find downloads/electron/win -name "*.exe" -not -name "elevate.exe" | head -1 | while read file; do
+              cp "$file" "release/easypocketmd-${VERSION}.exe"
+              echo "Copied exe file: $(basename "$file") -> easypocketmd-${VERSION}.exe"
+            done
+          fi
           
           # Copy Linux deb files
           cp downloads/electron/linux/*.deb release/ || true
@@ -138,12 +147,21 @@ jobs:
           mkdir -p deploy/win
           
           # Find and copy only the setup file, excluding elevate.exe
-          for file in downloads/electron/win/*.exe; do
-            if [[ "$(basename "$file")" != "elevate.exe" ]] && [[ "$(basename "$file")" == *"Setup"* ]]; then
+          find downloads/electron/win -name "*.exe" -not -name "elevate.exe" | while read file; do
+            if [[ "$(basename "$file")" == *"Setup"* ]]; then
               cp "$file" deploy/win/$(basename "$file")
               echo "Copied setup file: $(basename "$file")"
+              break
             fi
           done
+          
+          # If no setup file found, try to find any exe file
+          if [ -z "$(ls -A deploy/win)" ]; then
+            find downloads/electron/win -name "*.exe" -not -name "elevate.exe" | head -1 | while read file; do
+              cp "$file" deploy/win/$(basename "$file")
+              echo "Copied exe file: $(basename "$file")"
+            done
+          fi
 
       # 上传 Windows 产物
       - name: Upload Windows Electron artifacts
