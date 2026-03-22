@@ -100,8 +100,8 @@ BASE_URL=网站域名，例如https://md.yhsun.cn
 
 每次push都会触发自动构建上传代码到服务器，electron应用安卓应用通过打tag触发：
 ```bash
-git tag v1.2.3
-git push origin v1.2.3
+git tag v1.3
+git push origin v1.3
 ```
 
 ## Demo
