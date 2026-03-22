@@ -34,6 +34,9 @@
     "url": "https://github.com/sunhouy/markdown/issues"
   },
   "homepage": "https://github.com/sunhouy/markdown#readme",
+  "overrides": {
+    "sharp": "^0.34.5"
+  },
   "dependencies": {
     "@fortawesome/fontawesome-free": "^7.2.0",
     "bcryptjs": "^2.4.3",
