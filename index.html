@@ -236,7 +236,10 @@
 
 <!-- 冲突解决模态窗口 -->
 <div class="modal-overlay" id="conflictModalOverlay">
-    <div class="modal conflict-modal">
+    <div class="modal conflict-modal" style="position:relative;">
+        <button class="modal-close-btn" id="closeConflictBtn" style="position:absolute;top:15px;right:15px;background:none;border:none;font-size:20px;cursor:pointer;z-index:10;">
+            <i class="fas fa-times"></i>
+        </button>
         <div class="modal-header">
             <h2 data-i18n="fileConflict">发现文件冲突</h2>
             <p data-i18n="conflictSubtitle">以下文件在本地和服务器上存在不同版本</p>
@@ -402,10 +405,10 @@
                 <button class="dropdown-item" id="mobileFileManagerBtn"><i class="fas fa-folder"></i>  <span data-i18n="myFiles">我的文件</span></button>
                 <button class="dropdown-item" id="mobilePrintBtn"><i class="fas fa-print"></i>  <span data-i18n="cloudPrint">云打印</span></button>
                 <button class="dropdown-item" id="mobilePresentationBtn"><i class="fas fa-chalkboard-teacher"></i>  <span data-i18n="presentationMode">演示模式</span></button>
-                <button class="dropdown-item" id="mobileModeBtn"><i class="fas fa-exchange-alt"></i>  <span data-i18n="switchMode">切换模式</span></button>
+                <button class="dropdown-item" id="mobileModeBtn"><i class="fas fa-exchange-alt"></i>  <span data-i18n="switchMode">切换编辑器模式</span></button>
                 <button class="dropdown-item" id="mobileImportBtn"><i class="fas fa-file-import"></i>  <span data-i18n="import">导入</span></button>
                 <button class="dropdown-item" id="mobileExportBtn"><i class="fas fa-file-export"></i>  <span data-i18n="export">导出</span></button>
-                <button class="dropdown-item" id="mobileUncertaintyBtn"><i class="fas fa-calculator"></i>  <span data-i18n="uncertainty">不确定度</span></button>
+                <button class="dropdown-item" id="mobileUncertaintyBtn"><i class="fas fa-calculator"></i>  <span data-i18n="uncertainty">不确定度计算器</span></button>
                 <button class="dropdown-item" id="mobileClearBtn"><i class="fas fa-trash-alt"></i>  <span data-i18n="clear">清空</span></button>
                 <button class="dropdown-item" id="mobileSettingsBtn"><i class="fas fa-cog"></i>  <span data-i18n="settings">设置</span></button>
                 <button class="dropdown-item" id="aboutBtn"><i class="fas fa-info-circle"></i>  <span data-i18n="about">关于</span></button>

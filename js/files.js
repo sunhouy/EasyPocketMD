@@ -400,8 +400,43 @@
         conflictModal.classList.add('show');
         var resolveBtn = document.getElementById('resolveConflictsBtn');
         var cancelBtn = document.getElementById('cancelConflictBtn');
-        if (resolveBtn) resolveBtn.onclick = function() { resolveConflicts(conflicts, serverFiles); conflictModal.classList.remove('show'); };
-        if (cancelBtn) cancelBtn.onclick = function() { conflictModal.classList.remove('show'); loadLocalFiles(); global.showMessage(isEn() ? 'Conflict resolution cancelled, using local files' : '冲突解决已取消，使用本地文件'); };
+        var closeBtn = document.getElementById('closeConflictBtn');
+
+        var handleDefaultResolution = function() {
+            conflictModal.classList.remove('show');
+            document.removeEventListener('keydown', handleEsc);
+            // 默认全部设为服务器版本（或删除以同步服务器）
+            conflicts.forEach(function(conflict, index) {
+                var serverInput = document.querySelector('input[name="conflict-' + index + '"][value="server"]');
+                var deleteInput = document.querySelector('input[name="conflict-' + index + '"][value="delete"]');
+                if (serverInput) serverInput.checked = true;
+                if (deleteInput) deleteInput.checked = true;
+            });
+            resolveConflicts(conflicts, serverFiles);
+            global.showMessage(isEn() ? 'Using server version by default' : '已默认使用服务器版本');
+        };
+
+        var handleEsc = function(e) {
+            if (e.key === 'Escape' && conflictModal.classList.contains('show')) {
+                handleDefaultResolution();
+            }
+        };
+
+        if (resolveBtn) resolveBtn.onclick = function() { 
+            document.removeEventListener('keydown', handleEsc);
+            resolveConflicts(conflicts, serverFiles); 
+            conflictModal.classList.remove('show'); 
+        };
+        if (cancelBtn) cancelBtn.onclick = handleDefaultResolution;
+        if (closeBtn) closeBtn.onclick = handleDefaultResolution;
+        
+        // 点击外部区域关闭
+        conflictModal.onclick = function(e) {
+            if (e.target === conflictModal) handleDefaultResolution();
+        };
+        
+        // 监听 Esc 键
+        document.addEventListener('keydown', handleEsc);
     }
 
     function resolveConflicts(conflicts, serverFiles) {
@@ -750,10 +785,19 @@
             window.$.jstree.reference('#fileList').destroy();
         }
 
+        let lastToggleTime = 0;
+        function safeToggleNode(inst, node) {
+            const now = Date.now();
+            if (now - lastToggleTime < 300) return; // 300ms 内防止重复触发
+            lastToggleTime = now;
+            inst.toggle_node(node);
+        }
+
         const tree = window.$('#fileList').jstree({
             'core': {
                 'check_callback': true, // 允许所有操作
                 'data': treeData,
+                'dblclick_toggle': false, // 禁用默认的双击切换，由我们统一处理单击切换
                 'themes': {
                     'name': 'default',
                     'responsive': true,
@@ -767,6 +811,9 @@
                 'folder': { 'icon': 'fas fa-folder' } },
             'plugins': ['types', 'contextmenu', 'wholerow'],
             'contextmenu': {
+                'select_node': false,
+                'show_at_node': false,
+                'shortcut_all': false,
                 'items': function(node) {
                     const items = {
                         'rename': {
@@ -890,16 +937,24 @@
                     if (g('currentFileId')) global.saveCurrentFile(true);
                     openFile(data.node.id);
                 }
-            } else {
-                data.instance.toggle_node(data.node);
+            } else if (data.node.type === 'folder') {
+                safeToggleNode(data.instance, data.node);
             }
         })
-        .on('click.jstree', function (e, data) {
-            if (!data) return;
-            const node = data.node;
+        .on('click.jstree', function (e) {
+            const inst = window.$.jstree.reference(e.target);
+            const node = inst.get_node(e.target);
             if (node && node.type === 'folder') {
-                e.preventDefault();
-                data.instance.toggle_node(node);
+                const target = window.$(e.target);
+                // 排除右侧菜单按钮和箭头（箭头 jstree 会默认处理，且不需要我们在这里 toggle）
+                if ((target.hasClass('jstree-anchor') || target.closest('.jstree-anchor').length) && 
+                    !target.hasClass('file-menu-btn') && 
+                    !target.hasClass('jstree-ocl')) {
+                    // 如果节点已经是选中状态，select_node 不会再次触发，所以我们需要在这里手动 toggle
+                    if (inst.is_selected(node)) {
+                        safeToggleNode(inst, node);
+                    }
+                }
             }
         })
         .on('rename_node.jstree', function (e, data) {
@@ -967,9 +1022,10 @@
         })
         .on('ready.jstree', function() {
             expandActiveFile();
-            // 禁用默认右键菜单，确保 jstree 菜单显示
-            window.$('#fileList').on('contextmenu', '.jstree-anchor', function(e) {
+            // 禁用长按和右键菜单，统一使用右侧三个点
+            window.$('#fileList').on('contextmenu', function(e) {
                 e.preventDefault();
+                e.stopImmediatePropagation();
                 return false;
             });
         });

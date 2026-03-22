@@ -7,6 +7,8 @@ require('dotenv').config({ path: path.join(__dirname, '../.env') }); // Load env
 const app = express();
 const port = process.env.PORT || 3000;
 
+const isTest = process.env.NODE_ENV === 'test';
+
 // Middleware
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
@@ -19,11 +21,13 @@ const avatarsPath = path.join(__dirname, '../avatars');
 const screenshotsPath = path.join(__dirname, '../screenshots');
 const userFilesPath = path.join(__dirname, '../user_files');
 
-console.log('Serving static files from:');
-console.log('- Uploads:', uploadsPath);
-console.log('- Avatars:', avatarsPath);
-console.log('- Screenshots:', screenshotsPath);
-console.log('- User Files:', userFilesPath);
+if (!isTest) {
+    console.log('Serving static files from:');
+    console.log('- Uploads:', uploadsPath);
+    console.log('- Avatars:', avatarsPath);
+    console.log('- Screenshots:', screenshotsPath);
+    console.log('- User Files:', userFilesPath);
+}
 
 app.use('/uploads', express.static(uploadsPath));
 app.use('/avatars', express.static(avatarsPath));
@@ -35,11 +39,11 @@ app.use('/vditor', express.static(path.join(__dirname, '../node_modules/vditor/d
 // Serve Font Awesome from node_modules
 app.use('/fa', express.static(path.join(__dirname, '../node_modules/@fortawesome/fontawesome-free')));
 
-// Serve frontend static files
-// If dist folder exists (production build), serve it
-console.log('Server starting...');
-console.log('Current directory (__dirname):', __dirname);
-console.log('Current working directory (process.cwd()):', process.cwd());
+if (!isTest) {
+    console.log('Server starting...');
+    console.log('Current directory (__dirname):', __dirname);
+    console.log('Current working directory (process.cwd()):', process.cwd());
+}
 
 // PWA assets (must NOT fall back to index.html)
 // These files live in project root and are deployed alongside dist/
@@ -73,9 +77,9 @@ const potentialDistPaths = [
 let distPath = null;
 for (const p of potentialDistPaths) {
     const indexHtmlPath = path.join(p, 'index.html');
-    console.log(`Checking for frontend build at: ${p}`);
+    if (!isTest) console.log(`Checking for frontend build at: ${p}`);
     if (fs.existsSync(p) && fs.existsSync(indexHtmlPath)) {
-        console.log(`Found valid frontend build at: ${p}`);
+        if (!isTest) console.log(`Found valid frontend build at: ${p}`);
         distPath = p;
         break;
     }
@@ -93,7 +97,7 @@ if (distPath) {
 } else {
     // Fallback to serving root for development (though Vite is recommended)
     // Note: Root index.html now uses modules, so it won't work directly without Vite
-    console.log('Frontend build (dist) not found. Serving from root directory.');
+    if (!isTest) console.log('Frontend build (dist) not found. Serving from root directory.');
     app.use(express.static(rootPath));
     
     // SPA catch-all handler for root fallback
@@ -105,8 +109,10 @@ if (distPath) {
         if (fs.existsSync(indexPath)) {
             res.sendFile(indexPath);
         } else {
-            console.error('CRITICAL ERROR: Could not find frontend build (dist/index.html).');
-            console.error('Searched in:', potentialDistPaths);
+            if (!isTest) {
+                console.error('CRITICAL ERROR: Could not find frontend build (dist/index.html).');
+                console.error('Searched in:', potentialDistPaths);
+            }
             res.status(404).send(`
                 <h1>404 Not Found</h1>
                 <p>Frontend build files not found on server.</p>
@@ -141,7 +147,9 @@ app.use('/api/ai', aiRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
-    console.error(err.stack);
+    if (!isTest) {
+        console.error(err.stack);
+    }
     res.status(500).json({
         code: 500,
         message: '服务器内部错误',

@@ -1,13 +1,7 @@
 const request = require('supertest');
+const app = require('../../api/server');
 
-// Mock mysql2/promise to avoid real DB connections
-jest.mock('mysql2/promise', () => ({
-    createPool: jest.fn(() => ({
-        getConnection: jest.fn(),
-        execute: jest.fn(),
-        on: jest.fn()
-    }))
-}));
+jest.setTimeout(10000);
 
 // Mock the User model
 jest.mock('../../api/models/User', () => ({
@@ -19,9 +13,6 @@ jest.mock('../../api/models/User', () => ({
     login: jest.fn(),
     baseUrl: 'http://test.com'
 }));
-
-// Load the app after mocks
-const app = require('../../api/server');
 
 describe('Server Integration', () => {
     it('should export the express app', () => {

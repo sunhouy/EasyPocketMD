@@ -174,7 +174,7 @@
             storageCloud: '云端存储',
             storageThisTime: '仅本次生效',
             storagePermanent: '永久保存',
-            storageLocalDesc: '文件将缓存在本地路径，可能拖慢加载速度。',
+            storageLocalDesc: '文件将缓存在本地路径，会严重拖慢加载速度，仅作为临时解决方案，如果必须使用，不要上传大图片。',
             storageCloudDesc: '文件将直接上传至云端服务器。',
             storageUploadRequired: '检测到本地图片/文件，需上传至云端才能进行转换或导出。是否立即上传并继续？',
             uploadAndContinue: '上传并继续',
@@ -250,6 +250,7 @@
             newDocument: '新文档',
             newFolderDefault: '新文件夹',
             untitledDocument: '未命名文档',
+            saveSuccess: '保存成功',
             
             // 欢迎文档
             welcomeTitle: '欢迎使用 EasyPocketMD',
