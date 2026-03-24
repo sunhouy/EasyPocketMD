@@ -471,7 +471,7 @@ async function downloadInCapacitor(data, filename, mimeType, isRawData = false) 
         } else if (mode === 'export-pdf') {
             actionButtons = `
                 <div style="display:flex;gap:10px;margin-top:20px;">
-                    <button id="localConvertBtn" style="flex:1;padding:12px;font-weight:bold;background:#FF9800;color:white;border:none;border-radius:6px;cursor:pointer;">${isEn() ? 'Local Convert (Experimental)' : '本地转换（实验性功能）'}</button>
+                    <button id="localConvertBtn" style="flex:1;padding:12px;font-weight:bold;background:#FF9800;color:white;border:none;border-radius:6px;cursor:pointer;">${isEn() ? 'Local Convert (Experimental)' : '本地转换（不支持公式）'}</button>
                     <button id="serverConvertBtn" style="flex:1;padding:12px;font-weight:bold;background:#2196F3;color:white;border:none;border-radius:6px;cursor:pointer;">${isEn() ? 'Server Convert' : '后端转换'}</button>
                 </div>
             `;

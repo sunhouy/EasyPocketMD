@@ -11,6 +11,25 @@ let pdfMake = null;
 let pdfMakeInitialized = false;
 
 /**
+ * 动态加载 script 文件
+ */
+function loadScript(url) {
+    return new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = url;
+        script.onload = () => {
+            console.log('[PDF Debug] Script loaded:', url);
+            resolve();
+        };
+        script.onerror = (error) => {
+            console.error('[PDF Debug] Script load failed:', url, error);
+            reject(error);
+        };
+        document.head.appendChild(script);
+    });
+}
+
+/**
  * 按需初始化 pdfmake 并加载中文字体支持
  */
 async function initPdfMakeWithChineseFonts() {
@@ -20,21 +39,25 @@ async function initPdfMakeWithChineseFonts() {
     
     console.log('[PDF Debug] Initializing pdfmake with Chinese fonts...');
     
-    // 动态加载 pdfmake-support-chinese-fonts
-    const pdfMakeModule = await import('pdfmake-support-chinese-fonts/pdfmake.min');
-    const pdfFontsModule = await import('pdfmake-support-chinese-fonts/vfs_fonts');
-    
-    pdfMake = pdfMakeModule.default || pdfMakeModule;
-    const pdfFonts = pdfFontsModule.default || pdfFontsModule;
-    
-    // 设置 vfs
-    if (pdfFonts && pdfFonts.pdfMake && pdfFonts.pdfMake.vfs) {
-        pdfMake.vfs = pdfFonts.pdfMake.vfs;
-    } else if (pdfFonts && pdfFonts.vfs) {
-        pdfMake.vfs = pdfFonts.vfs;
+    try {
+        // 先设置全局的 pdfMake 对象
+        window.pdfMake = {};
+        
+        // 加载 pdfmake 和 vfs_fonts 作为普通脚本，而不是模块
+        await loadScript('./pdfmake.min.js');
+        await loadScript('./vfs_fonts.js');
+        
+        // 此时 window.pdfMake 应该已经有完整的 vfs 了
+        pdfMake = window.pdfMake;
+        
+        console.log('[PDF Debug] vfs keys:', Object.keys(pdfMake.vfs || {}));
+        
+    } catch (e) {
+        console.error('[PDF Debug] Initialization failed:', e);
+        throw e;
     }
     
-    // 设置字体
+    // 设置字体，注意是大写的 TTF，和 vfs 中的键名一致
     pdfMake.fonts = {
         Roboto: {
             normal: 'Roboto-Regular.ttf',
@@ -43,10 +66,10 @@ async function initPdfMakeWithChineseFonts() {
             bolditalics: 'Roboto-Regular.ttf'
         },
         fangzhen: {
-            normal: 'fzhei-jt.ttf',
-            bold: 'fzhei-jt.ttf',
-            italics: 'fzhei-jt.ttf',
-            bolditalics: 'fzhei-jt.ttf'
+            normal: 'fzhei-jt.TTF',
+            bold: 'fzhei-jt.TTF',
+            italics: 'fzhei-jt.TTF',
+            bolditalics: 'fzhei-jt.TTF'
         }
     };
     
@@ -84,14 +107,88 @@ async function generatePDFLocal(htmlContent, settings) {
     
     console.log('[PDF Debug] Processed content preview (first 500 chars):', processedContent.substring(0, 500));
     
-    const cleanedHtml = processedContent
+    // 首先创建临时 DOM 来处理图片和公式
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = processedContent;
+    
+    // 处理图片：转换为 data URLs
+    const images = tempDiv.querySelectorAll('img');
+    console.log('[PDF Debug] Found', images.length, 'images');
+    
+    // 将所有图片转换为 data URLs
+    const imagePromises = [];
+    images.forEach((img, index) => {
+        imagePromises.push(
+            new Promise((resolve) => {
+                // 如果已经是 data URL，直接使用
+                if (img.src.startsWith('data:')) {
+                    resolve();
+                    return;
+                }
+                
+                // 尝试转换为 data URL
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                const tempImg = new Image();
+                
+                tempImg.crossOrigin = 'anonymous';
+                
+                tempImg.onload = () => {
+                    canvas.width = tempImg.naturalWidth || tempImg.width;
+                    canvas.height = tempImg.naturalHeight || tempImg.height;
+                    ctx.drawImage(tempImg, 0, 0);
+                    try {
+                        const dataUrl = canvas.toDataURL('image/png');
+                        img.src = dataUrl;
+                        console.log('[PDF Debug] Image', index, 'converted to data URL');
+                    } catch (e) {
+                        console.warn('[PDF Debug] Failed to convert image', index, ':', e);
+                        img.remove();
+                    }
+                    resolve();
+                };
+                
+                tempImg.onerror = () => {
+                    console.warn('[PDF Debug] Failed to load image', index);
+                    img.remove();
+                    resolve();
+                };
+                
+                tempImg.src = img.src;
+            })
+        );
+    });
+    
+    // 等待所有图片处理完成
+    await Promise.all(imagePromises);
+    
+    // 处理 LaTeX 公式：移除 SVG 元素
+    const svgElements = tempDiv.querySelectorAll('svg');
+    console.log('[PDF Debug] Found', svgElements.length, 'SVG elements');
+    
+    // 移除所有 SVG 元素
+    svgElements.forEach(svg => {
+        const parent = svg.parentNode;
+        if (parent) {
+            const container = svg.closest('[data-mml-node], .mjx-chtml, .katex');
+            if (container) {
+                container.remove();
+            } else {
+                svg.remove();
+            }
+        }
+    });
+    
+    // 清理字体样式
+    let html = tempDiv.innerHTML;
+    html = html
         .replace(/font-family\s*:\s*[^;]+;/gi, '')
         .replace(/font-family\s*:\s*[^"']+["']/gi, '')
         .replace(/font-family\s*:\s*[^}]+}/gi, '}');
 
     const fullHtml = `
         <div>
-            ${cleanedHtml}
+            ${html}
         </div>
     `;
 
@@ -103,11 +200,42 @@ async function generatePDFLocal(htmlContent, settings) {
             h1: { fontSize: 24, bold: true, margin: [0, 0, 0, 10], font: 'fangzhen' },
             h2: { fontSize: 20, bold: true, margin: [0, 0, 0, 8], font: 'fangzhen' },
             h3: { fontSize: 16, bold: true, margin: [0, 0, 0, 6], font: 'fangzhen' },
-            h4: { fontSize: 14, bold: true, margin: [0, 0, 0, 4], font: 'fangzhen' }
+            h4: { fontSize: 14, bold: true, margin: [0, 0, 0, 4], font: 'fangzhen' },
+            img: { maxWidth: 500 } // 500pt 大约是 A4 页面去掉边距的宽度
         }
     });
 
     console.log('[PDF Debug] htmlToPdfmake conversion done');
+    
+    // 后处理：确保所有图片宽度不超过页面宽度
+    function limitImageWidth(content) {
+        if (Array.isArray(content)) {
+            content.forEach(item => limitImageWidth(item));
+        } else if (content && typeof content === 'object') {
+            // 检查是否是图片
+            if (content.image) {
+                // A4 页面宽度：595pt，减去边距（每个边 15mm ≈ 42pt），所以 595 - 42*2 = 511pt
+                // 我们设置最大 500pt 留一点余地
+                const maxWidth = 500;
+                if (!content.width || content.width > maxWidth) {
+                    content.width = maxWidth;
+                }
+                // 确保图片自适应
+                if (!content.fit) {
+                    content.fit = [maxWidth, 1000]; // 高度足够大，保持比例
+                }
+            }
+            // 递归处理子元素
+            for (const key in content) {
+                if (content.hasOwnProperty(key) && typeof content[key] === 'object') {
+                    limitImageWidth(content[key]);
+                }
+            }
+        }
+    }
+    
+    limitImageWidth(pdfMakeContent);
+    console.log('[PDF Debug] Image width limiting done');
 
     const docDefinition = {
         content: pdfMakeContent,
@@ -130,7 +258,13 @@ async function generatePDFLocal(htmlContent, settings) {
         console.log('[PDF Debug] pdfmake document created');
         
         console.log('[PDF Debug] Getting buffer...');
-        const buffer = await pdfDoc.getBuffer();
+        const buffer = await new Promise((resolve, reject) => {
+            pdfDoc.getBuffer((buffer) => {
+                resolve(buffer);
+            }, (error) => {
+                reject(error);
+            });
+        });
         console.log('[PDF Debug] Buffer created, length:', buffer.length, 'bytes');
         
         const blob = new Blob([buffer], { type: 'application/pdf' });
@@ -141,6 +275,60 @@ async function generatePDFLocal(htmlContent, settings) {
         console.error('[PDF Debug] Local PDF generation error:', error);
         throw error;
     }
+}
+
+/**
+ * Clean up MathJax-related content from HTML
+ * 1. Remove all MathJax scripts
+ * 2. Remove <mjx-assistive-mml> nodes
+ * 3. Process <mjx-container> to keep only SVG wrapped in div
+ * @param {string} html - The HTML content to clean
+ * @returns {string} - Cleaned HTML
+ */
+function cleanMathJaxContent(html) {
+    // Create a temporary DOM element to parse HTML
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = html;
+    
+    // 1. Remove all MathJax scripts
+    const scripts = tempDiv.querySelectorAll('script[src*="mathjax"], script[id*="MathJax"]');
+    scripts.forEach(script => script.remove());
+    
+    // Remove any other MathJax-related scripts
+    const allScripts = tempDiv.querySelectorAll('script');
+    allScripts.forEach(script => {
+        if (script.textContent && script.textContent.toLowerCase().includes('mathjax')) {
+            script.remove();
+        }
+    });
+    
+    // 2. Remove <mjx-assistive-mml> nodes
+    const assistiveMml = tempDiv.querySelectorAll('mjx-assistive-mml');
+    assistiveMml.forEach(el => el.remove());
+    
+    // 3. Process <mjx-container> elements
+    const mjxContainers = tempDiv.querySelectorAll('mjx-container');
+    mjxContainers.forEach(container => {
+        // Find the SVG inside
+        const svg = container.querySelector('svg');
+        if (svg) {
+            // Create a div to wrap the SVG
+            const wrapper = document.createElement('div');
+            wrapper.style.cssText = 'text-align: center; margin: 1em 0;';
+            
+            // Clone the SVG to avoid reference issues
+            const svgClone = svg.cloneNode(true);
+            wrapper.appendChild(svgClone);
+            
+            // Replace the mjx-container with our wrapper div
+            container.parentNode.replaceChild(wrapper, container);
+        } else {
+            // If no SVG found, just remove the container
+            container.remove();
+        }
+    });
+    
+    return tempDiv.innerHTML;
 }
 
 /**
@@ -160,6 +348,11 @@ export async function generatePDF(htmlContent, settings, filename) {
         console.warn('[PDF Debug] generatePDF received empty content');
         htmlContent = '<div style="padding: 20px; font-size: 16px; color: #666; text-align: center;">(文档内容为空)</div>';
     } 
+    
+    // Clean up MathJax-related content before sending to backend
+    console.log('[PDF Debug] Cleaning MathJax content...');
+    const cleanedHtmlContent = cleanMathJaxContent(htmlContent);
+    console.log('[PDF Debug] MathJax content cleaned');
     
     const fullHtml = `
         <!DOCTYPE html>
@@ -181,7 +374,7 @@ export async function generatePDF(htmlContent, settings, filename) {
             </style>
         </head>
         <body>
-            ${htmlContent}
+            ${cleanedHtmlContent}
         </body>
         </html>
     `;
