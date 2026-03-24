@@ -116,7 +116,23 @@
         return g('files').some(f => f.name === fullPath && f.id !== excludeId);
     }
 
-    // 【新增】获取所有可用目标文件夹（包含虚拟中间文件夹）
+    function getNextAvailableName(baseName, parentPath) {
+        const files = g('files');
+        let candidateName = baseName;
+        let counter = 2;
+        
+        while (true) {
+            const fullPath = parentPath ? parentPath + '/' + candidateName : candidateName;
+            const exists = files.some(f => f.name === fullPath);
+            if (!exists) {
+                return candidateName;
+            }
+            candidateName = baseName + counter;
+            counter++;
+        }
+    }
+
+    // 获取所有可用目标文件夹（包含虚拟中间文件夹）
     function getAllFolderPaths() {
         const folderSet = new Set(['']); // 根目录
         const files = g('files');
@@ -124,7 +140,7 @@
             if (f.type === 'folder') {
                 folderSet.add(f.name);
             }
-            // 对于文件，提取其所有的父路径作为文件夹
+            // 对于象文件，提取其所有的父路径作为文件夹
             if (f.type === 'file') {
                 let path = f.name;
                 while (path.includes('/')) {
@@ -898,7 +914,9 @@
                                 const inst = window.$.jstree.reference(data.reference);
                                 const obj = inst.get_node(data.reference);
                                 const path = obj.data.path;
-                                g('customPrompt')(isEn() ? 'Please enter filename' : '请输入文件名', { defaultValue: isEn() ? 'New File' : '新文件' }).then(function(name) {
+                                const baseName = isEn() ? 'New File' : '新文档';
+                                const defaultName = getNextAvailableName(baseName, path);
+                                g('customPrompt')(isEn() ? 'Please enter filename' : '请输入文件名', { defaultValue: defaultName }).then(function(name) {
                                     if (name) {
                                         const newPath = path + '/' + name;
                                         createFileAtPath(newPath);
@@ -912,7 +930,9 @@
                                 const inst = window.$.jstree.reference(data.reference);
                                 const obj = inst.get_node(data.reference);
                                 const path = obj.data.path;
-                                g('customPrompt')(isEn() ? 'Please enter folder name' : '请输入文件夹名', { defaultValue: isEn() ? 'New Folder' : '新文件夹' }).then(function(name) {
+                                const baseName = isEn() ? 'New Folder' : '新文件夹';
+                                const defaultName = getNextAvailableName(baseName, path);
+                                g('customPrompt')(isEn() ? 'Please enter folder name' : '请输入文件夹名', { defaultValue: defaultName }).then(function(name) {
                                     if (name) {
                                         const newPath = path + '/' + name;
                                         createFolderAtPath(newPath);
@@ -1456,7 +1476,7 @@
         });
     }
 
-    function openFile(fileId) {
+    async function openFile(fileId) {
         const files = g('files');
         const file = files.find(f => f.id === fileId && f.type === 'file');
         if (!file) {
@@ -1464,7 +1484,17 @@
             return;
         }
         global.currentFileId = fileId;
-        if (g('vditor')) g('vditor').setValue(file.content);
+        
+        let content = file.content;
+        if (global.LocalImageManager && global.LocalImageManager.convertLocalToBlob) {
+            try {
+                content = await global.LocalImageManager.convertLocalToBlob(content);
+            } catch (e) {
+                console.error('Failed to convert local images to blob:', e);
+            }
+        }
+        
+        if (g('vditor')) g('vditor').setValue(content);
         expandActiveFile();
         global.startAutoSave();
         global.showMessage(isEn() ? 'File opened: ' + file.name : '已打开文件: ' + file.name);
@@ -1539,7 +1569,16 @@
         const files = g('files');
         const fileIndex = files.findIndex(function(f) { return f.id === currentFileId && f.type === 'file'; });
         if (fileIndex === -1) return;
-        const content = vditor.getValue();
+        let content = vditor.getValue();
+        
+        if (global.LocalImageManager && global.LocalImageManager.convertBlobToLocal) {
+            try {
+                content = global.LocalImageManager.convertBlobToLocal(content);
+            } catch (e) {
+                console.error('Failed to convert blob images to local:', e);
+            }
+        }
+        
         const file = files[fileIndex];
         const contentChanged = content !== file.content;
         file.content = content;

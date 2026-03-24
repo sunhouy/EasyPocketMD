@@ -159,13 +159,29 @@
         const arrayBuffer = await file.arrayBuffer();
         const fileUrl = url || `local://${Date.now()}-${file.name}`;
         await global.IndexedDBManager.saveFile(fileUrl, arrayBuffer, file.type);
+        
+        const blobUrl = global.IndexedDBManager.createBlobURL(arrayBuffer, file.type);
+        if (global.LocalImageManager && global.LocalImageManager.registerUrlPair) {
+            global.LocalImageManager.registerUrlPair(fileUrl, blobUrl);
+        }
+        cache.set(fileUrl, blobUrl);
+        
         return fileUrl;
     }
 
     async function getLocalBlobUrl(url) {
+        if (cache.has(url)) {
+            return cache.get(url);
+        }
+        
         const localData = await global.IndexedDBManager.getFile(url);
         if (localData) {
-            return global.IndexedDBManager.createBlobURL(localData.data, localData.contentType);
+            const blobUrl = global.IndexedDBManager.createBlobURL(localData.data, localData.contentType);
+            if (global.LocalImageManager && global.LocalImageManager.registerUrlPair) {
+                global.LocalImageManager.registerUrlPair(url, blobUrl);
+            }
+            cache.set(url, blobUrl);
+            return blobUrl;
         }
         return null;
     }
@@ -185,7 +201,8 @@
         storeLocalFile,
         getLocalBlobUrl,
         createPlaceholderElement,
-        cleanup
+        cleanup,
+        getUrlCache: () => cache
     };
 
     setInterval(cleanup, 60000);
