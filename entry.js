@@ -15,8 +15,12 @@ import './js/translations.js';
 import './js/utils.js';
 import './js/auth.js';
 import './js/files.js';
+import './js/indexedDB.js';
+import './js/resourceLoader.js';
+import './js/resourceRenderer.js';
 
 // UI Modules
+import './js/ui/dialog.js';
 import './js/ui/common.js';
 import './js/ui/render.js';
 import './js/ui/chart.js';

@@ -56,7 +56,7 @@ async function exportFile(content, ext) {
 
                     // 确保pdfUrl是完整的URL
                     var fullPdfUrl = pdfUrl;
-                    if (!pdfUrl.startsWith('http://') && !pdfUrl.startsWith('https://')) {
+                    if (!pdfUrl.startsWith('http://') && !pdfUrl.startsWith('https://') && !pdfUrl.startsWith('blob:')) {
                         // 构建完整的URL
                         var origin = window.getAppOrigin ? window.getAppOrigin() : window.location.origin;
                         var baseUrl = origin;

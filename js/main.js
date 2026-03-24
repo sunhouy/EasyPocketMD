@@ -36,12 +36,11 @@ document.addEventListener('DOMContentLoaded', function() {
         { id: 'mobileChartBtn', icon: 'fas fa-chart-bar', textKey: 'chart', fn: function() { if (typeof window.showChartPicker === 'function') window.showChartPicker(); } },
         { id: 'mobileUncertaintyBtn', icon: 'fas fa-calculator', textKey: 'uncertainty', fn: function() { if (typeof window.showUncertaintyCalculator === 'function') window.showUncertaintyCalculator(); } },
         { id: 'mobileUndoBtn', icon: 'fas fa-undo', textKey: 'undo', fn: function() { if (window.vditor && window.vditor.vditor && window.vditor.vditor.undo) window.vditor.vditor.undo.undo(window.vditor.vditor); } },
-        { id: 'mobileRedoBtn', icon: 'fas fa-redo', textKey: 'redo', fn: function() { if (window.vditor && window.vditor.vditor && window.vditor.vditor.undo) window.vditor.vditor.undo.redo(window.vditor.vditor); } },
-        { id: 'mobileSaveBottomBtn', icon: 'fas fa-save', textKey: 'save', fn: function() { window.saveCurrentFile(true); } }
+        { id: 'mobileRedoBtn', icon: 'fas fa-redo', textKey: 'redo', fn: function() { if (window.vditor && window.vditor.vditor && window.vditor.vditor.undo) window.vditor.vditor.undo.redo(window.vditor.vditor); } }
     ];
 
     // 默认配置
-    window.defaultToolbarButtons = ['mobileFormatBtn', 'mobileInsertBtn', 'mobileFormulaBtn', 'mobileChartBtn', 'mobileUndoBtn', 'mobileRedoBtn', 'mobileSaveBottomBtn'];
+    window.defaultToolbarButtons = ['mobileFormatBtn', 'mobileInsertBtn', 'mobileFormulaBtn', 'mobileChartBtn', 'mobileUndoBtn', 'mobileRedoBtn'];
     
     // 加载用户配置
     window.userSettings = JSON.parse(localStorage.getItem('vditor_settings') || '{}');
@@ -381,7 +380,7 @@ document.addEventListener('DOMContentLoaded', function() {
         var fileListHelp = document.getElementById('fileListHelp');
         if (fileListHelp) {
             fileListHelp.addEventListener('click', function() {
-                alert(window.i18n ? window.i18n.t('fileListHelpText') : '文件列表功能提示：\n\n• 点击文件：打开文件\n• 点击文件夹：展开/收起子内容\n• 右键点击或长按：显示更多操作菜单（重命名、移动、删除等）');
+                window.customAlert(window.i18n ? window.i18n.t('fileListHelpText') : '文件列表功能提示：\n\n• 点击文件：打开文件\n• 点击文件夹：展开/收起子内容\n• 右键点击或长按：显示更多操作菜单（重命名、移动、删除等）');
             });
         }
         
@@ -434,8 +433,9 @@ document.addEventListener('DOMContentLoaded', function() {
         if (aboutBtn) aboutBtn.addEventListener('click', function() { window.showAboutDialog(); closeDrop(); });
 
         var mobileClearBtn = document.getElementById('mobileClearBtn');
-        if (mobileClearBtn) mobileClearBtn.addEventListener('click', function() {
-            if (confirm(window.i18n ? window.i18n.t('clearConfirm') : '确定要清空当前文件的内容吗？')) {
+        if (mobileClearBtn) mobileClearBtn.addEventListener('click', async function() {
+            const confirmed = await window.customConfirm(window.i18n ? window.i18n.t('clearConfirm') : '确定要清空当前文件的内容吗？');
+            if (confirmed) {
                 if (window.vditor) window.vditor.setValue('');
                 window.showMessage(window.i18n ? window.i18n.t('contentCleared') : '内容已清空');
             }
@@ -539,7 +539,7 @@ document.addEventListener('DOMContentLoaded', function() {
             { id: 'mobileModeBtn', fn: function() { showModeSelection(); closeDrop(); } },
             { id: 'mobileExportBtn', fn: function() { window.exportContent(); closeDrop(); } },
             { id: 'mobileUncertaintyBtn', fn: function() { if (typeof window.showUncertaintyCalculator === 'function') window.showUncertaintyCalculator(); closeDrop(); } },
-            { id: 'mobileClearBtn', fn: function() { if (confirm(window.i18n ? window.i18n.t('clearConfirm') : '确定要清空当前文件的内容吗？')) { if (window.vditor) window.vditor.setValue(''); window.showMessage(window.i18n ? window.i18n.t('contentCleared') : '内容已清空'); } closeDrop(); } },
+            { id: 'mobileClearBtn', fn: async function() { const confirmed = await window.customConfirm(window.i18n ? window.i18n.t('clearConfirm') : '确定要清空当前文件的内容吗？'); if (confirmed) { if (window.vditor) window.vditor.setValue(''); window.showMessage(window.i18n ? window.i18n.t('contentCleared') : '内容已清空'); } closeDrop(); } },
             { id: 'mobileSettingsBtn', fn: function() { window.showSettingsDialog(); closeDrop(); } },
             { id: 'aboutBtn', fn: function() { window.showAboutDialog(); closeDrop(); } }
         ];
@@ -795,7 +795,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // 验证按钮数量
         if (newSettings.toolbarButtons.length < 5 || newSettings.toolbarButtons.length > 7) {
-            alert(window.i18n ? window.i18n.t('buttonCountError') : '底部工具栏按钮数量必须在 5 到 7 个之间');
+            window.customAlert(window.i18n ? window.i18n.t('buttonCountError') : '底部工具栏按钮数量必须在 5 到 7 个之间');
             return;
         }
         

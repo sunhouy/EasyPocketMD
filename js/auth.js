@@ -241,9 +241,8 @@
         });
 
         if (hasUnsaved) {
-            if (!confirm(t('unsavedFilesSave'))) {
-                // 不保存
-            } else {
+            const confirmed = await g('customConfirm')(t('unsavedFilesSave'));
+            if (confirmed) {
                 if (global.syncAllFiles) await global.syncAllFiles();
             }
         }

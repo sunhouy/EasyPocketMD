@@ -257,38 +257,19 @@
     async function saveFilesLocally(filesArray, autoInsert) {
         autoInsert = autoInsert !== false;
         const markdownLinks = [];
-        const localFiles = JSON.parse(localStorage.getItem('vditor_local_files') || '[]');
 
         for (const file of filesArray) {
             try {
-                const dataUrl = await readFileAsDataURL(file);
-                let fileUrl = dataUrl;
-                const fileName = `${Date.now()}_${file.name}`;
-
-                // If in Electron, save to disk
-                if (window.electron && window.electron.saveLocalFile) {
-                    fileUrl = await window.electron.saveLocalFile(fileName, dataUrl);
-                }
-
-                // Add to local files registry
-                localFiles.push({
-                    name: fileName,
-                    originalName: file.name,
-                    url: fileUrl,
-                    type: file.type,
-                    size: file.size,
-                    date: new Date().toISOString()
-                });
-
-                const encodedUrl = fileUrl.includes(' ') ? encodeURI(fileUrl) : fileUrl;
-                const link = /\.(jpg|jpeg|png|gif|bmp|webp|svg)$/i.test(file.name) ? `![${file.name}](${encodedUrl})` : `[${file.name}](${encodedUrl})`;
+                const fileUrl = await global.ResourceLoader.storeLocalFile(file);
+                const blobUrl = await global.ResourceLoader.getLocalBlobUrl(fileUrl);
+                
+                const encodedUrl = blobUrl.includes(' ') ? encodeURI(blobUrl) : blobUrl;
+                const link = /\.(jpg|jpeg|png|gif|bmp|webp|svg)$/i.test(file.name) ? `![${file.name}](${fileUrl})` : `[${file.name}](${fileUrl})`;
                 markdownLinks.push(link);
             } catch (err) {
                 console.error('Failed to read local file', err);
             }
         }
-
-        localStorage.setItem('vditor_local_files', JSON.stringify(localFiles));
 
         if (autoInsert && markdownLinks.length > 0 && g('vditor')) {
             g('vditor').insertValue(markdownLinks.join('\n\n') + '\n\n');

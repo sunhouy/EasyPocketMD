@@ -824,7 +824,7 @@
                                 
                                 // 对于文件夹，如果是虚拟文件夹，则不允许重命名
                                 if (obj.data.isVirtual) {
-                                    alert(isEn() ? 'Virtual folder cannot be renamed, please create as real folder first' : '虚拟文件夹不可重命名，请先创建为实体文件夹');
+                                    g('customAlert')(isEn() ? 'Virtual folder cannot be renamed, please create as real folder first' : '虚拟文件夹不可重命名，请先创建为实体文件夹');
                                     return;
                                 }
 
@@ -834,7 +834,7 @@
                                     global.renameFile(obj.id);
                                 } else {
                                     console.error('renameFile function not found');
-                                    alert(isEn() ? 'Rename function not available' : '重命名功能不可用');
+                                    g('customAlert')(isEn() ? 'Rename function not available' : '重命名功能不可用');
                                 }
                             }
                         },
@@ -862,7 +862,7 @@
                                 
                                 // 对于文件夹，如果是虚拟文件夹，则不允许移动
                                 if (obj.data.isVirtual) {
-                                    alert(isEn() ? 'Virtual folder cannot be moved, please create as real folder first' : '虚拟文件夹不可移动，请先创建为实体文件夹');
+                                    g('customAlert')(isEn() ? 'Virtual folder cannot be moved, please create as real folder first' : '虚拟文件夹不可移动，请先创建为实体文件夹');
                                     return;
                                 }
                                 
@@ -885,7 +885,7 @@
                                 const inst = window.$.jstree.reference(data.reference);
                                 const obj = inst.get_node(data.reference);
                                 if (obj.data.isVirtual) {
-                                    alert(isEn() ? 'Cannot delete virtual folder directly, please delete its contents' : '不能直接删除虚拟文件夹，请删除其子内容');
+                                    g('customAlert')(isEn() ? 'Cannot delete virtual folder directly, please delete its contents' : '不能直接删除虚拟文件夹，请删除其子内容');
                                     return;
                                 }
                                 global.deleteFile(obj.id);
@@ -898,11 +898,12 @@
                                 const inst = window.$.jstree.reference(data.reference);
                                 const obj = inst.get_node(data.reference);
                                 const path = obj.data.path;
-                                const name = prompt(isEn() ? 'Please enter filename' : '请输入文件名', isEn() ? 'New File' : '新文件');
-                                if (name) {
-                                    const newPath = path + '/' + name;
-                                    createFileAtPath(newPath);
-                                }
+                                g('customPrompt')(isEn() ? 'Please enter filename' : '请输入文件名', { defaultValue: isEn() ? 'New File' : '新文件' }).then(function(name) {
+                                    if (name) {
+                                        const newPath = path + '/' + name;
+                                        createFileAtPath(newPath);
+                                    }
+                                });
                             }
                         },
                         'new_folder': {
@@ -911,11 +912,12 @@
                                 const inst = window.$.jstree.reference(data.reference);
                                 const obj = inst.get_node(data.reference);
                                 const path = obj.data.path;
-                                const name = prompt(isEn() ? 'Please enter folder name' : '请输入文件夹名', isEn() ? 'New Folder' : '新文件夹');
-                                if (name) {
-                                    const newPath = path + '/' + name;
-                                    createFolderAtPath(newPath);
-                                }
+                                g('customPrompt')(isEn() ? 'Please enter folder name' : '请输入文件夹名', { defaultValue: isEn() ? 'New Folder' : '新文件夹' }).then(function(name) {
+                                    if (name) {
+                                        const newPath = path + '/' + name;
+                                        createFolderAtPath(newPath);
+                                    }
+                                });
                             }
                         }
                     };
@@ -960,7 +962,7 @@
         .on('rename_node.jstree', function (e, data) {
              if (data.text === data.old) return;
              if (data.node.data.isVirtual) {
-                 alert(isEn() ? 'Cannot rename virtual folder, please create as real folder first' : '无法重命名虚拟文件夹，请先创建实文件夹');
+                 g('customAlert')(isEn() ? 'Cannot rename virtual folder, please create as real folder first' : '无法重命名虚拟文件夹，请先创建实文件夹');
                  data.instance.refresh(); 
                  return;
              }
@@ -1037,7 +1039,7 @@
         
         const files = g('files');
         if (files.some(f => f.name === path && f.type === 'file')) {
-            alert(isEn() ? 'File with the same name already exists' : '已存在同名文件');
+            g('customAlert')(isEn() ? 'File with the same name already exists' : '已存在同名文件');
             return;
         }
 
@@ -1063,7 +1065,7 @@
         ensureParentFolders(path);
         const files = g('files');
         if (files.some(f => f.name === path)) {
-            alert(isEn() ? 'This path already exists' : '该路径已存在');
+            g('customAlert')(isEn() ? 'This path already exists' : '该路径已存在');
             return;
         }
         const newFolder = {
@@ -1090,7 +1092,7 @@
         const parentPath = getParentPath(oldName);
         
         if (isNameExistsInParent(newBasename.trim(), parentPath, id)) {
-            alert(isEn() ? 'A file or folder with the same name already exists in this directory' : '该目录下已存在同名文件或文件夹');
+            g('customAlert')(isEn() ? 'A file or folder with the same name already exists in this directory' : '该目录下已存在同名文件或文件夹');
             loadFiles(); 
             return;
         }
@@ -1136,14 +1138,14 @@
 
         if (item.type === 'folder') {
             if (newName === oldName || newName.startsWith(oldName + '/')) {
-                alert(isEn() ? 'Cannot move folder to itself or its subdirectory' : '不能将文件夹移动到自身或其子目录中');
+                g('customAlert')(isEn() ? 'Cannot move folder to itself or its subdirectory' : '不能将文件夹移动到自身或其子目录中');
                 loadFiles(); 
                 return;
             }
         }
 
         if (files.some(f => f.name === newName && f.id !== id)) {
-            alert(isEn() ? 'An item with the same name already exists at the target location' : '目标位置已存在同名项');
+            g('customAlert')(isEn() ? 'An item with the same name already exists at the target location' : '目标位置已存在同名项');
             loadFiles(); 
             return;
         }
@@ -1206,8 +1208,13 @@
     }
 
     function loadFiles() {
+        const fileListSidebar = document.getElementById('fileListSidebar');
+        const wasVisible = fileListSidebar && fileListSidebar.classList.contains('show');
         loadOrders();
         initFileTree();
+        if (wasVisible && fileListSidebar) {
+            fileListSidebar.classList.add('show');
+        }
     }
 
     // ---------- 文件操作函数 ----------
@@ -1292,35 +1299,36 @@
         const parentPath = getParentPath(oldName);
         const oldBasename = getBasename(oldName);
 
-        const newBasename = prompt(isEn() ? `Please enter the new ${isFolder ? 'folder' : 'file'} name:` : `请输入新的${isFolder ? '文件夹' : '文件'}名：`, oldBasename);
-        if (!newBasename || newBasename.trim() === oldBasename) return;
+        g('customPrompt')(isEn() ? `Please enter the new ${isFolder ? 'folder' : 'file'} name:` : `请输入新的${isFolder ? '文件夹' : '文件'}名：`, { defaultValue: oldBasename }).then(function(newBasename) {
+            if (!newBasename || newBasename.trim() === oldBasename) return;
 
-        if (isNameExistsInParent(newBasename.trim(), parentPath, id)) {
-            alert(isEn() ? 'A file or folder with the same name already exists in this directory, please use another name' : '该目录下已存在同名文件或文件夹，请使用其他名称');
-            return;
-        }
-
-        const newName = parentPath ? parentPath + '/' + newBasename.trim() : newBasename.trim();
-
-        if (isFolder) {
-            renameFolderAndChildren(oldName, newName);
-        } else {
-            item.name = newName;
-        }
-
-        item.lastModified = Date.now();
-        item.isSynced = false;
-        localStorage.setItem('vditor_files', JSON.stringify(files));
-        loadFiles();
-        global.showMessage(isEn() ? `${isFolder ? 'Folder' : 'File'} renamed` : `${isFolder ? '文件夹' : '文件'}已重命名`);
-        if (g('currentUser')) {
-            if (isFolder) {
-                const affectedFiles = files.filter(f => f.type === 'file' && (f.name.startsWith(newName + '/') || f.name === newName));
-                affectedFiles.forEach(f => global.syncFileToServer(f.id));
-            } else {
-                global.deleteFileFromServer(oldName).then(() => global.syncFileToServer(id));
+            if (isNameExistsInParent(newBasename.trim(), parentPath, id)) {
+                g('customAlert')(isEn() ? 'A file or folder with the same name already exists in this directory, please use another name' : '该目录下已存在同名文件或文件夹，请使用其他名称');
+                return;
             }
-        }
+
+            const newName = parentPath ? parentPath + '/' + newBasename.trim() : newBasename.trim();
+
+            if (isFolder) {
+                renameFolderAndChildren(oldName, newName);
+            } else {
+                item.name = newName;
+            }
+
+            item.lastModified = Date.now();
+            item.isSynced = false;
+            localStorage.setItem('vditor_files', JSON.stringify(files));
+            loadFiles();
+            global.showMessage(isEn() ? `${isFolder ? 'Folder' : 'File'} renamed` : `${isFolder ? '文件夹' : '文件'}已重命名`);
+            if (g('currentUser')) {
+                if (isFolder) {
+                    const affectedFiles = files.filter(f => f.type === 'file' && (f.name.startsWith(newName + '/') || f.name === newName));
+                    affectedFiles.forEach(f => global.syncFileToServer(f.id));
+                } else {
+                    global.deleteFileFromServer(oldName).then(() => global.syncFileToServer(id));
+                }
+            }
+        });
     }
 
     function createDefaultFile() {
@@ -1361,85 +1369,87 @@
     function createNewFile() {
         const defaultName = isEn() ? 'New Document' : '新文档';
         const defaultPath = getSelectedFolderPath() + defaultName;
-        const input = prompt(isEn() ? 'Please enter filename (to create in a folder, ensure the folder exists, e.g., docs/note)' : '请输入文件名（如需在文件夹中创建，请确保文件夹已存在，例如 docs/note）', defaultPath);
-        if (!input) return;
+        g('customPrompt')(isEn() ? 'Please enter filename (to create in a folder, ensure the folder exists, e.g., docs/note)' : '请输入文件名（如需在文件夹中创建，请确保文件夹已存在，例如 docs/note）', { defaultValue: defaultPath }).then(function(input) {
+            if (!input) return;
 
-        let path = normalizePath(input);
-        
-        // 检查父文件夹是否存在
-        const parentPath = getParentPath(path);
-        const files = g('files');
-        
-        if (parentPath) {
-            const parentExists = files.some(f => f.name === parentPath && f.type === 'folder');
-            if (!parentExists) {
-                alert(isEn() ? 'Parent folder "' + parentPath + '" does not exist, please create it first using "New Folder"' : '父文件夹 "' + parentPath + '" 不存在，请先使用“新建文件夹”功能创建');
+            let path = normalizePath(input);
+            
+            // 检查父文件夹是否存在
+            const parentPath = getParentPath(path);
+            const files = g('files');
+            
+            if (parentPath) {
+                const parentExists = files.some(f => f.name === parentPath && f.type === 'folder');
+                if (!parentExists) {
+                    g('customAlert')(isEn() ? 'Parent folder "' + parentPath + '" does not exist, please create it first using "New Folder"' : '父文件夹 "' + parentPath + '" 不存在，请先使用“新建文件夹”功能创建');
+                    return;
+                }
+            }
+
+            if (files.some(f => f.name === path && f.type === 'file')) {
+                g('customAlert')(isEn() ? 'File with the same name already exists, please use another name' : '已存在同名文件，请使用其他名称');
                 return;
             }
-        }
 
-        if (files.some(f => f.name === path && f.type === 'file')) {
-            alert(isEn() ? 'File with the same name already exists, please use another name' : '已存在同名文件，请使用其他名称');
-            return;
-        }
-
-        const newFile = {
-            id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-            name: path,
-            type: 'file',
-            content: '# ' + getBasename(path) + '\n\n开始编写您的内容...',
-            lastModified: Date.now(),
-            isSynced: false,
-            order: 0
-        };
-        files.push(newFile);
-        localStorage.setItem('vditor_files', JSON.stringify(files));
-        openFile(newFile.id);
-        loadFiles();
-        g('lastSyncedContent')[newFile.id] = newFile.content;
-        g('unsavedChanges')[newFile.id] = false;
-        if (g('currentUser')) global.syncFileToServer(newFile.id);
-        global.showMessage(isEn() ? 'File created: ' + path : '已创建文件: ' + path);
+            const newFile = {
+                id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+                name: path,
+                type: 'file',
+                content: '# ' + getBasename(path) + '\n\n开始编写您的内容...',
+                lastModified: Date.now(),
+                isSynced: false,
+                order: 0
+            };
+            files.push(newFile);
+            localStorage.setItem('vditor_files', JSON.stringify(files));
+            openFile(newFile.id);
+            loadFiles();
+            g('lastSyncedContent')[newFile.id] = newFile.content;
+            g('unsavedChanges')[newFile.id] = false;
+            if (g('currentUser')) global.syncFileToServer(newFile.id);
+            global.showMessage(isEn() ? 'File created: ' + path : '已创建文件: ' + path);
+        });
     }
 
     function createNewFolder() {
         const defaultName = isEn() ? 'New Folder' : '新文件夹';
         const defaultPath = getSelectedFolderPath() + defaultName;
-        const input = prompt(isEn() ? 'Please enter folder path (e.g., docs/notes)' : '请输入文件夹路径（例如 docs/notes）', defaultPath);
-        if (!input) return;
+        g('customPrompt')(isEn() ? 'Please enter folder path (e.g., docs/notes)' : '请输入文件夹路径（例如 docs/notes）', { defaultValue: defaultPath }).then(function(input) {
+            if (!input) return;
 
-        let path = normalizePath(input);
-        ensureParentFolders(path);
+            let path = normalizePath(input);
+            ensureParentFolders(path);
 
-        const files = g('files');
-        if (files.some(f => f.name === path)) {
-            alert(isEn() ? 'This path already exists' : '该路径已存在');
-            return;
-        }
+            const files = g('files');
+            if (files.some(f => f.name === path)) {
+                g('customAlert')(isEn() ? 'This path already exists' : '该路径已存在');
+                return;
+            }
 
-        const newFolder = {
-            id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-            name: path,
-            type: 'folder',
-            content: '',
-            lastModified: Date.now(),
-            isSynced: false,
-            order: 0
-        };
-        files.push(newFolder);
-        localStorage.setItem('vditor_files', JSON.stringify(files));
-        loadFiles();
-        if (g('currentUser')) {
-            global.syncFileToServer(newFolder.id);
-        }
-        global.showMessage(isEn() ? 'Folder created: ' + path : '已创建文件夹: ' + path);
+            const newFolder = {
+                id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+                name: path,
+                type: 'folder',
+                content: '',
+                lastModified: Date.now(),
+                isSynced: false,
+                order: 0
+            };
+            files.push(newFolder);
+            localStorage.setItem('vditor_files', JSON.stringify(files));
+            loadFiles();
+            if (g('currentUser')) {
+                global.syncFileToServer(newFolder.id);
+            }
+            global.showMessage(isEn() ? 'Folder created: ' + path : '已创建文件夹: ' + path);
+        });
     }
 
     function openFile(fileId) {
         const files = g('files');
         const file = files.find(f => f.id === fileId && f.type === 'file');
         if (!file) {
-            alert(isEn() ? 'Cannot open folder' : '无法打开文件夹');
+            g('customAlert')(isEn() ? 'Cannot open folder' : '无法打开文件夹');
             return;
         }
         global.currentFileId = fileId;
@@ -1449,17 +1459,18 @@
         global.showMessage(isEn() ? 'File opened: ' + file.name : '已打开文件: ' + file.name);
     }
 
-    function deleteFile(id) {
+    async function deleteFile(id) {
         const files = g('files');
         const item = files.find(f => f.id === id);
         if (!item) return;
 
         if (item.type === 'file') {
             if (files.filter(f => f.type === 'file').length <= 1) {
-                alert(isEn() ? 'At least one file must be kept' : '至少需要保留一个文件');
+                g('customAlert')(isEn() ? 'At least one file must be kept' : '至少需要保留一个文件');
                 return;
             }
-            if (!confirm(isEn() ? 'Are you sure you want to delete this file?' : '确定要删除这个文件吗？')) return;
+            const confirmed = await g('customConfirm')(isEn() ? 'Are you sure you want to delete this file?' : '确定要删除这个文件吗？');
+            if (!confirmed) return;
 
             const idx = files.findIndex(f => f.id === id);
             files.splice(idx, 1);
@@ -1477,7 +1488,8 @@
             loadFiles();
             global.showMessage(isEn() ? 'File deleted: ' + item.name : '已删除文件: ' + item.name);
         } else {
-            if (!confirm(isEn() ? `Are you sure you want to delete the folder "${item.name}" and all its contents?` : `确定要删除文件夹“${item.name}”及其所有内容吗？`)) return;
+            const confirmed = await g('customConfirm')(isEn() ? `Are you sure you want to delete the folder "${item.name}" and all its contents?` : `确定要删除文件夹“${item.name}”及其所有内容吗？`);
+            if (!confirmed) return;
 
             const toDelete = files.filter(f => f.name === item.name || f.name.startsWith(item.name + '/'));
             const fileNamesToDelete = toDelete.filter(f => f.type === 'file').map(f => f.name);
@@ -1536,7 +1548,6 @@
                 // 保持 pending
             }
         }
-        global.showMessage(isEn() ? 'File saved' + (isManual && contentChanged ? '' : '') : '文件已保存' + (isManual && contentChanged ? '' : ''));
     }
 
     async function createHistoryVersion(filename, content) {
@@ -1714,7 +1725,7 @@
             if (result.code !== 200) console.error(isEn() ? 'Delete failed' : '删除失败', result.message);
         } catch (error) {
             console.error('从服务器删除文件失败', error);
-            alert((isEn() ? 'Delete file failed: ' : '删除文件失败: ') + error.message);
+            g('customAlert')((isEn() ? 'Delete file failed: ' : '删除文件失败: ') + error.message);
         }
     }
 
@@ -1796,14 +1807,16 @@
     }
 
     async function restoreFromHistory(filename, versionId, content, fileId) {
-        if (!confirm(isEn() ? 'Are you sure you want to restore to this version?\nThe current editor content will be replaced.' : '确定要恢复到此版本吗？\n当前编辑器的内容将被替换。')) return;
+        const confirmed1 = await g('customConfirm')(isEn() ? 'Are you sure you want to restore to this version?\nThe current editor content will be replaced.' : '确定要恢复到此版本吗？\n当前编辑器的内容将被替换。');
+        if (!confirmed1) return;
         try {
             global.showMessage(isEn() ? 'Restoring history version...' : '正在恢复历史版本...', 'info');
             var vditor = g('vditor');
             var currentContent = vditor ? vditor.getValue() : '';
             var diff = compareVersions(currentContent, content);
             if (!diff.hasChanges) { global.showMessage(isEn() ? 'Current content is the same as the selected version, no need to restore' : '当前内容与所选版本相同，无需恢复', 'info'); return; }
-            if (!confirm(isEn() ? 'About to restore history version, here is the change summary:\n' + diff.message + '\n\nAre you sure you want to restore?' : '即将恢复历史版本，以下是变化摘要：\n' + diff.message + '\n\n确定要恢复吗？')) return;
+            const confirmed2 = await g('customConfirm')(isEn() ? 'About to restore history version, here is the change summary:\n' + diff.message + '\n\nAre you sure you want to restore?' : '即将恢复历史版本，以下是变化摘要：\n' + diff.message + '\n\n确定要恢复吗？');
+            if (!confirmed2) return;
             if (g('currentUser')) {
                 var success = await restoreHistoryVersion(filename, versionId, content);
                 if (!success) global.showMessage(isEn() ? 'Server restore failed, will restore locally' : '服务器恢复失败，将在本地恢复', 'warning');
