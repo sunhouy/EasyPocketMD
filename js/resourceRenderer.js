@@ -26,14 +26,9 @@
         try {
             imgElement.setAttribute('data-original-src', originalSrc);
             
-            const localData = await global.IndexedDBManager.getFile(originalSrc);
-            if (localData) {
-                const blobUrl = await global.ResourceLoader.loadImage(originalSrc);
-                if (blobUrl !== originalSrc) {
-                    imgElement.src = blobUrl;
-                }
-            } else {
-                await global.ResourceLoader.loadImage(originalSrc);
+            const blobUrl = await global.ResourceLoader.loadImage(originalSrc);
+            if (blobUrl && blobUrl !== originalSrc) {
+                imgElement.src = blobUrl;
             }
         } catch (error) {
             console.error('Failed to process image:', error);

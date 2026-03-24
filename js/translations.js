@@ -174,7 +174,7 @@
             storageCloud: '云端存储',
             storageThisTime: '仅本次生效',
             storagePermanent: '永久保存',
-            storageLocalDesc: '文件将缓存在本地路径，会严重拖慢加载速度，仅作为临时解决方案，如果必须使用，不要上传大图片。',
+            storageLocalDesc: '文件将缓存在本地，清空缓存后将无法查看。浏览器可能随时删除这些内容。',
             storageCloudDesc: '文件将直接上传至云端服务器。',
             storageUploadRequired: '检测到本地图片/文件，需上传至云端才能进行转换或导出。是否立即上传并继续？',
             uploadAndContinue: '上传并继续',

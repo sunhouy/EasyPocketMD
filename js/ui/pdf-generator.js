@@ -23,6 +23,9 @@ async function generatePDFLocal(htmlContent, settings) {
         htmlContent = '<div style="padding: 20px; font-size: 16px; color: #666; text-align: center;">(文档内容为空)</div>';
     }
 
+    console.log('[PDF Debug] Starting local PDF generation...');
+    console.log('[PDF Debug] Input HTML length:', htmlContent.length);
+
     const cleanedHtml = htmlContent
         .replace(/font-family\s*:\s*[^;]+;/gi, '')
         .replace(/font-family\s*:\s*[^"']+["']/gi, '')
@@ -34,9 +37,8 @@ async function generatePDFLocal(htmlContent, settings) {
         </div>
     `;
 
-    console.log('[PDF Debug] Starting local PDF generation...');
-    console.log('[PDF Debug] Input HTML length:', htmlContent.length);
-
+    console.log('[PDF Debug] Converting HTML to pdfmake content...');
+    
     const pdfMakeContent = htmlToPdfmake(fullHtml, {
         defaultStyles: {
             p: { fontSize: 12, lineHeight: 1.2 },
@@ -69,7 +71,7 @@ async function generatePDFLocal(htmlContent, settings) {
         const pdfDoc = pdfMake.createPdf(docDefinition);
         console.log('[PDF Debug] pdfmake document created');
         
-        console.log('[PDF Debug] Getting blob using Promise...');
+        console.log('[PDF Debug] Getting buffer...');
         const buffer = await pdfDoc.getBuffer();
         console.log('[PDF Debug] Buffer created, length:', buffer.length, 'bytes');
         

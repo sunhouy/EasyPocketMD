@@ -994,6 +994,17 @@
                             // 显示上下文菜单
                             window.$('#fileList').jstree(true).show_contextmenu(node, x, y);
                             
+                            // 阻止菜单点击事件冒泡，防止文件列表被关闭
+                            setTimeout(function() {
+                                const $context = window.$('.vakata-context');
+                                if ($context.length) {
+                                    $context.on('click', function(e) {
+                                        e.stopPropagation();
+                                        e.stopImmediatePropagation();
+                                    });
+                                }
+                            }, 10);
+                            
                             // 多次尝试设置位置，确保正确
                             const setPosition = function() {
                                 const $context = window.$('.vakata-context');

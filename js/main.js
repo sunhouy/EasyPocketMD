@@ -210,7 +210,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (menuBtn && dropdown && !menuBtn.contains(e.target) && !dropdown.contains(e.target)) dropdown.classList.remove('show');
                 if (overlay && e.target === overlay) window.hideMobileActionSheet();
                 if (userMenu && !document.getElementById('mobileLoginBtn').contains(e.target) && !userMenu.contains(e.target)) userMenu.classList.remove('show');
-                if (fileListSidebar && mobileFileBtn && !mobileFileBtn.contains(e.target) && !fileListSidebar.contains(e.target)) fileListSidebar.classList.remove('show');
             });
             if (window.vditor && window.vditor.vditor && window.vditor.vditor.ir) {
                 window.vditor.vditor.ir.element.addEventListener('input', function() {
