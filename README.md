@@ -21,8 +21,8 @@ This project is something I’ve invested significant time and effort into, and 
 Whether on mobile or computer, you can use EasyPocketMD to edit Markdown documents. The multi-platform interface adopts a unified design style, providing you with a consistent operating experience.
 
 <div style="display: flex; justify-content: center; gap: 20px;">
-  <img src="readme/1_1.png" width="500"/>
-  <img src="readme/1_2.png" width="200"/>
+  <img src="readme/1_1.png"/>
+  <img src="readme/1_2.png"/>
 </div>
 
 ### Zero Learning Curve, Start Instantly
@@ -30,8 +30,8 @@ Whether on mobile or computer, you can use EasyPocketMD to edit Markdown documen
 No need to memorize any Markdown syntax. The bottom toolbar provides buttons for commonly used formatting options, such as bold, italic, headings, lists, quotes, code blocks, links, images, etc., allowing one-click insertion. Supports three operation modes: WYSIWYG / Instant Rendering / Split-Screen Preview, there's always an option that suits you.
 
 <div style="display: flex; justify-content: center; gap: 20px;">
-  <img src="readme/2_1.png" width="500"/>
-  <img src="readme/2_2.png" width="200"/>
+  <img src="readme/2_1.png"/>
+  <img src="readme/2_2.png"/>
 </div>
 
 ### Rich Extension Support
@@ -39,8 +39,8 @@ No need to memorize any Markdown syntax. The bottom toolbar provides buttons for
 The editor rapidly renders LaTeX formulas, mermaid diagrams, and even musical scores and chemical equations. Edited documents can be directly exported to HTML and PDF formats, with extremely convenient formatting options. What Word can do, this can do too, but faster and more lightweight. Your local txt and Markdown documents can be directly imported and edited here.
 
 <div style="display: flex; justify-content: center; gap: 20px;">
-  <img src="readme/3_1.png" width="200"/>
-  <img src="readme/3_2.png" width="200"/>
+  <img src="readme/3_1.png"/>
+  <img src="readme/3_2.png"/>
 </div>
 
 ### Never Worry About File Loss
@@ -48,8 +48,8 @@ The editor rapidly renders LaTeX formulas, mermaid diagrams, and even musical sc
 All edited documents are automatically saved to the local database. If logged into an account, they will automatically sync with the server and synchronize all content across devices. If files conflict on different devices, we will prompt you to decide which version to use. We save any modifications you make in real-time; even if the editor is suddenly closed or the computer is restarted, no data will be lost. We also keep version history, allowing you to view and restore to previous states at any time.
 
 <div style="display: flex; justify-content: center; gap: 20px;">
-  <img src="readme/4_1.png" width="400"/>
-  <img src="readme/4_2.png" width="400"/>
+  <img src="readme/4_1.png"/>
+  <img src="readme/4_2.png"/>
 </div>
 
 ### Leading Cloud Printing Features
@@ -57,8 +57,8 @@ All edited documents are automatically saved to the local database. If logged in
 Install the cloud printing client on a computer connected to a printer, and you can use the cloud printing function from any device to print documents. On your mobile phone, you can preview how the document will look after printing and configure all settings. The powerful AI intelligent layout function saves you time, allowing you to focus on writing the document while we handle the rest.
 
 <div style="display: flex; justify-content: center; gap: 20px;">
-  <img src="readme/5_1.png" width="200"/>
-  <img src="readme/5_2.png" width="200"/>
+  <img src="readme/5_1.png"/>
+  <img src="readme/5_2.png"/>
 </div>
 
 ### Strong Privacy Protection
@@ -66,8 +66,8 @@ Install the cloud printing client on a computer connected to a printer, and you 
 Your files and any uploaded content are encrypted and stored locally and on the server. You can share documents and manage access time and permissions. We use the latest libraries and promptly fix security vulnerabilities to ensure your privacy is not compromised.
 
 <div style="display: flex; justify-content: center; gap: 20px;">
-  <img src="readme/6_1.png" width="200"/>
-  <img src="readme/6_2.png" width="500"/>
+  <img src="readme/6_1.png"/>
+  <img src="readme/6_2.png"/>
 </div>
 
 ### Highly Personalized Experience
