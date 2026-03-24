@@ -183,6 +183,11 @@
             defaultStorageLocation: '默认存储位置',
             localFile: '本地文件',
             cloudFile: '云端文件',
+            uploadingFiles: '正在上传文件',
+            uploadProgress: '上传进度',
+            uploadInBackground: '后台上传',
+            uploadComplete: '上传完成',
+            uploadFailed: '上传失败',
             
             // 表格
             tableInserted: '表格已插入，可编辑表格内容',
@@ -534,6 +539,11 @@
             defaultStorageLocation: 'Default Storage Location',
             localFile: 'Local File',
             cloudFile: 'Cloud File',
+            uploadingFiles: 'Uploading Files',
+            uploadProgress: 'Upload Progress',
+            uploadInBackground: 'Upload in Background',
+            uploadComplete: 'Upload Complete',
+            uploadFailed: 'Upload Failed',
             
             // Table
             tableInserted: 'Table inserted, you can edit the content',
