@@ -2,14 +2,59 @@ import * as pdfjsLib from 'pdfjs-dist';
 // Vite handles the worker URL import
 import pdfWorker from 'pdfjs-dist/build/pdf.worker.mjs?url';
 import htmlToPdfmake from 'html-to-pdfmake';
-import pdfMake from 'pdfmake/build/pdfmake';
-import pdfFonts from 'pdfmake/build/vfs_fonts';
 
 // Set worker source
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
 
-// Initialize pdfmake fonts
-pdfMake.vfs = pdfFonts;
+// 保存 pdfmake 实例，用于按需初始化
+let pdfMake = null;
+let pdfMakeInitialized = false;
+
+/**
+ * 按需初始化 pdfmake 并加载中文字体支持
+ */
+async function initPdfMakeWithChineseFonts() {
+    if (pdfMakeInitialized) {
+        return pdfMake;
+    }
+    
+    console.log('[PDF Debug] Initializing pdfmake with Chinese fonts...');
+    
+    // 动态加载 pdfmake-support-chinese-fonts
+    const pdfMakeModule = await import('pdfmake-support-chinese-fonts/pdfmake.min');
+    const pdfFontsModule = await import('pdfmake-support-chinese-fonts/vfs_fonts');
+    
+    pdfMake = pdfMakeModule.default || pdfMakeModule;
+    const pdfFonts = pdfFontsModule.default || pdfFontsModule;
+    
+    // 设置 vfs
+    if (pdfFonts && pdfFonts.pdfMake && pdfFonts.pdfMake.vfs) {
+        pdfMake.vfs = pdfFonts.pdfMake.vfs;
+    } else if (pdfFonts && pdfFonts.vfs) {
+        pdfMake.vfs = pdfFonts.vfs;
+    }
+    
+    // 设置字体
+    pdfMake.fonts = {
+        Roboto: {
+            normal: 'Roboto-Regular.ttf',
+            bold: 'Roboto-Regular.ttf',
+            italics: 'Roboto-Regular.ttf',
+            bolditalics: 'Roboto-Regular.ttf'
+        },
+        fangzhen: {
+            normal: 'fzhei-jt.ttf',
+            bold: 'fzhei-jt.ttf',
+            italics: 'fzhei-jt.ttf',
+            bolditalics: 'fzhei-jt.ttf'
+        }
+    };
+    
+    pdfMakeInitialized = true;
+    console.log('[PDF Debug] pdfmake with Chinese fonts initialized');
+    
+    return pdfMake;
+}
 
 /**
  * Generate PDF from HTML content using local conversion (html-to-pdfmake + pdfmake)
@@ -18,15 +63,28 @@ pdfMake.vfs = pdfFonts;
  * @returns {Promise<string>} - Returns blob URL for the generated PDF
  */
 async function generatePDFLocal(htmlContent, settings) {
-    if (!htmlContent || htmlContent.trim() === '') {
-        console.warn('[PDF Debug] generatePDFLocal received empty content');
-        htmlContent = '<div style="padding: 20px; font-size: 16px; color: #666; text-align: center;">(文档内容为空)</div>';
-    }
-
     console.log('[PDF Debug] Starting local PDF generation...');
-    console.log('[PDF Debug] Input HTML length:', htmlContent.length);
-
-    const cleanedHtml = htmlContent
+    
+    console.log('[PDF Debug] Original htmlContent preview (first 500 chars):', htmlContent.substring(0, 500));
+    
+    // 按需初始化 pdfmake 并加载中文字体
+    const currentPdfMake = await initPdfMakeWithChineseFonts();
+    
+    let processedContent = htmlContent;
+    
+    // 提取真正的内容，移除开头的 <style> 标签
+    // 查找 <body> 标签或直接的内容
+    const bodyMatch = processedContent.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+    if (bodyMatch) {
+        processedContent = bodyMatch[1];
+    } else {
+        // 如果没有 <body> 标签，尝试移除开头的 <style> 标签
+        processedContent = processedContent.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
+    }
+    
+    console.log('[PDF Debug] Processed content preview (first 500 chars):', processedContent.substring(0, 500));
+    
+    const cleanedHtml = processedContent
         .replace(/font-family\s*:\s*[^;]+;/gi, '')
         .replace(/font-family\s*:\s*[^"']+["']/gi, '')
         .replace(/font-family\s*:\s*[^}]+}/gi, '}');
@@ -41,11 +99,11 @@ async function generatePDFLocal(htmlContent, settings) {
     
     const pdfMakeContent = htmlToPdfmake(fullHtml, {
         defaultStyles: {
-            p: { fontSize: 12, lineHeight: 1.2 },
-            h1: { fontSize: 24, bold: true, margin: [0, 0, 0, 10] },
-            h2: { fontSize: 20, bold: true, margin: [0, 0, 0, 8] },
-            h3: { fontSize: 16, bold: true, margin: [0, 0, 0, 6] },
-            h4: { fontSize: 14, bold: true, margin: [0, 0, 0, 4] }
+            p: { fontSize: 12, lineHeight: 1.2, font: 'fangzhen' },
+            h1: { fontSize: 24, bold: true, margin: [0, 0, 0, 10], font: 'fangzhen' },
+            h2: { fontSize: 20, bold: true, margin: [0, 0, 0, 8], font: 'fangzhen' },
+            h3: { fontSize: 16, bold: true, margin: [0, 0, 0, 6], font: 'fangzhen' },
+            h4: { fontSize: 14, bold: true, margin: [0, 0, 0, 4], font: 'fangzhen' }
         }
     });
 
@@ -54,7 +112,7 @@ async function generatePDFLocal(htmlContent, settings) {
     const docDefinition = {
         content: pdfMakeContent,
         defaultStyle: {
-            font: 'Roboto',
+            font: 'fangzhen',
             fontSize: 12
         },
         pageMargins: [
@@ -68,7 +126,7 @@ async function generatePDFLocal(htmlContent, settings) {
     console.log('[PDF Debug] Creating pdfmake document...');
 
     try {
-        const pdfDoc = pdfMake.createPdf(docDefinition);
+        const pdfDoc = currentPdfMake.createPdf(docDefinition);
         console.log('[PDF Debug] pdfmake document created');
         
         console.log('[PDF Debug] Getting buffer...');

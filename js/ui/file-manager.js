@@ -94,9 +94,36 @@
             const result = await response.json();
 
             if (result.code === 200) {
-                // Combine with local files
-                const localFiles = JSON.parse(localStorage.getItem('vditor_local_files') || '[]').map(f => ({...f, isLocal: true}));
-                const allFiles = [...localFiles, ...result.data];
+                // Combine with local files from localStorage and IndexedDB
+                const localStorageFiles = JSON.parse(localStorage.getItem('vditor_local_files') || '[]').map(f => ({...f, isLocal: true, source: 'localStorage'}));
+                
+                // Get files from IndexedDB
+                let indexedDBFiles = [];
+                try {
+                    if (global.IndexedDBManager) {
+                        const idbFiles = await global.IndexedDBManager.getAllFiles();
+                        indexedDBFiles = idbFiles.map(f => {
+                            const fileName = f.url.startsWith('local://') 
+                                ? f.url.replace('local://', '')
+                                : f.url.split('/').pop() || 'file';
+                            return {
+                                name: fileName,
+                                originalName: fileName,
+                                url: f.url,
+                                type: f.contentType,
+                                size: f.data ? f.data.byteLength : 0,
+                                date: new Date(f.lastModified || f.createdAt).toISOString(),
+                                isLocal: true,
+                                source: 'indexedDB',
+                                idbData: f
+                            };
+                        });
+                    }
+                } catch (err) {
+                    console.error('Failed to load IndexedDB files:', err);
+                }
+                
+                const allFiles = [...localStorageFiles, ...indexedDBFiles, ...result.data];
 
                 // Update Usage
                 usageInfo.innerHTML = `
@@ -127,8 +154,22 @@
 
                         // Preview
                         let preview = '';
-                        if (/\.(jpg|jpeg|png|gif|webp|svg)$/i.test(file.name)) {
-                            preview = `<div style="width:100%;height:80px;background-image:url('${file.thumbUrl || file.url}');background-size:contain;background-repeat:no-repeat;background-position:center;border-radius:4px;margin-bottom:5px;"></div>`;
+                        const isImage = /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(file.name) || 
+                                        (file.type && file.type.startsWith('image/'));
+                        
+                        if (isImage) {
+                            let imageUrl = file.thumbUrl || file.url;
+                            
+                            // If it's from IndexedDB, create a blob URL
+                            if (file.source === 'indexedDB' && file.idbData && global.IndexedDBManager) {
+                                try {
+                                    imageUrl = global.IndexedDBManager.createBlobURL(file.idbData.data, file.idbData.contentType);
+                                } catch (err) {
+                                    console.error('Failed to create blob URL for preview:', err);
+                                }
+                            }
+                            
+                            preview = `<div style="width:100%;height:80px;background-image:url('${imageUrl}');background-size:contain;background-repeat:no-repeat;background-position:center;border-radius:4px;margin-bottom:5px;"></div>`;
                         } else {
                             preview = `<div style="width:100%;height:80px;display:flex;align-items:center;justify-content:center;background:${nightMode ? '#444' : '#eee'};border-radius:4px;margin-bottom:5px;"><i class="fas fa-file" style="font-size:32px;color:#999;"></i></div>`;
                         }
@@ -166,9 +207,19 @@
                             const confirmed = await g('customConfirm')(t('confirmDeleteFile').replace('{name}', displayName));
                             if (confirmed) {
                                 if (file.isLocal) {
-                                    const locals = JSON.parse(localStorage.getItem('vditor_local_files') || '[]');
-                                    const filtered = locals.filter(f => f.name !== file.name);
-                                    localStorage.setItem('vditor_local_files', JSON.stringify(filtered));
+                                    if (file.source === 'indexedDB') {
+                                        try {
+                                            if (global.IndexedDBManager) {
+                                                await global.IndexedDBManager.deleteFile(file.url);
+                                            }
+                                        } catch (err) {
+                                            console.error('Failed to delete from IndexedDB:', err);
+                                        }
+                                    } else {
+                                        const locals = JSON.parse(localStorage.getItem('vditor_local_files') || '[]');
+                                        const filtered = locals.filter(f => f.name !== file.name);
+                                        localStorage.setItem('vditor_local_files', JSON.stringify(filtered));
+                                    }
                                     item.remove();
                                     global.showMessage(t('deleteSuccess'), 'success');
                                     return;
@@ -203,14 +254,19 @@
                                 try {
                                     global.showMessage(isEn() ? 'Uploading...' : '正在上传...', 'info');
                                     
-                                    // Fetch the file content if it's a file:// URL or data: URL
-                                    // 自动对 URL 进行编码处理，支持包含空格的本地文件路径
-                                    const fetchUrl = file.url.includes(' ') ? encodeURI(file.url) : file.url;
-                                    const response = await fetch(fetchUrl);
-                                    const blob = await response.blob();
-                                    const fileToUpload = new File([blob], file.originalName || file.name, { type: file.type });
+                                    let fileToUpload;
                                     
-                                    // Set temp location to cloud to ensure it goes to server
+                                    if (file.source === 'indexedDB' && file.idbData) {
+                                        const blob = new Blob([file.idbData.data], { type: file.idbData.contentType });
+                                        const originalName = file.originalName || file.name;
+                                        fileToUpload = new File([blob], originalName, { type: file.idbData.contentType });
+                                    } else {
+                                        const fetchUrl = file.url.includes(' ') ? encodeURI(file.url) : file.url;
+                                        const response = await fetch(fetchUrl);
+                                        const blob = await response.blob();
+                                        fileToUpload = new File([blob], file.originalName || file.name, { type: file.type });
+                                    }
+                                    
                                     const oldTemp = window.tempStorageLocation;
                                     window.tempStorageLocation = 'cloud';
                                     
@@ -220,10 +276,8 @@
                                     
                                     if (cloudLink) {
                                         const cloudUrl = cloudLink.match(/\((.*?)\)/)[1];
-                                        // Replace in editor if found
                                         if (g('vditor')) {
                                             const editorValue = g('vditor').getValue();
-                                            // 同时支持替换原始 URL 和已编码的 URL，防止因空格导致匹配失败
                                             const rawUrl = file.url;
                                             const encodedUrl = encodeURI(rawUrl);
                                             
@@ -241,13 +295,17 @@
                                             }
                                         }
 
-                                        // Remove from local list
-                                        const locals = JSON.parse(localStorage.getItem('vditor_local_files') || '[]');
-                                        const filtered = locals.filter(f => f.name !== file.name);
-                                        localStorage.setItem('vditor_local_files', JSON.stringify(filtered));
+                                        if (file.source === 'indexedDB') {
+                                            if (global.IndexedDBManager) {
+                                                await global.IndexedDBManager.deleteFile(file.url);
+                                            }
+                                        } else {
+                                            const locals = JSON.parse(localStorage.getItem('vditor_local_files') || '[]');
+                                            const filtered = locals.filter(f => f.name !== file.name);
+                                            localStorage.setItem('vditor_local_files', JSON.stringify(filtered));
+                                        }
                                         
                                         global.showMessage(t('uploadSuccess') || '上传成功', 'success');
-                                        // Refresh file manager
                                         modal.remove();
                                         showFileManager();
                                     }

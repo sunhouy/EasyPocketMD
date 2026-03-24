@@ -6,6 +6,12 @@
     function isEn() { return window.i18n && window.i18n.getLanguage() === 'en'; }
     function t(key) { return window.i18n ? window.i18n.t(key) : key; }
 
+    let uploadProgressModal = null;
+    let uploadItems = [];
+    let completedCount = 0;
+    let allUrls = [];
+    let autoInsertFlag = false;
+
     function triggerFileUpload() {
         var input = document.createElement('input');
         input.type = 'file';
@@ -43,19 +49,230 @@
         input.click();
     }
 
+    function createUploadProgressModal(files, autoInsert) {
+        autoInsertFlag = autoInsert;
+        completedCount = 0;
+        allUrls = [];
+        uploadItems = files.map((file, index) => ({
+            id: index,
+            file: file,
+            name: file.name,
+            progress: 0,
+            status: 'pending',
+            url: null,
+            error: null
+        }));
+
+        const nightMode = g('nightMode') === true;
+        const bgColor = nightMode ? '#2d2d2d' : 'white';
+        const textColor = nightMode ? '#eee' : '#333';
+        const cardBg = nightMode ? '#3d3d3d' : '#f8f9fa';
+
+        uploadProgressModal = document.createElement('div');
+        uploadProgressModal.className = 'upload-progress-modal-overlay';
+        uploadProgressModal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:20000;';
+
+        const content = document.createElement('div');
+        content.style.cssText = `background:${bgColor};color:${textColor};border-radius:12px;padding:25px;width:90%;max-width:500px;max-height:80vh;overflow-y:auto;box-shadow: 0 4px 20px rgba(0,0,0,0.3);`;
+
+        content.innerHTML = `
+            <h3 style="margin-top:0;margin-bottom:15px;">${t('uploadingFiles')}</h3>
+            <div id="upload-items-container" style="margin-bottom:20px;"></div>
+            <div style="display:flex;gap:10px;">
+                <button id="upload-background-btn" style="flex:1;padding:12px;background:${nightMode ? '#555' : '#6c757d'};color:white;border:none;border-radius:8px;font-weight:bold;cursor:pointer;">${t('uploadInBackground')}</button>
+            </div>
+        `;
+
+        uploadProgressModal.appendChild(content);
+        document.body.appendChild(uploadProgressModal);
+
+        document.getElementById('upload-background-btn').onclick = () => {
+            hideUploadProgressModal();
+        };
+
+        renderUploadItems();
+    }
+
+    function renderUploadItems() {
+        const container = document.getElementById('upload-items-container');
+        if (!container) return;
+
+        const nightMode = g('nightMode') === true;
+        const cardBg = nightMode ? '#3d3d3d' : '#f8f9fa';
+        const successColor = '#4CAF50';
+        const errorColor = '#f44336';
+
+        container.innerHTML = uploadItems.map(item => {
+            let statusIcon = '';
+            let statusText = '';
+            let progressBarColor = nightMode ? '#4a90e2' : '#2196F3';
+
+            if (item.status === 'uploading') {
+                statusIcon = '<i class="fas fa-spinner fa-spin" style="color:#4a90e2;"></i>';
+                statusText = `${item.progress}%`;
+            } else if (item.status === 'completed') {
+                statusIcon = `<i class="fas fa-check-circle" style="color:${successColor};"></i>`;
+                statusText = '100%';
+                progressBarColor = successColor;
+            } else if (item.status === 'error') {
+                statusIcon = `<i class="fas fa-exclamation-circle" style="color:${errorColor};"></i>`;
+                statusText = t('uploadFailed');
+                progressBarColor = errorColor;
+            } else {
+                statusIcon = '<i class="fas fa-clock" style="color:#999;"></i>';
+                statusText = '0%';
+            }
+
+            return `
+                <div style="padding:12px;background:${cardBg};border-radius:8px;margin-bottom:10px;">
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+                        <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0;">
+                            ${statusIcon}
+                            <span style="font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${item.name}</span>
+                        </div>
+                        <span style="font-size:12px;color:${nightMode ? '#aaa' : '#666'};flex-shrink:0;margin-left:8px;">${statusText}</span>
+                    </div>
+                    <div style="height:6px;background:${nightMode ? '#444' : '#e0e0e0'};border-radius:3px;overflow:hidden;">
+                        <div style="height:100%;width:${item.progress}%;background:${progressBarColor};transition:width 0.3s ease;"></div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    function updateUploadProgress(itemId, progress) {
+        const item = uploadItems.find(i => i.id === itemId);
+        if (item) {
+            item.progress = progress;
+            item.status = 'uploading';
+            renderUploadItems();
+        }
+    }
+
+    function markUploadComplete(itemId, url) {
+        const item = uploadItems.find(i => i.id === itemId);
+        if (item) {
+            item.progress = 100;
+            item.status = 'completed';
+            item.url = url;
+            completedCount++;
+            allUrls.push(url);
+            renderUploadItems();
+            
+            if (completedCount === uploadItems.length) {
+                setTimeout(() => {
+                    hideUploadProgressModal();
+                    global.showUploadStatus(t('uploadComplete') + '！共' + allUrls.length + '个文件', 'success');
+                    insertMarkdownLinks();
+                }, 500);
+            }
+        }
+    }
+
+    function markUploadError(itemId, error) {
+        const item = uploadItems.find(i => i.id === itemId);
+        if (item) {
+            item.status = 'error';
+            item.error = error;
+            completedCount++;
+            renderUploadItems();
+            
+            if (completedCount === uploadItems.length) {
+                setTimeout(() => {
+                    hideUploadProgressModal();
+                    if (allUrls.length > 0) {
+                        global.showUploadStatus(t('uploadComplete') + ' ' + allUrls.length + '/' + uploadItems.length, 'success');
+                        insertMarkdownLinks();
+                    } else {
+                        global.showUploadStatus(t('uploadFailed'), 'error');
+                    }
+                }, 500);
+            }
+        }
+    }
+
+    function insertMarkdownLinks() {
+        if (autoInsertFlag && allUrls.length > 0 && g('vditor')) {
+            const markdownLinks = allUrls.map(url => {
+                const fileName = url.split('/').pop();
+                const encodedUrl = url.includes(' ') ? encodeURI(url) : url;
+                return /\.(jpg|jpeg|png|gif|bmp|webp|svg)$/i.test(fileName) ? '![' + fileName + '](' + encodedUrl + ')' : '[' + fileName + '](' + encodedUrl + ')';
+            });
+            g('vditor').insertValue(markdownLinks.join('\n\n') + '\n\n');
+        }
+    }
+
+    function hideUploadProgressModal() {
+        if (uploadProgressModal) {
+            uploadProgressModal.remove();
+            uploadProgressModal = null;
+        }
+    }
+
+    async function uploadSingleFile(file, itemId) {
+        const formData = new FormData();
+        formData.append('files[]', file);
+        
+        if (g('currentUser')) {
+            formData.append('username', g('currentUser').username);
+            formData.append('password', g('currentUser').password);
+        }
+        
+        formData.append('uploadDir', 'uploads');
+        
+        return new Promise((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            
+            xhr.upload.addEventListener('progress', (e) => {
+                if (e.lengthComputable) {
+                    const progress = Math.round((e.loaded / e.total) * 100);
+                    updateUploadProgress(itemId, progress);
+                }
+            });
+            
+            xhr.addEventListener('load', () => {
+                if (xhr.status >= 200 && xhr.status < 300) {
+                    try {
+                        const result = JSON.parse(xhr.responseText);
+                        if (result.success && result.urls && result.urls.length > 0) {
+                            markUploadComplete(itemId, result.urls[0]);
+                            resolve(result.urls[0]);
+                        } else {
+                            markUploadError(itemId, result.message || 'Upload failed');
+                            reject(new Error(result.message || 'Upload failed'));
+                        }
+                    } catch (e) {
+                        markUploadError(itemId, 'Invalid response');
+                        reject(e);
+                    }
+                } else {
+                    markUploadError(itemId, 'HTTP error: ' + xhr.status);
+                    reject(new Error('HTTP error: ' + xhr.status));
+                }
+            });
+            
+            xhr.addEventListener('error', () => {
+                markUploadError(itemId, 'Network error');
+                reject(new Error('Network error'));
+            });
+            
+            const apiUrl = (window.getApiBaseUrl ? window.getApiBaseUrl() : 'api') + '/external/upload';
+            xhr.open('POST', apiUrl);
+            xhr.send(formData);
+        });
+    }
+
     async function uploadFiles(filesArray, autoInsert) {
         autoInsert = autoInsert !== false;
         
-        // Check storage settings
         if (!window.userSettings.storageLocation && !window.tempStorageLocation) {
             const choice = await showStorageChoicePopup();
-            if (!choice) return; // User cancelled or closed
+            if (!choice) return;
             
             if (choice.permanent) {
                 window.userSettings.storageLocation = choice.location;
                 localStorage.setItem('vditor_settings', JSON.stringify(window.userSettings));
             } else {
-                // Temporary choice for this session
                 window.tempStorageLocation = choice.location;
             }
         }
@@ -66,54 +283,21 @@
             return await saveFilesLocally(filesArray, autoInsert);
         }
 
-        var formData = new FormData();
-        for (var i = 0; i < filesArray.length; i++) {
-            formData.append('files[]', filesArray[i]);
-        }
-        
-        // Add user info if available
-        if (g('currentUser')) {
-            formData.append('username', g('currentUser').username);
-            formData.append('password', g('currentUser').password);
-        }
-        
-        formData.append('uploadDir', 'uploads');
-        try {
-            global.showUploadStatus('正在上传文件...', 'info');
-            var apiUrl = (window.getApiBaseUrl ? window.getApiBaseUrl() : 'api') + '/external/upload';
-            var response = await fetch(apiUrl, { method: 'POST', body: formData });
-            var result = await response.json();
-            if (result.success) {
-                global.showUploadStatus('上传成功！共' + result.count + '个文件', 'success');
-                var markdownLinks = result.urls.map(function(url) {
-                    var fileName = url.split('/').pop();
-                    // 处理 URL 中的空格，使用 encodeURI 保持其有效性
-                    var encodedUrl = url.includes(' ') ? encodeURI(url) : url;
-                    return /\.(jpg|jpeg|png|gif|bmp|webp|svg)$/i.test(fileName) ? '![' + fileName + '](' + encodedUrl + ')' : '[' + fileName + '](' + encodedUrl + ')';
-                });
-                if (autoInsert && markdownLinks.length > 0 && g('vditor')) {
-                    g('vditor').insertValue(markdownLinks.join('\n\n') + '\n\n');
-                }
-                return markdownLinks.join('\n\n');
+        createUploadProgressModal(filesArray, autoInsert);
 
-            }
-            global.showUploadStatus('上传失败: ' + (result.message || ''), 'error');
-            throw new Error(result.message || '上传失败');
+        const uploadPromises = filesArray.map((file, index) => uploadSingleFile(file, index));
+        
+        try {
+            await Promise.all(uploadPromises);
+            return allUrls.join('\n\n');
         } catch (error) {
-            console.error('上传错误', error);
-            global.showUploadStatus('上传失败，请检查网络', 'error');
+            console.error('Upload error', error);
             throw error;
         }
     }
 
-    /**
-     * 上传 base64 图片。
-     * 当 useTempDir 为 true 时，不附带用户信息，服务端会将文件保存在公共 uploads 目录，
-     * 用于临时文件（例如 PDF 导出 / 云打印中生成的 mermaid 图片）。
-     */
     function uploadImage(dataUrl, useTempDir) {
         return new Promise(function(resolve, reject) {
-            // Convert data URL to Blob
             var arr = dataUrl.split(','), mime = arr[0].match(/:(.*?);/)[1],
                 bstr = atob(arr[1]), n = bstr.length, u8arr = new Uint8Array(n);
             while(n--) {
@@ -121,19 +305,14 @@
             }
             var blob = new Blob([u8arr], {type: mime});
 
-            // Create FormData - 使用 'files[]' 字段名以匹配服务端期望
             var formData = new FormData();
             formData.append('files[]', blob, 'image.png');
             
-            // 打印 / 导出 PDF 时，要求图表上传到临时目录（/uploads），
-            // 此时不携带用户信息，避免被移动到用户专属目录。
-            // 其它场景仍然附带用户信息，走原有 user_files 目录逻辑。
             if (!useTempDir && g('currentUser')) {
                 formData.append('username', g('currentUser').username);
                 formData.append('password', g('currentUser').password);
             }
 
-            // Upload to server
             var apiUrl = (window.getApiBaseUrl ? window.getApiBaseUrl() : 'api') + '/external/upload';
             fetch(apiUrl, {
                 method: 'POST',
@@ -144,12 +323,9 @@
                 })
                 .then(function(data) {
                     if (data.success && data.urls && data.urls.length > 0) {
-                        // 从响应中获取第一个 URL
                         var imgUrl = data.urls[0];
 
-                        // 确保返回的是绝对地址
                         if (imgUrl && !imgUrl.startsWith('http://') && !imgUrl.startsWith('https://')) {
-                            // 构建完整的绝对地址
                             var origin = window.getAppOrigin ? window.getAppOrigin() : window.location.origin;
                             var absoluteUrl = origin + (imgUrl.startsWith('/') ? '' : '/') + imgUrl;
                             resolve(absoluteUrl);
@@ -211,13 +387,12 @@
             modal.appendChild(content);
             document.body.appendChild(modal);
 
-            let selectedLocation = 'cloud'; // Default to cloud
+            let selectedLocation = 'cloud';
             const localCard = content.querySelector('#choice-local');
             const cloudCard = content.querySelector('#choice-cloud');
             const confirmBtn = content.querySelector('#storage-confirm');
             const permanentCheckbox = content.querySelector('#storage-permanent');
 
-            // Set initial state
             cloudCard.style.borderColor = '#4CAF50';
             cloudCard.style.background = nightMode ? '#2e4a30' : '#e8f5e9';
 
@@ -297,3 +472,4 @@
     global.checkAndUploadLocalFiles = checkAndUploadLocalFiles;
 
 })(typeof window !== 'undefined' ? window : this);
+
