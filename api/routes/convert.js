@@ -21,6 +21,52 @@ const md = markdownIt({
 md.use(markdownItTaskLists);
 md.use(markdownItMathjax3);
 
+/**
+ * Clean up MathJax-related content from HTML (Node.js version using regex)
+ * 1. Remove all MathJax scripts
+ * 2. Remove <mjx-assistive-mml> nodes
+ * 3. Process <mjx-container> to keep only SVG wrapped in div
+ * @param {string} html - The HTML content to clean
+ * @returns {string} - Cleaned HTML
+ */
+function cleanMathJaxContent(html) {
+    try {
+        let cleaned = html;
+        
+        // 1. Remove all MathJax scripts
+        // Remove script tags with src containing mathjax or MathJax in id
+        cleaned = cleaned.replace(/<script[^>]*src[^>]*mathjax[^>]*>[\s\S]*?<\/script>/gi, '');
+        cleaned = cleaned.replace(/<script[^>]*id[^>]*MathJax[^>]*>[\s\S]*?<\/script>/gi, '');
+        
+        // Remove script tags containing mathjax in their content
+        // This is more complex with regex, so we'll do our best
+        cleaned = cleaned.replace(/<script[^>]*>[\s\S]*?mathjax[\s\S]*?<\/script>/gi, '');
+        
+        // 2. Remove <mjx-assistive-mml> nodes (including all content inside)
+        cleaned = cleaned.replace(/<mjx-assistive-mml[^>]*>[\s\S]*?<\/mjx-assistive-mml>/gi, '');
+        
+        // 3. Process <mjx-container> elements
+        // We need to find all mjx-container elements and extract the SVG
+        // This is a bit complex with regex, but we'll use a function to replace
+        cleaned = cleaned.replace(/<mjx-container[^>]*>([\s\S]*?)<\/mjx-container>/gi, (match, content) => {
+            // Extract SVG from the content
+            const svgMatch = content.match(/<svg[\s\S]*?<\/svg>/i);
+            if (svgMatch) {
+                // Wrap the SVG in a div with appropriate styling
+                return `<div style="text-align: center; margin: 1em 0;">${svgMatch[0]}</div>`;
+            }
+            // If no SVG found, remove the container
+            return '';
+        });
+        
+        return cleaned;
+    } catch (error) {
+        console.error('[PDF Debug] Error cleaning MathJax content:', error);
+        // If cleaning fails, return original HTML
+        return html;
+    }
+}
+
 // Conversion endpoint
 router.post('/markdown', (req, res) => {
     try {
@@ -53,7 +99,7 @@ router.post('/markdown', (req, res) => {
 // PDF Conversion endpoint
 router.post('/pdf', (req, res) => {
     try {
-        const { html, settings } = req.body;
+        let { html, settings } = req.body;
         
         if (!html) {
             return res.status(400).json({ 
@@ -61,6 +107,11 @@ router.post('/pdf', (req, res) => {
                 message: 'HTML content is required' 
             });
         }
+        
+        // Clean up MathJax-related content before conversion
+        console.log('[PDF Debug] Cleaning MathJax content on backend...');
+        html = cleanMathJaxContent(html);
+        console.log('[PDF Debug] MathJax content cleaned on backend');
 
         const filename = `${uuidv4()}.pdf`;
         // uploads folder is one level up from api/routes/ (api/routes/../uploads -> api/uploads -> no, server.js says ../uploads from api/)
