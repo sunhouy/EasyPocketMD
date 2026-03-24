@@ -39,6 +39,23 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Extract version from tag
+        id: extract-version
+        run: |
+          TAG_NAME=${{ github.event_name == 'workflow_dispatch' && github.event.inputs.release_tag != '' && github.event.inputs.release_tag || github.ref_name }}
+          VERSION=$(echo "$TAG_NAME" | sed 's/^v//')
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
+
+      - name: Update package.json version
+        run: |
+          node -e "
+            const fs = require('fs');
+            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+            pkg.version = process.env.VERSION;
+            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\\n');
+          "
+
       - name: Build web app (Vite)
         run: npm run build
 

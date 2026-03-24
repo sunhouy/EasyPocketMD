@@ -37,6 +37,25 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Extract version from tag
+        id: extract-version
+        run: |
+          TAG_NAME=${{ github.event_name == 'workflow_dispatch' && github.event.inputs.release_tag != '' && github.event.inputs.release_tag || github.ref_name }}
+          VERSION=$(echo "$TAG_NAME" | sed 's/^v//')
+          VERSION_CODE=$(echo "$VERSION" | awk -F. '{ printf("%d%02d%02d", $1, $2, $3) }')
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "VERSION_CODE=$VERSION_CODE" >> $GITHUB_ENV
+          echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
+
+      - name: Update package.json version
+        run: |
+          node -e "
+            const fs = require('fs');
+            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+            pkg.version = process.env.VERSION;
+            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\\n');
+          "
+
       - name: Build web app
         run: npm run build
 
@@ -67,7 +86,7 @@ jobs:
           printf '%s' "$JKS_BASE64" | base64 --decode > android/app/release.keystore
           chmod 600 android/app/release.keystore
 
-      - name: Configure Gradle for signing
+      - name: Configure Gradle for signing and version
         env:
           JKS_ALIAS: ${{ secrets.JKS_ALIAS }}
           JKS_PASSWORD: ${{ secrets.JKS_PASSWORD }}
@@ -82,8 +101,8 @@ jobs:
                   applicationId "cn.yhsun.md"
                   minSdkVersion rootProject.ext.minSdkVersion
                   targetSdkVersion rootProject.ext.targetSdkVersion
-                  versionCode 1
-                  versionName "1.0.0"
+                  versionCode $VERSION_CODE
+                  versionName "$VERSION"
                   testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
                   aaptOptions {
                      ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
@@ -138,6 +157,10 @@ jobs:
               logger.info("google-services.json not found, google-services plugin not applied. Push Notifications won't work")
           }
           EOF
+          
+          # 使用 sed 替换版本号变量
+          sed -i "s/\$VERSION_CODE/$VERSION_CODE/g" android/app/build.gradle
+          sed -i "s/\$VERSION/$VERSION/g" android/app/build.gradle
           
           cat > android/gradle.properties << EOF
           android.useAndroidX=true
