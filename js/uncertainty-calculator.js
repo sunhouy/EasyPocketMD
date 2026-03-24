@@ -419,7 +419,7 @@ function showUncertaintyCalculator() {
         const typeBInput = document.getElementById('typeBInput');
         const typeB = parseFloat(typeBInput.value);
         if (isNaN(typeB) || typeB <= 0) {
-            alert('请输入有效的B类不确定度');
+            g('customAlert')('请输入有效的B类不确定度');
             return;
         }
         
@@ -432,7 +432,7 @@ function showUncertaintyCalculator() {
             for (const input of measurementInputs) {
                 const value = parseFloat(input.value);
                 if (isNaN(value)) {
-                    alert('请输入有效的测量值');
+                    g('customAlert')('请输入有效的测量值');
                     return;
                 }
                 values.push(value);
@@ -446,14 +446,14 @@ function showUncertaintyCalculator() {
             const valueStrings = inputText.split(/[,，]/).map(s => s.trim()).filter(s => s !== '');
             
             if (valueStrings.length < 2) {
-                alert('至少需要输入2个测量值');
+                g('customAlert')('至少需要输入2个测量值');
                 return;
             }
             
             for (const s of valueStrings) {
                 const value = parseFloat(s);
                 if (isNaN(value)) {
-                    alert('请输入有效的测量值');
+                    g('customAlert')('请输入有效的测量值');
                     return;
                 }
                 values.push(value);
@@ -461,7 +461,7 @@ function showUncertaintyCalculator() {
         }
         
         if (values.length < 2) {
-            alert('至少需要2个测量值');
+            g('customAlert')('至少需要2个测量值');
             return;
         }
         
@@ -470,7 +470,7 @@ function showUncertaintyCalculator() {
             window.vditor.setValue(resultMarkdown);
         } else {
             console.log(resultMarkdown);
-            alert('结果已生成，但未找到编辑器，请检查Vditor是否已加载。');
+            g('customAlert')('结果已生成，但未找到编辑器，请检查Vditor是否已加载。');
         }
         closeUncertaintyCalculator();
     });

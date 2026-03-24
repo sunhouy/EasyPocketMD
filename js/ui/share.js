@@ -209,7 +209,8 @@
 
         // 删除分享链接
         shareContent.querySelector('#shareDeleteBtn').onclick = async function() {
-            if (confirm(isEn ? 'Are you sure you want to delete this share link? This cannot be undone.' : '确定要删除这个分享链接吗？删除后将无法恢复。')) {
+            const confirmed = await g('customConfirm')(isEn ? 'Are you sure you want to delete this share link? This cannot be undone.' : '确定要删除这个分享链接吗？删除后将无法恢复。');
+            if (confirmed) {
                 var btn = this;
                 btn.disabled = true;
                 btn.textContent = isEn ? 'Deleting...' : '删除中...';

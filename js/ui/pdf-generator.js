@@ -1,9 +1,87 @@
 import * as pdfjsLib from 'pdfjs-dist';
 // Vite handles the worker URL import
 import pdfWorker from 'pdfjs-dist/build/pdf.worker.mjs?url';
+import htmlToPdfmake from 'html-to-pdfmake';
+import pdfMake from 'pdfmake/build/pdfmake';
+import pdfFonts from 'pdfmake/build/vfs_fonts';
 
 // Set worker source
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
+
+// Initialize pdfmake fonts
+pdfMake.vfs = pdfFonts;
+
+/**
+ * Generate PDF from HTML content using local conversion (html-to-pdfmake + pdfmake)
+ * @param {string} htmlContent - The HTML content to convert
+ * @param {object} settings - Print settings (margin, etc.)
+ * @returns {Promise<string>} - Returns blob URL for the generated PDF
+ */
+async function generatePDFLocal(htmlContent, settings) {
+    if (!htmlContent || htmlContent.trim() === '') {
+        console.warn('[PDF Debug] generatePDFLocal received empty content');
+        htmlContent = '<div style="padding: 20px; font-size: 16px; color: #666; text-align: center;">(文档内容为空)</div>';
+    }
+
+    const cleanedHtml = htmlContent
+        .replace(/font-family\s*:\s*[^;]+;/gi, '')
+        .replace(/font-family\s*:\s*[^"']+["']/gi, '')
+        .replace(/font-family\s*:\s*[^}]+}/gi, '}');
+
+    const fullHtml = `
+        <div>
+            ${cleanedHtml}
+        </div>
+    `;
+
+    console.log('[PDF Debug] Starting local PDF generation...');
+    console.log('[PDF Debug] Input HTML length:', htmlContent.length);
+
+    const pdfMakeContent = htmlToPdfmake(fullHtml, {
+        defaultStyles: {
+            p: { fontSize: 12, lineHeight: 1.2 },
+            h1: { fontSize: 24, bold: true, margin: [0, 0, 0, 10] },
+            h2: { fontSize: 20, bold: true, margin: [0, 0, 0, 8] },
+            h3: { fontSize: 16, bold: true, margin: [0, 0, 0, 6] },
+            h4: { fontSize: 14, bold: true, margin: [0, 0, 0, 4] }
+        }
+    });
+
+    console.log('[PDF Debug] htmlToPdfmake conversion done');
+
+    const docDefinition = {
+        content: pdfMakeContent,
+        defaultStyle: {
+            font: 'Roboto',
+            fontSize: 12
+        },
+        pageMargins: [
+            (settings.pageMargin || 15) * 2.83465,
+            (settings.pageMargin || 15) * 2.83465,
+            (settings.pageMargin || 15) * 2.83465,
+            (settings.pageMargin || 15) * 2.83465
+        ]
+    };
+
+    console.log('[PDF Debug] Creating pdfmake document...');
+
+    try {
+        const pdfDoc = pdfMake.createPdf(docDefinition);
+        console.log('[PDF Debug] pdfmake document created');
+        
+        console.log('[PDF Debug] Getting blob using Promise...');
+        const buffer = await pdfDoc.getBuffer();
+        console.log('[PDF Debug] Buffer created, length:', buffer.length, 'bytes');
+        
+        const blob = new Blob([buffer], { type: 'application/pdf' });
+        const url = URL.createObjectURL(blob);
+        console.log('[PDF Debug] Blob URL created:', url);
+        return url;
+    } catch (error) {
+        console.error('[PDF Debug] Local PDF generation error:', error);
+        throw error;
+    }
+}
 
 /**
  * Generate PDF from HTML content using server-side conversion
@@ -13,6 +91,9 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
  * @returns {Promise<string>} - Returns PDF URL
  */
 export async function generatePDF(htmlContent, settings, filename) {
+    if (settings && settings.conversionMethod === 'local') {
+        return await generatePDFLocal(htmlContent, settings);
+    }
     
     // Debug: Check if content is empty
     if (!htmlContent || htmlContent.trim() === '') {

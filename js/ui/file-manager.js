@@ -80,10 +80,6 @@
         modal.appendChild(content);
         document.body.appendChild(modal);
 
-        modal.addEventListener('click', (e) => {
-            if (e.target === modal) modal.remove();
-        });
-
         // Fetch Data
         try {
             var apiUrl = (window.getApiBaseUrl ? window.getApiBaseUrl() : 'api') + '/user_files/list';
@@ -167,7 +163,8 @@
 
                         const delBtn = item.querySelector('.del-btn');
                         delBtn.onclick = async () => {
-                            if (confirm(t('confirmDeleteFile').replace('{name}', displayName))) {
+                            const confirmed = await g('customConfirm')(t('confirmDeleteFile').replace('{name}', displayName));
+                            if (confirmed) {
                                 if (file.isLocal) {
                                     const locals = JSON.parse(localStorage.getItem('vditor_local_files') || '[]');
                                     const filtered = locals.filter(f => f.name !== file.name);

@@ -468,8 +468,15 @@ async function downloadInCapacitor(data, filename, mimeType, isRawData = false) 
                     <button id="printSendBtn" style="flex:1;padding:12px;font-weight:bold;background:#2196F3;color:white;border:none;border-radius:6px;cursor:pointer;">${isEn() ? 'Send to Print' : '发送打印'}</button>
                 </div>
             `;
+        } else if (mode === 'export-pdf') {
+            actionButtons = `
+                <div style="display:flex;gap:10px;margin-top:20px;">
+                    <button id="localConvertBtn" style="flex:1;padding:12px;font-weight:bold;background:#FF9800;color:white;border:none;border-radius:6px;cursor:pointer;">${isEn() ? 'Local Convert (Experimental)' : '本地转换（实验性功能）'}</button>
+                    <button id="serverConvertBtn" style="flex:1;padding:12px;font-weight:bold;background:#2196F3;color:white;border:none;border-radius:6px;cursor:pointer;">${isEn() ? 'Server Convert' : '后端转换'}</button>
+                </div>
+            `;
         } else {
-            var actionName = mode === 'export-pdf' ? (isEn() ? 'Export PDF' : '导出 PDF') : (isEn() ? 'Export HTML' : '导出 HTML');
+            var actionName = isEn() ? 'Export HTML' : '导出 HTML';
             actionButtons = `
                 <div style="display:flex;gap:10px;margin-top:20px;">
                     <button id="confirmExportBtn" style="flex:1;padding:12px;font-weight:bold;background:#2196F3;color:white;border:none;border-radius:6px;cursor:pointer;">${actionName}</button>
@@ -1016,6 +1023,32 @@ async function downloadInCapacitor(data, filename, mimeType, isRawData = false) 
             };
         }
 
+        // Local Convert Button Logic
+        var localConvertBtn = modalContent.querySelector('#localConvertBtn');
+        if (localConvertBtn) {
+            localConvertBtn.onclick = function() {
+                if (callback) {
+                    var settings = getPrintSettings(modalContent);
+                    settings.conversionMethod = 'local';
+                    printModal.remove();
+                    callback(settings);
+                }
+            };
+        }
+
+        // Server Convert Button Logic
+        var serverConvertBtn = modalContent.querySelector('#serverConvertBtn');
+        if (serverConvertBtn) {
+            serverConvertBtn.onclick = function() {
+                if (callback) {
+                    var settings = getPrintSettings(modalContent);
+                    settings.conversionMethod = 'server';
+                    printModal.remove();
+                    callback(settings);
+                }
+            };
+        }
+
         // 对齐按钮切换
         var alignButtons = modalContent.querySelectorAll('.align-btn');
         alignButtons.forEach(function(btn) {
@@ -1509,7 +1542,7 @@ async function downloadInCapacitor(data, filename, mimeType, isRawData = false) 
         } catch (error) {
             console.error('PDF download error:', error);
             loadingModal.remove();
-            alert((isEn() ? 'PDF generation failed: ' : 'PDF生成失败: ') + error.message);
+            g('customAlert')((isEn() ? 'PDF generation failed: ' : 'PDF生成失败: ') + error.message);
         }
     }
 
@@ -1659,7 +1692,7 @@ async function downloadInCapacitor(data, filename, mimeType, isRawData = false) 
         } catch (error) {
             console.error('预览错误:', error);
             loadingModal.remove();
-            alert('预览失败: ' + error.message);
+            g('customAlert')('预览失败: ' + error.message);
         }
     }
 
@@ -2004,7 +2037,7 @@ async function downloadInCapacitor(data, filename, mimeType, isRawData = false) 
     function showFilePrintDialog() {
         // 检查用户是否登录
         if (!g('currentUser')) {
-            alert(isEn() ? 'Please log in first to use file print feature' : '请先登录后再使用文件打印功能');
+            g('customAlert')(isEn() ? 'Please log in first to use file print feature' : '请先登录后再使用文件打印功能');
             if (g('showLoginModal')) {
                 g('showLoginModal')();
             }
@@ -2263,7 +2296,7 @@ async function downloadInCapacitor(data, filename, mimeType, isRawData = false) 
                 var userPassword = g('currentUser').password;
 
                 if (uploadedFiles.length === 0) {
-                    alert(isEn() ? 'Please upload a file first' : '请先上传文件');
+                    g('customAlert')(isEn() ? 'Please upload a file first' : '请先上传文件');
                     return;
                 }
 

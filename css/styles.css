@@ -2230,6 +2230,10 @@ body.night-mode .jstree-default .jstree-icon.jstree-ocl {
     .file-menu-btn {
         opacity: 1 !important;
     }
+    /* 移动端隐藏大纲视图设置 */
+    .show-outline-setting {
+        display: none !important;
+    }
 }
 /* Context menu adjustment */
 .vakata-context {
@@ -2306,5 +2310,39 @@ body.night-mode .vakata-context li > a:hover {
 
 body.night-mode .vakata-context li > a i {
     color: #aaa !important;
+}
+
+/* 资源加载占位符样式 */
+.resource-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100px;
+    background: #f5f5f5;
+    border: 1px dashed #ddd;
+    border-radius: 4px;
+    margin: 10px 0;
+    color: #666;
+    font-size: 14px;
+}
+
+body.night-mode .resource-loading {
+    background: #2d2d2d;
+    border-color: #444;
+    color: #aaa;
+}
+
+.resource-loading .fa-spinner {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+/* 图片加载时的过渡效果 */
+img[data-original-src] {
+    transition: opacity 0.3s ease;
 }
 
