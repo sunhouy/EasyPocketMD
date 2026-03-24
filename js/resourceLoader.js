@@ -62,10 +62,6 @@
         }
     }
 
-    function isLocalOnlyUrl(url) {
-        return url && url.startsWith('local://');
-    }
-
     async function loadResource(url, isImage = false) {
         if (cache.has(url)) {
             return cache.get(url);
@@ -83,39 +79,33 @@
                     const blobUrl = global.IndexedDBManager.createBlobURL(localData.data, localData.contentType);
                     cache.set(url, blobUrl);
                     
-                    if (!isLocalOnlyUrl(url)) {
-                        (async () => {
-                            try {
-                                const result = await fetchResource(url, localData);
-                                if (!result.notModified) {
-                                    await global.IndexedDBManager.saveFile(
-                                        url,
-                                        result.data,
-                                        result.contentType,
-                                        result.lastModified,
-                                        result.etag
-                                    );
-                                    
-                                    if (cache.has(url)) {
-                                        const oldBlobUrl = cache.get(url);
-                                        pendingRevokes.push(oldBlobUrl);
-                                    }
-                                    
-                                    const newBlobUrl = global.IndexedDBManager.createBlobURL(result.data, result.contentType);
-                                    cache.set(url, newBlobUrl);
-                                    refreshResourceInDOM(url, newBlobUrl, isImage);
+                    (async () => {
+                        try {
+                            const result = await fetchResource(url, localData);
+                            if (!result.notModified) {
+                                await global.IndexedDBManager.saveFile(
+                                    url,
+                                    result.data,
+                                    result.contentType,
+                                    result.lastModified,
+                                    result.etag
+                                );
+                                
+                                if (cache.has(url)) {
+                                    const oldBlobUrl = cache.get(url);
+                                    pendingRevokes.push(oldBlobUrl);
                                 }
-                            } catch (error) {
-                                console.error('Background update failed:', error);
+                                
+                                const newBlobUrl = global.IndexedDBManager.createBlobURL(result.data, result.contentType);
+                                cache.set(url, newBlobUrl);
+                                refreshResourceInDOM(url, newBlobUrl, isImage);
                             }
-                        })();
-                    }
+                        } catch (error) {
+                            console.error('Background update failed:', error);
+                        }
+                    })();
                     
                     return blobUrl;
-                }
-
-                if (isLocalOnlyUrl(url)) {
-                    throw new Error('Local file not found in IndexedDB');
                 }
 
                 const result = await fetchResource(url);
