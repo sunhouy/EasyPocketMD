@@ -19,8 +19,8 @@
 无论是手机还是电脑，都可以使用 EasyPocketMD 来编辑 Markdown 文档。多平台界面采用统一的设计风格，给您一致的操作体验。
 
 <div style="display: flex; justify-content: center; gap: 20px;">
-  <img src="readme/1_1.png" width="500"/>
-  <img src="readme/1_2.png" width="200"/>
+  <img src="readme/1_1.png" height="300px"/>
+  <img src="readme/1_2.png" height="300px"/>
 </div>
 
 ### 零学习成本，直接上手
@@ -28,8 +28,8 @@
 不需记忆任何 Markdown 语法，底部的工具栏提供了常用的格式插入按钮，如加粗、斜体、标题、列表、引用、代码块、链接、图片等，一键即可插入。支持所见即所得 / 即时渲染 / 分屏预览三种操作模式，总有一个选择适合您。
 
 <div style="display: flex; justify-content: center; gap: 20px;">
-  <img src="readme/2_1.png" width="500"/>
-  <img src="readme/2_2.png" width="200"/>
+  <img src="readme/2_1.png" height="300px"/>
+  <img src="readme/2_2.png" height="300px"/>
 </div>
 
 ### 丰富的拓展支持
@@ -37,8 +37,8 @@
 编辑器极速渲染latex公式，mermaid图表，甚至是五线谱和化学方程式。编辑的文档可以直接导出HTML和PDF格式，并极其方便的设置您想要的格式。word能做的，这里都能做，并且更快，更轻量。您本地的txt和markdown文档可以直接导入，在这里继续编辑。
 
 <div style="display: flex; justify-content: center; gap: 20px;">
-  <img src="readme/3_1.png" width="200"/>
-  <img src="readme/3_2.png" width="200"/>
+  <img src="readme/3_1.png" height="300px"/>
+  <img src="readme/3_2.png" height="300px"/>
 </div>
 
 ### 永不会担心文件丢失
@@ -46,8 +46,8 @@
 所有编辑的文档都将自动保存到本地数据库，如果登陆了账户，会自动与服务器同步，并跨设备同步所有内容。如果不同设备的文件冲突了，我们会提示您决定使用哪个版本。我们会实时保存您做的任何修改，即使突然关闭编辑器或重启电脑，也不会丢失任何数据。我们还会记录历史版本，您可以随时查看和恢复到之前的状态。
 
 <div style="display: flex; justify-content: center; gap: 20px;">
-  <img src="readme/4_1.png" width="400"/>
-  <img src="readme/4_2.png" width="400"/>
+  <img src="readme/4_1.png" height="300px"/>
+  <img src="readme/4_2.png" height="300px"/>
 </div>
 
 ### 领先的云打印功能
@@ -55,8 +55,8 @@
 在装有打印机的电脑上安装云打印客户端，您可以在任何设备上使用云打印功能将文档打印出来。在手机上，您可以预览文档打印出后的状态，并进行所有配置。强大的AI智能排版功能更可以节省您的时间，让您只须聚焦文档的编写，剩下的交给我们。
 
 <div style="display: flex; justify-content: center; gap: 20px;">
-  <img src="readme/5_1.png" width="200"/>
-  <img src="readme/5_2.png" width="200"/>
+  <img src="readme/5_1.png" height="300px"/>
+  <img src="readme/5_2.png" height="300px"/>
 </div>
 
 ### 强大的隐私保护
@@ -64,8 +64,8 @@
 您的文件和上传的任何内容都会加密存储在本地和服务器中。您可以分享文档，并进行访问时间和权限的管理。我们使用最新的库，并随时修复安全漏洞，确保您的隐私不被泄露。
 
 <div style="display: flex; justify-content: center; gap: 20px;">
-  <img src="readme/6_1.png" width="200"/>
-  <img src="readme/6_2.png" width="500"/>
+  <img src="readme/6_1.png" height="300px"/>
+  <img src="readme/6_2.png" height="300px"/>
 </div>
 
 ### 高度个性化的体验
