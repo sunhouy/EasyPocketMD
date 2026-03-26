@@ -442,7 +442,16 @@ document.addEventListener('DOMContentLoaded', function() {
         });
 
         var mobileSettingsBtn = document.getElementById('mobileSettingsBtn');
-        if (mobileSettingsBtn) mobileSettingsBtn.addEventListener('click', function() { window.showSettingsDialog(); closeDrop(); });
+        if (mobileSettingsBtn) mobileSettingsBtn.addEventListener('click', function() { window.showSettingsDialog(); });
+        var saveFileBtn = document.getElementById('saveFileBtn');
+        if (saveFileBtn) saveFileBtn.addEventListener('click', async function() {
+            if (window.saveCurrentFile) {
+                await window.saveCurrentFile(true);
+                // 自定义保存成功提示
+                var t = function(key) { return window.i18n ? window.i18n.t(key) : key; };
+                window.showMessage(t('saveSuccess') || '保存成功', 'success');
+            }
+        });
 
         var mobileLoginBtn = document.getElementById('mobileLoginBtn');
         if (mobileLoginBtn) mobileLoginBtn.addEventListener('click', window.handleLoginButtonClick);
@@ -539,7 +548,7 @@ document.addEventListener('DOMContentLoaded', function() {
             { id: 'mobileExportBtn', fn: function() { window.exportContent(); closeDrop(); } },
             { id: 'mobileUncertaintyBtn', fn: function() { if (typeof window.showUncertaintyCalculator === 'function') window.showUncertaintyCalculator(); closeDrop(); } },
             { id: 'mobileClearBtn', fn: async function() { const confirmed = await window.customConfirm(window.i18n ? window.i18n.t('clearConfirm') : '确定要清空当前文件的内容吗？'); if (confirmed) { if (window.vditor) window.vditor.setValue(''); window.showMessage(window.i18n ? window.i18n.t('contentCleared') : '内容已清空'); } closeDrop(); } },
-            { id: 'mobileSettingsBtn', fn: function() { window.showSettingsDialog(); closeDrop(); } },
+            // mobileSettingsBtn 已移到顶部工具栏
             { id: 'aboutBtn', fn: function() { window.showAboutDialog(); closeDrop(); } }
         ];
         list.forEach(function(b) {
@@ -565,6 +574,14 @@ document.addEventListener('DOMContentLoaded', function() {
     function reinitMobileFeatures() {
         var btns = [
             { id: 'mobileLoginBtn', fn: window.handleLoginButtonClick },
+            { id: 'mobileSettingsBtn', fn: window.showSettingsDialog },
+            { id: 'saveFileBtn', fn: async function() {
+                if (window.saveCurrentFile) {
+                    await window.saveCurrentFile(true);
+                    var t = function(key) { return window.i18n ? window.i18n.t(key) : key; };
+                    window.showMessage(t('saveSuccess') || '保存成功', 'success');
+                }
+            }},
             { id: 'modeToggle', fn: window.toggleNightMode },
             { id: 'mobileFileBtn', fn: function() { document.getElementById('fileListSidebar').classList.toggle('show'); } }
         ];

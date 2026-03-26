@@ -105,7 +105,7 @@
             insert: '插入',
             formula: '公式',
             chart: '图表',
-            uncertainty: '不确定度',
+            uncertainty: '不确定度计算器',
             undo: '撤销',
             redo: '重做',
 
