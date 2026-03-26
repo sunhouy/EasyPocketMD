@@ -13,16 +13,20 @@
     // 记录“本地已保存但服务器尚未确认保存”的文件，避免本地/服务器长期不一致
     function loadPendingServerSync() {
         try {
-            return JSON.parse(localStorage.getItem('vditor_pending_server_sync') || '{}') || {};
+            const stored = localStorage.getItem('vditor_pending_server_sync');
+            return stored ? JSON.parse(stored) : {};
         } catch (e) {
+            console.warn('Failed to load pending server sync:', e);
             return {};
         }
     }
 
     function persistPendingServerSync(map) {
         try {
-            localStorage.setItem('vditor_pending_server_sync', JSON.stringify(map || {}));
-        } catch (e) {}
+            localStorage.setItem('vditor_pending_server_sync', JSON.stringify(map));
+        } catch (e) {
+            console.warn('Failed to persist pending server sync:', e);
+        }
     }
 
     function markPendingServerSync(fileId, pending) {
@@ -228,7 +232,28 @@
                     loadFiles();
                     if (g('files').length > 0) openFirstFile();
                     else createDefaultFile();
-                    global.showSyncStatus(isEn() ? 'File sync completed' : '文件同步完成', 'success');
+                    
+                    // 自动同步待同步列表中的文件（用户强制退出时未同步的文件）
+                    // 这些文件已经使用了本地版本，现在立即同步到服务器
+                    const pendingServerSync = g('pendingServerSync') || {};
+                    const pendingFileIds = Object.keys(pendingServerSync).filter(id => pendingServerSync[id]);
+                    if (pendingFileIds.length > 0) {
+                        global.showSyncStatus(isEn() ? 'Auto-syncing ' + pendingFileIds.length + ' unsaved files...' : '正在自动同步 ' + pendingFileIds.length + ' 个未同步的文件...', 'syncing');
+                        setTimeout(() => {
+                            (async () => {
+                                for (const fileId of pendingFileIds) {
+                                    try {
+                                        await global.syncFileToServer(fileId);
+                                    } catch (e) {
+                                        console.warn('自动同步文件失败:', fileId, e);
+                                    }
+                                }
+                                global.showSyncStatus(isEn() ? 'File sync completed' : '文件同步完成', 'success');
+                            })();
+                        }, 1000);
+                    } else {
+                        global.showSyncStatus(isEn() ? 'File sync completed' : '文件同步完成', 'success');
+                    }
                 }
             } else {
                 loadLocalFiles();
@@ -243,10 +268,17 @@
 
     function detectConflicts(localFiles, serverFiles) {
         const conflicts = [];
+        const pendingServerSync = g('pendingServerSync') || {};
         const serverFileMap = {};
         serverFiles.forEach(function(f) { serverFileMap[f.name] = f; });
 
         localFiles.forEach(function(localFile) {
+            // 如果文件在待同步列表中（用户强制退出时未同步），跳过冲突检测，直接使用本地版本
+            // 这些文件会在后续自动同步，无需用户手动解决冲突
+            if (localFile.id && pendingServerSync[localFile.id]) {
+                return;
+            }
+
             const serverFile = serverFileMap[localFile.name];
             if (serverFile) {
                 if (serverFile.content !== localFile.content) {
@@ -260,7 +292,7 @@
                     });
                 }
             } else {
-                // 只有当本地文件曾经同步过（isSynced=true），而服务器现在没有时，才视为“服务器删除”冲突。
+                // 只有当本地文件曾经同步过（isSynced=true），而服务器现在没有时，才视为"服务器删除"冲突。
                 // 本地新建但从未同步过的文件（isSynced=false）会在 loadFilesFromServer 中自动上传，不弹窗。
                 if (localFile.isSynced) {
                     conflicts.push({
@@ -551,10 +583,29 @@
         }
     }
 
-    // 打开第一个文件（忽略文件夹）
+    // 打开第一个文件（忽略文件夹和系统文件）
     function openFirstFile() {
-        const firstFile = g('files').find(f => f.type === 'file');
-        if (firstFile) openFile(firstFile.id);
+        const defaultOpening = g('userSettings') && g('userSettings').defaultFileOpening || 'lastEdited';
+        
+        if (defaultOpening === 'firstFile') {
+            // 直接打开第一个非系统文件
+            const firstFile = g('files').find(f => f.type === 'file' && f.name !== '.easypocketmd_orders');
+            if (firstFile) openFile(firstFile.id);
+        } else {
+            // lastEdited: 优先打开上次打开的文件
+            const lastOpenedFileId = localStorage.getItem('vditor_last_opened_file');
+            if (lastOpenedFileId) {
+                const lastFile = g('files').find(f => f.id === lastOpenedFileId && f.type === 'file' && f.name !== '.easypocketmd_orders');
+                if (lastFile) {
+                    openFile(lastOpenedFileId);
+                    return;
+                }
+            }
+            
+            // 如果没有上次打开的文件或文件不存在，则打开第一个非系统文件
+            const firstFile = g('files').find(f => f.type === 'file' && f.name !== '.easypocketmd_orders');
+            if (firstFile) openFile(firstFile.id);
+        }
     }
 
     function loadOrders() {
@@ -705,7 +756,7 @@
         // 2. 收集所有需要创建节点的路径（包括中间路径）
         const allPaths = new Set();
         files.forEach(f => {
-            if (f.name === '.easypocketmd_orders') return;
+            if (f.name === '.easypocketmd_orders') return; // 过滤掉系统文件
             allPaths.add(f.name);
             let p = f.name;
             while(p.includes('/')) {
@@ -763,11 +814,31 @@
         });
 
         // 按照 order 排序，同级元素比较
+        const defaultSorting = g('userSettings') && g('userSettings').defaultSorting || 'modifiedTime';
         nodes.sort((a, b) => {
             const orderA = a.data.order;
             const orderB = b.data.order;
             if (orderA !== orderB) return orderA - orderB;
-            // 如果 order 相同，文件夹排前面，然后按名称排序
+            
+            // 如果 order 相同，根据默认排序方式排序
+            if (defaultSorting === 'modifiedTime') {
+                // 按修改时间排序（最新的在前）
+                const fileA = g('files').find(f => f.name === a.data.path);
+                const fileB = g('files').find(f => f.name === b.data.path);
+                const timeA = fileA ? fileA.lastModified : 0;
+                const timeB = fileB ? fileB.lastModified : 0;
+                if (timeA !== timeB) return timeB - timeA; // 最新的在前
+            } else if (defaultSorting === 'fileSize') {
+                // 按文件大小排序（大的在前）
+                const fileA = g('files').find(f => f.name === a.data.path);
+                const fileB = g('files').find(f => f.name === b.data.path);
+                const sizeA = fileA && fileA.type === 'file' ? (fileA.content ? fileA.content.length : 0) : 0;
+                const sizeB = fileB && fileB.type === 'file' ? (fileB.content ? fileB.content.length : 0) : 0;
+                if (sizeA !== sizeB) return sizeB - sizeA; // 大的在前
+            }
+            // alphabetical 或其他情况：按名称排序
+            
+            // 文件夹排前面
             if (a.data.type === 'folder' && b.data.type === 'file') return -1;
             if (a.data.type === 'file' && b.data.type === 'folder') return 1;
             return a.text.localeCompare(b.text);
@@ -818,6 +889,7 @@
                     'name': 'default',
                     'responsive': true,
                     'dots': false,
+                    'lines': false,
                     'icons': true
                 }
             },
@@ -825,7 +897,7 @@
                 'default': { 'icon': 'fas fa-folder' },
                 'file': { 'icon': 'fas fa-file' },
                 'folder': { 'icon': 'fas fa-folder' } },
-            'plugins': ['types', 'contextmenu', 'wholerow'],
+            'plugins': ['types', 'contextmenu'],
             'contextmenu': {
                 'select_node': false,
                 'show_at_node': false,
@@ -1176,7 +1248,7 @@
         }
 
         if (files.some(f => f.name === newName && f.id !== id)) {
-            g('customAlert')(isEn() ? 'An item with the same name already exists at the target location' : '目标位置已存在同名项');
+            g('customAlert')(isEn() ? 'An item with the same name already exists at the target location' : '目��位置已存在同名项');
             loadFiles(); 
             return;
         }
@@ -1484,6 +1556,9 @@
             return;
         }
         global.currentFileId = fileId;
+        
+        // 记录最后打开的文件
+        localStorage.setItem('vditor_last_opened_file', fileId);
         
         let content = file.content;
         if (global.LocalImageManager && global.LocalImageManager.convertLocalToBlob) {

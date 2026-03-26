@@ -41,21 +41,23 @@ jobs:
 
       - name: Extract version from tag
         id: extract-version
+        shell: bash
         run: |
-          TAG_NAME=${{ github.event_name == 'workflow_dispatch' && github.event.inputs.release_tag != '' && github.event.inputs.release_tag || github.ref_name }}
-          VERSION=$(echo "$TAG_NAME" | sed 's/^v//')
-          
-          # 确保版本号符合 semver 规范（主版本.次版本.修订版本）
-          if echo "$VERSION" | grep -q '^[0-9]\+\.[0-9]\+$'; then
-            # 如果是 x.y 格式，添加 .0 变成 x.y.0
-            VERSION="$VERSION.0"
-          elif echo "$VERSION" | grep -q '^[0-9]\+$'; then
-            # 如果是 x 格式，添加 .0.0 变成 x.0.0
-            VERSION="$VERSION.0.0"
-          fi
-          
-          echo "VERSION=$VERSION" >> $GITHUB_ENV
-          echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
+          TAG_NAME="${{ github.event_name == 'workflow_dispatch' && github.event.inputs.release_tag != '' && github.event.inputs.release_tag || github.ref_name }}"
+          node -e "
+            const fs = require('fs');
+            let tagName = process.argv[1];
+            let version = tagName.replace(/^v/, '');
+            const parts = version.split('.');
+            if (parts.length === 1) {
+              version = parts[0] + '.0.0';
+            } else if (parts.length === 2) {
+              version = parts[0] + '.' + parts[1] + '.0';
+            }
+            const envPath = process.env.GITHUB_ENV;
+            fs.appendFileSync(envPath, `VERSION=${version}\n`);
+            fs.appendFileSync(envPath, `TAG_NAME=${tagName}\n`);
+          " "$TAG_NAME"
 
       - name: Update package.json version
         run: |

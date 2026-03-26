@@ -159,7 +159,7 @@ body.night-mode .mobile-bottom-bar {
 }
 
 .bottom-btn svg {
-    font-size: 15px; 
+    font-size: 15px;
     margin-bottom: 2px;
 }
 
@@ -890,7 +890,7 @@ body.night-mode .file-item:hover {
 
 .file-item.active {
     background: #e3f2fd;
-    /* border-left: 3px solid #4a90e2;  移除左侧边框 */ 
+    /* border-left: 3px solid #4a90e2;  移除左侧边框 */
 }
 
 body.night-mode .file-item.active {
@@ -1701,7 +1701,7 @@ body.night-mode table {
     background-color: #1a1a1a !important;
 }
 
-body.night-mode table th, 
+body.night-mode table th,
 body.night-mode table td {
     border-color: #444 !important;
     color: #ffffff !important;
@@ -2085,7 +2085,7 @@ body.night-mode .jstree-default .jstree-icon {
     align-items: center !important;
     width: auto !important; /* 让宽度根据内容自适应 */
     max-width: calc(100% - 28px) !important; /* 限制最大宽度 */
-    padding-right: 4px !important; 
+    padding-right: 4px !important;
     box-sizing: border-box !important;
     vertical-align: middle !important;
 }
@@ -2373,5 +2373,50 @@ img[data-original-src] {
         transform: translateY(0);
         opacity: 1;
     }
+}
+
+/* 彻底移除 jstree 所有可能的分隔线 */
+.jstree-default .jstree-wholerow,
+.jstree-default .jstree-wholerow-hovered,
+.jstree-default .jstree-wholerow-clicked {
+    border: none !important;
+    border-top: none !important;
+    border-bottom: none !important;
+    box-shadow: none !important;
+}
+
+.jstree-default .jstree-node,
+.jstree-default .jstree-children,
+.jstree-default ul,
+.jstree-default li,
+.jstree-default ins,
+.jstree-default a {
+    border: none !important;
+    border-top: none !important;
+    border-bottom: none !important;
+    box-shadow: none !important;
+    background: transparent !important;
+}
+
+body.night-mode .jstree-default .jstree-wholerow,
+body.night-mode .jstree-default .jstree-wholerow-hovered,
+body.night-mode .jstree-default .jstree-wholerow-clicked {
+    border: none !important;
+    border-top: none !important;
+    border-bottom: none !important;
+    box-shadow: none !important;
+}
+
+body.night-mode .jstree-default .jstree-node,
+body.night-mode .jstree-default .jstree-children,
+body.night-mode .jstree-default ul,
+body.night-mode .jstree-default li,
+body.night-mode .jstree-default ins,
+body.night-mode .jstree-default a {
+    border: none !important;
+    border-top: none !important;
+    border-bottom: none !important;
+    box-shadow: none !important;
+    background: transparent !important;
 }
 
