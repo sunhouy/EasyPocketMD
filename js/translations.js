@@ -21,7 +21,7 @@
             fileListHelp: '点击三个点显示更多功能',
             newFile: '新建文件',
             newFolder: '新建文件夹',
-            fileListHelpText: '文件列表功能提示：\n\n• 点击文件：打开文件\n• 点击文件夹：展开/收起子内容\n• 点击文件/文件夹右侧的三个点：显示更多操作菜单（重命名、移动、删除等）',
+            fileListHelpText: '文件列表功能提示： <br>• 点击文件：打开文件 <br>• 点击文件夹：展开/收起子内容 <br>• 点击文件/文件夹右侧的三个点：显示更多操作菜单（历史版本重命名、移动、删除等）',
 
             // 登录/注册
             loginRegister: '登录/注册',
@@ -67,6 +67,15 @@
             english: 'English',
             fontSize: '字体大小',
             showOutline: '显示大纲视图（需刷新页面）',
+            storageCloud: '云端存储',
+            defaultFileOpening: '默认文件打开方式',
+            lastEditedFile: '上次编辑的文件',
+            firstFile: '第一个文件',
+            defaultSorting: '默认排序方式',
+            sortByModifiedTime: '修改时间',
+            sortAlphabetically: '首字母',
+            sortByFileSize: '文件大小',
+            help: '帮助',
 
             // 关于
             about: '关于',
@@ -99,7 +108,6 @@
             uncertainty: '不确定度',
             undo: '撤销',
             redo: '重做',
-            save: '保存',
 
             // 编辑器模式
             selectEditorMode: '选择编辑器模式',
@@ -171,7 +179,6 @@
             storageChoiceTitle: '选择存储位置',
             storageChoiceMessage: '您是首次插入图片或文件，请选择存储方式：',
             storageLocal: '本地存储（不建议）',
-            storageCloud: '云端存储',
             storageThisTime: '仅本次生效',
             storagePermanent: '永久保存',
             storageLocalDesc: '文件将缓存在本地，清空缓存后将无法查看。浏览器可能随时删除这些内容。',
@@ -200,7 +207,6 @@
             
             // 我的文件
             pleaseLoginFirst: '请先登录',
-            loading: '正在加载...',
             usedSpace: '已用空间',
             totalFiles: '共 {count} 个文件',
             noFiles: '暂无文件',
@@ -217,8 +223,6 @@
             rename: '重命名',
             move: '移动',
             history: '历史版本',
-            newFile: '新建文件',
-            newFolder: '新建文件夹',
             virtualFolderRenameNotAllowed: '虚拟文件夹不可重命名，请先创建为实体文件夹',
             renameNotAvailable: '重命名功能不可用',
             virtualFolderMoveNotAllowed: '虚拟文件夹不可移动，请先创建为实体文件夹',
@@ -236,7 +240,6 @@
             folderRenamed: '文件夹已重命名',
             moveTo: '移动到...',
             rootDirectory: '根目录',
-            cancel: '取消',
             cannotMoveToSelf: '不能将文件夹移动到自身或其子目录中',
             targetExists: '目标位置已存在同名项',
             fileMoved: '文件已移动',
@@ -355,19 +358,13 @@
             reuploadToServer: '重新上传到服务器',
             deleteLocalFile: '删除本地文件',
             useLocalVersion: '使用本地版本',
-            useServerVersion: '使用服务器版本',
-            
-            // 历史版本
-            historyTitle: '历史版本',
-            historyCount: '最多保留1000个历史版本',
-            loadingHistory: '正在加载历史版本...',
-            close: '关闭'
+            useServerVersion: '使用服务器版本'
         },
         en: {
             // Page title and header
-            pageTitle: 'Markdown Editor',
-            mobileTitle: 'Markdown Editor',
-            loading: 'Starting editor...',
+            pageTitle: 'EasyPocketMD',
+            mobileTitle: 'EasyPocketMD',
+            loading: 'Loading EasyPocketMD...',
 
             // Sync status
             syncing: 'Syncing...',
@@ -423,6 +420,15 @@
             english: 'English',
             fontSize: 'Font Size',
             showOutline: 'Show Outline View',
+            storageCloud: 'Cloud Storage',
+            defaultFileOpening: 'Default File Opening',
+            lastEditedFile: 'Last Edited File',
+            firstFile: 'First File',
+            defaultSorting: 'Default Sorting',
+            sortByModifiedTime: 'Modified Time',
+            sortAlphabetically: 'Alphabetical',
+            sortByFileSize: 'File Size',
+            help: 'Help',
 
             // About
             about: 'About',
@@ -455,7 +461,6 @@
             uncertainty: 'Uncertainty',
             undo: 'Undo',
             redo: 'Redo',
-            save: 'Save',
 
             // Editor modes
             selectEditorMode: 'Select Editor Mode',
@@ -527,7 +532,6 @@
             storageChoiceTitle: 'Storage Location',
             storageChoiceMessage: 'This is your first time inserting a file. Please choose where to store it:',
             storageLocal: 'Local Storage (Not recommended)',
-            storageCloud: 'Cloud Storage',
             storageThisTime: 'Only this time',
             storagePermanent: 'Save permanently',
             storageLocalDesc: 'Files will be cached locally. Performance may be impacted.',
@@ -556,7 +560,6 @@
             
             // My Files
             pleaseLoginFirst: 'Please login first',
-            loading: 'Loading...',
             usedSpace: 'Used Space',
             totalFiles: '{count} files total',
             noFiles: 'No files',
@@ -573,8 +576,6 @@
             rename: 'Rename',
             move: 'Move',
             history: 'History',
-            newFile: 'New File',
-            newFolder: 'New Folder',
             virtualFolderRenameNotAllowed: 'Virtual folders cannot be renamed, please create a real folder first',
             renameNotAvailable: 'Rename function not available',
             virtualFolderMoveNotAllowed: 'Virtual folders cannot be moved, please create a real folder first',
@@ -592,7 +593,6 @@
             folderRenamed: 'Folder renamed',
             moveTo: 'Move to...',
             rootDirectory: 'Root',
-            cancel: 'Cancel',
             cannotMoveToSelf: 'Cannot move folder to itself or its subdirectories',
             targetExists: 'Item with same name already exists at target location',
             fileMoved: 'File moved',
@@ -608,125 +608,120 @@
             folderCreated: 'Folder created',
             parentFolderNotExists: 'Parent folder "{path}" does not exist, please use "New Folder" function first',
             fileExistsPleaseUseOther: 'File with same name already exists, please use another name',
-            newDocument: 'New Document',
-            newFolderDefault: 'New Folder',
-            untitledDocument: 'Untitled',
+            newDocument: '新文档',
+            newFolderDefault: '新文件夹',
+            untitledDocument: '未命名文档',
             
-            // Welcome document
-            welcomeTitle: 'Welcome to Markdown Editor',
-            welcomeContent: 'This is a new document.',
-            features: 'Features',
-            featureMarkdown: 'Supports Markdown syntax',
-            featurePreview: 'Live preview',
-            featureAutoSave: 'Auto save',
-            featureMultiFile: 'Multi-file management',
-            startWriting: 'Start writing!',
-            startWritingContent: 'Start writing your content...',
+            // 欢迎文档
+            welcomeTitle: '欢迎使用 EasyPocketMD',
+            welcomeContent: '这是一个新的文档。',
+            features: '功能特性',
+            featureMarkdown: '支持 Markdown 语法',
+            featurePreview: '实时预览',
+            featureAutoSave: '自动保存',
+            featureMultiFile: '多文件管理',
+            startWriting: '开始编写吧！',
+            startWritingContent: '开始编写您的内容...',
             
-            // Cloud Print
-            downloadPrintClient: 'Download Print Client',
-            downloadWindows: 'Download Windows Version',
-            recommendedCurrentSystem: 'Recommended (Current System)',
+            // 云打印
+            downloadPrintClient: '下载打印客户端',
+            downloadWindows: '下载Windows版本',
+            recommendedCurrentSystem: '推荐 (当前系统)',
             windows: 'Windows',
             linux: 'Linux',
             macos: 'macOS',
-            pleaseLoginToUse: 'Please login first to use this feature',
-            cloudPrintSettings: 'Cloud Print Settings',
-            exportPdfSettings: 'Export PDF Settings',
-            exportHtmlSettings: 'Export HTML Settings',
-            aiLayout: 'AI Smart Layout',
-            uploadFileToPrint: 'Upload File to Print',
-            clickToDownloadClient: 'Click to download print client',
-            printClientStatus: 'Print Client Status',
-            pleaseConnectClient: 'Please connect print client',
-            clientConnected: 'Print client connected',
-            basicSettings: 'Basic Settings',
-            titleFontSize: 'Base Title Font Size (H4)',
-            bodyFontSize: 'Body Font Size',
-            pageMargin: 'Page Margin',
-            small: 'Small',
-            default: 'Default',
-            large: 'Large',
-            extraLarge: 'Extra Large',
-            lineHeight: 'Line Height',
-            paragraphSpacing: 'Paragraph Spacing',
-            titleSpacing: 'Title Spacing',
-            titleAlignment: 'Title Alignment',
-            leftAlign: 'Left',
-            centerAlign: 'Center',
-            rightAlign: 'Right',
-            contentAlignment: 'Content Alignment',
-            indentParagraph: 'Auto indent first line of paragraphs',
-            fitToPage: 'Auto fit to one page',
-            advancedHeadingSettings: 'Advanced Heading Size Settings',
-            enableCustomHeadingSizes: 'Enable custom heading sizes',
-            h1Size: 'H1 Size (pt)',
-            h2Size: 'H2 Size (pt)',
-            h3Size: 'H3 Size (pt)',
-            h4Size: 'H4 Size (pt)',
-            h5Size: 'H5 Size (pt)',
-            h6Size: 'H6 Size (pt)',
-            quickSetDecrement: 'Quick set decrement (pt)',
-            applyDecrement: 'Apply Decrement',
-            imageSettings: 'Image Settings',
-            imageWidth: 'Image Width',
-            imageHeight: 'Image Height',
-            example: 'e.g.',
-            preview: 'Preview',
-            sendPrint: 'Send Print',
-            exportPdf: 'Export PDF',
-            exportHtml: 'Export HTML',
-            parsingResponseError: 'Response parsing error',
-            websocketError: 'WebSocket error',
-            networkNotConnected: 'Network not connected, please connect to network',
-            printClientConnection: 'Print Client Connection',
-            cannotConnectToClient: 'Cannot connect to print client',
-            pleaseEnsureClientStarted: 'Please ensure print client is started and bound with your account password',
-            retryConnection: 'Retry Connection',
-            connecting: 'Connecting...',
-            connectionFailed: 'Connection failed, please ensure print client is started and logged in with correct credentials',
-            processingUploadedFiles: 'Processing uploaded files...',
-            filePrintTaskSent: 'File print task sent',
-            fileUploadFailed: 'File upload failed',
-            unknownError: 'Unknown error',
-            filePrintFailed: 'File print failed',
-            connectionTimeout: 'Connection timeout',
-            printFailed: 'Print failed',
+            pleaseLoginToUse: '请先登录后再使用此功能',
+            cloudPrintSettings: '云打印设置',
+            exportPdfSettings: '导出 PDF 设置',
+            exportHtmlSettings: '导出 HTML 设置',
+            aiLayout: 'AI智能排版',
+            uploadFileToPrint: '上传文件打印',
+            clickToDownloadClient: '点击下载打印客户端',
+            printClientStatus: '打印客户端状态',
+            pleaseConnectClient: '请连接打印客户端',
+            clientConnected: '打印客户端已连接',
+            basicSettings: '基础设置',
+            titleFontSize: '基础标题字号 (H4)',
+            bodyFontSize: '正文字号',
+            pageMargin: '页边距',
+            small: '小',
+            default: '默认',
+            large: '大',
+            extraLarge: '特大',
+            lineHeight: '行距',
+            paragraphSpacing: '段落间距',
+            titleSpacing: '标题间距',
+            titleAlignment: '标题对齐',
+            leftAlign: '居左',
+            centerAlign: '居中',
+            rightAlign: '居右',
+            contentAlignment: '内容对齐',
+            indentParagraph: '每段段首自动空两格',
+            fitToPage: '自动排版至一页',
+            advancedHeadingSettings: '高级标题字号设置',
+            enableCustomHeadingSizes: '启用自定义标题字号',
+            h1Size: 'H1 字号 (pt)',
+            h2Size: 'H2 字号 (pt)',
+            h3Size: 'H3 字号 (pt)',
+            h4Size: 'H4 字号 (pt)',
+            h5Size: 'H5 字号 (pt)',
+            h6Size: 'H6 字号 (pt)',
+            quickSetDecrement: '快速设置递减量 (pt)',
+            applyDecrement: '应用递减',
+            imageSettings: '图片设置',
+            imageWidth: '图片宽度',
+            imageHeight: '图片高度',
+            example: '如',
+            preview: '预览',
+            sendPrint: '发送打印',
+            exportPdf: '导出 PDF',
+            exportHtml: '导出 HTML',
+            parsingResponseError: '响应解析错误',
+            websocketError: 'WebSocket错误',
+            networkNotConnected: '网络未连接，请连接网络',
+            printClientConnection: '打印客户端连接',
+            cannotConnectToClient: '无法连接到打印客户端',
+            pleaseEnsureClientStarted: '请确保打印客户端已启动并使用您的账号密码绑定',
+            retryConnection: '重新连接',
+            connecting: '连接中...',
+            connectionFailed: '连接失败，请确保打印客户端已启动并使用正确的账号密码登录',
+            processingUploadedFiles: '正在处理上传的文件...',
+            filePrintTaskSent: '文件打印任务已发送',
+            fileUploadFailed: '文件上传失败',
+            unknownError: '未知错误',
+            filePrintFailed: '文件打印失败',
+            connectionTimeout: '连接超时',
+            printFailed: '打印失败',
             
-            // Sync status
-            loadingFilesFromServer: 'Loading files from server...',
-            syncComplete: 'File sync complete',
-            noFilesOnServer: 'No files on server, using local files',
-            syncFailedUseLocal: 'Sync failed, using local files',
-            detectingLocalNewFiles: 'Detected local new files, auto uploading {count}...',
-            conflictResolvedFilesSynced: 'Conflict resolved, files synced',
-            conflictResolutionCancelled: 'Conflict resolution cancelled, using local files',
+            // 同步状态
+            loadingFilesFromServer: '正在从服务器加载文件...',
+            syncComplete: '文件同步完成',
+            noFilesOnServer: '服务器没有文件，使用本地文件',
+            syncFailedUseLocal: '同步失败，使用本地文件',
+            detectingLocalNewFiles: '检测到本地新文件，正在自动上传 {count} 个...',
+            conflictResolvedFilesSynced: '冲突已解决，文件已同步',
+            conflictResolutionCancelled: '冲突解决已取消，使用本地文件',
             
-            // Conflict resolution
+            // 冲突解决
             fileConflictWarning: '⚠️ {filename}',
-            fileDeletedOnServer: 'This file has been deleted on the server',
-            localModifiedTime: 'Local modified time',
-            serverModifiedTime: 'Server modified time',
-            reuploadToServer: 'Reupload to server',
-            deleteLocalFile: 'Delete local file',
-            useLocalVersion: 'Use local version',
-            useServerVersion: 'Use server version',
-            
-            // History versions
-            historyTitle: 'History Versions',
-            historyCount: 'Up to 1000 history versions are kept',
-            loadingHistory: 'Loading history versions...',
-            close: 'Close'
-        }
+            fileDeletedOnServer: '该文件在服务器上已经删除',
+            localModifiedTime: '本地修改时间',
+            serverModifiedTime: '服务器修改时间',
+            reuploadToServer: '重新上传到服务器',
+            deleteLocalFile: '删除本地文件',
+            useLocalVersion: '使用本地版本',
+            useServerVersion: '使用服务器版本'
+        },
     };
 
     // 当前语言
     let currentLanguage = 'zh';
 
     // 语言管理器
-    const i18n = {
+    // 暴露到全局
+    window.i18n = {
         // 初始化语言
-        init: function() {
+        init: function () {
             // 从本地存储获取语言设置，默认使用中文
             const savedLanguage = localStorage.getItem('vditor_language');
             if (savedLanguage && (savedLanguage === 'zh' || savedLanguage === 'en')) {
@@ -741,12 +736,12 @@
         },
 
         // 获取当前语言
-        getLanguage: function() {
+        getLanguage: function () {
             return currentLanguage;
         },
 
         // 设置语言
-        setLanguage: function(lang) {
+        setLanguage: function (lang) {
             if (lang !== 'zh' && lang !== 'en') {
                 console.warn('Invalid language:', lang);
                 return;
@@ -757,7 +752,7 @@
         },
 
         // 获取翻译文本
-        t: function(key) {
+        t: function (key) {
             const langTranslations = translations[currentLanguage];
             if (langTranslations && langTranslations[key]) {
                 return langTranslations[key];
@@ -767,13 +762,6 @@
             return key;
         },
 
-        // 获取所有翻译对象（用于调试）
-        getTranslations: function() {
-            return translations;
-        }
     };
-
-    // 暴露到全局
-    window.i18n = i18n;
 
 })(window);

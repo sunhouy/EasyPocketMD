@@ -162,6 +162,11 @@
     <div class="file-list-header">
         <h3 class="file-list-title" data-i18n="fileListTitle">文件列表</h3>
         <div class="file-list-header-actions">
+            <!--
+            <button class="file-list-settings" id="fileListSettingsBtn" data-i18n-title="settings" title="设置">
+                <i class="fas fa-cog"></i>
+            </button>
+            -->
             <div class="file-list-help" id="fileListHelp" data-i18n-title="fileListHelp" title="右键或长按显示更多功能">
                 <i class="fas fa-question-circle"></i>
             </div>
@@ -344,6 +349,21 @@
                 </div>
             </div>
             <div class="form-group">
+                <label data-i18n="defaultFileOpening">默认文件打开方式</label>
+                <div class="radio-group" id="defaultFileOpeningSetting">
+                    <label><input type="radio" name="defaultFileOpening" value="lastEdited"> <span data-i18n="lastEditedFile">上次编辑的文件</span></label>
+                    <label><input type="radio" name="defaultFileOpening" value="firstFile"> <span data-i18n="firstFile">第一个文件</span></label>
+                </div>
+            </div>
+            <div class="form-group">
+                <label data-i18n="defaultSorting">默认排序方式</label>
+                <div class="radio-group" id="defaultSortingSetting">
+                    <label><input type="radio" name="defaultSorting" value="modifiedTime"> <span data-i18n="sortByModifiedTime">修改时间</span></label>
+                    <label><input type="radio" name="defaultSorting" value="alphabetical"> <span data-i18n="sortAlphabetically">首字母</span></label>
+                    <label><input type="radio" name="defaultSorting" value="fileSize"> <span data-i18n="sortByFileSize">文件大小</span></label>
+                </div>
+            </div>
+            <div class="form-group">
                 <label data-i18n="bottomToolbarButtons">底部工具栏按钮 (5-7个)</label>
                 <div class="checkbox-group" id="toolbarButtonsSettings">
                     <!-- 动态生成 -->
@@ -401,6 +421,7 @@
             </button>
             <div class="mobile-dropdown-content" id="mobileDropdown">
 
+                <button type="button" class="dropdown-item" id="mobileSettingsBtn"><i class="fas fa-cog"></i>  <span data-i18n="settings">设置</span></button>
                 <button class="dropdown-item" id="mobileShareBtn"><i class="fas fa-share-alt"></i>  <span data-i18n="share">分享</span></button>
                 <button class="dropdown-item" id="mobileFileManagerBtn"><i class="fas fa-folder"></i>  <span data-i18n="myFiles">我的文件</span></button>
                 <button class="dropdown-item" id="mobilePrintBtn"><i class="fas fa-print"></i>  <span data-i18n="cloudPrint">云打印</span></button>
@@ -409,7 +430,6 @@
                 <button class="dropdown-item" id="mobileImportBtn"><i class="fas fa-file-import"></i>  <span data-i18n="import">导入</span></button>
                 <button class="dropdown-item" id="mobileExportBtn"><i class="fas fa-file-export"></i>  <span data-i18n="export">导出</span></button>
                 <button class="dropdown-item" id="mobileClearBtn"><i class="fas fa-trash-alt"></i>  <span data-i18n="clear">清空</span></button>
-                <button class="dropdown-item" id="mobileSettingsBtn"><i class="fas fa-cog"></i>  <span data-i18n="settings">设置</span></button>
                 <button class="dropdown-item" id="aboutBtn"><i class="fas fa-info-circle"></i>  <span data-i18n="about">关于</span></button>
             </div>
         </div>

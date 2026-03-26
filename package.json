@@ -6,7 +6,6 @@
   "scripts": {
     "dev": "vite",
     "build": "node version.js && vite build",
-    "preview": "vite preview",
     "test": "NODE_ENV=test jest --runInBand --forceExit",
     "check-deploy": "node scripts/check-deploy.js",
     "start": "node api/server.js",
@@ -27,7 +26,7 @@
   "keywords": [],
   "author": {
     "name": "sunhouyun",
-    "email": "no-reply@md.yhsun.cn"
+    "email": "sunhouyun@yhsun.cn"
   },
   "license": "ISC",
   "bugs": {

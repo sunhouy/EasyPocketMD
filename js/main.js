@@ -41,7 +41,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // 默认配置
     window.defaultToolbarButtons = ['mobileFormatBtn', 'mobileInsertBtn', 'mobileFormulaBtn', 'mobileChartBtn', 'mobileUndoBtn', 'mobileRedoBtn'];
-    
+
     // 加载用户配置
     window.userSettings = JSON.parse(localStorage.getItem('vditor_settings') || '{}');
     if (!window.userSettings.toolbarButtons) {
@@ -56,7 +56,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (typeof window.userSettings.showOutline !== 'boolean') {
         window.userSettings.showOutline = false; // 默认不显示大纲
     }
-    
+
     // 初始化主题
     initTheme();
 
@@ -73,10 +73,10 @@ document.addEventListener('DOMContentLoaded', function() {
         } else {
             window.nightMode = false;
         }
-        
+
         // 兼容旧的 localStorage 设置
         if (localStorage.getItem('vditor_night_mode') === 'true') {
-             // 忽略旧设置
+            // 忽略旧设置
         }
     }
 
@@ -169,24 +169,24 @@ document.addEventListener('DOMContentLoaded', function() {
         after: function() {
             window.vditorReady = true;
             if (loading) loading.style.display = 'none';
-            
+
             // 计算加载时间
             // const loadTime = Math.round(performance.now() - pageLoadStartTime);
-            
+
             // 打印EasyPocketMD
             console.log('%c%s', 'font-size: 48px; font-weight: bold; color: #4a90e2; text-shadow: 2px 2px 4px rgba(0,0,0,0.2);', 'EasyPocketMD');
             // console.log('%cLoad time: %dms', 'font-size: 16px; font-weight: bold; color: #27ae60;', loadTime);
-            
+
             // 应用字体大小设置
             applyFontSize(window.userSettings.fontSize);
-            
+
             // 应用大纲视图设置
             applyOutline(window.userSettings.showOutline);
-            
+
             // 初始化用户界面和移动特性
             initUserInterface();
             initMobileFeatures();
-            
+
             // 延迟加载PDF库，不阻塞首屏
             setTimeout(function() {
                 import('./ui/pdf-generator.js').then(module => {
@@ -206,7 +206,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 var userMenu = document.getElementById('userMenuDropdown');
                 var fileListSidebar = document.getElementById('fileListSidebar');
                 var mobileFileBtn = document.getElementById('mobileFileBtn');
-                
+
                 if (menuBtn && dropdown && !menuBtn.contains(e.target) && !dropdown.contains(e.target)) dropdown.classList.remove('show');
                 if (overlay && e.target === overlay) window.hideMobileActionSheet();
                 if (userMenu && !document.getElementById('mobileLoginBtn').contains(e.target) && !userMenu.contains(e.target)) userMenu.classList.remove('show');
@@ -227,11 +227,11 @@ document.addEventListener('DOMContentLoaded', function() {
     // 顶部提示横幅相关函数
     let currentNoticeType = null;
     let networkMonitoringInitialized = false;
-    
+
     function initTopNoticeBanner() {
         const banner = document.getElementById('topNoticeBanner');
         const closeBtn = document.getElementById('topNoticeClose');
-        
+
         if (closeBtn) {
             closeBtn.addEventListener('click', function() {
                 hideTopNoticeBanner();
@@ -241,15 +241,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
         }
-        
+
         // 初始化网络状态监听
         initNetworkMonitoring();
     }
-    
+
     function initNetworkMonitoring() {
         if (networkMonitoringInitialized) return;
         networkMonitoringInitialized = true;
-        
+
         // 监听网络恢复事件
         window.addEventListener('online', function() {
             console.log('Network connected');
@@ -258,7 +258,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 hideTopNoticeBanner();
             }
         });
-        
+
         // 监听网络断开事件，主动显示网络错误提示
         window.addEventListener('offline', function() {
             console.log('Network disconnected');
@@ -270,23 +270,23 @@ document.addEventListener('DOMContentLoaded', function() {
     function showTopNoticeBanner(type, text, icon, isHtml) {
         const banner = document.getElementById('topNoticeBanner');
         if (!banner) return;
-        
+
         // 只有未登录提示检查是否已被关闭，网络错误提示始终显示
         if (type === 'guest' && localStorage.getItem('guestNoticeDismissed') === 'true') {
             return;
         }
-        
+
         // 移除旧的类型类
         banner.classList.remove('type-guest', 'type-network-error');
         // 添加新的类型类
         banner.classList.add('type-' + type);
-        
+
         // 设置图标
         const iconEl = banner.querySelector('.notice-icon');
         if (iconEl) {
             iconEl.className = 'notice-icon ' + icon;
         }
-        
+
         // 设置文本
         const textEl = banner.querySelector('.notice-text');
         if (textEl) {
@@ -296,7 +296,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 textEl.textContent = text;
             }
         }
-        
+
         // 显示横幅
         banner.style.display = 'flex';
         document.body.classList.add('has-top-notice');
@@ -311,7 +311,7 @@ document.addEventListener('DOMContentLoaded', function() {
             currentNoticeType = null;
         }
     }
-    
+
     // 便捷函数：显示未登录提示
     function showGuestNoticeBanner() {
         const text = '未登录用户，上传的图片和文件仅保证保存2小时，<a href="#" id="guestBannerLoginLink" style="color: white; text-decoration: underline; cursor: pointer;">登录</a>后永久保存，且文件自动同步到服务器。';
@@ -321,7 +321,7 @@ document.addEventListener('DOMContentLoaded', function() {
             'fas fa-info-circle',
             true
         );
-        
+
         // 添加登录链接的点击事件
         setTimeout(function() {
             const loginLink = document.getElementById('guestBannerLoginLink');
@@ -335,7 +335,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }, 100);
     }
-    
+
     // 便捷函数：显示网络错误提示
     function showNetworkErrorBanner() {
         showTopNoticeBanner(
@@ -355,7 +355,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function initUserInterface() {
         // 初始化顶部提示横幅
         initTopNoticeBanner();
-        
+
         if (window.currentUser) {
             window.showUserInfo();
             window.startAutoSync();
@@ -365,7 +365,7 @@ document.addEventListener('DOMContentLoaded', function() {
             // 检查是否是分享链接
             const urlParams = new URLSearchParams(window.location.search);
             const shareId = urlParams.get('share_id');
-            
+
             if (!shareId) {
                 // 不是分享链接，显示未登录提示横幅
                 showGuestNoticeBanner();
@@ -374,7 +374,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         var fileListClose = document.getElementById('fileListClose');
         if (fileListClose) fileListClose.addEventListener('click', function() { document.getElementById('fileListSidebar').classList.remove('show'); });
-        
+
         // 文件列表帮助图标
         var fileListHelp = document.getElementById('fileListHelp');
         if (fileListHelp) {
@@ -382,14 +382,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 window.customAlert(window.i18n ? window.i18n.t('fileListHelpText') : '文件列表功能提示：\n\n• 点击文件：打开文件\n• 点击文件夹：展开/收起子内容\n• 右键点击或长按：显示更多操作菜单（重命名、移动、删除等）');
             });
         }
-        
+
         var addFileBtn = document.getElementById('addFileBtn');
         if (addFileBtn) addFileBtn.addEventListener('click', window.createNewFile);
         var addFolderBtn = document.getElementById('addFolderBtn');
         if (addFolderBtn) addFolderBtn.addEventListener('click', window.createNewFolder);
         var mobileFileBtn = document.getElementById('mobileFileBtn');
         if (mobileFileBtn) mobileFileBtn.addEventListener('click', function() { document.getElementById('fileListSidebar').classList.toggle('show'); });
-        
+
         // 演示模式按钮仅在桌面端显示
         var mobilePresentationBtn = document.getElementById('mobilePresentationBtn');
         if (mobilePresentationBtn) {
@@ -411,10 +411,10 @@ document.addEventListener('DOMContentLoaded', function() {
         if (mobileFileManagerBtn) mobileFileManagerBtn.addEventListener('click', function() { window.showFileManager(); closeDrop(); });
         var mobilePrintBtn = document.getElementById('mobilePrintBtn');
         if (mobilePrintBtn) mobilePrintBtn.addEventListener('click', function() { window.showPrintDialog(); closeDrop(); });
-        
+
         var mobilePresentationBtn = document.getElementById('mobilePresentationBtn');
         if (mobilePresentationBtn) mobilePresentationBtn.addEventListener('click', function() { enterPresentationMode(); closeDrop(); });
-        
+
         var mobileMenuBtn = document.getElementById('mobileMenuBtn');
         if (mobileMenuBtn) mobileMenuBtn.addEventListener('click', function(e) { e.stopPropagation(); if (dropdown) dropdown.classList.toggle('show'); });
         var mobileModeBtn = document.getElementById('mobileModeBtn');
@@ -440,15 +440,15 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             closeDrop();
         });
-        
+
         var mobileSettingsBtn = document.getElementById('mobileSettingsBtn');
         if (mobileSettingsBtn) mobileSettingsBtn.addEventListener('click', function() { window.showSettingsDialog(); closeDrop(); });
-        
+
         var mobileLoginBtn = document.getElementById('mobileLoginBtn');
         if (mobileLoginBtn) mobileLoginBtn.addEventListener('click', window.handleLoginButtonClick);
         var modeToggle = document.getElementById('modeToggle');
         if (modeToggle) modeToggle.addEventListener('click', window.toggleNightMode);
-        
+
         // 渲染底部工具栏
         window.renderBottomToolbar();
     }
@@ -550,7 +550,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 neu.addEventListener('click', b.fn);
             }
         });
-        
+
         // 演示模式按钮仅在桌面端显示
         var mobilePresentationBtn = document.getElementById('mobilePresentationBtn');
         if (mobilePresentationBtn) {
@@ -576,7 +576,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 neu.addEventListener('click', b.fn);
             }
         });
-        
+
         // 重新渲染底部工具栏
         window.renderBottomToolbar();
     }
@@ -621,10 +621,10 @@ document.addEventListener('DOMContentLoaded', function() {
     window.renderBottomToolbar = function() {
         var toolbarContainer = document.getElementById('bottomBarButtons');
         if (!toolbarContainer) return;
-        
+
         toolbarContainer.innerHTML = '';
         var buttons = window.userSettings.toolbarButtons || window.defaultToolbarButtons;
-        
+
         buttons.forEach(function(btnId) {
             var btnConfig = window.allToolbarButtons.find(function(b) { return b.id === btnId; });
             if (btnConfig) {
@@ -643,7 +643,7 @@ document.addEventListener('DOMContentLoaded', function() {
     window.showSettingsDialog = function() {
         var modal = document.getElementById('settingsModalOverlay');
         if (!modal) return;
-        
+
         // 设置当前编辑器模式
         var currentEditorMode = localStorage.getItem('vditor_editor_mode') || 'ir';
         var modeRadios = document.getElementsByName('editorMode');
@@ -652,7 +652,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 modeRadios[i].checked = true;
             }
         }
-        
+
         // 设置当前主题模式
         var currentThemeMode = window.userSettings.themeMode || 'system';
         var themeRadios = document.getElementsByName('themeMode');
@@ -661,7 +661,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 themeRadios[i].checked = true;
             }
         }
-        
+
         // 设置当前语言
         if (window.i18n) {
             var currentLang = window.i18n.getLanguage();
@@ -672,13 +672,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
         }
-        
+
         // 设置字体大小
         var fontSizeSelect = document.getElementById('fontSizeSelect');
         if (fontSizeSelect) {
             fontSizeSelect.value = window.userSettings.fontSize || '16px';
         }
-        
+
         // 设置大纲视图
         var showOutlineCheckbox = document.getElementById('showOutlineCheckbox');
         if (showOutlineCheckbox) {
@@ -693,25 +693,43 @@ document.addEventListener('DOMContentLoaded', function() {
                 storageRadios[i].checked = true;
             }
         }
-        
+
+        // 设置默认文件打开方式
+        var currentDefaultFileOpening = window.userSettings.defaultFileOpening || 'lastEdited';
+        var defaultFileOpeningRadios = document.getElementsByName('defaultFileOpening');
+        for (var i = 0; i < defaultFileOpeningRadios.length; i++) {
+            if (defaultFileOpeningRadios[i].value === currentDefaultFileOpening) {
+                defaultFileOpeningRadios[i].checked = true;
+            }
+        }
+
+        // 设置默认排序方式
+        var currentDefaultSorting = window.userSettings.defaultSorting || 'modifiedTime';
+        var defaultSortingRadios = document.getElementsByName('defaultSorting');
+        for (var i = 0; i < defaultSortingRadios.length; i++) {
+            if (defaultSortingRadios[i].value === currentDefaultSorting) {
+                defaultSortingRadios[i].checked = true;
+            }
+        }
+
         // 生成工具栏按钮选择
         var toolbarSettings = document.getElementById('toolbarButtonsSettings');
         toolbarSettings.innerHTML = '';
         var currentButtons = window.userSettings.toolbarButtons || window.defaultToolbarButtons;
-        
+
         window.allToolbarButtons.forEach(function(btnConfig) {
             var label = document.createElement('label');
             var checkbox = document.createElement('input');
             checkbox.type = 'checkbox';
             checkbox.value = btnConfig.id;
             checkbox.checked = currentButtons.includes(btnConfig.id);
-            
+
             label.appendChild(checkbox);
             var buttonText = (window.i18n && btnConfig.textKey) ? window.i18n.t(btnConfig.textKey) : btnConfig.text;
             label.appendChild(document.createTextNode(' ' + buttonText));
             toolbarSettings.appendChild(label);
         });
-        
+
         modal.classList.add('show');
     };
 
@@ -725,7 +743,7 @@ document.addEventListener('DOMContentLoaded', function() {
             showOutline: false,
             storageLocation: 'cloud'
         };
-        
+
         // 获取选中的编辑器模式
         var modeRadios = document.getElementsByName('editorMode');
         for (var i = 0; i < modeRadios.length; i++) {
@@ -737,7 +755,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 break;
             }
         }
-        
+
         // 获取选中的主题模式
         var themeRadios = document.getElementsByName('themeMode');
         for (var i = 0; i < themeRadios.length; i++) {
@@ -746,7 +764,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 break;
             }
         }
-        
+
         // 获取选中的语言
         var languageChanged = false;
         var newLanguage = null;
@@ -762,7 +780,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
         }
-        
+
         // 获取选中的工具栏按钮
         var toolbarCheckboxes = document.querySelectorAll('#toolbarButtonsSettings input[type="checkbox"]');
         toolbarCheckboxes.forEach(function(cb) {
@@ -770,13 +788,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 newSettings.toolbarButtons.push(cb.value);
             }
         });
-        
+
         // 获取字体大小
         var fontSizeSelect = document.getElementById('fontSizeSelect');
         if (fontSizeSelect) {
             newSettings.fontSize = fontSizeSelect.value;
         }
-        
+
         // 获取大纲视图设置
         var showOutlineCheckbox = document.getElementById('showOutlineCheckbox');
         if (showOutlineCheckbox) {
@@ -791,23 +809,41 @@ document.addEventListener('DOMContentLoaded', function() {
                 break;
             }
         }
-        
+
+        // 获取选中的默认文件打开方式
+        var defaultFileOpeningRadios = document.getElementsByName('defaultFileOpening');
+        for (var i = 0; i < defaultFileOpeningRadios.length; i++) {
+            if (defaultFileOpeningRadios[i].checked) {
+                newSettings.defaultFileOpening = defaultFileOpeningRadios[i].value;
+                break;
+            }
+        }
+
+        // 获取选中的默认排序方式
+        var defaultSortingRadios = document.getElementsByName('defaultSorting');
+        for (var i = 0; i < defaultSortingRadios.length; i++) {
+            if (defaultSortingRadios[i].checked) {
+                newSettings.defaultSorting = defaultSortingRadios[i].value;
+                break;
+            }
+        }
+
         // 验证按钮数量
         if (newSettings.toolbarButtons.length < 5 || newSettings.toolbarButtons.length > 7) {
             window.customAlert(window.i18n ? window.i18n.t('buttonCountError') : '底部工具栏按钮数量必须在 5 到 7 个之间');
             return;
         }
-        
+
         // 检查是否需要重新初始化编辑器来应用大纲视图设置
         var needReinitForOutline = window.userSettings.showOutline !== newSettings.showOutline;
-        
+
         // 保存设置
         window.userSettings = newSettings;
         localStorage.setItem('vditor_settings', JSON.stringify(window.userSettings));
-        
+
         // 应用字体大小设置
         applyFontSize(newSettings.fontSize);
-        
+
         // 应用主题
         var oldNightMode = window.nightMode;
         if (newSettings.themeMode === 'system') {
@@ -821,7 +857,7 @@ document.addEventListener('DOMContentLoaded', function() {
         } else {
             window.nightMode = false;
         }
-        
+
         // 应用语言更改
         if (languageChanged && window.i18n && newLanguage) {
             window.i18n.setLanguage(newLanguage);
@@ -832,17 +868,19 @@ document.addEventListener('DOMContentLoaded', function() {
                 sv: { name: getModeName('sv'), icon: 'fas fa-columns' }
             };
         }
-        
+
         if (oldNightMode !== window.nightMode || languageChanged || needReinitForOutline) {
-             window.location.reload(); // 重新加载以应用主题、语言或大纲视图更改
+            window.location.reload(); // 重新加载以应用主题、语言或大纲视图更改
         } else {
-             applyTranslations();
-             window.renderBottomToolbar();
-             document.getElementById('settingsModalOverlay').classList.remove('show');
-             window.showMessage(window.i18n ? window.i18n.t('settingsSaved') : '设置已保存', 'success');
+            applyTranslations();
+            window.renderBottomToolbar();
+            // 重新加载文件列表以应用新的排序设置
+            if (window.loadFiles) window.loadFiles();
+            document.getElementById('settingsModalOverlay').classList.remove('show');
+            window.showMessage(window.i18n ? window.i18n.t('settingsSaved') : '设置已保存', 'success');
         }
     });
-    
+
     var cancelSettingsBtn = document.getElementById('cancelSettingsBtn');
     if(cancelSettingsBtn) cancelSettingsBtn.addEventListener('click', function() {
         document.getElementById('settingsModalOverlay').classList.remove('show');
@@ -853,27 +891,27 @@ document.addEventListener('DOMContentLoaded', function() {
         var modal = document.getElementById('aboutModalOverlay');
         if (modal) modal.classList.add('show');
     };
-    
+
     var closeAboutBtn = document.getElementById('closeAboutBtn');
     if (closeAboutBtn) closeAboutBtn.addEventListener('click', function() {
         document.getElementById('aboutModalOverlay').classList.remove('show');
     });
-    
+
     // 点击遮罩层关闭模态框
     var settingsModalOverlay = document.getElementById('settingsModalOverlay');
     if (settingsModalOverlay) settingsModalOverlay.addEventListener('click', function(e) {
         if (e.target === this) this.classList.remove('show');
     });
-    
+
     var aboutModalOverlay = document.getElementById('aboutModalOverlay');
     if (aboutModalOverlay) aboutModalOverlay.addEventListener('click', function(e) {
         if (e.target === this) this.classList.remove('show');
     });
-    
+
     // 应用字体大小设置
     function applyFontSize(fontSize) {
         if (!window.vditor) return;
-        
+
         var vditorElement = document.getElementById('vditor');
         if (vditorElement) {
             // 设置编辑器整体字体大小
@@ -882,20 +920,20 @@ document.addEventListener('DOMContentLoaded', function() {
                 el.style.fontSize = fontSize;
                 el.style.lineHeight = '1.6';
             });
-            
+
             // 设置输入区字体大小
             var inputElements = vditorElement.querySelectorAll('.vditor-ir__input, textarea, .vditor-wysiwyg');
             inputElements.forEach(function(el) {
                 el.style.fontSize = fontSize;
             });
-            
+
             // 添加样式标签来覆盖默认样式
             var styleId = 'vditor-font-size-style';
             var existingStyle = document.getElementById(styleId);
             if (existingStyle) {
                 existingStyle.remove();
             }
-            
+
             var style = document.createElement('style');
             style.id = styleId;
             style.textContent = `
@@ -910,21 +948,21 @@ document.addEventListener('DOMContentLoaded', function() {
             document.head.appendChild(style);
         }
     }
-    
+
     // 应用大纲视图设置
     function applyOutline(show) {
         if (!window.vditor) return;
-        
+
         // 如果需要，重新初始化编辑器以应用大纲视图设置
         if (window.userSettings.showOutline !== show) {
             window.userSettings.showOutline = show;
             localStorage.setItem('vditor_settings', JSON.stringify(window.userSettings));
-            
+
             // 重新初始化编辑器
             var currentContent = window.vditor.getValue();
             var currentMode = window.vditor.vditor ? window.vditor.vditor.mode : 'ir';
             if (window.vditor.destroy) window.vditor.destroy();
-            
+
             var newConfig = {
                 height: editorConfig.height,
                 width: editorConfig.width,
@@ -950,12 +988,12 @@ document.addEventListener('DOMContentLoaded', function() {
             window.vditor = new Vditor('vditor', newConfig);
         }
     }
-    
+
     function enterPresentationMode() {
         var mobileToolbar = document.querySelector('.mobile-toolbar-container');
         var mobileBottomBar = document.querySelector('.mobile-bottom-bar');
         var editorContainer = document.querySelector('.editor-container');
-        
+
         if (mobileToolbar) {
             mobileToolbar.style.display = 'none';
         }
@@ -966,7 +1004,7 @@ document.addEventListener('DOMContentLoaded', function() {
             editorContainer.style.top = '0';
             editorContainer.style.height = '100vh';
         }
-        
+
         if (document.documentElement.requestFullscreen) {
             document.documentElement.requestFullscreen();
         } else if (document.documentElement.webkitRequestFullscreen) {
@@ -974,19 +1012,19 @@ document.addEventListener('DOMContentLoaded', function() {
         } else if (document.documentElement.msRequestFullscreen) {
             document.documentElement.msRequestFullscreen();
         }
-        
+
         document.addEventListener('fullscreenchange', handleFullscreenChange);
         document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
         document.addEventListener('msfullscreenchange', handleFullscreenChange);
-        
+
         window.showMessage(window.i18n ? window.i18n.t('presentationModeStarted') : '已进入演示模式，按 ESC 键退出', 'info');
     }
-    
+
     function exitPresentationMode() {
         var mobileToolbar = document.querySelector('.mobile-toolbar-container');
         var mobileBottomBar = document.querySelector('.mobile-bottom-bar');
         var editorContainer = document.querySelector('.editor-container');
-        
+
         if (mobileToolbar) {
             mobileToolbar.style.display = '';
         }
@@ -997,14 +1035,14 @@ document.addEventListener('DOMContentLoaded', function() {
             editorContainer.style.top = '';
             editorContainer.style.height = '';
         }
-        
+
         document.removeEventListener('fullscreenchange', handleFullscreenChange);
         document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
         document.removeEventListener('msfullscreenchange', handleFullscreenChange);
-        
+
         window.showMessage(window.i18n ? window.i18n.t('presentationModeEnded') : '已退出演示模式', 'info');
     }
-    
+
     function handleFullscreenChange() {
         if (!document.fullscreenElement && !document.webkitFullscreenElement && !document.msFullscreenElement) {
             exitPresentationMode();
