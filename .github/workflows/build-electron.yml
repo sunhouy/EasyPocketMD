@@ -44,8 +44,7 @@ jobs:
         shell: bash
         run: |
           TAG_NAME="${{ github.event_name == 'workflow_dispatch' && github.event.inputs.release_tag != '' && github.event.inputs.release_tag || github.ref_name }}"
-          node -e "
-            const fs = require('fs');
+          VERSION=$(node -e "
             let tagName = process.argv[1];
             let version = tagName.replace(/^v/, '');
             const parts = version.split('.');
@@ -54,10 +53,10 @@ jobs:
             } else if (parts.length === 2) {
               version = parts[0] + '.' + parts[1] + '.0';
             }
-            const envPath = process.env.GITHUB_ENV;
-            fs.appendFileSync(envPath, `VERSION=${version}\n`);
-            fs.appendFileSync(envPath, `TAG_NAME=${tagName}\n`);
-          " "$TAG_NAME"
+            console.log(version);
+          " "$TAG_NAME")
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
 
       - name: Update package.json version
         run: |

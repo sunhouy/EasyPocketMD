@@ -42,7 +42,8 @@ body.has-top-notice .sync-status {
     top: calc(70px + 40px); /* 原位置 + 提示横幅高度 */
 }
 
-body.has-top-notice .editor-mode-toggle {
+body.has-top-notice .editor-mode-toggle,
+body.has-top-notice .editor-save-btn {
     top: calc(7px + 40px); /* 原位置 + 提示横幅高度 */
 }
 
@@ -81,9 +82,15 @@ body.night-mode .mobile-toolbar-container {
 /* 移动端工具栏 */
 .mobile-toolbar {
     display: flex;
-    justify-content: space-between;
+    justify-content: flex-start;
     align-items: center;
     width: 100%;
+    gap: 8px;
+}
+
+/* 顶部工具栏右侧内容区域，确保不与固定按钮重叠 */
+.mobile-toolbar .mobile-dropdown {
+    margin-left: auto;
 }
 
 /* 移动端操作按钮 */
@@ -91,23 +98,28 @@ body.night-mode .mobile-toolbar-container {
     width: 36px;
     height: 36px;
     border-radius: 50%;
-    background: rgba(255, 255, 255, 0.95);
+    background: rgba(255, 255, 255, 0.9);
     border: none;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 18px;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    font-size: 16px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
     z-index: 1001;
-    transition: all 0.2s ease;
+    transition: all 0.3s ease;
     color: #333; /* 默认黑色 */
 }
 
 body.night-mode .mobile-action-btn {
-    background: rgba(60, 60, 60, 0.95);
+    background: rgba(45, 45, 45, 0.9);
     color: #fff; /* 夜间模式白色 */
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.mobile-action-btn:hover {
+    transform: scale(1.1);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
 }
 
 .mobile-action-btn:active {
@@ -1182,12 +1194,35 @@ body.night-mode {
     color: #333; /* 默认黑色 */
 }
 
-.editor-mode-toggle:hover {
+/* 保存按钮 */
+.editor-save-btn {
+    position: fixed;
+    top: 7px;
+    right: 93px;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.9);
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    z-index: 1003 !important;
+    transition: all 0.3s ease;
+    color: #333; /* 默认黑色 */
+}
+
+.editor-mode-toggle:hover,
+.editor-save-btn:hover {
     transform: scale(1.1);
     box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
 }
 
-body.night-mode .editor-mode-toggle {
+body.night-mode .editor-mode-toggle,
+body.night-mode .editor-save-btn {
     background: rgba(45, 45, 45, 0.9);
     color: #fff; /* 夜间模式白色 */
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
