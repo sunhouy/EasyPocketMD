@@ -30,7 +30,8 @@ import './js/ui/chart.js';
 import './js/ui/export.js';
 import './js/ui/upload.js';
 import './js/ui/share.js';
-import './js/ui/print.js';
+// 云打印模块改为懒加载，不在首屏加载
+// import './js/ui/print.js';
 // AI 助手模块改为懒加载，不在首屏加载
 // import './js/ui/ai.js';
 // import './js/ui/ai-assistant.js';

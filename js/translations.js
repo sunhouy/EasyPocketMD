@@ -410,7 +410,17 @@
             aiWritePlaceholder: '请输入主题或要求...',
             aiEditPlaceholder: '请输入需要修改的文本...',
             aiFormatPlaceholder: '请输入需要排版的文本...',
-            aiPPTPlaceholder: '请输入主题或大纲...'
+            aiPPTPlaceholder: '请输入主题或大纲...',
+            generateOutline: '生成大纲',
+            outlinePreview: '大纲预览',
+            generatePages: '生成页面',
+            downloadPPT: '下载PPT',
+            page: '页',
+            pages: '页面',
+            add: '添加',
+            edit: '编辑',
+            regen: '重生成',
+            generating: '生成中...'
         },
         en: {
             // Page title and header
@@ -814,8 +824,18 @@
             aiWritePlaceholder: 'Enter topic or requirements...',
             aiEditPlaceholder: 'Enter text to edit...',
             aiFormatPlaceholder: 'Enter text to format...',
-            aiPPTPlaceholder: 'Enter topic or outline...'
-        },
+            aiPPTPlaceholder: 'Enter topic or outline...',
+            generateOutline: 'Generate Outline',
+            outlinePreview: 'Outline Preview',
+            generatePages: 'Generate Pages',
+            downloadPPT: 'Download PPT',
+            page: 'Page',
+            pages: 'Pages',
+            add: 'Add',
+            edit: 'Edit',
+            regen: 'Regen',
+            generating: 'Generating...'
+        }
     };
 
     // 当前语言

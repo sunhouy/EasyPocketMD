@@ -37,87 +37,92 @@ async function exportFile(content, ext) {
 
     // PDF 处理逻辑
     if (ext === 'pdf') {
-         if (global.showPrintDialog) {
-             global.hideMobileActionSheet();
-             global.showPrintDialog('export-pdf', async function(settings) {
-                 try {
-                    var loadingModal = document.createElement('div');
-                    loadingModal.className = 'modal-overlay';
-                    loadingModal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.9);z-index:10001;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;';
-                    loadingModal.innerHTML = '<div style="background:white;color:#333;border-radius:12px;padding:30px;text-align:center;"><div style="font-size:24px;margin-bottom:15px;"><i class="fas fa-spinner fa-spin"></i></div><div style="font-size:16px;">' + (isEn() ? 'Generating PDF...' : '生成PDF中...') + '</div></div>';
-                    document.body.appendChild(loadingModal);
+        // 懒加载打印模块
+        if (typeof global.showPrintDialog !== 'function') {
+            await import('./print.js');
+        }
+        global.hideMobileActionSheet();
+        global.showPrintDialog('export-pdf', async function(settings) {
+            try {
+                var loadingModal = document.createElement('div');
+                loadingModal.className = 'modal-overlay';
+                loadingModal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.9);z-index:10001;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;';
+                loadingModal.innerHTML = '<div style="background:white;color:#333;border-radius:12px;padding:30px;text-align:center;"><div style="font-size:24px;margin-bottom:15px;"><i class="fas fa-spinner fa-spin"></i></div><div style="font-size:16px;">' + (isEn() ? 'Generating PDF...' : '生成PDF中...') + '</div></div>';
+                document.body.appendChild(loadingModal);
 
-                    if (!global.preparePrintContent) {
-                         throw new Error(isEn() ? 'Print module not loaded' : '打印模块未加载');
-                    }
-                    var htmlContent = await global.preparePrintContent(content, settings);
-                    
-                    // 懒加载 PDF 生成器并生成PDF
-                    const { generatePDF } = await getPDFGenerator();
-                    var pdfUrl = await generatePDF(htmlContent, settings);
-                    
-                    // 如果是 Capacitor 环境，使用特殊的下载逻辑
-                    if (window.Capacitor && window.Capacitor.isNativePlatform()) {
-                        await downloadInCapacitor(pdfUrl, '文档_' + new Date().toISOString().slice(0, 10) + '.pdf', 'application/pdf');
-                        loadingModal.remove();
-                        return;
-                    }
+                if (!global.preparePrintContent) {
+                    throw new Error(isEn() ? 'Print module not loaded' : '打印模块未加载');
+                }
+                var htmlContent = await global.preparePrintContent(content, settings);
 
-                    // 确保pdfUrl是完整的URL
-                    var fullPdfUrl = pdfUrl;
-                    if (!pdfUrl.startsWith('http://') && !pdfUrl.startsWith('https://') && !pdfUrl.startsWith('blob:')) {
-                        // 构建完整的URL
-                        var origin = window.getAppOrigin ? window.getAppOrigin() : window.location.origin;
-                        var baseUrl = origin;
-                        if (!pdfUrl.startsWith('/')) {
-                            baseUrl += '/' + window.location.pathname.split('/').slice(0, -1).join('/') + '/';
-                        }
-                        fullPdfUrl = baseUrl + pdfUrl;
-                    }
+                // 懒加载 PDF 生成器并生成PDF
+                const { generatePDF } = await getPDFGenerator();
+                var pdfUrl = await generatePDF(htmlContent, settings);
 
-                    // 创建下载链接
-                    var a = document.createElement('a');
-                    a.href = fullPdfUrl;
-                    a.download = '文档_' + new Date().toISOString().slice(0, 10) + '.pdf';
-                    a.target = '_blank'; // 新窗口打开以防下载失败
-                    document.body.appendChild(a);
-                    a.click();
-                    
-                    setTimeout(function() {
-                        document.body.removeChild(a);
-                    }, 100);
-                    
+                // 如果是 Capacitor 环境，使用特殊的下载逻辑
+                if (window.Capacitor && window.Capacitor.isNativePlatform()) {
+                    await downloadInCapacitor(pdfUrl, '文档_' + new Date().toISOString().slice(0, 10) + '.pdf', 'application/pdf');
                     loadingModal.remove();
-                    global.showMessage(isEn() ? 'Document exported as .pdf' : '文档已导出为.pdf格式');
-                 } catch (error) {
-                    console.error('PDF导出错误:', error);
-                    global.showMessage((isEn() ? 'PDF export failed: ' : 'PDF导出失败: ') + error.message);
-                    if (loadingModal) loadingModal.remove();
-                 }
-             });
-             return;
-         }
+                    return;
+                }
+
+                // 确保pdfUrl是完整的URL
+                var fullPdfUrl = pdfUrl;
+                if (!pdfUrl.startsWith('http://') && !pdfUrl.startsWith('https://') && !pdfUrl.startsWith('blob:')) {
+                    // 构建完整的URL
+                    var origin = window.getAppOrigin ? window.getAppOrigin() : window.location.origin;
+                    var baseUrl = origin;
+                    if (!pdfUrl.startsWith('/')) {
+                        baseUrl += '/' + window.location.pathname.split('/').slice(0, -1).join('/') + '/';
+                    }
+                    fullPdfUrl = baseUrl + pdfUrl;
+                }
+
+                // 创建下载链接
+                var a = document.createElement('a');
+                a.href = fullPdfUrl;
+                a.download = '文档_' + new Date().toISOString().slice(0, 10) + '.pdf';
+                a.target = '_blank'; // 新窗口打开以防下载失败
+                document.body.appendChild(a);
+                a.click();
+
+                setTimeout(function() {
+                    document.body.removeChild(a);
+                }, 100);
+
+                loadingModal.remove();
+                global.showMessage(isEn() ? 'Document exported as .pdf' : '文档已导出为.pdf格式');
+            } catch (error) {
+                console.error('PDF导出错误:', error);
+                global.showMessage((isEn() ? 'PDF export failed: ' : 'PDF导出失败: ') + error.message);
+                if (loadingModal) loadingModal.remove();
+            }
+        });
+        return;
     }
 
     // HTML 处理逻辑
     if (ext === 'html') {
-         if (global.showPrintDialog) {
-             global.hideMobileActionSheet();
-             global.showPrintDialog('export-html', async function(settings) {
-                 try {
-                    var loadingModal = document.createElement('div');
-                    loadingModal.className = 'modal-overlay';
-                    loadingModal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.9);z-index:10001;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;';
-                    loadingModal.innerHTML = '<div style="background:white;color:#333;border-radius:12px;padding:30px;text-align:center;"><div style="font-size:24px;margin-bottom:15px;"><i class="fas fa-spinner fa-spin"></i></div><div style="font-size:16px;">' + (isEn() ? 'Processing...' : '处理中...') + '</div></div>';
-                    document.body.appendChild(loadingModal);
+        // 懒加载打印模块
+        if (typeof global.showPrintDialog !== 'function') {
+            await import('./print.js');
+        }
+        global.hideMobileActionSheet();
+        global.showPrintDialog('export-html', async function(settings) {
+            try {
+                var loadingModal = document.createElement('div');
+                loadingModal.className = 'modal-overlay';
+                loadingModal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.9);z-index:10001;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;';
+                loadingModal.innerHTML = '<div style="background:white;color:#333;border-radius:12px;padding:30px;text-align:center;"><div style="font-size:24px;margin-bottom:15px;"><i class="fas fa-spinner fa-spin"></i></div><div style="font-size:16px;">' + (isEn() ? 'Processing...' : '处理中...') + '</div></div>';
+                document.body.appendChild(loadingModal);
 
-                    if (!global.preparePrintContent) {
-                         throw new Error(isEn() ? 'Print module not loaded' : '打印模块未加载');
-                    }
-                    var htmlContent = await global.preparePrintContent(content, settings);
+                if (!global.preparePrintContent) {
+                    throw new Error(isEn() ? 'Print module not loaded' : '打印模块未加载');
+                }
+                var htmlContent = await global.preparePrintContent(content, settings);
 
-                    // 生成完整的HTML文档
-                    var finalHtml = `<!DOCTYPE html>
+                // 生成完整的HTML文档
+                var finalHtml = `<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -129,36 +134,35 @@ async function exportFile(content, ext) {
 </body>
 </html>`;
 
-                    loadingModal.remove();
-                    
-                    var filename = '文档_' + new Date().toISOString().slice(0, 10) + '.html';
-                    if (window.Capacitor && window.Capacitor.isNativePlatform()) {
-                        await downloadInCapacitor(finalHtml, filename, 'text/html', true);
-                        return;
-                    }
+                loadingModal.remove();
 
-                    var blob = new Blob([finalHtml], { type: 'text/html' });
-                    var url = URL.createObjectURL(blob);
-                    var a = document.createElement('a');
-                    a.href = url;
-                    a.download = filename;
-                    document.body.appendChild(a);
-                    a.click();
-                    
-                    setTimeout(function() {
-                        document.body.removeChild(a);
-                        window.URL.revokeObjectURL(url);
-                    }, 100);
-                    
-                    global.showMessage(isEn() ? 'Document exported as .html' : '文档已导出为.html格式');
-                 } catch (error) {
-                    console.error('HTML导出错误:', error);
-                    global.showMessage((isEn() ? 'HTML export failed: ' : 'HTML导出失败: ') + error.message);
-                    if (loadingModal) loadingModal.remove();
-                 }
-             });
-             return;
-         }
+                var filename = '文档_' + new Date().toISOString().slice(0, 10) + '.html';
+                if (window.Capacitor && window.Capacitor.isNativePlatform()) {
+                    await downloadInCapacitor(finalHtml, filename, 'text/html', true);
+                    return;
+                }
+
+                var blob = new Blob([finalHtml], { type: 'text/html' });
+                var url = URL.createObjectURL(blob);
+                var a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+
+                setTimeout(function() {
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(url);
+                }, 100);
+
+                global.showMessage(isEn() ? 'Document exported as .html' : '文档已导出为.html格式');
+            } catch (error) {
+                console.error('HTML导出错误:', error);
+                global.showMessage((isEn() ? 'HTML export failed: ' : 'HTML导出失败: ') + error.message);
+                if (loadingModal) loadingModal.remove();
+            }
+        });
+        return;
     }
 
     var filename = '文档_' + new Date().toISOString().slice(0, 10) + '.' + ext;

@@ -1,5 +1,5 @@
 {
-  "name": "md",
+  "name": "EasyPocketMD",
   "version": "1.0.0",
   "description": "基于Vditor的移动端轻量化在线markdown编辑器，可进行多文件管理。支持可视化插入格式、公式、图表，上传文件和图片，降低学习和操作门槛；支持多端文件同步，历史版本，文件分享，日间、夜间模式切换，导入本地文件，导出文档，云打印功能",
   "main": "electron-main.js",
@@ -57,6 +57,7 @@
     "pdfjs-dist": "^4.4.168",
     "pdfmake": "^0.3.7",
     "pdfmake-support-chinese-fonts": "^1.0.3",
+    "pptxgenjs": "^4.0.1",
     "sharp": "^0.34.5",
     "uuid": "^9.0.1",
     "vditor": "^3.11.2",

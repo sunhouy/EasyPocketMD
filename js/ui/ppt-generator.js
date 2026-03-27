@@ -1,5 +1,5 @@
 /**
- * PPT生成器模块
+ * PPT生成器模块 - 整合到AI助手
  * 支持：大纲生成 -> 分页预览 -> 单页重新生成 -> HTML转PPTX -> 下载
  */
 
@@ -20,279 +20,120 @@
         cacheKey: '.ppt_draft_' // 缓存键前缀
     };
 
-    // 动态加载html-to-pptx库
-    var htmlToPptxLoaded = false;
-    var htmlToPptxLoading = false;
-
-    async function loadHtmlToPptx() {
-        if (htmlToPptxLoaded) return true;
-        if (htmlToPptxLoading) {
-            // 等待加载完成
-            while (htmlToPptxLoading) {
-                await new Promise(r => setTimeout(r, 100));
-            }
-            return htmlToPptxLoaded;
-        }
-
-        htmlToPptxLoading = true;
-        try {
-            // 动态导入html-to-pptx
-            const module = await import('html-to-pptx');
-            global.HtmlToPptx = module.default || module;
-            htmlToPptxLoaded = true;
-            return true;
-        } catch (e) {
-            console.error('Failed to load html-to-pptx:', e);
-            return false;
-        } finally {
-            htmlToPptxLoading = false;
-        }
-    }
-
-    // 显示PPT生成器面板
-    function showPPTGenerator() {
+    // 初始化PPT生成器（在AI助手的PPT菜单中调用）
+    function initPPTGenerator() {
         // 检查是否有缓存的草稿
         checkCachedDraft();
         
-        var modal = document.getElementById('pptGeneratorModal');
-        if (!modal) {
-            createPPTGeneratorUI();
-            modal = document.getElementById('pptGeneratorModal');
-        }
-        
-        modal.style.display = 'flex';
-        showPPTStep('input');
-    }
-
-    // 创建PPT生成器UI
-    function createPPTGeneratorUI() {
-        var nightMode = g('nightMode') === true;
-        var bg = nightMode ? '#2d2d2d' : 'white';
-        var textColor = nightMode ? '#eee' : '#333';
-        var borderColor = nightMode ? '#444' : '#ddd';
-
-        var modal = document.createElement('div');
-        modal.id = 'pptGeneratorModal';
-        modal.className = 'modal-overlay';
-        modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);display:none;align-items:center;justify-content:center;z-index:10003;backdrop-filter:blur(5px);';
-
-        modal.innerHTML = `
-            <div class="ppt-generator-modal" style="background:${bg};color:${textColor};border-radius:16px;width:95%;max-width:900px;max-height:90vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
-                <!-- 头部 -->
-                <div class="ppt-generator-header" style="padding:20px 25px;border-bottom:1px solid ${borderColor};display:flex;justify-content:space-between;align-items:center;flex-shrink:0;">
-                    <div>
-                        <h2 style="margin:0;font-size:22px;display:flex;align-items:center;gap:10px;">
-                            <i class="fas fa-file-powerpoint" style="color:#e74c3c;"></i>
-                            ${isEn() ? 'PPT Generator' : 'PPT生成器'}
-                        </h2>
-                        <p style="margin:5px 0 0 0;font-size:13px;color:${nightMode ? '#aaa' : '#666'};">
-                            ${isEn() ? 'AI-powered PPT creation with preview' : 'AI驱动的PPT创建，支持实时预览'}
-                        </p>
-                    </div>
-                    <button id="closePPTGenerator" style="background:none;border:none;font-size:24px;cursor:pointer;color:${nightMode ? '#aaa' : '#666'};padding:5px;border-radius:4px;transition:all 0.2s;">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
-
-                <!-- 内容区域 -->
-                <div class="ppt-generator-content" style="flex:1;overflow-y:auto;padding:25px;">
-                    <!-- 步骤1：输入主题/大纲 -->
-                    <div id="pptStepInput" class="ppt-step">
-                        <div style="margin-bottom:20px;">
-                            <label style="display:block;margin-bottom:8px;font-weight:500;">${isEn() ? 'PPT Topic' : 'PPT主题'}</label>
-                            <input type="text" id="pptTopicInput" placeholder="${isEn() ? 'Enter PPT topic...' : '输入PPT主题...'}" 
-                                style="width:100%;padding:12px 15px;border:1px solid ${borderColor};border-radius:8px;font-size:15px;background:${nightMode ? '#3d3d3d' : 'white'};color:${textColor};">
-                        </div>
-                        
-                        <div style="margin-bottom:20px;">
-                            <label style="display:block;margin-bottom:8px;font-weight:500;">${isEn() ? 'Outline (Optional)' : '大纲（可选）'}</label>
-                            <textarea id="pptOutlineInput" placeholder="${isEn() ? 'Enter outline or leave empty for AI generation...' : '输入大纲，留空则由AI生成...'}" 
-                                style="width:100%;min-height:150px;padding:12px 15px;border:1px solid ${borderColor};border-radius:8px;font-size:14px;resize:vertical;background:${nightMode ? '#3d3d3d' : 'white'};color:${textColor};font-family:inherit;"></textarea>
-                        </div>
-
-                        <div style="margin-bottom:25px;">
-                            <label style="display:block;margin-bottom:10px;font-weight:500;">${isEn() ? 'Aspect Ratio' : 'PPT比例'}</label>
-                            <div style="display:flex;gap:15px;">
-                                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:10px 15px;border:2px solid ${pptState.ratio === '16:9' ? '#4a90e2' : borderColor};border-radius:8px;transition:all 0.2s;" data-ratio="16:9">
-                                    <input type="radio" name="pptRatioSelect" value="16:9" ${pptState.ratio === '16:9' ? 'checked' : ''} style="accent-color:#4a90e2;">
-                                    <span>16:9</span>
-                                </label>
-                                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:10px 15px;border:2px solid ${pptState.ratio === '4:3' ? '#4a90e2' : borderColor};border-radius:8px;transition:all 0.2s;" data-ratio="4:3">
-                                    <input type="radio" name="pptRatioSelect" value="4:3" ${pptState.ratio === '4:3' ? 'checked' : ''} style="accent-color:#4a90e2;">
-                                    <span>4:3</span>
-                                </label>
-                            </div>
-                        </div>
-
-                        <button id="generatePPTOutline" style="width:100%;padding:14px;background:linear-gradient(135deg, #4a90e2 0%, #357abd 100%);color:white;border:none;border-radius:8px;font-size:16px;font-weight:500;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;transition:all 0.3s;">
-                            <i class="fas fa-magic"></i>
-                            ${isEn() ? 'Generate Outline' : '生成大纲'}
-                        </button>
-                    </div>
-
-                    <!-- 步骤2：大纲预览和编辑 -->
-                    <div id="pptStepOutline" class="ppt-step" style="display:none;">
-                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;">
-                            <h3 style="margin:0;">${isEn() ? 'Outline Preview' : '大纲预览'}</h3>
-                            <button id="editOutlineBtn" style="padding:6px 12px;background:transparent;border:1px solid ${borderColor};border-radius:6px;cursor:pointer;font-size:13px;color:${textColor};">
-                                <i class="fas fa-edit"></i> ${isEn() ? 'Edit' : '编辑'}
-                            </button>
-                        </div>
-                        <div id="outlinePreview" style="background:${nightMode ? '#1e1e1e' : '#f8f9fa'};border:1px solid ${borderColor};border-radius:8px;padding:15px;max-height:300px;overflow-y:auto;font-size:14px;line-height:1.8;">
-                            <!-- 大纲内容将在这里显示 -->
-                        </div>
-                        <div style="display:flex;gap:10px;margin-top:20px;">
-                            <button id="backToInput" style="flex:1;padding:12px;background:transparent;border:1px solid ${borderColor};border-radius:8px;cursor:pointer;font-size:15px;color:${textColor};">
-                                <i class="fas fa-arrow-left"></i> ${isEn() ? 'Back' : '返回'}
-                            </button>
-                            <button id="generatePages" style="flex:2;padding:12px;background:linear-gradient(135deg, #27ae60 0%, #219a52 100%);color:white;border:none;border-radius:8px;font-size:15px;font-weight:500;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;">
-                                <i class="fas fa-play"></i> ${isEn() ? 'Generate Pages' : '生成页面'}
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- 步骤3：分页预览和编辑 -->
-                    <div id="pptStepPages" class="ppt-step" style="display:none;">
-                        <div style="display:flex;gap:15px;height:500px;">
-                            <!-- 左侧页面列表 -->
-                            <div style="width:200px;flex-shrink:0;display:flex;flex-direction:column;">
-                                <h3 style="margin:0 0 10px 0;font-size:14px;">${isEn() ? 'Pages' : '页面列表'}</h3>
-                                <div id="pagesList" style="flex:1;overflow-y:auto;border:1px solid ${borderColor};border-radius:8px;padding:10px;background:${nightMode ? '#1e1e1e' : '#f8f9fa'};">
-                                    <!-- 页面缩略图列表 -->
-                                </div>
-                                <button id="addNewPage" style="margin-top:10px;padding:10px;background:transparent;border:1px dashed ${borderColor};border-radius:6px;cursor:pointer;font-size:13px;color:${nightMode ? '#aaa' : '#666'};display:flex;align-items:center;justify-content:center;gap:5px;">
-                                    <i class="fas fa-plus"></i> ${isEn() ? 'Add Page' : '添加页面'}
-                                </button>
-                            </div>
-                            
-                            <!-- 右侧预览和编辑 -->
-                            <div style="flex:1;display:flex;flex-direction:column;">
-                                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-                                    <span id="currentPageLabel" style="font-size:14px;color:${nightMode ? '#aaa' : '#666'};">Page 1 / 5</span>
-                                    <div style="display:flex;gap:8px;">
-                                        <button id="regenerateCurrentPage" style="padding:6px 12px;background:transparent;border:1px solid ${borderColor};border-radius:6px;cursor:pointer;font-size:12px;color:${textColor};display:flex;align-items:center;gap:5px;">
-                                            <i class="fas fa-redo"></i> ${isEn() ? 'Regenerate' : '重新生成'}
-                                        </button>
-                                        <button id="editCurrentPage" style="padding:6px 12px;background:transparent;border:1px solid ${borderColor};border-radius:6px;cursor:pointer;font-size:12px;color:${textColor};display:flex;align-items:center;gap:5px;">
-                                            <i class="fas fa-edit"></i> ${isEn() ? 'Edit' : '编辑'}
-                                        </button>
-                                    </div>
-                                </div>
-                                
-                                <!-- 页面预览 -->
-                                <div id="pagePreviewContainer" style="flex:1;border:1px solid ${borderColor};border-radius:8px;overflow:hidden;background:white;position:relative;">
-                                    <div id="pagePreview" style="width:100%;height:100%;padding:30px;overflow:auto;box-sizing:border-box;color:#333;">
-                                        <!-- 页面内容 -->
-                                    </div>
-                                    <!-- 加载遮罩 -->
-                                    <div id="pageLoadingMask" style="display:none;position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);align-items:center;justify-content:center;z-index:10;">
-                                        <div style="text-align:center;color:white;">
-                                            <i class="fas fa-spinner fa-spin" style="font-size:32px;margin-bottom:10px;"></i>
-                                            <p style="margin:0;">${isEn() ? 'Generating...' : '生成中...'}</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div style="display:flex;gap:10px;margin-top:20px;">
-                            <button id="backToOutline" style="flex:1;padding:12px;background:transparent;border:1px solid ${borderColor};border-radius:8px;cursor:pointer;font-size:15px;color:${textColor};">
-                                <i class="fas fa-arrow-left"></i> ${isEn() ? 'Back' : '返回'}
-                            </button>
-                            <button id="downloadPPT" style="flex:2;padding:12px;background:linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);color:white;border:none;border-radius:8px;font-size:15px;font-weight:500;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;">
-                                <i class="fas fa-download"></i> ${isEn() ? 'Download PPT' : '下载PPT'}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        `;
-
-        document.body.appendChild(modal);
+        // 初始化事件
         initPPTGeneratorEvents();
+        
+        // 显示输入步骤
+        showPPTStep('input');
     }
 
     // 初始化事件监听
     function initPPTGeneratorEvents() {
-        // 关闭按钮
-        document.getElementById('closePPTGenerator').addEventListener('click', function() {
-            // 保存草稿
-            saveDraft();
-            document.getElementById('pptGeneratorModal').style.display = 'none';
-        });
-
         // 比例选择
-        document.querySelectorAll('input[name="pptRatioSelect"]').forEach(function(radio) {
+        document.querySelectorAll('input[name="pptRatio"]').forEach(function(radio) {
             radio.addEventListener('change', function() {
                 pptState.ratio = this.value;
-                updateRatioSelection();
             });
         });
 
-        // 生成大纲
-        document.getElementById('generatePPTOutline').addEventListener('click', generateOutline);
+        // 生成大纲按钮
+        var generateOutlineBtn = document.getElementById('aiPPTGenerateOutline');
+        if (generateOutlineBtn) {
+            generateOutlineBtn.addEventListener('click', generateOutline);
+        }
 
-        // 编辑大纲
-        document.getElementById('editOutlineBtn').addEventListener('click', function() {
-            var outlineText = document.getElementById('pptOutlineInput').value;
-            var newOutline = prompt(isEn() ? 'Edit outline:' : '编辑大纲：', outlineText);
-            if (newOutline !== null) {
-                document.getElementById('pptOutlineInput').value = newOutline;
-                parseOutline(newOutline);
-                renderOutlinePreview();
-            }
-        });
+        // 编辑大纲按钮
+        var editOutlineBtn = document.getElementById('aiPPTEEditOutline');
+        if (editOutlineBtn) {
+            editOutlineBtn.addEventListener('click', function() {
+                showCustomPrompt(isEn() ? 'Edit outline:' : '编辑大纲：', 
+                    document.getElementById('aiPPTInput').value,
+                    function(newOutline) {
+                        if (newOutline !== null) {
+                            document.getElementById('aiPPTInput').value = newOutline;
+                            parseOutline(newOutline);
+                            renderOutlinePreview();
+                        }
+                    }
+                );
+            });
+        }
 
-        // 返回输入
-        document.getElementById('backToInput').addEventListener('click', function() {
-            showPPTStep('input');
-        });
+        // 返回输入按钮
+        var backToInputBtn = document.getElementById('aiPPTBackToInput');
+        if (backToInputBtn) {
+            backToInputBtn.addEventListener('click', function() {
+                showPPTStep('input');
+            });
+        }
 
-        // 生成页面
-        document.getElementById('generatePages').addEventListener('click', generateAllPages);
+        // 生成页面按钮
+        var generatePagesBtn = document.getElementById('aiPPTGeneratePages');
+        if (generatePagesBtn) {
+            generatePagesBtn.addEventListener('click', generateAllPages);
+        }
 
-        // 返回大纲
-        document.getElementById('backToOutline').addEventListener('click', function() {
-            showPPTStep('outline');
-        });
+        // 返回大纲按钮
+        var backToOutlineBtn = document.getElementById('aiPPTBackToOutline');
+        if (backToOutlineBtn) {
+            backToOutlineBtn.addEventListener('click', function() {
+                showPPTStep('outline');
+            });
+        }
 
-        // 添加新页面
-        document.getElementById('addNewPage').addEventListener('click', addNewPage);
+        // 添加新页面按钮
+        var addPageBtn = document.getElementById('aiPPTAddPage');
+        if (addPageBtn) {
+            addPageBtn.addEventListener('click', addNewPage);
+        }
 
-        // 重新生成当前页面
-        document.getElementById('regenerateCurrentPage').addEventListener('click', regenerateCurrentPage);
+        // 重新生成当前页面按钮
+        var regenerateBtn = document.getElementById('aiPPTRegeneratePage');
+        if (regenerateBtn) {
+            regenerateBtn.addEventListener('click', regenerateCurrentPage);
+        }
 
-        // 编辑当前页面
-        document.getElementById('editCurrentPage').addEventListener('click', editCurrentPage);
+        // 编辑当前页面按钮
+        var editPageBtn = document.getElementById('aiPPTEditPage');
+        if (editPageBtn) {
+            editPageBtn.addEventListener('click', editCurrentPage);
+        }
 
-        // 下载PPT
-        document.getElementById('downloadPPT').addEventListener('click', downloadPPT);
-    }
-
-    // 更新比例选择UI
-    function updateRatioSelection() {
-        document.querySelectorAll('[data-ratio]').forEach(function(label) {
-            var ratio = label.getAttribute('data-ratio');
-            var nightMode = g('nightMode') === true;
-            var borderColor = nightMode ? '#444' : '#ddd';
-            label.style.borderColor = ratio === pptState.ratio ? '#4a90e2' : borderColor;
-        });
+        // 下载PPT按钮
+        var downloadBtn = document.getElementById('aiPPTDownload');
+        if (downloadBtn) {
+            downloadBtn.addEventListener('click', downloadPPT);
+        }
     }
 
     // 显示指定步骤
     function showPPTStep(step) {
-        document.getElementById('pptStepInput').style.display = 'none';
-        document.getElementById('pptStepOutline').style.display = 'none';
-        document.getElementById('pptStepPages').style.display = 'none';
-        document.getElementById('pptStep' + step.charAt(0).toUpperCase() + step.slice(1)).style.display = 'block';
+        var inputSection = document.getElementById('aiPPTInputSection');
+        var outlineSection = document.getElementById('aiPPTOutlineSection');
+        var pagesSection = document.getElementById('aiPPTPagesSection');
+        
+        if (inputSection) inputSection.style.display = step === 'input' ? 'block' : 'none';
+        if (outlineSection) outlineSection.style.display = step === 'outline' ? 'block' : 'none';
+        if (pagesSection) pagesSection.style.display = step === 'pages' ? 'block' : 'none';
     }
 
     // 生成大纲
     async function generateOutline() {
-        var topic = document.getElementById('pptTopicInput').value.trim();
-        var outlineText = document.getElementById('pptOutlineInput').value.trim();
+        var input = document.getElementById('aiPPTInput').value.trim();
+        var topic = '';
         
-        if (!topic && !outlineText) {
+        // 尝试从输入中提取主题
+        if (input) {
+            var lines = input.split('\n');
+            topic = lines[0].replace(/^#+\s*/, '').substring(0, 50);
+        }
+        
+        if (!topic && !input) {
             if (global.showMessage) {
                 global.showMessage(isEn() ? 'Please enter topic or outline' : '请输入主题或大纲', 'error');
             }
@@ -301,19 +142,38 @@
 
         pptState.topic = topic;
         
-        var btn = document.getElementById('generatePPTOutline');
+        var btn = document.getElementById('aiPPTGenerateOutline');
+        var originalText = btn.innerHTML;
         btn.disabled = true;
         btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ' + (isEn() ? 'Generating...' : '生成中...');
 
         try {
-            if (outlineText) {
+            if (input && input.includes('第') && input.includes('页')) {
                 // 使用用户提供的大纲
-                parseOutline(outlineText);
+                parseOutline(input);
             } else {
                 // 调用AI生成大纲
-                var prompt = `请为主题"${topic}"生成一个PPT大纲，包含5-8页。每页包含标题和要点。比例：${pptState.ratio}。`;
+                var prompt = `请为主题"${topic || input}"生成一个详细的PPT大纲，包含5-8页。
+
+重要要求：
+1. 每页的标题必须是具体的、有意义的标题，不能只是"标题"二字
+2. 标题应该概括该页的核心内容
+3. 每页包含2-4个要点，每个要点要具体
+4. 第一页通常是封面或概述页
+
+格式要求：
+**第1页：封面/概述标题**
+- 要点1：具体内容
+- 要点2：具体内容
+
+**第2页：具体章节标题**
+- 要点1：具体内容
+- 要点2：具体内容
+
+请确保每个标题都是有意义的，能够清晰表达该页的主题。`;
+                
                 var result = await callAIAPI(prompt, '');
-                document.getElementById('pptOutlineInput').value = result;
+                document.getElementById('aiPPTInput').value = result;
                 parseOutline(result);
             }
             
@@ -326,7 +186,7 @@
             }
         } finally {
             btn.disabled = false;
-            btn.innerHTML = '<i class="fas fa-magic"></i> ' + (isEn() ? 'Generate Outline' : '生成大纲');
+            btn.innerHTML = originalText;
         }
     }
 
@@ -371,21 +231,24 @@
 
     // 渲染大纲预览
     function renderOutlinePreview() {
-        var container = document.getElementById('outlinePreview');
+        var container = document.getElementById('aiPPTOutlinePreview');
+        if (!container) return;
+        
         if (!pptState.outline || pptState.outline.length === 0) {
-            container.innerHTML = '<p style="color:#999;text-align:center;">' + (isEn() ? 'No outline data' : '无大纲数据') + '</p>';
+            container.innerHTML = '<p style="color:#999;text-align:center;padding:20px;">' + (isEn() ? 'No outline data' : '无大纲数据') + '</p>';
             return;
         }
         
+        var nightMode = g('nightMode') === true;
         var html = '';
         for (var i = 0; i < pptState.outline.length; i++) {
             var page = pptState.outline[i];
-            html += '<div style="margin-bottom:15px;padding:10px;background:' + (g('nightMode') ? '#2d2d2d' : 'white') + ';border-radius:6px;border-left:3px solid #4a90e2;">';
-            html += '<strong style="color:#4a90e2;">第' + page.number + '页：</strong>' + page.title;
+            html += '<div style="margin-bottom:15px;padding:12px;background:' + (nightMode ? '#2d2d2d' : '#f8f9fa') + ';border-radius:8px;border-left:3px solid #4a90e2;">';
+            html += '<strong style="color:#4a90e2;">第' + page.number + '页：</strong>' + escapeHtml(page.title);
             if (page.content.length > 0) {
                 html += '<ul style="margin:8px 0 0 0;padding-left:20px;">';
                 for (var j = 0; j < page.content.length; j++) {
-                    html += '<li>' + page.content[j] + '</li>';
+                    html += '<li>' + escapeHtml(page.content[j]) + '</li>';
                 }
                 html += '</ul>';
             }
@@ -438,17 +301,37 @@
     // 生成单页
     async function generatePage(index) {
         var page = pptState.outline[index];
-        var prompt = `请为PPT第${page.number}页生成HTML内容。
-主题：${pptState.topic}
-页面标题：${page.title}
-要点：${page.content.join('\n')}
+        
+        // 检查标题是否是默认的"标题"，如果是则让AI生成一个更好的标题
+        var pageTitle = page.title;
+        if (pageTitle === '标题' || pageTitle === '标题页' || !pageTitle) {
+            // 根据内容生成标题
+            if (page.content.length > 0) {
+                pageTitle = page.content[0].substring(0, 20);
+            } else {
+                pageTitle = '第' + page.number + '页';
+            }
+        }
+        
+        var prompt = `请为PPT第${page.number}页生成美观的HTML幻灯片内容。
+
+PPT主题：${pptState.topic}
+页面标题：${pageTitle}
+页面要点：
+${page.content.map((c, i) => (i + 1) + '. ' + c).join('\n')}
 
 要求：
-1. 使用简洁的HTML，只包含body内的内容
-2. 使用内联样式，确保美观
-3. 包含标题和要点内容
-4. 适合${pptState.ratio}比例的PPT展示
-5. 背景色使用白色，文字使用深色`;
+1. 生成一个完整的HTML幻灯片，包含在<div>中
+2. 使用现代美观的PPT风格设计
+3. 标题要醒目（使用大字号、粗体、居中或左对齐）
+4. 内容要丰富，每个要点都要有详细说明（2-3句话）
+5. 使用项目符号列表展示要点
+6. 添加适当的颜色、间距和视觉层次
+7. 可以使用图标或装饰元素增强视觉效果
+8. 背景使用浅色（白色或浅灰），文字使用深色
+9. 适合${pptState.ratio}比例的PPT展示
+
+请直接返回HTML代码，不要包含markdown代码块标记。`;
 
         var html = await callAIAPI(prompt, '');
         
@@ -463,7 +346,10 @@
 
     // 渲染页面列表
     function renderPagesList() {
-        var container = document.getElementById('pagesList');
+        var container = document.getElementById('aiPPTPagesList');
+        if (!container) return;
+        
+        var nightMode = g('nightMode') === true;
         var html = '';
         
         for (var i = 0; i < pptState.outline.length; i++) {
@@ -471,10 +357,10 @@
             var isGenerated = pptState.pages[i] !== null;
             var isActive = i === pptState.currentPage;
             
-            html += '<div class="page-thumbnail" data-index="' + i + '" style="padding:10px;margin-bottom:8px;border-radius:6px;cursor:pointer;transition:all 0.2s;' + 
-                    (isActive ? 'background:#4a90e2;color:white;' : 'background:' + (g('nightMode') ? '#2d2d2d' : 'white') + ';border:1px solid ' + (g('nightMode') ? '#444' : '#ddd') + ';') + '">';
+            html += '<div class="ppt-page-thumb" data-index="' + i + '" style="padding:10px;margin-bottom:8px;border-radius:6px;cursor:pointer;transition:all 0.2s;' + 
+                    (isActive ? 'background:#4a90e2;color:white;' : 'background:' + (nightMode ? '#2d2d2d' : 'white') + ';border:1px solid ' + (nightMode ? '#444' : '#ddd') + ';') + '">';
             html += '<div style="font-size:12px;font-weight:bold;">第' + page.number + '页</div>';
-            html += '<div style="font-size:11px;opacity:0.8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + page.title + '</div>';
+            html += '<div style="font-size:11px;opacity:0.8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escapeHtml(page.title) + '</div>';
             html += '<div style="font-size:10px;margin-top:4px;">';
             html += isGenerated ? '<i class="fas fa-check-circle" style="color:' + (isActive ? 'white' : '#27ae60') + ';"></i> ' + (isEn() ? 'Ready' : '已生成') : '<i class="fas fa-clock" style="color:#999;"></i> ' + (isEn() ? 'Pending' : '待生成');
             html += '</div>';
@@ -484,7 +370,7 @@
         container.innerHTML = html;
         
         // 绑定点击事件
-        container.querySelectorAll('.page-thumbnail').forEach(function(thumb) {
+        container.querySelectorAll('.ppt-page-thumb').forEach(function(thumb) {
             thumb.addEventListener('click', function() {
                 selectPage(parseInt(this.getAttribute('data-index')));
             });
@@ -501,7 +387,10 @@
 
     // 渲染页面预览
     function renderPagePreview(index) {
-        var container = document.getElementById('pagePreview');
+        var container = document.getElementById('aiPPTPagePreview');
+        var wrapper = document.getElementById('aiPPTPagePreviewWrapper');
+        if (!container || !wrapper) return;
+        
         var html = pptState.pages[index];
         
         if (!html) {
@@ -509,21 +398,43 @@
             return;
         }
         
-        // 设置比例
-        var aspectRatio = pptState.ratio === '16:9' ? '16/9' : '4/3';
-        container.style.aspectRatio = aspectRatio;
+        // 设置比例 - 使用固定宽高比
+        var aspectRatio = pptState.ratio === '16:9' ? 16/9 : 4/3;
+        
+        // 计算合适的尺寸以适应容器
+        var maxWidth = wrapper.parentElement.clientWidth - 40;
+        var maxHeight = wrapper.parentElement.clientHeight - 40;
+        
+        var width, height;
+        if (maxWidth / maxHeight > aspectRatio) {
+            // 高度限制
+            height = maxHeight;
+            width = height * aspectRatio;
+        } else {
+            // 宽度限制
+            width = maxWidth;
+            height = width / aspectRatio;
+        }
+        
+        wrapper.style.width = width + 'px';
+        wrapper.style.height = height + 'px';
+        wrapper.style.aspectRatio = aspectRatio;
+        
         container.innerHTML = html;
     }
 
     // 更新当前页面标签
     function updateCurrentPageLabel() {
-        var label = document.getElementById('currentPageLabel');
-        label.textContent = 'Page ' + (pptState.currentPage + 1) + ' / ' + pptState.outline.length;
+        var label = document.getElementById('aiPPTCurrentPageLabel');
+        if (label) {
+            label.textContent = 'Page ' + (pptState.currentPage + 1) + ' / ' + pptState.outline.length;
+        }
     }
 
     // 显示/隐藏页面加载
     function showPageLoading(show) {
-        document.getElementById('pageLoadingMask').style.display = show ? 'flex' : 'none';
+        var mask = document.getElementById('aiPPTPageLoading');
+        if (mask) mask.style.display = show ? 'flex' : 'none';
     }
 
     // 重新生成当前页面
@@ -549,32 +460,34 @@
     // 编辑当前页面
     function editCurrentPage() {
         var currentHtml = pptState.pages[pptState.currentPage] || '';
-        var newHtml = prompt(isEn() ? 'Edit HTML content:' : '编辑HTML内容：', currentHtml);
-        if (newHtml !== null) {
-            pptState.pages[pptState.currentPage] = newHtml;
-            renderPagePreview(pptState.currentPage);
-            saveDraft();
-        }
+        showCustomPrompt(isEn() ? 'Edit HTML content:' : '编辑HTML内容：', currentHtml, function(newHtml) {
+            if (newHtml !== null) {
+                pptState.pages[pptState.currentPage] = newHtml;
+                renderPagePreview(pptState.currentPage);
+                saveDraft();
+            }
+        });
     }
 
     // 添加新页面
     function addNewPage() {
-        var newPageNum = pptState.outline.length + 1;
-        var title = prompt(isEn() ? 'Enter page title:' : '输入页面标题：');
-        if (title) {
-            pptState.outline.push({
-                number: newPageNum,
-                title: title,
-                content: []
-            });
-            pptState.pages.push(null);
-            renderPagesList();
-            selectPage(pptState.outline.length - 1);
-            saveDraft();
-        }
+        showCustomPrompt(isEn() ? 'Enter page title:' : '输入页面标题：', '', function(title) {
+            if (title) {
+                var newPageNum = pptState.outline.length + 1;
+                pptState.outline.push({
+                    number: newPageNum,
+                    title: title,
+                    content: []
+                });
+                pptState.pages.push(null);
+                renderPagesList();
+                selectPage(pptState.outline.length - 1);
+                saveDraft();
+            }
+        });
     }
 
-    // 下载PPT
+    // 下载PPT - 使用更简单的方法生成PPTX
     async function downloadPPT() {
         // 检查是否所有页面都已生成
         var ungeneratedPages = [];
@@ -585,78 +498,40 @@
         }
         
         if (ungeneratedPages.length > 0) {
-            if (!confirm((isEn() ? 'Pages ' : '第') + ungeneratedPages.join(', ') + (isEn() ? ' are not generated yet. Continue?' : '页尚未生成，是否继续？'))) {
-                return;
-            }
+            showCustomConfirm(
+                (isEn() ? 'Pages ' : '第') + ungeneratedPages.join(', ') + (isEn() ? ' are not generated yet. Continue?' : '页尚未生成，是否继续？'),
+                function() {
+                    doDownloadPPT();
+                }
+            );
+        } else {
+            doDownloadPPT();
         }
+    }
 
-        var btn = document.getElementById('downloadPPT');
+    // 实际下载PPT
+    async function doDownloadPPT() {
+        var btn = document.getElementById('aiPPTDownload');
+        if (!btn) return;
+        
+        var originalText = btn.innerHTML;
         btn.disabled = true;
-        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ' + (isEn() ? 'Loading library...' : '加载库中...');
-
-        // 加载html-to-pptx库
-        var loaded = await loadHtmlToPptx();
-        if (!loaded) {
-            btn.disabled = false;
-            btn.innerHTML = '<i class="fas fa-download"></i> ' + (isEn() ? 'Download PPT' : '下载PPT');
-            if (global.showMessage) {
-                global.showMessage(isEn() ? 'Failed to load PPT library' : '加载PPT库失败', 'error');
-            }
-            return;
-        }
-
-        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ' + (isEn() ? 'Generating PPT...' : '生成PPT中...');
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ' + (isEn() ? 'Generating...' : '生成中...');
 
         try {
-            // 使用html-to-pptx生成PPT
-            var pptx = global.HtmlToPptx || window.HtmlToPptx;
-            if (!pptx) {
-                throw new Error('HtmlToPptx not available');
-            }
-
-            // 创建PPT
-            var presentation = new pptx();
+            // 使用纯前端方式生成PPT
+            // 由于html-to-pptx库有问题，我们使用Blob和简单的XML格式生成PPTX
+            var pptxBlob = await generatePPTXBlob();
             
-            // 设置幻灯片大小
-            var slideWidth = pptState.ratio === '16:9' ? 10 : 10;
-            var slideHeight = pptState.ratio === '16:9' ? 5.625 : 7.5;
-            presentation.defineSlideSize({ width: slideWidth, height: slideHeight });
-
-            // 添加每页
-            for (var i = 0; i < pptState.pages.length; i++) {
-                if (pptState.pages[i]) {
-                    var slide = presentation.addSlide();
-                    
-                    // 将HTML转换为PPT元素
-                    // 这里简化处理，实际可能需要更复杂的转换
-                    var tempDiv = document.createElement('div');
-                    tempDiv.innerHTML = pptState.pages[i];
-                    
-                    // 提取文本内容
-                    var text = tempDiv.textContent || tempDiv.innerText || '';
-                    var lines = text.split('\n').filter(function(l) { return l.trim(); });
-                    
-                    if (lines.length > 0) {
-                        // 第一行作为标题
-                        slide.addText(lines[0], {
-                            x: 0.5, y: 0.5, w: slideWidth - 1, h: 1,
-                            fontSize: 24, bold: true, color: '363636'
-                        });
-                        
-                        // 其余作为内容
-                        if (lines.length > 1) {
-                            slide.addText(lines.slice(1).join('\n'), {
-                                x: 0.5, y: 1.5, w: slideWidth - 1, h: slideHeight - 2,
-                                fontSize: 14, color: '666666'
-                            });
-                        }
-                    }
-                }
-            }
-
             // 下载文件
-            var fileName = (pptState.topic || 'PPT') + '.pptx';
-            await presentation.writeFile({ fileName: fileName });
+            var url = URL.createObjectURL(pptxBlob);
+            var a = document.createElement('a');
+            a.href = url;
+            a.download = (pptState.topic || 'PPT') + '.pptx';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
 
             if (global.showMessage) {
                 global.showMessage(isEn() ? 'PPT downloaded successfully' : 'PPT下载成功', 'success');
@@ -671,8 +546,157 @@
             }
         } finally {
             btn.disabled = false;
-            btn.innerHTML = '<i class="fas fa-download"></i> ' + (isEn() ? 'Download PPT' : '下载PPT');
+            btn.innerHTML = originalText;
         }
+    }
+
+    // 生成PPTX Blob - 使用 pptxgenjs
+    async function generatePPTXBlob() {
+        // 动态导入 pptxgenjs
+        const module = await import('pptxgenjs');
+        // 处理不同的导出方式
+        const PptxGen = module.default || module.PptxGenJS || module;
+        
+        // 创建演示文稿
+        const pres = new PptxGen();
+        
+        // 设置幻灯片大小 - 使用 layout 属性
+        if (pptState.ratio === '4:3') {
+            pres.layout = 'LAYOUT_4x3';
+        } else {
+            pres.layout = 'LAYOUT_16x9';
+        }
+        
+        // 设置元数据
+        pres.title = pptState.topic || 'PPT';
+        pres.subject = 'Generated by EasyPocketMD AI';
+        pres.author = 'EasyPocketMD';
+        
+        // 为每页生成幻灯片
+        for (var i = 0; i < pptState.outline.length; i++) {
+            var page = pptState.outline[i];
+            var html = pptState.pages[i] || '';
+            
+            // 获取标题 - 优先使用HTML中的标题
+            var title = page ? page.title : ('Slide ' + (i + 1));
+            
+            // 检查标题是否是默认的"标题"，如果是则从内容中提取
+            if (title === '标题' || title === '标题页' || !title) {
+                if (page && page.content.length > 0) {
+                    title = page.content[0].substring(0, 25);
+                } else {
+                    title = '第' + (i + 1) + '页';
+                }
+            }
+            
+            // 从HTML中提取标题和内容
+            var extractedTitle = title;
+            var content = '';
+            
+            if (html) {
+                var tempDiv = document.createElement('div');
+                tempDiv.innerHTML = html;
+                
+                // 尝试提取h1-h3作为标题
+                var h1 = tempDiv.querySelector('h1, h2, h3');
+                if (h1) {
+                    extractedTitle = h1.textContent || h1.innerText || title;
+                }
+                
+                // 移除标题元素，剩下的作为内容
+                if (h1) h1.remove();
+                
+                // 提取内容
+                var text = tempDiv.textContent || tempDiv.innerText || '';
+                var lines = text.split('\n').filter(function(l) { return l.trim(); });
+                content = lines.join('\n');
+            }
+            
+            // 如果HTML中没有提取到内容，使用大纲中的要点
+            if (!content && page && page.content && page.content.length > 0) {
+                content = page.content.join('\n');
+            }
+            
+            // 创建幻灯片
+            var slide = pres.addSlide();
+            
+            // 获取幻灯片尺寸
+            var slideWidth = pres.presLayout ? pres.presLayout.width : 10;
+            var slideHeight = pres.presLayout ? pres.presLayout.height : 5.625;
+            
+            // 添加标题 - 调整字号和位置
+            slide.addText(extractedTitle, {
+                x: 0.3,
+                y: 0.3,
+                w: slideWidth - 0.6,
+                h: 0.8,
+                fontSize: 28,
+                bold: true,
+                color: '2c3e50',
+                align: 'center',
+                fontFace: 'Microsoft YaHei'
+            });
+            
+            // 添加分隔线
+            slide.addShape(pres.ShapeType.line, {
+                x: 0.5,
+                y: 1.2,
+                w: slideWidth - 1,
+                h: 0,
+                line: { color: '3498db', width: 2 }
+            });
+            
+            // 添加内容 - 调整字号和位置
+            if (content) {
+                // 将内容按行分割，创建项目符号列表
+                var contentLines = content.split('\n').filter(function(l) { return l.trim(); });
+                
+                // 限制内容行数，避免超出页面
+                var maxLines = slideHeight > 6 ? 8 : 6; // 4:3比例可以显示更多内容
+                if (contentLines.length > maxLines) {
+                    contentLines = contentLines.slice(0, maxLines);
+                }
+                
+                var bulletPoints = contentLines.map(function(line) {
+                    // 限制每行长度
+                    var trimmedLine = line.trim();
+                    if (trimmedLine.length > 100) {
+                        trimmedLine = trimmedLine.substring(0, 97) + '...';
+                    }
+                    return { 
+                        text: trimmedLine, 
+                        options: { fontSize: 16, color: '34495e', breakLine: true } 
+                    };
+                });
+                
+                if (bulletPoints.length > 0) {
+                    slide.addText(bulletPoints, {
+                        x: 0.5,
+                        y: 1.5,
+                        w: slideWidth - 1,
+                        h: slideHeight - 2.2,
+                        bullet: { type: 'number', color: '3498db' },
+                        lineSpacing: 28,
+                        paraSpaceAfter: 8,
+                        fontFace: 'Microsoft YaHei'
+                    });
+                }
+            }
+            
+            // 添加页脚
+            slide.addText('Generated by EasyPocketMD AI', {
+                x: 0.5,
+                y: slideHeight - 0.5,
+                w: slideWidth - 1,
+                h: 0.3,
+                fontSize: 9,
+                color: '95a5a6',
+                align: 'center'
+            });
+        }
+        
+        // 生成 blob
+        return await pres.write({ outputType: 'blob' });
     }
 
     // 保存草稿到localStorage
@@ -697,20 +721,6 @@
                 pptState.outline = draft.outline || [];
                 pptState.pages = draft.pages || [];
                 pptState.ratio = draft.ratio || '16:9';
-                
-                document.getElementById('pptTopicInput').value = pptState.topic;
-                document.getElementById('pptOutlineInput').value = draft.outline ? 
-                    draft.outline.map(function(p) { 
-                        return '**第' + p.number + '页：' + p.title + '**\n' + p.content.map(function(c) { return '- ' + c; }).join('\n');
-                    }).join('\n\n') : '';
-                
-                // 更新比例选择
-                var ratioRadio = document.querySelector('input[name="pptRatioSelect"][value="' + pptState.ratio + '"]');
-                if (ratioRadio) {
-                    ratioRadio.checked = true;
-                    updateRatioSelection();
-                }
-                
                 return true;
             } catch (e) {
                 console.error('Failed to load draft:', e);
@@ -736,12 +746,20 @@
                 
                 // 如果草稿在24小时内
                 if (hoursDiff < 24) {
-                    if (confirm((isEn() ? 'Found unsaved PPT draft from ' : '发现未保存的PPT草稿，创建于') + 
-                               time.toLocaleString() + (isEn() ? '. Continue?' : '，是否继续编辑？'))) {
-                        loadDraft();
-                    } else {
-                        clearDraft();
-                    }
+                    showCustomConfirm(
+                        (isEn() ? 'Found unsaved PPT draft from ' : '发现未保存的PPT草稿，创建于') + 
+                        time.toLocaleString() + (isEn() ? '. Continue?' : '，是否继续编辑？'),
+                        function() {
+                            loadDraft();
+                            if (pptState.outline && pptState.outline.length > 0) {
+                                renderOutlinePreview();
+                                showPPTStep('outline');
+                            }
+                        },
+                        function() {
+                            clearDraft();
+                        }
+                    );
                 } else {
                     clearDraft();
                 }
@@ -780,10 +798,114 @@
         }
     }
 
+    // 自定义确认对话框（替代浏览器confirm）
+    function showCustomConfirm(message, onConfirm, onCancel) {
+        var overlay = document.createElement('div');
+        overlay.className = 'custom-confirm-overlay';
+        overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:10005;';
+        
+        var nightMode = g('nightMode') === true;
+        var bg = nightMode ? '#2d2d2d' : 'white';
+        var textColor = nightMode ? '#eee' : '#333';
+        var borderColor = nightMode ? '#444' : '#ddd';
+        
+        overlay.innerHTML = `
+            <div style="background:${bg};color:${textColor};padding:25px;border-radius:12px;max-width:400px;width:90%;box-shadow:0 10px 40px rgba(0,0,0,0.3);">
+                <p style="margin:0 0 20px 0;font-size:15px;line-height:1.6;">${escapeHtml(message)}</p>
+                <div style="display:flex;gap:10px;justify-content:flex-end;">
+                    <button class="custom-confirm-cancel" style="padding:10px 20px;background:transparent;border:1px solid ${borderColor};border-radius:6px;cursor:pointer;font-size:14px;color:${textColor};">
+                        ${isEn() ? 'Cancel' : '取消'}
+                    </button>
+                    <button class="custom-confirm-ok" style="padding:10px 20px;background:#4a90e2;color:white;border:none;border-radius:6px;cursor:pointer;font-size:14px;">
+                        ${isEn() ? 'Confirm' : '确认'}
+                    </button>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(overlay);
+        
+        overlay.querySelector('.custom-confirm-cancel').addEventListener('click', function() {
+            document.body.removeChild(overlay);
+            if (onCancel) onCancel();
+        });
+        
+        overlay.querySelector('.custom-confirm-ok').addEventListener('click', function() {
+            document.body.removeChild(overlay);
+            if (onConfirm) onConfirm();
+        });
+        
+        overlay.addEventListener('click', function(e) {
+            if (e.target === overlay) {
+                document.body.removeChild(overlay);
+                if (onCancel) onCancel();
+            }
+        });
+    }
+
+    // 自定义输入对话框（替代浏览器prompt）
+    function showCustomPrompt(message, defaultValue, onConfirm) {
+        var overlay = document.createElement('div');
+        overlay.className = 'custom-prompt-overlay';
+        overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:10005;';
+        
+        var nightMode = g('nightMode') === true;
+        var bg = nightMode ? '#2d2d2d' : 'white';
+        var textColor = nightMode ? '#eee' : '#333';
+        var borderColor = nightMode ? '#444' : '#ddd';
+        
+        overlay.innerHTML = `
+            <div style="background:${bg};color:${textColor};padding:25px;border-radius:12px;max-width:500px;width:90%;box-shadow:0 10px 40px rgba(0,0,0,0.3);">
+                <p style="margin:0 0 15px 0;font-size:15px;">${escapeHtml(message)}</p>
+                <textarea class="custom-prompt-input" style="width:100%;min-height:100px;padding:12px;border:1px solid ${borderColor};border-radius:8px;font-size:14px;resize:vertical;background:${nightMode ? '#3d3d3d' : 'white'};color:${textColor};font-family:inherit;box-sizing:border-box;margin-bottom:15px;">${escapeHtml(defaultValue || '')}</textarea>
+                <div style="display:flex;gap:10px;justify-content:flex-end;">
+                    <button class="custom-prompt-cancel" style="padding:10px 20px;background:transparent;border:1px solid ${borderColor};border-radius:6px;cursor:pointer;font-size:14px;color:${textColor};">
+                        ${isEn() ? 'Cancel' : '取消'}
+                    </button>
+                    <button class="custom-prompt-ok" style="padding:10px 20px;background:#4a90e2;color:white;border:none;border-radius:6px;cursor:pointer;font-size:14px;">
+                        ${isEn() ? 'OK' : '确定'}
+                    </button>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(overlay);
+        
+        var input = overlay.querySelector('.custom-prompt-input');
+        input.focus();
+        input.select();
+        
+        overlay.querySelector('.custom-prompt-cancel').addEventListener('click', function() {
+            document.body.removeChild(overlay);
+            if (onConfirm) onConfirm(null);
+        });
+        
+        overlay.querySelector('.custom-prompt-ok').addEventListener('click', function() {
+            var value = input.value;
+            document.body.removeChild(overlay);
+            if (onConfirm) onConfirm(value);
+        });
+        
+        overlay.addEventListener('click', function(e) {
+            if (e.target === overlay) {
+                document.body.removeChild(overlay);
+                if (onConfirm) onConfirm(null);
+            }
+        });
+    }
+
+    // HTML转义
+    function escapeHtml(text) {
+        if (!text) return '';
+        var div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
     // 导出到全局
-    global.showPPTGenerator = showPPTGenerator;
+    global.initPPTGenerator = initPPTGenerator;
     global.PPTGenerator = {
-        show: showPPTGenerator,
+        init: initPPTGenerator,
         saveDraft: saveDraft,
         loadDraft: loadDraft,
         clearDraft: clearDraft
