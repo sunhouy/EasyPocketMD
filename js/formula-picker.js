@@ -234,17 +234,36 @@ function showFormulaPicker() {
         flex-direction: column;
     `;
 
+
     // 创建标题
     const title = document.createElement('div');
     title.textContent = isEn() ? 'Insert LaTeX Formula' : '插入LaTeX公式';
     title.style.cssText = `
         font-size: 18px;
         font-weight: 600;
-        margin-bottom: 15px;
+        margin-bottom: 8px;
         text-align: center;
         color: ${(window.nightMode === true) ? '#eee' : '#333'};
     `;
     formulaContainer.appendChild(title);
+
+    // 创建搜索输入框
+    const searchBox = document.createElement('input');
+    searchBox.type = 'text';
+    searchBox.placeholder = isEn() ? 'Search formula by keyword, symbol, or LaTeX...' : '输入关键词、符号或LaTeX搜索公式...';
+    searchBox.style.cssText = `
+        width: 100%;
+        padding: 8px 12px;
+        margin-bottom: 10px;
+        border: 1px solid ${(window.nightMode === true) ? '#444' : '#ccc'};
+        border-radius: 6px;
+        font-size: 14px;
+        background: ${(window.nightMode === true) ? '#222' : '#fafafa'};
+        color: ${(window.nightMode === true) ? '#eee' : '#333'};
+        outline: none;
+        box-sizing: border-box;
+    `;
+    formulaContainer.appendChild(searchBox);
 
     // 创建分类标签
     const categoryTabs = document.createElement('div');
@@ -349,53 +368,82 @@ function showFormulaPicker() {
 
     let selectedFormula = null;
 
-    // 创建分类标签
-    Object.keys(formulaCategories).forEach(category => {
-        const tab = document.createElement('button');
-        tab.textContent = category;
-        tab.style.cssText = `
-            padding: 8px 12px;
-            margin-right: 10px;
-            border: none;
-            background: ${(window.nightMode === true) ? '#444' : '#f5f5f5'};
-            border-radius: 20px;
-            white-space: nowrap;
-            cursor: pointer;
-            color: ${(window.nightMode === true) ? '#eee' : '#333'};
-            font-size: 12px;
-        `;
-        tab.addEventListener('click', () => {
-            // 移除所有标签的激活状态
-            document.querySelectorAll('.formula-tab').forEach(t => {
-                t.style.background = (window.nightMode === true) ? '#444' : '#f5f5f5';
-                t.style.color = (window.nightMode === true) ? '#eee' : '#333';
-                t.style.fontWeight = 'normal';
+
+    // 分类标签和搜索结果标签
+    let searchActive = false;
+    function renderCategoryTabs() {
+        categoryTabs.innerHTML = '';
+        // 搜索时显示“搜索结果”标签
+        if (searchActive) {
+            const searchTab = document.createElement('button');
+            searchTab.textContent = isEn() ? 'Search Results' : '搜索结果';
+            searchTab.className = 'formula-tab';
+            searchTab.style.cssText = `
+                padding: 8px 12px;
+                margin-right: 10px;
+                border: none;
+                background: #4a90e2;
+                border-radius: 20px;
+                white-space: nowrap;
+                cursor: pointer;
+                color: white;
+                font-size: 12px;
+                font-weight: 600;
+            `;
+            categoryTabs.appendChild(searchTab);
+        } else {
+            Object.keys(formulaCategories).forEach(category => {
+                const tab = document.createElement('button');
+                tab.textContent = category;
+                tab.style.cssText = `
+                    padding: 8px 12px;
+                    margin-right: 10px;
+                    border: none;
+                    background: ${(window.nightMode === true) ? '#444' : '#f5f5f5'};
+                    border-radius: 20px;
+                    white-space: nowrap;
+                    cursor: pointer;
+                    color: ${(window.nightMode === true) ? '#eee' : '#333'};
+                    font-size: 12px;
+                `;
+                tab.addEventListener('click', () => {
+                    document.querySelectorAll('.formula-tab').forEach(t => {
+                        t.style.background = (window.nightMode === true) ? '#444' : '#f5f5f5';
+                        t.style.color = (window.nightMode === true) ? '#eee' : '#333';
+                        t.style.fontWeight = 'normal';
+                    });
+                    tab.style.background = '#4a90e2';
+                    tab.style.color = 'white';
+                    tab.style.fontWeight = '600';
+                    showFormulaCategory(category);
+                });
+                tab.className = 'formula-tab';
+                categoryTabs.appendChild(tab);
             });
-            // 激活当前标签
-            tab.style.background = '#4a90e2';
-            tab.style.color = 'white';
-            tab.style.fontWeight = '600';
-            // 显示对应的符号
-            showFormulaCategory(category);
-        });
-        tab.className = 'formula-tab';
-        categoryTabs.appendChild(tab);
-    });
+        }
+    }
 
     formulaContainer.insertBefore(categoryTabs, formulaGrid);
 
-    // 显示第一个分类的符号
-    const firstTab = categoryTabs.querySelector('.formula-tab');
-    if (firstTab) {
-        firstTab.click();
-    }
-
-    // 显示指定分类的符号
+    // 搜索和分类切换的渲染逻辑
     function showFormulaCategory(category) {
         formulaGrid.innerHTML = '';
         selectedFormula = null;
+        let items = formulaCategories[category];
+        renderFormulaGrid(items);
+    }
 
-        formulaCategories[category].forEach(item => {
+    function renderFormulaGrid(items) {
+        formulaGrid.innerHTML = '';
+        selectedFormula = null;
+        if (!items || items.length === 0) {
+            const emptyMsg = document.createElement('div');
+            emptyMsg.textContent = isEn() ? 'No matching formula found.' : '无匹配公式';
+            emptyMsg.style.cssText = 'text-align:center;color:#888;padding:30px 0;grid-column: 1/-1;';
+            formulaGrid.appendChild(emptyMsg);
+            return;
+        }
+        items.forEach(item => {
             const symbolBtn = document.createElement('button');
             symbolBtn.innerHTML = `<span style="font-size: 16px;">${item.display}</span>`;
             symbolBtn.title = `LaTeX: ${item.latex}`;
@@ -416,8 +464,6 @@ function showFormulaPicker() {
                 min-height: 60px;
                 flex-direction: column;
             `;
-
-            // 添加LaTeX代码提示
             const latexPreview = document.createElement('div');
             latexPreview.textContent = item.latex;
             latexPreview.style.cssText = `
@@ -431,34 +477,67 @@ function showFormulaPicker() {
                 max-width: 100%;
             `;
             symbolBtn.appendChild(latexPreview);
-
             symbolBtn.addEventListener('click', () => {
-                // 移除所有符号的选中状态
                 document.querySelectorAll('#formulaGrid button').forEach(btn => {
                     btn.style.borderColor = 'transparent';
                     btn.style.background = 'none';
                 });
-
-                // 设置当前符号为选中状态
                 symbolBtn.style.borderColor = '#4a90e2';
                 symbolBtn.style.background = (window.nightMode === true) ? 'rgba(74, 144, 226, 0.2)' : 'rgba(74, 144, 226, 0.1)';
                 selectedFormula = item;
             });
-
             symbolBtn.addEventListener('mouseenter', function() {
                 if (selectedFormula !== item) {
                     this.style.background = (window.nightMode === true) ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)';
                 }
             });
-
             symbolBtn.addEventListener('mouseleave', function() {
                 if (selectedFormula !== item) {
                     this.style.background = 'none';
                 }
             });
-
             formulaGrid.appendChild(symbolBtn);
         });
+    }
+
+    // 搜索逻辑
+    searchBox.addEventListener('input', function() {
+        const q = this.value.trim().toLowerCase();
+        if (!q) {
+            searchActive = false;
+            renderCategoryTabs();
+            // 默认显示第一个分类
+            const firstTab = categoryTabs.querySelector('.formula-tab');
+            if (firstTab) firstTab.click();
+            return;
+        }
+        // 搜索所有分类下所有公式
+        let results = [];
+        Object.values(formulaCategories).forEach(arr => {
+            arr.forEach(item => {
+                // 支持 display、latex、keywords 匹配
+                let match = false;
+                if (item.display && item.display.toLowerCase().includes(q)) match = true;
+                else if (item.latex && item.latex.toLowerCase().includes(q)) match = true;
+                else if (item.keywords && Array.isArray(item.keywords)) {
+                    for (let kw of item.keywords) {
+                        if (kw.toLowerCase().includes(q)) { match = true; break; }
+                    }
+                }
+                if (match) results.push(item);
+            });
+        });
+        searchActive = true;
+        renderCategoryTabs();
+        renderFormulaGrid(results);
+    });
+
+    // 初始渲染
+    renderCategoryTabs();
+    // 默认显示第一个分类
+    if (!searchActive) {
+        const firstTab = categoryTabs.querySelector('.formula-tab');
+        if (firstTab) firstTab.click();
     }
 
     // 插入按钮点击事件

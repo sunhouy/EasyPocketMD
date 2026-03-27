@@ -1,6 +1,8 @@
 
 const express = require('express');
 
+const request = require('supertest');
+
 describe('Debug test', () => {
     it('should pass simple test', async () => {
         const app = express();
