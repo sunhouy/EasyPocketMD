@@ -1,5 +1,7 @@
 
 const app = require('../../api/server');
+
+const request = require('supertest');
 const db = require('../../api/config/db');
 
 jest.setTimeout(10000);

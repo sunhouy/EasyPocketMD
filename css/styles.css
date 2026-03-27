@@ -106,9 +106,10 @@ body.night-mode .mobile-toolbar-container {
     justify-content: center;
     font-size: 16px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-    z-index: 1001;
+    z-index: 1003 !important;
     transition: all 0.3s ease;
     color: #333; /* 默认黑色 */
+    position: relative;
 }
 
 body.night-mode .mobile-action-btn {
@@ -1177,7 +1178,7 @@ body.night-mode {
 .editor-mode-toggle {
     position: fixed;
     top: 7px;
-    right: 50px;
+    right: 60px;
     width: 36px;
     height: 36px;
     border-radius: 50%;
@@ -1198,7 +1199,7 @@ body.night-mode {
 .editor-save-btn {
     position: fixed;
     top: 7px;
-    right: 93px;
+    right: 103px;
     width: 36px;
     height: 36px;
     border-radius: 50%;
@@ -1234,9 +1235,18 @@ body.night-mode .editor-save-btn {
     font-weight: 600;
     color: #333;
     margin: 0;
-    flex-grow: 1;
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     text-align: center;
-    padding: 0 10px;
+    height: 100%;
+    pointer-events: none;
+    z-index: 1002;
 }
 
 body.night-mode .mobile-title {

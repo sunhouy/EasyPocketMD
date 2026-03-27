@@ -146,11 +146,3 @@ Endpoint `/api/index.php` mimics original PHP API responses. Don't break this fo
 | `index.html` | Main SPA entry; hidden modals for login, file dialogs |
 | `vite.config.js` | Vite build config, injects version to sw.js at build time |
 
-## Debugging Tips
-
-1. **API not responding?** Check server logs: `api/error.log` or console output from `npm start`
-2. **Files not syncing?** Check `pendingServerSync` in localStorage; verify `lastSyncedContent` matches server
-3. **PDF export failing?** Ensure backend has `/api/convert/pdf` route; check `pdfmake` config for Chinese fonts
-4. **Mobile app offline?** IndexedDB should have cached files; check `sw.js` for cache hits
-5. **Tests failing?** Run with `SILENT_TESTS=false` to see mocked DB calls; check `tests/setup.js` mock responses
-

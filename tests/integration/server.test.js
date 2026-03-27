@@ -1,6 +1,8 @@
 
 const app = require('../../api/server');
 
+const request = require('supertest');
+
 jest.setTimeout(10000);
 
 // Mock the User model

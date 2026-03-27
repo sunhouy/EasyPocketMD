@@ -1,5 +1,7 @@
 
 const app = require('../../api/server');
+
+const request = require('supertest');
 const fs = require('fs');
 const wkhtmltopdf = require('wkhtmltopdf');
 
