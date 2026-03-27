@@ -1,4 +1,4 @@
-const request = require('supertest');
+
 const app = require('../../api/server');
 const fs = require('fs');
 const wkhtmltopdf = require('wkhtmltopdf');

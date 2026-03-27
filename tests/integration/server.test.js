@@ -1,4 +1,4 @@
-const request = require('supertest');
+
 const app = require('../../api/server');
 
 jest.setTimeout(10000);
