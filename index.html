@@ -266,6 +266,46 @@
     </div>
 </div>
 
+<!-- 差异对比模态窗口 -->
+<div class="modal-overlay" id="diffModalOverlay">
+    <div class="modal diff-modal" style="position:relative;max-height:90vh;overflow:hidden;display:flex;flex-direction:column;">
+        <button class="modal-close-btn" id="closeDiffBtn" style="position:absolute;top:15px;right:15px;background:none;border:none;font-size:20px;cursor:pointer;z-index:10;">
+            <i class="fas fa-times"></i>
+        </button>
+        <div class="modal-header" style="flex-shrink:0;">
+            <h2 data-i18n="diffTitle">文件差异对比</h2>
+            <p id="diffFileName" style="color:#666;font-size:14px;margin-top:5px;"></p>
+        </div>
+
+        <div class="diff-info" style="flex-shrink:0;">
+            <i class="fas fa-info-circle"></i>
+            <span data-i18n="diffInfo">左侧为本地版本，右侧为服务器版本。绿色表示新增，红色表示删除。</span>
+        </div>
+
+        <div class="diff-container" style="flex:1;overflow:hidden;display:flex;flex-direction:column;">
+            <div class="diff-header">
+                <div class="diff-version-header">
+                    <span class="diff-version-label" data-i18n="localVersion">本地版本</span>
+                    <span id="diffLocalTime" class="diff-version-time"></span>
+                </div>
+                <div class="diff-version-header">
+                    <span class="diff-version-label" data-i18n="serverVersion">服务器版本</span>
+                    <span id="diffServerTime" class="diff-version-time"></span>
+                </div>
+            </div>
+            <div class="diff-content-wrapper">
+                <div id="diffContent" class="diff-content">
+                    <!-- 差异内容将动态生成 -->
+                </div>
+            </div>
+        </div>
+
+        <div class="modal-actions" style="flex-shrink:0;margin-top:15px;">
+            <button class="modal-btn secondary" id="closeDiffModalBtn" data-i18n="close">关闭</button>
+        </div>
+    </div>
+</div>
+
 <!-- 历史版本模态窗口 -->
 <div class="modal-overlay" id="historyModalOverlay">
     <div class="modal history-modal" style="position:relative;max-height:85vh;overflow:hidden;display:flex;flex-direction:column;">

@@ -1113,6 +1113,250 @@ body.night-mode .conflict-details {
     color: #aaa;
 }
 
+/* 查看差异按钮 */
+.diff-view-btn {
+    background: #4a90e2;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 8px 12px;
+    cursor: pointer;
+    font-size: 14px;
+    margin-left: 10px;
+    transition: background 0.2s;
+    flex-shrink: 0;
+}
+
+.diff-view-btn:hover {
+    background: #357abd;
+}
+
+body.night-mode .diff-view-btn {
+    background: #5a9fd2;
+}
+
+body.night-mode .diff-view-btn:hover {
+    background: #4a8fc2;
+}
+
+/* 差异对比模态窗口 */
+.diff-modal {
+    max-width: 90vw;
+    width: 900px;
+    max-height: 90vh;
+}
+
+.diff-info {
+    background: #e3f2fd;
+    border-left: 4px solid #2196f3;
+    padding: 12px;
+    margin-bottom: 15px;
+    border-radius: 4px;
+    font-size: 13px;
+}
+
+body.night-mode .diff-info {
+    background: #1e3a5f;
+    border-left-color: #64b5f6;
+}
+
+.diff-container {
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+body.night-mode .diff-container {
+    border-color: #444;
+}
+
+.diff-header {
+    display: flex;
+    background: #f5f5f5;
+    border-bottom: 1px solid #ddd;
+}
+
+body.night-mode .diff-header {
+    background: #333;
+    border-bottom-color: #444;
+}
+
+.diff-version-header {
+    flex: 1;
+    padding: 10px 15px;
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.diff-version-header:first-child {
+    border-right: 1px solid #ddd;
+}
+
+body.night-mode .diff-version-header:first-child {
+    border-right-color: #444;
+}
+
+.diff-version-label {
+    color: #333;
+    margin-right: 8px;
+}
+
+body.night-mode .diff-version-label {
+    color: #eee;
+}
+
+.diff-version-time {
+    color: #666;
+    font-size: 12px;
+}
+
+body.night-mode .diff-version-time {
+    color: #aaa;
+}
+
+.diff-content-wrapper {
+    flex: 1;
+    overflow: auto;
+    background: #fff;
+    max-height: 50vh;
+}
+
+body.night-mode .diff-content-wrapper {
+    background: #1e1e1e;
+}
+
+.diff-content {
+    display: flex;
+    flex-direction: column;
+    font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.diff-line {
+    display: flex;
+    min-height: 24px;
+}
+
+.diff-line:nth-child(even) {
+    background: rgba(0,0,0,0.02);
+}
+
+body.night-mode .diff-line:nth-child(even) {
+    background: rgba(255,255,255,0.02);
+}
+
+.diff-line-num {
+    width: 50px;
+    padding: 2px 8px;
+    text-align: right;
+    color: #999;
+    font-size: 12px;
+    background: #f5f5f5;
+    border-right: 1px solid #e0e0e0;
+    flex-shrink: 0;
+}
+
+body.night-mode .diff-line-num {
+    background: #2d2d2d;
+    border-right-color: #444;
+    color: #666;
+}
+
+.diff-line-content {
+    flex: 1;
+    padding: 2px 10px;
+    overflow: hidden;
+}
+
+.diff-line-content pre {
+    margin: 0;
+    white-space: pre-wrap;
+    word-break: break-all;
+    font-family: inherit;
+}
+
+.diff-empty {
+    background: repeating-linear-gradient(
+        45deg,
+        #f5f5f5,
+        #f5f5f5 10px,
+        #e8e8e8 10px,
+        #e8e8e8 20px
+    );
+}
+
+body.night-mode .diff-empty {
+    background: repeating-linear-gradient(
+        45deg,
+        #2d2d2d,
+        #2d2d2d 10px,
+        #3d3d3d 10px,
+        #3d3d3d 20px
+    );
+}
+
+/* 差异类型样式 */
+.diff-same .diff-line-content {
+    color: #333;
+}
+
+body.night-mode .diff-same .diff-line-content {
+    color: #ddd;
+}
+
+.diff-removed {
+    background: #ffe6e6 !important;
+}
+
+.diff-removed .diff-line-num {
+    background: #ffcccc;
+    color: #c00;
+}
+
+body.night-mode .diff-removed {
+    background: #4a1a1a !important;
+}
+
+body.night-mode .diff-removed .diff-line-num {
+    background: #5a2a2a;
+    color: #ff6666;
+}
+
+.diff-removed .diff-line-content {
+    color: #c00;
+}
+
+body.night-mode .diff-removed .diff-line-content {
+    color: #ff8888;
+}
+
+.diff-added {
+    background: #e6ffe6 !important;
+}
+
+.diff-added .diff-line-num {
+    background: #ccffcc;
+    color: #090;
+}
+
+body.night-mode .diff-added {
+    background: #1a4a1a !important;
+}
+
+body.night-mode .diff-added .diff-line-num {
+    background: #2a5a2a;
+    color: #66ff66;
+}
+
+.diff-added .diff-line-content {
+    color: #090;
+}
+
+body.night-mode .diff-added .diff-line-content {
+    color: #88ff88;
+}
+
 /* 同步状态指示器 */
 .sync-status {
     position: fixed;
