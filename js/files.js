@@ -1033,6 +1033,12 @@
                 }
             } else if (data.node.type === 'folder') {
                 safeToggleNode(data.instance, data.node);
+                // 点击文件夹后，保持当前打开文件的选中状态
+                const currentFileId = g('currentFileId');
+                if (currentFileId && data.instance.get_node(currentFileId)) {
+                    data.instance.deselect_node(data.node);
+                    data.instance.select_node(currentFileId);
+                }
             }
         })
         .on('click.jstree', function (e) {
