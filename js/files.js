@@ -429,6 +429,156 @@
         return true;
     }
 
+    // ---------- 差异对比功能 ----------
+    
+    /**
+     * 计算两个文本的差异（基于行的简单LCS算法）
+     * 返回格式：[{type: 'same'|'added'|'removed', left: string, right: string}]
+     */
+    function computeDiff(leftText, rightText) {
+        const leftLines = leftText.split('\n');
+        const rightLines = rightText.split('\n');
+        
+        // 使用动态规划计算LCS
+        const m = leftLines.length;
+        const n = rightLines.length;
+        const dp = Array(m + 1).fill(null).map(() => Array(n + 1).fill(0));
+        
+        for (let i = 1; i <= m; i++) {
+            for (let j = 1; j <= n; j++) {
+                if (leftLines[i - 1] === rightLines[j - 1]) {
+                    dp[i][j] = dp[i - 1][j - 1] + 1;
+                } else {
+                    dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]);
+                }
+            }
+        }
+        
+        // 回溯构建差异
+        const result = [];
+        let i = m, j = n;
+        
+        while (i > 0 || j > 0) {
+            if (i > 0 && j > 0 && leftLines[i - 1] === rightLines[j - 1]) {
+                result.unshift({
+                    type: 'same',
+                    left: leftLines[i - 1],
+                    right: rightLines[j - 1]
+                });
+                i--;
+                j--;
+            } else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) {
+                result.unshift({
+                    type: 'added',
+                    left: '',
+                    right: rightLines[j - 1]
+                });
+                j--;
+            } else {
+                result.unshift({
+                    type: 'removed',
+                    left: leftLines[i - 1],
+                    right: ''
+                });
+                i--;
+            }
+        }
+        
+        return result;
+    }
+    
+    /**
+     * 渲染差异对比视图
+     */
+    function renderDiffView(diffResult) {
+        let html = '';
+        diffResult.forEach(function(item, index) {
+            const lineNum = index + 1;
+            if (item.type === 'same') {
+                html += '<div class="diff-line diff-same">' +
+                    '<div class="diff-line-num">' + lineNum + '</div>' +
+                    '<div class="diff-line-content"><pre>' + escapeHtml(item.left) + '</pre></div>' +
+                    '<div class="diff-line-num">' + lineNum + '</div>' +
+                    '<div class="diff-line-content"><pre>' + escapeHtml(item.right) + '</pre></div>' +
+                    '</div>';
+            } else if (item.type === 'removed') {
+                html += '<div class="diff-line diff-removed">' +
+                    '<div class="diff-line-num">' + lineNum + '</div>' +
+                    '<div class="diff-line-content"><pre>' + escapeHtml(item.left) + '</pre></div>' +
+                    '<div class="diff-line-num">-</div>' +
+                    '<div class="diff-line-content diff-empty"></div>' +
+                    '</div>';
+            } else if (item.type === 'added') {
+                html += '<div class="diff-line diff-added">' +
+                    '<div class="diff-line-num">-</div>' +
+                    '<div class="diff-line-content diff-empty"></div>' +
+                    '<div class="diff-line-num">' + lineNum + '</div>' +
+                    '<div class="diff-line-content"><pre>' + escapeHtml(item.right) + '</pre></div>' +
+                    '</div>';
+            }
+        });
+        return html;
+    }
+    
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+    
+    /**
+     * 显示差异对比模态窗口
+     */
+    function showDiffModal(conflict) {
+        const diffModal = document.getElementById('diffModalOverlay');
+        const diffContent = document.getElementById('diffContent');
+        const diffFileName = document.getElementById('diffFileName');
+        const diffLocalTime = document.getElementById('diffLocalTime');
+        const diffServerTime = document.getElementById('diffServerTime');
+        
+        if (!diffModal || !diffContent) return;
+        
+        // 设置文件信息
+        diffFileName.textContent = conflict.filename;
+        diffLocalTime.textContent = new Date(conflict.localModified).toLocaleString();
+        diffServerTime.textContent = new Date(conflict.serverModified).toLocaleString();
+        
+        // 计算并渲染差异
+        const diffResult = computeDiff(conflict.localContent || '', conflict.serverContent || '');
+        diffContent.innerHTML = renderDiffView(diffResult);
+        
+        // 显示模态窗口
+        diffModal.classList.add('show');
+        
+        // 绑定关闭事件
+        const closeBtn = document.getElementById('closeDiffBtn');
+        const closeModalBtn = document.getElementById('closeDiffModalBtn');
+        
+        const closeModal = function() {
+            diffModal.classList.remove('show');
+        };
+        
+        if (closeBtn) closeBtn.onclick = closeModal;
+        if (closeModalBtn) closeModalBtn.onclick = closeModal;
+        
+        // 点击外部关闭
+        diffModal.onclick = function(e) {
+            if (e.target === diffModal) closeModal();
+        };
+        
+        // ESC键关闭
+        const handleEsc = function(e) {
+            if (e.key === 'Escape' && diffModal.classList.contains('show')) {
+                closeModal();
+                document.removeEventListener('keydown', handleEsc);
+            }
+        };
+        document.addEventListener('keydown', handleEsc);
+    }
+    
+    // 暴露到全局以便冲突模态窗口调用
+    global.showDiffModal = showDiffModal;
+
     function showConflictResolution(conflicts, serverFiles) {
         const conflictModal = document.getElementById('conflictModalOverlay');
         const conflictList = document.getElementById('conflictList');
@@ -439,11 +589,20 @@
             conflictItem.className = 'conflict-option';
 
             if (conflict.type === 'delete') {
-                conflictItem.innerHTML = '<div><strong style="color: #dc3545;">⚠️ ' + conflict.filename + '</strong><div class="conflict-details"><div style="color: #dc3545;">' + (isEn() ? 'This file has been deleted on the server' : '该文件在服务器上已经删除') + '</div><div>' + (isEn() ? 'Local modified time: ' : '本地修改时间: ') + new Date(conflict.localModified).toLocaleString() + '</div></div><div style="margin-top: 8px;"><label style="margin-right: 15px;"><input type="radio" name="conflict-' + index + '" value="upload">' + (isEn() ? 'Re-upload to server' : '重新上传到服务器') + '</label><label><input type="radio" name="conflict-' + index + '" value="delete" checked>' + (isEn() ? 'Delete local file' : '删除本地文件') + '</label></div></div>';
+                conflictItem.innerHTML = '<div style="flex:1;"><strong style="color: #dc3545;">⚠️ ' + conflict.filename + '</strong><div class="conflict-details"><div style="color: #dc3545;">' + (isEn() ? 'This file has been deleted on the server' : '该文件在服务器上已经删除') + '</div><div>' + (isEn() ? 'Local modified time: ' : '本地修改时间: ') + new Date(conflict.localModified).toLocaleString() + '</div></div><div style="margin-top: 8px;"><label style="margin-right: 15px;"><input type="radio" name="conflict-' + index + '" value="upload">' + (isEn() ? 'Re-upload to server' : '重新上传到服务器') + '</label><label><input type="radio" name="conflict-' + index + '" value="delete" checked>' + (isEn() ? 'Delete local file' : '删除本地文件') + '</label></div></div>';
             } else {
-                conflictItem.innerHTML = '<div><strong>' + conflict.filename + '</strong><div class="conflict-details"><div>' + (isEn() ? 'Local modified time: ' : '本地修改时间: ') + new Date(conflict.localModified).toLocaleString() + '</div><div>' + (isEn() ? 'Server modified time: ' : '服务器修改时间: ') + new Date(conflict.serverModified).toLocaleString() + '</div></div><div style="margin-top: 8px;"><label style="margin-right: 15px;"><input type="radio" name="conflict-' + index + '" value="local">' + (isEn() ? 'Use local version' : '使用本地版本') + '</label><label><input type="radio" name="conflict-' + index + '" value="server" checked>' + (isEn() ? 'Use server version' : '使用服务器版本') + '</label></div></div>';
+                conflictItem.innerHTML = '<div style="flex:1;"><strong>' + conflict.filename + '</strong><div class="conflict-details"><div>' + (isEn() ? 'Local modified time: ' : '本地修改时间: ') + new Date(conflict.localModified).toLocaleString() + '</div><div>' + (isEn() ? 'Server modified time: ' : '服务器修改时间: ') + new Date(conflict.serverModified).toLocaleString() + '</div></div><div style="margin-top: 8px;"><label style="margin-right: 15px;"><input type="radio" name="conflict-' + index + '" value="local">' + (isEn() ? 'Use local version' : '使用本地版本') + '</label><label><input type="radio" name="conflict-' + index + '" value="server" checked>' + (isEn() ? 'Use server version' : '使用服务器版本') + '</label></div></div><button class="diff-view-btn" data-index="' + index + '" title="' + (isEn() ? 'View differences' : '查看差异') + '"><i class="fas fa-columns"></i></button>';
             }
             conflictList.appendChild(conflictItem);
+        });
+        
+        // 绑定查看差异按钮事件
+        conflictList.querySelectorAll('.diff-view-btn').forEach(function(btn) {
+            btn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                const index = parseInt(this.getAttribute('data-index'));
+                showDiffModal(conflicts[index]);
+            });
         });
         conflictModal.classList.add('show');
         var resolveBtn = document.getElementById('resolveConflictsBtn');

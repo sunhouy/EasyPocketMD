@@ -438,8 +438,29 @@ function showFormulaPicker() {
         selectedFormula = null;
         if (!items || items.length === 0) {
             const emptyMsg = document.createElement('div');
-            emptyMsg.textContent = isEn() ? 'No matching formula found.' : '无匹配公式';
             emptyMsg.style.cssText = 'text-align:center;color:#888;padding:30px 0;grid-column: 1/-1;';
+            
+            // 获取当前搜索关键词
+            const searchKeyword = searchBox.value.trim();
+            
+            // 创建提示文本
+            const hintText = document.createElement('div');
+            hintText.textContent = isEn() ? 'No matching formula found.' : '无匹配公式';
+            hintText.style.cssText = 'margin-bottom: 10px;';
+            emptyMsg.appendChild(hintText);
+            
+            // 创建AI搜索链接
+            if (searchKeyword) {
+                const aiSearchLink = document.createElement('a');
+                aiSearchLink.href = 'javascript:void(0)';
+                aiSearchLink.textContent = isEn() ? 'Try AI Search' : '试试AI搜索';
+                aiSearchLink.style.cssText = 'color: #667eea; text-decoration: underline; cursor: pointer; font-size: 14px;';
+                aiSearchLink.addEventListener('click', function() {
+                    performAISearch(searchKeyword);
+                });
+                emptyMsg.appendChild(aiSearchLink);
+            }
+            
             formulaGrid.appendChild(emptyMsg);
             return;
         }
@@ -540,10 +561,20 @@ function showFormulaPicker() {
         if (firstTab) firstTab.click();
     }
 
+    // 获取当前选中的公式（支持本地和AI搜索结果）
+    function getSelectedFormula() {
+        // 优先使用本地选中的公式
+        if (selectedFormula) return selectedFormula;
+        // 其次使用AI搜索结果选中的公式
+        if (window.selectedFormula) return window.selectedFormula;
+        return null;
+    }
+
     // 插入按钮点击事件
     insertBtn.addEventListener('click', () => {
-        if (selectedFormula && vditor) {
-            vditor.insertValue(selectedFormula.latex + '\n\n');
+        const formula = getSelectedFormula();
+        if (formula && vditor) {
+            vditor.insertValue(formula.latex + '\n\n');
             closeFormulaPicker();
             showMessage(isEn() ? 'LaTeX formula inserted' : 'LaTeX公式已插入');
         } else {
@@ -553,8 +584,9 @@ function showFormulaPicker() {
 
     // 插入带$的公式
     wrapInDollarBtn.addEventListener('click', () => {
-        if (selectedFormula && vditor) {
-            vditor.insertValue(`$${selectedFormula.latex}$` + '\n\n');
+        const formula = getSelectedFormula();
+        if (formula && vditor) {
+            vditor.insertValue(`$${formula.latex}$` + '\n\n');
             closeFormulaPicker();
             showMessage(isEn() ? 'Inline formula inserted' : '行内公式已插入');
         } else {
@@ -564,8 +596,9 @@ function showFormulaPicker() {
 
     // 插入带$$的公式
     wrapInDoubleDollarBtn.addEventListener('click', () => {
-        if (selectedFormula && vditor) {
-            vditor.insertValue(`$$${selectedFormula.latex}$$` + '\n\n');
+        const formula = getSelectedFormula();
+        if (formula && vditor) {
+            vditor.insertValue(`$$${formula.latex}$$` + '\n\n');
             closeFormulaPicker();
             showMessage(isEn() ? 'Block formula inserted' : '块级公式已插入');
         } else {
@@ -588,6 +621,8 @@ function showFormulaPicker() {
         if (formulaSheet.parentNode) {
             formulaSheet.parentNode.removeChild(formulaSheet);
         }
+        // 清理全局选中的公式
+        window.selectedFormula = null;
     }
 
     // 添加键盘事件支持
@@ -598,6 +633,276 @@ function showFormulaPicker() {
         }
     }
     document.addEventListener('keydown', handleKeydown);
+}
+
+// AI搜索公式功能
+async function performAISearch(keyword) {
+    function isEn() { return window.i18n && window.i18n.getLanguage() === 'en'; }
+    
+    // 显示AI搜索加载状态
+    const formulaGrid = document.getElementById('formulaGrid');
+    if (!formulaGrid) return;
+    
+    formulaGrid.innerHTML = '';
+    
+    // 创建加载提示
+    const loadingDiv = document.createElement('div');
+    loadingDiv.style.cssText = 'text-align:center;padding:40px 0;grid-column: 1/-1;';
+    
+    const loadingIcon = document.createElement('div');
+    loadingIcon.innerHTML = '<i class="fas fa-magic" style="font-size: 32px; color: #667eea;"></i>';
+    loadingIcon.style.cssText = 'margin-bottom: 15px;';
+    
+    const loadingText = document.createElement('div');
+    loadingText.textContent = isEn() ? 'AI is searching...' : 'AI搜索中...';
+    loadingText.style.cssText = 'color: #667eea; font-size: 14px;';
+    
+    loadingDiv.appendChild(loadingIcon);
+    loadingDiv.appendChild(loadingText);
+    formulaGrid.appendChild(loadingDiv);
+    
+    try {
+        // 调用AI接口搜索公式
+        const apiUrl = (window.getApiBaseUrl ? window.getApiBaseUrl() : 'api') + '/ai/formula';
+        
+        const response = await fetch(apiUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + (window.currentUser ? (window.currentUser.token || window.currentUser.username) : '')
+            },
+            body: JSON.stringify({
+                keyword: keyword,
+                language: isEn() ? 'en' : 'zh'
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (result.code === 200 && result.data) {
+            // 解析AI返回的公式数据
+            const aiFormulas = parseAIFormulaResponse(result.data);
+            
+            if (aiFormulas.length > 0) {
+                // 显示AI搜索结果
+                renderAIFormulaResults(aiFormulas, keyword);
+            } else {
+                // AI也没找到结果
+                showAINoResult(keyword);
+            }
+        } else {
+            // API调用失败，显示错误
+            showAIError(result.message || (isEn() ? 'AI search failed' : 'AI搜索失败'));
+        }
+    } catch (error) {
+        console.error('AI搜索错误:', error);
+        showAIError(isEn() ? 'Network error, please try again' : '网络错误，请重试');
+    }
+}
+
+// 解析AI返回的公式响应
+function parseAIFormulaResponse(aiResponse) {
+    const formulas = [];
+    
+    // 尝试解析JSON格式的响应
+    try {
+        // 如果AI返回的是JSON数组
+        const parsed = JSON.parse(aiResponse);
+        if (Array.isArray(parsed)) {
+            return parsed.map(item => ({
+                display: item.display || item.name || item.latex,
+                latex: item.latex || item.formula || item.code,
+                description: item.description || ''
+            }));
+        }
+    } catch (e) {
+        // 不是JSON格式，尝试按行解析
+    }
+    
+    // 尝试按常见格式解析文本响应
+    // 格式1: display | latex
+    // 格式2: display: latex
+    const lines = aiResponse.split('\n').filter(line => line.trim());
+    
+    for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+        
+        // 跳过说明性文字
+        if (trimmed.startsWith('以下是') || trimmed.startsWith('Here are') || 
+            trimmed.startsWith('这是') || trimmed.startsWith('These are')) {
+            continue;
+        }
+        
+        let display = '';
+        let latex = '';
+        
+        // 尝试匹配 | 分隔符
+        if (trimmed.includes('|')) {
+            const parts = trimmed.split('|').map(p => p.trim());
+            if (parts.length >= 2) {
+                display = parts[0];
+                latex = parts[1];
+            }
+        }
+        // 尝试匹配 : 分隔符
+        else if (trimmed.includes(':')) {
+            const parts = trimmed.split(':').map(p => p.trim());
+            if (parts.length >= 2) {
+                display = parts[0];
+                latex = parts[1];
+            }
+        }
+        // 尝试匹配 LaTeX 代码（以 \ 开头）
+        else if (trimmed.includes('\\')) {
+            const latexMatch = trimmed.match(/(\\[a-zA-Z]+(?:\{[^}]*\})*)/);
+            if (latexMatch) {
+                latex = latexMatch[1];
+                display = trimmed.replace(latex, '').trim() || latex;
+            } else {
+                latex = trimmed;
+                display = trimmed;
+            }
+        }
+        // 默认情况
+        else {
+            display = trimmed;
+            latex = trimmed;
+        }
+        
+        if (latex) {
+            formulas.push({
+                display: display || latex,
+                latex: latex,
+                description: ''
+            });
+        }
+    }
+    
+    return formulas;
+}
+
+// 显示AI搜索结果
+function renderAIFormulaResults(formulas, keyword) {
+    function isEn() { return window.i18n && window.i18n.getLanguage() === 'en'; }
+    
+    const formulaGrid = document.getElementById('formulaGrid');
+    if (!formulaGrid) return;
+    
+    formulaGrid.innerHTML = '';
+    
+    // 添加AI搜索结果标题
+    const resultHeader = document.createElement('div');
+    resultHeader.style.cssText = 'grid-column: 1/-1; padding: 10px 0; border-bottom: 1px solid #eee; margin-bottom: 10px;';
+    resultHeader.innerHTML = `<span style="color: #667eea; font-weight: bold;">${isEn() ? 'AI Search Results' : 'AI搜索结果'}</span> <span style="color: #888; font-size: 12px;">"${keyword}"</span>`;
+    formulaGrid.appendChild(resultHeader);
+    
+    // 渲染公式列表
+    formulas.forEach(item => {
+        const symbolBtn = document.createElement('button');
+        symbolBtn.innerHTML = `<span style="font-size: 16px;">${item.display}</span>`;
+        symbolBtn.title = `LaTeX: ${item.latex}`;
+        symbolBtn.style.cssText = `
+            padding: 10px;
+            border: 2px solid transparent;
+            background: none;
+            cursor: pointer;
+            border-radius: 6px;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Times New Roman', serif;
+            color: ${(window.nightMode === true) ? '#fff' : '#333'};
+            text-align: center;
+            word-break: break-all;
+            min-height: 60px;
+            flex-direction: column;
+        `;
+        
+        const latexPreview = document.createElement('div');
+        latexPreview.textContent = item.latex;
+        latexPreview.style.cssText = `
+            font-size: 10px;
+            color: ${(window.nightMode === true) ? '#aaa' : '#666'};
+            margin-top: 5px;
+            font-family: 'Courier New', monospace;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 100%;
+        `;
+        symbolBtn.appendChild(latexPreview);
+        
+        // 点击选择公式
+        symbolBtn.addEventListener('click', () => {
+            document.querySelectorAll('#formulaGrid button').forEach(btn => {
+                btn.style.borderColor = 'transparent';
+                btn.style.background = 'none';
+            });
+            symbolBtn.style.borderColor = '#667eea';
+            symbolBtn.style.background = (window.nightMode === true) ? 'rgba(102, 126, 234, 0.2)' : 'rgba(102, 126, 234, 0.1)';
+            
+            // 保存选中的公式到全局变量供插入按钮使用
+            window.selectedFormula = item;
+        });
+        
+        symbolBtn.addEventListener('mouseenter', function() {
+            if (window.selectedFormula !== item) {
+                this.style.background = (window.nightMode === true) ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)';
+            }
+        });
+        
+        symbolBtn.addEventListener('mouseleave', function() {
+            if (window.selectedFormula !== item) {
+                this.style.background = 'none';
+            }
+        });
+        
+        formulaGrid.appendChild(symbolBtn);
+    });
+    
+    // 添加返回提示
+    const backHint = document.createElement('div');
+    backHint.style.cssText = 'grid-column: 1/-1; text-align: center; padding: 10px 0; font-size: 12px; color: #888;';
+    backHint.textContent = isEn() ? 'Click a formula to select it, then use the buttons below to insert' : '点击公式选择，然后使用下方按钮插入';
+    formulaGrid.appendChild(backHint);
+}
+
+// 显示AI无结果
+function showAINoResult(keyword) {
+    function isEn() { return window.i18n && window.i18n.getLanguage() === 'en'; }
+    
+    const formulaGrid = document.getElementById('formulaGrid');
+    if (!formulaGrid) return;
+    
+    formulaGrid.innerHTML = '';
+    
+    const emptyMsg = document.createElement('div');
+    emptyMsg.style.cssText = 'text-align:center;color:#888;padding:30px 0;grid-column: 1/-1;';
+    emptyMsg.innerHTML = `
+        <div style="margin-bottom: 10px;">${isEn() ? 'AI could not find matching formulas' : 'AI未找到匹配的公式'}</div>
+        <div style="font-size: 12px; color: #aaa;">${isEn() ? 'Try different keywords' : '请尝试其他关键词'}</div>
+    `;
+    formulaGrid.appendChild(emptyMsg);
+}
+
+// 显示AI错误
+function showAIError(errorMessage) {
+    function isEn() { return window.i18n && window.i18n.getLanguage() === 'en'; }
+    
+    const formulaGrid = document.getElementById('formulaGrid');
+    if (!formulaGrid) return;
+    
+    formulaGrid.innerHTML = '';
+    
+    const errorDiv = document.createElement('div');
+    errorDiv.style.cssText = 'text-align:center;color:#dc3545;padding:30px 0;grid-column: 1/-1;';
+    errorDiv.innerHTML = `
+        <div style="margin-bottom: 10px;"><i class="fas fa-exclamation-circle"></i></div>
+        <div>${errorMessage}</div>
+    `;
+    formulaGrid.appendChild(errorDiv);
 }
 
 // 导出函数到全局对象

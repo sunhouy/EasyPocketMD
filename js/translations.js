@@ -41,6 +41,13 @@
             conflictSubtitle: '以下文件在本地和服务器上存在不同版本',
             resolveConflictInfo: '请为每个冲突的文件选择保留哪个版本',
             resolveConflicts: '确认解决冲突',
+            viewDiff: '查看差异',
+            localVersion: '本地版本',
+            serverVersion: '服务器版本',
+
+            // 差异对比
+            diffTitle: '文件差异对比',
+            diffInfo: '左侧为本地版本，右侧为服务器版本。绿色表示新增，红色表示删除。',
 
             // 历史版本
             historyTitle: '历史版本',
@@ -394,6 +401,13 @@
             conflictSubtitle: 'The following files have different versions locally and on the server',
             resolveConflictInfo: 'Please choose which version to keep for each conflicting file',
             resolveConflicts: 'Resolve Conflicts',
+            viewDiff: 'View Differences',
+            localVersion: 'Local Version',
+            serverVersion: 'Server Version',
+
+            // Diff comparison
+            diffTitle: 'File Diff Comparison',
+            diffInfo: 'Left side is local version, right side is server version. Green indicates additions, red indicates deletions.',
 
             // History versions
             historyTitle: 'History Versions',

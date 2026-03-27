@@ -131,4 +131,148 @@ router.post('/layout', async (req, res) => {
     }
 });
 
+// AI Formula Search endpoint
+router.post('/formula', async (req, res) => {
+    try {
+        const { keyword, language } = req.body;
+        
+        if (!keyword) {
+            return res.status(400).json({ 
+                code: 400, 
+                message: 'Keyword is required' 
+            });
+        }
+
+        const apiKey = process.env.DASHSCOPE_API_KEY;
+        if (!apiKey) {
+            return res.status(500).json({
+                code: 500,
+                message: 'AI API Key is not configured on server'
+            });
+        }
+
+        // Construct system prompt based on language
+        const isEnglish = language === 'en';
+        const systemPrompt = isEnglish 
+            ? `You are a LaTeX formula expert. Given a user's search keyword, provide relevant LaTeX formulas.
+Return the results in the following format (one formula per line):
+display_name | latex_code
+
+For example:
+Quadratic formula | x = \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}
+Summation | \\sum_{i=1}^{n} x_i
+Integral | \\int_{a}^{b} f(x) \\,dx
+
+Provide 5-10 most relevant formulas. Only return the formula list, no explanations.`
+            : `你是LaTeX公式专家。根据用户的搜索关键词，提供相关的LaTeX公式。
+请按以下格式返回结果（每行一个公式）：
+显示名称 | latex代码
+
+例如：
+二次公式 | x = \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}
+求和符号 | \\sum_{i=1}^{n} x_i
+积分 | \\int_{a}^{b} f(x) \\,dx
+
+提供5-10个最相关的公式。只返回公式列表，不要解释。`;
+
+        const userPrompt = isEnglish
+            ? `Search for LaTeX formulas related to: "${keyword}"`
+            : `搜索与"${keyword}"相关的LaTeX公式`;
+
+        // Call DashScope API
+        const requestBody = JSON.stringify({
+            model: "qwen-turbo",
+            input: {
+                messages: [
+                    {
+                        role: "system",
+                        content: systemPrompt
+                    },
+                    {
+                        role: "user",
+                        content: userPrompt
+                    }
+                ]
+            },
+            parameters: {
+                result_format: "message"
+            }
+        });
+
+        const options = {
+            hostname: 'dashscope.aliyuncs.com',
+            path: '/api/v1/services/aigc/text-generation/generation',
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`,
+                'Content-Length': Buffer.byteLength(requestBody)
+            }
+        };
+
+        const apiRequest = https.request(options, (apiRes) => {
+            let data = '';
+            
+            apiRes.on('data', (chunk) => {
+                data += chunk;
+            });
+            
+            apiRes.on('end', () => {
+                if (apiRes.statusCode >= 200 && apiRes.statusCode < 300) {
+                    try {
+                        const response = JSON.parse(data);
+                        if (response.output && response.output.choices && response.output.choices.length > 0) {
+                            const aiContent = response.output.choices[0].message.content;
+                            res.json({
+                                code: 200,
+                                data: aiContent
+                            });
+                        } else {
+                            console.error('DashScope API unexpected response:', response);
+                            res.status(500).json({
+                                code: 500,
+                                message: 'AI processing failed',
+                                error: response.message || 'Unknown error'
+                            });
+                        }
+                    } catch (e) {
+                        console.error('Failed to parse DashScope response:', e);
+                        res.status(500).json({
+                            code: 500,
+                            message: 'Failed to parse AI response'
+                        });
+                    }
+                } else {
+                    console.error(`DashScope API Error: ${apiRes.statusCode}`, data);
+                    res.status(apiRes.statusCode).json({
+                        code: apiRes.statusCode,
+                        message: 'AI API request failed',
+                        error: data
+                    });
+                }
+            });
+        });
+
+        apiRequest.on('error', (e) => {
+            console.error('DashScope Request Error:', e);
+            res.status(500).json({
+                code: 500,
+                message: 'Network error calling AI service',
+                error: e.message
+            });
+        });
+
+        apiRequest.write(requestBody);
+        apiRequest.end();
+
+    } catch (error) {
+        console.error('AI Formula Search error:', error);
+        return res.status(500).json({
+            code: 500,
+            message: 'Internal server error',
+            error: error.message
+        });
+    }
+});
+
 module.exports = router;
