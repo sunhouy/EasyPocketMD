@@ -1,11 +1,19 @@
 
-import { generatePDF } from './pdf-generator.js';
-
 const global = window;
 
 function g(name) { return global[name]; }
 function isEn() { return window.i18n && window.i18n.getLanguage() === 'en'; }
 function t(key) { return window.i18n ? window.i18n.t(key) : key; }
+
+// 懒加载 PDF 生成器
+async function getPDFGenerator() {
+    if (!global.generatePDF) {
+        const module = await import('./pdf-generator.js');
+        global.generatePDF = module.generatePDF;
+        global.renderPDF = module.renderPDF;
+    }
+    return { generatePDF: global.generatePDF, renderPDF: global.renderPDF };
+}
 
 function exportContent() {
     if (!g('vditor')) return;
@@ -44,7 +52,8 @@ async function exportFile(content, ext) {
                     }
                     var htmlContent = await global.preparePrintContent(content, settings);
                     
-                    // 生成PDF并获取URL
+                    // 懒加载 PDF 生成器并生成PDF
+                    const { generatePDF } = await getPDFGenerator();
                     var pdfUrl = await generatePDF(htmlContent, settings);
                     
                     // 如果是 Capacitor 环境，使用特殊的下载逻辑

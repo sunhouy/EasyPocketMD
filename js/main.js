@@ -36,7 +36,13 @@ document.addEventListener('DOMContentLoaded', function() {
         { id: 'mobileUncertaintyBtn', icon: 'fas fa-calculator', textKey: 'uncertainty', fn: function() { if (typeof window.showUncertaintyCalculator === 'function') window.showUncertaintyCalculator(); } },
         { id: 'mobileUndoBtn', icon: 'fas fa-undo', textKey: 'undo', fn: function() { if (window.vditor && window.vditor.vditor && window.vditor.vditor.undo) window.vditor.vditor.undo.undo(window.vditor.vditor); } },
         { id: 'mobileRedoBtn', icon: 'fas fa-redo', textKey: 'redo', fn: function() { if (window.vditor && window.vditor.vditor && window.vditor.vditor.undo) window.vditor.vditor.undo.redo(window.vditor.vditor); } },
-        { id: 'mobileAIBtn', icon: 'fas fa-robot', textKey: 'aiAssistant', fn: function() { if (typeof window.showAIPanel === 'function') window.showAIPanel(); } }
+        { id: 'mobileAIBtn', icon: 'fas fa-robot', textKey: 'aiAssistant', fn: async function() {
+            if (typeof window.showAIPanel !== 'function') {
+                // 懒加载 AI 助手模块
+                await import('./ui/ai-assistant.js');
+            }
+            if (typeof window.showAIPanel === 'function') window.showAIPanel();
+        } }
     ];
 
     // 默认配置
@@ -186,15 +192,6 @@ document.addEventListener('DOMContentLoaded', function() {
             // 初始化用户界面和移动特性
             initUserInterface();
             initMobileFeatures();
-
-            // 延迟加载PDF库，不阻塞首屏
-            setTimeout(function() {
-                import('./ui/pdf-generator.js').then(module => {
-                    window.generatePDF = module.generatePDF;
-                    window.renderPDF = module.renderPDF;
-                    // console.log('PDF modules loaded');
-                }).catch(err => console.error('Failed to load PDF modules', err));
-            }, 100);
             document.addEventListener('keydown', function(e) {
                 if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); window.saveCurrentFile(true); }
                 if (e.ctrlKey && e.shiftKey && e.key === 'L') { e.preventDefault(); window.toggleNightMode(); }

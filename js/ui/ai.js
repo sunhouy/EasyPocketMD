@@ -12,6 +12,16 @@
         format: 'standard'
     };
 
+    // 懒加载 PDF 生成器
+    async function getPDFGenerator() {
+        if (!global.generatePDF) {
+            const module = await import('./pdf-generator.js');
+            global.generatePDF = module.generatePDF;
+            global.renderPDF = module.renderPDF;
+        }
+        return { generatePDF: global.generatePDF, renderPDF: global.renderPDF };
+    }
+
     function showAILayoutDialog(parentModalContent, cleanupFunc, parentModal) {
         var nightMode = g('nightMode') === true;
         
@@ -315,24 +325,20 @@
         document.body.appendChild(loadingModal);
 
         try {
-            // Ensure generatePDF and renderPDF are available
-            if (!global.generatePDF) {
-                
-                console.error('generatePDF not found on global object');
-                throw new Error(isEn() ? 'PDF generation module not loaded' : 'PDF生成模块未加载');
-            }
+            // 懒加载 PDF 生成器
+            const { generatePDF, renderPDF } = await getPDFGenerator();
 
-            var pdfUrl = await global.generatePDF(html, settings);
-            
+            var pdfUrl = await generatePDF(html, settings);
+
             loadingModal.remove();
 
             previewModal = document.createElement('div');
             previewModal.className = 'modal-overlay';
             previewModal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.9);z-index:10003;display:flex;flex-direction:column;align-items:stretch;justify-content:stretch;padding:0;';
-            
+
             var previewContent = document.createElement('div');
             previewContent.style.cssText = 'background:' + (nightMode ? '#1a1a1a' : '#f0f0f0') + ';border-radius:0;display:flex;flex-direction:column;flex:1;box-shadow:none;border:none;min-height:0;';
-            
+
             var closeBtn = document.createElement('button');
             closeBtn.innerHTML = '<i class="fas fa-times"></i>';
             closeBtn.style.cssText = 'position:absolute;top:10px;right:10px;background:' + (nightMode ? '#333' : '#fff') + ';border:1px solid ' + (nightMode ? '#555' : '#ddd') + ';color:#666;font-size:16px;cursor:pointer;padding:8px;border-radius:4px;z-index:10;';
@@ -340,14 +346,14 @@
             // Document container
             var docContainer = document.createElement('div');
             docContainer.style.cssText = 'flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;overflow:auto;padding:20px;min-height:0;';
-            
+
             var pagesWrapper = document.createElement('div');
             pagesWrapper.style.cssText = 'display:flex;flex-direction:column;gap:20px;align-items:center;width:100%;max-width:800px;';
-            
+
             docContainer.appendChild(pagesWrapper);
-            
+
             // Render PDF
-            await global.renderPDF(pdfUrl, pagesWrapper);
+            await renderPDF(pdfUrl, pagesWrapper);
             
             // Bottom action buttons
             var buttonContainer = document.createElement('div');
