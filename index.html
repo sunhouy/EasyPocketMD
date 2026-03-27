@@ -446,7 +446,6 @@
         </button>
         <div class="modal-header" style="flex-shrink:0;">
             <h2 data-i18n="aiAssistant">AI助手</h2>
-            <p data-i18n="aiSubtitle">智能写作助手，让创作更轻松</p>
         </div>
         <div class="ai-main-content" style="flex:1;overflow-y:auto;padding:15px;">
             <!-- 主界面：四个功能按钮 -->
@@ -522,21 +521,95 @@
             <div id="aiPPTMenu" class="ai-submenu" style="display:none;">
                 <button class="ai-back-btn" data-back="main"><i class="fas fa-arrow-left"></i> <span data-i18n="back">返回</span></button>
                 <h3 data-i18n="aiPPT">生成PPT</h3>
-                <div class="ai-option-grid">
-                    <button class="ai-option-btn" data-ppt-type="current">📄 <span data-i18n="pptFromCurrent">根据本文件内容生成</span></button>
-                    <button class="ai-option-btn" data-ppt-type="topic">💡 <span data-i18n="pptFromTopic">输入主题生成</span></button>
-                    <button class="ai-option-btn" data-ppt-type="outline">📋 <span data-i18n="pptFromOutline">输入大纲生成</span></button>
-                </div>
-                <div class="ai-ppt-options">
-                    <label data-i18n="pptRatio">PPT比例：</label>
-                    <div class="ai-ratio-group">
-                        <label><input type="radio" name="pptRatio" value="4:3" checked> 4:3</label>
-                        <label><input type="radio" name="pptRatio" value="16:9"> 16:9</label>
+                
+                <!-- 步骤1：输入主题/大纲 -->
+                <div id="aiPPTInputSection">
+                    <div class="ai-ppt-options" style="margin-bottom:15px;">
+                        <label data-i18n="pptRatio">PPT比例：</label>
+                        <div class="ai-ratio-group">
+                            <label><input type="radio" name="pptRatio" value="16:9" checked> 16:9</label>
+                            <label><input type="radio" name="pptRatio" value="4:3"> 4:3</label>
+                        </div>
+                    </div>
+                    <div class="ai-input-area">
+                        <textarea id="aiPPTInput" placeholder="请输入主题或大纲...&#10;&#10;示例格式：&#10;**第1页：标题**&#10;- 要点1&#10;- 要点2&#10;&#10;**第2页：内容**&#10;- 要点1&#10;- 要点2" data-i18n-placeholder="aiPPTPlaceholder" style="min-height:180px;"></textarea>
+                        <button class="ai-generate-btn" id="aiPPTGenerateOutline"><i class="fas fa-magic"></i> <span data-i18n="generateOutline">生成大纲</span></button>
                     </div>
                 </div>
-                <div class="ai-input-area">
-                    <textarea id="aiPPTInput" placeholder="请输入主题或大纲..." data-i18n-placeholder="aiPPTPlaceholder"></textarea>
-                    <button class="ai-generate-btn" id="aiPPTGenerate"><i class="fas fa-sparkles"></i> <span data-i18n="generate">生成</span></button>
+
+                <!-- 步骤2：大纲预览 -->
+                <div id="aiPPTOutlineSection" style="display:none;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;">
+                        <h4 style="margin:0;" data-i18n="outlinePreview">大纲预览</h4>
+                        <button id="aiPPTEEditOutline" style="padding:6px 12px;background:transparent;border:1px solid #ddd;border-radius:6px;cursor:pointer;font-size:13px;">
+                            <i class="fas fa-edit"></i> <span data-i18n="edit">编辑</span>
+                        </button>
+                    </div>
+                    <div id="aiPPTOutlinePreview" style="max-height:250px;overflow-y:auto;padding:10px;background:#f8f9fa;border-radius:8px;margin-bottom:15px;">
+                        <!-- 大纲内容 -->
+                    </div>
+                    <div style="display:flex;gap:10px;">
+                        <button id="aiPPTBackToInput" style="flex:1;padding:10px;background:transparent;border:1px solid #ddd;border-radius:8px;cursor:pointer;">
+                            <i class="fas fa-arrow-left"></i> <span data-i18n="back">返回</span>
+                        </button>
+                        <button id="aiPPTGeneratePages" style="flex:2;padding:10px;background:linear-gradient(135deg, #27ae60 0%, #219a52 100%);color:white;border:none;border-radius:8px;cursor:pointer;">
+                            <i class="fas fa-play"></i> <span data-i18n="generatePages">生成页面</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 步骤3：分页预览和编辑 -->
+                <div id="aiPPTPagesSection" style="display:none;">
+                    <div style="display:flex;gap:10px;height:350px;">
+                        <!-- 左侧页面列表 -->
+                        <div style="width:140px;flex-shrink:0;display:flex;flex-direction:column;">
+                            <h4 style="margin:0 0 8px 0;font-size:13px;" data-i18n="pages">页面</h4>
+                            <div id="aiPPTPagesList" style="flex:1;overflow-y:auto;border:1px solid #ddd;border-radius:6px;padding:8px;background:#f8f9fa;">
+                                <!-- 页面列表 -->
+                            </div>
+                            <button id="aiPPTAddPage" style="margin-top:8px;padding:8px;background:transparent;border:1px dashed #ccc;border-radius:6px;cursor:pointer;font-size:12px;color:#666;">
+                                <i class="fas fa-plus"></i> <span data-i18n="add">添加</span>
+                            </button>
+                        </div>
+                        
+                        <!-- 右侧预览 -->
+                        <div style="flex:1;display:flex;flex-direction:column;">
+                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                                <span id="aiPPTCurrentPageLabel" style="font-size:12px;color:#666;">Page 1 / 5</span>
+                                <div style="display:flex;gap:6px;">
+                                    <button id="aiPPTRegeneratePage" style="padding:5px 10px;background:transparent;border:1px solid #ddd;border-radius:5px;cursor:pointer;font-size:11px;">
+                                        <i class="fas fa-redo"></i> <span data-i18n="regen">重生成</span>
+                                    </button>
+                                    <button id="aiPPTEditPage" style="padding:5px 10px;background:transparent;border:1px solid #ddd;border-radius:5px;cursor:pointer;font-size:11px;">
+                                        <i class="fas fa-edit"></i> <span data-i18n="edit">编辑</span>
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div style="flex:1;border:1px solid #ddd;border-radius:8px;overflow:auto;background:#f0f0f0;position:relative;display:flex;align-items:center;justify-content:center;padding:10px;">
+                                <div id="aiPPTPagePreviewWrapper" style="background:white;box-shadow:0 2px 8px rgba(0,0,0,0.1);overflow:hidden;">
+                                    <div id="aiPPTPagePreview" style="width:100%;height:100%;padding:30px;box-sizing:border-box;color:#333;overflow:auto;">
+                                        <!-- 页面内容 -->
+                                    </div>
+                                </div>
+                                <div id="aiPPTPageLoading" style="display:none;position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);align-items:center;justify-content:center;z-index:10;">
+                                    <div style="text-align:center;color:white;">
+                                        <i class="fas fa-spinner fa-spin" style="font-size:24px;margin-bottom:8px;"></i>
+                                        <p style="margin:0;font-size:12px;" data-i18n="generating">生成中...</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div style="display:flex;gap:10px;margin-top:15px;">
+                        <button id="aiPPTBackToOutline" style="flex:1;padding:10px;background:transparent;border:1px solid #ddd;border-radius:8px;cursor:pointer;">
+                            <i class="fas fa-arrow-left"></i> <span data-i18n="back">返回</span>
+                        </button>
+                        <button id="aiPPTDownload" style="flex:2;padding:10px;background:linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);color:white;border:none;border-radius:8px;cursor:pointer;">
+                            <i class="fas fa-download"></i> <span data-i18n="downloadPPT">下载PPT</span>
+                        </button>
+                    </div>
                 </div>
             </div>
             <!-- 生成结果展示 -->

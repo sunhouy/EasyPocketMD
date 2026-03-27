@@ -45,8 +45,8 @@ document.addEventListener('DOMContentLoaded', function() {
         } }
     ];
 
-    // 默认配置
-    window.defaultToolbarButtons = ['mobileInsertBtn', 'mobileFormulaBtn', 'mobileChartBtn', 'mobileUndoBtn', 'mobileRedoBtn'];
+    // 默认配置（未登录时显示：插入、公式、图表、撤销、重做、AI助手）
+    window.defaultToolbarButtons = ['mobileInsertBtn', 'mobileFormulaBtn', 'mobileChartBtn', 'mobileUndoBtn', 'mobileRedoBtn', 'mobileAIBtn'];
 
     // 加载用户配置
     window.userSettings = JSON.parse(localStorage.getItem('vditor_settings') || '{}');
@@ -416,7 +416,13 @@ document.addEventListener('DOMContentLoaded', function() {
         var mobileFileManagerBtn = document.getElementById('mobileFileManagerBtn');
         if (mobileFileManagerBtn) mobileFileManagerBtn.addEventListener('click', function() { window.showFileManager(); closeDrop(); });
         var mobilePrintBtn = document.getElementById('mobilePrintBtn');
-        if (mobilePrintBtn) mobilePrintBtn.addEventListener('click', function() { window.showPrintDialog(); closeDrop(); });
+        if (mobilePrintBtn) mobilePrintBtn.addEventListener('click', async function() {
+            if (typeof window.showPrintDialog !== 'function') {
+                await import('./ui/print.js');
+            }
+            window.showPrintDialog();
+            closeDrop();
+        });
 
         var mobilePresentationBtn = document.getElementById('mobilePresentationBtn');
         if (mobilePresentationBtn) mobilePresentationBtn.addEventListener('click', function() { enterPresentationMode(); closeDrop(); });
@@ -547,7 +553,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
             { id: 'mobileShareBtn', fn: function() { window.showShareDialog(); closeDrop(); } },
             { id: 'mobileFileManagerBtn', fn: function() { window.showFileManager(); closeDrop(); } },
-            { id: 'mobilePrintBtn', fn: function() { window.showPrintDialog(); closeDrop(); } },
+            { id: 'mobilePrintBtn', fn: async function() {
+                if (typeof window.showPrintDialog !== 'function') {
+                    await import('./ui/print.js');
+                }
+                window.showPrintDialog();
+                closeDrop();
+            } },
             { id: 'mobilePresentationBtn', fn: function() { enterPresentationMode(); closeDrop(); } },
             { id: 'mobileMenuBtn', fn: function(e) { e.stopPropagation(); if (dropdown) dropdown.classList.toggle('show'); } },
             { id: 'mobileModeBtn', fn: function() { showModeSelection(); closeDrop(); } },

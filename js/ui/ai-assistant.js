@@ -306,6 +306,10 @@
                 var action = this.getAttribute('data-ai-action');
                 if (action) {
                     showAIMenu(action);
+                    // 如果是PPT菜单，初始化PPT生成器
+                    if (action === 'ppt' && typeof global.initPPTGenerator === 'function') {
+                        global.initPPTGenerator();
+                    }
                 }
             });
         });
@@ -441,68 +445,6 @@
                     document.getElementById('aiFormatInput').value = input.substring(0, 500) + (input.length > 500 ? '...' : '');
                 }
                 generateContent('format', currentAIState.selectedType, input);
-            });
-        }
-
-        var pptGenerateBtn = document.getElementById('aiPPTGenerate');
-        if (pptGenerateBtn) {
-            pptGenerateBtn.addEventListener('click', function() {
-                // 添加点击动画效果
-                this.style.transform = 'scale(0.98)';
-                setTimeout(function() {
-                    this.style.transform = '';
-                }.bind(this), 100);
-
-                var input = document.getElementById('aiPPTInput').value.trim();
-                var ratio = document.querySelector('input[name="pptRatio"]:checked');
-                var ratioValue = ratio ? ratio.value : '16:9';
-
-                // 关闭AI助手面板
-                closeAIPanel();
-
-                // 打开PPT生成器
-                if (typeof global.showPPTGenerator === 'function') {
-                    global.showPPTGenerator();
-                    
-                    // 根据选择类型设置内容
-                    if (currentAIState.selectedType === 'current') {
-                        // 根据当前文件生成
-                        var content = getEditorContent();
-                        if (content) {
-                            // 提取主题（使用第一行或文件名）
-                            var topic = content.split('\n')[0].replace(/^#+\s*/, '').substring(0, 50);
-                            setTimeout(function() {
-                                var topicInput = document.getElementById('pptTopicInput');
-                                var outlineInput = document.getElementById('pptOutlineInput');
-                                if (topicInput) topicInput.value = topic;
-                                if (outlineInput) outlineInput.value = content.substring(0, 2000);
-                            }, 100);
-                        }
-                    } else if (input) {
-                        // 根据输入的主题或大纲生成
-                        setTimeout(function() {
-                            var topicInput = document.getElementById('pptTopicInput');
-                            var outlineInput = document.getElementById('pptOutlineInput');
-                            if (topicInput) topicInput.value = input.substring(0, 100);
-                            if (outlineInput && currentAIState.selectedType === 'outline') {
-                                if (outlineInput) outlineInput.value = input;
-                            }
-                        }, 100);
-                    }
-                    
-                    // 设置比例
-                    setTimeout(function() {
-                        var ratioRadio = document.querySelector('input[name="pptRatioSelect"][value="' + ratioValue + '"]');
-                        if (ratioRadio) {
-                            ratioRadio.checked = true;
-                            ratioRadio.dispatchEvent(new Event('change'));
-                        }
-                    }, 100);
-                } else {
-                    if (global.showMessage) {
-                        global.showMessage(isEn() ? 'PPT generator not loaded' : 'PPT生成器未加载', 'error');
-                    }
-                }
             });
         }
 
