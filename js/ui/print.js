@@ -1,12 +1,20 @@
 
-import { generatePDF, renderPDF } from './pdf-generator.js';
-
 const global = window;
 
 function g(name) { return global[name]; }
 
 function isEn() { return window.i18n && window.i18n.getLanguage() === 'en'; }
 function t(key) { return window.i18n ? window.i18n.t(key) : key; }
+
+// 懒加载 PDF 生成器
+async function getPDFGenerator() {
+    if (!global.generatePDF) {
+        const module = await import('./pdf-generator.js');
+        global.generatePDF = module.generatePDF;
+        global.renderPDF = module.renderPDF;
+    }
+    return { generatePDF: global.generatePDF, renderPDF: global.renderPDF };
+}
 
 /**
  * 在 Capacitor 中处理文件下载/分享
@@ -1485,7 +1493,8 @@ async function downloadInCapacitor(data, filename, mimeType, isRawData = false) 
 
         try {
             var htmlContent = await preparePrintContent(content, settings);
-            // generatePDF returns a URL now
+            // 懒加载 PDF 生成器并生成PDF
+            const { generatePDF } = await getPDFGenerator();
             var pdfUrl = await generatePDF(htmlContent, settings, 'document.pdf');
             
             loadingModal.remove();
@@ -1588,7 +1597,7 @@ async function downloadInCapacitor(data, filename, mimeType, isRawData = false) 
         document.body.appendChild(loadingModal);
         
         // 函数：显示预览页面
-        var showPreview = function() {
+        var showPreview = async function() {
             if (!pdfUrl) return;
             
             console.log('[PDF Debug] Showing preview for URL:', pdfUrl);
@@ -1613,7 +1622,9 @@ async function downloadInCapacitor(data, filename, mimeType, isRawData = false) 
             
             docContainer.appendChild(pagesWrapper);
 
-            renderPDF(pdfUrl, pagesWrapper);
+            // 确保 PDF 生成器已加载
+            const { renderPDF } = await getPDFGenerator();
+            await renderPDF(pdfUrl, pagesWrapper);
 
             var buttonContainer = document.createElement('div');
             buttonContainer.style.cssText = 'display:flex;gap:8px;padding:12px;background:' + (nightMode ? '#2d2d2d' : '#f8f9fa') + ';border-top:1px solid ' + (nightMode ? '#444' : '#eee') + ';justify-content:flex-end;';
@@ -1684,6 +1695,8 @@ async function downloadInCapacitor(data, filename, mimeType, isRawData = false) 
 
         try {
             var htmlContent = await preparePrintContent(content, settings);
+            // 懒加载 PDF 生成器并生成PDF
+            const { generatePDF } = await getPDFGenerator();
             pdfUrl = await generatePDF(htmlContent, settings);
 
             // PDF生成完成，直接显示预览
@@ -1735,6 +1748,8 @@ async function downloadInCapacitor(data, filename, mimeType, isRawData = false) 
                 statusUI.updateStatus(isEn() ? 'Preparing content...' : '正在准备内容...', isEn() ? 'Generating PDF document...' : '正在生成PDF文档...');
                 var htmlContent = await preparePrintContent(content, settings);
                 if (isCancelled) return;
+                // 懒加载 PDF 生成器并生成PDF
+                const { generatePDF } = await getPDFGenerator();
                 pdfUrl = await generatePDF(htmlContent, settings);
             }
             

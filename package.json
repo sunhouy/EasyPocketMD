@@ -43,6 +43,7 @@
     "dotenv": "^16.3.1",
     "express": "^4.18.2",
     "html-to-pdfmake": "^2.5.33",
+    "html-to-pptx": "^1.1.0",
     "html2canvas": "^1.4.1",
     "html2pdf.js": "^0.14.0",
     "jquery": "^3.7.1",
@@ -72,8 +73,8 @@
     "electron-builder": "^26.8.1",
     "jest": "^30.2.0",
     "jest-environment-jsdom": "^30.3.0",
-    "vite": "^7.3.1",
     "supertest": "^7.2.2",
+    "vite": "^7.3.1",
     "vite-plugin-static-copy": "^3.2.0"
   },
   "build": {
