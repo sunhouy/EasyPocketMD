@@ -35,7 +35,8 @@ document.addEventListener('DOMContentLoaded', function() {
         { id: 'mobileChartBtn', icon: 'fas fa-chart-bar', textKey: 'chart', fn: function() { if (typeof window.showChartPicker === 'function') window.showChartPicker(); } },
         { id: 'mobileUncertaintyBtn', icon: 'fas fa-calculator', textKey: 'uncertainty', fn: function() { if (typeof window.showUncertaintyCalculator === 'function') window.showUncertaintyCalculator(); } },
         { id: 'mobileUndoBtn', icon: 'fas fa-undo', textKey: 'undo', fn: function() { if (window.vditor && window.vditor.vditor && window.vditor.vditor.undo) window.vditor.vditor.undo.undo(window.vditor.vditor); } },
-        { id: 'mobileRedoBtn', icon: 'fas fa-redo', textKey: 'redo', fn: function() { if (window.vditor && window.vditor.vditor && window.vditor.vditor.undo) window.vditor.vditor.undo.redo(window.vditor.vditor); } }
+        { id: 'mobileRedoBtn', icon: 'fas fa-redo', textKey: 'redo', fn: function() { if (window.vditor && window.vditor.vditor && window.vditor.vditor.undo) window.vditor.vditor.undo.redo(window.vditor.vditor); } },
+        { id: 'mobileAIBtn', icon: 'fas fa-robot', textKey: 'aiAssistant', fn: function() { if (typeof window.showAIPanel === 'function') window.showAIPanel(); } }
     ];
 
     // 默认配置
