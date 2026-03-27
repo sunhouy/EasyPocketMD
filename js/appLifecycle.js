@@ -221,16 +221,52 @@
 
     /**
      * 检查并提供草稿恢复
+     * 自动比较云端和本地草稿的修改时间，决定是自动恢复还是显示冲突提示
      */
     function checkAndOfferDraftRecovery() {
         if (!global.draftRecovery) return;
 
         // 延迟检查，确保应用已完全加载
-        setTimeout(function() {
-            if (global.draftRecovery.hasRecoverableDraft()) {
-                const draftInfo = global.draftRecovery.getDraftInfo();
-                if (draftInfo) {
-                    showDraftRecoveryDialog(draftInfo);
+        setTimeout(async function() {
+            // 使用新的检查方法，比较云端和本地草稿时间
+            if (global.draftRecovery.checkDraftRecoveryStatus) {
+                try {
+                    const status = await global.draftRecovery.checkDraftRecoveryStatus();
+                    
+                    if (!status.hasDraft) {
+                        return; // 没有可恢复的草稿
+                    }
+
+                    if (status.shouldAutoRecover) {
+                        // 草稿版本更新，直接自动恢复
+                        console.log('[Lifecycle] Draft is newer than cloud version, auto-recovering...');
+                        performDraftRecovery();
+                    } else if (status.hasConflict) {
+                        // 云端版本更新，显示冲突提示
+                        console.log('[Lifecycle] Cloud version is newer, showing conflict dialog...');
+                        showDraftConflictDialog(status.draftInfo, status.cloudModified);
+                    } else {
+                        // 时间相近或云端更新，清除草稿，使用云端版本
+                        console.log('[Lifecycle] Cloud version is up-to-date, clearing draft...');
+                        global.draftRecovery.clearDraft();
+                    }
+                } catch (e) {
+                    console.error('[Lifecycle] Error checking draft recovery status:', e);
+                    // 出错时回退到原来的逻辑
+                    if (global.draftRecovery.hasRecoverableDraft()) {
+                        const draftInfo = global.draftRecovery.getDraftInfo();
+                        if (draftInfo) {
+                            showDraftRecoveryDialog(draftInfo);
+                        }
+                    }
+                }
+            } else {
+                // 旧版本回退
+                if (global.draftRecovery.hasRecoverableDraft()) {
+                    const draftInfo = global.draftRecovery.getDraftInfo();
+                    if (draftInfo) {
+                        showDraftRecoveryDialog(draftInfo);
+                    }
                 }
             }
         }, 1000);
@@ -249,7 +285,7 @@
     }
 
     /**
-     * 显示草稿恢复对话框
+     * 显示草稿恢复对话框（旧版，保留作为回退）
      */
     function showDraftRecoveryDialog(draftInfo) {
         const env = detectEnvironment();
@@ -295,6 +331,72 @@
                 performDraftRecovery();
             } else {
                 global.draftRecovery.clearDraft();
+            }
+        }
+    }
+
+    /**
+     * 显示草稿冲突对话框
+     * 当云端版本比草稿更新时显示，让用户选择使用哪个版本
+     */
+    function showDraftConflictDialog(draftInfo, cloudModified) {
+        const env = detectEnvironment();
+        const isEn = global.i18n && global.i18n.getCurrentLanguage && global.i18n.getCurrentLanguage() === 'en';
+        
+        const draftTime = new Date(draftInfo.timestamp).toLocaleString();
+        const serverTime = cloudModified ? new Date(cloudModified).toLocaleString() : (isEn ? 'Unknown' : '未知');
+        
+        const title = isEn ? 'Draft Conflict Detected' : '草稿冲突检测';
+        const message = isEn 
+            ? `The file "${draftInfo.fileName}" has been modified on both sides:\n\n` +
+              `Local draft time: ${draftTime}\n` +
+              `Server version time: ${serverTime}\n\n` +
+              `The server version is newer. Click OK to use the server version, or Cancel to recover your local draft.`
+            : `文件「${draftInfo.fileName}」在两端都有修改：\n\n` +
+              `本地草稿时间: ${draftTime}\n` +
+              `云端版本时间: ${serverTime}\n\n` +
+              `云端版本较新。点击"确定"使用云端版本，点击"取消"恢复本地草稿。`;
+
+        if (env.isCapacitor && capacitorApp) {
+            // Capacitor 环境使用原生对话框
+            try {
+                const { Dialog } = require('@capacitor/dialog');
+                Dialog.confirm({
+                    title: title,
+                    message: message
+                }).then(function(result) {
+                    if (result.value) {
+                        // 使用云端版本，清除草稿
+                        global.draftRecovery.clearDraft();
+                        const msg = isEn ? 'Using server version' : '已使用云端版本';
+                        if (global.showMessage) {
+                            global.showMessage(msg, 'info');
+                        }
+                    } else {
+                        // 恢复本地草稿
+                        performDraftRecovery();
+                    }
+                });
+            } catch (e) {
+                // 回退到普通 confirm
+                if (confirm(message)) {
+                    global.draftRecovery.clearDraft();
+                } else {
+                    performDraftRecovery();
+                }
+            }
+        } else {
+            // Web/Electron 环境
+            if (confirm(message)) {
+                // 使用云端版本，清除草稿
+                global.draftRecovery.clearDraft();
+                const msg = isEn ? 'Using server version' : '已使用云端版本';
+                if (global.showMessage) {
+                    global.showMessage(msg, 'info');
+                }
+            } else {
+                // 恢复本地草稿
+                performDraftRecovery();
             }
         }
     }

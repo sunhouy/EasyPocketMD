@@ -780,7 +780,7 @@
 
         // AI生成按钮
         var aiBtn = document.createElement('button');
-        aiBtn.innerHTML = '<i class="fas fa-magic"></i> ' + (isEn() ? 'AI Generate (Natural Language)' : 'AI生成（自然语言描述）');
+        aiBtn.innerHTML = '<i class="fas fa-magic"></i> ' + (isEn() ? 'AI Generate (Natural Language)' : 'AI生成');
         aiBtn.style.cssText = 'width: 100%; padding: 12px; margin-bottom: 15px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 500;';
         aiBtn.onclick = showAIGenerateDialog;
         container.appendChild(aiBtn);

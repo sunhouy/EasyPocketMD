@@ -30,8 +30,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // 工具栏配置（使用翻译函数）
     window.allToolbarButtons = [
-        { id: 'mobileFormatBtn', icon: 'fas fa-font', textKey: 'format', fn: function() { window.showFormatMenu(); } },
-        { id: 'mobileInsertBtn', icon: 'fas fa-plus', textKey: 'insert', fn: function() { window.showInsertMenu(); } },
+        { id: 'mobileInsertBtn', icon: 'fas fa-plus', textKey: 'insert', fn: function() { if (typeof window.showInsertPicker === 'function') window.showInsertPicker(); else window.showInsertMenu(); } },
         { id: 'mobileFormulaBtn', icon: 'fas fa-superscript', textKey: 'formula', fn: function() { if (typeof window.showFormulaPicker === 'function') window.showFormulaPicker(); } },
         { id: 'mobileChartBtn', icon: 'fas fa-chart-bar', textKey: 'chart', fn: function() { if (typeof window.showChartPicker === 'function') window.showChartPicker(); } },
         { id: 'mobileUncertaintyBtn', icon: 'fas fa-calculator', textKey: 'uncertainty', fn: function() { if (typeof window.showUncertaintyCalculator === 'function') window.showUncertaintyCalculator(); } },
@@ -40,7 +39,7 @@ document.addEventListener('DOMContentLoaded', function() {
     ];
 
     // 默认配置
-    window.defaultToolbarButtons = ['mobileFormatBtn', 'mobileInsertBtn', 'mobileFormulaBtn', 'mobileChartBtn', 'mobileUndoBtn', 'mobileRedoBtn'];
+    window.defaultToolbarButtons = ['mobileInsertBtn', 'mobileFormulaBtn', 'mobileChartBtn', 'mobileUndoBtn', 'mobileRedoBtn'];
 
     // 加载用户配置
     window.userSettings = JSON.parse(localStorage.getItem('vditor_settings') || '{}');

@@ -2047,38 +2047,67 @@
     }
 
     function previewHistoryVersion(filename, versionId, content, timestamp) {
-        var nightMode = g('nightMode') === true;
-        var previewModal = document.createElement('div');
-        previewModal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.9);z-index:10000;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;';
-        var previewContent = document.createElement('div');
-        previewContent.style.cssText = 'background:' + (nightMode ? '#2d2d2d' : 'white') + ';border-radius:12px;padding:0;width:95%;max-width:900px;max-height:85vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 10px 40px rgba(0,0,0,0.3);';
-        var previewHeader = document.createElement('div');
-        previewHeader.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:20px;border-bottom:1px solid ' + (nightMode ? '#444' : '#eee') + ';background:' + (nightMode ? '#1e1e1e' : '#f8f9fa') + ';';
-        var headerLeft = document.createElement('div');
-        var previewTitle = document.createElement('h3');
-        previewTitle.textContent = (isEn() ? 'Preview History Version (ID: ' : '预览历史版本 (ID: ') + versionId + ')';
-        previewTitle.style.cssText = 'margin:0 0 5px 0;color:' + (nightMode ? '#eee' : '#333') + ';font-size:18px;';
-        var previewSubtitle = document.createElement('div');
-        previewSubtitle.textContent = (isEn() ? 'File: ' : '文件: ') + filename + ' | ' + (isEn() ? 'Saved at: ' : '保存时间: ') + new Date(timestamp).toLocaleString();
-        previewSubtitle.style.cssText = 'color:' + (nightMode ? '#aaa' : '#666') + ';font-size:13px;';
-        headerLeft.appendChild(previewTitle);
-        headerLeft.appendChild(previewSubtitle);
-        var closeBtn = document.createElement('button');
-        closeBtn.innerHTML = '<i class="fas fa-times"></i>';
-        closeBtn.style.cssText = 'background:none;border:none;color:' + (nightMode ? '#aaa' : '#666') + ';font-size:20px;cursor:pointer;padding:8px;';
-        previewHeader.appendChild(headerLeft);
-        previewHeader.appendChild(closeBtn);
-        var previewBody = document.createElement('div');
-        previewBody.style.cssText = 'flex:1;overflow-y:auto;padding:20px;font-family:Courier New,monospace;white-space:pre-wrap;word-break:break-all;color:' + (nightMode ? '#ddd' : '#333') + ';line-height:1.6;background:' + (nightMode ? '#1e1e1e' : '#fafafa') + ';';
-        previewBody.innerHTML = highlightMarkdown(content);
-        previewContent.appendChild(previewHeader);
-        previewContent.appendChild(previewBody);
-        previewModal.appendChild(previewContent);
-        document.body.appendChild(previewModal);
-        closeBtn.addEventListener('click', function() { previewModal.remove(); });
-        previewModal.addEventListener('click', function(e) { if (e.target === previewModal) previewModal.remove(); });
-        var handleKeydown = function(e) { if (e.key === 'Escape') { previewModal.remove(); document.removeEventListener('keydown', handleKeydown); } };
-        document.addEventListener('keydown', handleKeydown);
+        const diffModal = document.getElementById('diffModalOverlay');
+        const diffContent = document.getElementById('diffContent');
+        const diffFileName = document.getElementById('diffFileName');
+        const diffLocalTime = document.getElementById('diffLocalTime');
+        const diffServerTime = document.getElementById('diffServerTime');
+        const diffInfo = diffModal.querySelector('.diff-info span');
+        const localVersionLabel = diffModal.querySelector('.diff-version-header:first-child .diff-version-label');
+        const serverVersionLabel = diffModal.querySelector('.diff-version-header:last-child .diff-version-label');
+        
+        if (!diffModal || !diffContent) return;
+        
+        // 获取当前文件内容
+        const files = g('files');
+        const currentFile = files.find(function(f) { return f.name === filename; });
+        const currentContent = currentFile ? currentFile.content : '';
+        
+        // 设置文件信息
+        diffFileName.textContent = filename;
+        diffLocalTime.textContent = new Date(timestamp).toLocaleString();
+        diffServerTime.textContent = isEn() ? 'Current Version' : '当前版本';
+        
+        // 更新标签文本
+        if (localVersionLabel) localVersionLabel.textContent = (isEn() ? 'History Version ' : '历史版本 ') + versionId;
+        if (serverVersionLabel) serverVersionLabel.textContent = isEn() ? 'Current Version' : '当前版本';
+        if (diffInfo) diffInfo.textContent = isEn() ? 'Left: History version, Right: Current version. Green: Added, Red: Deleted.' : '左侧为历史版本，右侧为当前版本。绿色表示新增，红色表示删除。';
+        
+        // 计算并渲染差异（历史版本 vs 当前版本）
+        const diffResult = computeDiff(content || '', currentContent || '');
+        diffContent.innerHTML = renderDiffView(diffResult);
+        
+        // 显示模态窗口
+        diffModal.classList.add('show');
+        
+        // 绑定关闭事件
+        const closeBtn = document.getElementById('closeDiffBtn');
+        const closeModalBtn = document.getElementById('closeDiffModalBtn');
+        
+        const closeModal = function() {
+            diffModal.classList.remove('show');
+            // 恢复原始标签文本
+            if (localVersionLabel) localVersionLabel.textContent = isEn() ? 'Local Version' : '本地版本';
+            if (serverVersionLabel) serverVersionLabel.textContent = isEn() ? 'Server Version' : '服务器版本';
+            if (diffInfo) diffInfo.textContent = isEn() ? 'Left: Local version, Right: Server version. Green: Added, Red: Deleted.' : '左侧为本地版本，右侧为服务器版本。绿色表示新增，红色表示删除。';
+        };
+        
+        if (closeBtn) closeBtn.onclick = closeModal;
+        if (closeModalBtn) closeModalBtn.onclick = closeModal;
+        
+        // 点击外部关闭
+        diffModal.onclick = function(e) {
+            if (e.target === diffModal) closeModal();
+        };
+        
+        // ESC键关闭
+        const handleEsc = function(e) {
+            if (e.key === 'Escape' && diffModal.classList.contains('show')) {
+                closeModal();
+                document.removeEventListener('keydown', handleEsc);
+            }
+        };
+        document.addEventListener('keydown', handleEsc);
     }
 
     async function restoreHistoryVersion(filename, versionId, content) {
