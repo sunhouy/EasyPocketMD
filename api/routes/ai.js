@@ -275,4 +275,187 @@ Provide 5-10 most relevant formulas. Only return the formula list, no explanatio
     }
 });
 
+// AI Chart Search endpoint
+router.post('/chart', async (req, res) => {
+    try {
+        const { keyword, description, language } = req.body;
+        
+        // Support both keyword (old) and description (new natural language) parameters
+        const userInput = description || keyword;
+        
+        if (!userInput) {
+            return res.status(400).json({ 
+                code: 400, 
+                message: 'Description or keyword is required' 
+            });
+        }
+
+        const apiKey = process.env.DASHSCOPE_API_KEY;
+        if (!apiKey) {
+            return res.status(500).json({
+                code: 500,
+                message: 'AI API Key is not configured on server'
+            });
+        }
+
+        // Construct system prompt based on language
+        const isEnglish = language === 'en';
+        const systemPrompt = isEnglish 
+            ? `You are a Mermaid chart expert. Generate Mermaid diagrams based on user's natural language description.
+
+Supported chart types:
+- flowchart (graph TD/LR): for processes, workflows, decision trees
+- sequenceDiagram: for interactions between components/actors
+- classDiagram: for object-oriented design
+- stateDiagram: for state machines
+- gantt: for project timelines
+- pie: for data distribution
+- xychart-beta: for line/bar charts
+- erDiagram: for database relationships
+- journey: for user experience mapping
+- gitGraph: for version control visualization
+- mindmap: for hierarchical ideas
+- timeline: for chronological events
+- C4Context/C4Container: for system architecture
+
+Rules:
+1. Generate ONLY ONE chart that best matches the user's description
+2. Return ONLY the Mermaid code block, no explanations
+3. Use appropriate syntax for the chart type
+4. Include meaningful labels in English
+5. Ensure the chart is valid Mermaid syntax
+
+Format:
+\`\`\`mermaid
+<chart code>
+\`\`\``
+            : `你是Mermaid图表专家。根据用户的自然语言描述生成Mermaid图表。
+
+支持的图表类型：
+- flowchart (graph TD/LR): 流程、工作流、决策树
+- sequenceDiagram: 组件/参与者之间的交互
+- classDiagram: 面向对象设计
+- stateDiagram: 状态机
+- gantt: 项目时间线
+- pie: 数据分布
+- xychart-beta: 折线/柱状图
+- erDiagram: 数据库关系
+- journey: 用户体验地图
+- gitGraph: 版本控制可视化
+- mindmap: 层次化思维导图
+- timeline: 时间线事件
+- C4Context/C4Container: 系统架构
+
+规则：
+1. 只生成一个最匹配用户描述的图表
+2. 只返回Mermaid代码块，不要解释
+3. 使用适合该图表类型的语法
+4. 使用中文标签
+5. 确保图表是有效的Mermaid语法
+
+格式：
+\`\`\`mermaid
+<图表代码>
+\`\`\``;
+
+        const userPrompt = isEnglish
+            ? `Generate a Mermaid chart for: "${userInput}"`
+            : `生成以下描述的Mermaid图表："${userInput}"`;
+
+        // Call DashScope API
+        const requestBody = JSON.stringify({
+            model: "qwen-turbo",
+            input: {
+                messages: [
+                    {
+                        role: "system",
+                        content: systemPrompt
+                    },
+                    {
+                        role: "user",
+                        content: userPrompt
+                    }
+                ]
+            },
+            parameters: {
+                result_format: "message"
+            }
+        });
+
+        const options = {
+            hostname: 'dashscope.aliyuncs.com',
+            path: '/api/v1/services/aigc/text-generation/generation',
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`,
+                'Content-Length': Buffer.byteLength(requestBody)
+            }
+        };
+
+        const apiRequest = https.request(options, (apiRes) => {
+            let data = '';
+            
+            apiRes.on('data', (chunk) => {
+                data += chunk;
+            });
+            
+            apiRes.on('end', () => {
+                if (apiRes.statusCode >= 200 && apiRes.statusCode < 300) {
+                    try {
+                        const response = JSON.parse(data);
+                        if (response.output && response.output.choices && response.output.choices.length > 0) {
+                            const aiContent = response.output.choices[0].message.content;
+                            res.json({
+                                code: 200,
+                                data: aiContent
+                            });
+                        } else {
+                            console.error('DashScope API unexpected response:', response);
+                            res.status(500).json({
+                                code: 500,
+                                message: 'AI processing failed',
+                                error: response.message || 'Unknown error'
+                            });
+                        }
+                    } catch (e) {
+                        console.error('Failed to parse DashScope response:', e);
+                        res.status(500).json({
+                            code: 500,
+                            message: 'Failed to parse AI response'
+                        });
+                    }
+                } else {
+                    console.error(`DashScope API Error: ${apiRes.statusCode}`, data);
+                    res.status(apiRes.statusCode).json({
+                        code: apiRes.statusCode,
+                        message: 'AI API request failed',
+                        error: data
+                    });
+                }
+            });
+        });
+
+        apiRequest.on('error', (e) => {
+            console.error('DashScope Request Error:', e);
+            res.status(500).json({
+                code: 500,
+                message: 'Network error calling AI service',
+                error: e.message
+            });
+        });
+
+        apiRequest.write(requestBody);
+        apiRequest.end();
+
+    } catch (error) {
+        console.error('AI Chart Search error:', error);
+        return res.status(500).json({
+            code: 500,
+            message: 'Internal server error',
+            error: error.message
+        });
+    }
+});
+
 module.exports = router;
