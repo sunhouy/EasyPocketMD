@@ -241,25 +241,25 @@
 
 <!-- 冲突解决模态窗口 -->
 <div class="modal-overlay" id="conflictModalOverlay">
-    <div class="modal conflict-modal" style="position:relative;">
+    <div class="modal conflict-modal" style="position:relative;width:100vw;height:100vh;max-width:100vw;max-height:100vh;border-radius:0;padding:10px;overflow:hidden;display:flex;flex-direction:column;">
         <button class="modal-close-btn" id="closeConflictBtn" style="position:absolute;top:15px;right:15px;background:none;border:none;font-size:20px;cursor:pointer;z-index:10;">
             <i class="fas fa-times"></i>
         </button>
-        <div class="modal-header">
+        <div class="modal-header" style="flex-shrink:0;">
             <h2 data-i18n="fileConflict">发现文件冲突</h2>
             <p data-i18n="conflictSubtitle">以下文件在本地和服务器上存在不同版本</p>
         </div>
 
-        <div class="conflict-info">
+        <div class="conflict-info" style="flex-shrink:0;">
             <i class="fas fa-exclamation-triangle"></i>
             <span data-i18n="resolveConflictInfo">请为每个冲突的文件选择保留哪个版本</span>
         </div>
 
-        <div id="conflictList" class="conflict-options">
+        <div id="conflictList" class="conflict-options" style="flex:1;overflow-y:auto;">
             <!-- 冲突文件列表将动态生成 -->
         </div>
 
-        <div class="modal-actions">
+        <div class="modal-actions" style="flex-shrink:0;margin-top:10px;">
             <button class="modal-btn primary" id="resolveConflictsBtn" data-i18n="resolveConflicts">确认解决冲突</button>
             <button class="modal-btn secondary" id="cancelConflictBtn" data-i18n="cancel">取消</button>
         </div>
@@ -268,7 +268,7 @@
 
 <!-- 差异对比模态窗口 -->
 <div class="modal-overlay" id="diffModalOverlay">
-    <div class="modal diff-modal" style="position:relative;max-height:90vh;overflow:hidden;display:flex;flex-direction:column;">
+    <div class="modal diff-modal" style="position:relative;width:100vw;height:100vh;max-width:100vw;max-height:100vh;border-radius:0;padding:10px;overflow:hidden;display:flex;flex-direction:column;">
         <button class="modal-close-btn" id="closeDiffBtn" style="position:absolute;top:15px;right:15px;background:none;border:none;font-size:20px;cursor:pointer;z-index:10;">
             <i class="fas fa-times"></i>
         </button>
@@ -282,7 +282,7 @@
             <span data-i18n="diffInfo">左侧为本地版本，右侧为服务器版本。绿色表示新增，红色表示删除。</span>
         </div>
 
-        <div class="diff-container" style="flex:1;overflow:hidden;display:flex;flex-direction:column;">
+        <div class="diff-container" style="flex:1;overflow:hidden;display:flex;flex-direction:column;margin:0 -10px;border-radius:0;border-left:none;border-right:none;">
             <div class="diff-header">
                 <div class="diff-version-header">
                     <span class="diff-version-label" data-i18n="localVersion">本地版本</span>
@@ -293,7 +293,7 @@
                     <span id="diffServerTime" class="diff-version-time"></span>
                 </div>
             </div>
-            <div class="diff-content-wrapper">
+            <div class="diff-content-wrapper" style="padding:0;">
                 <div id="diffContent" class="diff-content">
                     <!-- 差异内容将动态生成 -->
                 </div>
@@ -434,6 +434,122 @@
             <p><strong data-i18n="acknowledgments">致谢</strong></p>
             <p>vditor, fortawesome, bcryptjs, cors, dotenv, express, html-to-image, markdown-it, multer, mysql2, uuid</p>
             <p><a href="https://beian.miit.gov.cn/" target="_blank" data-i18n="icp">京ICP备2025154249号</a></p>
+        </div>
+    </div>
+</div>
+
+<!-- AI助手模态窗口 -->
+<div class="modal-overlay" id="aiModalOverlay">
+    <div class="modal ai-modal" style="position:relative;max-height:85vh;overflow:hidden;display:flex;flex-direction:column;">
+        <button class="modal-close-btn" id="closeAIBtn" style="position:absolute;top:15px;right:15px;background:none;border:none;font-size:20px;cursor:pointer;z-index:10;">
+            <i class="fas fa-times"></i>
+        </button>
+        <div class="modal-header" style="flex-shrink:0;">
+            <h2 data-i18n="aiAssistant">AI助手</h2>
+            <p data-i18n="aiSubtitle">智能写作助手，让创作更轻松</p>
+        </div>
+        <div class="ai-main-content" style="flex:1;overflow-y:auto;padding:15px;">
+            <!-- 主界面：四个功能按钮 -->
+            <div id="aiMainMenu" class="ai-menu-grid">
+                <button class="ai-menu-btn" data-ai-action="write">
+                    <i class="fas fa-pen-fancy"></i>
+                    <span data-i18n="aiWrite">帮我写</span>
+                </button>
+                <button class="ai-menu-btn" data-ai-action="edit">
+                    <i class="fas fa-edit"></i>
+                    <span data-i18n="aiEdit">帮我改</span>
+                </button>
+                <button class="ai-menu-btn" data-ai-action="format">
+                    <i class="fas fa-magic"></i>
+                    <span data-i18n="aiFormat">帮我排版</span>
+                </button>
+                <button class="ai-menu-btn" data-ai-action="ppt">
+                    <i class="fas fa-file-powerpoint"></i>
+                    <span data-i18n="aiPPT">生成PPT</span>
+                </button>
+            </div>
+            <!-- 帮我写子菜单 -->
+            <div id="aiWriteMenu" class="ai-submenu" style="display:none;">
+                <button class="ai-back-btn" data-back="main"><i class="fas fa-arrow-left"></i> <span data-i18n="back">返回</span></button>
+                <h3 data-i18n="aiWrite">帮我写</h3>
+                <div class="ai-option-grid">
+                    <button class="ai-option-btn" data-write-type="outline">📋 <span data-i18n="articleOutline">文章大纲</span></button>
+                    <button class="ai-option-btn" data-write-type="speech">🎤 <span data-i18n="speechDraft">讲话稿</span></button>
+                    <button class="ai-option-btn" data-write-type="reflection">💭 <span data-i18n="reflection">心得体会</span></button>
+                    <button class="ai-option-btn" data-write-type="meeting">📒 <span data-i18n="meetingMinutes">会议纪要</span></button>
+                    <button class="ai-option-btn" data-write-type="weekly">📊 <span data-i18n="weeklyReport">工作周报</span></button>
+                    <button class="ai-option-btn" data-write-type="summary">📝 <span data-i18n="summary">总结</span></button>
+                    <button class="ai-option-btn" data-write-type="notice">📢 <span data-i18n="notice">通知</span></button>
+                    <button class="ai-option-btn" data-write-type="application">📄 <span data-i18n="application">申请</span></button>
+                    <button class="ai-option-btn" data-write-type="certificate">📜 <span data-i18n="certificate">证明</span></button>
+                </div>
+                <div class="ai-input-area">
+                    <textarea id="aiWriteInput" placeholder="请输入主题或要求..." data-i18n-placeholder="aiWritePlaceholder"></textarea>
+                    <button class="ai-generate-btn" id="aiWriteGenerate"><i class="fas fa-sparkles"></i> <span data-i18n="generate">生成</span></button>
+                </div>
+            </div>
+            <!-- 帮我改子菜单 -->
+            <div id="aiEditMenu" class="ai-submenu" style="display:none;">
+                <button class="ai-back-btn" data-back="main"><i class="fas fa-arrow-left"></i> <span data-i18n="back">返回</span></button>
+                <h3 data-i18n="aiEdit">帮我改</h3>
+                <div class="ai-option-grid">
+                    <button class="ai-option-btn" data-edit-type="formal">📋 <span data-i18n="moreFormal">更正式</span></button>
+                    <button class="ai-option-btn" data-edit-type="academic">🎓 <span data-i18n="moreAcademic">更学术</span></button>
+                    <button class="ai-option-btn" data-edit-type="party">🏛️ <span data-i18n="partyStyle">党政风</span></button>
+                    <button class="ai-option-btn" data-edit-type="proofread">🔍 <span data-i18n="proofread">改错别字</span></button>
+                </div>
+                <div class="ai-input-area">
+                    <textarea id="aiEditInput" placeholder="请输入需要修改的文本..." data-i18n-placeholder="aiEditPlaceholder"></textarea>
+                    <button class="ai-generate-btn" id="aiEditGenerate"><i class="fas fa-sparkles"></i> <span data-i18n="generate">生成</span></button>
+                </div>
+            </div>
+            <!-- 帮我排版子菜单 -->
+            <div id="aiFormatMenu" class="ai-submenu" style="display:none;">
+                <button class="ai-back-btn" data-back="main"><i class="fas fa-arrow-left"></i> <span data-i18n="back">返回</span></button>
+                <h3 data-i18n="aiFormat">帮我排版</h3>
+                <div class="ai-option-grid">
+                    <button class="ai-option-btn" data-format-type="clean">✨ <span data-i18n="cleanFormat">简洁排版</span></button>
+                    <button class="ai-option-btn" data-format-type="academic">📚 <span data-i18n="academicFormat">学术排版</span></button>
+                    <button class="ai-option-btn" data-format-type="business">💼 <span data-i18n="businessFormat">商务排版</span></button>
+                    <button class="ai-option-btn" data-format-type="creative">🎨 <span data-i18n="creativeFormat">创意排版</span></button>
+                </div>
+                <div class="ai-input-area">
+                    <textarea id="aiFormatInput" placeholder="请输入需要排版的文本..." data-i18n-placeholder="aiFormatPlaceholder"></textarea>
+                    <button class="ai-generate-btn" id="aiFormatGenerate"><i class="fas fa-sparkles"></i> <span data-i18n="generate">生成</span></button>
+                </div>
+            </div>
+            <!-- 生成PPT子菜单 -->
+            <div id="aiPPTMenu" class="ai-submenu" style="display:none;">
+                <button class="ai-back-btn" data-back="main"><i class="fas fa-arrow-left"></i> <span data-i18n="back">返回</span></button>
+                <h3 data-i18n="aiPPT">生成PPT</h3>
+                <div class="ai-option-grid">
+                    <button class="ai-option-btn" data-ppt-type="current">📄 <span data-i18n="pptFromCurrent">根据本文件内容生成</span></button>
+                    <button class="ai-option-btn" data-ppt-type="topic">💡 <span data-i18n="pptFromTopic">输入主题生成</span></button>
+                    <button class="ai-option-btn" data-ppt-type="outline">📋 <span data-i18n="pptFromOutline">输入大纲生成</span></button>
+                </div>
+                <div class="ai-ppt-options">
+                    <label data-i18n="pptRatio">PPT比例：</label>
+                    <div class="ai-ratio-group">
+                        <label><input type="radio" name="pptRatio" value="4:3" checked> 4:3</label>
+                        <label><input type="radio" name="pptRatio" value="16:9"> 16:9</label>
+                    </div>
+                </div>
+                <div class="ai-input-area">
+                    <textarea id="aiPPTInput" placeholder="请输入主题或大纲..." data-i18n-placeholder="aiPPTPlaceholder"></textarea>
+                    <button class="ai-generate-btn" id="aiPPTGenerate"><i class="fas fa-sparkles"></i> <span data-i18n="generate">生成</span></button>
+                </div>
+            </div>
+            <!-- 生成结果展示 -->
+            <div id="aiResultArea" class="ai-result-area" style="display:none;">
+                <button class="ai-back-btn" id="aiResultBack"><i class="fas fa-arrow-left"></i> <span data-i18n="back">返回</span></button>
+                <h3 data-i18n="aiResult">生成结果</h3>
+                <div class="ai-result-content" id="aiResultContent"></div>
+                <div class="ai-result-actions">
+                    <button class="ai-action-btn secondary" id="aiCopyResult"><i class="fas fa-copy"></i> <span data-i18n="copy">复制</span></button>
+                    <button class="ai-action-btn secondary" id="aiRegenerate"><i class="fas fa-redo"></i> <span data-i18n="regenerate">重新生成</span></button>
+                    <button class="ai-action-btn primary" id="aiInsertResult"><i class="fas fa-plus"></i> <span data-i18n="insertToEditor">插入到编辑器</span></button>
+                </div>
+            </div>
         </div>
     </div>
 </div>
