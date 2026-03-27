@@ -149,6 +149,105 @@
     }
 
     /**
+     * 获取云端文件修改时间
+     * @param {string} fileId - 文件ID
+     * @returns {Promise<number|null>} - 云端修改时间戳，如果获取失败返回null
+     */
+    async function getCloudFileModifiedTime(fileId) {
+        try {
+            const files = global.files || [];
+            const currentFile = files.find(f => f.id === fileId);
+            if (!currentFile) return null;
+
+            // 如果用户未登录，无法获取云端版本
+            if (!global.currentUser) return null;
+
+            const apiBase = global.getApiBaseUrl ? global.getApiBaseUrl() : '';
+            const response = await fetch(`${apiBase}/api/files/content?username=${encodeURIComponent(global.currentUser.username)}&filename=${encodeURIComponent(currentFile.name)}`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${global.currentUser.token || global.currentUser.username}`
+                }
+            });
+
+            if (!response.ok) return null;
+
+            const result = global.parseJsonResponse ? await global.parseJsonResponse(response) : await response.json();
+            if (result.code === 200 && result.data && result.data.last_modified) {
+                return new Date(result.data.last_modified).getTime();
+            }
+            return null;
+        } catch (e) {
+            console.error('[Draft] Failed to get cloud file modified time:', e);
+            return null;
+        }
+    }
+
+    /**
+     * 检查草稿恢复状态
+     * @returns {Promise<{hasDraft: boolean, draftInfo: object|null, cloudModified: number|null, shouldAutoRecover: boolean, hasConflict: boolean}>}
+     */
+    async function checkDraftRecoveryStatus() {
+        try {
+            const draftJson = localStorage.getItem(DRAFT_KEY);
+            if (!draftJson) {
+                return { hasDraft: false, draftInfo: null, cloudModified: null, shouldAutoRecover: false, hasConflict: false };
+            }
+
+            const draft = JSON.parse(draftJson);
+            if (!draft || !draft.fileId || !draft.content) {
+                return { hasDraft: false, draftInfo: null, cloudModified: null, shouldAutoRecover: false, hasConflict: false };
+            }
+
+            const draftInfo = {
+                fileId: draft.fileId,
+                fileName: draft.fileName,
+                timestamp: draft.timestamp,
+                date: new Date(draft.timestamp).toLocaleString(),
+                content: draft.content
+            };
+
+            // 获取云端文件修改时间
+            const cloudModified = await getCloudFileModifiedTime(draft.fileId);
+
+            // 如果没有云端版本（文件可能被删除或未同步过）
+            if (cloudModified === null) {
+                // 检查本地文件是否存在
+                const files = global.files || [];
+                const currentFile = files.find(f => f.id === draft.fileId);
+                if (!currentFile) {
+                    // 文件被删除了，但草稿还在，可以恢复
+                    return { hasDraft: true, draftInfo, cloudModified: null, shouldAutoRecover: true, hasConflict: false };
+                }
+                // 本地文件存在，比较草稿和本地文件
+                const shouldAutoRecover = draft.timestamp > (currentFile.lastModified || 0);
+                return { hasDraft: true, draftInfo, cloudModified: null, shouldAutoRecover, hasConflict: false };
+            }
+
+            // 比较草稿时间和云端时间
+            const draftTime = draft.timestamp;
+            const timeDiff = draftTime - cloudModified;
+            const CONFLICT_THRESHOLD = 5000; // 5秒内视为可能冲突
+
+            // 如果云端版本更新
+            if (cloudModified > draftTime) {
+                return { hasDraft: true, draftInfo, cloudModified, shouldAutoRecover: false, hasConflict: true };
+            }
+
+            // 如果草稿版本更新（且差距超过阈值，避免微小时间差导致的误判）
+            if (draftTime > cloudModified + CONFLICT_THRESHOLD) {
+                return { hasDraft: true, draftInfo, cloudModified, shouldAutoRecover: true, hasConflict: false };
+            }
+
+            // 时间相近，视为无冲突，使用云端版本（清除草稿）
+            return { hasDraft: true, draftInfo, cloudModified, shouldAutoRecover: false, hasConflict: false };
+        } catch (e) {
+            console.error('[Draft] Failed to check draft recovery status:', e);
+            return { hasDraft: false, draftInfo: null, cloudModified: null, shouldAutoRecover: false, hasConflict: false };
+        }
+    }
+
+    /**
      * 恢复草稿到编辑器
      */
     function recoverDraft() {
@@ -249,6 +348,7 @@
         backupNow: backupNow,
         hasRecoverableDraft: hasRecoverableDraft,
         getDraftInfo: getDraftInfo,
+        checkDraftRecoveryStatus: checkDraftRecoveryStatus,
         recoverDraft: recoverDraft,
         clearDraft: clearDraft,
         startBackupTimer: startBackupTimer,

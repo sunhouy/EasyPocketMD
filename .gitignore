@@ -25,3 +25,6 @@ js/ui.js.bak
 # Capacitor
 android/
 ios/
+
+IMPLEMENTATION_NOTES.md
+AGENTS.md

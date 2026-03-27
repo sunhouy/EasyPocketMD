@@ -37,5 +37,6 @@ import './js/ui/file-manager.js';
 import './js/emoji-picker.js';
 import './js/formula-picker.js';
 import './js/uncertainty-calculator.js';
+import './js/ui/insert-picker.js';
 
 import './js/main.js';
