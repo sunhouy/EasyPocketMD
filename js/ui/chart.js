@@ -161,12 +161,34 @@
             icon: '<i class="fas fa-chart-line"></i>',
             name: '折线图 (Line Chart)',
             keywords: ['line', '折线图', '趋势'],
-            description: isEn() ? 'Create a line chart' : '创建折线图',
+            description: isEn() ? 'Create a line chart with multiple lines' : '创建支持多条线的折线图',
             hasDataInput: true,
             generateTemplate: function(data) {
                 var xLabels = data.xLabels || ['Jan', 'Feb', 'Mar', 'Apr'];
-                var yValues = data.yValues || [10, 20, 30, 40];
-                var code = '---\ntitle: ' + (data.title || (isEn() ? 'Line Chart' : '折线图')) + '\n---\nxychart-beta\n    title "' + (data.title || (isEn() ? 'Trend' : '趋势')) + '"\n    x-axis [' + xLabels.join(', ') + ']\n    y-axis "' + (data.yLabel || (isEn() ? 'Value' : '数值')) + '" 0 --> ' + Math.max.apply(null, yValues) * 1.2 + '\n    line [' + yValues.join(', ') + ']\n';
+                var yLabel = data.yLabel || (isEn() ? 'Value' : '数值');
+                var lineCount = parseInt(data.lineCount) || 1;
+                
+                var allValues = [];
+                var lines = [];
+                for (var i = 0; i < lineCount; i++) {
+                    var lineKey = 'line' + (i + 1) + 'Values';
+                    var lineNameKey = 'line' + (i + 1) + 'Name';
+                    var lineValues = data[lineKey] || [10, 20, 30, 40];
+                    var lineName = data[lineNameKey] || ((isEn() ? 'Line ' : '线') + (i + 1));
+                    if (typeof lineValues === 'string') {
+                        lineValues = lineValues.split(',').map(function(s) { return parseFloat(s.trim()) || 0; });
+                    }
+                    allValues = allValues.concat(lineValues);
+                    lines.push({ name: lineName, values: lineValues });
+                }
+                
+                var maxVal = Math.max.apply(null, allValues) * 1.2;
+                var code = '---\ntitle: ' + (data.title || (isEn() ? 'Line Chart' : '折线图')) + '\n---\nxychart-beta\n    title "' + (data.title || (isEn() ? 'Trend' : '趋势')) + '"\n    x-axis [' + xLabels.join(', ') + ']\n    y-axis "' + yLabel + '" 0 --> ' + maxVal + '\n';
+                
+                lines.forEach(function(line) {
+                    code += '    line [' + line.values.join(', ') + ']\n';
+                });
+                
                 return '```mermaid\n' + code + '```';
             },
             dataConfig: {
@@ -174,7 +196,23 @@
                     { name: 'title', label: isEn() ? 'Chart Title' : '图表标题', type: 'text', defaultValue: isEn() ? 'Sales Trend' : '销售趋势' },
                     { name: 'xLabels', label: isEn() ? 'X-Axis Labels (comma separated)' : 'X轴标签（逗号分隔）', type: 'text', placeholder: 'Jan, Feb, Mar, Apr', defaultValue: 'Q1, Q2, Q3, Q4' },
                     { name: 'yLabel', label: isEn() ? 'Y-Axis Label' : 'Y轴标签', type: 'text', defaultValue: isEn() ? 'Sales' : '销售额' },
-                    { name: 'yValues', label: isEn() ? 'Y Values (comma separated)' : 'Y轴数值（逗号分隔）', type: 'text', placeholder: '10, 20, 30, 40', defaultValue: '100, 150, 120, 180' }
+                    { name: 'lineCount', label: isEn() ? 'Number of Lines' : '线条数量', type: 'select', options: [
+                        { value: '1', label: '1' },
+                        { value: '2', label: '2' },
+                        { value: '3', label: '3' },
+                        { value: '4', label: '4' },
+                        { value: '5', label: '5' }
+                    ], defaultValue: '2' },
+                    { name: 'line1Name', label: isEn() ? 'Line 1 Name' : '线条1名称', type: 'text', defaultValue: isEn() ? 'Product A' : '产品A' },
+                    { name: 'line1Values', label: isEn() ? 'Line 1 Values (comma separated)' : '线条1数值（逗号分隔）', type: 'text', placeholder: '10, 20, 30, 40', defaultValue: '100, 150, 120, 180' },
+                    { name: 'line2Name', label: isEn() ? 'Line 2 Name' : '线条2名称', type: 'text', defaultValue: isEn() ? 'Product B' : '产品B' },
+                    { name: 'line2Values', label: isEn() ? 'Line 2 Values (comma separated)' : '线条2数值（逗号分隔）', type: 'text', placeholder: '15, 25, 35, 45', defaultValue: '80, 120, 160, 140' },
+                    { name: 'line3Name', label: isEn() ? 'Line 3 Name' : '线条3名称', type: 'text', defaultValue: isEn() ? 'Product C' : '产品C' },
+                    { name: 'line3Values', label: isEn() ? 'Line 3 Values (comma separated)' : '线条3数值（逗号分隔）', type: 'text', placeholder: '20, 30, 25, 35', defaultValue: '60, 90, 110, 130' },
+                    { name: 'line4Name', label: isEn() ? 'Line 4 Name' : '线条4名称', type: 'text', defaultValue: isEn() ? 'Product D' : '产品D' },
+                    { name: 'line4Values', label: isEn() ? 'Line 4 Values (comma separated)' : '线条4数值（逗号分隔）', type: 'text', placeholder: '25, 35, 45, 55', defaultValue: '120, 100, 140, 160' },
+                    { name: 'line5Name', label: isEn() ? 'Line 5 Name' : '线条5名称', type: 'text', defaultValue: isEn() ? 'Product E' : '产品E' },
+                    { name: 'line5Values', label: isEn() ? 'Line 5 Values (comma separated)' : '线条5数值（逗号分隔）', type: 'text', placeholder: '30, 40, 50, 60', defaultValue: '90, 110, 100, 120' }
                 ]
             }
         },
@@ -182,12 +220,34 @@
             icon: '<i class="fas fa-chart-bar"></i>',
             name: '柱状图 (Bar Chart)',
             keywords: ['bar', '柱状图', '条形图'],
-            description: isEn() ? 'Create a bar chart' : '创建柱状图',
+            description: isEn() ? 'Create a bar chart with multiple series' : '创建支持多组数据的柱状图',
             hasDataInput: true,
             generateTemplate: function(data) {
                 var xLabels = data.xLabels || ['A', 'B', 'C'];
-                var yValues = data.yValues || [10, 20, 15];
-                var code = '---\ntitle: ' + (data.title || (isEn() ? 'Bar Chart' : '柱状图')) + '\n---\nxychart-beta\n    title "' + (data.title || (isEn() ? 'Comparison' : '对比')) + '"\n    x-axis ["' + xLabels.join('", "') + '"]\n    y-axis "' + (data.yLabel || (isEn() ? 'Value' : '数值')) + '" 0 --> ' + Math.max.apply(null, yValues) * 1.2 + '\n    bar [' + yValues.join(', ') + ']\n';
+                var yLabel = data.yLabel || (isEn() ? 'Value' : '数值');
+                var barCount = parseInt(data.barCount) || 1;
+                
+                var allValues = [];
+                var bars = [];
+                for (var i = 0; i < barCount; i++) {
+                    var barKey = 'bar' + (i + 1) + 'Values';
+                    var barNameKey = 'bar' + (i + 1) + 'Name';
+                    var barValues = data[barKey] || [10, 20, 15];
+                    var barName = data[barNameKey] || ((isEn() ? 'Series ' : '系列') + (i + 1));
+                    if (typeof barValues === 'string') {
+                        barValues = barValues.split(',').map(function(s) { return parseFloat(s.trim()) || 0; });
+                    }
+                    allValues = allValues.concat(barValues);
+                    bars.push({ name: barName, values: barValues });
+                }
+                
+                var maxVal = Math.max.apply(null, allValues) * 1.2;
+                var code = '---\ntitle: ' + (data.title || (isEn() ? 'Bar Chart' : '柱状图')) + '\n---\nxychart-beta\n    title "' + (data.title || (isEn() ? 'Comparison' : '对比')) + '"\n    x-axis ["' + xLabels.join('", "') + '"]\n    y-axis "' + yLabel + '" 0 --> ' + maxVal + '\n';
+                
+                bars.forEach(function(bar) {
+                    code += '    bar [' + bar.values.join(', ') + ']\n';
+                });
+                
                 return '```mermaid\n' + code + '```';
             },
             dataConfig: {
@@ -195,7 +255,23 @@
                     { name: 'title', label: isEn() ? 'Chart Title' : '图表标题', type: 'text', defaultValue: isEn() ? 'Quarterly Sales' : '季度销售' },
                     { name: 'xLabels', label: isEn() ? 'X-Axis Labels (comma separated)' : 'X轴标签（逗号分隔）', type: 'text', placeholder: 'A, B, C', defaultValue: 'Q1, Q2, Q3, Q4' },
                     { name: 'yLabel', label: isEn() ? 'Y-Axis Label' : 'Y轴标签', type: 'text', defaultValue: isEn() ? 'Sales' : '销售额' },
-                    { name: 'yValues', label: isEn() ? 'Y Values (comma separated)' : 'Y轴数值（逗号分隔）', type: 'text', placeholder: '10, 20, 15', defaultValue: '150, 180, 120, 190' }
+                    { name: 'barCount', label: isEn() ? 'Number of Series' : '数据系列数量', type: 'select', options: [
+                        { value: '1', label: '1' },
+                        { value: '2', label: '2' },
+                        { value: '3', label: '3' },
+                        { value: '4', label: '4' },
+                        { value: '5', label: '5' }
+                    ], defaultValue: '2' },
+                    { name: 'bar1Name', label: isEn() ? 'Series 1 Name' : '系列1名称', type: 'text', defaultValue: isEn() ? '2023' : '2023年' },
+                    { name: 'bar1Values', label: isEn() ? 'Series 1 Values (comma separated)' : '系列1数值（逗号分隔）', type: 'text', placeholder: '10, 20, 15', defaultValue: '150, 180, 120, 190' },
+                    { name: 'bar2Name', label: isEn() ? 'Series 2 Name' : '系列2名称', type: 'text', defaultValue: isEn() ? '2024' : '2024年' },
+                    { name: 'bar2Values', label: isEn() ? 'Series 2 Values (comma separated)' : '系列2数值（逗号分隔）', type: 'text', placeholder: '15, 25, 20', defaultValue: '170, 200, 140, 210' },
+                    { name: 'bar3Name', label: isEn() ? 'Series 3 Name' : '系列3名称', type: 'text', defaultValue: isEn() ? '2025' : '2025年' },
+                    { name: 'bar3Values', label: isEn() ? 'Series 3 Values (comma separated)' : '系列3数值（逗号分隔）', type: 'text', placeholder: '20, 30, 25', defaultValue: '180, 220, 160, 230' },
+                    { name: 'bar4Name', label: isEn() ? 'Series 4 Name' : '系列4名称', type: 'text', defaultValue: isEn() ? 'Target' : '目标' },
+                    { name: 'bar4Values', label: isEn() ? 'Series 4 Values (comma separated)' : '系列4数值（逗号分隔）', type: 'text', placeholder: '25, 35, 30', defaultValue: '200, 240, 180, 250' },
+                    { name: 'bar5Name', label: isEn() ? 'Series 5 Name' : '系列5名称', type: 'text', defaultValue: isEn() ? 'Forecast' : '预测' },
+                    { name: 'bar5Values', label: isEn() ? 'Series 5 Values (comma separated)' : '系列5数值（逗号分隔）', type: 'text', placeholder: '30, 40, 35', defaultValue: '210, 250, 190, 260' }
                 ]
             }
         },
