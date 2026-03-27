@@ -1357,6 +1357,11 @@ body.night-mode .diff-added .diff-line-content {
     color: #88ff88;
 }
 
+/* 差异对比窗口 - 确保在历史版本窗口之上 */
+#diffModalOverlay {
+    z-index: 3000;
+}
+
 /* 同步状态指示器 */
 .sync-status {
     position: fixed;
