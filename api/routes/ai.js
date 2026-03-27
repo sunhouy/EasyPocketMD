@@ -593,4 +593,117 @@ Format:
     }
 });
 
+// AI Generate endpoint for AI Assistant
+router.post('/generate', async (req, res) => {
+    try {
+        const { prompt, content } = req.body;
+        
+        if (!prompt) {
+            return res.status(400).json({ 
+                code: 400, 
+                message: 'Prompt is required' 
+            });
+        }
+
+        const apiKey = process.env.DASHSCOPE_API_KEY;
+        if (!apiKey) {
+            return res.status(500).json({
+                code: 500,
+                message: 'AI API Key is not configured on server'
+            });
+        }
+
+        // Call DashScope API
+        const requestBody = JSON.stringify({
+            model: "qwen-turbo",
+            input: {
+                messages: [
+                    {
+                        role: "system",
+                        content: "你是一个专业的写作助手。请根据用户的要求生成内容，直接返回结果，不要包含任何解释、前言或后语。"
+                    },
+                    {
+                        role: "user",
+                        content: content ? prompt + "\n\n" + content : prompt
+                    }
+                ]
+            },
+            parameters: {
+                result_format: "message",
+                max_tokens: 2000
+            }
+        });
+
+        const options = {
+            hostname: 'dashscope.aliyuncs.com',
+            path: '/api/v1/services/aigc/text-generation/generation',
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${apiKey}`,
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            }
+        };
+
+        const aiReq = https.request(options, (aiRes) => {
+            let data = '';
+            
+            aiRes.on('data', (chunk) => {
+                data += chunk;
+            });
+            
+            aiRes.on('end', () => {
+                try {
+                    const response = JSON.parse(data);
+                    
+                    if (response.output && response.output.choices && response.output.choices[0]) {
+                        const generatedContent = response.output.choices[0].message.content;
+                        res.json({
+                            code: 200,
+                            message: 'success',
+                            data: generatedContent
+                        });
+                    } else if (response.code) {
+                        // API returned an error
+                        res.status(500).json({
+                            code: 500,
+                            message: response.message || 'AI service error'
+                        });
+                    } else {
+                        res.status(500).json({
+                            code: 500,
+                            message: 'Unexpected response from AI service'
+                        });
+                    }
+                } catch (parseError) {
+                    console.error('Error parsing AI response:', parseError);
+                    res.status(500).json({
+                        code: 500,
+                        message: 'Failed to parse AI response'
+                    });
+                }
+            });
+        });
+
+        aiReq.on('error', (error) => {
+            console.error('Error calling AI API:', error);
+            res.status(500).json({
+                code: 500,
+                message: 'Failed to call AI service'
+            });
+        });
+
+        aiReq.write(requestBody);
+        aiReq.end();
+
+    } catch (error) {
+        console.error('Error in AI generate:', error);
+        res.status(500).json({
+            code: 500,
+            message: 'Internal server error',
+            error: error.message
+        });
+    }
+});
+
 module.exports = router;

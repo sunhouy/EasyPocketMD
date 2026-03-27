@@ -489,10 +489,16 @@
 
         var formData = {};
 
+        // 检查是否是折线图或柱状图（需要动态显示字段）
+        var isLineChart = chart.name.indexOf('折线图') > -1 || chart.name.indexOf('Line Chart') > -1;
+        var isBarChart = chart.name.indexOf('柱状图') > -1 || chart.name.indexOf('Bar Chart') > -1;
+        var countFieldName = isLineChart ? 'lineCount' : (isBarChart ? 'barCount' : null);
+
         if (chart.dataConfig && chart.dataConfig.fields) {
             chart.dataConfig.fields.forEach(function(field) {
                 var fieldContainer = document.createElement('div');
                 fieldContainer.style.cssText = 'margin-bottom: 15px;';
+                fieldContainer.dataset.fieldName = field.name;
 
                 var label = document.createElement('label');
                 label.textContent = field.label;
@@ -527,7 +533,44 @@
 
                 fieldContainer.appendChild(input);
                 form.appendChild(fieldContainer);
+
+                // 如果是线条/系列相关的字段，根据数量选择显示或隐藏
+                if (countFieldName && (field.name.indexOf('line') === 0 || field.name.indexOf('bar') === 0)) {
+                    var match = field.name.match(/^(line|bar)(\d+)/);
+                    if (match) {
+                        var num = parseInt(match[2]);
+                        var countSelect = null;
+                        // 找到数量选择器
+                        setTimeout(function() {
+                            countSelect = formData[countFieldName];
+                            if (countSelect) {
+                                var currentCount = parseInt(countSelect.value) || 1;
+                                fieldContainer.style.display = num <= currentCount ? 'block' : 'none';
+                            }
+                        }, 0);
+                    }
+                }
             });
+
+            // 绑定数量选择器的变化事件
+            if (countFieldName && formData[countFieldName]) {
+                formData[countFieldName].addEventListener('change', function() {
+                    var selectedCount = parseInt(this.value) || 1;
+                    chart.dataConfig.fields.forEach(function(field) {
+                        if (field.name.indexOf('line') === 0 || field.name.indexOf('bar') === 0) {
+                            var match = field.name.match(/^(line|bar)(\d+)/);
+                            if (match) {
+                                var num = parseInt(match[2]);
+                                var fieldContainer = form.querySelector('[data-field-name="' + field.name + '"]');
+                                if (fieldContainer) {
+                                    fieldContainer.style.display = num <= selectedCount ? 'block' : 'none';
+                                }
+                            }
+                        }
+                    });
+                    updatePreview();
+                });
+            }
         }
 
         container.appendChild(form);
