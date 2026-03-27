@@ -794,7 +794,7 @@ function renderAIFormulaResults(formulas, keyword) {
     // 添加AI搜索结果标题
     const resultHeader = document.createElement('div');
     resultHeader.style.cssText = 'grid-column: 1/-1; padding: 10px 0; border-bottom: 1px solid #eee; margin-bottom: 10px;';
-    resultHeader.innerHTML = `<span style="color: #667eea; font-weight: bold;">${isEn() ? 'AI Search Results' : 'AI搜索结果'}</span> <span style="color: #888; font-size: 12px;">"${keyword}"</span>`;
+    resultHeader.innerHTML = `<span style="color: #667eea; font-weight: bold;">${isEn() ? 'AI Search Results' : 'AI搜索结果'}</span> <span style="color: #888; font-size: 12px;"></span>`;
     formulaGrid.appendChild(resultHeader);
     
     // 渲染公式列表

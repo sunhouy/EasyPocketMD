@@ -143,6 +143,12 @@
             notLoggedIn: '未登录',
             confirmLeave: '您有未保存的文件，确定要离开吗？',
 
+            // 草稿恢复
+            draftRecoveryTitle: '恢复草稿',
+            draftRecoveryMessage: '检测到未保存的草稿「{fileName}」(修改时间: {date})，是否恢复？',
+            draftRecovered: '草稿「{fileName}」已恢复',
+            draftRecoveryFailed: '草稿恢复失败',
+
             // 用户菜单
             userMenu: '用户菜单',
             pleaseLoginToSave: '请登录以保存您的文档',
@@ -502,6 +508,12 @@
             // File operations
             notLoggedIn: 'Not logged in',
             confirmLeave: 'You have unsaved files, are you sure you want to leave?',
+
+            // Draft recovery
+            draftRecoveryTitle: 'Recover Draft',
+            draftRecoveryMessage: 'Found unsaved draft "{fileName}" (modified: {date}). Recover it?',
+            draftRecovered: 'Draft "{fileName}" recovered',
+            draftRecoveryFailed: 'Failed to recover draft',
 
             // User menu
             userMenu: 'User Menu',

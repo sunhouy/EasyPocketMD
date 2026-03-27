@@ -216,8 +216,17 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (window.currentFileId) {
                         window.unsavedChanges[window.currentFileId] = true;
                         window.startAutoSave();
+                        // 标记草稿需要备份
+                        if (window.draftRecovery) {
+                            window.draftRecovery.markDirty();
+                        }
                     }
                 });
+            }
+
+            // 初始化应用生命周期管理（草稿恢复等）
+            if (window.appLifecycle) {
+                window.appLifecycle.init();
             }
         }
     };

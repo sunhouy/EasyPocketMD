@@ -19,6 +19,8 @@ import './js/indexedDB.js';
 import './js/resourceLoader.js';
 import './js/resourceRenderer.js';
 import './js/localImageManager.js';
+import './js/draftRecovery.js';
+import './js/appLifecycle.js';
 
 // UI Modules
 import './js/ui/dialog.js';

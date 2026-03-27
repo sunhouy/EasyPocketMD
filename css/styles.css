@@ -458,7 +458,7 @@ body.night-mode .modal-content::-webkit-scrollbar-thumb:hover {
 }
 
 .modal-header {
-    margin-bottom: 20px;
+    margin-bottom: 0;
     text-align: center;
 }
 
@@ -1715,7 +1715,6 @@ body.night-mode .custom-fullscreen-btn {
     background: #f5f5f5;
     border-radius: 6px;
     padding: 10px 15px;
-    margin: 10px 15px;
     font-size: 14px;
     color: #666;
     display: flex;

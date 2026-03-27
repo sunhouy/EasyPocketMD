@@ -1810,7 +1810,7 @@
         const fileIndex = files.findIndex(function(f) { return f.id === currentFileId && f.type === 'file'; });
         if (fileIndex === -1) return;
         let content = vditor.getValue();
-        
+
         if (global.LocalImageManager && global.LocalImageManager.convertBlobToLocal) {
             try {
                 content = global.LocalImageManager.convertBlobToLocal(content);
@@ -1818,13 +1818,19 @@
                 console.error('Failed to convert blob images to local:', e);
             }
         }
-        
+
         const file = files[fileIndex];
         const contentChanged = content !== file.content;
         file.content = content;
         file.lastModified = Date.now();
         localStorage.setItem('vditor_files', JSON.stringify(files));
         g('unsavedChanges')[currentFileId] = false;
+
+        // 保存成功后清除草稿（因为已经正式保存到 localStorage）
+        if (global.draftRecovery) {
+            global.draftRecovery.clearDraft();
+        }
+
         if (g('currentUser')) {
             // 保存即触发服务器同步；失败则保留 pending 标记，稍后会自动补齐同步
             markPendingServerSync(currentFileId, true);
@@ -1908,7 +1914,14 @@
 
     function startAutoSave() {
         global.clearAutoSave();
-        global.autoSaveTimer = setTimeout(function() { global.saveCurrentFile(); }, 3000);
+        // 缩短自动保存间隔到 1 秒，更快保存到 localStorage
+        global.autoSaveTimer = setTimeout(function() {
+            global.saveCurrentFile();
+            // 保存后清除草稿（因为已经正式保存了）
+            if (global.draftRecovery) {
+                global.draftRecovery.clearDraft();
+            }
+        }, 1000);
     }
 
     function clearAutoSave() {
