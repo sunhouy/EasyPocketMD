@@ -4,131 +4,137 @@ require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
 
 const redisConfig = {
     host: process.env.REDIS_HOST || 'localhost',
-    port: process.env.REDIS_PORT || 6379,
+    port: parseInt(process.env.REDIS_PORT) || 6379,
     password: process.env.REDIS_PASSWORD || undefined,
-    db: process.env.REDIS_DB || 0,
+    db: parseInt(process.env.REDIS_DB) || 0,
     retryStrategy: (times) => {
-        if (times > 3) {
+        if (times > 5) {
+            console.log('Redis: max retries reached, stop reconnecting');
             return null;
         }
-        return Math.min(times * 100, 1000);
+        const delay = Math.min(times * 500, 2000);
+        console.log(`Redis: reconnect attempt ${times}, next in ${delay}ms`);
+        return delay;
     },
-    maxRetriesPerRequest: 1,
-    enableOfflineQueue: false,
-    lazyConnect: true
+    maxRetriesPerRequest: 3,
+    enableOfflineQueue: true,
+    lazyConnect: true,
+    connectTimeout: 10000,
+    commandTimeout: 5000
 };
+
+console.log('Redis configuration loaded:', {
+    host: redisConfig.host,
+    port: redisConfig.port,
+    hasPassword: !!redisConfig.password,
+    db: redisConfig.db
+});
 
 let redis = null;
 let redisAvailable = false;
-let connectionPromise = null;
-
-async function ensureConnection() {
-    if (redisAvailable && redis) {
-        return true;
-    }
-    if (!redis) {
-        return false;
-    }
-    if (connectionPromise) {
-        return connectionPromise;
-    }
-    
-    connectionPromise = redis.connect()
-        .then(() => {
-            redisAvailable = true;
-            return true;
-        })
-        .catch((err) => {
-            console.error('Redis connection failed:', err.message);
-            redisAvailable = false;
-            return false;
-        })
-        .finally(() => {
-            connectionPromise = null;
-        });
-    
-    return connectionPromise;
-}
 
 try {
     redis = new Redis(redisConfig);
 
     redis.on('connect', () => {
-        console.log('Redis connected successfully');
+        console.log('Redis: connected successfully');
         redisAvailable = true;
     });
 
     redis.on('ready', () => {
+        console.log('Redis: ready for commands');
         redisAvailable = true;
     });
 
     redis.on('error', (err) => {
-        if (redisAvailable) {
-            console.error('Redis error:', err.message);
-        }
+        console.error('Redis: error occurred -', err.message);
         redisAvailable = false;
     });
 
     redis.on('close', () => {
+        console.log('Redis: connection closed');
         redisAvailable = false;
     });
 
-    // 立即尝试连接
-    ensureConnection().catch(() => {
-        redisAvailable = false;
+    redis.on('reconnecting', () => {
+        console.log('Redis: attempting to reconnect...');
     });
+
 } catch (err) {
+    console.error('Redis: failed to initialize -', err.message);
     redis = null;
     redisAvailable = false;
 }
 
+async function ensureConnection() {
+    if (!redis) {
+        return false;
+    }
+    if (redisAvailable && redis.status === 'ready') {
+        return true;
+    }
+    try {
+        if (redis.status === 'wait' || redis.status === 'end') {
+            await redis.connect();
+        }
+        return redisAvailable;
+    } catch (err) {
+        console.error('Redis: ensureConnection failed -', err.message);
+        return false;
+    }
+}
+
 module.exports = {
     get: async (...args) => {
-        const connected = await ensureConnection();
-        if (!connected || !redis) return null;
+        if (!redis) return null;
         try {
             return await redis.get(...args);
-        } catch {
+        } catch (err) {
+            console.error('Redis get error:', err.message);
             return null;
         }
     },
     setex: async (...args) => {
-        const connected = await ensureConnection();
-        if (!connected || !redis) return false;
+        if (!redis) return false;
         try {
             await redis.setex(...args);
             return true;
-        } catch {
+        } catch (err) {
+            console.error('Redis setex error:', err.message);
             return false;
         }
     },
     del: async (...args) => {
-        const connected = await ensureConnection();
-        if (!connected || !redis) return false;
+        if (!redis) return false;
         try {
             await redis.del(...args);
             return true;
-        } catch {
+        } catch (err) {
+            console.error('Redis del error:', err.message);
             return false;
         }
     },
     keys: async (...args) => {
-        const connected = await ensureConnection();
-        if (!connected || !redis) return [];
+        if (!redis) return [];
         try {
             return await redis.keys(...args);
-        } catch {
+        } catch (err) {
+            console.error('Redis keys error:', err.message);
             return [];
         }
     },
     ttl: async (...args) => {
-        const connected = await ensureConnection();
-        if (!connected || !redis) return -1;
+        if (!redis) return -1;
         try {
             return await redis.ttl(...args);
-        } catch {
+        } catch (err) {
+            console.error('Redis ttl error:', err.message);
             return -1;
         }
     },
-    isAvailable: () => redisAvailable
+    isAvailable: () => redisAvailable && redis && redis.status === 'ready',
+    getStatus: () => ({
+        available: redisAvailable,
+        status: redis ? redis.status : 'not_initialized'
+    })
 };

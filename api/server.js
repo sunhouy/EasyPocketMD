@@ -82,6 +82,49 @@ app.get('/icon-512.png', (req, res) => {
     res.sendFile(path.join(rootPath, 'icon-512.png'));
 });
 
+// Import routes first
+const legacyRoutes = require('./routes/legacy');
+const authRoutes = require('./routes/auth');
+const fileRoutes = require('./routes/files');
+const shareRoutes = require('./routes/share');
+const adminRoutes = require('./routes/admin');
+const apiRoutes = require('./routes/api');
+const convertRoutes = require('./routes/convert');
+const aiRoutes = require('./routes/ai');
+const userFilesRoutes = require('./routes/user_files');
+
+// Use routes with rate limiting - MUST BE BEFORE SPA FALLBACK!
+// AI routes - strict rate limiting (especially for unauthenticated users)
+app.use('/api/ai', aiLimiter, aiRoutes);
+
+// Auth routes - prevent brute force attacks
+app.use('/api/auth/login', authLimiter);
+app.use('/api/auth/register', registerLimiter);
+app.use('/api/auth', authRoutes);
+
+// File routes - rate limiting based on auth status
+app.use('/api/files', fileLimiter, fileRoutes);
+app.use('/api/user_files', fileLimiter, userFilesRoutes);
+
+// Upload routes - strict rate limiting
+app.use('/api/upload_screenshot', uploadLimiter);
+app.use('/api/upload', uploadLimiter);
+
+// Share routes
+app.use('/api/share', apiLimiter, shareRoutes);
+
+// Admin routes - strict rate limiting
+app.use('/api/admin', strictLimiter, adminRoutes);
+
+// External API routes
+app.use('/api/external', apiLimiter, apiRoutes);
+
+// Convert routes - rate limiting for export functions
+app.use('/api/convert', convertLimiter, convertRoutes);
+
+// Legacy routes - general API rate limiting
+app.use('/api', apiLimiter, legacyRoutes);
+
 // Try to find the dist folder in multiple locations
 const potentialDistPaths = [
     path.join(__dirname, '../dist'),
@@ -139,50 +182,9 @@ if (distPath) {
     });
 }
 
-// Import routes
-const legacyRoutes = require('./routes/legacy');
-const authRoutes = require('./routes/auth');
-const fileRoutes = require('./routes/files');
-const shareRoutes = require('./routes/share');
-const adminRoutes = require('./routes/admin');
-const apiRoutes = require('./routes/api');
-const convertRoutes = require('./routes/convert');
-const aiRoutes = require('./routes/ai');
-const userFilesRoutes = require('./routes/user_files');
-
-// Use routes with rate limiting
-// AI routes - strict rate limiting (especially for unauthenticated users)
-app.use('/api/ai', aiLimiter, aiRoutes);
-
-// Auth routes - prevent brute force attacks
-app.use('/api/auth/login', authLimiter);
-app.use('/api/auth/register', registerLimiter);
-app.use('/api/auth', authRoutes);
-
-// File routes - rate limiting based on auth status
-app.use('/api/files', fileLimiter, fileRoutes);
-app.use('/api/user_files', fileLimiter, userFilesRoutes);
-
-// Upload routes - strict rate limiting
-app.use('/api/upload_screenshot', uploadLimiter);
-app.use('/api/upload', uploadLimiter);
-
-// Share routes
-app.use('/api/share', apiLimiter, shareRoutes);
-
-// Admin routes - strict rate limiting
-app.use('/api/admin', strictLimiter, adminRoutes);
-
-// External API routes
-app.use('/api/external', apiLimiter, apiRoutes);
-
-// Convert routes - rate limiting for export functions
-app.use('/api/convert', convertLimiter, convertRoutes);
-
-// Legacy routes - general API rate limiting
-app.use('/api', apiLimiter, legacyRoutes);
-
 // Health check endpoint (no rate limiting for monitoring)
+const redis = require('./config/redis');
+
 app.get('/api/health', (req, res) => {
     res.json({
         code: 200,
@@ -190,6 +192,44 @@ app.get('/api/health', (req, res) => {
         message: 'Service is healthy',
         timestamp: new Date().toISOString()
     });
+});
+
+// Redis health check endpoint
+app.get('/api/health/redis', async (req, res) => {
+    const redisStatus = redis.getStatus();
+    let pingResult = null;
+    
+    if (redisStatus.available) {
+        try {
+            const pingStart = Date.now();
+            pingResult = await redis.get('ping_test_key');
+            const pingLatency = Date.now() - pingStart;
+            res.json({
+                code: 200,
+                status: 'ok',
+                message: 'Redis is connected and operational',
+                redis: redisStatus,
+                pingLatency: `${pingLatency}ms`,
+                timestamp: new Date().toISOString()
+            });
+        } catch (err) {
+            res.json({
+                code: 503,
+                status: 'error',
+                message: 'Redis connection test failed: ' + err.message,
+                redis: redisStatus,
+                timestamp: new Date().toISOString()
+            });
+        }
+    } else {
+        res.json({
+            code: 503,
+            status: 'error',
+            message: 'Redis is not available',
+            redis: redisStatus,
+            timestamp: new Date().toISOString()
+        });
+    }
 });
 
 // Error handling middleware
