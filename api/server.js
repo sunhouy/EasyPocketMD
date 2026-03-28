@@ -4,10 +4,26 @@ const path = require('path');
 const fs = require('fs');
 require('dotenv').config({ path: path.join(__dirname, '../.env') }); // Load environment variables
 
+// 加载敏感词库
+const { loadSensitiveWords } = require('./utils/sensitiveFilter');
+loadSensitiveWords();
+
 const app = express();
 const port = process.env.PORT || 3000;
 
 const isTest = process.env.NODE_ENV === 'test';
+
+// Import rate limiters
+const {
+    aiLimiter,
+    authLimiter,
+    registerLimiter,
+    uploadLimiter,
+    apiLimiter,
+    fileLimiter,
+    convertLimiter,
+    strictLimiter
+} = require('./middleware/rateLimiter');
 
 // Middleware
 app.use(cors());
@@ -134,16 +150,37 @@ const convertRoutes = require('./routes/convert');
 const aiRoutes = require('./routes/ai');
 const userFilesRoutes = require('./routes/user_files');
 
-// Use routes
-app.use('/api', legacyRoutes);
+// Use routes with rate limiting
+// AI routes - strict rate limiting (especially for unauthenticated users)
+app.use('/api/ai', aiLimiter, aiRoutes);
+
+// Auth routes - prevent brute force attacks
+app.use('/api/auth/login', authLimiter);
+app.use('/api/auth/register', registerLimiter);
 app.use('/api/auth', authRoutes);
-app.use('/api/files', fileRoutes);
-app.use('/api/user_files', userFilesRoutes);
-app.use('/api/share', shareRoutes);
-app.use('/api/admin', adminRoutes);
-app.use('/api/external', apiRoutes);
-app.use('/api/convert', convertRoutes);
-app.use('/api/ai', aiRoutes);
+
+// File routes - rate limiting based on auth status
+app.use('/api/files', fileLimiter, fileRoutes);
+app.use('/api/user_files', fileLimiter, userFilesRoutes);
+
+// Upload routes - strict rate limiting
+app.use('/api/upload_screenshot', uploadLimiter);
+app.use('/api/upload', uploadLimiter);
+
+// Share routes
+app.use('/api/share', apiLimiter, shareRoutes);
+
+// Admin routes - strict rate limiting
+app.use('/api/admin', strictLimiter, adminRoutes);
+
+// External API routes
+app.use('/api/external', apiLimiter, apiRoutes);
+
+// Convert routes - rate limiting for export functions
+app.use('/api/convert', convertLimiter, convertRoutes);
+
+// Legacy routes - general API rate limiting
+app.use('/api', apiLimiter, legacyRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
