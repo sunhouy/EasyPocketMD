@@ -109,6 +109,121 @@
         return '';
     }
 
+    /** 显示速率限制提示 */
+    function showRateLimitMessage(message, retryAfter) {
+        const isEn = window.i18n && window.i18n.getCurrentLang && window.i18n.getCurrentLang() === 'en';
+        const title = isEn ? 'Rate Limit Exceeded' : '请求过于频繁';
+        const defaultMsg = isEn
+            ? 'Too many requests. Please try again later.'
+            : '您的操作太频繁了，请稍后再试。';
+        const loginSuggestion = isEn
+            ? 'Tip: Log in to get higher rate limits.'
+            : '提示：登录账号可获得更高的请求额度。';
+
+        // 创建模态框
+        const modal = document.createElement('div');
+        modal.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 999999;
+        `;
+
+        const content = document.createElement('div');
+        content.style.cssText = `
+            background: var(--bg-color, #fff);
+            color: var(--text-color, #333);
+            padding: 24px;
+            border-radius: 12px;
+            max-width: 400px;
+            width: 90%;
+            text-align: center;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        `;
+
+        const icon = document.createElement('div');
+        icon.innerHTML = '⏱️';
+        icon.style.cssText = 'font-size: 48px; margin-bottom: 16px;';
+
+        const titleEl = document.createElement('h3');
+        titleEl.textContent = title;
+        titleEl.style.cssText = 'margin: 0 0 12px 0; font-size: 18px;';
+
+        const msgEl = document.createElement('p');
+        msgEl.textContent = message || defaultMsg;
+        msgEl.style.cssText = 'margin: 0 0 16px 0; line-height: 1.5;';
+
+        const tipEl = document.createElement('p');
+        tipEl.textContent = loginSuggestion;
+        tipEl.style.cssText = 'margin: 0 0 20px 0; color: #666; font-size: 13px;';
+
+        const btnContainer = document.createElement('div');
+        btnContainer.style.cssText = 'display: flex; gap: 10px; justify-content: center;';
+
+        const okBtn = document.createElement('button');
+        okBtn.textContent = isEn ? 'OK' : '知道了';
+        okBtn.style.cssText = `
+            padding: 10px 24px;
+            background: #2196F3;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+        `;
+        okBtn.onclick = () => {
+            document.body.removeChild(modal);
+        };
+
+        // 如果未登录，显示登录按钮
+        const currentUser = window.currentUser || (window.getUser && window.getUser());
+        if (!currentUser) {
+            const loginBtn = document.createElement('button');
+            loginBtn.textContent = isEn ? 'Log In' : '去登录';
+            loginBtn.style.cssText = `
+                padding: 10px 24px;
+                background: transparent;
+                color: #2196F3;
+                border: 1px solid #2196F3;
+                border-radius: 6px;
+                cursor: pointer;
+                font-size: 14px;
+            `;
+            loginBtn.onclick = () => {
+                document.body.removeChild(modal);
+                if (window.showLoginModal) {
+                    window.showLoginModal();
+                }
+            };
+            btnContainer.appendChild(loginBtn);
+        }
+
+        btnContainer.appendChild(okBtn);
+
+        content.appendChild(icon);
+        content.appendChild(titleEl);
+        content.appendChild(msgEl);
+        if (!currentUser) {
+            content.appendChild(tipEl);
+        }
+        content.appendChild(btnContainer);
+        modal.appendChild(content);
+        document.body.appendChild(modal);
+
+        // 点击背景关闭
+        modal.onclick = (e) => {
+            if (e.target === modal) {
+                document.body.removeChild(modal);
+            }
+        };
+    }
+
     /** 安全解析接口响应为 JSON，若返回 HTML 或非 JSON 则返回错误对象并附带详情便于排查 */
     function parseJsonResponse(response) {
         return response.text().then(function(text) {
@@ -136,7 +251,13 @@
                 return { code: 500, message: msg };
             }
             try {
-                return JSON.parse(text);
+                var data = JSON.parse(text);
+                // 处理 429 速率限制错误
+                if (response.status === 429 || data.code === 429) {
+                    var retryAfter = response.headers.get('Retry-After');
+                    showRateLimitMessage(data.message, retryAfter);
+                }
+                return data;
             } catch (e) {
                 return { code: 500, message: '响应解析失败: ' + (e.message || '无效 JSON') };
             }

@@ -343,7 +343,21 @@
                 if (result.code === 200 && result.data) {
                     showShareResult(result.data, shareModal);
                 } else {
-                    shareContent.querySelector('#shareError').textContent = result.message || (isEn ? 'Create failed' : '创建失败');
+                    // 处理敏感词检测错误
+                    if (result.sensitive_words && result.sensitive_words.length > 0) {
+                        var wordsStr = result.sensitive_words.join('、');
+                        var errorMsg;
+                        if (result.sensitive_field === 'content') {
+                            // 文件内容包含敏感词
+                            errorMsg = (isEn ? 'File content contains sensitive words: ' : '文件内容包含敏感词') + wordsStr + (isEn ? ', cannot share' : '，无法分享');
+                        } else {
+                            // 文件名包含敏感词
+                            errorMsg = (isEn ? 'Filename contains sensitive words: ' : '文件名包含敏感词') + wordsStr + (isEn ? ', cannot share' : '，无法分享');
+                        }
+                        shareContent.querySelector('#shareError').textContent = errorMsg;
+                    } else {
+                        shareContent.querySelector('#shareError').textContent = result.message || (isEn ? 'Create failed' : '创建失败');
+                    }
                     shareContent.querySelector('#shareError').style.display = 'block';
                     btn.disabled = false;
                     btn.textContent = isEn ? 'Create Share Link' : '创建分享链接';

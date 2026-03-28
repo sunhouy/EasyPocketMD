@@ -20,9 +20,10 @@ class ShareManager {
                 return { code: 401, message: '用户认证失败' };
             }
 
-            // 2. Check if file exists
-            const [fileRows] = await connection.execute('SELECT id FROM user_files WHERE username = ? AND filename = ?', [username, filename]);
+            // 2. Check if file exists and get content
+            const [fileRows] = await connection.execute('SELECT id, content FROM user_files WHERE username = ? AND filename = ?', [username, filename]);
             if (fileRows.length === 0) return { code: 404, message: '文档不存在' };
+            const fileContent = fileRows[0].content || '';
 
             // 3. Calculate expiration
             let expiresAt = null;
@@ -65,7 +66,8 @@ class ShareManager {
                     mode,
                     expires_at: expiresAt,
                     has_password: !!sharePassword
-                }
+                },
+                fileContent: fileContent
             };
 
         } catch (error) {
