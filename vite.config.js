@@ -109,6 +109,10 @@ export default defineConfig({
           dest: 'vditor'
         },
         {
+          src: 'node_modules/echarts/dist/echarts.min.js',
+          dest: 'echarts'
+        },
+        {
           src: 'node_modules/pdfmake-support-chinese-fonts/pdfmake.min.js',
           dest: '.'
         },
@@ -140,8 +144,8 @@ export default defineConfig({
         
         try {
           if (fs.existsSync(sourceDir)) {
-            console.log('Copying Vditor files from:', sourceDir);
-            console.log('To:', targetDir);
+            // console.log('Copying Vditor files from:', sourceDir);
+            // console.log('To:', targetDir);
             
             if (!fs.existsSync(targetDir)) {
               fs.mkdirSync(targetDir, { recursive: true });
@@ -164,14 +168,14 @@ export default defineConfig({
             }
             
             copyDir(sourceDir, targetDir);
-            console.log('Vditor files copied successfully!');
+            // console.log('Vditor files copied successfully!');
           }
           
           // 复制 pdfmake 中文支持文件
           const pdfmakeSourceDir = path.join(__dirname, 'node_modules', 'pdfmake-support-chinese-fonts');
           const distDir = options.dir || 'dist';
           
-          console.log('Copying pdfmake Chinese font support files...');
+          // console.log('Copying pdfmake Chinese font support files...');
           fs.copyFileSync(
             path.join(pdfmakeSourceDir, 'pdfmake.min.js'),
             path.join(distDir, 'pdfmake.min.js')
@@ -180,7 +184,7 @@ export default defineConfig({
             path.join(pdfmakeSourceDir, 'vfs_fonts.js'),
             path.join(distDir, 'vfs_fonts.js')
           );
-          console.log('pdfmake Chinese font support files copied!');
+          // console.log('pdfmake Chinese font support files copied!');
           
         } catch (error) {
           console.error('Error copying files:', error);

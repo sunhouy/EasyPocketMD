@@ -18,7 +18,7 @@ function loadScript(url) {
         const script = document.createElement('script');
         script.src = url;
         script.onload = () => {
-            console.log('[PDF Debug] Script loaded:', url);
+            // console.log('[PDF Debug] Script loaded:', url);
             resolve();
         };
         script.onerror = (error) => {

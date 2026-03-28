@@ -442,15 +442,15 @@ Provide 5-10 most relevant Markdown examples. Only return the list, no explanati
 // AI Chart Search endpoint
 router.post('/chart', async (req, res) => {
     try {
-        const { keyword, description, language } = req.body;
-        
+        const { keyword, description, language, chartType } = req.body;
+
         // Support both keyword (old) and description (new natural language) parameters
         const userInput = description || keyword;
-        
+
         if (!userInput) {
-            return res.status(400).json({ 
-                code: 400, 
-                message: 'Description or keyword is required' 
+            return res.status(400).json({
+                code: 400,
+                message: 'Description or keyword is required'
             });
         }
 
@@ -462,11 +462,48 @@ router.post('/chart', async (req, res) => {
             });
         }
 
-        // Construct system prompt based on language
+        // Construct system prompt based on language and chart type
         const isEnglish = language === 'en';
-        const systemPrompt = isEnglish 
-            ? `You are a Mermaid chart expert. Generate Mermaid diagrams based on user's natural language description.
+        const isECharts = chartType === 'echarts';
 
+        let systemPrompt;
+        if (isECharts) {
+            // ECharts prompt
+            systemPrompt = isEnglish
+                ? `You are an ECharts expert. Generate ECharts configuration based on user's natural language description.
+
+Rules:
+1. Generate ONLY ONE chart that best matches the user's description
+2. Return ONLY the ECharts container HTML div, no explanations
+3. Use the following format for the ECharts container:
+   <div class="echarts-container" data-chart-type="echarts-<type>" data-chart-option-b64="<base64 encoded option>"></div>
+4. The data-chart-option-b64 should be a Base64 encoded JSON string of the ECharts option
+5. Include meaningful labels and data
+6. Ensure the configuration is valid ECharts syntax
+
+Example format:
+\`\`\`html
+<div class="echarts-container" data-chart-type="echarts-line" data-chart-option-b64="eyJ0aXRsZSI6eyJ0ZXh0IjoiTGluZSBDaGFydCJ9LCJ4QXhpcyI6eyJ0eXBlIjoiY2F0ZWdvcnkifSwieUF4aXMiOnsidHlwZSI6InZhbHVlIn0sInNlcmllcyI6W3sidHlwZSI6ImxpbmUiLCJkYXRhIjpbMTIwLDEzMiwxMDEsMTM0LDkwLDIzMF19XX0="></div>
+\`\`\``
+                : `你是ECharts专家。根据用户的自然语言描述生成ECharts配置。
+
+规则：
+1. 只生成一个最匹配用户描述的图表
+2. 只返回ECharts容器HTML div，不要解释
+3. 使用以下格式作为ECharts容器：
+   <div class="echarts-container" data-chart-type="echarts-<类型>" data-chart-option-b64="<base64编码的option>"></div>
+4. data-chart-option-b64应该是ECharts option的Base64编码JSON字符串
+5. 使用中文标签和有意义的数据
+6. 确保配置是有效的ECharts语法
+
+示例格式：
+\`\`\`html
+<div class="echarts-container" data-chart-type="echarts-line" data-chart-option-b64="eyJ0aXRsZSI6eyJ0ZXh0Ijoi5pWw5o2u5Z2mIn0sInhBeGlzIjp7InR5cGUiOiJjYXRlZ29yeSJ9LCJ5QXhpcyI6eyJ0eXBlIjoidmFsdWUifSwic2VyaWVzIjpbeyJ0eXBlIjoibGluZSIsImRhdGEiOlsxMjAsMTMyLDEwMSwxMzQsOTAsMjMwXX1dfQ=="></div>
+\`\`\``;
+        } else {
+            // Mermaid prompt
+            systemPrompt = isEnglish
+                ? `You are a Mermaid chart expert. Generate Mermaid diagrams based on user's natural language description.
 
 Rules:
 1. Generate ONLY ONE chart that best matches the user's description
@@ -479,7 +516,7 @@ Format:
 \`\`\`mermaid
 <chart code>
 \`\`\``
-            : `你是Mermaid图表专家。根据用户的自然语言描述生成Mermaid图表。
+                : `你是Mermaid图表专家。根据用户的自然语言描述生成Mermaid图表。
 
 规则：
 1. 只生成一个最匹配用户描述的图表
@@ -492,10 +529,11 @@ Format:
 \`\`\`mermaid
 <图表代码>
 \`\`\``;
+        }
 
         const userPrompt = isEnglish
-            ? `Generate a Mermaid chart for: "${userInput}"`
-            : `生成以下描述的Mermaid图表："${userInput}"`;
+            ? `Generate a ${isECharts ? 'ECharts' : 'Mermaid'} chart for: "${userInput}"`
+            : `生成以下描述的${isECharts ? 'ECharts' : 'Mermaid'}图表："${userInput}"`;
 
         // Call DashScope API
         const requestBody = JSON.stringify({
