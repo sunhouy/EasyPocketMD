@@ -94,6 +94,14 @@ jobs:
           # node-word-detection 等原生模块已在服务器编译好，避免重复安装
           npm install --omit=dev --prefer-offline
           
+          # 检查 node-word-detection 是否正确编译，如果没有则使用 Python 3.8 重新编译
+          if [ ! -f "node_modules/node-word-detection/build/Release/node-word-detection.node" ]; then
+            echo "编译 node-word-detection 原生模块..."
+            cd node_modules/node-word-detection
+            PYTHON=/usr/bin/python3.8 npm run build
+            cd /www/wwwroot/js
+          fi
+          
           # PM2 启动/重启服务
           if pm2 describe md-server > /dev/null; then
             pm2 restart md-server

@@ -114,6 +114,10 @@ class FileManager {
                     message = '文件保存成功';
                 }
 
+                // Invalidate cache after successful save
+                await Cache.deleteUserFiles(username);
+                await Cache.deleteFileContent(username, filename);
+
                 return {
                     code: 200,
                     message,
