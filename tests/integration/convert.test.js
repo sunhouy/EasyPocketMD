@@ -19,6 +19,11 @@ jest.mock('wkhtmltopdf', () => {
     });
 });
 
+// Mock fs methods for PDF generation
+jest.spyOn(fs, 'mkdirSync').mockImplementation(() => {});
+jest.spyOn(fs, 'existsSync').mockReturnValue(true);
+jest.spyOn(fs, 'statSync').mockReturnValue({ size: 100 });
+
 // Mock fs.createWriteStream to handle mock wkhtmltopdf output
 jest.spyOn(fs, 'createWriteStream').mockImplementation(() => {
     const { PassThrough } = require('stream');
@@ -29,10 +34,6 @@ jest.spyOn(fs, 'createWriteStream').mockImplementation(() => {
     });
     return stream;
 });
-
-// Mock fs.existsSync and fs.statSync for finish event check
-jest.spyOn(fs, 'existsSync').mockReturnValue(true);
-jest.spyOn(fs, 'statSync').mockReturnValue({ size: 100 });
 
 jest.setTimeout(10000);
 
