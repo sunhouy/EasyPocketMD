@@ -372,7 +372,7 @@
             markDirty();
         });
 
-        console.log('[Draft] Draft recovery module initialized');
+        // console.log('[Draft] Draft recovery module initialized');
     }
 
     // 导出公共 API
