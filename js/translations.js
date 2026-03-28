@@ -174,6 +174,9 @@
             registerFailed: '注册失败',
             unsavedFilesSave: '有文件尚未保存，是否保存？',
             loggedOut: '已退出登录',
+            sessionExpired: '会话已过期',
+            sessionExpiredPleaseLogin: '登录会话已过期，请重新登录',
+            tokenRefreshed: '登录状态已刷新',
             
             // 格式菜单
             heading1: '标题 1',
@@ -599,6 +602,9 @@
             registerFailed: 'Registration failed',
             unsavedFilesSave: 'You have unsaved files, do you want to save?',
             loggedOut: 'Logged out',
+            sessionExpired: 'Session expired',
+            sessionExpiredPleaseLogin: 'Session expired, please login again',
+            tokenRefreshed: 'Login status refreshed',
             
             // Format menu
             heading1: 'Heading 1',

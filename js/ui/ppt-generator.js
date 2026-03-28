@@ -38,16 +38,20 @@
         var topicRequired = document.getElementById('topicRequired');
         
         if (pptState.source === 'current') {
-            fromCurrentBtn.classList.add('active');
-            fromTopicBtn.classList.remove('active');
+            fromCurrentBtn.style.borderColor = '#4a90e2';
+            fromCurrentBtn.style.background = 'rgba(74,144,226,0.1)';
+            fromTopicBtn.style.borderColor = '#ddd';
+            fromTopicBtn.style.background = 'white';
             // 根据本文件生成时，显示主题输入框（可选）
             if (topicSection) topicSection.style.display = 'block';
             if (topicLabel) {
                 topicLabel.innerHTML = '主题 <span id="topicRequired" style="color:#999;font-weight:normal;">（可选）</span>';
             }
         } else {
-            fromTopicBtn.classList.add('active');
-            fromCurrentBtn.classList.remove('active');
+            fromTopicBtn.style.borderColor = '#4a90e2';
+            fromTopicBtn.style.background = 'rgba(74,144,226,0.1)';
+            fromCurrentBtn.style.borderColor = '#ddd';
+            fromCurrentBtn.style.background = 'white';
             // 输入主题生成时，显示主题输入框（必填）
             if (topicSection) topicSection.style.display = 'block';
             if (topicLabel) {

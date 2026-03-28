@@ -354,6 +354,33 @@
                     body: JSON.stringify(body)
                 });
                 const r = global.parseJsonResponse ? await global.parseJsonResponse(resp) : await resp.json();
+
+                // 检查 Token 错误
+                if (global.isTokenError && global.isTokenError(r)) {
+                    const handled = await global.handleTokenExpired();
+                    if (handled) {
+                        // 使用新 Token 重试
+                        body.token = g('currentUser').token;
+                        const retryResp = await fetch(api + '/files/save', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(body)
+                        });
+                        const retryR = global.parseJsonResponse ? await global.parseJsonResponse(retryResp) : await retryResp.json();
+                        if (retryR.code === 200) {
+                            f.isSynced = true;
+                            f.lastModified = Date.now();
+                            serverFiles.push({
+                                name: f.name,
+                                type: f.type,
+                                content: f.type === 'folder' ? '{"meta":"folder"}' : content,
+                                lastModified: f.lastModified
+                            });
+                        }
+                    }
+                    continue;
+                }
+
                 if (r.code === 200) {
                     // 标记本地为已同步，并把它加入 serverFiles，避免后续被当成缺失
                     f.isSynced = true;
@@ -1865,13 +1892,45 @@
         if (!g('currentUser')) return [];
         try {
             var api = global.getApiBaseUrl ? global.getApiBaseUrl() : 'api';
-            const response = await fetch(api + '/files/history/list?username=' + encodeURIComponent(g('currentUser').username) + '&filename=' + encodeURIComponent(filename), {
-                method: 'GET',
-                headers: { 'Authorization': 'Bearer ' + g('currentUser').token }
-            });
-            const result = global.parseJsonResponse ? await global.parseJsonResponse(response) : await response.json();
+            const url = api + '/files/history/list?username=' + encodeURIComponent(g('currentUser').username) + '&filename=' + encodeURIComponent(filename);
+
+            // 使用 authenticatedFetch 自动处理 Token 过期
+            let result;
+            if (global.authenticatedFetch) {
+                result = await global.authenticatedFetch(url, { method: 'GET' });
+            } else {
+                // 降级处理：使用普通 fetch
+                const response = await fetch(url, {
+                    method: 'GET',
+                    headers: { 'Authorization': 'Bearer ' + g('currentUser').token }
+                });
+                result = global.parseJsonResponse ? await global.parseJsonResponse(response) : await response.json();
+
+                // 检查 Token 错误
+                if (global.isTokenError && global.isTokenError(result)) {
+                    const handled = await global.handleTokenExpired();
+                    if (handled) {
+                        // 重试
+                        const retryResponse = await fetch(url, {
+                            method: 'GET',
+                            headers: { 'Authorization': 'Bearer ' + g('currentUser').token }
+                        });
+                        result = global.parseJsonResponse ? await global.parseJsonResponse(retryResponse) : await retryResponse.json();
+                    } else {
+                        return [];
+                    }
+                }
+            }
+
             return (result.code === 200 && result.data && result.data.history) ? result.data.history : [];
-        } catch (e) { console.error('获取历史版本失败', e); return []; }
+        } catch (e) {
+            console.error('获取历史版本失败', e);
+            // 如果是 Token 错误，显示友好提示
+            if (e.message && (e.message.includes('sessionExpired') || e.message.includes('过期'))) {
+                return [];
+            }
+            return [];
+        }
     }
 
     // 当前历史版本选择状态
