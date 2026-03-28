@@ -37,7 +37,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: test
     if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
-    
+
     steps:
     - name: Checkout source
       uses: actions/checkout@v4
@@ -58,79 +58,226 @@ jobs:
     - name: Build frontend
       run: npm run build
 
-    - name: Clean up server directory
+    - name: Create deployment tarball
+      run: |
+        mkdir -p deploy_tmp
+        cp -r dist api print package.json package-lock.json nginx.conf sw.js manifest.webmanifest icon-192.png icon-512.png deploy_tmp/
+        tar -czf deploy.tar.gz -C deploy_tmp .
+
+    - name: Prepare and execute zero-downtime deployment
       uses: appleboy/ssh-action@master
       with:
         host: ${{ secrets.SERVER_HOST }}
         username: ${{ secrets.SERVER_USER }}
         password: ${{ secrets.SERVER_PASSWORD }}
         script: |
-          target_dir="/www/wwwroot/js"
-          if [ -d "$target_dir" ]; then
-            cd "$target_dir"
-            find . -maxdepth 1 -mindepth 1 ! -name '.env' ! -name 'uploads' ! -name 'user_uploads' ! -name 'user_files' ! -name 'node_modules' -exec rm -rf {} +
+          set -e
+
+          # 定义目录
+          GREEN_DIR="/www/wwwroot/js_green"
+          BLUE_DIR="/www/wwwroot/js_blue"
+          SHARED_DIR="/www/wwwroot/js_shared"
+          LINK_PATH="/www/wwwroot/js"
+
+          # 创建必要的目录
+          mkdir -p "$GREEN_DIR" "$BLUE_DIR" "$SHARED_DIR/uploads" "$SHARED_DIR/user_uploads" "$SHARED_DIR/user_files"
+
+          # 确定当前和下一个部署目录
+          if [ -L "$LINK_PATH" ]; then
+            CURRENT_TARGET=$(readlink -f "$LINK_PATH")
+            if [ "$CURRENT_TARGET" = "$GREEN_DIR" ]; then
+              NEXT_DIR="$BLUE_DIR"
+              NEXT_NAME="md-server-blue"
+              CURRENT_NAME="md-server-green"
+              echo "当前: green -> 切换到: blue"
+            else
+              NEXT_DIR="$GREEN_DIR"
+              NEXT_NAME="md-server-green"
+              CURRENT_NAME="md-server-blue"
+              echo "当前: blue -> 切换到: green"
+            fi
+          else
+            NEXT_DIR="$GREEN_DIR"
+            NEXT_NAME="md-server-green"
+            CURRENT_NAME=""
+            echo "首次部署到: green"
           fi
 
-    - name: Upload files to server
+          # 清理下一个部署目录
+          echo "清理 $NEXT_DIR..."
+          rm -rf "${NEXT_DIR:?}/"*
+
+          # 等待上传文件（文件会通过 SCP 上传到临时位置）
+          echo "等待部署包..."
+
+    - name: Upload deployment tarball
       uses: appleboy/scp-action@master
       with:
         host: ${{ secrets.SERVER_HOST }}
         username: ${{ secrets.SERVER_USER }}
         password: ${{ secrets.SERVER_PASSWORD }}
-        # PWA 资源（sw.js / manifest / icons）必须部署到站点根目录，否则 /sw.js 会回退为 index.html 导致 MIME 错误
-        source: "dist,api,print,package.json,package-lock.json,nginx.conf,sw.js,manifest.webmanifest,icon-192.png,icon-512.png"
-        target: "/www/wwwroot/js"
+        source: "deploy.tar.gz"
+        target: "/tmp"
         strip_components: 0
 
-    - name: Install dependencies on server
+    - name: Extract and setup deployment
       uses: appleboy/ssh-action@master
       with:
         host: ${{ secrets.SERVER_HOST }}
         username: ${{ secrets.SERVER_USER }}
         password: ${{ secrets.SERVER_PASSWORD }}
         script: |
-          cd /www/wwwroot/js
-          # 保留 node_modules，只安装缺失的依赖
-          # node-word-detection 等原生模块已在服务器编译好，避免重复安装
+          set -e
+
+          GREEN_DIR="/www/wwwroot/js_green"
+          BLUE_DIR="/www/wwwroot/js_blue"
+          SHARED_DIR="/www/wwwroot/js_shared"
+          LINK_PATH="/www/wwwroot/js"
+
+          # 确定目标目录
+          if [ -L "$LINK_PATH" ]; then
+            CURRENT_TARGET=$(readlink -f "$LINK_PATH")
+            if [ "$CURRENT_TARGET" = "$GREEN_DIR" ]; then
+              NEXT_DIR="$BLUE_DIR"
+            else
+              NEXT_DIR="$GREEN_DIR"
+            fi
+          else
+            NEXT_DIR="$GREEN_DIR"
+          fi
+
+          echo "解压部署包到 $NEXT_DIR..."
+          tar -xzf /tmp/deploy.tar.gz -C "$NEXT_DIR"
+
+          # 设置共享目录符号链接
+          cd "$NEXT_DIR"
+          rm -rf uploads user_uploads user_files
+          ln -s "$SHARED_DIR/uploads" uploads
+          ln -s "$SHARED_DIR/user_uploads" user_uploads
+          ln -s "$SHARED_DIR/user_files" user_files
+
+          # 安装依赖
+          echo "安装依赖..."
           npm install --omit=dev --prefer-offline
-          
-          # 检查 node-word-detection 是否正确编译，如果没有则使用 Python 3.8 重新编译
+
+          # 检查原生模块
           if [ ! -f "node_modules/node-word-detection/build/Release/node-word-detection.node" ]; then
             echo "编译 node-word-detection 原生模块..."
             cd node_modules/node-word-detection
             PYTHON=/usr/bin/python3.8 npm run build
-            cd /www/wwwroot/js
+            cd "$NEXT_DIR"
           fi
-          
-          # PM2 启动/重启服务
-          if pm2 describe md-server > /dev/null; then
-            pm2 restart md-server
-          else
-            pm2 start api/server.js --name "md-server"
-          fi
-          
-          # 配置 Nginx (md.yhsun.cn)
-          if [ -f "nginx.conf" ]; then
-            mv nginx.conf /www/server/panel/vhost/nginx/md.yhsun.cn.conf
-          fi
-          
-          # 配置 Nginx (print.yhsun.cn)
-          if [ -f "print/nginx_print_server.conf" ]; then
-            mv print/nginx_print_server.conf /www/server/panel/vhost/nginx/print.yhsun.cn.conf
-          fi
-          
-          service nginx reload
-          
-    - name: Setup and start print server
+
+          echo "部署目录准备完成: $NEXT_DIR"
+
+    - name: Zero-downtime switch
       uses: appleboy/ssh-action@master
       with:
         host: ${{ secrets.SERVER_HOST }}
         username: ${{ secrets.SERVER_USER }}
         password: ${{ secrets.SERVER_PASSWORD }}
         script: |
-          cd /www/wwwroot/js/print
-          
-          # 检查 Python3 是否可用
+          set -e
+
+          GREEN_DIR="/www/wwwroot/js_green"
+          BLUE_DIR="/www/wwwroot/js_blue"
+          LINK_PATH="/www/wwwroot/js"
+
+          # 确定当前和下一个部署
+          if [ -L "$LINK_PATH" ]; then
+            CURRENT_TARGET=$(readlink -f "$LINK_PATH")
+            if [ "$CURRENT_TARGET" = "$GREEN_DIR" ]; then
+              NEXT_DIR="$BLUE_DIR"
+              NEXT_NAME="md-server-blue"
+              CURRENT_NAME="md-server-green"
+            else
+              NEXT_DIR="$GREEN_DIR"
+              NEXT_NAME="md-server-green"
+              CURRENT_NAME="md-server-blue"
+            fi
+          else
+            NEXT_DIR="$GREEN_DIR"
+            NEXT_NAME="md-server-green"
+            CURRENT_NAME=""
+          fi
+
+          echo "在新目录启动服务: $NEXT_NAME"
+          cd "$NEXT_DIR"
+
+          # 启动或重载新服务
+          if ! pm2 describe "$NEXT_NAME" > /dev/null 2>&1; then
+            echo "启动新服务: $NEXT_NAME"
+            PORT=3001 pm2 start api/server.js --name "$NEXT_NAME" --env production
+          else
+            echo "重载现有服务: $NEXT_NAME"
+            PORT=3001 pm2 reload "$NEXT_NAME" --update-env
+          fi
+
+          # 健康检查
+          echo "等待健康检查..."
+          HEALTHY=false
+          for i in {1..30}; do
+            if curl -sf http://localhost:3001 > /dev/null 2>&1 || \
+               curl -sf http://localhost:3001/api/health > /dev/null 2>&1; then
+              echo "✓ 新服务健康检查通过"
+              HEALTHY=true
+              break
+            fi
+            echo "健康检查尝试 $i/30..."
+            sleep 2
+          done
+
+          if [ "$HEALTHY" != "true" ]; then
+            echo "✗ 健康检查失败，取消切换"
+            exit 1
+          fi
+
+          # 原子切换符号链接
+          echo "执行原子切换..."
+          ln -sfn "$NEXT_DIR" "${LINK_PATH}_new"
+          mv -Tf "${LINK_PATH}_new" "$LINK_PATH"
+
+          # 更新 Nginx 配置
+          if [ -f "$NEXT_DIR/nginx.conf" ]; then
+            cp "$NEXT_DIR/nginx.conf" /www/server/panel/vhost/nginx/md.yhsun.cn.conf
+            # 确保 Nginx 配置指向正确的端口
+            sed -i 's/proxy_pass http:\/\/localhost:[0-9]*/proxy_pass http:\/\/localhost:3001/' /www/server/panel/vhost/nginx/md.yhsun.cn.conf
+          fi
+
+          # 重载 Nginx
+          service nginx reload
+
+          # 停止旧服务
+          if [ -n "$CURRENT_NAME" ] && pm2 describe "$CURRENT_NAME" > /dev/null 2>&1; then
+            echo "停止旧服务: $CURRENT_NAME"
+            pm2 stop "$CURRENT_NAME" || true
+            pm2 delete "$CURRENT_NAME" || true
+          fi
+
+          # 保存 PM2 配置
+          pm2 save
+
+          echo "✓ 零停机部署完成！"
+          pm2 list
+
+    - name: Setup and start print server (zero-downtime)
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.SERVER_HOST }}
+        username: ${{ secrets.SERVER_USER }}
+        password: ${{ secrets.SERVER_PASSWORD }}
+        script: |
+          set -e
+
+          LINK_PATH="/www/wwwroot/js"
+          if [ -L "$LINK_PATH" ]; then
+            CURRENT_TARGET=$(readlink -f "$LINK_PATH")
+            cd "$CURRENT_TARGET/print"
+          else
+            cd "/www/wwwroot/js_green/print"
+          fi
+
+          # 检查 Python
           if command -v python3 &> /dev/null; then
             PYTHON_CMD=python3
           elif command -v python &> /dev/null; then
@@ -139,35 +286,68 @@ jobs:
             echo "错误: 未找到 Python"
             exit 1
           fi
-          
+
           echo "使用 Python: $PYTHON_CMD"
-          
-          # 安装 Python 依赖
+
+          # 安装依赖
           if [ -f "requirements.txt" ]; then
-            echo "正在安装 Python 依赖..."
-            $PYTHON_CMD -m pip install --upgrade pip
-            $PYTHON_CMD -m pip install -r requirements.txt
+            echo "安装 Python 依赖..."
+            $PYTHON_CMD -m pip install --upgrade pip -q
+            $PYTHON_CMD -m pip install -r requirements.txt -q
           fi
-          
-          # 使用 PM2 管理打印服务器
-          echo "启动/重启打印服务器..."
-          
-          # 停止旧的打印服务器（如果存在）
+
+          # 零停机重启打印服务器
+          echo "零停机重启打印服务器..."
           if pm2 describe print-server > /dev/null 2>&1; then
-            echo "正在重新启动打印服务器..."
-            pm2 stop print-server
-            pm2 delete print-server
+            pm2 reload print-server --update-env
+          else
+            pm2 start print_server.py --name "print-server" --interpreter "$PYTHON_CMD" -- --host 0.0.0.0 --port 8770
           fi
-          
-          # 启动新的打印服务器
-          # 使用 --host 0.0.0.0 和 --port 8770，默认禁用自动偏移以确保 Nginx 代理正确
-          echo "启动打印服务器在 0.0.0.0:8770..."
-          pm2 start print_server.py --name "print-server" --interpreter "$PYTHON_CMD" -- --host 0.0.0.0 --port 8770
-          
-          # 保存 PM2 配置
+
           pm2 save
-          
-          echo "打印服务器已成功启动或重连！"
+          echo "✓ 打印服务器热更新完成！"
+
+    - name: Final health check
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.SERVER_HOST }}
+        username: ${{ secrets.SERVER_USER }}
+        password: ${{ secrets.SERVER_PASSWORD }}
+        script: |
+          echo "执行最终健康检查..."
+
+          # 主服务检查
+          for i in {1..5}; do
+            if curl -sf http://localhost:3001 > /dev/null 2>&1; then
+              echo "✓ 主服务运行正常"
+              break
+            fi
+            if [ $i -eq 5 ]; then
+              echo "✗ 主服务检查失败"
+              exit 1
+            fi
+            sleep 2
+          done
+
+          # 打印服务检查
+          for i in {1..5}; do
+            if curl -sf http://localhost:8770 > /dev/null 2>&1; then
+              echo "✓ 打印服务运行正常"
+              break
+            fi
+            if [ $i -eq 5 ]; then
+              echo "⚠ 打印服务检查失败（非致命）"
+            fi
+            sleep 2
+          done
+
+          # 清理临时文件
+          rm -f /tmp/deploy.tar.gz
+
+          echo ""
+          echo "=========================================="
+          echo "✓ 零停机部署成功完成！"
+          echo "=========================================="
           pm2 list
 
   # 检查 print_client.py 是否变更
@@ -203,21 +383,21 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
     - uses: actions/checkout@v4
-    
+
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
         python-version: '3.10'
-        
+
     - name: Install dependencies
       run: |
         pip install -r print/requirements.txt
         pip install pyinstaller
-        
+
     - name: Build with PyInstaller
       run: |
         pyinstaller --onefile --console --name print_client_${{ matrix.target }} print/print_client.py
-        
+
     - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
@@ -234,19 +414,19 @@ jobs:
       with:
         name: print_client_windows
         path: downloads
-        
+
     - name: Download Linux artifact
       uses: actions/download-artifact@v4
       with:
         name: print_client_linux
         path: downloads
-        
+
     - name: Download macOS artifact
       uses: actions/download-artifact@v4
       with:
         name: print_client_macos
         path: downloads
-        
+
     - name: Create target directory
       uses: appleboy/ssh-action@master
       with:
