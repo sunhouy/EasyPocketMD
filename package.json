@@ -54,6 +54,7 @@
     "html2pdf.js": "^0.14.0",
     "ioredis": "^5.10.1",
     "jquery": "^3.7.1",
+    "jsonwebtoken": "^9.0.3",
     "jspdf": "^4.2.1",
     "jstree": "^3.3.17",
     "markdown-it": "^14.1.1",

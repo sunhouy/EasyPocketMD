@@ -342,7 +342,7 @@
                 const filenameToSend = f.type === 'folder' ? (f.name.endsWith('/') ? f.name : (f.name + '/')) : f.name;
                 const body = {
                     username: g('currentUser').username,
-                    token: g('currentUser').token || g('currentUser').username,
+                    token: g('currentUser').token,
                     filename: filenameToSend,
                     content: f.type === 'folder' ? '{"meta":"folder"}' : content
                 };
@@ -403,7 +403,7 @@
 
         const body = {
             username: g('currentUser').username,
-            token: g('currentUser').token || g('currentUser').username,
+            token: g('currentUser').token,
             filename: file.name,
             content: content
         };
@@ -1853,7 +1853,7 @@
             var api = global.getApiBaseUrl ? global.getApiBaseUrl() : 'api';
             const response = await fetch(api + '/files/history/create', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (g('currentUser').token || g('currentUser').username) },
+                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + g('currentUser').token },
                 body: JSON.stringify({ username: g('currentUser').username, filename: filename, content: content, timestamp: Date.now() })
             });
             const result = global.parseJsonResponse ? await global.parseJsonResponse(response) : await response.json();
@@ -1867,7 +1867,7 @@
             var api = global.getApiBaseUrl ? global.getApiBaseUrl() : 'api';
             const response = await fetch(api + '/files/history/list?username=' + encodeURIComponent(g('currentUser').username) + '&filename=' + encodeURIComponent(filename), {
                 method: 'GET',
-                headers: { 'Authorization': 'Bearer ' + (g('currentUser').token || g('currentUser').username) }
+                headers: { 'Authorization': 'Bearer ' + g('currentUser').token }
             });
             const result = global.parseJsonResponse ? await global.parseJsonResponse(response) : await response.json();
             return (result.code === 200 && result.data && result.data.history) ? result.data.history : [];
@@ -2088,7 +2088,7 @@
             var api = global.getApiBaseUrl ? global.getApiBaseUrl() : 'api';
             var response = await fetch(api + '/files/history/delete', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (g('currentUser').token || g('currentUser').username) },
+                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + g('currentUser').token },
                 body: JSON.stringify({ username: g('currentUser').username, filename: filename, version_ids: versionIds })
             });
             var result = global.parseJsonResponse ? await global.parseJsonResponse(response) : await response.json();
@@ -2210,7 +2210,7 @@
             var api = global.getApiBaseUrl ? global.getApiBaseUrl() : 'api';
             const response = await fetch(api + '/files/save', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (g('currentUser').token || g('currentUser').username) },
+                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + g('currentUser').token },
                 body: JSON.stringify({ username: g('currentUser').username, filename: filenameToSend, content: content })
             });
             const result = global.parseJsonResponse ? await global.parseJsonResponse(response) : await response.json();
@@ -2246,7 +2246,7 @@
             var api = global.getApiBaseUrl ? global.getApiBaseUrl() : 'api';
             const response = await fetch(api + '/files/delete', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (g('currentUser').token || g('currentUser').username) },
+                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + g('currentUser').token },
                 body: JSON.stringify({ username: g('currentUser').username, filename: filename })
             });
             const text = await response.text();
@@ -2344,7 +2344,7 @@
             var api = global.getApiBaseUrl ? global.getApiBaseUrl() : 'api';
             var response = await fetch(api + '/files/history/restore', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (g('currentUser').token || g('currentUser').username) },
+                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + g('currentUser').token },
                 body: JSON.stringify({ username: g('currentUser').username, filename: filename, version_id: versionId })
             });
             var result = global.parseJsonResponse ? await global.parseJsonResponse(response) : await response.json();
@@ -2410,7 +2410,7 @@
             var api = global.getApiBaseUrl ? global.getApiBaseUrl() : 'api';
             var response = await fetch(api + '/files/history/delete', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (g('currentUser').token || g('currentUser').username) },
+                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + g('currentUser').token },
                 body: JSON.stringify({ username: g('currentUser').username, filename: filename, version_id: versionId })
             });
             var result = global.parseJsonResponse ? await global.parseJsonResponse(response) : await response.json();
