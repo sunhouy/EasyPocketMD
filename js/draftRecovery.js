@@ -112,12 +112,9 @@
             const draft = JSON.parse(draftJson);
             if (!draft || !draft.fileId || !draft.content) return false;
 
-            // 检查草稿是否比当前文件更新（先通过ID匹配，再通过文件名匹配）
+            // 检查草稿是否比当前文件更新
             const files = global.files || [];
-            let currentFile = files.find(f => f.id === draft.fileId);
-            if (!currentFile && draft.fileName) {
-                currentFile = files.find(f => f.name === draft.fileName);
-            }
+            const currentFile = files.find(f => f.id === draft.fileId);
 
             if (!currentFile) {
                 // 文件可能被删除了，但草稿还在，仍然可以恢复
@@ -169,7 +166,7 @@
             const response = await fetch(`${apiBase}/api/files/content?username=${encodeURIComponent(global.currentUser.username)}&filename=${encodeURIComponent(currentFile.name)}`, {
                 method: 'GET',
                 headers: {
-                    'Authorization': `Bearer ${global.currentUser.token}`
+                    'Authorization': `Bearer ${global.currentUser.token || global.currentUser.username}`
                 }
             });
 
