@@ -92,7 +92,6 @@ jobs:
           cd /www/wwwroot/js
           # 确保不会因为历史残留导致安装异常
           rm -rf node_modules
-          rm -f package-lock.json
           # 安装生产依赖
           npm install --omit=dev
           

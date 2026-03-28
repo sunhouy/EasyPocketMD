@@ -44,10 +44,13 @@ function checkSensitiveWords(text) {
     loadSensitiveWords();
   }
 
-  const result = node_word_detection.check_word(text);
+  // check_word 返回 boolean，find_word 返回敏感词列表
+  const hasSensitive = node_word_detection.check_word(text);
 
-  if (result && result.length > 0) {
-    return { hasSensitive: true, words: result };
+  if (hasSensitive) {
+    // 查找所有敏感词（-1 表示查找全部）
+    const words = node_word_detection.find_word(text, -1);
+    return { hasSensitive: true, words: words || [] };
   }
 
   return { hasSensitive: false, words: [] };
