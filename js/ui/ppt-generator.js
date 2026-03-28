@@ -36,12 +36,13 @@
         var topicSection = document.getElementById('aiPPTTopicSection');
         var topicLabel = document.querySelector('#aiPPTTopicSection label');
         var topicRequired = document.getElementById('topicRequired');
+        var isNightMode = document.body.classList.contains('night-mode');
         
         if (pptState.source === 'current') {
             fromCurrentBtn.style.borderColor = '#4a90e2';
             fromCurrentBtn.style.background = 'rgba(74,144,226,0.1)';
-            fromTopicBtn.style.borderColor = '#ddd';
-            fromTopicBtn.style.background = 'white';
+            fromTopicBtn.style.borderColor = isNightMode ? '#444' : '#ddd';
+            fromTopicBtn.style.background = isNightMode ? '#2d2d2d' : 'white';
             // 根据本文件生成时，显示主题输入框（可选）
             if (topicSection) topicSection.style.display = 'block';
             if (topicLabel) {
@@ -50,8 +51,8 @@
         } else {
             fromTopicBtn.style.borderColor = '#4a90e2';
             fromTopicBtn.style.background = 'rgba(74,144,226,0.1)';
-            fromCurrentBtn.style.borderColor = '#ddd';
-            fromCurrentBtn.style.background = 'white';
+            fromCurrentBtn.style.borderColor = isNightMode ? '#444' : '#ddd';
+            fromCurrentBtn.style.background = isNightMode ? '#2d2d2d' : 'white';
             // 输入主题生成时，显示主题输入框（必填）
             if (topicSection) topicSection.style.display = 'block';
             if (topicLabel) {
@@ -362,6 +363,7 @@ ${userOutline ? '用户提供的参考大纲：\n' + userOutline + '\n\n' : ''}
     function renderOutlinePreview() {
         var container = document.getElementById('aiPPTOutlinePreview');
         if (!container) return;
+        var isNightMode = document.body.classList.contains('night-mode');
         
         if (!pptState.outline || pptState.outline.length === 0) {
             container.innerHTML = '<p style="color:#999;text-align:center;padding:20px;">无大纲数据</p>';
@@ -371,7 +373,8 @@ ${userOutline ? '用户提供的参考大纲：\n' + userOutline + '\n\n' : ''}
         var html = '';
         for (var i = 0; i < pptState.outline.length; i++) {
             var page = pptState.outline[i];
-            html += '<div style="margin-bottom:15px;padding:12px;background:#f8f9fa;border-radius:8px;border-left:3px solid #4a90e2;">';
+            var bgColor = isNightMode ? '#3d3d3d' : '#f8f9fa';
+            html += '<div style="margin-bottom:15px;padding:12px;background:' + bgColor + ';border-radius:8px;border-left:3px solid #4a90e2;">';
             html += '<strong style="color:#4a90e2;">第' + page.number + '页：</strong>' + escapeHtml(page.title);
             if (page.content.length > 0) {
                 html += '<ul style="margin:8px 0 0 0;padding-left:20px;">';
@@ -439,6 +442,11 @@ ${userOutline ? '用户提供的参考大纲：\n' + userOutline + '\n\n' : ''}
         var ratio = pptState.ratio;
         var aspectRatio = ratio === '16:9' ? '16:9' : '4:3';
         
+        var isNightMode = document.body.classList.contains('night-mode');
+        var bgColor = isNightMode ? '#1e1e1e' : '#ffffff';
+        var textColor = isNightMode ? '#e0e0e0' : '#2c3e50';
+        var subtitleColor = isNightMode ? '#b0b0b0' : '#34495e';
+        
         var prompt = `第${page.number}页：${pageTitle}
 ${page.content.map((c, i) => '要点' + (i + 1) + '：' + c).join('\n')}
 
@@ -451,18 +459,18 @@ ${page.content.map((c, i) => '要点' + (i + 1) + '：' + c).join('\n')}
 4. 每个要点都要有详细说明（1-2句话），字号适中（如2.5vw或3%）
 5. 使用项目符号列表展示要点
 6. 添加适当的颜色、间距和视觉层次
-7. 背景使用浅色，文字使用深色
+7. 背景色：${bgColor}，文字色：${textColor}
 8. 页面padding使用百分比（如5%）
 9. 确保内容不会溢出容器
 10. 不要使用固定宽度/高度的容器
 
 示例格式：
-<div style="width:100%;height:100%;padding:5%;box-sizing:border-box;">
-  <h1 style="font-size:5vw;margin:0 0 3% 0;color:#2c3e50;">标题</h1>
-  <ul style="font-size:2.5vw;line-height:1.6;color:#34495e;">
-    <li>要点内容</li>
-  </ul>
-</div>
+&lt;div style="width:100%;height:100%;padding:5%;box-sizing:border-box;background:${bgColor};"&gt;
+  &lt;h1 style="font-size:5vw;margin:0 0 3% 0;color:${textColor};"&gt;标题&lt;/h1&gt;
+  &lt;ul style="font-size:2.5vw;line-height:1.6;color:${subtitleColor};"&gt;
+    &lt;li&gt;要点内容&lt;/li&gt;
+  &lt;/ul&gt;
+&lt;/div&gt;
 
 直接返回HTML代码。`;
 
@@ -481,6 +489,7 @@ ${page.content.map((c, i) => '要点' + (i + 1) + '：' + c).join('\n')}
     function renderEditorPagesList() {
         var container = document.getElementById('pptEditorPagesList');
         if (!container) return;
+        var isNightMode = document.body.classList.contains('night-mode');
         
         var html = '';
         for (var i = 0; i < pptState.outline.length; i++) {
@@ -488,8 +497,8 @@ ${page.content.map((c, i) => '要点' + (i + 1) + '：' + c).join('\n')}
             var isGenerated = pptState.pages[i] !== null;
             var isActive = i === pptState.currentPage;
             
-            // 水平排列的缩略图
-            var bgStyle = isActive ? 'background:#4a90e2 !important;color:white !important;' : 'background:rgba(255,255,255,0.1);color:white;';
+            // 水平排列的缩略图 - 适配夜间模式
+            var bgStyle = isActive ? 'background:#4a90e2 !important;color:white !important;' : (isNightMode ? 'background:rgba(255,255,255,0.1);color:#eee;' : 'background:rgba(0,0,0,0.05);color:#333;');
             html += '<div class="ppt-editor-thumb" data-index="' + i + '" data-active="' + isActive + '" style="flex-shrink:0;width:140px;padding:10px;border-radius:6px;cursor:pointer;transition:all 0.2s;position:relative;' + bgStyle + '">';
             
             // 删除按钮
@@ -505,7 +514,7 @@ ${page.content.map((c, i) => '要点' + (i + 1) + '：' + c).join('\n')}
             html += '<div style="font-size:12px;font-weight:bold;padding-right:40px;">第' + page.number + '页</div>';
             html += '<div style="font-size:11px;opacity:0.8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:4px;">' + escapeHtml(page.title) + '</div>';
             html += '<div style="font-size:10px;margin-top:6px;">';
-            html += isGenerated ? '<i class="fas fa-check-circle" style="color:' + (isActive ? 'white' : '#27ae60') + ';"></i> <span style="opacity:0.8;">已生成</span>' : '<i class="fas fa-clock" style="color:#999;"></i> <span style="opacity:0.6;">待生成</span>';
+            html += isGenerated ? '<i class="fas fa-check-circle" style="color:' + (isActive ? 'white' : '#27ae60') + ';"></i> <span style="opacity:0.8;">已生成</span>' : '<i class="fas fa-clock" style="color:' + (isNightMode ? '#aaa' : '#999') + ';"></i> <span style="opacity:0.6;">待生成</span>';
             html += '</div>';
             html += '</div>';
         }

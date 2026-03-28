@@ -2893,3 +2893,23 @@ body.night-mode .ppt-source-btn.active {
     background: rgba(74, 144, 226, 0.2) !important;
     border-color: #4a90e2 !important;
 }
+
+/* PPT editor modal night mode */
+body.night-mode #pptEditorModal {
+    background: #1e1e1e !important;
+}
+
+body.night-mode #pptEditorPreview {
+    background: #2d2d2d !important;
+}
+
+body.night-mode .ppt-editor-thumb {
+    background: #2d2d2d !important;
+    border-color: #444 !important;
+    color: #eee !important;
+}
+
+body.night-mode .ppt-editor-thumb[data-active="true"] {
+    background: #4a90e2 !important;
+    color: white !important;
+}
