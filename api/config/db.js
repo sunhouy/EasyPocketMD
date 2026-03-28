@@ -1,6 +1,4 @@
 const mysql = require('mysql2/promise');
-const path = require('path');
-require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
 
 const dbConfig = {
     host: process.env.DB_HOST,

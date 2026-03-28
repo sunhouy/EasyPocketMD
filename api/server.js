@@ -2,7 +2,6 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
-require('dotenv').config({ path: path.join(__dirname, '../.env') }); // Load environment variables
 
 // 加载敏感词库
 const { loadSensitiveWords } = require('./utils/sensitiveFilter');

@@ -1,6 +1,4 @@
 const Redis = require('ioredis');
-const path = require('path');
-require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
 
 const redisConfig = {
     host: process.env.REDIS_HOST || 'localhost',
