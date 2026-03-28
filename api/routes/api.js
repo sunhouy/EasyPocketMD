@@ -101,7 +101,7 @@ router.post('/upload_screenshot', upload.single('screenshot'), async (req, res) 
 
 // General upload
 router.post('/upload', generalUpload.array('files[]'), async (req, res) => {
-    if (!req.files || req.files.length === 0) {
+    if (!Array.isArray(req.files) || req.files.length === 0) {
         return res.json({ success: false, message: '没有上传文件' });
     }
 
