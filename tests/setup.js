@@ -41,15 +41,21 @@ jest.mock('ioredis', () => {
 });
 
 // Mock sensitive word detection module
-jest.mock('node-word-detection', () => ({
-    node_word_detection: {
-        add_word: jest.fn(),
-        check_word: jest.fn().mockReturnValue(false),
-        find_word: jest.fn().mockReturnValue([]),
-        check_word_replace: jest.fn().mockReturnValue({ have: false, str: '' }),
-        get_word_num: jest.fn().mockReturnValue(0)
-    }
-}));
+jest.mock('sensitive-word-filter', () => {
+    return jest.fn().mockImplementation(() => ({
+        addWords: jest.fn(),
+        filter: jest.fn((text, replacement) => {
+            // 模拟过滤功能：如果文本包含"敏感词"则替换
+            if (typeof text === 'string' && text.includes('敏感词')) {
+                if (replacement) {
+                    return text.replace(/敏感词/g, replacement);
+                }
+                return text.replace(/敏感词/g, '**');
+            }
+            return text;
+        })
+    }));
+});
 
 // Mock fs for sensitive word file check and PDF generation
 jest.mock('fs', () => ({

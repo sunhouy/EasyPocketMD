@@ -435,4 +435,120 @@ sequenceDiagram
     }
 });
 
+// AI Generate endpoint - 通用AI生成接口（用于AI助手的帮我写、帮我改、生成PPT等功能）
+router.post('/generate', async (req, res) => {
+    try {
+        const { prompt, content } = req.body;
+
+        if (!prompt) {
+            return res.status(400).json({
+                code: 400,
+                message: 'Prompt is required'
+            });
+        }
+
+        const apiKey = process.env.DASHSCOPE_API_KEY;
+        if (!apiKey) {
+            return res.status(500).json({
+                code: 500,
+                message: 'AI API Key is not configured on server'
+            });
+        }
+
+        // Call DashScope API
+        const requestBody = JSON.stringify({
+            model: "qwen-turbo",
+            input: {
+                messages: [
+                    {
+                        role: "system",
+                        content: "你是一个专业的写作助手，可以帮助用户生成各种类型的文档内容、改写文本、生成PPT大纲等。请根据用户的要求提供高质量的回复。直接返回结果，不要包含解释性文字。"
+                    },
+                    {
+                        role: "user",
+                        content: prompt + (content ? '\n\n' + content : '')
+                    }
+                ]
+            },
+            parameters: {
+                result_format: "message"
+            }
+        });
+
+        const options = {
+            hostname: 'dashscope.aliyuncs.com',
+            path: '/api/v1/services/aigc/text-generation/generation',
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`,
+                'Content-Length': Buffer.byteLength(requestBody)
+            }
+        };
+
+        const apiRequest = https.request(options, (apiRes) => {
+            let data = '';
+
+            apiRes.on('data', (chunk) => {
+                data += chunk;
+            });
+
+            apiRes.on('end', () => {
+                if (apiRes.statusCode >= 200 && apiRes.statusCode < 300) {
+                    try {
+                        const response = JSON.parse(data);
+                        if (response.output && response.output.choices && response.output.choices.length > 0) {
+                            const aiContent = response.output.choices[0].message.content;
+                            res.json({
+                                code: 200,
+                                data: aiContent
+                            });
+                        } else {
+                            console.error('DashScope API unexpected response:', response);
+                            res.status(500).json({
+                                code: 500,
+                                message: 'AI processing failed',
+                                error: response.message || 'Unknown error'
+                            });
+                        }
+                    } catch (e) {
+                        console.error('Failed to parse DashScope response:', e);
+                        res.status(500).json({
+                            code: 500,
+                            message: 'Failed to parse AI response'
+                        });
+                    }
+                } else {
+                    console.error(`DashScope API Error: ${apiRes.statusCode}`, data);
+                    res.status(apiRes.statusCode).json({
+                        code: apiRes.statusCode,
+                        message: 'AI API request failed',
+                        error: data
+                    });
+                }
+            });
+        });
+
+        apiRequest.on('error', (e) => {
+            console.error('DashScope Request Error:', e);
+            res.status(500).json({
+                code: 500,
+                message: 'Network error calling AI service',
+                error: e.message
+            });
+        });
+
+        apiRequest.write(requestBody);
+        apiRequest.end();
+
+    } catch (error) {
+        console.error('AI Generate error:', error);
+        return res.status(500).json({
+            code: 500,
+            message: 'Internal server error',
+            error: error.message
+        });
+    }
+});
+
 module.exports = router;
