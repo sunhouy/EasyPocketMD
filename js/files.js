@@ -1735,7 +1735,16 @@
             }
         }
         
-        if (g('vditor')) g('vditor').setValue(content);
+        if (g('vditor')) {
+            g('vditor').setValue(content);
+            
+            // 延迟处理图片懒加载，等待Vditor渲染完成
+            setTimeout(() => {
+                if (window.LazyImageLoader && window.LazyImageLoader.processVditorImages) {
+                    window.LazyImageLoader.processVditorImages();
+                }
+            }, 300);
+        }
         expandActiveFile();
         global.startAutoSave();
         global.showMessage(isEn() ? 'File opened: ' + file.name : '已打开文件: ' + file.name);

@@ -224,6 +224,12 @@ document.addEventListener('DOMContentLoaded', function() {
                             window.renderEChartsContainers();
                         }
                     }, 500);
+                    // 处理图片懒加载
+                    setTimeout(function() {
+                        if (window.LazyImageLoader && window.LazyImageLoader.processVditorImages) {
+                            window.LazyImageLoader.processVditorImages();
+                        }
+                    }, 300);
                 });
             }
 

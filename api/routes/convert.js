@@ -333,6 +333,12 @@ router.post('/docx', async (req, res) => {
             max-width: 100%;
             height: auto;
         }
+        img {
+            max-width: 100%;
+            height: auto;
+            display: block;
+            margin: 1em auto;
+        }
         -->
     </style>
 </head>

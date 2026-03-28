@@ -85,10 +85,25 @@
             var result = await response.json();
             if (result.success) {
                 global.showUploadStatus('上传成功！共' + result.count + '个文件', 'success');
-                var markdownLinks = result.urls.map(function(url) {
+                
+                // 使用新的 files 数组（包含缩略图信息）
+                var fileInfos = result.files || result.urls.map(function(url) {
+                    return { url: url, thumb_url: url };
+                });
+                
+                var markdownLinks = fileInfos.map(function(fileInfo) {
+                    var url = fileInfo.url || fileInfo;
+                    var thumbUrl = fileInfo.thumb_url || url;
                     var fileName = url.split('/').pop();
                     // 处理 URL 中的空格，使用 encodeURI 保持其有效性
                     var encodedUrl = url.includes(' ') ? encodeURI(url) : url;
+                    var encodedThumbUrl = thumbUrl.includes(' ') ? encodeURI(thumbUrl) : thumbUrl;
+                    
+                    // 注册缩略图映射
+                    if (window.LazyImageLoader) {
+                        window.LazyImageLoader.registerThumbnail(encodedUrl, encodedThumbUrl);
+                    }
+                    
                     return /\.(jpg|jpeg|png|gif|bmp|webp|svg)$/i.test(fileName) ? '![' + fileName + '](' + encodedUrl + ')' : '[' + fileName + '](' + encodedUrl + ')';
                 });
                 if (autoInsert && markdownLinks.length > 0 && g('vditor')) {
