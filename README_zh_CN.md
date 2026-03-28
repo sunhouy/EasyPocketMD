@@ -96,6 +96,12 @@ DB_NAME=数据库名
 ADMIN_USER=管理员用户名
 ADMIN_PASSWORD=管理员密码
 BASE_URL=网站域名，例如https://md.yhsun.cn
+
+# Redis 配置（可选，用于文件缓存）
+REDIS_HOST=localhost
+REDIS_PORT=6379
+REDIS_PASSWORD=
+REDIS_DB=0
 ```
 
 每次push都会触发自动构建上传代码到服务器，electron应用安卓应用通过打tag触发：

@@ -239,7 +239,7 @@
                     const pendingServerSync = g('pendingServerSync') || {};
                     const pendingFileIds = Object.keys(pendingServerSync).filter(id => pendingServerSync[id]);
                     if (pendingFileIds.length > 0) {
-                        global.showSyncStatus(isEn() ? 'Auto-syncing ' + pendingFileIds.length + ' unsaved files...' : '正在自动同步 ' + pendingFileIds.length + ' 个未同步的文件...', 'syncing');
+                        global.showSyncStatus(isEn() ? 'Auto-syncing...' : '正在自动同步...', 'syncing');
                         setTimeout(() => {
                             (async () => {
                                 for (const fileId of pendingFileIds) {

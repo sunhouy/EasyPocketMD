@@ -152,6 +152,7 @@
             // 文件操作
             notLoggedIn: '未登录',
             confirmLeave: '您有未保存的文件，确定要离开吗？',
+            savingPleaseWait: '正在保存，请稍候...',
 
             // 草稿恢复
             draftRecoveryTitle: '恢复草稿',
@@ -417,9 +418,9 @@
             insertToEditor: '插入到编辑器',
             generate: '生成',
             aiWritePlaceholder: '请输入主题或要求...',
-            aiEditPlaceholder: '请输入需要修改的文本...',
-            aiFormatPlaceholder: '请输入需要排版的文本...',
-            aiPPTPlaceholder: '请输入主题或大纲...',
+            aiEditPlaceholder: '请输入需要补充的内容（可选）...',
+            aiFormatPlaceholder: '请输入需要补充的内容（可选）...',
+            aiPPTPlaceholder: '请输入需要补充的内容（可选）...',
             generateOutline: '生成大纲',
             outlinePreview: '大纲预览',
             generatePages: '生成页面',
@@ -576,6 +577,7 @@
             // File operations
             notLoggedIn: 'Not logged in',
             confirmLeave: 'You have unsaved files, are you sure you want to leave?',
+            savingPleaseWait: 'Saving, please wait...',
 
             // Draft recovery
             draftRecoveryTitle: 'Recover Draft',

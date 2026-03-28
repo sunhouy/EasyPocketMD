@@ -62,6 +62,61 @@
     }
 
     /**
+     * 强制保存到 localStorage
+     * 确保所有未保存的更改都写入 localStorage，并更新 unsavedChanges 状态
+     * 返回是否保存成功
+     */
+    function forceSaveToLocalStorage() {
+        try {
+            // 1. 立即备份当前草稿
+            if (global.draftRecovery) {
+                global.draftRecovery.backupNow();
+            }
+
+            // 2. 保存所有未保存的文件到 localStorage
+            const files = global.files || [];
+            const vditor = global.vditor;
+            const currentFileId = global.currentFileId;
+            let hasChanges = false;
+
+            files.forEach(function(file) {
+                if (file.type !== 'file') return;
+                
+                // 获取最新内容（当前打开的文件从编辑器获取，其他从 file.content）
+                let content = file.content;
+                if (file.id === currentFileId && vditor) {
+                    content = vditor.getValue();
+                }
+                
+                // 检查是否有未保存的更改
+                const lastSynced = global.lastSyncedContent[file.id];
+                if (content !== lastSynced) {
+                    file.content = content;
+                    file.lastModified = Date.now();
+                    global.lastSyncedContent[file.id] = content;
+                    global.unsavedChanges[file.id] = false;
+                    hasChanges = true;
+                }
+            });
+
+            if (hasChanges) {
+                localStorage.setItem('vditor_files', JSON.stringify(files));
+            }
+
+            // 3. 清除草稿（因为已经正式保存）
+            if (global.draftRecovery) {
+                global.draftRecovery.clearDraft();
+            }
+
+            // console.log('[Lifecycle] Force save completed');
+            return true;
+        } catch (e) {
+            console.error('[Lifecycle] Force save failed:', e);
+            return false;
+        }
+    }
+
+    /**
      * 使用同步 XHR 进行最后的保存尝试
      * 在 beforeunload 等同步事件中使用
      */
@@ -99,32 +154,46 @@
      * 初始化 Web 环境生命周期处理
      */
     function initWebLifecycle() {
-        // beforeunload: 提示用户有未保存的更改
+        // beforeunload: 强制保存，如果保存失败则阻止退出
         window.addEventListener('beforeunload', function(e) {
             const unsaved = global.unsavedChanges || {};
             const hasUnsaved = (global.files || []).some(f => unsaved[f.id]);
 
             if (hasUnsaved) {
-                // 尝试同步保存
-                emergencySave();
-                syncSaveToServer();
-
-                // 显示确认对话框
-                e.preventDefault();
-                e.returnValue = global.i18n ? global.i18n.t('confirmLeave') : '您有未保存的文件，确定要离开吗？';
-                return e.returnValue;
+                // 先尝试强制保存到 localStorage
+                const saveSuccess = forceSaveToLocalStorage();
+                
+                // 尝试同步保存到服务器
+                if (global.currentUser) {
+                    syncSaveToServer();
+                }
+                
+                // 检查是否保存成功（再次检查 unsavedChanges）
+                const stillUnsaved = (global.files || []).some(f => global.unsavedChanges[f.id]);
+                if (stillUnsaved) {
+                    // 保存失败，阻止用户退出
+                    e.preventDefault();
+                    e.returnValue = global.i18n ? global.i18n.t('savingPleaseWait') : '正在保存，请稍候...';
+                    return e.returnValue;
+                }
+                // 保存成功，允许退出
             }
         });
 
         // pagehide: 页面即将被隐藏/卸载
         window.addEventListener('pagehide', function(e) {
-            emergencySave();
+            forceSaveToLocalStorage();
         });
 
         // visibilitychange: 页面可见性变化
         document.addEventListener('visibilitychange', function() {
             if (document.visibilityState === 'hidden') {
-                emergencySave();
+                // 切后台时立即执行完整保存
+                forceSaveToLocalStorage();
+                // 如果已登录，尝试同步到服务器
+                if (global.currentUser && global.syncCurrentFileWithBeacon) {
+                    global.syncCurrentFileWithBeacon();
+                }
             } else if (document.visibilityState === 'visible') {
                 // 页面重新可见，检查是否需要恢复草稿
                 checkAndOfferDraftRecovery();

@@ -641,12 +641,7 @@
 
         // 按钮栏
         var buttonBar = document.createElement('div');
-        buttonBar.style.cssText = 'display: flex; gap: 10px; justify-content: flex-end;';
-
-        var cancelBtn = document.createElement('button');
-        cancelBtn.textContent = isEn() ? 'Cancel' : '取消';
-        cancelBtn.style.cssText = 'padding: 10px 20px; background: ' + (nightMode ? '#444' : '#f5f5f5') + '; color: ' + (nightMode ? '#eee' : '#333') + '; border: none; border-radius: 6px; cursor: pointer; font-size: 14px;';
-        cancelBtn.onclick = closeChartPicker;
+        buttonBar.style.cssText = 'display: flex; gap: 10px; justify-content: center;';
 
         var insertBtn = document.createElement('button');
         insertBtn.innerHTML = '<i class="fas fa-plus"></i> ' + (isEn() ? 'Insert' : '插入');
@@ -676,9 +671,26 @@
             }
         };
 
-        buttonBar.appendChild(cancelBtn);
         buttonBar.appendChild(insertBtn);
         container.appendChild(buttonBar);
+
+        // 右上角关闭按钮
+        var closeBtn = document.createElement('button');
+        closeBtn.innerHTML = '<i class="fas fa-times"></i>';
+        closeBtn.style.cssText = 'position: absolute; top: 15px; right: 15px; width: 32px; height: 32px; background: ' + (nightMode ? '#444' : '#f5f5f5') + '; color: ' + (nightMode ? '#eee' : '#666') + '; border: none; border-radius: 50%; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; transition: all 0.2s;';
+        closeBtn.onmouseenter = function() {
+            this.style.background = '#dc3545';
+            this.style.color = 'white';
+        };
+        closeBtn.onmouseleave = function() {
+            this.style.background = (nightMode ? '#444' : '#f5f5f5');
+            this.style.color = (nightMode ? '#eee' : '#666');
+        };
+        closeBtn.onclick = closeChartPicker;
+        container.appendChild(closeBtn);
+
+        // 设置容器为相对定位，以便关闭按钮绝对定位
+        container.style.position = 'relative';
 
         modal.appendChild(container);
         document.body.appendChild(modal);
@@ -862,12 +874,7 @@
 
         // 按钮栏
         var buttonBar = document.createElement('div');
-        buttonBar.style.cssText = 'display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;';
-
-        var cancelBtn = document.createElement('button');
-        cancelBtn.textContent = isEn() ? 'Cancel' : '取消';
-        cancelBtn.style.cssText = 'padding: 10px 20px; background: ' + (nightMode ? '#444' : '#f5f5f5') + '; color: ' + (nightMode ? '#eee' : '#333') + '; border: none; border-radius: 6px; cursor: pointer; font-size: 14px;';
-        cancelBtn.onclick = closeChartPicker;
+        buttonBar.style.cssText = 'display: flex; gap: 10px; justify-content: center; margin-top: 20px;';
 
         var generateBtn = document.createElement('button');
         generateBtn.innerHTML = '<i class="fas fa-magic"></i> ' + (isEn() ? 'Generate' : '生成');
@@ -933,10 +940,27 @@
             }
         };
 
-        buttonBar.appendChild(cancelBtn);
         buttonBar.appendChild(generateBtn);
         buttonBar.appendChild(insertBtn);
         container.appendChild(buttonBar);
+
+        // 右上角关闭按钮
+        var closeBtn = document.createElement('button');
+        closeBtn.innerHTML = '<i class="fas fa-times"></i>';
+        closeBtn.style.cssText = 'position: absolute; top: 15px; right: 15px; width: 32px; height: 32px; background: ' + (nightMode ? '#444' : '#f5f5f5') + '; color: ' + (nightMode ? '#eee' : '#666') + '; border: none; border-radius: 50%; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; transition: all 0.2s;';
+        closeBtn.onmouseenter = function() {
+            this.style.background = '#dc3545';
+            this.style.color = 'white';
+        };
+        closeBtn.onmouseleave = function() {
+            this.style.background = (nightMode ? '#444' : '#f5f5f5');
+            this.style.color = (nightMode ? '#eee' : '#666');
+        };
+        closeBtn.onclick = closeChartPicker;
+        container.appendChild(closeBtn);
+
+        // 设置容器为相对定位，以便关闭按钮绝对定位
+        container.style.position = 'relative';
 
         modal.appendChild(container);
         document.body.appendChild(modal);
@@ -983,13 +1007,13 @@
         // 标题
         var title = document.createElement('div');
         title.textContent = isEn() ? 'Insert Chart' : '插入图表';
-        title.style.cssText = 'font-size: 18px; font-weight: 600; margin-bottom: 15px; text-align: center; color: ' + (nightMode ? '#eee' : '#333') + ';';
+        title.style.cssText = 'font-size: 18px; font-weight: 600; margin-bottom: 12px; text-align: center; color: ' + (nightMode ? '#eee' : '#333') + ';';
         container.appendChild(title);
 
         // 分类切换标签
         var categoryTabs = document.createElement('div');
-        categoryTabs.style.cssText = 'display: flex; gap: 10px; margin-bottom: 15px; border-bottom: 1px solid ' + (nightMode ? '#444' : '#ddd') + '; padding-bottom: 10px;';
-        
+        categoryTabs.style.cssText = 'display: flex; gap: 10px; margin-bottom: 12px; border-bottom: 1px solid ' + (nightMode ? '#444' : '#ddd') + '; padding-bottom: 10px;';
+
         var echartsTab = document.createElement('button');
         echartsTab.innerHTML = '<i class="fas fa-chart-pie"></i> ECharts';
         echartsTab.style.cssText = 'flex: 1; padding: 10px; background: ' + (currentCategory === 'echarts' ? '#667eea' : (nightMode ? '#444' : '#f5f5f5')) + '; color: ' + (currentCategory === 'echarts' ? 'white' : (nightMode ? '#eee' : '#333')) + '; border: none; border-radius: 6px; cursor: pointer; font-size: 14px;';
@@ -1004,16 +1028,10 @@
 
         // AI生成按钮
         var aiBtn = document.createElement('button');
-        aiBtn.innerHTML = '<i class="fas fa-magic"></i> ' + (isEn() ? 'AI Generate (Natural Language)' : 'AI生成');
-        aiBtn.style.cssText = 'width: 100%; padding: 12px; margin-bottom: 15px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 500;';
+        aiBtn.innerHTML = '<i class="fas fa-magic"></i> ' + (isEn() ? 'AI Generate' : 'AI生成');
+        aiBtn.style.cssText = 'width: 100%; padding: 8px; margin-bottom: 12px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 500;';
         aiBtn.onclick = showAIGenerateDialog;
         container.appendChild(aiBtn);
-
-        // 分隔线
-        var divider = document.createElement('div');
-        divider.style.cssText = 'display: flex; align-items: center; margin-bottom: 15px; color: ' + (nightMode ? '#888' : '#999') + '; font-size: 12px;';
-        divider.innerHTML = '<span style="flex: 1; height: 1px; background: ' + (nightMode ? '#444' : '#ddd') + ';"></span><span style="padding: 0 10px;">' + (isEn() ? 'OR choose a template' : '或选择模板') + '</span><span style="flex: 1; height: 1px; background: ' + (nightMode ? '#444' : '#ddd') + ';"></span>';
-        container.appendChild(divider);
 
         // 搜索框
         var searchBox = document.createElement('input');
@@ -1041,23 +1059,18 @@
 
             items.forEach(function(chart) {
                 var chartBtn = document.createElement('button');
-                chartBtn.style.cssText = 'padding: 15px; border: 2px solid transparent; background: ' + (nightMode ? '#3d3d3d' : '#f5f5f5') + '; cursor: pointer; border-radius: 8px; transition: all 0.2s; text-align: center; color: ' + (nightMode ? '#eee' : '#333') + ';';
+                chartBtn.style.cssText = 'padding: 12px; border: 2px solid transparent; background: ' + (nightMode ? '#3d3d3d' : '#f5f5f5') + '; cursor: pointer; border-radius: 8px; transition: all 0.2s; text-align: center; color: ' + (nightMode ? '#eee' : '#333') + ';';
 
                 var iconDiv = document.createElement('div');
-                iconDiv.style.cssText = 'font-size: 28px; margin-bottom: 8px; color: #667eea;';
+                iconDiv.style.cssText = 'font-size: 24px; margin-bottom: 6px; color: #667eea;';
                 iconDiv.innerHTML = chart.icon;
 
                 var nameDiv = document.createElement('div');
-                nameDiv.style.cssText = 'font-weight: bold; font-size: 12px; margin-bottom: 4px;';
+                nameDiv.style.cssText = 'font-weight: bold; font-size: 12px;';
                 nameDiv.textContent = chart.name.split('(')[0].trim();
-
-                var descDiv = document.createElement('div');
-                descDiv.style.cssText = 'font-size: 11px; color: ' + (nightMode ? '#aaa' : '#666') + '; line-height: 1.3;';
-                descDiv.textContent = chart.description;
 
                 chartBtn.appendChild(iconDiv);
                 chartBtn.appendChild(nameDiv);
-                chartBtn.appendChild(descDiv);
 
                 chartBtn.onclick = function() {
                     if (chart.hasDataInput) {
@@ -1081,8 +1094,10 @@
             });
         }
 
-        // 初始渲染 - 默认显示 ECharts
-        if (typeof window.echartsTemplates !== 'undefined' && window.echartsTemplates.length > 0) {
+        // 初始渲染 - 根据 currentCategory 显示对应模板
+        if (currentCategory === 'mermaid') {
+            renderCharts(mermaidTemplates);
+        } else if (typeof window.echartsTemplates !== 'undefined' && window.echartsTemplates.length > 0) {
             renderEChartsTemplates(window.echartsTemplates);
         } else {
             // 如果 echartsTemplates 还没加载，尝试预加载
@@ -1162,23 +1177,18 @@
 
             templates.forEach(function(template) {
                 var chartBtn = document.createElement('button');
-                chartBtn.style.cssText = 'padding: 15px; border: 2px solid transparent; background: ' + (nightMode ? '#3d3d3d' : '#f5f5f5') + '; cursor: pointer; border-radius: 8px; transition: all 0.2s; text-align: center; color: ' + (nightMode ? '#eee' : '#333') + ';';
+                chartBtn.style.cssText = 'padding: 12px; border: 2px solid transparent; background: ' + (nightMode ? '#3d3d3d' : '#f5f5f5') + '; cursor: pointer; border-radius: 8px; transition: all 0.2s; text-align: center; color: ' + (nightMode ? '#eee' : '#333') + ';';
 
                 var iconDiv = document.createElement('div');
-                iconDiv.style.cssText = 'font-size: 28px; margin-bottom: 8px; color: #667eea;';
+                iconDiv.style.cssText = 'font-size: 24px; margin-bottom: 6px; color: #667eea;';
                 iconDiv.innerHTML = template.icon;
 
                 var nameDiv = document.createElement('div');
-                nameDiv.style.cssText = 'font-weight: bold; font-size: 12px; margin-bottom: 4px;';
+                nameDiv.style.cssText = 'font-weight: bold; font-size: 12px;';
                 nameDiv.textContent = isEn() && template.nameEn ? template.nameEn : template.name;
-
-                var descDiv = document.createElement('div');
-                descDiv.style.cssText = 'font-size: 11px; color: ' + (nightMode ? '#aaa' : '#666') + '; line-height: 1.3;';
-                descDiv.textContent = template.description;
 
                 chartBtn.appendChild(iconDiv);
                 chartBtn.appendChild(nameDiv);
-                chartBtn.appendChild(descDiv);
 
                 chartBtn.onclick = function() {
                     if (typeof window.showEChartsDataInput === 'function') {
@@ -1240,12 +1250,23 @@
             }
         });
 
-        // 取消按钮
-        var cancelBtn = document.createElement('button');
-        cancelBtn.textContent = isEn() ? 'Cancel' : '取消';
-        cancelBtn.style.cssText = 'margin-top: 15px; padding: 10px 20px; background: ' + (nightMode ? '#444' : '#f5f5f5') + '; color: ' + (nightMode ? '#eee' : '#333') + '; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; align-self: center;';
-        cancelBtn.onclick = closeChartPicker;
-        container.appendChild(cancelBtn);
+        // 右上角关闭按钮
+        var closeBtn = document.createElement('button');
+        closeBtn.innerHTML = '<i class="fas fa-times"></i>';
+        closeBtn.style.cssText = 'position: absolute; top: 15px; right: 15px; width: 32px; height: 32px; background: ' + (nightMode ? '#444' : '#f5f5f5') + '; color: ' + (nightMode ? '#eee' : '#666') + '; border: none; border-radius: 50%; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; transition: all 0.2s;';
+        closeBtn.onmouseenter = function() {
+            this.style.background = '#dc3545';
+            this.style.color = 'white';
+        };
+        closeBtn.onmouseleave = function() {
+            this.style.background = (nightMode ? '#444' : '#f5f5f5');
+            this.style.color = (nightMode ? '#eee' : '#666');
+        };
+        closeBtn.onclick = closeChartPicker;
+        container.appendChild(closeBtn);
+
+        // 设置容器为相对定位，以便关闭按钮绝对定位
+        container.style.position = 'relative';
 
         modal.appendChild(container);
         document.body.appendChild(modal);
