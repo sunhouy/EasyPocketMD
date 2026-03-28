@@ -36,7 +36,10 @@ jobs:
           node-version: '20'
 
       - name: Install dependencies
-        run: npm install
+        run: |
+          # Clean install to avoid rollup platform-specific module issues
+          rm -rf node_modules package-lock.json
+          npm install
 
       - name: Extract version from tag
         id: extract-version
