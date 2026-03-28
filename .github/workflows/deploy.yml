@@ -68,7 +68,7 @@ jobs:
           target_dir="/www/wwwroot/js"
           if [ -d "$target_dir" ]; then
             cd "$target_dir"
-            find . -maxdepth 1 -mindepth 1 ! -name '.env' ! -name 'uploads' ! -name 'user_uploads' ! -name 'user_files' -exec rm -rf {} +
+            find . -maxdepth 1 -mindepth 1 ! -name '.env' ! -name 'uploads' ! -name 'user_uploads' ! -name 'user_files' ! -name 'node_modules' -exec rm -rf {} +
           fi
 
     - name: Upload files to server
@@ -90,10 +90,9 @@ jobs:
         password: ${{ secrets.SERVER_PASSWORD }}
         script: |
           cd /www/wwwroot/js
-          # 确保不会因为历史残留导致安装异常
-          rm -rf node_modules
-          # 安装生产依赖
-          npm install --omit=dev
+          # 保留 node_modules，只安装缺失的依赖
+          # node-word-detection 等原生模块已在服务器编译好，避免重复安装
+          npm install --omit=dev --prefer-offline
           
           # PM2 启动/重启服务
           if pm2 describe md-server > /dev/null; then
