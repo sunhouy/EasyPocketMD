@@ -134,7 +134,7 @@
         const content = vditor.getValue();
         const body = {
             username: global.currentUser.username,
-            token: global.currentUser.token || global.currentUser.username,
+            token: global.currentUser.token,
             filename: file.name,
             content: content
         };

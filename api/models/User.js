@@ -1,8 +1,13 @@
 const db = require('../config/db');
 const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 const fs = require('fs');
 const path = require('path');
 const { promisify } = require('util');
+
+// JWT 密钥，从环境变量获取或使用默认值
+const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
 
 class User {
     constructor() {
@@ -23,6 +28,20 @@ class User {
     // Verify password
     async verifyPassword(password, hashedPassword) {
         return await bcrypt.compare(password, hashedPassword);
+    }
+
+    // Generate JWT token
+    generateToken(username) {
+        return jwt.sign({ username }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+    }
+
+    // Verify JWT token
+    verifyToken(token) {
+        try {
+            return jwt.verify(token, JWT_SECRET);
+        } catch (error) {
+            return null;
+        }
     }
 
     // Register user
@@ -115,6 +134,9 @@ class User {
 
             await db.execute('UPDATE users SET last_login = NOW(), login_count = login_count + 1 WHERE id = ?', [user.id]);
 
+            // 生成 JWT token
+            const token = this.generateToken(user.username);
+
             return {
                 code: 200,
                 message: '登录成功',
@@ -122,7 +144,8 @@ class User {
                     username: user.username,
                     is_member: user.is_member,
                     last_login: user.last_login,
-                    login_count: user.login_count + 1
+                    login_count: user.login_count + 1,
+                    token: token
                 }
             };
         } catch (error) {

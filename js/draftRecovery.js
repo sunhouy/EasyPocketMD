@@ -169,7 +169,7 @@
             const response = await fetch(`${apiBase}/api/files/content?username=${encodeURIComponent(global.currentUser.username)}&filename=${encodeURIComponent(currentFile.name)}`, {
                 method: 'GET',
                 headers: {
-                    'Authorization': `Bearer ${global.currentUser.token || global.currentUser.username}`
+                    'Authorization': `Bearer ${global.currentUser.token}`
                 }
             });
 

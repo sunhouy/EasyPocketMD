@@ -16,7 +16,7 @@
             var apiUrl = (global.getApiBaseUrl ? global.getApiBaseUrl() : 'api') + '/share/create';
             var response = await fetch(apiUrl, { 
                 method: 'POST', 
-                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (g('currentUser').token || g('currentUser').username) }, 
+                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + g('currentUser').token }, 
                 body: JSON.stringify(body) 
             });
             if (global.parseJsonResponse) return await global.parseJsonResponse(response);
@@ -103,7 +103,7 @@
             var apiUrl = (global.getApiBaseUrl ? global.getApiBaseUrl() : 'api') + '/share/list?username=' + encodeURIComponent(g('currentUser').username);
             var response = await fetch(apiUrl, { 
                 method: 'GET', 
-                headers: { 'Authorization': 'Bearer ' + (g('currentUser').token || g('currentUser').username) } 
+                headers: { 'Authorization': 'Bearer ' + g('currentUser').token } 
             });
             var result = await global.parseJsonResponse(response);
 
@@ -219,7 +219,7 @@
                     var apiUrl = (global.getApiBaseUrl ? global.getApiBaseUrl() : 'api') + '/share/delete';
                     var response = await fetch(apiUrl, { 
                         method: 'POST', 
-                        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (g('currentUser').token || g('currentUser').username) }, 
+                        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + g('currentUser').token }, 
                         body: JSON.stringify(body) 
                     });
                     var result = await global.parseJsonResponse(response);
@@ -266,7 +266,7 @@
                 var updateUrl = (global.getApiBaseUrl ? global.getApiBaseUrl() : 'api') + '/share/properties';
                 var updateResponse = await fetch(updateUrl, { 
                     method: 'POST', 
-                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (g('currentUser').token || g('currentUser').username) }, 
+                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + g('currentUser').token }, 
                     body: JSON.stringify(updateBody) 
                 });
                 var updateResult = await global.parseJsonResponse(updateResponse);

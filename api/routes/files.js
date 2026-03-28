@@ -16,11 +16,9 @@ const verifyUser = async (req, res, next) => {
     if (result.code !== 200) {
         return res.json(result);
     }
-    // Set user info to req.user if needed (verifyTokenOrPassword doesn't return user obj, but we know username/token is valid)
-    // Actually verifyTokenOrPassword just returns code/message.
-    // If token is valid, data.username should be verified? 
-    // Wait, verifyTokenOrPassword checks if token === username (simple check).
-    // So if code is 200, we trust data.username.
+    // Set user info to req.user
+    // verifyTokenOrPassword now uses JWT verification, which validates token signature and username match
+    // If code is 200, we trust data.username.
     req.user = { id: data.username, username: data.username };
     next();
 };

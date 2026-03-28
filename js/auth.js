@@ -131,9 +131,10 @@
 
             if (message) {
                 if (result.code === 200) {
+                    // 使用后端返回的 JWT token，如果没有则使用密码进行后续验证
                     global.currentUser = {
                         username: username,
-                        token: result.data.token || username,
+                        token: result.data.token,
                         password: password
                     };
                     localStorage.setItem('vditor_user', JSON.stringify(global.currentUser));
@@ -199,22 +200,39 @@
 
             if (message) {
                 if (result.code === 200) {
-                    global.currentUser = {
-                        username: username,
-                        token: username,
-                        password: password
-                    };
-                    localStorage.setItem('vditor_user', JSON.stringify(global.currentUser));
-                    message.textContent = t('registerSuccessAutoLogin');
-                    message.className = 'modal-message success';
+                    // 注册成功后，调用登录接口获取 JWT token
+                    const loginResponse = await fetch((global.getApiBaseUrl ? global.getApiBaseUrl() : 'api') + '/auth/login', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ username: username, password: password })
+                    });
+                    const loginResult = global.parseJsonResponse ? await global.parseJsonResponse(loginResponse) : await loginResponse.json();
+                    
+                    if (loginResult.code === 200) {
+                        global.currentUser = {
+                            username: username,
+                            token: loginResult.data.token,
+                            password: password
+                        };
+                        localStorage.setItem('vditor_user', JSON.stringify(global.currentUser));
+                        message.textContent = t('registerSuccessAutoLogin');
+                        message.className = 'modal-message success';
 
-                    setTimeout(() => {
-                        hideLoginModal();
-                        showUserInfo();
-                        global.showMessage(t('registerSuccessStartSync'));
-                        if (global.startAutoSync) global.startAutoSync();
-                        if (global.loadFilesFromServer) global.loadFilesFromServer();
-                    }, 1500);
+                        setTimeout(() => {
+                            hideLoginModal();
+                            showUserInfo();
+                            global.showMessage(t('registerSuccessStartSync'));
+                            if (global.startAutoSync) global.startAutoSync();
+                            if (global.loadFilesFromServer) global.loadFilesFromServer();
+                        }, 1500);
+                    } else {
+                        // 登录失败，但仍显示注册成功，让用户手动登录
+                        message.textContent = t('registerSuccessAutoLogin');
+                        message.className = 'modal-message success';
+                        setTimeout(() => {
+                            switchToLoginTab();
+                        }, 1500);
+                    }
                 } else {
                     message.textContent = result.message || t('registerFailed');
                     message.className = 'modal-message error';
