@@ -8,19 +8,47 @@ const redisConfig = {
     password: process.env.REDIS_PASSWORD || undefined,
     db: process.env.REDIS_DB || 0,
     retryStrategy: (times) => {
-        // 只重试3次，然后停止重试
         if (times > 3) {
             return null;
         }
         return Math.min(times * 100, 1000);
     },
     maxRetriesPerRequest: 1,
-    enableOfflineQueue: false, // 禁用离线队列，避免Redis不可用时堆积请求
-    lazyConnect: true // 延迟连接，直到第一次使用
+    enableOfflineQueue: false,
+    lazyConnect: true
 };
 
 let redis = null;
 let redisAvailable = false;
+let connectionPromise = null;
+
+async function ensureConnection() {
+    if (redisAvailable && redis) {
+        return true;
+    }
+    if (!redis) {
+        return false;
+    }
+    if (connectionPromise) {
+        return connectionPromise;
+    }
+    
+    connectionPromise = redis.connect()
+        .then(() => {
+            redisAvailable = true;
+            return true;
+        })
+        .catch((err) => {
+            console.error('Redis connection failed:', err.message);
+            redisAvailable = false;
+            return false;
+        })
+        .finally(() => {
+            connectionPromise = null;
+        });
+    
+    return connectionPromise;
+}
 
 try {
     redis = new Redis(redisConfig);
@@ -35,7 +63,6 @@ try {
     });
 
     redis.on('error', (err) => {
-        // 静默处理连接错误，只在第一次报错
         if (redisAvailable) {
             console.error('Redis error:', err.message);
         }
@@ -46,21 +73,19 @@ try {
         redisAvailable = false;
     });
 
-    // 尝试连接，但不阻塞
-    redis.connect().catch(() => {
-        // 连接失败，静默处理
+    // 立即尝试连接
+    ensureConnection().catch(() => {
         redisAvailable = false;
     });
 } catch (err) {
-    // Redis 初始化失败，创建空对象
     redis = null;
     redisAvailable = false;
 }
 
-// 导出一个安全的 Redis 包装对象
 module.exports = {
     get: async (...args) => {
-        if (!redisAvailable || !redis) return null;
+        const connected = await ensureConnection();
+        if (!connected || !redis) return null;
         try {
             return await redis.get(...args);
         } catch {
@@ -68,7 +93,8 @@ module.exports = {
         }
     },
     setex: async (...args) => {
-        if (!redisAvailable || !redis) return false;
+        const connected = await ensureConnection();
+        if (!connected || !redis) return false;
         try {
             await redis.setex(...args);
             return true;
@@ -77,7 +103,8 @@ module.exports = {
         }
     },
     del: async (...args) => {
-        if (!redisAvailable || !redis) return false;
+        const connected = await ensureConnection();
+        if (!connected || !redis) return false;
         try {
             await redis.del(...args);
             return true;
@@ -86,7 +113,8 @@ module.exports = {
         }
     },
     keys: async (...args) => {
-        if (!redisAvailable || !redis) return [];
+        const connected = await ensureConnection();
+        if (!connected || !redis) return [];
         try {
             return await redis.keys(...args);
         } catch {
@@ -94,7 +122,8 @@ module.exports = {
         }
     },
     ttl: async (...args) => {
-        if (!redisAvailable || !redis) return -1;
+        const connected = await ensureConnection();
+        if (!connected || !redis) return -1;
         try {
             return await redis.ttl(...args);
         } catch {
