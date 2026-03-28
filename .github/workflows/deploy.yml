@@ -211,8 +211,11 @@ jobs:
 
           # 原子切换符号链接
           echo "执行原子切换..."
-          ln -sfn "$NEXT_DIR" "${LINK_PATH}_new"
-          mv -Tf "${LINK_PATH}_new" "$LINK_PATH"
+          # 如果 LINK_PATH 是目录或已存在的符号链接，先删除
+          if [ -e "$LINK_PATH" ] || [ -L "$LINK_PATH" ]; then
+            rm -rf "$LINK_PATH"
+          fi
+          ln -sfn "$NEXT_DIR" "$LINK_PATH"
 
           # 更新 Nginx 配置
           if [ -f "$NEXT_DIR/nginx.conf" ]; then
