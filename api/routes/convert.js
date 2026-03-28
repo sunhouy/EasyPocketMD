@@ -212,7 +212,7 @@ router.post('/pdf', (req, res) => {
 });
 
 // Word (DOCX) Conversion endpoint
-router.post('/docx', (req, res) => {
+router.post('/docx', async (req, res) => {
     try {
         let { markdown, settings } = req.body;
         
@@ -223,11 +223,39 @@ router.post('/docx', (req, res) => {
             });
         }
         
-        // Render markdown to HTML
-        let html = md.render(markdown);
+        // Process mermaid diagrams - replace with placeholder text
+        // Mermaid diagrams need to be rendered on frontend, backend can't generate images
+        let processedMarkdown = markdown.replace(/```mermaid\n([\s\S]*?)```/g, (match, content) => {
+            return `<div style="border: 1px solid #ddd; padding: 10px; margin: 10px 0; background: #f9f9f9; text-align: center;">
+                <p style="color: #666; margin: 0;">[Mermaid Diagram]</p>
+                <pre style="text-align: left; margin: 5px 0;">${content.trim()}</pre>
+            </div>`;
+        });
         
-        // Clean up MathJax-related content
-        html = cleanMathJaxContent(html);
+        // Render markdown to HTML
+        let html = md.render(processedMarkdown);
+        
+        // Process MathJax content - convert to Word-compatible format
+        // Keep the SVG rendering of formulas
+        html = html.replace(/<mjx-container[^>]*>([\s\S]*?)<\/mjx-container>/gi, (match, content) => {
+            // Extract SVG from the content
+            const svgMatch = content.match(/<svg[\s\S]*?<\/svg>/i);
+            if (svgMatch) {
+                // Wrap the SVG in a div with appropriate styling
+                return `<div style="text-align: center; margin: 1em 0;">${svgMatch[0]}</div>`;
+            }
+            // If no SVG found, try to extract the formula text
+            const texMatch = content.match(/\\\[([\s\S]*?)\\\]/);
+            if (texMatch) {
+                return `<div style="text-align: center; margin: 1em 0; font-style: italic;">[Formula: ${texMatch[1].trim()}]</div>`;
+            }
+            return '';
+        });
+        
+        // Remove MathJax scripts and assistive elements
+        html = html.replace(/<script[^>]*src[^>]*mathjax[^>]*>[\s\S]*?<\/script>/gi, '');
+        html = html.replace(/<script[^>]*id[^>]*MathJax[^>]*>[\s\S]*?<\/script>/gi, '');
+        html = html.replace(/<mjx-assistive-mml[^>]*>[\s\S]*?<\/mjx-assistive-mml>/gi, '');
         
         // Get settings with defaults
         const margin = settings?.pageMargin || '25';
@@ -299,6 +327,11 @@ router.post('/docx', (req, res) => {
             background: #f5f5f5;
             padding: 10px;
             overflow-x: auto;
+            border: 1px solid #ddd;
+        }
+        svg {
+            max-width: 100%;
+            height: auto;
         }
         -->
     </style>

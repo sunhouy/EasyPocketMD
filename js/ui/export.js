@@ -107,9 +107,12 @@ function exportContent() {
             this.style.background = nightMode ? '#3d3d3d' : '#f5f5f5';
         };
 
-        optionBtn.onclick = async function() {
+        optionBtn.onclick = function() {
             modal.remove();
-            await exportFile(content, f.ext);
+            // 使用 setTimeout 确保模态框完全关闭后再执行导出
+            setTimeout(function() {
+                exportFile(content, f.ext);
+            }, 50);
         };
 
         container.appendChild(optionBtn);
