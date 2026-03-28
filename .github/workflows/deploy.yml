@@ -160,14 +160,6 @@ jobs:
           echo "安装依赖..."
           npm install --omit=dev --prefer-offline
 
-          # 检查原生模块
-          if [ ! -f "node_modules/node-word-detection/build/Release/node-word-detection.node" ]; then
-            echo "编译 node-word-detection 原生模块..."
-            cd node_modules/node-word-detection
-            PYTHON=/usr/bin/python3.8 npm run build
-            cd "$NEXT_DIR"
-          fi
-
           echo "部署目录准备完成: $NEXT_DIR"
 
     - name: Zero-downtime switch
