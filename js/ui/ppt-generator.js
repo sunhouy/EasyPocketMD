@@ -650,61 +650,7 @@ ${page.content.map((c, i) => '要点' + (i + 1) + '：' + c).join('\n')}
         }
     }
 
-    // 使用dom-to-image将HTML转换为图片
-    async function htmlToCanvas(html, width, height) {
-        // 动态导入dom-to-image
-        const domtoimage = await import('dom-to-image');
-        
-        return new Promise(function(resolve, reject) {
-            // 创建临时容器 - 使用visibility:hidden而不是移出屏幕
-            // 这样可以确保浏览器正常渲染，但用户看不到
-            var container = document.createElement('div');
-            container.style.cssText = 'position:fixed;top:0;left:0;width:' + width + 'px;height:' + height + 'px;visibility:hidden;z-index:-9999;pointer-events:none;';
-            container.innerHTML = html;
-            document.body.appendChild(container);
-            
-            // 强制重绘以确保渲染
-            container.offsetHeight;
-            
-            // 等待所有资源加载（图片、字体等）
-            var images = container.querySelectorAll('img');
-            var loadPromises = [];
-            
-            images.forEach(function(img) {
-                if (!img.complete) {
-                    loadPromises.push(new Promise(function(r) {
-                        img.onload = r;
-                        img.onerror = r;
-                    }));
-                }
-            });
-            
-            // 等待所有图片加载完成，并给额外时间让字体和样式渲染
-            Promise.all(loadPromises).then(function() {
-                // 额外延迟确保字体和样式完全渲染
-                setTimeout(function() {
-                    // 使用dom-to-image库截图
-                    domtoimage.default.toPng(container, {
-                        width: width,
-                        height: height,
-                        quality: 1,
-                        bgcolor: '#ffffff',
-                        style: {
-                            'visibility': 'visible'
-                        }
-                    }).then(function(dataUrl) {
-                        document.body.removeChild(container);
-                        resolve(dataUrl);
-                    }).catch(function(err) {
-                        document.body.removeChild(container);
-                        reject(err);
-                    });
-                }, 500); // 500ms延迟确保渲染完成
-            });
-        });
-    }
-
-    // 实际下载 - 使用Canvas截图方式
+    // 实际下载 - 使用html-to-pptx库
     async function doDownloadPPT() {
         var btn = document.getElementById('pptEditorDownload');
         if (!btn) return;
@@ -714,54 +660,53 @@ ${page.content.map((c, i) => '要点' + (i + 1) + '：' + c).join('\n')}
         btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 生成中...';
 
         try {
-            const module = await import('pptxgenjs');
-            const PptxGen = module.default || module;
+            // 动态导入html-to-pptx
+            const htmlToPptx = await import('html-to-pptx');
+            const { downloadHtmlToPpt } = htmlToPptx;
             
-            const pres = new PptxGen();
-            pres.layout = pptState.ratio === '4:3' ? 'LAYOUT_4x3' : 'LAYOUT_16x9';
-            pres.title = pptState.topic || 'PPT';
+            // 创建临时容器来存放所有PPT页面
+            // 注意：元素必须是可见的，否则getBoundingClientRect会失败
+            // 使用visibility:visible但移出屏幕
+            var container = document.createElement('div');
+            container.id = 'ppt-export-container';
+            container.style.cssText = 'position:fixed;top:-10000px;left:-10000px;width:1px;height:1px;overflow:visible;z-index:-1;';
             
-            // 定义页面尺寸（像素）
-            var slideWidth = pptState.ratio === '4:3' ? 1280 : 1920;
-            var slideHeight = 1080;
+            // 定义页面尺寸 - 使用16:9比例
+            var slideWidth = 1000;
+            var slideHeight = 562.5;
             
-            // 逐页生成截图并添加到PPT
+            // 为每页创建DOM元素
             for (var i = 0; i < pptState.outline.length; i++) {
                 var html = pptState.pages[i];
+                var page = pptState.outline[i];
                 
-                if (!html) {
-                    // 如果没有生成内容，创建一个空白页
-                    pres.addSlide();
-                    continue;
+                var pageDiv = document.createElement('div');
+                pageDiv.className = 'h-ppt-page';
+                pageDiv.style.cssText = 'width:' + slideWidth + 'px;height:' + slideHeight + 'px;position:relative;background:#ffffff;overflow:hidden;box-sizing:border-box;';
+                
+                if (html) {
+                    // 包装内容，添加内边距
+                    pageDiv.innerHTML = '<div style="width:100%;height:100%;padding:40px;box-sizing:border-box;">' + html + '</div>';
+                } else {
+                    // 空白页
+                    pageDiv.innerHTML = '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:#999;font-size:24px;">第' + (i + 1) + '页</div>';
                 }
                 
-                // 包装HTML以确保正确渲染
-                var wrappedHtml = '<div style="width:' + slideWidth + 'px;height:' + slideHeight + 'px;box-sizing:border-box;overflow:hidden;background:#ffffff;">' + html + '</div>';
-                
-                try {
-                    // 截图
-                    var dataUrl = await htmlToCanvas(wrappedHtml, slideWidth, slideHeight);
-                    
-                    // 添加幻灯片
-                    var slide = pres.addSlide();
-                    
-                    // 添加图片到幻灯片（填满整个幻灯片）
-                    slide.addImage({
-                        data: dataUrl,
-                        x: 0,
-                        y: 0,
-                        w: '100%',
-                        h: '100%',
-                        sizing: { type: 'cover', w: '100%', h: '100%' }
-                    });
-                } catch (err) {
-                    console.error('截图失败，使用备用方案', err);
-                    // 如果截图失败，添加空白页
-                    pres.addSlide();
-                }
+                container.appendChild(pageDiv);
             }
             
-            await pres.writeFile({ fileName: (pptState.topic || 'PPT') + '.pptx' });
+            document.body.appendChild(container);
+            
+            // 等待DOM渲染完成
+            await new Promise(function(r) { setTimeout(r, 500); });
+            
+            // 使用html-to-pptx导出
+            // 参数：类名, 文件名（不需要.pptx后缀）
+            var fileName = pptState.topic || 'PPT';
+            await downloadHtmlToPpt('h-ppt-page', fileName);
+            
+            // 清理临时容器
+            document.body.removeChild(container);
             
             if (global.showMessage) {
                 global.showMessage('PPT下载成功', 'success');
