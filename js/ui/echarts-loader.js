@@ -1312,8 +1312,13 @@
             
             try {
                 if (optionB64) {
-                    // 新的 Base64 编码格式
-                    var jsonStr = decodeURIComponent(escape(atob(optionB64)));
+                    // 新的 Base64 编码格式 - 使用 TextDecoder 解码避免 URI malformed 错误
+                    var binaryString = atob(optionB64);
+                    var bytes = new Uint8Array(binaryString.length);
+                    for (var i = 0; i < binaryString.length; i++) {
+                        bytes[i] = binaryString.charCodeAt(i);
+                    }
+                    var jsonStr = new TextDecoder('utf-8').decode(bytes);
                     option = JSON.parse(jsonStr);
                 } else if (optionJson) {
                     // 兼容旧格式

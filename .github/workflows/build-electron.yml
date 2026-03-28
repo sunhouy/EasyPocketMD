@@ -35,7 +35,8 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Install dependencies
+      - name: Clean install dependencies
+        shell: bash
         run: |
           # Clean install to avoid rollup platform-specific module issues
           rm -rf node_modules package-lock.json

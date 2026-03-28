@@ -78,7 +78,36 @@ router.post('/layout', async (req, res) => {
                     try {
                         const response = JSON.parse(data);
                         if (response.output && response.output.choices && response.output.choices.length > 0) {
-                            const aiContent = response.output.choices[0].message.content;
+                            let aiContent = response.output.choices[0].message.content;
+
+                            // 如果是 ECharts 类型，将 AI 返回的 JSON 转换为 HTML 容器
+                            if (isECharts) {
+                                try {
+                                    // 清理可能的 markdown 代码块标记
+                                    let jsonStr = aiContent.replace(/```json\s*/g, '').replace(/```\s*$/g, '').replace(/```html\s*/g, '').trim();
+
+                                    // 验证 JSON 是否有效
+                                    const option = JSON.parse(jsonStr);
+
+                                    // 转换为 Base64
+                                    const optionJson = JSON.stringify(option);
+                                    const optionB64 = Buffer.from(optionJson).toString('base64');
+
+                                    // 检测图表类型
+                                    let chartType = 'line';
+                                    if (option.series && option.series.length > 0) {
+                                        const type = option.series[0].type;
+                                        if (type) chartType = type;
+                                    }
+
+                                    // 生成 HTML 容器
+                                    aiContent = `<div class="echarts-container" data-chart-type="echarts-${chartType}" data-chart-option-b64="${optionB64}"></div>`;
+                                } catch (e) {
+                                    console.error('Failed to parse ECharts JSON:', e);
+                                    // 如果解析失败，返回原始内容
+                                }
+                            }
+
                             res.json({
                                 code: 200,
                                 data: aiContent
@@ -468,38 +497,30 @@ router.post('/chart', async (req, res) => {
 
         let systemPrompt;
         if (isECharts) {
-            // ECharts prompt
+            // ECharts prompt - 直接返回 JSON 配置，不要 Base64
             systemPrompt = isEnglish
                 ? `You are an ECharts expert. Generate ECharts configuration based on user's natural language description.
 
 Rules:
 1. Generate ONLY ONE chart that best matches the user's description
-2. Return ONLY the ECharts container HTML div, no explanations
-3. Use the following format for the ECharts container:
-   <div class="echarts-container" data-chart-type="echarts-<type>" data-chart-option-b64="<base64 encoded option>"></div>
-4. The data-chart-option-b64 should be a Base64 encoded JSON string of the ECharts option
-5. Include meaningful labels and data
-6. Ensure the configuration is valid ECharts syntax
+2. Return ONLY valid ECharts option JSON, no explanations, no markdown code blocks
+3. The JSON must include: title, xAxis (for cartesian charts), yAxis (for cartesian charts), and series
+4. Use meaningful labels and realistic sample data
+5. Ensure the JSON is valid and parseable
 
-Example format:
-\`\`\`html
-<div class="echarts-container" data-chart-type="echarts-line" data-chart-option-b64="eyJ0aXRsZSI6eyJ0ZXh0IjoiTGluZSBDaGFydCJ9LCJ4QXhpcyI6eyJ0eXBlIjoiY2F0ZWdvcnkifSwieUF4aXMiOnsidHlwZSI6InZhbHVlIn0sInNlcmllcyI6W3sidHlwZSI6ImxpbmUiLCJkYXRhIjpbMTIwLDEzMiwxMDEsMTM0LDkwLDIzMF19XX0="></div>
-\`\`\``
+Example output format (raw JSON, no backticks):
+{"title":{"text":"Sales Trend"},"xAxis":{"type":"category","data":["Jan","Feb","Mar","Apr","May","Jun"]},"yAxis":{"type":"value"},"series":[{"type":"line","data":[120,132,101,134,90,230]}]}`
                 : `你是ECharts专家。根据用户的自然语言描述生成ECharts配置。
 
 规则：
 1. 只生成一个最匹配用户描述的图表
-2. 只返回ECharts容器HTML div，不要解释
-3. 使用以下格式作为ECharts容器：
-   <div class="echarts-container" data-chart-type="echarts-<类型>" data-chart-option-b64="<base64编码的option>"></div>
-4. data-chart-option-b64应该是ECharts option的Base64编码JSON字符串
-5. 使用中文标签和有意义的数据
-6. 确保配置是有效的ECharts语法
+2. 只返回有效的ECharts option JSON，不要解释，不要用代码块包裹
+3. JSON必须包含：title、xAxis（笛卡尔坐标系图表）、yAxis（笛卡尔坐标系图表）和 series
+4. 使用中文标签和合理的示例数据
+5. 确保JSON格式正确且可解析
 
-示例格式：
-\`\`\`html
-<div class="echarts-container" data-chart-type="echarts-line" data-chart-option-b64="eyJ0aXRsZSI6eyJ0ZXh0Ijoi5pWw5o2u5Z2mIn0sInhBeGlzIjp7InR5cGUiOiJjYXRlZ29yeSJ9LCJ5QXhpcyI6eyJ0eXBlIjoidmFsdWUifSwic2VyaWVzIjpbeyJ0eXBlIjoibGluZSIsImRhdGEiOlsxMjAsMTMyLDEwMSwxMzQsOTAsMjMwXX1dfQ=="></div>
-\`\`\``;
+示例输出格式（纯JSON，无反引号）：
+{"title":{"text":"销售趋势"},"xAxis":{"type":"category","data":["1月","2月","3月","4月","5月","6月"]},"yAxis":{"type":"value"},"series":[{"type":"line","data":[120,132,101,134,90,230]}]}`;
         } else {
             // Mermaid prompt
             systemPrompt = isEnglish

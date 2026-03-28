@@ -99,7 +99,13 @@ export default defineConfig({
           vditor: ['vditor']
         }
       }
+    },
+    commonjsOptions: {
+      transformMixedEsModules: true
     }
+  },
+  optimizeDeps: {
+    include: ['docx']
   },
   plugins: [
     viteStaticCopy({

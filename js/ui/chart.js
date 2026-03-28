@@ -703,8 +703,74 @@
     function insertChartTemplate(template) {
         try {
             if (g('vditor')) {
-                g('vditor').insertValue(template + '\n\n');
-                global.showMessage(isEn() ? 'Chart inserted' : '图表已插入');
+                // 检查是否是 AI 生成的 ECharts HTML 格式
+                var echartsMatch = template.match(/<div class="echarts-container"[^>]*data-chart-option-b64="([^"]+)"[^>]*>/);
+                if (echartsMatch && typeof window.EChartsLoader !== 'undefined') {
+                    // 是 ECharts，需要渲染并转换为图片
+                    var optionB64 = echartsMatch[1];
+                    try {
+                        // 使用 TextDecoder 解码 Base64，避免 URI malformed 错误
+                        var binaryString = atob(optionB64);
+                        var bytes = new Uint8Array(binaryString.length);
+                        for (var i = 0; i < binaryString.length; i++) {
+                            bytes[i] = binaryString.charCodeAt(i);
+                        }
+                        var optionJson = new TextDecoder('utf-8').decode(bytes);
+                        var option = JSON.parse(optionJson);
+
+                        // 创建临时容器渲染图表
+                        var tempDiv = document.createElement('div');
+                        tempDiv.style.cssText = 'width: 600px; height: 400px; position: fixed; left: -9999px; top: -9999px;';
+                        document.body.appendChild(tempDiv);
+
+                        window.EChartsLoader.load(function() {
+                            try {
+                                var chart = echarts.init(tempDiv);
+                                chart.setOption(option);
+
+                                // 等待渲染完成后导出图片
+                                setTimeout(function() {
+                                    try {
+                                        var dataUrl = chart.getDataURL({
+                                            type: 'png',
+                                            pixelRatio: 2,
+                                            backgroundColor: '#fff'
+                                        });
+
+                                        // 获取图表标题作为 alt 文本
+                                        var title = option.title && option.title.text ? option.title.text : 'Chart';
+                                        g('vditor').insertValue('![' + title + '](' + dataUrl + ')\n\n');
+                                        global.showMessage(isEn() ? 'Chart inserted' : '图表已插入');
+                                    } catch (e) {
+                                        console.error('Export chart error:', e);
+                                        // 导出失败，回退到插入原始 HTML
+                                        g('vditor').insertValue(template + '\n\n');
+                                        global.showMessage(isEn() ? 'Chart inserted (HTML mode)' : '图表已插入（HTML模式）');
+                                    }
+
+                                    // 清理
+                                    chart.dispose();
+                                    document.body.removeChild(tempDiv);
+                                }, 500);
+                            } catch (e) {
+                                console.error('Render chart error:', e);
+                                document.body.removeChild(tempDiv);
+                                g('vditor').insertValue(template + '\n\n');
+                                global.showMessage(isEn() ? 'Chart inserted' : '图表已插入');
+                            }
+                        });
+                        return; // 异步处理，提前返回
+                    } catch (e) {
+                        console.error('Parse ECharts option error:', e);
+                        // 解析失败，回退到插入原始内容
+                        g('vditor').insertValue(template + '\n\n');
+                        global.showMessage(isEn() ? 'Chart inserted' : '图表已插入');
+                    }
+                } else {
+                    // 普通 Mermaid 或其他格式，直接插入
+                    g('vditor').insertValue(template + '\n\n');
+                    global.showMessage(isEn() ? 'Chart inserted' : '图表已插入');
+                }
             }
         } catch (e) {
             console.error('插入图表错误', e);
@@ -746,32 +812,25 @@
         desc.style.cssText = 'font-size: 13px; color: ' + (nightMode ? '#aaa' : '#666') + '; margin-bottom: 20px;';
         container.appendChild(desc);
 
-        // 图表类型选择
-        var typeLabel = document.createElement('label');
-        typeLabel.textContent = isEn() ? 'Chart Type:' : '图表类型：';
-        typeLabel.style.cssText = 'display: block; margin-bottom: 8px; font-size: 14px; color: ' + (nightMode ? '#ddd' : '#333') + ';';
-        container.appendChild(typeLabel);
-
-        var typeSelect = document.createElement('select');
-        typeSelect.style.cssText = 'width: 100%; padding: 8px 12px; margin-bottom: 15px; border: 1px solid ' + (nightMode ? '#444' : '#ccc') + '; border-radius: 6px; font-size: 14px; background: ' + (nightMode ? '#222' : '#fafafa') + '; color: ' + (nightMode ? '#eee' : '#333') + ';';
-        typeSelect.innerHTML =
-            '<option value="echarts">ECharts (' + (isEn() ? 'Data Visualization' : '数据可视化') + ')</option>' +
-            '<option value="mermaid">Mermaid (' + (isEn() ? 'Flowcharts, Diagrams' : '流程图、图表') + ')</option>';
+        // 图表类型（固定为 Mermaid）
+        var typeSelect = document.createElement('input');
+        typeSelect.type = 'hidden';
+        typeSelect.value = 'mermaid';
         container.appendChild(typeSelect);
 
         // 示例提示
         var examples = document.createElement('div');
         examples.style.cssText = 'margin-bottom: 15px; padding: 10px; background: ' + (nightMode ? '#1a1a1a' : '#f0f0f0') + '; border-radius: 6px; font-size: 12px; color: ' + (nightMode ? '#888' : '#666') + ';';
         examples.innerHTML = '<strong>' + (isEn() ? 'Examples:' : '示例：') + '</strong><br>' +
-            (isEn() ? 
+            (isEn() ?
                 '• Show me a login flowchart with email verification<br>' +
                 '• Create a sequence diagram for online payment<br>' +
                 '• Draw a class diagram for an e-commerce system<br>' +
-                '• Make a line chart showing sales trend for 6 months' :
+                '• Make a Gantt chart for a 3-month project' :
                 '• 显示一个带邮箱验证的登录流程图<br>' +
                 '• 创建一个在线支付的序列图<br>' +
                 '• 绘制一个电商系统的类图<br>' +
-                '• 制作一个显示6个月销售趋势的折线图');
+                '• 制作一个3个月项目的甘特图');
         container.appendChild(examples);
 
         // 输入框
