@@ -55,13 +55,40 @@ jobs:
     - name: Install dependencies
       run: npm install
 
+    - name: Create .env file
+      run: |
+        cat > .env << EOF
+        PORT=${{ secrets.PORT }}
+        DB_HOST=${{ secrets.DB_HOST }}
+        DB_PORT=${{ secrets.DB_PORT }}
+        DB_USER=${{ secrets.DB_USER }}
+        DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+        DB_NAME=${{ secrets.DB_NAME }}
+        REDIS_HOST=${{ secrets.REDIS_HOST }}
+        REDIS_PORT=${{ secrets.REDIS_PORT }}
+        REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}
+        REDIS_DB=${{ secrets.REDIS_DB }}
+        JWT_SECRET=${{ secrets.JWT_SECRET }}
+        JWT_EXPIRES_IN=${{ secrets.JWT_EXPIRES_IN }}
+        ADMIN_USER=${{ secrets.ADMIN_USER }}
+        ADMIN_PASSWORD=${{ secrets.ADMIN_PASSWORD }}
+        BASE_URL=${{ secrets.BASE_URL }}
+        DASHSCOPE_API_KEY=${{ secrets.DASHSCOPE_API_KEY }}
+        EOF
+
+    - name: Create SSL certificates
+      run: |
+        mkdir -p ssl
+        echo "${{ secrets.KEY }}" > ssl/md.yhsun.cn.key
+        echo "${{ secrets.PEM }}" > ssl/md.yhsun.cn.pem
+
     - name: Build frontend
       run: npm run build
 
     - name: Create deployment tarball
       run: |
         mkdir -p deploy_tmp
-        cp -r dist api print package.json package-lock.json nginx.conf sw.js manifest.webmanifest icon-192.png icon-512.png deploy_tmp/
+        cp -r dist api print package.json package-lock.json nginx.conf sw.js manifest.webmanifest icon-192.png icon-512.png .env ssl deploy_tmp/
         tar -czf deploy.tar.gz -C deploy_tmp .
 
     - name: Prepare and execute zero-downtime deployment
@@ -227,6 +254,21 @@ jobs:
             rm -rf "$LINK_PATH"
           fi
           ln -sfn "$NEXT_DIR" "$LINK_PATH"
+
+          # 配置 SSL 证书
+          echo "配置 SSL 证书..."
+          CERT_DIR="/www/server/panel/vhost/cert/md.yhsun.cn"
+          mkdir -p "$CERT_DIR"
+          
+          if [ -f "$NEXT_DIR/ssl/md.yhsun.cn.key" ] && [ -f "$NEXT_DIR/ssl/md.yhsun.cn.pem" ]; then
+            cp "$NEXT_DIR/ssl/md.yhsun.cn.key" "$CERT_DIR/privkey.pem"
+            cp "$NEXT_DIR/ssl/md.yhsun.cn.pem" "$CERT_DIR/fullchain.pem"
+            chmod 600 "$CERT_DIR/privkey.pem"
+            chmod 644 "$CERT_DIR/fullchain.pem"
+            echo "✓ SSL 证书已更新"
+          else
+            echo "警告: 未找到 SSL 证书文件"
+          fi
 
           # 更新 Nginx 配置
           if [ -f "$NEXT_DIR/nginx.conf" ]; then
