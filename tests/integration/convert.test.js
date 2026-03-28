@@ -2,7 +2,6 @@
 const app = require('../../api/server');
 
 const request = require('supertest');
-const fs = require('fs');
 const wkhtmltopdf = require('wkhtmltopdf');
 
 // Mock wkhtmltopdf
@@ -17,22 +16,6 @@ jest.mock('wkhtmltopdf', () => {
         });
         return stream;
     });
-});
-
-// Mock fs methods for PDF generation
-jest.spyOn(fs, 'mkdirSync').mockImplementation(() => {});
-jest.spyOn(fs, 'existsSync').mockReturnValue(true);
-jest.spyOn(fs, 'statSync').mockReturnValue({ size: 100 });
-
-// Mock fs.createWriteStream to handle mock wkhtmltopdf output
-jest.spyOn(fs, 'createWriteStream').mockImplementation(() => {
-    const { PassThrough } = require('stream');
-    const stream = new PassThrough();
-    // Emit finish event after a short delay to simulate successful write
-    setImmediate(() => {
-        stream.emit('finish');
-    });
-    return stream;
 });
 
 jest.setTimeout(10000);
@@ -60,8 +43,7 @@ describe('Convert API Integration', () => {
 
     describe('POST /api/convert/pdf', () => {
         it('should initiate pdf generation and return success', async () => {
-            // This test is complex because of the stream finish event
-            // But we've mocked wkhtmltopdf to write and end the stream
+            // fs methods (createWriteStream, existsSync, statSync, mkdirSync) are mocked in setup.js
             const res = await request(app)
                 .post('/api/convert/pdf')
                 .send({ html: '<h1>PDF</h1>' });
