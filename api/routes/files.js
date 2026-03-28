@@ -96,9 +96,15 @@ router.post('/history/restore', verifyUser, async (req, res) => {
 
 // Delete history
 router.post('/history/delete', verifyUser, async (req, res) => {
-    const { username, filename, version_id } = req.body;
+    const { username, filename, version_id, version_ids } = req.body;
     if (!username || !filename) return res.json({ code: 400, message: '缺少必要参数' });
-    res.json(await historyManager.deleteHistory(username, filename, version_id));
+
+    // 支持批量删除
+    if (version_ids && Array.isArray(version_ids) && version_ids.length > 0) {
+        res.json(await historyManager.deleteHistoryBatch(username, filename, version_ids));
+    } else {
+        res.json(await historyManager.deleteHistory(username, filename, version_id));
+    }
 });
 
 module.exports = router;

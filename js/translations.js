@@ -54,6 +54,16 @@
             historyCount: '最多保留1000个历史版本',
             loadingHistory: '正在加载历史版本...',
             close: '关闭',
+            selectAll: '全选',
+            deselectAll: '取消全选',
+            batchDelete: '批量删除',
+            clearAllHistory: '清空全部',
+            selectedCount: '已选择 {count} 项',
+            confirmBatchDelete: '确定要删除选中的 {count} 个历史版本吗？',
+            confirmClearAllHistory: '确定要清空该文件的所有历史版本吗？此操作不可恢复！',
+            batchDeleteSuccess: '批量删除成功',
+            clearAllSuccess: '已清空所有历史版本',
+            noHistorySelected: '请先选择要删除的历史版本',
 
             // 设置
             settings: '设置',
@@ -468,6 +478,16 @@
             historyCount: 'Up to 1000 history versions are kept',
             loadingHistory: 'Loading history versions...',
             close: 'Close',
+            selectAll: 'Select All',
+            deselectAll: 'Deselect All',
+            batchDelete: 'Batch Delete',
+            clearAllHistory: 'Clear All',
+            selectedCount: '{count} selected',
+            confirmBatchDelete: 'Are you sure you want to delete {count} selected history versions?',
+            confirmClearAllHistory: 'Are you sure you want to clear all history versions for this file? This action cannot be undone!',
+            batchDeleteSuccess: 'Batch delete successful',
+            clearAllSuccess: 'All history versions cleared',
+            noHistorySelected: 'Please select history versions to delete',
 
             // Settings
             settings: 'Settings',

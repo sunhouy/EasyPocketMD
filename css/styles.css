@@ -488,23 +488,24 @@ body.keyboard-open .editor-container {
     z-index: 1000;
     width: 300px;
     max-height: calc(100vh - 140px);
-    overflow-y: auto;
+    overflow: hidden;
+    padding: 0;
     display: none;
-    padding: 8px;
+    flex-direction: column;
 }
 
 .file-list-sidebar.show {
-    display: block;
+    display: flex;
 }
 
 .file-list-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 15px;
-    padding-bottom: 10px;
+    padding: 15px 15px 10px 15px;
     border-bottom: 1px solid #eaeaea;
     position: relative;
+    flex-shrink: 0;
 }
 
 .file-list-title {
@@ -729,9 +730,9 @@ body.keyboard-open .editor-container {
 }
 
 .file-list-actions {
-    margin-top: 15px;
-    padding-top: 10px;
+    padding: 10px 15px 15px 15px;
     border-top: 1px solid #eaeaea;
+    flex-shrink: 0;
 }
 
 .add-file-btn {
@@ -1379,6 +1380,70 @@ body.night-mode .vditor-toolbar__item:hover {
     color: #666;
 }
 
+/* 历史版本批量操作工具栏 */
+.history-batch-toolbar {
+    background: #f8f9fa;
+    border-bottom: 1px solid #eee;
+}
+
+body.night-mode .history-batch-toolbar {
+    background: #2d2d2d;
+    border-bottom-color: #444;
+}
+
+.history-checkbox-label {
+    color: #333;
+    font-size: 14px;
+}
+
+body.night-mode .history-checkbox-label {
+    color: #eee;
+}
+
+.history-checkbox-label input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+    accent-color: #4CAF50;
+}
+
+.history-selected-count {
+    color: #666;
+    font-size: 14px;
+}
+
+body.night-mode .history-selected-count {
+    color: #aaa;
+}
+
+/* 历史版本复选框 */
+.history-version {
+    position: relative;
+}
+
+.history-version-checkbox {
+    position: absolute;
+    top: 15px;
+    left: 15px;
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+    accent-color: #4CAF50;
+    z-index: 2;
+}
+
+.history-version-content-wrapper {
+    margin-left: 35px;
+}
+
+.history-version.selected {
+    background: rgba(76, 175, 80, 0.15);
+}
+
+body.night-mode .history-version.selected {
+    background: rgba(76, 175, 80, 0.25);
+}
+
 .file-header {
     display: flex;
     justify-content: space-between;
@@ -1839,6 +1904,8 @@ body.night-mode .jstree-default .jstree-children {
     overflow-y: auto;
     width: 100%;
     box-sizing: border-box;
+    flex: 1;
+    padding: 8px 15px;
 }
 
 .jstree-node {

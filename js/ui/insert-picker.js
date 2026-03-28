@@ -89,15 +89,33 @@
                     break;
                 case 'emoji':
                     closeInsertPicker();
-                    if (typeof window.showEmojiPicker === 'function') window.showEmojiPicker();
+                    if (typeof window.showEmojiPicker !== 'function') {
+                        import('../emoji-picker.js').then(function() {
+                            if (typeof window.showEmojiPicker === 'function') window.showEmojiPicker();
+                        });
+                    } else {
+                        window.showEmojiPicker();
+                    }
                     break;
                 case 'formula':
                     closeInsertPicker();
-                    if (typeof window.showFormulaPicker === 'function') window.showFormulaPicker();
+                    if (typeof window.showFormulaPicker !== 'function') {
+                        import('../formula-picker.js').then(function() {
+                            if (typeof window.showFormulaPicker === 'function') window.showFormulaPicker();
+                        });
+                    } else {
+                        window.showFormulaPicker();
+                    }
                     break;
                 case 'chart':
                     closeInsertPicker();
-                    if (typeof window.showChartPicker === 'function') window.showChartPicker();
+                    if (typeof window.showChartPicker !== 'function') {
+                        import('./chart.js').then(function() {
+                            if (typeof window.showChartPicker === 'function') window.showChartPicker();
+                        });
+                    } else {
+                        window.showChartPicker();
+                    }
                     break;
                 case 'echarts':
                     closeInsertPicker();

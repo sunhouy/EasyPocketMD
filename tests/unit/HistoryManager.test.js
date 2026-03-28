@@ -99,4 +99,64 @@ describe('HistoryManager', () => {
             expect(applied).toBe(newContent);
         });
     });
+
+    describe('deleteHistoryBatch', () => {
+        it('should batch delete history versions successfully', async () => {
+            db.execute.mockResolvedValueOnce([[{ id: 1 }]]); // getUserByUsername
+
+            const mockConnection = {
+                beginTransaction: jest.fn(),
+                commit: jest.fn(),
+                rollback: jest.fn(),
+                execute: jest.fn()
+                    .mockResolvedValueOnce([[{ id: 101 }]]) // version 1 found
+                    .mockResolvedValueOnce([]) // delete file_content for v1
+                    .mockResolvedValueOnce([]) // delete file_history for v1
+                    .mockResolvedValueOnce([[{ id: 102 }]]) // version 2 found
+                    .mockResolvedValueOnce([]) // delete file_content for v2
+                    .mockResolvedValueOnce([]), // delete file_history for v2
+                release: jest.fn()
+            };
+            db.getConnection.mockResolvedValue(mockConnection);
+
+            const result = await historyManager.deleteHistoryBatch('testuser', 'test.md', [1, 2]);
+
+            expect(result.code).toBe(200);
+            expect(result.data.deleted_count).toBe(2);
+            expect(mockConnection.commit).toHaveBeenCalled();
+        });
+
+        it('should handle non-existent versions in batch delete', async () => {
+            db.execute.mockResolvedValueOnce([[{ id: 1 }]]); // getUserByUsername
+
+            const mockConnection = {
+                beginTransaction: jest.fn(),
+                commit: jest.fn(),
+                rollback: jest.fn(),
+                execute: jest.fn()
+                    .mockResolvedValueOnce([[{ id: 101 }]]) // version 1 found
+                    .mockResolvedValueOnce([{ affectedRows: 1 }]) // delete file_content for v1
+                    .mockResolvedValueOnce([{ affectedRows: 1 }]) // delete file_history for v1
+                    .mockResolvedValueOnce([[]]), // version 999 not found (empty array wrapped in array)
+                release: jest.fn()
+            };
+            db.getConnection.mockResolvedValue(mockConnection);
+
+            const result = await historyManager.deleteHistoryBatch('testuser', 'test.md', [1, 999]);
+
+            expect(result.code).toBe(200);
+            expect(result.data.deleted_count).toBe(1);
+            expect(result.data.failed_count).toBe(1);
+            expect(result.data.failed_versions).toContain(999);
+        });
+
+        it('should return 404 if user not found', async () => {
+            db.execute.mockResolvedValueOnce([[]]); // getUserByUsername returns null
+
+            const result = await historyManager.deleteHistoryBatch('nonexistent', 'test.md', [1, 2]);
+
+            expect(result.code).toBe(404);
+            expect(result.message).toContain('用户不存在');
+        });
+    });
 });

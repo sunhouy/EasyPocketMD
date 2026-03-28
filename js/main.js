@@ -31,9 +31,24 @@ document.addEventListener('DOMContentLoaded', function() {
     // 工具栏配置（使用翻译函数）
     window.allToolbarButtons = [
         { id: 'mobileInsertBtn', icon: 'fas fa-plus', textKey: 'insert', fn: function() { if (typeof window.showInsertPicker === 'function') window.showInsertPicker(); else window.showInsertMenu(); } },
-        { id: 'mobileFormulaBtn', icon: 'fas fa-superscript', textKey: 'formula', fn: function() { if (typeof window.showFormulaPicker === 'function') window.showFormulaPicker(); } },
-        { id: 'mobileChartBtn', icon: 'fas fa-chart-bar', textKey: 'chart', fn: function() { if (typeof window.showChartPicker === 'function') window.showChartPicker(); } },
-        { id: 'mobileUncertaintyBtn', icon: 'fas fa-calculator', textKey: 'uncertainty', fn: function() { if (typeof window.showUncertaintyCalculator === 'function') window.showUncertaintyCalculator(); } },
+        { id: 'mobileFormulaBtn', icon: 'fas fa-superscript', textKey: 'formula', fn: async function() {
+            if (typeof window.showFormulaPicker !== 'function') {
+                await import('./formula-picker.js');
+            }
+            if (typeof window.showFormulaPicker === 'function') window.showFormulaPicker();
+        } },
+        { id: 'mobileChartBtn', icon: 'fas fa-chart-bar', textKey: 'chart', fn: async function() {
+            if (typeof window.showChartPicker !== 'function') {
+                await import('./ui/chart.js');
+            }
+            if (typeof window.showChartPicker === 'function') window.showChartPicker();
+        } },
+        { id: 'mobileUncertaintyBtn', icon: 'fas fa-calculator', textKey: 'uncertainty', fn: async function() {
+            if (typeof window.showUncertaintyCalculator !== 'function') {
+                await import('./uncertainty-calculator.js');
+            }
+            if (typeof window.showUncertaintyCalculator === 'function') window.showUncertaintyCalculator();
+        } },
         { id: 'mobileUndoBtn', icon: 'fas fa-undo', textKey: 'undo', fn: function() { if (window.vditor && window.vditor.vditor && window.vditor.vditor.undo) window.vditor.vditor.undo.undo(window.vditor.vditor); } },
         { id: 'mobileRedoBtn', icon: 'fas fa-redo', textKey: 'redo', fn: function() { if (window.vditor && window.vditor.vditor && window.vditor.vditor.undo) window.vditor.vditor.undo.redo(window.vditor.vditor); } },
         { id: 'mobileAIBtn', icon: 'fas fa-robot', textKey: 'aiAssistant', fn: async function() {
@@ -429,7 +444,13 @@ document.addEventListener('DOMContentLoaded', function() {
         function closeDrop() { if (dropdown) dropdown.classList.remove('show'); }
 
         var mobileShareBtn = document.getElementById('mobileShareBtn');
-        if (mobileShareBtn) mobileShareBtn.addEventListener('click', function() { window.showShareDialog(); closeDrop(); });
+        if (mobileShareBtn) mobileShareBtn.addEventListener('click', async function() {
+            if (typeof window.showShareDialog !== 'function') {
+                await import('./ui/share.js');
+            }
+            window.showShareDialog();
+            closeDrop();
+        });
         var mobileFileManagerBtn = document.getElementById('mobileFileManagerBtn');
         if (mobileFileManagerBtn) mobileFileManagerBtn.addEventListener('click', function() { window.showFileManager(); closeDrop(); });
         var mobilePrintBtn = document.getElementById('mobilePrintBtn');
@@ -449,10 +470,22 @@ document.addEventListener('DOMContentLoaded', function() {
         var mobileModeBtn = document.getElementById('mobileModeBtn');
         if (mobileModeBtn) mobileModeBtn.addEventListener('click', function() { showModeSelection(); closeDrop(); });
         var mobileExportBtn = document.getElementById('mobileExportBtn');
-        if (mobileExportBtn) mobileExportBtn.addEventListener('click', function() { window.exportContent(); closeDrop(); });
+        if (mobileExportBtn) mobileExportBtn.addEventListener('click', async function() {
+            if (typeof window.exportContent !== 'function') {
+                await import('./ui/export.js');
+            }
+            window.exportContent();
+            closeDrop();
+        });
 
         var mobileUncertaintyBtn = document.getElementById('mobileUncertaintyBtn');
-        if (mobileUncertaintyBtn) mobileUncertaintyBtn.addEventListener('click', function() { if (typeof window.showUncertaintyCalculator === 'function') window.showUncertaintyCalculator(); closeDrop(); });
+        if (mobileUncertaintyBtn) mobileUncertaintyBtn.addEventListener('click', async function() {
+            if (typeof window.showUncertaintyCalculator !== 'function') {
+                await import('./uncertainty-calculator.js');
+            }
+            if (typeof window.showUncertaintyCalculator === 'function') window.showUncertaintyCalculator();
+            closeDrop();
+        });
 
         var mobileImportBtn = document.getElementById('mobileImportBtn');
         if (mobileImportBtn) mobileImportBtn.addEventListener('click', function() { window.importFiles(); closeDrop(); });
@@ -568,7 +601,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
         var list = [
 
-            { id: 'mobileShareBtn', fn: function() { window.showShareDialog(); closeDrop(); } },
+            { id: 'mobileShareBtn', fn: async function() {
+                if (typeof window.showShareDialog !== 'function') {
+                    await import('./ui/share.js');
+                }
+                window.showShareDialog();
+                closeDrop();
+            } },
             { id: 'mobileFileManagerBtn', fn: function() { window.showFileManager(); closeDrop(); } },
             { id: 'mobilePrintBtn', fn: async function() {
                 if (typeof window.showPrintDialog !== 'function') {
@@ -580,8 +619,20 @@ document.addEventListener('DOMContentLoaded', function() {
             { id: 'mobilePresentationBtn', fn: function() { enterPresentationMode(); closeDrop(); } },
             { id: 'mobileMenuBtn', fn: function(e) { e.stopPropagation(); if (dropdown) dropdown.classList.toggle('show'); } },
             { id: 'mobileModeBtn', fn: function() { showModeSelection(); closeDrop(); } },
-            { id: 'mobileExportBtn', fn: function() { window.exportContent(); closeDrop(); } },
-            { id: 'mobileUncertaintyBtn', fn: function() { if (typeof window.showUncertaintyCalculator === 'function') window.showUncertaintyCalculator(); closeDrop(); } },
+            { id: 'mobileExportBtn', fn: async function() {
+                if (typeof window.exportContent !== 'function') {
+                    await import('./ui/export.js');
+                }
+                window.exportContent();
+                closeDrop();
+            } },
+            { id: 'mobileUncertaintyBtn', fn: async function() {
+                if (typeof window.showUncertaintyCalculator !== 'function') {
+                    await import('./uncertainty-calculator.js');
+                }
+                if (typeof window.showUncertaintyCalculator === 'function') window.showUncertaintyCalculator();
+                closeDrop();
+            } },
             { id: 'mobileClearBtn', fn: async function() { const confirmed = await window.customConfirm(window.i18n ? window.i18n.t('clearConfirm') : '确定要清空当前文件的内容吗？'); if (confirmed) { if (window.vditor) window.vditor.setValue(''); window.showMessage(window.i18n ? window.i18n.t('contentCleared') : '内容已清空'); } closeDrop(); } },
             // mobileSettingsBtn 已移到顶部工具栏
             { id: 'aboutBtn', fn: function() { window.showAboutDialog(); closeDrop(); } }
