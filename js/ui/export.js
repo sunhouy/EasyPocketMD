@@ -280,22 +280,19 @@ async function exportFile(content, ext) {
 
     // DOCX 导出逻辑
     if (ext === 'docx') {
+        // 懒加载打印模块（如果未加载）
+        if (typeof global.showPrintDialog !== 'function') {
+            await import('./print.js');
+        }
+        global.hideMobileActionSheet();
         // 显示打印设置对话框，让用户配置导出选项
-        if (global.showPrintDialog) {
-            global.showPrintDialog('export-docx', async function(settings) {
-                // 懒加载 DOCX 生成器
-                if (typeof global.exportDOCX !== 'function') {
-                    await import('./docx-generator.js');
-                }
-                await global.exportDOCX(content, settings);
-            });
-        } else {
-            // 如果没有打印对话框，直接使用默认设置
+        global.showPrintDialog('export-docx', async function(settings) {
+            // 懒加载 DOCX 生成器
             if (typeof global.exportDOCX !== 'function') {
                 await import('./docx-generator.js');
             }
-            await global.exportDOCX(content);
-        }
+            await global.exportDOCX(content, settings);
+        });
         return;
     }
 
