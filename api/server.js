@@ -182,6 +182,16 @@ app.use('/api/convert', convertLimiter, convertRoutes);
 // Legacy routes - general API rate limiting
 app.use('/api', apiLimiter, legacyRoutes);
 
+// Health check endpoint (no rate limiting for monitoring)
+app.get('/api/health', (req, res) => {
+    res.json({
+        code: 200,
+        status: 'ok',
+        message: 'Service is healthy',
+        timestamp: new Date().toISOString()
+    });
+});
+
 // Error handling middleware
 app.use((err, req, res, next) => {
     if (!isTest) {
