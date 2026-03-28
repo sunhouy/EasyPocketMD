@@ -51,11 +51,22 @@ jest.mock('node-word-detection', () => ({
     }
 }));
 
-// Mock fs for sensitive word file check
+// Mock fs for sensitive word file check and PDF generation
 jest.mock('fs', () => ({
     ...jest.requireActual('fs'),
     existsSync: jest.fn().mockReturnValue(true),
-    readFileSync: jest.fn().mockReturnValue('')
+    readFileSync: jest.fn().mockReturnValue(''),
+    mkdirSync: jest.fn(),
+    createWriteStream: jest.fn(() => {
+        const { PassThrough } = require('stream');
+        const stream = new PassThrough();
+        // Emit finish event after a short delay to simulate successful write
+        setImmediate(() => {
+            stream.emit('finish');
+        });
+        return stream;
+    }),
+    statSync: jest.fn(() => ({ size: 100 }))
 }));
 
 // Mock markdown-it-mathjax3 to avoid deasync issues during tests
