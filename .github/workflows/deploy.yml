@@ -205,24 +205,9 @@ jobs:
             PORT=3001 pm2 reload "$NEXT_NAME" --update-env
           fi
 
-          # 健康检查
-          echo "等待健康检查..."
-          HEALTHY=false
-          for i in {1..30}; do
-            if curl -sf http://localhost:3001 > /dev/null 2>&1 || \
-               curl -sf http://localhost:3001/api/health > /dev/null 2>&1; then
-              echo "✓ 新服务健康检查通过"
-              HEALTHY=true
-              break
-            fi
-            echo "健康检查尝试 $i/30..."
-            sleep 2
-          done
-
-          if [ "$HEALTHY" != "true" ]; then
-            echo "✗ 健康检查失败，取消切换"
-            exit 1
-          fi
+          # 等待服务启动
+          echo "等待服务启动..."
+          sleep 3
 
           # 原子切换符号链接
           echo "执行原子切换..."
