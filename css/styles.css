@@ -11,44 +11,36 @@ body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     transition: background 0.3s ease;
     overflow: hidden;
-    position: relative; /* 添加相对定位，作为编辑器容器的参考 */
+    position: relative;
 }
 
-/* 编辑器容器 - 修改为绝对定位 */
 .editor-container {
     position: absolute;
-    top: 50px; /* 顶部工具栏高度 */
-    bottom: 50px; /* 底部工具栏高度 */
+    top: 50px;
+    bottom: 50px;
     left: 0;
     right: 0;
     width: 100%;
     padding: 0;
     overflow: hidden;
-    /* 移除原来的高度和margin-top */
-    /* height: calc(100vh - 120px); */
-    /* margin-top: 60px; */
+    background-color: #ffffff !important;
 }
 
-/* 当显示顶部提示横幅时，调整编辑器容器和工具栏的位置 */
 body.has-top-notice .editor-container {
-    top: calc(50px + 40px); /* 顶部工具栏高度 + 提示横幅高度 */
+    top: calc(50px + 40px);
 }
 
 body.has-top-notice .mobile-toolbar-container {
-    top: 40px; /* 提示横幅高度 */
+    top: 40px;
 }
 
 body.has-top-notice .sync-status {
-    top: calc(70px + 40px); /* 原位置 + 提示横幅高度 */
+    top: calc(70px + 40px);
 }
 
 body.has-top-notice .editor-mode-toggle,
 body.has-top-notice .editor-save-btn {
-    top: calc(7px + 40px); /* 原位置 + 提示横幅高度 */
-}
-
-body.has-top-notice .custom-fullscreen-btn {
-    top: calc(7px + 40px); /* 原位置 + 提示横幅高度 */
+    top: calc(7px + 40px);
 }
 
 #vditor {
@@ -58,7 +50,6 @@ body.has-top-notice .custom-fullscreen-btn {
     outline: none;
 }
 
-/* 移动端顶部工具栏 */
 .mobile-toolbar-container {
     position: fixed;
     top: 0;
@@ -73,13 +64,6 @@ body.has-top-notice .custom-fullscreen-btn {
     height: 50px;
 }
 
-body.night-mode .mobile-toolbar-container {
-    background: #2d2d2d;
-    border-bottom: 1px solid #444;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
-}
-
-/* 移动端工具栏 */
 .mobile-toolbar {
     display: flex;
     justify-content: flex-start;
@@ -88,12 +72,10 @@ body.night-mode .mobile-toolbar-container {
     gap: 8px;
 }
 
-/* 顶部工具栏右侧内容区域，确保不与固定按钮重叠 */
 .mobile-toolbar .mobile-dropdown {
     margin-left: auto;
 }
 
-/* 移动端操作按钮 */
 .mobile-action-btn {
     width: 36px;
     height: 36px;
@@ -108,14 +90,8 @@ body.night-mode .mobile-toolbar-container {
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
     z-index: 1003 !important;
     transition: all 0.3s ease;
-    color: #333; /* 默认黑色 */
+    color: #333;
     position: relative;
-}
-
-body.night-mode .mobile-action-btn {
-    background: rgba(45, 45, 45, 0.9);
-    color: #fff; /* 夜间模式白色 */
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
 }
 
 .mobile-action-btn:hover {
@@ -128,24 +104,17 @@ body.night-mode .mobile-action-btn {
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-/* 移动端底部操作栏 - 修改高度 */
 .mobile-bottom-bar {
     position: fixed;
     bottom: 0;
     left: 0;
     right: 0;
     background: white;
-    padding: 5px 10px; /* 减小padding，让底部更窄 */
+    padding: 5px 10px;
     border-top: 1px solid #eaeaea;
     box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.05);
     z-index: 1002;
-    height: 50px; /* 固定高度，比原来窄 */
-}
-
-body.night-mode .mobile-bottom-bar {
-    background: #2d2d2d;
-    border-top: 1px solid #444;
-    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.2);
+    height: 50px;
 }
 
 .bottom-bar-buttons {
@@ -163,12 +132,12 @@ body.night-mode .mobile-bottom-bar {
     background: none;
     border: none;
     color: #666;
-    font-size: 14px; /* 字体调大 */
-    padding: 3px 6px; /* 保持padding不变 */
+    font-size: 14px;
+    padding: 3px 6px;
     border-radius: 6px;
     transition: all 0.2s ease;
-    min-width: 45px; /* 保持最小宽度不变 */
-    height: 36px; /* 固定高度 */
+    min-width: 45px;
+    height: 36px;
 }
 
 .bottom-btn svg {
@@ -180,15 +149,6 @@ body.night-mode .mobile-bottom-bar {
     background: rgba(0, 0, 0, 0.05);
 }
 
-body.night-mode .bottom-btn {
-    color: #aaa;
-}
-
-body.night-mode .bottom-btn:active {
-    background: rgba(255, 255, 255, 0.1);
-}
-
-/* 移动端工具栏下拉菜单 */
 .mobile-dropdown {
     position: relative;
 }
@@ -197,8 +157,8 @@ body.night-mode .bottom-btn:active {
     display: none;
     position: absolute;
     top: 50px;
-    right: 0; /* 改为右侧弹出 */
-    left: auto; /* 覆盖左侧定位 */
+    right: 0;
+    left: auto;
     background: white;
     border-radius: 12px;
     box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
@@ -207,11 +167,6 @@ body.night-mode .bottom-btn:active {
     z-index: 1003;
     max-height: 500px;
     overflow-y: auto;
-}
-
-body.night-mode .mobile-dropdown-content {
-    background: #2d2d2d;
-    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
 }
 
 .mobile-dropdown-content.show {
@@ -242,15 +197,6 @@ body.night-mode .mobile-dropdown-content {
     background: rgba(0, 0, 0, 0.05);
 }
 
-body.night-mode .dropdown-item {
-    color: #ddd;
-}
-
-body.night-mode .dropdown-item:active {
-    background: rgba(255, 255, 255, 0.1);
-}
-
-/* 移动端全屏样式 - 修改为适应绝对定位 */
 body.mobile-fullscreen .mobile-toolbar-container,
 body.mobile-fullscreen .mobile-bottom-bar {
     display: none !important;
@@ -261,7 +207,6 @@ body.mobile-fullscreen .editor-container {
     bottom: 0 !important;
 }
 
-/* 加载提示 */
 .loading {
     position: fixed;
     top: 50%;
@@ -273,11 +218,6 @@ body.mobile-fullscreen .editor-container {
     display: none;
 }
 
-body.night-mode .loading {
-    color: #aaa;
-}
-
-/* 移动端提示框 */
 .mobile-hint {
     position: fixed;
     bottom: 80px;
@@ -300,16 +240,14 @@ body.night-mode .loading {
     to { opacity: 0; visibility: hidden; }
 }
 
-/* 移动端键盘弹出时的调整 - 修改为适应绝对定位 */
 body.keyboard-open .mobile-bottom-bar {
     display: none !important;
 }
 
 body.keyboard-open .editor-container {
-    bottom: 0 !important; /* 键盘弹出时，底部工具栏隐藏，编辑器可以到底部 */
+    bottom: 0 !important;
 }
 
-/* 移动端操作面板样式 - 防止被输入法覆盖 */
 .mobile-action-sheet {
     position: fixed;
     top: 50%;
@@ -318,7 +256,7 @@ body.keyboard-open .editor-container {
     background: white;
     border-radius: 16px;
     box-shadow: 0 5px 30px rgba(0,0,0,0.2);
-    z-index: 1005; /* 提高z-index，确保在最上层 */
+    z-index: 1005;
     padding: 20px 0 10px;
     width: 90%;
     max-width: 400px;
@@ -329,11 +267,6 @@ body.keyboard-open .editor-container {
 
 .mobile-action-sheet.show {
     display: block;
-}
-
-body.night-mode .mobile-action-sheet {
-    background: #2d2d2d;
-    color: #eee;
 }
 
 .mobile-action-sheet-overlay {
@@ -351,7 +284,6 @@ body.night-mode .mobile-action-sheet {
     display: block;
 }
 
-/* 新添加：登录注册模态窗口样式 */
 .modal-overlay {
     position: fixed;
     top: 0;
@@ -380,12 +312,6 @@ body.night-mode .mobile-action-sheet {
     position: relative;
 }
 
-body.night-mode .modal {
-    background: #2d2d2d;
-    color: #eee;
-}
-
-/* 模态框右上角关闭按钮样式 */
 .modal-close-btn {
     color: #666;
     padding: 5px;
@@ -398,16 +324,6 @@ body.night-mode .modal {
     background: rgba(0,0,0,0.05);
 }
 
-body.night-mode .modal-close-btn {
-    color: #ccc;
-}
-
-body.night-mode .modal-close-btn:hover {
-    color: #fff;
-    background: rgba(255,255,255,0.15);
-}
-
-/* 自定义滚动条样式 */
 .modal-form::-webkit-scrollbar,
 .history-list::-webkit-scrollbar,
 .modal-content::-webkit-scrollbar {
@@ -434,24 +350,6 @@ body.night-mode .modal-close-btn:hover {
     background: #aaa;
 }
 
-body.night-mode .modal-form::-webkit-scrollbar-track,
-body.night-mode .history-list::-webkit-scrollbar-track,
-body.night-mode .modal-content::-webkit-scrollbar-track {
-    background: rgba(255,255,255,0.05);
-}
-
-body.night-mode .modal-form::-webkit-scrollbar-thumb,
-body.night-mode .history-list::-webkit-scrollbar-thumb,
-body.night-mode .modal-content::-webkit-scrollbar-thumb {
-    background: #555;
-}
-
-body.night-mode .modal-form::-webkit-scrollbar-thumb:hover,
-body.night-mode .history-list::-webkit-scrollbar-thumb:hover,
-body.night-mode .modal-content::-webkit-scrollbar-thumb:hover {
-    background: #666;
-}
-
 @keyframes modalFadeIn {
     from { opacity: 0; transform: translateY(-20px); }
     to { opacity: 1; transform: translateY(0); }
@@ -467,18 +365,10 @@ body.night-mode .modal-content::-webkit-scrollbar-thumb:hover {
     color: #333;
 }
 
-body.night-mode .modal-header h2 {
-    color: #eee;
-}
-
 .modal-tabs {
     display: flex;
     border-bottom: 1px solid #eaeaea;
     margin-bottom: 20px;
-}
-
-body.night-mode .modal-tabs {
-    border-bottom: 1px solid #444;
 }
 
 .tab-btn {
@@ -493,10 +383,6 @@ body.night-mode .modal-tabs {
     color: #666;
 }
 
-body.night-mode .tab-btn {
-    color: #aaa;
-}
-
 .tab-btn.active {
     border-bottom: 3px solid #4a90e2;
     color: #4a90e2;
@@ -505,10 +391,6 @@ body.night-mode .tab-btn {
 
 .tab-btn:hover {
     background: rgba(0, 0, 0, 0.03);
-}
-
-body.night-mode .tab-btn:hover {
-    background: rgba(255, 255, 255, 0.05);
 }
 
 .modal-form {
@@ -528,22 +410,12 @@ body.night-mode .tab-btn:hover {
     color: #555;
 }
 
-body.night-mode .form-group label {
-    color: #ccc;
-}
-
 .form-group input {
     padding: 12px;
     border: 1px solid #ddd;
     border-radius: 6px;
     font-size: 16px;
     transition: border 0.3s ease;
-}
-
-body.night-mode .form-group input {
-    background: #3d3d3d;
-    border: 1px solid #555;
-    color: #eee;
 }
 
 .form-group input:focus {
@@ -580,17 +452,8 @@ body.night-mode .form-group input {
     color: #333;
 }
 
-body.night-mode .modal-btn.secondary {
-    background: #3d3d3d;
-    color: #eee;
-}
-
 .modal-btn.secondary:hover {
     background: #e5e5e5;
-}
-
-body.night-mode .modal-btn.secondary:hover {
-    background: #4d4d4d;
 }
 
 .modal-message {
@@ -608,12 +471,6 @@ body.night-mode .modal-btn.secondary:hover {
     display: block;
 }
 
-body.night-mode .modal-message.success {
-    background: #1e4620;
-    color: #a3d9a5;
-    border: 1px solid #2e7d32;
-}
-
 .modal-message.error {
     background: #f8d7da;
     color: #721c24;
@@ -621,51 +478,6 @@ body.night-mode .modal-message.success {
     display: block;
 }
 
-body.night-mode .modal-message.error {
-    background: #5c2a2a;
-    color: #f5c6cb;
-    border: 1px solid #721c24;
-}
-
-.user-info {
-    position: fixed;
-    top: 20px;
-    left: 20px;
-    background: white;
-    padding: 10px 15px;
-    border-radius: 8px;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-    z-index: 1003 !important;
-    display: none;
-    align-items: center;
-    font-size: 14px;
-}
-
-body.night-mode .user-info {
-    background: #2d2d2d;
-    color: #eee;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
-}
-
-.user-info span {
-    margin-right: 10px;
-}
-
-.logout-btn {
-    background: #ff6b6b;
-    color: white;
-    border: none;
-    border-radius: 4px;
-    padding: 5px 10px;
-    cursor: pointer;
-    font-size: 12px;
-}
-
-.logout-btn:hover {
-    background: #ff5252;
-}
-
-/* 新添加：文件列表样式 */
 .file-list-sidebar {
     position: fixed;
     top: 70px;
@@ -679,12 +491,6 @@ body.night-mode .user-info {
     overflow-y: auto;
     display: none;
     padding: 8px;
-}
-
-body.night-mode .file-list-sidebar {
-    background: #2d2d2d;
-    color: #eee;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
 }
 
 .file-list-sidebar.show {
@@ -701,19 +507,11 @@ body.night-mode .file-list-sidebar {
     position: relative;
 }
 
-body.night-mode .file-list-header {
-    border-bottom: 1px solid #444;
-}
-
 .file-list-title {
     font-size: 16px;
     margin-left: 15px;
     font-weight: 600;
     color: #333;
-}
-
-body.night-mode .file-list-title {
-    color: #eee;
 }
 
 .file-list-header-actions {
@@ -740,15 +538,6 @@ body.night-mode .file-list-title {
     color: #4a90e2;
 }
 
-body.night-mode .file-list-help {
-    color: #aaa;
-}
-
-body.night-mode .file-list-help:hover {
-    background: rgba(255, 255, 255, 0.1);
-    color: #4a90e2;
-}
-
 .file-list-close {
     background: none;
     border: none;
@@ -761,17 +550,12 @@ body.night-mode .file-list-help:hover {
     color: #333;
 }
 
-body.night-mode .file-list-close:hover {
-    color: #eee;
-}
-
 .file-list {
     list-style: none;
     padding: 0;
     margin: 0;
 }
 
-/* 文件夹样式 */
 .folder-item {
     margin-bottom: 5px;
 }
@@ -791,13 +575,9 @@ body.night-mode .file-list-close:hover {
     background: rgba(0, 0, 0, 0.05);
 }
 
-body.night-mode .folder-header:hover {
-    background: rgba(255, 255, 255, 0.1);
-}
-
 .folder-icon {
     margin-right: 8px;
-    color: #f7b731; /* 文件夹颜色 */
+    color: #f7b731;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -805,15 +585,10 @@ body.night-mode .folder-header:hover {
 }
 
 .folder-name {
-    color: #4a90e2; /* Blue */
+    color: #4a90e2;
     font-weight: 600;
 }
 
-body.night-mode .folder-name {
-    color: #66b1ff; /* Lighter blue for dark mode */
-}
-
-/* 文件夹内容（子文件列表） */
 .file-sublist {
     display: none;
     margin-top: 2px;
@@ -823,11 +598,6 @@ body.night-mode .folder-name {
     display: block;
 }
 
-/* 嵌套层级缩进 */
-/* 由于使用了 ul padding-left，这里不需要再为 item 单独设置 padding */
-/* 移除旧的 .folder-content 样式 */
-
-/* jstree text style */
 .jstree-default .jstree-anchor {
     color: #333;
     transition: all 0.2s;
@@ -880,7 +650,6 @@ body.night-mode .folder-name {
     border: none !important;
 }
 
-/* 文件项样式调整 */
 .file-item {
     padding: 8px 12px;
     border-radius: 6px;
@@ -897,18 +666,8 @@ body.night-mode .folder-name {
     background: rgba(0, 0, 0, 0.05);
 }
 
-body.night-mode .file-item:hover {
-    background: rgba(255, 255, 255, 0.1);
-}
-
 .file-item.active {
     background: #e3f2fd;
-    /* border-left: 3px solid #4a90e2;  移除左侧边框 */
-}
-
-body.night-mode .file-item.active {
-    background: #1e3a5f;
-    /* border-left: 3px solid #4a90e2; */
 }
 
 .file-item.drag-over {
@@ -943,19 +702,12 @@ body.night-mode .file-item.active {
     display: flex;
     gap: 2px;
     flex-shrink: 0;
-    opacity: 0; /* 默认隐藏操作按钮 */
+    opacity: 0;
     transition: opacity 0.2s;
 }
 
 .file-item:hover .file-actions {
-    opacity: 1; /* 悬停时显示 */
-}
-
-/* 移动端始终显示 */
-@media (max-width: 768px) {
-    .file-actions {
-        opacity: 1;
-    }
+    opacity: 1;
 }
 
 .file-action-btn {
@@ -976,19 +728,10 @@ body.night-mode .file-item.active {
     background: rgba(0, 0, 0, 0.1);
 }
 
-body.night-mode .file-action-btn:hover {
-    color: #eee;
-    background: rgba(255, 255, 255, 0.2);
-}
-
 .file-list-actions {
     margin-top: 15px;
     padding-top: 10px;
     border-top: 1px solid #eaeaea;
-}
-
-body.night-mode .file-list-actions {
-    border-top: 1px solid #444;
 }
 
 .add-file-btn {
@@ -1020,8 +763,6 @@ body.night-mode .file-list-actions {
     background: #e1a325;
 }
 
-
-/* 冲突解决模态框样式 - 全屏显示 */
 .conflict-modal {
     max-width: 100vw;
     width: 100vw;
@@ -1038,11 +779,6 @@ body.night-mode .file-list-actions {
     padding: 12px;
     margin-bottom: 20px;
     border-radius: 4px;
-}
-
-body.night-mode .conflict-info {
-    background: #5d4037;
-    border-left: 4px solid #ff9800;
 }
 
 .conflict-options {
@@ -1072,18 +808,6 @@ body.night-mode .conflict-info {
 
 .conflict-options::-webkit-scrollbar-thumb:hover {
     background: #555;
-}
-
-body.night-mode .conflict-options::-webkit-scrollbar-track {
-    background: #333;
-}
-
-body.night-mode .conflict-options::-webkit-scrollbar-thumb {
-    background: #666;
-}
-
-body.night-mode .conflict-options::-webkit-scrollbar-thumb:hover {
-    background: #888;
 }
 
 .conflict-option {
@@ -1116,11 +840,6 @@ body.night-mode .conflict-options::-webkit-scrollbar-thumb:hover {
     margin-top: 5px;
 }
 
-body.night-mode .conflict-details {
-    color: #aaa;
-}
-
-/* 查看差异按钮 */
 .diff-view-btn {
     background: #4a90e2;
     color: white;
@@ -1138,15 +857,6 @@ body.night-mode .conflict-details {
     background: #357abd;
 }
 
-body.night-mode .diff-view-btn {
-    background: #5a9fd2;
-}
-
-body.night-mode .diff-view-btn:hover {
-    background: #4a8fc2;
-}
-
-/* 差异对比模态窗口 - 全屏显示 */
 .diff-modal {
     max-width: 100vw;
     width: 100vw;
@@ -1166,30 +876,16 @@ body.night-mode .diff-view-btn:hover {
     font-size: 13px;
 }
 
-body.night-mode .diff-info {
-    background: #1e3a5f;
-    border-left-color: #64b5f6;
-}
-
 .diff-container {
     border: 1px solid #ddd;
     border-radius: 6px;
     overflow: hidden;
 }
 
-body.night-mode .diff-container {
-    border-color: #444;
-}
-
 .diff-header {
     display: flex;
     background: #f5f5f5;
     border-bottom: 1px solid #ddd;
-}
-
-body.night-mode .diff-header {
-    background: #333;
-    border-bottom-color: #444;
 }
 
 .diff-version-header {
@@ -1203,17 +899,9 @@ body.night-mode .diff-header {
     border-right: 1px solid #ddd;
 }
 
-body.night-mode .diff-version-header:first-child {
-    border-right-color: #444;
-}
-
 .diff-version-label {
     color: #333;
     margin-right: 8px;
-}
-
-body.night-mode .diff-version-label {
-    color: #eee;
 }
 
 .diff-version-time {
@@ -1221,19 +909,11 @@ body.night-mode .diff-version-label {
     font-size: 12px;
 }
 
-body.night-mode .diff-version-time {
-    color: #aaa;
-}
-
 .diff-content-wrapper {
     flex: 1;
     overflow: auto;
     background: #fff;
     max-height: none;
-}
-
-body.night-mode .diff-content-wrapper {
-    background: #1e1e1e;
 }
 
 .diff-content {
@@ -1253,10 +933,6 @@ body.night-mode .diff-content-wrapper {
     background: rgba(0,0,0,0.02);
 }
 
-body.night-mode .diff-line:nth-child(even) {
-    background: rgba(255,255,255,0.02);
-}
-
 .diff-line-num {
     width: 50px;
     padding: 2px 8px;
@@ -1266,12 +942,6 @@ body.night-mode .diff-line:nth-child(even) {
     background: #f5f5f5;
     border-right: 1px solid #e0e0e0;
     flex-shrink: 0;
-}
-
-body.night-mode .diff-line-num {
-    background: #2d2d2d;
-    border-right-color: #444;
-    color: #666;
 }
 
 .diff-line-content {
@@ -1297,23 +967,8 @@ body.night-mode .diff-line-num {
     );
 }
 
-body.night-mode .diff-empty {
-    background: repeating-linear-gradient(
-        45deg,
-        #2d2d2d,
-        #2d2d2d 10px,
-        #3d3d3d 10px,
-        #3d3d3d 20px
-    );
-}
-
-/* 差异类型样式 */
 .diff-same .diff-line-content {
     color: #333;
-}
-
-body.night-mode .diff-same .diff-line-content {
-    color: #ddd;
 }
 
 .diff-removed {
@@ -1325,21 +980,8 @@ body.night-mode .diff-same .diff-line-content {
     color: #c00;
 }
 
-body.night-mode .diff-removed {
-    background: #4a1a1a !important;
-}
-
-body.night-mode .diff-removed .diff-line-num {
-    background: #5a2a2a;
-    color: #ff6666;
-}
-
 .diff-removed .diff-line-content {
     color: #c00;
-}
-
-body.night-mode .diff-removed .diff-line-content {
-    color: #ff8888;
 }
 
 .diff-added {
@@ -1351,29 +993,14 @@ body.night-mode .diff-removed .diff-line-content {
     color: #090;
 }
 
-body.night-mode .diff-added {
-    background: #1a4a1a !important;
-}
-
-body.night-mode .diff-added .diff-line-num {
-    background: #2a5a2a;
-    color: #66ff66;
-}
-
 .diff-added .diff-line-content {
     color: #090;
 }
 
-body.night-mode .diff-added .diff-line-content {
-    color: #88ff88;
-}
-
-/* 差异对比窗口 - 确保在历史版本窗口之上 */
 #diffModalOverlay {
     z-index: 3000;
 }
 
-/* 同步状态指示器 */
 .sync-status {
     position: fixed;
     top: 70px;
@@ -1389,11 +1016,6 @@ body.night-mode .diff-added .diff-line-content {
     align-items: center;
     gap: 8px;
     max-width: 400px;
-}
-
-body.night-mode .sync-status {
-    background: #2d2d2d;
-    color: #eee;
 }
 
 .sync-status.syncing {
@@ -1414,27 +1036,15 @@ body.night-mode .sync-status {
     color: #155724;
 }
 
-body.night-mode .sync-status.success {
-    background: #1e4620;
-    color: #a3d9a5;
-}
-
 .sync-status.error {
     background: #f8d7da;
     color: #721c24;
 }
 
-body.night-mode .sync-status.error {
-    background: #5c2a2a;
-    color: #f5c6cb;
-}
-
-/* 夜间模式样式 */
 body.night-mode {
     background: #000000 !important;
 }
 
-/* 编辑器模式切换按钮 */
 .editor-mode-toggle {
     position: fixed;
     top: 7px;
@@ -1452,10 +1062,9 @@ body.night-mode {
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
     z-index: 1003 !important;
     transition: all 0.3s ease;
-    color: #333; /* 默认黑色 */
+    color: #333;
 }
 
-/* 保存按钮 */
 .editor-save-btn {
     position: fixed;
     top: 7px;
@@ -1473,7 +1082,7 @@ body.night-mode {
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
     z-index: 1003 !important;
     transition: all 0.3s ease;
-    color: #333; /* 默认黑色 */
+    color: #333;
 }
 
 .editor-mode-toggle:hover,
@@ -1482,14 +1091,6 @@ body.night-mode {
     box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
 }
 
-body.night-mode .editor-mode-toggle,
-body.night-mode .editor-save-btn {
-    background: rgba(45, 45, 45, 0.9);
-    color: #fff; /* 夜间模式白色 */
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-}
-
-/* 移动端标题样式 */
 .mobile-title {
     font-size: 16px;
     font-weight: 600;
@@ -1509,11 +1110,6 @@ body.night-mode .editor-save-btn {
     z-index: 1002;
 }
 
-body.night-mode .mobile-title {
-    color: #eee;
-}
-
-/* Vditor夜间模式样式覆盖 */
 body.night-mode .vditor {
     background-color: #1a1a1a !important;
     color: #d4d4d4 !important;
@@ -1561,7 +1157,6 @@ body.night-mode .vditor-toolbar__item:hover {
     background-color: #444444 !important;
 }
 
-/* 上传状态提示 */
 .upload-status {
     position: fixed;
     top: 120px;
@@ -1586,7 +1181,6 @@ body.night-mode .vditor-toolbar__item:hover {
     background: rgba(244, 67, 54, 0.9);
 }
 
-/* 图片预览样式 */
 .image-preview {
     max-width: 100%;
     max-height: 200px;
@@ -1618,16 +1212,10 @@ body.night-mode .vditor-toolbar__item:hover {
     overflow-y: auto;
 }
 
-body.night-mode .user-menu-dropdown {
-    background: #2d2d2d;
-    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
-}
-
 .user-menu-dropdown.show {
     display: block;
 }
 
-/* 全屏按钮 */
 .custom-fullscreen-btn {
     position: fixed;
     top: 7px;
@@ -1647,13 +1235,6 @@ body.night-mode .user-menu-dropdown {
     transition: all 0.3s ease;
 }
 
-body.night-mode .custom-fullscreen-btn {
-    background: rgba(60, 60, 60, 0.9);
-    color: #fff;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-}
-
-/* Vditor工具栏隐藏 */
 .vditor-toolbar {
     display: none !important;
 }
@@ -1675,7 +1256,6 @@ body.night-mode .custom-fullscreen-btn {
     padding: 15px !important;
 }
 
-/* 桌面端消息提示样式 */
 .desktop-message {
     position: fixed !important;
     top: 20px !important;
@@ -1710,18 +1290,6 @@ body.night-mode .custom-fullscreen-btn {
     }
 }
 
-@keyframes slideOutUp {
-    from {
-        transform: translate(-50%, 0) !important;
-        opacity: 1;
-    }
-    to {
-        transform: translate(-50%, -100%) !important;
-        opacity: 0;
-    }
-}
-
-/* 历史版本样式 */
 .history-modal {
     max-width: 90vw;
     max-height: 85vh;
@@ -1742,22 +1310,12 @@ body.night-mode .custom-fullscreen-btn {
     color: #4a90e2;
 }
 
-.night-mode .history-info {
-    background: #2d2d2d;
-    color: #aaa;
-}
-
 .history-list {
     max-height: 450px;
     overflow-y: auto;
     margin: 0 15px;
     border: 1px solid #eee;
     border-radius: 8px;
-}
-
-.night-mode .history-list {
-    border-color: #444;
-    background: #2d2d2d;
 }
 
 .history-version {
@@ -1770,16 +1328,8 @@ body.night-mode .custom-fullscreen-btn {
     border-bottom: none;
 }
 
-.night-mode .history-version {
-    border-color: #444;
-}
-
 .history-version:hover {
     background: #f9f9f9;
-}
-
-.night-mode .history-version:hover {
-    background: #3d3d3d;
 }
 
 .history-version-header {
@@ -1794,17 +1344,9 @@ body.night-mode .custom-fullscreen-btn {
     color: #333;
 }
 
-.night-mode .history-version-title {
-    color: #eee;
-}
-
 .history-version-date {
     color: #888;
     font-size: 12px;
-}
-
-.night-mode .history-version-date {
-    color: #aaa;
 }
 
 .history-version-actions {
@@ -1826,28 +1368,15 @@ body.night-mode .custom-fullscreen-btn {
     color: #666;
 }
 
-.night-mode .history-version-content {
-    background: #1e1e1e;
-    color: #aaa;
-}
-
 .history-version-current {
     background: rgba(76, 175, 80, 0.1);
     border-left: 3px solid #4CAF50;
-}
-
-.night-mode .history-version-current {
-    background: rgba(76, 175, 80, 0.2);
 }
 
 .history-loading {
     text-align: center;
     padding: 30px;
     color: #666;
-}
-
-.night-mode .history-loading {
-    color: #aaa;
 }
 
 .file-header {
@@ -1857,41 +1386,11 @@ body.night-mode .custom-fullscreen-btn {
     width: 100%;
 }
 
-.file-actions {
-    display: flex;
-    gap: 5px;
-}
-
-.file-action-btn {
-    background: none;
-    border: none;
-    color: #666;
-    cursor: pointer;
-    padding: 4px 6px;
-    border-radius: 4px;
-    font-size: 12px;
-}
-
-.file-action-btn:hover {
-    background: #f0f0f0;
-    color: #333;
-}
-
-.night-mode .file-action-btn {
-    color: #aaa;
-}
-
-.night-mode .file-action-btn:hover {
-    background: #3d3d3d;
-    color: #fff;
-}
-
-/* 修改编辑器整体背景色 */
 .vditor {
     --border-color: transparent !important;
     --toolbar-height: 0px !important;
-    --panel-background-color: #ffffff !important; /* 日间模式改为白色 */
-    --textarea-background-color: #ffffff !important; /* 编辑器区域背景色改为白色 */
+    --panel-background-color: #ffffff !important;
+    --textarea-background-color: #ffffff !important;
     display: flex;
     flex-direction: column;
     border: none !important;
@@ -1900,17 +1399,15 @@ body.night-mode .custom-fullscreen-btn {
     font-family: "Helvetica Neue", "Luxi Sans", "DejaVu Sans", "Hiragino Sans GB", "Microsoft Yahei", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", "Segoe UI Symbol", "Android Emoji", "EmojiSymbols";
     height: 100% !important;
     width: 100% !important;
-    background-color: #ffffff !important; /* 确保整体背景为白色 */
+    background-color: #ffffff !important;
 }
 
-/* 夜间模式背景色 */
 body.night-mode .vditor {
-    --panel-background-color: #1a1a1a !important; /* 夜间模式深色 */
-    --textarea-background-color: #1a1a1a !important; /* 夜间模式深色 */
+    --panel-background-color: #1a1a1a !important;
+    --textarea-background-color: #1a1a1a !important;
     background-color: #1a1a1a !important;
 }
 
-/* 修改内容区域背景色 */
 .vditor-content {
     display: flex;
     flex: 1;
@@ -1918,14 +1415,13 @@ body.night-mode .vditor {
     position: relative;
     height: 100% !important;
     min-height: 0 !important;
-    background-color: #ffffff !important; /* 内容区域背景白色 */
+    background-color: #ffffff !important;
 }
 
 body.night-mode .vditor-content {
-    background-color: #1a1a1a !important; /* 夜间模式深色 */
+    background-color: #1a1a1a !important;
 }
 
-/* 修改文本编辑器区域背景色 */
 .vditor-sv {
     margin: 0 !important;
     overflow: auto;
@@ -1936,7 +1432,7 @@ body.night-mode .vditor-content {
     resize: none;
     padding: 0 10px !important;
     box-sizing: border-box;
-    background-color: #ffffff !important; /* 改为白色 */
+    background-color: #ffffff !important;
     outline: 0 none;
     font-size: 16px;
     line-height: 1.6;
@@ -1949,12 +1445,11 @@ body.night-mode .vditor-content {
 }
 
 body.night-mode .vditor-sv {
-    background-color: #1a1a1a !important; /* 夜间模式深色 */
+    background-color: #1a1a1a !important;
 }
 
-/* 修改WYSIWYG模式背景色 */
 .vditor-wysiwyg pre.vditor-reset {
-    background-color: #ffffff !important; /* 改为白色 */
+    background-color: #ffffff !important;
     margin: 0 !important;
     white-space: pre-wrap;
     height: 100%;
@@ -1963,12 +1458,11 @@ body.night-mode .vditor-sv {
 }
 
 body.night-mode .vditor-wysiwyg pre.vditor-reset {
-    background-color: #1a1a1a !important; /* 夜间模式深色 */
+    background-color: #1a1a1a !important;
 }
 
-/* 修改IR模式背景色 */
 .vditor-ir pre.vditor-reset {
-    background-color: #ffffff !important; /* 改为白色 */
+    background-color: #ffffff !important;
     margin: 0 !important;
     white-space: pre-wrap;
     height: 100%;
@@ -1977,10 +1471,9 @@ body.night-mode .vditor-wysiwyg pre.vditor-reset {
 }
 
 body.night-mode .vditor-ir pre.vditor-reset {
-    background-color: #1a1a1a !important; /* 夜间模式深色 */
+    background-color: #1a1a1a !important;
 }
 
-/* 表格样式 */
 table {
     border-collapse: collapse;
     width: 100%;
@@ -1998,7 +1491,6 @@ th {
     font-weight: bold;
 }
 
-/* 夜间模式表格样式 - 增强优先级 */
 body.night-mode table {
     border-collapse: collapse !important;
     border-color: #444 !important;
@@ -2021,7 +1513,6 @@ body.night-mode table tr {
     background-color: #1a1a1a !important;
 }
 
-/* 确保编辑器内部表格也应用样式 */
 body.night-mode .vditor table,
 body.night-mode .vditor-content table {
     border-collapse: collapse !important;
@@ -2044,31 +1535,16 @@ body.night-mode .vditor-content table th {
     font-weight: bold !important;
 }
 
-/* 如果需要，也可以修改编辑器容器本身的背景色 */
-.editor-container {
-    position: absolute;
-    top: 50px;
-    bottom: 50px;
-    left: 0;
-    right: 0;
-    width: 100%;
-    padding: 0;
-    overflow: hidden;
-    background-color: #ffffff !important; /* 编辑器容器背景也改为白色 */
-}
-
 body.night-mode .editor-container {
-    background-color: #1a1a1a !important; /* 夜间模式深色 */
+    background-color: #1a1a1a !important;
 }
 
-/* 确保夜间模式颜色变量也正确设置 */
 .vditor--dark {
     --border-color: transparent !important;
-    --panel-background-color: #1a1a1a !important; /* 夜间模式深色 */
-    --textarea-background-color: #1a1a1a !important; /* 夜间模式深色 */
+    --panel-background-color: #1a1a1a !important;
+    --textarea-background-color: #1a1a1a !important;
 }
 
-/* 删除历史版本按钮样式 */
 .delete-history-btn {
     background: #dc3545 !important;
     color: white !important;
@@ -2091,7 +1567,6 @@ body.night-mode .editor-container {
     font-size: 11px;
 }
 
-/* 预览和恢复按钮样式 - 与删除按钮一致 */
 .preview-btn,
 .restore-btn {
     background: #6c757d !important;
@@ -2124,7 +1599,6 @@ body.night-mode .editor-container {
     font-size: 11px;
 }
 
-/* 删除确认模态框样式 */
 .delete-confirm-modal {
     max-width: 400px;
 }
@@ -2191,31 +1665,19 @@ body.night-mode .editor-container {
 }
 
 @keyframes fadeIn {
-    from {
-        opacity: 0;
-    }
-    to {
-        opacity: 1;
-    }
+    from { opacity: 0; }
+    to { opacity: 1; }
 }
 
 @keyframes slideUp {
-    from {
-        transform: translateY(30px);
-        opacity: 0;
-    }
-    to {
-        transform: translateY(0);
-        opacity: 1;
-    }
+    from { transform: translateY(30px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
 }
 
-/* 添加动画到模态框 */
 .modal {
     animation: slideUp 0.3s ease-out;
 }
 
-/* 分享模态框样式 */
 .share-modal .modal-header h2 {
     color: #4a90e2;
 }
@@ -2224,47 +1686,6 @@ body.night-mode .editor-container {
     display: none;
 }
 
-.share-modal label[for^="mode"] {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 10px;
-    border: 2px solid #ddd;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: all 0.3s;
-}
-
-.share-modal label[for^="mode"]:hover {
-    border-color: #4a90e2;
-    background: rgba(74, 144, 226, 0.1);
-}
-
-.share-modal input[type="radio"]:checked + div + div {
-    color: #4a90e2;
-    font-weight: 600;
-}
-
-.share-modal input[type="radio"]:checked + div {
-    background: #4a90e2;
-    color: white;
-}
-
-.share-result-modal .fa-check-circle {
-    animation: scaleIn 0.5s ease-out;
-}
-
-@keyframes scaleIn {
-    0% { transform: scale(0); opacity: 0; }
-    100% { transform: scale(1); opacity: 1; }
-}
-
-@keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
-}
-
-/* Radio Group 样式 */
 .radio-group {
     display: flex;
     gap: 15px;
@@ -2283,7 +1704,6 @@ body.night-mode .editor-container {
     cursor: pointer;
 }
 
-/* Checkbox Group 样式 */
 .checkbox-group {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
@@ -2305,16 +1725,11 @@ body.night-mode .editor-container {
     background: #f0f0f0;
 }
 
-body.night-mode .checkbox-group label:hover {
-    background: #3d3d3d;
-}
-
 .checkbox-group input {
     margin-right: 8px;
     cursor: pointer;
 }
 
-/* Select Group 样式 */
 .select-group {
     margin-top: 5px;
 }
@@ -2330,18 +1745,11 @@ body.night-mode .checkbox-group label:hover {
     color: #333;
 }
 
-body.night-mode .form-control {
-    background: #3d3d3d;
-    border: 1px solid #555;
-    color: #eee;
-}
-
 .form-control:focus {
     outline: none;
     border-color: #4a90e2;
 }
 
-/* jstree dark mode support */
 body.night-mode .jstree-default .jstree-anchor {
     color: #eee;
     text-shadow: none !important;
@@ -2376,19 +1784,12 @@ body.night-mode .jstree-default .jstree-node {
 body.night-mode .jstree-default .jstree-children {
     border: none !important;
 }
-body.night-mode .jstree-default .jstree-icon {
-    /* 移除之前的全局 filter: invert(1)，因为我们现在用单独的样式控制了 */
-}
 
-/* 自定义文件菜单按钮样式 */
-.jstree-node {
-    /* 移除 relative，防止影响展开的高度计算 */
-}
 .jstree-anchor {
     display: inline-flex !important;
     align-items: center !important;
-    width: auto !important; /* 让宽度根据内容自适应 */
-    max-width: calc(100% - 28px) !important; /* 限制最大宽度 */
+    width: auto !important;
+    max-width: calc(100% - 28px) !important;
     padding-right: 4px !important;
     box-sizing: border-box !important;
     vertical-align: middle !important;
@@ -2398,17 +1799,17 @@ body.night-mode .jstree-default .jstree-icon {
     display: inline-flex !important;
     align-items: center;
     justify-content: center;
-    margin-left: 5px !important; /* 紧贴在文本右侧，留出一点间距 */
+    margin-left: 5px !important;
     cursor: pointer !important;
     opacity: 0;
     transition: all 0.2s;
-    color: #333; /* 默认深黑色，更清晰 */
+    color: #333;
     padding: 4px;
     border-radius: 4px;
     font-size: 14px;
     z-index: 2;
     background: inherit;
-    flex-shrink: 0; /* 防止按钮被挤压 */
+    flex-shrink: 0;
 }
 
 .jstree-anchor:hover .file-menu-btn,
@@ -2421,16 +1822,6 @@ body.night-mode .jstree-default .jstree-icon {
     background: rgba(0,0,0,0.1);
 }
 
-body.night-mode .file-menu-btn {
-    color: #eee;
-}
-
-body.night-mode .file-menu-btn:hover {
-    color: #fff;
-    background: rgba(255,255,255,0.2);
-}
-
-/* 移除根目录文件前的占位，使其紧靠左侧 */
 .jstree-default > ul > .jstree-node.jstree-leaf > .jstree-ocl {
     display: none !important;
 }
@@ -2443,7 +1834,6 @@ body.night-mode .file-menu-btn:hover {
     margin-left: 0 !important;
 }
 
-/* 确保文件列表容器不会溢出 */
 #fileList {
     overflow-x: hidden !important;
     overflow-y: auto;
@@ -2451,7 +1841,6 @@ body.night-mode .file-menu-btn:hover {
     box-sizing: border-box;
 }
 
-/* 移除空行 */
 .jstree-node {
     margin: 0 !important;
     padding: 0 !important;
@@ -2463,43 +1852,37 @@ body.night-mode .file-menu-btn:hover {
     padding: 0 !important;
 }
 
-/* 确保文件夹展开/折叠箭头正确显示，并修改其样式使其更小、更精致 */
 .jstree-default .jstree-ocl {
     display: inline-block !important;
     vertical-align: middle !important;
     margin-right: 2px !important;
-    background-image: none !important; /* 移除默认的精灵图背景 */
+    background-image: none !important;
     width: 16px !important;
     height: 24px !important;
     line-height: 24px !important;
     text-align: center !important;
     font-family: "Font Awesome 5 Free";
     font-weight: 900;
-    font-size: 13px !important; /* 稍微调大一点字号 */
-    color: #000; /* 日间模式纯黑色 */
+    font-size: 13px !important;
+    color: #000;
 }
 
-/* 折叠状态（向右的箭头） */
 .jstree-default .jstree-closed > .jstree-ocl::before {
-    content: "\f0da"; /* fas fa-caret-right */
+    content: "\f0da";
 }
 
-/* 展开状态（向下的箭头） */
 .jstree-default .jstree-open > .jstree-ocl::before {
-    content: "\f0d7"; /* fas fa-caret-down */
+    content: "\f0d7";
 }
 
-/* 叶子节点不需要箭头 */
 .jstree-default .jstree-leaf > .jstree-ocl::before {
     content: "";
 }
 
-/* 夜间模式下的箭头颜色 */
 body.night-mode .jstree-default .jstree-ocl {
-    color: #fff !important; /* 夜间模式纯白色 */
+    color: #fff !important;
 }
 
-/* 因为不再使用精灵图，去掉之前设置的 invert 滤镜，防止影响其他正常图标 */
 body.night-mode .jstree-default .jstree-icon.jstree-themeicon {
     filter: invert(1);
 }
@@ -2520,7 +1903,6 @@ body.night-mode .jstree-default .jstree-icon.jstree-ocl {
     vertical-align: middle !important;
 }
 
-/* 确保文件名不会溢出 */
 .jstree-anchor > .jstree-icon {
     flex-shrink: 0;
 }
@@ -2529,17 +1911,15 @@ body.night-mode .jstree-default .jstree-icon.jstree-ocl {
     flex-shrink: 0;
 }
 
-/* 移动端始终显示三个点按钮 */
 @media (max-width: 768px) {
-    .file-menu-btn {
-        opacity: 1 !important;
+    .file-actions {
+        opacity: 1;
     }
-    /* 移动端隐藏大纲视图设置 */
     .show-outline-setting {
         display: none !important;
     }
 }
-/* Context menu adjustment */
+
 .vakata-context {
     z-index: 10000 !important;
     position: fixed !important;
@@ -2577,7 +1957,6 @@ body.night-mode .jstree-default .jstree-icon.jstree-ocl {
     border-radius: 0 !important;
 }
 
-/* 隐藏 jstree 默认的 contextmenu 分隔符 */
 .vakata-context li > a .vakata-contextmenu-sep {
     display: none !important;
 }
@@ -2591,7 +1970,6 @@ body.night-mode .jstree-default .jstree-icon.jstree-ocl {
     display: inline-block !important;
 }
 
-/* Dark mode for context menu */
 body.night-mode .vakata-context {
     background: #2d2d2d !important;
     border-color: #444 !important;
@@ -2616,7 +1994,6 @@ body.night-mode .vakata-context li > a i {
     color: #aaa !important;
 }
 
-/* 资源加载占位符样式 */
 .resource-loading {
     display: flex;
     align-items: center;
@@ -2630,56 +2007,18 @@ body.night-mode .vakata-context li > a i {
     font-size: 14px;
 }
 
-body.night-mode .resource-loading {
-    background: #2d2d2d;
-    border-color: #444;
-    color: #aaa;
-}
-
 .resource-loading .fa-spinner {
     animation: spin 1s linear infinite;
 }
 
-@keyframes spin {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
-}
-
-/* 图片加载时的过渡效果 */
 img[data-original-src] {
     transition: opacity 0.3s ease;
 }
 
-/* 上传进度弹窗样式 */
 .upload-progress-modal-overlay {
     animation: fadeIn 0.2s ease-out;
 }
 
-@keyframes fadeIn {
-    from {
-        opacity: 0;
-    }
-    to {
-        opacity: 1;
-    }
-}
-
-.upload-progress-modal-overlay > div {
-    animation: slideUp 0.3s ease-out;
-}
-
-@keyframes slideUp {
-    from {
-        transform: translateY(30px);
-        opacity: 0;
-    }
-    to {
-        transform: translateY(0);
-        opacity: 1;
-    }
-}
-
-/* 彻底移除 jstree 所有可能的分隔线 */
 .jstree-default .jstree-wholerow,
 .jstree-default .jstree-wholerow-hovered,
 .jstree-default .jstree-wholerow-clicked {
@@ -2724,18 +2063,9 @@ body.night-mode .jstree-default a {
     background: transparent !important;
 }
 
-/* AI助手模态框样式 */
 .ai-modal {
     max-width: 500px;
     width: 90%;
-}
-
-body.night-mode .ai-modal .modal-header h2 {
-    color: #eee;
-}
-
-body.night-mode .ai-modal .modal-header p {
-    color: #aaa;
 }
 
 .ai-menu-grid {
@@ -2788,27 +2118,6 @@ body.night-mode .ai-modal .modal-header p {
     box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.2);
 }
 
-body.night-mode .ai-menu-btn {
-    background: #2d2d2d;
-    border-color: #444;
-}
-
-body.night-mode .ai-menu-btn span {
-    color: #eee;
-}
-
-body.night-mode .ai-menu-btn:hover {
-    border-color: #4a90e2;
-    background: rgba(74, 144, 226, 0.15);
-}
-
-body.night-mode .ai-menu-btn.active {
-    border-color: #4a90e2;
-    background: rgba(74, 144, 226, 0.25);
-    box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.3);
-}
-
-/* AI子菜单样式 */
 .ai-submenu {
     padding: 10px;
 }
@@ -2831,22 +2140,10 @@ body.night-mode .ai-menu-btn.active {
     color: #4a90e2;
 }
 
-body.night-mode .ai-back-btn {
-    color: #aaa;
-}
-
-body.night-mode .ai-back-btn:hover {
-    color: #4a90e2;
-}
-
 .ai-submenu h3 {
     margin: 0 0 15px 0;
     color: #333;
     font-size: 18px;
-}
-
-body.night-mode .ai-submenu h3 {
-    color: #eee;
 }
 
 .ai-option-grid {
@@ -2883,24 +2180,6 @@ body.night-mode .ai-submenu h3 {
     box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.3);
 }
 
-body.night-mode .ai-option-btn {
-    background: #2d2d2d;
-    border-color: #444;
-    color: #eee;
-}
-
-body.night-mode .ai-option-btn:hover {
-    border-color: #4a90e2;
-    background: rgba(74, 144, 226, 0.15);
-}
-
-body.night-mode .ai-option-btn.selected {
-    border-color: #4a90e2;
-    background: rgba(74, 144, 226, 0.25);
-    box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.4);
-}
-
-/* AI输入区域 */
 .ai-input-area {
     display: flex;
     flex-direction: column;
@@ -2921,12 +2200,6 @@ body.night-mode .ai-option-btn.selected {
 .ai-input-area textarea:focus {
     outline: none;
     border-color: #4a90e2;
-}
-
-body.night-mode .ai-input-area textarea {
-    background: #2d2d2d;
-    border-color: #444;
-    color: #eee;
 }
 
 .ai-generate-btn {
@@ -2955,7 +2228,6 @@ body.night-mode .ai-input-area textarea {
     transform: translateY(0);
 }
 
-/* PPT选项 */
 .ai-ppt-options {
     margin: 15px 0;
     padding: 10px;
@@ -2963,18 +2235,10 @@ body.night-mode .ai-input-area textarea {
     border-radius: 8px;
 }
 
-body.night-mode .ai-ppt-options {
-    background: #3d3d3d;
-}
-
 .ai-ppt-options label {
     font-size: 14px;
     color: #333;
     margin-right: 15px;
-}
-
-body.night-mode .ai-ppt-options label {
-    color: #eee;
 }
 
 .ai-ratio-group {
@@ -2992,15 +2256,10 @@ body.night-mode .ai-ppt-options label {
     color: #333;
 }
 
-body.night-mode .ai-ratio-group label {
-    color: #eee;
-}
-
 .ai-ratio-group input[type="radio"] {
     accent-color: #4a90e2;
 }
 
-/* AI结果区域 */
 .ai-result-area {
     padding: 10px;
 }
@@ -3016,12 +2275,6 @@ body.night-mode .ai-ratio-group label {
     font-size: 14px;
     line-height: 1.6;
     white-space: pre-wrap;
-}
-
-body.night-mode .ai-result-content {
-    background: #2d2d2d;
-    border-color: #444;
-    color: #eee;
 }
 
 .ai-result-actions {
@@ -3061,320 +2314,6 @@ body.night-mode .ai-result-content {
     background: #f0f0f0;
 }
 
-body.night-mode .ai-action-btn.secondary {
-    color: #aaa;
-    border-color: #444;
-}
-
-body.night-mode .ai-action-btn.secondary:hover {
-    background: #3d3d3d;
-}
-
-/* PPT生成器夜间模式适配 */
-body.night-mode .ppt-source-btn {
-    background: #2d2d2d;
-    border-color: #444;
-    color: #eee !important;
-}
-
-body.night-mode .ppt-source-btn span {
-    color: #eee !important;
-}
-
-body.night-mode .ppt-source-btn.active {
-    background: rgba(74, 144, 226, 0.2);
-    border-color: #4a90e2;
-    color: #eee !important;
-}
-
-body.night-mode .ppt-source-btn.active span {
-    color: #eee !important;
-}
-
-body.night-mode #aiPPTTopicSection input {
-    background: #2d2d2d;
-    border-color: #444;
-    color: #eee;
-}
-
-body.night-mode #aiPPTOutlineSection h4 {
-    color: #eee;
-}
-
-body.night-mode #aiPPTOutlinePreview {
-    background: #2d2d2d;
-    border-color: #444;
-    color: #eee;
-}
-
-body.night-mode #aiPPTOutlinePreview li {
-    color: #ddd;
-}
-
-/* PPT编辑器夜间模式 */
-body.night-mode .ppt-editor-container {
-    background: #1a1a2e;
-}
-
-body.night-mode .ppt-editor-header {
-    background: #16213e;
-    border-bottom: 1px solid #0f3460;
-}
-
-body.night-mode .ppt-preview-panel {
-    background: #0f0f1a;
-}
-
-body.night-mode .ppt-pages-panel {
-    background: #16213e;
-    border-left-color: #0f3460;
-}
-
-/* PPT编辑器按钮夜间模式 */
-body.night-mode #pptEditorPrev,
-body.night-mode #pptEditorNext {
-    background: rgba(255,255,255,0.15) !important;
-    color: #eee !important;
-}
-
-body.night-mode #pptEditorPrev:hover,
-body.night-mode #pptEditorNext:hover {
-    background: rgba(255,255,255,0.25) !important;
-}
-
-body.night-mode #pptEditorRegen {
-    background: #2980b9 !important;
-}
-
-body.night-mode #pptEditorRegen:hover {
-    background: #3498db !important;
-}
-
-body.night-mode #pptEditorDownload {
-    background: #c0392b !important;
-}
-
-body.night-mode #pptEditorDownload:hover {
-    background: #e74c3c !important;
-}
-
-body.night-mode #pptEditorPageNum {
-    color: #eee !important;
-}
-
-body.night-mode #pptEditorAddPage {
-    border-color: #3498db !important;
-    color: #3498db !important;
-}
-
-body.night-mode #pptEditorAddPage:hover {
-    background: rgba(52, 152, 219, 0.2) !important;
-}
-
-/* PPT缩略图列表夜间模式 */
-body.night-mode .ppt-editor-thumb {
-    background: rgba(255,255,255,0.1) !important;
-    color: #eee !important;
-}
-
-body.night-mode .ppt-editor-thumb:hover {
-    background: rgba(255,255,255,0.2) !important;
-}
-
-body.night-mode .ppt-editor-thumb[data-active="true"] {
-    background: #4a90e2 !important;
-    color: white !important;
-}
-
-/* AI助手弹窗夜间模式 - 更全面的适配 */
-body.night-mode #aiAssistantModal .modal-content {
-    background: #2d2d2d;
-    color: #eee;
-}
-
-body.night-mode #aiAssistantModal .ai-menu-btn {
-    background: #3d3d3d;
-    border-color: #555;
-    color: #eee;
-}
-
-body.night-mode #aiAssistantModal .ai-menu-btn:hover {
-    background: #4d4d4d;
-    border-color: #4a90e2;
-}
-
-body.night-mode #aiAssistantModal .ai-option-btn {
-    background: #3d3d3d;
-    border-color: #555;
-    color: #eee;
-}
-
-body.night-mode #aiAssistantModal .ai-option-btn:hover {
-    background: #4a90e2;
-    border-color: #4a90e2;
-}
-
-body.night-mode #aiAssistantModal .ai-option-btn.active {
-    background: #4a90e2;
-    border-color: #4a90e2;
-}
-
-body.night-mode #aiAssistantModal .ai-textarea {
-    background: #3d3d3d;
-    border-color: #555;
-    color: #eee;
-}
-
-body.night-mode #aiAssistantModal .ai-textarea::placeholder {
-    color: #999;
-}
-
-body.night-mode #aiAssistantModal .ai-generate-btn {
-    background: #4a90e2;
-}
-
-body.night-mode #aiAssistantModal .ai-generate-btn:hover {
-    background: #357abd;
-}
-
-body.night-mode #aiAssistantModal .ai-result-content {
-    background: #3d3d3d;
-    border-color: #555;
-    color: #eee;
-}
-
-body.night-mode #aiAssistantModal h3,
-body.night-mode #aiAssistantModal h4 {
-    color: #eee;
-}
-
-body.night-mode #aiAssistantModal .ai-back-btn {
-    color: #aaa;
-}
-
-body.night-mode #aiAssistantModal .ai-back-btn:hover {
-    color: #4a90e2;
-}
-
-/* PPT输入区域夜间模式 */
-body.night-mode #aiPPTInputSection {
-    background: #2d2d2d;
-}
-
-body.night-mode #aiPPTInputSection h4 {
-    color: #eee;
-}
-
-body.night-mode #aiPPTInput {
-    background: #3d3d3d;
-    border-color: #555;
-    color: #eee;
-}
-
-body.night-mode #aiPPTInput::placeholder {
-    color: #888;
-}
-
-body.night-mode #aiPPTOutlineSection {
-    background: #2d2d2d;
-}
-
-body.night-mode #aiPPTOutlinePreview > div {
-    background: #3d3d3d !important;
-    border-color: #555 !important;
-}
-
-body.night-mode #aiPPTOutlinePreview strong {
-    color: #66b1ff !important;
-}
-
-body.night-mode #aiPPTOutlinePreview ul {
-    color: #ddd;
-}
-
-body.night-mode #aiPPTOutlinePreview li {
-    color: #ccc;
-}
-
-/* PPT编辑器加载动画夜间模式 */
-body.night-mode #pptEditorLoading {
-    color: #eee;
-}
-
-body.night-mode #pptEditorLoading i {
-    color: #4a90e2;
-}
-
-/* PPT预览容器夜间模式 */
-body.night-mode #pptEditorPreviewContainer {
-    box-shadow: 0 10px 40px rgba(0,0,0,0.8);
-}
-
-/* 自定义确认对话框夜间模式 */
-body.night-mode .confirm-dialog {
-    background: #2d2d2d;
-    color: #eee;
-}
-
-body.night-mode .confirm-dialog p {
-    color: #eee;
-}
-
-body.night-mode .confirm-dialog .confirm-cancel {
-    background: transparent;
-    border-color: #555;
-    color: #aaa;
-}
-
-body.night-mode .confirm-dialog .confirm-cancel:hover {
-    background: rgba(255,255,255,0.1);
-    color: #eee;
-}
-
-body.night-mode .confirm-dialog .confirm-ok {
-    background: #4a90e2;
-}
-
-body.night-mode .confirm-dialog .confirm-ok:hover {
-    background: #357abd;
-}
-
-/* 自定义输入对话框夜间模式 */
-body.night-mode .prompt-dialog {
-    background: #2d2d2d;
-    color: #eee;
-}
-
-body.night-mode .prompt-dialog p {
-    color: #eee;
-}
-
-body.night-mode .prompt-dialog .prompt-input {
-    background: #3d3d3d;
-    border-color: #555;
-    color: #eee;
-}
-
-body.night-mode .prompt-dialog .prompt-cancel {
-    background: transparent;
-    border-color: #555;
-    color: #aaa;
-}
-
-body.night-mode .prompt-dialog .prompt-cancel:hover {
-    background: rgba(255,255,255,0.1);
-    color: #eee;
-}
-
-body.night-mode .prompt-dialog .prompt-ok {
-    background: #4a90e2;
-}
-
-body.night-mode .prompt-dialog .prompt-ok:hover {
-    background: #357abd;
-}
-
-/* 响应式调整 */
 @media (max-width: 480px) {
     .ai-menu-grid {
         grid-template-columns: repeat(2, 1fr);
@@ -3407,3 +2346,457 @@ body.night-mode .prompt-dialog .prompt-ok:hover {
     }
 }
 
+/* Night mode styles */
+body.night-mode .mobile-toolbar-container {
+    background: #2d2d2d;
+    border-bottom: 1px solid #444;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+}
+
+body.night-mode .mobile-action-btn {
+    background: rgba(45, 45, 45, 0.9);
+    color: #fff;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+body.night-mode .mobile-bottom-bar {
+    background: #2d2d2d;
+    border-top: 1px solid #444;
+    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.2);
+}
+
+body.night-mode .bottom-btn {
+    color: #aaa;
+}
+
+body.night-mode .bottom-btn:active {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+body.night-mode .mobile-dropdown-content {
+    background: #2d2d2d;
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+}
+
+body.night-mode .dropdown-item {
+    color: #ddd;
+}
+
+body.night-mode .dropdown-item:active {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+body.night-mode .loading {
+    color: #aaa;
+}
+
+body.night-mode .mobile-action-sheet {
+    background: #2d2d2d;
+    color: #eee;
+}
+
+body.night-mode .modal {
+    background: #2d2d2d;
+    color: #eee;
+}
+
+body.night-mode .modal-close-btn {
+    color: #ccc;
+}
+
+body.night-mode .modal-close-btn:hover {
+    color: #fff;
+    background: rgba(255,255,255,0.15);
+}
+
+body.night-mode .modal-form::-webkit-scrollbar-track,
+body.night-mode .history-list::-webkit-scrollbar-track,
+body.night-mode .modal-content::-webkit-scrollbar-track {
+    background: rgba(255,255,255,0.05);
+}
+
+body.night-mode .modal-form::-webkit-scrollbar-thumb,
+body.night-mode .history-list::-webkit-scrollbar-thumb,
+body.night-mode .modal-content::-webkit-scrollbar-thumb {
+    background: #555;
+}
+
+body.night-mode .modal-form::-webkit-scrollbar-thumb:hover,
+body.night-mode .history-list::-webkit-scrollbar-thumb:hover,
+body.night-mode .modal-content::-webkit-scrollbar-thumb:hover {
+    background: #666;
+}
+
+body.night-mode .modal-header h2 {
+    color: #eee;
+}
+
+body.night-mode .modal-tabs {
+    border-bottom: 1px solid #444;
+}
+
+body.night-mode .tab-btn {
+    color: #aaa;
+}
+
+body.night-mode .tab-btn:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+body.night-mode .form-group label {
+    color: #ccc;
+}
+
+body.night-mode .form-group input {
+    background: #3d3d3d;
+    border: 1px solid #555;
+    color: #eee;
+}
+
+body.night-mode .modal-btn.secondary {
+    background: #3d3d3d;
+    color: #eee;
+}
+
+body.night-mode .modal-btn.secondary:hover {
+    background: #4d4d4d;
+}
+
+body.night-mode .modal-message.success {
+    background: #1e4620;
+    color: #a3d9a5;
+    border: 1px solid #2e7d32;
+}
+
+body.night-mode .modal-message.error {
+    background: #5c2a2a;
+    color: #f5c6cb;
+    border: 1px solid #721c24;
+}
+
+body.night-mode .file-list-sidebar {
+    background: #2d2d2d;
+    color: #eee;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+}
+
+body.night-mode .file-list-header {
+    border-bottom: 1px solid #444;
+}
+
+body.night-mode .file-list-title {
+    color: #eee;
+}
+
+body.night-mode .file-list-help {
+    color: #aaa;
+}
+
+body.night-mode .file-list-help:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #4a90e2;
+}
+
+body.night-mode .file-list-close:hover {
+    color: #eee;
+}
+
+body.night-mode .folder-header:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+body.night-mode .folder-name {
+    color: #66b1ff;
+}
+
+body.night-mode .file-item:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+body.night-mode .file-item.active {
+    background: #1e3a5f;
+}
+
+body.night-mode .file-action-btn:hover {
+    color: #eee;
+    background: rgba(255, 255, 255, 0.2);
+}
+
+body.night-mode .file-list-actions {
+    border-top: 1px solid #444;
+}
+
+body.night-mode .conflict-info {
+    background: #5d4037;
+    border-left: 4px solid #ff9800;
+}
+
+body.night-mode .conflict-details {
+    color: #aaa;
+}
+
+body.night-mode .diff-view-btn {
+    background: #5a9fd2;
+}
+
+body.night-mode .diff-view-btn:hover {
+    background: #4a8fc2;
+}
+
+body.night-mode .diff-info {
+    background: #1e3a5f;
+    border-left-color: #64b5f6;
+}
+
+body.night-mode .diff-container {
+    border-color: #444;
+}
+
+body.night-mode .diff-header {
+    background: #333;
+    border-bottom-color: #444;
+}
+
+body.night-mode .diff-version-header:first-child {
+    border-right-color: #444;
+}
+
+body.night-mode .diff-version-label {
+    color: #eee;
+}
+
+body.night-mode .diff-version-time {
+    color: #aaa;
+}
+
+body.night-mode .diff-content-wrapper {
+    background: #1e1e1e;
+}
+
+body.night-mode .diff-line:nth-child(even) {
+    background: rgba(255,255,255,0.02);
+}
+
+body.night-mode .diff-line-num {
+    background: #2d2d2d;
+    border-right-color: #444;
+    color: #666;
+}
+
+body.night-mode .diff-empty {
+    background: repeating-linear-gradient(
+        45deg,
+        #2d2d2d,
+        #2d2d2d 10px,
+        #3d3d3d 10px,
+        #3d3d3d 20px
+    );
+}
+
+body.night-mode .diff-same .diff-line-content {
+    color: #ddd;
+}
+
+body.night-mode .diff-removed {
+    background: #4a1a1a !important;
+}
+
+body.night-mode .diff-removed .diff-line-num {
+    background: #5a2a2a;
+    color: #ff6666;
+}
+
+body.night-mode .diff-removed .diff-line-content {
+    color: #ff8888;
+}
+
+body.night-mode .diff-added {
+    background: #1a4a1a !important;
+}
+
+body.night-mode .diff-added .diff-line-num {
+    background: #2a5a2a;
+    color: #66ff66;
+}
+
+body.night-mode .diff-added .diff-line-content {
+    color: #88ff88;
+}
+
+body.night-mode .sync-status {
+    background: #2d2d2d;
+    color: #eee;
+}
+
+body.night-mode .sync-status.success {
+    background: #1e4620;
+    color: #a3d9a5;
+}
+
+body.night-mode .sync-status.error {
+    background: #5c2a2a;
+    color: #f5c6cb;
+}
+
+body.night-mode .editor-mode-toggle,
+body.night-mode .editor-save-btn {
+    background: rgba(45, 45, 45, 0.9);
+    color: #fff;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+body.night-mode .mobile-title {
+    color: #eee;
+}
+
+body.night-mode .custom-fullscreen-btn {
+    background: rgba(60, 60, 60, 0.9);
+    color: #fff;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+body.night-mode .history-info {
+    background: #2d2d2d;
+    color: #aaa;
+}
+
+body.night-mode .history-list {
+    border-color: #444;
+    background: #2d2d2d;
+}
+
+body.night-mode .history-version {
+    border-color: #444;
+}
+
+body.night-mode .history-version:hover {
+    background: #3d3d3d;
+}
+
+body.night-mode .history-version-title {
+    color: #eee;
+}
+
+body.night-mode .history-version-date {
+    color: #aaa;
+}
+
+body.night-mode .history-version-content {
+    background: #1e1e1e;
+    color: #aaa;
+}
+
+body.night-mode .history-version-current {
+    background: rgba(76, 175, 80, 0.2);
+}
+
+body.night-mode .history-loading {
+    color: #aaa;
+}
+
+body.night-mode .form-control {
+    background: #3d3d3d;
+    border: 1px solid #555;
+    color: #eee;
+}
+
+body.night-mode .file-menu-btn {
+    color: #eee;
+}
+
+body.night-mode .file-menu-btn:hover {
+    color: #fff;
+    background: rgba(255,255,255,0.2);
+}
+
+body.night-mode .resource-loading {
+    background: #2d2d2d;
+    border-color: #444;
+    color: #aaa;
+}
+
+body.night-mode .ai-menu-btn {
+    background: #2d2d2d;
+    border-color: #444;
+}
+
+body.night-mode .ai-menu-btn span {
+    color: #eee;
+}
+
+body.night-mode .ai-menu-btn:hover {
+    border-color: #4a90e2;
+    background: rgba(74, 144, 226, 0.15);
+}
+
+body.night-mode .ai-menu-btn.active {
+    border-color: #4a90e2;
+    background: rgba(74, 144, 226, 0.25);
+    box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.3);
+}
+
+body.night-mode .ai-back-btn {
+    color: #aaa;
+}
+
+body.night-mode .ai-back-btn:hover {
+    color: #4a90e2;
+}
+
+body.night-mode .ai-submenu h3 {
+    color: #eee;
+}
+
+body.night-mode .ai-option-btn {
+    background: #2d2d2d;
+    border-color: #444;
+    color: #eee;
+}
+
+body.night-mode .ai-option-btn:hover {
+    border-color: #4a90e2;
+    background: rgba(74, 144, 226, 0.15);
+}
+
+body.night-mode .ai-option-btn.selected {
+    border-color: #4a90e2;
+    background: rgba(74, 144, 226, 0.25);
+    box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.4);
+}
+
+body.night-mode .ai-input-area textarea {
+    background: #2d2d2d;
+    border-color: #444;
+    color: #eee;
+}
+
+body.night-mode .ai-ppt-options {
+    background: #3d3d3d;
+}
+
+body.night-mode .ai-ppt-options label {
+    color: #eee;
+}
+
+body.night-mode .ai-ratio-group label {
+    color: #eee;
+}
+
+body.night-mode .ai-result-content {
+    background: #2d2d2d;
+    border-color: #444;
+    color: #eee;
+}
+
+body.night-mode .ai-action-btn.secondary {
+    color: #aaa;
+    border-color: #444;
+}
+
+body.night-mode .ai-action-btn.secondary:hover {
+    background: #3d3d3d;
+}
+
+body.night-mode .checkbox-group label:hover {
+    background: #3d3d3d;
+}
