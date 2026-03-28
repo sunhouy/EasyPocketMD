@@ -85,25 +85,6 @@ router.post('/upload_screenshot', upload.single('screenshot'), async (req, res) 
 
     if (!req.file) return res.json({ code: 400, message: '缺少截图文件' });
 
-    // Generate thumbnail for screenshot
-    let thumbUrl = null;
-    try {
-        const screenshotDir = path.join(__dirname, '../../screenshots');
-        const thumbFilename = 'thumb_' + req.file.filename;
-        const thumbPath = path.join(screenshotDir, thumbFilename);
-        
-        await sharp(req.file.path)
-            .resize(200, 200, {
-                fit: 'contain',
-                background: { r: 255, g: 255, b: 255, alpha: 0 }
-            })
-            .toFile(thumbPath);
-        
-        thumbUrl = `${userModel.baseUrl}/screenshots/${thumbFilename}`;
-    } catch (err) {
-        console.error('Failed to generate thumbnail for screenshot:', err);
-    }
-
     const fileUrl = `${userModel.baseUrl}/screenshots/${req.file.filename}`;
     
     res.json({
@@ -113,7 +94,6 @@ router.post('/upload_screenshot', upload.single('screenshot'), async (req, res) 
             file_name: req.file.filename,
             file_path: '/screenshots/' + req.file.filename,
             file_url: fileUrl,
-            thumb_url: thumbUrl || fileUrl,
             file_size: req.file.size
         }
     });
@@ -167,23 +147,14 @@ router.post('/upload', generalUpload.array('files[]'), async (req, res) => {
         }
     }
 
-    const fileInfos = req.files.map(file => {
-        const fileUrl = `${userModel.baseUrl}/${urlPrefix}/${file.filename}`;
-        const thumbFilename = 'thumb_' + file.filename;
-        const thumbUrl = `${userModel.baseUrl}/${urlPrefix}/${thumbFilename}`;
-        return {
-            url: fileUrl,
-            thumb_url: thumbUrl,
-            filename: file.filename
-        };
+    const urls = req.files.map(file => {
+        return `${userModel.baseUrl}/${urlPrefix}/${file.filename}`;
     });
 
     res.json({
         success: true,
         count: req.files.length,
-        urls: fileInfos.map(f => f.url),
-        thumbs: fileInfos.map(f => f.thumb_url),
-        files: fileInfos
+        urls: urls
     });
 });
 

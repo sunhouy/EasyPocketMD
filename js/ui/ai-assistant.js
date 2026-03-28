@@ -306,9 +306,17 @@
                 var action = this.getAttribute('data-ai-action');
                 if (action) {
                     showAIMenu(action);
-                    // 如果是PPT菜单，初始化PPT生成器
-                    if (action === 'ppt' && typeof global.initPPTGenerator === 'function') {
-                        global.initPPTGenerator();
+                    // 如果是PPT菜单，懒加载并初始化PPT生成器
+                    if (action === 'ppt') {
+                        if (typeof global.initPPTGenerator !== 'function') {
+                            import('./ppt-generator.js').then(function() {
+                                if (typeof global.initPPTGenerator === 'function') {
+                                    global.initPPTGenerator();
+                                }
+                            });
+                        } else {
+                            global.initPPTGenerator();
+                        }
                     }
                 }
             });

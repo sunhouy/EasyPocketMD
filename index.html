@@ -321,6 +321,25 @@
             <span data-i18n="historyCount">最多保留1000个历史版本</span>
         </div>
 
+        <!-- 批量操作工具栏 -->
+        <div class="history-batch-toolbar" id="historyBatchToolbar" style="flex-shrink:0;padding:10px 15px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center;background:#f8f9fa;">
+            <div class="history-batch-left">
+                <label class="history-checkbox-label" style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                    <input type="checkbox" id="historySelectAllCheckbox" style="width:18px;height:18px;cursor:pointer;">
+                    <span id="historySelectAllText" data-i18n="selectAll">全选</span>
+                </label>
+            </div>
+            <div class="history-batch-right" style="display:flex;gap:10px;">
+                <span id="historySelectedCount" class="history-selected-count" style="display:none;align-items:center;color:#666;font-size:14px;"></span>
+                <button id="historyBatchDeleteBtn" class="modal-btn small" style="background:#dc3545;color:white;display:none;">
+                    <i class="fas fa-trash"></i> <span data-i18n="batchDelete">批量删除</span>
+                </button>
+                <button id="historyClearAllBtn" class="modal-btn small" style="background:#6c757d;color:white;">
+                    <i class="fas fa-broom"></i> <span data-i18n="clearAllHistory">清空全部</span>
+                </button>
+            </div>
+        </div>
+
         <div id="historyList" class="history-list" style="flex:1;overflow-y:auto;">
             <!-- 历史版本列表将动态生成 -->
             <div class="history-loading">

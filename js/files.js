@@ -1735,16 +1735,7 @@
             }
         }
         
-        if (g('vditor')) {
-            g('vditor').setValue(content);
-            
-            // 延迟处理图片懒加载，等待Vditor渲染完成
-            setTimeout(() => {
-                if (window.LazyImageLoader && window.LazyImageLoader.processVditorImages) {
-                    window.LazyImageLoader.processVditorImages();
-                }
-            }, 300);
-        }
+        if (g('vditor')) g('vditor').setValue(content);
         expandActiveFile();
         global.startAutoSave();
         global.showMessage(isEn() ? 'File opened: ' + file.name : '已打开文件: ' + file.name);
@@ -1883,30 +1874,80 @@
         } catch (e) { console.error('获取历史版本失败', e); return []; }
     }
 
+    // 当前历史版本选择状态
+    let selectedHistoryVersions = new Set();
+    let currentHistoryFileId = null;
+    let currentHistoryFilename = null;
+
     async function showHistoryModal(fileId, filename) {
         const modal = document.getElementById('historyModalOverlay');
         const historyList = document.getElementById('historyList');
         const historyFileName = document.getElementById('historyFileName');
         if (!modal || !historyList || !historyFileName) return;
+
+        // 重置选择状态
+        selectedHistoryVersions.clear();
+        currentHistoryFileId = fileId;
+        currentHistoryFilename = filename;
+        updateHistoryBatchToolbar();
+
         historyFileName.textContent = filename;
         modal.classList.add('show');
         historyList.innerHTML = '<div class="history-loading"><i class="fas fa-spinner fa-spin"></i> ' + (isEn() ? 'Loading history versions...' : '正在加载历史版本...') + '</div>';
+
+        // 绑定批量操作事件
+        bindHistoryBatchEvents(fileId, filename);
+
         try {
             const history = await getFileHistory(filename);
             if (history.length === 0) {
                 historyList.innerHTML = '<div class="history-loading">' + (isEn() ? 'No history versions' : '暂无历史版本') + '</div>';
+                // 隐藏批量操作工具栏
+                const batchToolbar = document.getElementById('historyBatchToolbar');
+                if (batchToolbar) batchToolbar.style.display = 'none';
                 return;
             }
+
+            // 显示批量操作工具栏
+            const batchToolbar = document.getElementById('historyBatchToolbar');
+            if (batchToolbar) batchToolbar.style.display = 'flex';
+
             const files = g('files');
             const currentFile = files.find(function(f) { return f.id === fileId; });
             const currentContent = currentFile ? currentFile.content : '';
             historyList.innerHTML = '';
+
             history.forEach(function(version, index) {
                 const versionEl = document.createElement('div');
                 versionEl.className = 'history-version' + (index === 0 ? ' history-version-current' : '');
+                versionEl.dataset.versionId = version.version_id;
+
                 const date = new Date(version.timestamp).toLocaleString();
                 const contentPreview = version.content.substring(0, 200) + (version.content.length > 200 ? '...' : '');
-                versionEl.innerHTML = '<div class="history-version-header"><div class="history-version-title">' + (isEn() ? 'Version ' : '版本 ') + version.version_id + (index === 0 ? ' <span style="color:#4CAF50;font-size:12px;">(' + (isEn() ? 'Current' : '当前') + ')</span>' : '') + '</div><div class="history-version-date">' + date + '</div></div><div class="history-version-content">' + global.escapeHtml(contentPreview) + '</div><div class="history-version-actions"><button class="modal-btn small preview-btn"><i class="fas fa-eye"></i> ' + (isEn() ? 'Preview' : '预览') + '</button>' + (index > 0 ? '<button class="modal-btn small primary restore-btn"><i class="fas fa-history"></i> ' + (isEn() ? 'Restore' : '恢复') + '</button>' : '') + '<button class="modal-btn small delete-history-btn"><i class="fas fa-trash"></i> ' + (isEn() ? 'Delete' : '删除') + '</button></div>';
+
+                // 添加复选框（当前版本除外）
+                const checkboxHtml = index > 0 ? '<input type="checkbox" class="history-version-checkbox" data-version-id="' + version.version_id + '">' : '';
+
+                versionEl.innerHTML = checkboxHtml + '<div class="history-version-content-wrapper"><div class="history-version-header"><div class="history-version-title">' + (isEn() ? 'Version ' : '版本 ') + version.version_id + (index === 0 ? ' <span style="color:#4CAF50;font-size:12px;">(' + (isEn() ? 'Current' : '当前') + ')</span>' : '') + '</div><div class="history-version-date">' + date + '</div></div><div class="history-version-content">' + global.escapeHtml(contentPreview) + '</div><div class="history-version-actions"><button class="modal-btn small preview-btn"><i class="fas fa-eye"></i> ' + (isEn() ? 'Preview' : '预览') + '</button>' + (index > 0 ? '<button class="modal-btn small primary restore-btn"><i class="fas fa-history"></i> ' + (isEn() ? 'Restore' : '恢复') + '</button>' : '') + '<button class="modal-btn small delete-history-btn"><i class="fas fa-trash"></i> ' + (isEn() ? 'Delete' : '删除') + '</button></div></div>';
+
+                // 绑定复选框事件
+                if (index > 0) {
+                    const checkbox = versionEl.querySelector('.history-version-checkbox');
+                    if (checkbox) {
+                        checkbox.addEventListener('change', function(e) {
+                            e.stopPropagation();
+                            if (this.checked) {
+                                selectedHistoryVersions.add(version.version_id);
+                                versionEl.classList.add('selected');
+                            } else {
+                                selectedHistoryVersions.delete(version.version_id);
+                                versionEl.classList.remove('selected');
+                            }
+                            updateHistoryBatchToolbar();
+                        });
+                    }
+                }
+
                 var previewBtn = versionEl.querySelector('.preview-btn');
                 if (previewBtn) previewBtn.addEventListener('click', function(e) { e.stopPropagation(); global.previewHistoryVersion(filename, version.version_id, version.content, version.timestamp); });
                 if (index > 0) {
@@ -1915,10 +1956,187 @@
                 }
                 var deleteBtn = versionEl.querySelector('.delete-history-btn');
                 if (deleteBtn) deleteBtn.addEventListener('click', function(e) { e.stopPropagation(); e.preventDefault(); global.deleteHistoryVersion(filename, version.version_id, version.history_id || '', fileId); });
+
                 historyList.appendChild(versionEl);
             });
         } catch (error) {
             historyList.innerHTML = '<div class="history-loading">' + (isEn() ? 'Load failed: ' : '加载失败: ') + error.message + '</div>';
+        }
+    }
+
+    function bindHistoryBatchEvents(fileId, filename) {
+        // 全选/取消全选
+        const selectAllCheckbox = document.getElementById('historySelectAllCheckbox');
+        const selectAllText = document.getElementById('historySelectAllText');
+        const batchDeleteBtn = document.getElementById('historyBatchDeleteBtn');
+        const clearAllBtn = document.getElementById('historyClearAllBtn');
+
+        if (selectAllCheckbox) {
+            selectAllCheckbox.checked = false;
+            selectAllCheckbox.onclick = function() {
+                const checkboxes = document.querySelectorAll('.history-version-checkbox');
+                const versionEls = document.querySelectorAll('.history-version');
+
+                if (this.checked) {
+                    checkboxes.forEach(function(cb, idx) {
+                        cb.checked = true;
+                        selectedHistoryVersions.add(parseInt(cb.dataset.versionId));
+                        if (versionEls[idx]) versionEls[idx].classList.add('selected');
+                    });
+                    if (selectAllText) selectAllText.textContent = isEn() ? 'Deselect All' : '取消全选';
+                } else {
+                    checkboxes.forEach(function(cb, idx) {
+                        cb.checked = false;
+                        selectedHistoryVersions.delete(parseInt(cb.dataset.versionId));
+                        if (versionEls[idx]) versionEls[idx].classList.remove('selected');
+                    });
+                    if (selectAllText) selectAllText.textContent = isEn() ? 'Select All' : '全选';
+                }
+                updateHistoryBatchToolbar();
+            };
+        }
+
+        // 批量删除按钮
+        if (batchDeleteBtn) {
+            batchDeleteBtn.onclick = function() {
+                if (selectedHistoryVersions.size === 0) {
+                    global.showMessage(isEn() ? 'Please select history versions to delete' : '请先选择要删除的历史版本', 'warning');
+                    return;
+                }
+                showBatchDeleteConfirmModal(filename, Array.from(selectedHistoryVersions), fileId);
+            };
+        }
+
+        // 清空全部按钮
+        if (clearAllBtn) {
+            clearAllBtn.onclick = function() {
+                showClearAllConfirmModal(filename, fileId);
+            };
+        }
+    }
+
+    function updateHistoryBatchToolbar() {
+        const selectedCountEl = document.getElementById('historySelectedCount');
+        const batchDeleteBtn = document.getElementById('historyBatchDeleteBtn');
+        const selectAllText = document.getElementById('historySelectAllText');
+
+        if (selectedHistoryVersions.size > 0) {
+            if (selectedCountEl) {
+                selectedCountEl.style.display = 'flex';
+                selectedCountEl.textContent = (isEn() ? '' : '已选择 ') + selectedHistoryVersions.size + (isEn() ? ' selected' : ' 项');
+            }
+            if (batchDeleteBtn) batchDeleteBtn.style.display = 'inline-flex';
+        } else {
+            if (selectedCountEl) selectedCountEl.style.display = 'none';
+            if (batchDeleteBtn) batchDeleteBtn.style.display = 'none';
+        }
+
+        // 更新全选文字
+        const checkboxes = document.querySelectorAll('.history-version-checkbox');
+        const allChecked = checkboxes.length > 0 && Array.from(checkboxes).every(function(cb) { return cb.checked; });
+        if (selectAllText) {
+            selectAllText.textContent = allChecked ? (isEn() ? 'Deselect All' : '取消全选') : (isEn() ? 'Select All' : '全选');
+        }
+    }
+
+    function showBatchDeleteConfirmModal(filename, versionIds, fileId) {
+        var nightMode = g('nightMode') === true;
+        var confirmModal = document.createElement('div');
+        confirmModal.className = 'modal-overlay';
+        confirmModal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:10001;';
+        var modalContent = document.createElement('div');
+        var bgColor = nightMode ? '#2d2d2d' : 'white';
+        var textColor = nightMode ? '#eee' : '#333';
+        var secondaryTextColor = nightMode ? '#aaa' : '#666';
+        modalContent.style.cssText = 'background:' + bgColor + ';color:' + textColor + ';border-radius:12px;padding:25px;max-width:90%;';
+        modalContent.innerHTML = '<div class="modal-header" style="text-align:center;margin-bottom:20px;"><h2 style="margin:0 0 10px 0;color:#dc3545;">' + (isEn() ? 'Batch Delete Confirmation' : '批量删除确认') + '</h2><p style="color:' + secondaryTextColor + ';margin:0;">' + (isEn() ? 'Are you sure you want to delete the selected history versions?' : '确定要删除选中的历史版本吗？') + '</p></div><div style="margin:15px 0;text-align:center;"><strong style="color:#dc3545;font-size:18px;">' + versionIds.length + '</strong> ' + (isEn() ? 'versions will be deleted' : '个版本将被删除') + '</div><div style="display:flex;gap:10px;justify-content:center;margin-top:25px;"><button class="delete-confirm-cancel" style="padding:10px 24px;background:' + (nightMode ? '#555' : '#6c757d') + ';color:white;border:none;border-radius:6px;cursor:pointer;">' + (isEn() ? 'Cancel' : '取消') + '</button><button class="delete-confirm-ok" style="padding:10px 24px;background:#dc3545;color:white;border:none;border-radius:6px;cursor:pointer;">' + (isEn() ? 'Confirm Delete' : '确认删除') + '</button></div>';
+        confirmModal.appendChild(modalContent);
+        document.body.appendChild(confirmModal);
+        var cancelBtn = modalContent.querySelector('.delete-confirm-cancel');
+        var confirmBtn = modalContent.querySelector('.delete-confirm-ok');
+        cancelBtn.onclick = function() { global.removeModal(confirmModal); };
+        confirmBtn.onclick = function() {
+            confirmBtn.disabled = true;
+            confirmBtn.textContent = isEn() ? 'Deleting...' : '删除中...';
+            performBatchDeleteHistory(filename, versionIds, fileId, confirmModal);
+        };
+        confirmModal.addEventListener('click', function(e) { if (e.target === confirmModal) global.removeModal(confirmModal); });
+        var handleKeydown = function(e) { if (e.key === 'Escape') { global.removeModal(confirmModal); document.removeEventListener('keydown', handleKeydown); } };
+        document.addEventListener('keydown', handleKeydown);
+        confirmModal.removeKeydownHandler = function() { document.removeEventListener('keydown', handleKeydown); };
+    }
+
+    async function performBatchDeleteHistory(filename, versionIds, fileId, modalElement) {
+        try {
+            var success = await deleteHistoryVersionBatchAPI(filename, versionIds);
+            if (success) {
+                global.removeModal(modalElement);
+                global.showMessage((isEn() ? 'Batch delete successful, deleted ' : '批量删除成功，已删除 ') + versionIds.length + (isEn() ? ' versions' : ' 个版本'), 'success');
+                selectedHistoryVersions.clear();
+                // 刷新列表
+                setTimeout(function() { global.showHistoryModal(fileId, filename); }, 500);
+            } else throw new Error(isEn() ? 'Delete failed' : '删除失败');
+        } catch (error) {
+            console.error('批量删除历史版本失败', error);
+            global.showMessage((isEn() ? 'Batch delete failed: ' : '批量删除失败: ') + error.message, 'error');
+        }
+    }
+
+    async function deleteHistoryVersionBatchAPI(filename, versionIds) {
+        if (!g('currentUser')) return false;
+        try {
+            var api = global.getApiBaseUrl ? global.getApiBaseUrl() : 'api';
+            var response = await fetch(api + '/files/history/delete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (g('currentUser').token || g('currentUser').username) },
+                body: JSON.stringify({ username: g('currentUser').username, filename: filename, version_ids: versionIds })
+            });
+            var result = global.parseJsonResponse ? await global.parseJsonResponse(response) : await response.json();
+            return result.code === 200;
+        } catch (e) { throw e; }
+    }
+
+    function showClearAllConfirmModal(filename, fileId) {
+        var nightMode = g('nightMode') === true;
+        var confirmModal = document.createElement('div');
+        confirmModal.className = 'modal-overlay';
+        confirmModal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:10001;';
+        var modalContent = document.createElement('div');
+        var bgColor = nightMode ? '#2d2d2d' : 'white';
+        var textColor = nightMode ? '#eee' : '#333';
+        var secondaryTextColor = nightMode ? '#aaa' : '#666';
+        modalContent.style.cssText = 'background:' + bgColor + ';color:' + textColor + ';border-radius:12px;padding:25px;max-width:90%;';
+        modalContent.innerHTML = '<div class="modal-header" style="text-align:center;margin-bottom:20px;"><h2 style="margin:0 0 10px 0;color:#dc3545;"><i class="fas fa-exclamation-triangle"></i> ' + (isEn() ? 'Clear All History' : '清空全部历史') + '</h2><p style="color:' + secondaryTextColor + ';margin:0;">' + (isEn() ? 'Are you sure you want to clear ALL history versions?' : '确定要清空该文件的所有历史版本吗？') + '</p></div><div style="margin:15px 0;text-align:center;color:#dc3545;font-weight:bold;">' + (isEn() ? 'This action cannot be undone!' : '此操作不可恢复！') + '</div><div style="margin:10px 0;text-align:center;color:' + secondaryTextColor + ';">' + (isEn() ? 'File: ' : '文件：') + global.escapeHtml(filename) + '</div><div style="display:flex;gap:10px;justify-content:center;margin-top:25px;"><button class="delete-confirm-cancel" style="padding:10px 24px;background:' + (nightMode ? '#555' : '#6c757d') + ';color:white;border:none;border-radius:6px;cursor:pointer;">' + (isEn() ? 'Cancel' : '取消') + '</button><button class="delete-confirm-ok" style="padding:10px 24px;background:#dc3545;color:white;border:none;border-radius:6px;cursor:pointer;">' + (isEn() ? 'Confirm Clear All' : '确认清空全部') + '</button></div>';
+        confirmModal.appendChild(modalContent);
+        document.body.appendChild(confirmModal);
+        var cancelBtn = modalContent.querySelector('.delete-confirm-cancel');
+        var confirmBtn = modalContent.querySelector('.delete-confirm-ok');
+        cancelBtn.onclick = function() { global.removeModal(confirmModal); };
+        confirmBtn.onclick = function() {
+            confirmBtn.disabled = true;
+            confirmBtn.textContent = isEn() ? 'Clearing...' : '清空中...';
+            performClearAllHistory(filename, fileId, confirmModal);
+        };
+        confirmModal.addEventListener('click', function(e) { if (e.target === confirmModal) global.removeModal(confirmModal); });
+        var handleKeydown = function(e) { if (e.key === 'Escape') { global.removeModal(confirmModal); document.removeEventListener('keydown', handleKeydown); } };
+        document.addEventListener('keydown', handleKeydown);
+        confirmModal.removeKeydownHandler = function() { document.removeEventListener('keydown', handleKeydown); };
+    }
+
+    async function performClearAllHistory(filename, fileId, modalElement) {
+        try {
+            var success = await deleteHistoryVersionAPI(filename, 0); // version_id = 0 表示删除全部
+            if (success) {
+                global.removeModal(modalElement);
+                global.showMessage(isEn() ? 'All history versions cleared' : '已清空所有历史版本', 'success');
+                selectedHistoryVersions.clear();
+                // 关闭模态框
+                var historyModal = document.getElementById('historyModalOverlay');
+                if (historyModal) historyModal.classList.remove('show');
+            } else throw new Error(isEn() ? 'Clear failed' : '清空失败');
+        } catch (error) {
+            console.error('清空历史版本失败', error);
+            global.showMessage((isEn() ? 'Clear failed: ' : '清空失败: ') + error.message, 'error');
         }
     }
 

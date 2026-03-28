@@ -3,7 +3,6 @@ const router = express.Router();
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
-const sharp = require('sharp');
 
 const userModel = require('../models/User');
 const fileManager = require('../models/FileManager');
@@ -392,11 +391,11 @@ router.all('/index.php', upload.any(), async (req, res) => {
 
             case 'upload_screenshot':
                 if (method !== 'POST') throw new Error('请求方法错误');
-
+                
                 // Multer puts files in req.files
                 var file = req.files && req.files.find(f => f.fieldname === 'screenshot');
                 if (!file) throw new Error('缺少截图文件');
-
+                
                 if (!data.username || !data.password) {
                     // Clean up file
                     fs.unlinkSync(file.path);
@@ -422,28 +421,9 @@ router.all('/index.php', upload.any(), async (req, res) => {
                 const absolutePath = path.join(__dirname, '../../screenshots', fileName);
 
                 moveFile(file, absolutePath);
-
-                // Generate thumbnail for screenshot
-                let thumbUrl = null;
-                try {
-                    const screenshotDir = path.join(__dirname, '../../screenshots');
-                    const thumbFilename = 'thumb_' + fileName;
-                    const thumbPath = path.join(screenshotDir, thumbFilename);
-
-                    await sharp(absolutePath)
-                        .resize(200, 200, {
-                            fit: 'contain',
-                            background: { r: 255, g: 255, b: 255, alpha: 0 }
-                        })
-                        .toFile(thumbPath);
-
-                    thumbUrl = `${userModel.baseUrl}/screenshots/${thumbFilename}`;
-                } catch (err) {
-                    console.error('Failed to generate thumbnail for screenshot:', err);
-                }
-
+                
                 const fileUrl = `${userModel.baseUrl}/${relativePath}`;
-
+                
                 res.json({
                     code: 200,
                     message: '截图上传成功',
@@ -451,7 +431,6 @@ router.all('/index.php', upload.any(), async (req, res) => {
                         file_name: fileName,
                         file_path: '/' + relativePath,
                         file_url: fileUrl,
-                        thumb_url: thumbUrl || fileUrl,
                         file_size: file.size
                     }
                 });

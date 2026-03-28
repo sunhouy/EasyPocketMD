@@ -219,6 +219,58 @@ class HistoryManager {
         };
     }
 
+    // Batch delete history versions
+    async deleteHistoryBatch(username, filename, versionIds) {
+        try {
+            const user = await this.getUserByUsername(username);
+            if (!user) return { code: 404, message: '用户不存在' };
+
+            const userId = user.id;
+            const connection = await db.getConnection();
+            let deletedCount = 0;
+            let failedVersions = [];
+
+            try {
+                await connection.beginTransaction();
+
+                for (const versionId of versionIds) {
+                    const [rows] = await connection.execute(
+                        'SELECT id FROM file_history WHERE user_id = ? AND filename = ? AND version_id = ?',
+                        [userId, filename, versionId]
+                    );
+                    if (rows.length > 0) {
+                        const historyId = rows[0].id;
+                        await connection.execute('DELETE FROM file_content WHERE history_id = ?', [historyId]);
+                        await connection.execute('DELETE FROM file_history WHERE id = ?', [historyId]);
+                        deletedCount++;
+                    } else {
+                        failedVersions.push(versionId);
+                    }
+                }
+
+                await connection.commit();
+
+                return {
+                    code: 200,
+                    message: `批量删除完成，成功删除 ${deletedCount} 个版本`,
+                    data: {
+                        deleted_count: deletedCount,
+                        failed_count: failedVersions.length,
+                        failed_versions: failedVersions,
+                        filename
+                    }
+                };
+            } catch (error) {
+                await connection.rollback();
+                throw error;
+            } finally {
+                connection.release();
+            }
+        } catch (error) {
+            return { code: 500, message: '批量删除历史版本失败: ' + error.message };
+        }
+    }
+
     // Helpers
     async getLatestVersion(userId, filename) {
         const [rows] = await db.execute('SELECT version_id, content_hash, content_length FROM file_history WHERE user_id = ? AND filename = ? ORDER BY version_id DESC LIMIT 1', [userId, filename]);
