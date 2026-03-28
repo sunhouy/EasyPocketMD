@@ -6,14 +6,14 @@ class ShareManager {
         this.baseUrl = process.env.BASE_URL || 'http://localhost:3000';
     }
 
-    // Create share
-    async createShare(username, password, filename, mode = 'view', sharePassword = null, expireDays = 7) {
+    // Get file content for sensitive word check (without creating share)
+    async getFileContentForShare(username, password, filename) {
         const connection = await db.getConnection();
         try {
             // 1. Authenticate user
             const [userRows] = await connection.execute('SELECT id, password FROM users WHERE username = ?', [username]);
             if (userRows.length === 0) return { code: 401, message: '用户认证失败' };
-            
+
             const user = userRows[0];
             const bcrypt = require('bcryptjs');
             if (!(await bcrypt.compare(password, user.password))) {
@@ -23,7 +23,39 @@ class ShareManager {
             // 2. Check if file exists and get content
             const [fileRows] = await connection.execute('SELECT id, content FROM user_files WHERE username = ? AND filename = ?', [username, filename]);
             if (fileRows.length === 0) return { code: 404, message: '文档不存在' };
-            const fileContent = fileRows[0].content || '';
+
+            return {
+                code: 200,
+                data: {
+                    filename: filename,
+                    content: fileRows[0].content || ''
+                }
+            };
+
+        } catch (error) {
+            return { code: 500, message: '获取文件内容失败: ' + error.message };
+        } finally {
+            connection.release();
+        }
+    }
+
+    // Create share
+    async createShare(username, password, filename, mode = 'view', sharePassword = null, expireDays = 7) {
+        const connection = await db.getConnection();
+        try {
+            // 1. Authenticate user
+            const [userRows] = await connection.execute('SELECT id, password FROM users WHERE username = ?', [username]);
+            if (userRows.length === 0) return { code: 401, message: '用户认证失败' };
+
+            const user = userRows[0];
+            const bcrypt = require('bcryptjs');
+            if (!(await bcrypt.compare(password, user.password))) {
+                return { code: 401, message: '用户认证失败' };
+            }
+
+            // 2. Check if file exists
+            const [fileRows] = await connection.execute('SELECT id FROM user_files WHERE username = ? AND filename = ?', [username, filename]);
+            if (fileRows.length === 0) return { code: 404, message: '文档不存在' };
 
             // 3. Calculate expiration
             let expiresAt = null;
@@ -35,7 +67,7 @@ class ShareManager {
                 expiresAt = date.toISOString().slice(0, 19).replace('T', ' ');
             }
 
-            // 5. Generate unique share_id and insert
+            // 4. Generate unique share_id and insert
             let shareId;
             // 如果存在已有分享，直接使用已有ID，并更新信息
             const [existingRows] = await connection.execute('SELECT share_id FROM file_shares WHERE username = ? AND filename = ?', [username, filename]);
@@ -66,8 +98,7 @@ class ShareManager {
                     mode,
                     expires_at: expiresAt,
                     has_password: !!sharePassword
-                },
-                fileContent: fileContent
+                }
             };
 
         } catch (error) {

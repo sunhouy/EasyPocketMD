@@ -23,27 +23,25 @@ router.post('/create', verifyUser, async (req, res) => {
     const { username, password, filename, mode, share_password, expire_days } = req.body;
     if (!username || !filename) return res.json({ code: 400, message: '缺少必要参数' });
 
-    // 先获取分享结果（包含文件内容）
-    const shareResult = await shareManager.createShare(username, password, filename, mode, share_password, expire_days);
-
-    // 如果创建失败，直接返回错误
-    if (shareResult.code !== 200) {
-        return res.json(shareResult);
+    // 1. 先获取文件内容进行敏感词检查（不创建分享）
+    const fileResult = await shareManager.getFileContentForShare(username, password, filename);
+    if (fileResult.code !== 200) {
+        return res.json(fileResult);
     }
 
-    // 检查文件名是否包含敏感词
+    // 2. 检查文件名是否包含敏感词
     const filenameCheck = checkSensitiveWords(filename);
     if (filenameCheck.hasSensitive) {
         return res.json({
             code: 400,
-            message: `包含敏感词${filenameCheck.words.join('、')}，无法分享`,
+            message: `文件名包含敏感词${filenameCheck.words.join('、')}，无法分享`,
             sensitive_words: filenameCheck.words,
             sensitive_field: 'filename'
         });
     }
 
-    // 检查文件内容是否包含敏感词
-    const fileContent = shareResult.fileContent;
+    // 3. 检查文件内容是否包含敏感词
+    const fileContent = fileResult.data.content;
     if (fileContent) {
         const contentCheck = checkSensitiveWords(fileContent);
         if (contentCheck.hasSensitive) {
@@ -56,9 +54,8 @@ router.post('/create', verifyUser, async (req, res) => {
         }
     }
 
-    // 删除 fileContent 字段，不返回给前端
-    delete shareResult.fileContent;
-
+    // 4. 敏感词检查通过后，创建分享
+    const shareResult = await shareManager.createShare(username, password, filename, mode, share_password, expire_days);
     res.json(shareResult);
 });
 
@@ -96,6 +93,18 @@ router.post('/get', async (req, res) => {
 router.post('/update', async (req, res) => {
     const { share_id, content, password } = req.body;
     if (!share_id || !content) return res.json({ code: 400, message: '缺少必要参数' });
+
+    // 检查更新内容是否包含敏感词
+    const contentCheck = checkSensitiveWords(content);
+    if (contentCheck.hasSensitive) {
+        return res.json({
+            code: 400,
+            message: `更新内容包含敏感词${contentCheck.words.join('、')}，无法更新`,
+            sensitive_words: contentCheck.words,
+            sensitive_field: 'content'
+        });
+    }
+
     res.json(await shareManager.updateSharedFile(share_id, content, password));
 });
 
