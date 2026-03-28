@@ -22,7 +22,12 @@ jest.mock('wkhtmltopdf', () => {
 // Mock fs.createWriteStream to handle mock wkhtmltopdf output
 jest.spyOn(fs, 'createWriteStream').mockImplementation(() => {
     const { PassThrough } = require('stream');
-    return new PassThrough();
+    const stream = new PassThrough();
+    // Emit finish event after a short delay to simulate successful write
+    setImmediate(() => {
+        stream.emit('finish');
+    });
+    return stream;
 });
 
 // Mock fs.existsSync and fs.statSync for finish event check
