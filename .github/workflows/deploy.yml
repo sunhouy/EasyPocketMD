@@ -196,18 +196,29 @@ jobs:
           echo "在新目录启动服务: $NEXT_NAME"
           cd "$NEXT_DIR"
 
-          # 启动或重载新服务
+          # 启动或重启新服务（确保代码变更生效）
           if ! pm2 describe "$NEXT_NAME" > /dev/null 2>&1; then
             echo "启动新服务: $NEXT_NAME"
             PORT=3001 pm2 start api/server.js --name "$NEXT_NAME" --env production
           else
-            echo "重载现有服务: $NEXT_NAME"
-            PORT=3001 pm2 reload "$NEXT_NAME" --update-env
+            echo "重启现有服务（确保代码变更生效）: $NEXT_NAME"
+            PORT=3001 pm2 restart "$NEXT_NAME" --update-env
           fi
 
           # 等待服务启动
           echo "等待服务启动..."
-          sleep 3
+          sleep 5
+          
+          # 验证服务健康状态
+          echo "验证服务健康状态..."
+          for i in {1..10}; do
+            if curl -s http://localhost:3001/api/health | grep -q '"code":200'; then
+              echo "✓ 服务健康检查通过"
+              break
+            fi
+            echo "等待服务就绪... ($i/10)"
+            sleep 2
+          done
 
           # 原子切换符号链接
           echo "执行原子切换..."
@@ -219,9 +230,14 @@ jobs:
 
           # 更新 Nginx 配置
           if [ -f "$NEXT_DIR/nginx.conf" ]; then
+            echo "更新 Nginx 配置..."
             cp "$NEXT_DIR/nginx.conf" /www/server/panel/vhost/nginx/md.yhsun.cn.conf
             # 确保 Nginx 配置指向正确的端口
             sed -i 's/proxy_pass http:\/\/localhost:[0-9]*/proxy_pass http:\/\/localhost:3001/' /www/server/panel/vhost/nginx/md.yhsun.cn.conf
+            # 确保 API 路由配置正确
+            if ! grep -q "location /api/" /www/server/panel/vhost/nginx/md.yhsun.cn.conf; then
+              echo "警告: Nginx 配置中缺少 /api/ 路由配置"
+            fi
           fi
 
           # 重载 Nginx
