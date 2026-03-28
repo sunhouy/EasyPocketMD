@@ -1,6 +1,7 @@
 /**
  * 用户认证 - 登录、注册、登出、登录模态
  * 添加了登录/注册按钮的防抖处理，防止重复提交
+ * 添加了 Token 验证和刷新功能
  */
 (function(global) {
     'use strict';
@@ -12,6 +13,140 @@
     // 辅助函数：获取翻译
     function t(key) {
         return global.i18n ? global.i18n.t(key) : key;
+    }
+
+    /**
+     * 验证 Token 是否有效
+     * @returns {Promise<boolean>} 是否有效
+     */
+    async function verifyToken() {
+        if (!global.currentUser || !global.currentUser.token) {
+            return false;
+        }
+        try {
+            const apiUrl = (global.getApiBaseUrl ? global.getApiBaseUrl() : 'api') + '/auth/verify';
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    username: global.currentUser.username,
+                    token: global.currentUser.token
+                })
+            });
+            const result = global.parseJsonResponse ? await global.parseJsonResponse(response) : await response.json();
+            return result.code === 200;
+        } catch (error) {
+            console.error('Token 验证错误:', error);
+            return false;
+        }
+    }
+
+    /**
+     * 刷新 Token（使用密码重新登录）
+     * @returns {Promise<boolean>} 是否成功
+     */
+    async function refreshToken() {
+        if (!global.currentUser || !global.currentUser.password) {
+            return false;
+        }
+        try {
+            const apiUrl = (global.getApiBaseUrl ? global.getApiBaseUrl() : 'api') + '/auth/login';
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    username: global.currentUser.username,
+                    password: global.currentUser.password
+                })
+            });
+            const result = global.parseJsonResponse ? await global.parseJsonResponse(response) : await response.json();
+            if (result.code === 200 && result.data.token) {
+                global.currentUser.token = result.data.token;
+                localStorage.setItem('vditor_user', JSON.stringify(global.currentUser));
+                return true;
+            }
+            return false;
+        } catch (error) {
+            console.error('Token 刷新错误:', error);
+            return false;
+        }
+    }
+
+    /**
+     * 处理 Token 过期或无效的情况
+     * 尝试刷新 Token，如果失败则提示用户重新登录
+     * @returns {Promise<boolean>} 是否成功处理
+     */
+    async function handleTokenExpired() {
+        // 尝试刷新 Token
+        const refreshed = await refreshToken();
+        if (refreshed) {
+            global.showMessage(t('tokenRefreshed'), 'success');
+            return true;
+        }
+
+        // 刷新失败，清除登录状态并提示重新登录
+        global.currentUser = null;
+        localStorage.removeItem('vditor_user');
+        showUserInfo();
+        global.showMessage(t('sessionExpiredPleaseLogin'), 'warning');
+        showLoginModal();
+        return false;
+    }
+
+    /**
+     * 检查 API 响应是否为 Token 错误
+     * @param {Object} result - API 响应结果
+     * @returns {boolean} 是否为 Token 错误
+     */
+    function isTokenError(result) {
+        if (!result) return false;
+        if (result.code === 401) return true;
+        if (result.message && (
+            result.message.includes('Token验证失败') ||
+            result.message.includes('token') ||
+            result.message.includes('Token') ||
+            result.message.includes('过期') ||
+            result.message.includes('expired')
+        )) return true;
+        return false;
+    }
+
+    /**
+     * 执行需要认证的 API 请求，自动处理 Token 过期
+     * @param {string} url - API URL
+     * @param {Object} options - fetch 选项
+     * @returns {Promise<Object>} API 响应
+     */
+    async function authenticatedFetch(url, options = {}) {
+        // 确保 headers 存在
+        if (!options.headers) options.headers = {};
+
+        // 添加认证头
+        if (global.currentUser && global.currentUser.token) {
+            options.headers['Authorization'] = 'Bearer ' + global.currentUser.token;
+        }
+
+        let response = await fetch(url, options);
+        let result = global.parseJsonResponse ? await global.parseJsonResponse(response) : await response.json();
+
+        // 如果是 Token 错误，尝试刷新并重试
+        if (isTokenError(result)) {
+            const handled = await handleTokenExpired();
+            if (handled) {
+                // 使用新 Token 重试
+                if (global.currentUser && global.currentUser.token) {
+                    options.headers['Authorization'] = 'Bearer ' + global.currentUser.token;
+                }
+                response = await fetch(url, options);
+                result = global.parseJsonResponse ? await global.parseJsonResponse(response) : await response.json();
+            } else {
+                // 刷新失败，返回错误
+                throw new Error(t('sessionExpired'));
+            }
+        }
+
+        return result;
     }
 
     function showUserInfo() {
@@ -303,5 +438,10 @@
     global.hideLoginModal = hideLoginModal;
     global.handleLoginButtonClick = handleLoginButtonClick;
     global.logout = logout;
+    global.verifyToken = verifyToken;
+    global.refreshToken = refreshToken;
+    global.handleTokenExpired = handleTokenExpired;
+    global.isTokenError = isTokenError;
+    global.authenticatedFetch = authenticatedFetch;
 
 })(typeof window !== 'undefined' ? window : this);

@@ -2882,40 +2882,14 @@ body.night-mode .user-menu-dropdown .dropdown-item:hover {
     background: rgba(255, 255, 255, 0.1);
 }
 
-/* PPT source buttons */
-.ppt-source-btn-group {
-    display: flex;
-    gap: 10px;
-}
-
-.ppt-source-btn {
-    flex: 1;
-    padding: 12px;
-    border: 2px solid #ddd;
-    border-radius: 8px;
-    background: white;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    color: #333;
-    transition: all 0.3s ease;
-}
-
-.ppt-source-btn.active {
-    border-color: #4a90e2;
-    background: rgba(74, 144, 226, 0.1);
-}
-
 /* PPT source buttons night mode */
 body.night-mode .ppt-source-btn {
-    background: #2d2d2d;
-    border-color: #444;
-    color: #eee;
+    background: #2d2d2d !important;
+    border-color: #444 !important;
+    color: #eee !important;
 }
 
 body.night-mode .ppt-source-btn.active {
-    background: rgba(74, 144, 226, 0.2);
-    border-color: #4a90e2;
+    background: rgba(74, 144, 226, 0.2) !important;
+    border-color: #4a90e2 !important;
 }

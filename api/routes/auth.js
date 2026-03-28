@@ -4,6 +4,7 @@ const userModel = require('../models/User');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const { verifyTokenOrPassword } = require('../utils/auth');
 
 // Multer setup for avatar
 const storage = multer.diskStorage({
@@ -101,6 +102,16 @@ router.post('/get_avatar', async (req, res) => {
         return res.json({ code: 400, message: '缺少必要参数' });
     }
     const result = await userModel.getAvatar(username);
+    res.json(result);
+});
+
+// Verify Token
+router.post('/verify', async (req, res) => {
+    const { username, token } = req.body;
+    if (!username || !token) {
+        return res.json({ code: 400, message: '缺少必要参数' });
+    }
+    const result = await verifyTokenOrPassword(userModel, { username, token });
     res.json(result);
 });
 

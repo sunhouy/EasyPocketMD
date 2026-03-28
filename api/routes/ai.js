@@ -78,36 +78,7 @@ router.post('/layout', async (req, res) => {
                     try {
                         const response = JSON.parse(data);
                         if (response.output && response.output.choices && response.output.choices.length > 0) {
-                            let aiContent = response.output.choices[0].message.content;
-
-                            // 如果是 ECharts 类型，将 AI 返回的 JSON 转换为 HTML 容器
-                            if (isECharts) {
-                                try {
-                                    // 清理可能的 markdown 代码块标记
-                                    let jsonStr = aiContent.replace(/```json\s*/g, '').replace(/```\s*$/g, '').replace(/```html\s*/g, '').trim();
-
-                                    // 验证 JSON 是否有效
-                                    const option = JSON.parse(jsonStr);
-
-                                    // 转换为 Base64
-                                    const optionJson = JSON.stringify(option);
-                                    const optionB64 = Buffer.from(optionJson).toString('base64');
-
-                                    // 检测图表类型
-                                    let chartType = 'line';
-                                    if (option.series && option.series.length > 0) {
-                                        const type = option.series[0].type;
-                                        if (type) chartType = type;
-                                    }
-
-                                    // 生成 HTML 容器
-                                    aiContent = `<div class="echarts-container" data-chart-type="echarts-${chartType}" data-chart-option-b64="${optionB64}"></div>`;
-                                } catch (e) {
-                                    console.error('Failed to parse ECharts JSON:', e);
-                                    // 如果解析失败，返回原始内容
-                                }
-                            }
-
+                            const aiContent = response.output.choices[0].message.content;
                             res.json({
                                 code: 200,
                                 data: aiContent
@@ -169,14 +140,6 @@ router.post('/formula', async (req, res) => {
             return res.status(400).json({ 
                 code: 400, 
                 message: 'Keyword is required' 
-            });
-        }
-
-        // 检查关键词长度（最多10个字）
-        if (keyword.length > 10) {
-            return res.status(400).json({
-                code: 400,
-                message: language === 'en' ? 'Keyword too long (max 10 characters)' : '关键词过长（最多10个字）'
             });
         }
 
@@ -312,23 +275,15 @@ Provide 5-10 most relevant formulas. Only return the formula list, no explanatio
     }
 });
 
-// AI Markdown Search endpoint
-router.post('/markdown', async (req, res) => {
+// AI Chart Search endpoint
+router.post('/chart', async (req, res) => {
     try {
         const { keyword, language } = req.body;
-
+        
         if (!keyword) {
-            return res.status(400).json({
-                code: 400,
-                message: 'Keyword is required'
-            });
-        }
-
-        // 检查关键词长度（最多10个字）
-        if (keyword.length > 10) {
-            return res.status(400).json({
-                code: 400,
-                message: language === 'en' ? 'Keyword too long (max 10 characters)' : '关键词过长（最多10个字）'
+            return res.status(400).json({ 
+                code: 400, 
+                message: 'Keyword is required' 
             });
         }
 
@@ -342,219 +297,47 @@ router.post('/markdown', async (req, res) => {
 
         // Construct system prompt based on language
         const isEnglish = language === 'en';
-        const systemPrompt = isEnglish
-            ? `You are a Markdown expert. Given a user's search keyword, provide relevant Markdown code examples.
-Return the results in the following format (one example per line):
-display_name | markdown_code
+        const systemPrompt = isEnglish 
+            ? `You are a Mermaid chart expert. Given a user's search keyword, generate relevant Mermaid diagram templates.
+Return the results as Mermaid code blocks. Each chart should be in its own code block.
 
-For example:
-Bold text | **bold text**
-Link | [link text](https://example.com)
-Table | | Col1 | Col2 |\\n|------|------|\\n| A | B |
-Code block | \`\`\`\\ncode\n\`\`\`
-Quote | > quote text
+Supported chart types: flowchart, sequenceDiagram, classDiagram, stateDiagram, gantt, pie, xychart-beta, erDiagram, journey, gitGraph, mindmap, timeline, C4Context, C4Container, requirementDiagram.
 
-Provide 5-10 most relevant Markdown examples. Only return the list, no explanations.`
-            : `你是Markdown专家。根据用户的搜索关键词，提供相关的Markdown代码示例。
-请按以下格式返回结果（每行一个示例）：
-显示名称 | markdown代码
+Format your response like this:
+\`\`\`mermaid
+graph TD
+    A[Start] --> B[Process]
+    B --> C[End]
+\`\`\`
 
-例如：
-粗体文字 | **粗体文字**
-链接 | [链接文字](https://example.com)
-表格 | | 列1 | 列2 |\\n|------|------|\\n| A | B |
-代码块 | \`\`\`\\n代码\n\`\`\`
-引用 | > 引用文字
+\`\`\`mermaid
+sequenceDiagram
+    A->>B: Message
+\`\`\`
 
-提供5-10个最相关的Markdown示例。只返回列表，不要解释。`;
+Provide 2-4 relevant chart templates based on the user's request. Only return the Mermaid code blocks, no explanations.`
+            : `你是Mermaid图表专家。根据用户的搜索关键词，生成相关的Mermaid图表模板。
+请返回Mermaid代码块格式的结果。每个图表应该在自己的代码块中。
+
+支持的图表类型：流程图(flowchart)、序列图(sequenceDiagram)、类图(classDiagram)、状态图(stateDiagram)、甘特图(gantt)、饼图(pie)、折线/柱状图(xychart-beta)、ER图(erDiagram)、用户旅程图(journey)、Git分支图(gitGraph)、思维导图(mindmap)、时间线图(timeline)、C4架构图(C4Context/C4Container)、需求图(requirementDiagram)。
+
+请按以下格式返回：
+\`\`\`mermaid
+graph TD
+    A[开始] --> B[处理]
+    B --> C[结束]
+\`\`\`
+
+\`\`\`mermaid
+sequenceDiagram
+    A->>B: 消息
+\`\`\`
+
+根据用户请求提供2-4个相关图表模板。只返回Mermaid代码块，不要解释。`;
 
         const userPrompt = isEnglish
-            ? `Search for Markdown code examples related to: "${keyword}"`
-            : `搜索与"${keyword}"相关的Markdown代码示例`;
-
-        // Call DashScope API
-        const requestBody = JSON.stringify({
-            model: "qwen-turbo",
-            input: {
-                messages: [
-                    {
-                        role: "system",
-                        content: systemPrompt
-                    },
-                    {
-                        role: "user",
-                        content: userPrompt
-                    }
-                ]
-            },
-            parameters: {
-                result_format: "message"
-            }
-        });
-
-        const options = {
-            hostname: 'dashscope.aliyuncs.com',
-            path: '/api/v1/services/aigc/text-generation/generation',
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${apiKey}`,
-                'Content-Length': Buffer.byteLength(requestBody)
-            }
-        };
-
-        const apiRequest = https.request(options, (apiRes) => {
-            let data = '';
-
-            apiRes.on('data', (chunk) => {
-                data += chunk;
-            });
-
-            apiRes.on('end', () => {
-                if (apiRes.statusCode >= 200 && apiRes.statusCode < 300) {
-                    try {
-                        const response = JSON.parse(data);
-                        if (response.output && response.output.choices && response.output.choices.length > 0) {
-                            const aiContent = response.output.choices[0].message.content;
-                            res.json({
-                                code: 200,
-                                data: aiContent
-                            });
-                        } else {
-                            console.error('DashScope API unexpected response:', response);
-                            res.status(500).json({
-                                code: 500,
-                                message: 'AI processing failed',
-                                error: response.message || 'Unknown error'
-                            });
-                        }
-                    } catch (e) {
-                        console.error('Failed to parse DashScope response:', e);
-                        res.status(500).json({
-                            code: 500,
-                            message: 'Failed to parse AI response'
-                        });
-                    }
-                } else {
-                    console.error(`DashScope API Error: ${apiRes.statusCode}`, data);
-                    res.status(apiRes.statusCode).json({
-                        code: apiRes.statusCode,
-                        message: 'AI API request failed',
-                        error: data
-                    });
-                }
-            });
-        });
-
-        apiRequest.on('error', (e) => {
-            console.error('DashScope Request Error:', e);
-            res.status(500).json({
-                code: 500,
-                message: 'Network error calling AI service',
-                error: e.message
-            });
-        });
-
-        apiRequest.write(requestBody);
-        apiRequest.end();
-
-    } catch (error) {
-        console.error('AI Markdown Search error:', error);
-        return res.status(500).json({
-            code: 500,
-            message: 'Internal server error',
-            error: error.message
-        });
-    }
-});
-
-// AI Chart Search endpoint
-router.post('/chart', async (req, res) => {
-    try {
-        const { keyword, description, language, chartType } = req.body;
-
-        // Support both keyword (old) and description (new natural language) parameters
-        const userInput = description || keyword;
-
-        if (!userInput) {
-            return res.status(400).json({
-                code: 400,
-                message: 'Description or keyword is required'
-            });
-        }
-
-        const apiKey = process.env.DASHSCOPE_API_KEY;
-        if (!apiKey) {
-            return res.status(500).json({
-                code: 500,
-                message: 'AI API Key is not configured on server'
-            });
-        }
-
-        // Construct system prompt based on language and chart type
-        const isEnglish = language === 'en';
-        const isECharts = chartType === 'echarts';
-
-        let systemPrompt;
-        if (isECharts) {
-            // ECharts prompt - 直接返回 JSON 配置，不要 Base64
-            systemPrompt = isEnglish
-                ? `You are an ECharts expert. Generate ECharts configuration based on user's natural language description.
-
-Rules:
-1. Generate ONLY ONE chart that best matches the user's description
-2. Return ONLY valid ECharts option JSON, no explanations, no markdown code blocks
-3. The JSON must include: title, xAxis (for cartesian charts), yAxis (for cartesian charts), and series
-4. Use meaningful labels and realistic sample data
-5. Ensure the JSON is valid and parseable
-
-Example output format (raw JSON, no backticks):
-{"title":{"text":"Sales Trend"},"xAxis":{"type":"category","data":["Jan","Feb","Mar","Apr","May","Jun"]},"yAxis":{"type":"value"},"series":[{"type":"line","data":[120,132,101,134,90,230]}]}`
-                : `你是ECharts专家。根据用户的自然语言描述生成ECharts配置。
-
-规则：
-1. 只生成一个最匹配用户描述的图表
-2. 只返回有效的ECharts option JSON，不要解释，不要用代码块包裹
-3. JSON必须包含：title、xAxis（笛卡尔坐标系图表）、yAxis（笛卡尔坐标系图表）和 series
-4. 使用中文标签和合理的示例数据
-5. 确保JSON格式正确且可解析
-
-示例输出格式（纯JSON，无反引号）：
-{"title":{"text":"销售趋势"},"xAxis":{"type":"category","data":["1月","2月","3月","4月","5月","6月"]},"yAxis":{"type":"value"},"series":[{"type":"line","data":[120,132,101,134,90,230]}]}`;
-        } else {
-            // Mermaid prompt
-            systemPrompt = isEnglish
-                ? `You are a Mermaid chart expert. Generate Mermaid diagrams based on user's natural language description.
-
-Rules:
-1. Generate ONLY ONE chart that best matches the user's description
-2. Return ONLY the Mermaid code block, no explanations
-3. Use appropriate syntax for the chart type
-4. Include meaningful labels in English
-5. Ensure the chart is valid Mermaid syntax
-
-Format:
-\`\`\`mermaid
-<chart code>
-\`\`\``
-                : `你是Mermaid图表专家。根据用户的自然语言描述生成Mermaid图表。
-
-规则：
-1. 只生成一个最匹配用户描述的图表
-2. 只返回Mermaid代码块，不要解释
-3. 使用适合该图表类型的语法
-4. 使用中文标签
-5. 确保图表是有效的Mermaid语法
-
-格式：
-\`\`\`mermaid
-<图表代码>
-\`\`\``;
-        }
-
-        const userPrompt = isEnglish
-            ? `Generate a ${isECharts ? 'ECharts' : 'Mermaid'} chart for: "${userInput}"`
-            : `生成以下描述的${isECharts ? 'ECharts' : 'Mermaid'}图表："${userInput}"`;
+            ? `Generate Mermaid chart templates for: "${keyword}"`
+            : `生成与"${keyword}"相关的Mermaid图表模板`;
 
         // Call DashScope API
         const requestBody = JSON.stringify({
@@ -645,119 +428,6 @@ Format:
     } catch (error) {
         console.error('AI Chart Search error:', error);
         return res.status(500).json({
-            code: 500,
-            message: 'Internal server error',
-            error: error.message
-        });
-    }
-});
-
-// AI Generate endpoint for AI Assistant
-router.post('/generate', async (req, res) => {
-    try {
-        const { prompt, content } = req.body;
-        
-        if (!prompt) {
-            return res.status(400).json({ 
-                code: 400, 
-                message: 'Prompt is required' 
-            });
-        }
-
-        const apiKey = process.env.DASHSCOPE_API_KEY;
-        if (!apiKey) {
-            return res.status(500).json({
-                code: 500,
-                message: 'AI API Key is not configured on server'
-            });
-        }
-
-        // Call DashScope API
-        const requestBody = JSON.stringify({
-            model: "qwen-turbo",
-            input: {
-                messages: [
-                    {
-                        role: "system",
-                        content: "你是一个专业的写作助手。请根据用户的要求生成内容，直接返回结果，不要包含任何解释、前言或后语。"
-                    },
-                    {
-                        role: "user",
-                        content: content ? prompt + "\n\n" + content : prompt
-                    }
-                ]
-            },
-            parameters: {
-                result_format: "message",
-                max_tokens: 2000
-            }
-        });
-
-        const options = {
-            hostname: 'dashscope.aliyuncs.com',
-            path: '/api/v1/services/aigc/text-generation/generation',
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${apiKey}`,
-                'Content-Type': 'application/json',
-                'Accept': 'application/json'
-            }
-        };
-
-        const aiReq = https.request(options, (aiRes) => {
-            let data = '';
-            
-            aiRes.on('data', (chunk) => {
-                data += chunk;
-            });
-            
-            aiRes.on('end', () => {
-                try {
-                    const response = JSON.parse(data);
-                    
-                    if (response.output && response.output.choices && response.output.choices[0]) {
-                        const generatedContent = response.output.choices[0].message.content;
-                        res.json({
-                            code: 200,
-                            message: 'success',
-                            data: generatedContent
-                        });
-                    } else if (response.code) {
-                        // API returned an error
-                        res.status(500).json({
-                            code: 500,
-                            message: response.message || 'AI service error'
-                        });
-                    } else {
-                        res.status(500).json({
-                            code: 500,
-                            message: 'Unexpected response from AI service'
-                        });
-                    }
-                } catch (parseError) {
-                    console.error('Error parsing AI response:', parseError);
-                    res.status(500).json({
-                        code: 500,
-                        message: 'Failed to parse AI response'
-                    });
-                }
-            });
-        });
-
-        aiReq.on('error', (error) => {
-            console.error('Error calling AI API:', error);
-            res.status(500).json({
-                code: 500,
-                message: 'Failed to call AI service'
-            });
-        });
-
-        aiReq.write(requestBody);
-        aiReq.end();
-
-    } catch (error) {
-        console.error('Error in AI generate:', error);
-        res.status(500).json({
             code: 500,
             message: 'Internal server error',
             error: error.message
