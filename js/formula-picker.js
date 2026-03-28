@@ -496,7 +496,7 @@ function showFormulaPicker() {
     const bottomBar = document.createElement('div');
     bottomBar.style.cssText = `
         display: flex;
-        justify-content: space-between;
+        justify-content: center;
         margin-top: 15px;
         padding-top: 15px;
         border-top: 1px solid ${(window.nightMode === true) ? '#444' : '#eee'};
@@ -508,18 +508,6 @@ function showFormulaPicker() {
         padding: 10px 20px;
         background: #4a90e2;
         color: white;
-        border: none;
-        border-radius: 6px;
-        cursor: pointer;
-        font-size: 14px;
-    `;
-
-    const cancelBtn = document.createElement('button');
-    cancelBtn.textContent = isEn() ? 'Cancel' : '取消';
-    cancelBtn.style.cssText = `
-        padding: 10px 20px;
-        background: ${(window.nightMode === true) ? '#444' : '#f5f5f5'};
-        color: ${(window.nightMode === true) ? '#eee' : '#333'};
         border: none;
         border-radius: 6px;
         cursor: pointer;
@@ -563,8 +551,41 @@ function showFormulaPicker() {
     buttonGroup.appendChild(wrapInDoubleDollarBtn);
 
     bottomBar.appendChild(buttonGroup);
-    bottomBar.appendChild(cancelBtn);
     formulaContainer.appendChild(bottomBar);
+
+    // 右上角关闭按钮
+    const closeBtn = document.createElement('button');
+    closeBtn.innerHTML = '<i class="fas fa-times"></i>';
+    closeBtn.style.cssText = `
+        position: absolute;
+        top: 15px;
+        right: 15px;
+        width: 32px;
+        height: 32px;
+        background: ${(window.nightMode === true) ? '#444' : '#f5f5f5'};
+        color: ${(window.nightMode === true) ? '#eee' : '#666'};
+        border: none;
+        border-radius: 50%;
+        cursor: pointer;
+        font-size: 16px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s;
+    `;
+    closeBtn.onmouseenter = function() {
+        this.style.background = '#dc3545';
+        this.style.color = 'white';
+    };
+    closeBtn.onmouseleave = function() {
+        this.style.background = (window.nightMode === true) ? '#444' : '#f5f5f5';
+        this.style.color = (window.nightMode === true) ? '#eee' : '#666';
+    };
+    closeBtn.onclick = closeFormulaPicker;
+    formulaContainer.appendChild(closeBtn);
+
+    // 设置容器为相对定位，以便关闭按钮绝对定位
+    formulaContainer.style.position = 'relative';
 
     formulaSheet.appendChild(formulaContainer);
     document.body.appendChild(formulaSheet);
@@ -821,9 +842,6 @@ function showFormulaPicker() {
             showMessage(isEn() ? 'Please select a formula first' : '请先选择一个公式', 'error');
         }
     });
-
-    // 取消按钮点击事件
-    cancelBtn.addEventListener('click', closeFormulaPicker);
 
     // 点击模态框外部关闭
     formulaSheet.addEventListener('click', (e) => {

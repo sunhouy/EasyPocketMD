@@ -1,12 +1,18 @@
 const fs = require('fs');
 const path = require('path');
-const SensitiveWordFilter = require('sensitive-word-filter');
+const sensitiveWordFilter = require('sensitive-word-filter');
 
 // 敏感词文件路径
 const SENSITIVE_WORDS_PATH = '/www/wwwroot/static/sensitive.txt';
 
-// 创建过滤器实例
-const filter = new SensitiveWordFilter();
+// 使用库导出的 filter 函数
+const filter = {
+  addWords: function(words) {
+    // 该库不支持动态添加词，词库在模块加载时已固定
+    // 这里仅作为兼容接口
+  },
+  filter: sensitiveWordFilter.filter
+};
 
 // 是否已经加载过词库
 let isLoaded = false;
