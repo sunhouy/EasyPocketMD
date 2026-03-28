@@ -490,8 +490,19 @@ ${page.content.map((c, i) => '要点' + (i + 1) + '：' + c).join('\n')}
             
             // 水平排列的缩略图
             var bgStyle = isActive ? 'background:#4a90e2 !important;color:white !important;' : 'background:rgba(255,255,255,0.1);color:white;';
-            html += '<div class="ppt-editor-thumb" data-index="' + i + '" data-active="' + isActive + '" style="flex-shrink:0;width:120px;padding:10px;border-radius:6px;cursor:pointer;transition:all 0.2s;' + bgStyle + '">';
-            html += '<div style="font-size:12px;font-weight:bold;">第' + page.number + '页</div>';
+            html += '<div class="ppt-editor-thumb" data-index="' + i + '" data-active="' + isActive + '" style="flex-shrink:0;width:140px;padding:10px;border-radius:6px;cursor:pointer;transition:all 0.2s;position:relative;' + bgStyle + '">';
+            
+            // 删除按钮
+            html += '<button class="ppt-delete-page-btn" data-delete-index="' + i + '" style="position:absolute;top:2px;right:2px;width:20px;height:20px;border:none;border-radius:50%;background:rgba(231,76,60,0.8);color:white;font-size:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10;opacity:0;transition:opacity 0.2s;">';
+            html += '<i class="fas fa-times"></i>';
+            html += '</button>';
+            
+            // 在当前页后插入新页的按钮
+            html += '<button class="ppt-insert-page-btn" data-insert-index="' + i + '" style="position:absolute;top:2px;right:24px;width:20px;height:20px;border:none;border-radius:50%;background:rgba(52,152,219,0.8);color:white;font-size:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10;opacity:0;transition:opacity 0.2s;" title="在此页后插入">';
+            html += '<i class="fas fa-plus"></i>';
+            html += '</button>';
+            
+            html += '<div style="font-size:12px;font-weight:bold;padding-right:40px;">第' + page.number + '页</div>';
             html += '<div style="font-size:11px;opacity:0.8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:4px;">' + escapeHtml(page.title) + '</div>';
             html += '<div style="font-size:10px;margin-top:6px;">';
             html += isGenerated ? '<i class="fas fa-check-circle" style="color:' + (isActive ? 'white' : '#27ae60') + ';"></i> <span style="opacity:0.8;">已生成</span>' : '<i class="fas fa-clock" style="color:#999;"></i> <span style="opacity:0.6;">待生成</span>';
@@ -501,10 +512,130 @@ ${page.content.map((c, i) => '要点' + (i + 1) + '：' + c).join('\n')}
         
         container.innerHTML = html;
         
+        // 页面点击事件
         container.querySelectorAll('.ppt-editor-thumb').forEach(function(thumb) {
-            thumb.addEventListener('click', function() {
+            thumb.addEventListener('click', function(e) {
+                // 如果点击的是按钮，不触发页面选择
+                if (e.target.closest('.ppt-delete-page-btn') || e.target.closest('.ppt-insert-page-btn')) {
+                    return;
+                }
                 selectPage(parseInt(this.getAttribute('data-index')));
             });
+            
+            // 鼠标悬停显示按钮
+            thumb.addEventListener('mouseenter', function() {
+                var deleteBtn = this.querySelector('.ppt-delete-page-btn');
+                var insertBtn = this.querySelector('.ppt-insert-page-btn');
+                if (deleteBtn) deleteBtn.style.opacity = '1';
+                if (insertBtn) insertBtn.style.opacity = '1';
+            });
+            
+            thumb.addEventListener('mouseleave', function() {
+                var deleteBtn = this.querySelector('.ppt-delete-page-btn');
+                var insertBtn = this.querySelector('.ppt-insert-page-btn');
+                if (deleteBtn) deleteBtn.style.opacity = '0';
+                if (insertBtn) insertBtn.style.opacity = '0';
+            });
+        });
+        
+        // 删除按钮事件
+        container.querySelectorAll('.ppt-delete-page-btn').forEach(function(btn) {
+            btn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                var index = parseInt(this.getAttribute('data-delete-index'));
+                deletePage(index);
+            });
+        });
+        
+        // 插入按钮事件
+        container.querySelectorAll('.ppt-insert-page-btn').forEach(function(btn) {
+            btn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                var index = parseInt(this.getAttribute('data-insert-index'));
+                insertPageAfter(index);
+            });
+        });
+    }
+    
+    // 删除页面
+    function deletePage(index) {
+        if (pptState.outline.length <= 1) {
+            if (global.showMessage) {
+                global.showMessage('至少需要保留一页', 'error');
+            }
+            return;
+        }
+        
+        showCustomConfirm(
+            '确定要删除第' + (index + 1) + '页吗？',
+            function() {
+                pptState.outline.splice(index, 1);
+                pptState.pages.splice(index, 1);
+                
+                // 重新编号
+                for (var i = 0; i < pptState.outline.length; i++) {
+                    pptState.outline[i].number = i + 1;
+                }
+                
+                // 调整当前页
+                if (pptState.currentPage >= pptState.outline.length) {
+                    pptState.currentPage = pptState.outline.length - 1;
+                }
+                
+                renderEditorPagesList();
+                renderEditorPreview(pptState.currentPage);
+                updateEditorPageNum();
+                saveDraft();
+                
+                if (global.showMessage) {
+                    global.showMessage('页面已删除', 'success');
+                }
+            }
+        );
+    }
+    
+    // 在指定位置后插入新页面
+    async function insertPageAfter(index) {
+        showCustomPrompt('输入新页面标题：', '', async function(title) {
+            if (!title) return;
+            
+            var insertIndex = index + 1;
+            
+            // 插入到大纲数组
+            pptState.outline.splice(insertIndex, 0, {
+                number: insertIndex + 1,
+                title: title,
+                content: []
+            });
+            pptState.pages.splice(insertIndex, 0, null);
+            
+            // 重新编号
+            for (var i = 0; i < pptState.outline.length; i++) {
+                pptState.outline[i].number = i + 1;
+            }
+            
+            renderEditorPagesList();
+            selectPage(insertIndex);
+            saveDraft();
+            
+            // 自动生成新页面内容
+            showEditorLoading(true);
+            try {
+                await generatePage(insertIndex);
+                renderEditorPagesList();
+                renderEditorPreview(insertIndex);
+                saveDraft();
+                if (global.showMessage) {
+                    global.showMessage('新页面已生成', 'success');
+                }
+            } catch (e) {
+                console.error('生成页面失败', e);
+                if (global.showMessage) {
+                    global.showMessage('页面生成失败', 'error');
+                }
+            } finally {
+                showEditorLoading(false);
+            }
         });
     }
 
@@ -611,20 +742,42 @@ ${page.content.map((c, i) => '要点' + (i + 1) + '：' + c).join('\n')}
         }
     }
 
-    // 添加新页面
-    function addNewPage() {
-        showCustomPrompt('输入页面标题：', '', function(title) {
-            if (title) {
-                var newPageNum = pptState.outline.length + 1;
-                pptState.outline.push({
-                    number: newPageNum,
-                    title: title,
-                    content: []
-                });
-                pptState.pages.push(null);
+    // 添加新页面（在末尾添加并自动生成）
+    async function addNewPage() {
+        showCustomPrompt('输入页面标题：', '', async function(title) {
+            if (!title) return;
+            
+            var newPageNum = pptState.outline.length + 1;
+            var newIndex = pptState.outline.length;
+            
+            pptState.outline.push({
+                number: newPageNum,
+                title: title,
+                content: []
+            });
+            pptState.pages.push(null);
+            
+            renderEditorPagesList();
+            selectPage(newIndex);
+            saveDraft();
+            
+            // 自动生成新页面内容
+            showEditorLoading(true);
+            try {
+                await generatePage(newIndex);
                 renderEditorPagesList();
-                selectPage(pptState.outline.length - 1);
+                renderEditorPreview(newIndex);
                 saveDraft();
+                if (global.showMessage) {
+                    global.showMessage('新页面已生成', 'success');
+                }
+            } catch (e) {
+                console.error('生成页面失败', e);
+                if (global.showMessage) {
+                    global.showMessage('页面生成失败', 'error');
+                }
+            } finally {
+                showEditorLoading(false);
             }
         });
     }

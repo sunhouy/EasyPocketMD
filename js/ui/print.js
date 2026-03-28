@@ -2068,9 +2068,19 @@ async function downloadInCapacitor(data, filename, mimeType, isRawData = false) 
         var textColor = nightMode ? '#eee' : '#333';
         var borderColor = nightMode ? '#444' : '#ddd';
         var modalContent = document.createElement('div');
-        modalContent.style.cssText = 'background:' + bg + ';color:' + textColor + ';border-radius:12px;padding:25px;width:90%;max-width:600px;max-height:85vh;overflow-y:auto;';
+        modalContent.style.cssText = 'background:' + bg + ';color:' + textColor + ';border-radius:12px;padding:25px;width:90%;max-width:600px;max-height:85vh;overflow-y:auto;position:relative;';
 
-        var title = '<h2 style="text-align:center;margin-bottom:20px;">' + (isEn() ? 'File Upload Print' : '文件上传打印') + '</h2>';
+        // 右上角关闭按钮
+        var closeBtn = document.createElement('button');
+        closeBtn.innerHTML = '<i class="fas fa-times"></i>';
+        closeBtn.style.cssText = 'position:absolute;top:15px;right:15px;background:none;border:none;color:' + textColor + ';font-size:20px;cursor:pointer;';
+        closeBtn.onclick = function() {
+            cleanup();
+            printModal.remove();
+        };
+        modalContent.appendChild(closeBtn);
+
+        var title = '<h2 style="text-align:center;margin-bottom:20px;margin-top:0;">' + (isEn() ? 'File Upload Print' : '文件上传打印') + '</h2>';
 
         // 客户端连接状态区域
         var statusSection = `
@@ -2103,7 +2113,6 @@ async function downloadInCapacitor(data, filename, mimeType, isRawData = false) 
         var actionButtons = `
             <div style="display:flex;gap:10px;margin-top:20px;">
                 <button id="filePrintBtn" style="flex:1;padding:12px;font-weight:bold;background:#2196F3;color:white;border:none;border-radius:6px;cursor:pointer;">${isEn() ? 'Print File' : '打印文件'}</button>
-                <button id="filePrintCancelBtn" style="flex:1;padding:12px;background:` + (nightMode ? '#555' : '#9E9E9E') + `;color:white;border:none;border-radius:6px;cursor:pointer;">${isEn() ? 'Cancel' : '取消'}</button>
             </div>
         `;
 
@@ -2209,18 +2218,6 @@ async function downloadInCapacitor(data, filename, mimeType, isRawData = false) 
         };
 
         // 关闭模态框时关闭WebSocket连接
-        var cancelBtn = modalContent.querySelector('#filePrintCancelBtn');
-        if (cancelBtn) {
-            var originalOnClick = cancelBtn.onclick;
-            cancelBtn.onclick = function() {
-                cleanup();
-                if (originalOnClick) {
-                    originalOnClick();
-                } else {
-                    printModal.remove();
-                }
-            };
-        }
 
         // 打印按钮也需要关闭连接
         var printBtn = modalContent.querySelector('#filePrintBtn');
@@ -2355,15 +2352,6 @@ async function downloadInCapacitor(data, filename, mimeType, isRawData = false) 
                     btn.textContent = isEn() ? 'Print File' : '打印文件';
                 }
             }, 500);
-        }
-
-        // 取消按钮事件
-        var filePrintCancelBtn = modalContent.querySelector('#filePrintCancelBtn');
-        if (filePrintCancelBtn) {
-            // 移除水波纹效果
-            filePrintCancelBtn.onclick = function() {
-                printModal.remove();
-            };
         }
 
         printModal.addEventListener('click', function(e) {
