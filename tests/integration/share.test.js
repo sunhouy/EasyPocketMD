@@ -21,7 +21,15 @@ describe('Share API Integration', () => {
 
     describe('POST /api/share/create', () => {
         it('should create share and return 200', async () => {
-            const mockConnection = {
+            // First call for getFileContentForShare (sensitive word check)
+            const mockConnection1 = {
+                execute: jest.fn()
+                    .mockResolvedValueOnce([[{ id: 1, password: 'hashed' }]]) // User
+                    .mockResolvedValueOnce([[{ id: 101, content: 'test content' }]]), // File content
+                release: jest.fn()
+            };
+            // Second call for createShare
+            const mockConnection2 = {
                 execute: jest.fn()
                     .mockResolvedValueOnce([[{ id: 1, password: 'hashed' }]]) // User
                     .mockResolvedValueOnce([[{ id: 101 }]]) // File
@@ -29,7 +37,9 @@ describe('Share API Integration', () => {
                     .mockResolvedValueOnce([{ affectedRows: 1 }]), // Insert
                 release: jest.fn()
             };
-            db.getConnection.mockResolvedValueOnce(mockConnection);
+            db.getConnection
+                .mockResolvedValueOnce(mockConnection1)
+                .mockResolvedValueOnce(mockConnection2);
             bcrypt.compare.mockResolvedValue(true);
 
             const res = await request(app)
