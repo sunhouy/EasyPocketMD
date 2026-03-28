@@ -63,7 +63,7 @@ function exportContent() {
         { name: isEn() ? 'Markdown File (.md)' : 'Markdown文件 (.md)', ext: 'md', icon: '<i class="fas fa-file-code"></i>' },
         { name: isEn() ? 'Plain Text File (.txt)' : '纯文本文件 (.txt)', ext: 'txt', icon: '<i class="fas fa-file-alt"></i>' },
         { name: isEn() ? 'HTML File (.html)' : 'HTML文件 (.html)', ext: 'html', icon: '<i class="fab fa-html5"></i>' },
-        { name: isEn() ? 'Word File (.docx)' : 'Word文档 (.docx)', ext: 'docx', icon: '<i class="fas fa-file-word"></i>' },
+        { name: isEn() ? 'Word File (.doc)' : 'Word文档 (.doc)', ext: 'docx', icon: '<i class="fas fa-file-word"></i>' },
         { name: isEn() ? 'PDF File (.pdf)' : 'PDF文件 (.pdf)', ext: 'pdf', icon: '<i class="fas fa-file-pdf"></i>' }
     ];
 
@@ -277,11 +277,22 @@ async function exportFile(content, ext) {
 
     // DOCX 导出逻辑
     if (ext === 'docx') {
-        // 懒加载 DOCX 生成器
-        if (typeof global.exportDOCX !== 'function') {
-            await import('./docx-generator.js');
+        // 显示打印设置对话框，让用户配置导出选项
+        if (global.showPrintDialog) {
+            global.showPrintDialog('export-docx', async function(settings) {
+                // 懒加载 DOCX 生成器
+                if (typeof global.exportDOCX !== 'function') {
+                    await import('./docx-generator.js');
+                }
+                await global.exportDOCX(content, settings);
+            });
+        } else {
+            // 如果没有打印对话框，直接使用默认设置
+            if (typeof global.exportDOCX !== 'function') {
+                await import('./docx-generator.js');
+            }
+            await global.exportDOCX(content);
         }
-        await global.exportDOCX(content);
         return;
     }
 

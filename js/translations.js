@@ -47,7 +47,7 @@
 
             // 差异对比
             diffTitle: '文件差异对比',
-            diffInfo: '左侧为本地版本，右侧为服务器版本。绿色表示新增，红色表示删除。',
+            diffInfo: '绿色表示新增，红色表示删除。',
 
             // 历史版本
             historyTitle: '历史版本',
@@ -403,7 +403,6 @@
             pptFromOutline: '输入大纲生成',
             pptRatio: 'PPT比例',
             aiResult: '生成结果',
-            copy: '复制',
             regenerate: '重新生成',
             insertToEditor: '插入到编辑器',
             generate: '生成',
@@ -638,7 +637,6 @@
             usedSpace: 'Used Space',
             totalFiles: '{count} files total',
             noFiles: 'No files',
-            copy: 'Copy',
             delete: 'Delete',
             linkCopied: 'Link copied',
             confirmDeleteFile: 'Are you sure you want to delete {name}?',

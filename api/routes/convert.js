@@ -211,4 +211,125 @@ router.post('/pdf', (req, res) => {
     }
 });
 
+// Word (DOCX) Conversion endpoint
+router.post('/docx', (req, res) => {
+    try {
+        let { markdown, settings } = req.body;
+        
+        if (!markdown) {
+            return res.status(400).json({ 
+                code: 400, 
+                message: 'Markdown content is required' 
+            });
+        }
+        
+        // Render markdown to HTML
+        let html = md.render(markdown);
+        
+        // Clean up MathJax-related content
+        html = cleanMathJaxContent(html);
+        
+        // Get settings with defaults
+        const margin = settings?.pageMargin || '25';
+        const bodyFontSize = settings?.bodyFontSize || '12';
+        const lineHeight = settings?.lineHeight || '1.5';
+        const titleFontSize = settings?.titleFontSize || '18';
+        
+        // Build Word-readable HTML MIME format
+        const wordHtml = `<html xmlns:o="urn:schemas-microsoft-com:office:office" 
+      xmlns:w="urn:schemas-microsoft-com:office:word" 
+      xmlns="http://www.w3.org/TR/REC-html40">
+<head>
+    <meta charset="utf-8">
+    <title>Document</title>
+    <!--[if gte mso 9]>
+    <xml>
+        <w:WordDocument>
+            <w:View>Print</w:View>
+            <w:Zoom>100</w:Zoom>
+            <w:DoNotOptimizeForBrowser/>
+        </w:WordDocument>
+    </xml>
+    <![endif]-->
+    <style>
+        <!--
+        @page {
+            size: 21cm 29.7cm;
+            margin: ${margin}mm;
+        }
+        @page Section1 {
+            margin: ${margin}mm;
+        }
+        div.Section1 {
+            page: Section1;
+        }
+        body {
+            font-family: "SimSun", "宋体", serif;
+            font-size: ${bodyFontSize}pt;
+            line-height: ${lineHeight};
+        }
+        h1, h2, h3, h4, h5, h6 {
+            font-weight: bold;
+            margin: 1em 0;
+        }
+        h1 { font-size: ${parseInt(bodyFontSize) * 2}pt; }
+        h2 { font-size: ${parseInt(bodyFontSize) * 1.5}pt; }
+        h3 { font-size: ${parseInt(bodyFontSize) * 1.25}pt; }
+        p {
+            margin: 0 0 0.5em 0;
+        }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+        }
+        td, th {
+            border: 1px solid #000;
+            padding: 8px;
+        }
+        th {
+            background-color: #f8f9fa;
+            font-weight: bold;
+        }
+        code {
+            background: #f5f5f5;
+            padding: 2px 4px;
+            font-family: monospace;
+        }
+        pre {
+            background: #f5f5f5;
+            padding: 10px;
+            overflow-x: auto;
+        }
+        -->
+    </style>
+</head>
+<body>
+    <div class="Section1">
+        ${html}
+    </div>
+</body>
+</html>`;
+
+        // Generate filename
+        const filename = `document_${new Date().toISOString().slice(0, 10)}.doc`;
+        
+        // Set headers for file download
+        res.setHeader('Content-Type', 'application/msword');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        
+        // Send the Word HTML with BOM for UTF-8
+        const bom = Buffer.from([0xEF, 0xBB, 0xBF]);
+        const content = Buffer.from(wordHtml, 'utf8');
+        res.send(Buffer.concat([bom, content]));
+
+    } catch (error) {
+        console.error('DOCX conversion endpoint error:', error);
+        return res.status(500).json({
+            code: 500,
+            message: 'Server error during DOCX conversion',
+            error: error.message
+        });
+    }
+});
+
 module.exports = router;

@@ -190,7 +190,8 @@
                         ...f,
                         name: name,
                         type: type,
-                        content: content
+                        content: content,
+                        lastModified: f.last_modified || f.lastModified || Date.now()
                     };
                 });
 
@@ -1950,7 +1951,7 @@
             return pendingServerSync[file.id] || !file.isSynced || currentContent !== lastSyncedContent[file.id];
         });
         if (filesToSync.length === 0) return;
-        global.showSyncStatus(isEn() ? 'Syncing ' + filesToSync.length + ' files...' : '正在同步 ' + filesToSync.length + ' 个文件...');
+        global.showSyncStatus(isEn() ? 'Syncing ' + filesToSync.length + ' files...' : '正在同步...');
         try {
             for (var i = 0; i < filesToSync.length; i++) await global.syncFileToServer(filesToSync[i].id);
             global.showSyncStatus(isEn() ? 'All files synced' : '所有文件同步完成', 'success');
@@ -2071,7 +2072,7 @@
         // 更新标签文本
         if (localVersionLabel) localVersionLabel.textContent = (isEn() ? 'History Version ' : '历史版本 ') + versionId;
         if (serverVersionLabel) serverVersionLabel.textContent = isEn() ? 'Current Version' : '当前版本';
-        if (diffInfo) diffInfo.textContent = isEn() ? 'Left: History version, Right: Current version. Green: Added, Red: Deleted.' : '左侧为历史版本，右侧为当前版本。绿色表示新增，红色表示删除。';
+        if (diffInfo) diffInfo.textContent = isEn() ? 'Green: Added, Red: Deleted.' : '左侧为历史版本，右侧为当前版本。绿色表示新增，红色表示删除。';
         
         // 计算并渲染差异（历史版本 vs 当前版本）
         const diffResult = computeDiff(content || '', currentContent || '');

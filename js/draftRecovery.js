@@ -112,9 +112,12 @@
             const draft = JSON.parse(draftJson);
             if (!draft || !draft.fileId || !draft.content) return false;
 
-            // 检查草稿是否比当前文件更新
+            // 检查草稿是否比当前文件更新（先通过ID匹配，再通过文件名匹配）
             const files = global.files || [];
-            const currentFile = files.find(f => f.id === draft.fileId);
+            let currentFile = files.find(f => f.id === draft.fileId);
+            if (!currentFile && draft.fileName) {
+                currentFile = files.find(f => f.name === draft.fileName);
+            }
 
             if (!currentFile) {
                 // 文件可能被删除了，但草稿还在，仍然可以恢复
@@ -212,9 +215,12 @@
 
             // 如果没有云端版本（文件可能被删除或未同步过）
             if (cloudModified === null) {
-                // 检查本地文件是否存在
+                // 检查本地文件是否存在（先通过ID匹配，再通过文件名匹配）
                 const files = global.files || [];
-                const currentFile = files.find(f => f.id === draft.fileId);
+                let currentFile = files.find(f => f.id === draft.fileId);
+                if (!currentFile && draft.fileName) {
+                    currentFile = files.find(f => f.name === draft.fileName);
+                }
                 if (!currentFile) {
                     // 文件被删除了，但草稿还在，可以恢复
                     return { hasDraft: true, draftInfo, cloudModified: null, shouldAutoRecover: true, hasConflict: false };
@@ -226,20 +232,41 @@
 
             // 比较草稿时间和云端时间
             const draftTime = draft.timestamp;
-            const timeDiff = draftTime - cloudModified;
             const CONFLICT_THRESHOLD = 5000; // 5秒内视为可能冲突
 
-            // 如果云端版本更新
+            // 如果云端版本更新（草稿比云端旧）
             if (cloudModified > draftTime) {
                 return { hasDraft: true, draftInfo, cloudModified, shouldAutoRecover: false, hasConflict: true };
             }
 
-            // 如果草稿版本更新（且差距超过阈值，避免微小时间差导致的误判）
-            if (draftTime > cloudModified + CONFLICT_THRESHOLD) {
+            // 如果草稿版本更新（草稿比云端新）
+            if (draftTime > cloudModified) {
+                // 检查内容是否真正不同（先通过ID匹配，再通过文件名匹配）
+                const files = global.files || [];
+                let currentFile = files.find(f => f.id === draft.fileId);
+                if (!currentFile && draft.fileName) {
+                    currentFile = files.find(f => f.name === draft.fileName);
+                }
+                if (currentFile && currentFile.content === draft.content) {
+                    // 内容相同，无需恢复
+                    return { hasDraft: true, draftInfo, cloudModified, shouldAutoRecover: false, hasConflict: false };
+                }
+                // 草稿更新且内容不同，自动恢复
                 return { hasDraft: true, draftInfo, cloudModified, shouldAutoRecover: true, hasConflict: false };
             }
 
-            // 时间相近，视为无冲突，使用云端版本（清除草稿）
+            // 时间完全相同，检查内容是否不同（先通过ID匹配，再通过文件名匹配）
+            const files = global.files || [];
+            let currentFile = files.find(f => f.id === draft.fileId);
+            if (!currentFile && draft.fileName) {
+                currentFile = files.find(f => f.name === draft.fileName);
+            }
+            if (currentFile && currentFile.content !== draft.content) {
+                // 时间相同但内容不同，可能是并发修改，显示冲突
+                return { hasDraft: true, draftInfo, cloudModified, shouldAutoRecover: false, hasConflict: true };
+            }
+
+            // 时间和内容都相同，无需恢复
             return { hasDraft: true, draftInfo, cloudModified, shouldAutoRecover: false, hasConflict: false };
         } catch (e) {
             console.error('[Draft] Failed to check draft recovery status:', e);
@@ -259,7 +286,12 @@
             if (!draft || !draft.fileId || !draft.content) return null;
 
             const files = global.files || [];
-            const fileIndex = files.findIndex(f => f.id === draft.fileId);
+            let fileIndex = files.findIndex(f => f.id === draft.fileId);
+            
+            // 如果通过ID找不到，尝试通过文件名匹配
+            if (fileIndex === -1 && draft.fileName) {
+                fileIndex = files.findIndex(f => f.name === draft.fileName);
+            }
 
             if (fileIndex === -1) {
                 // 文件不存在，需要重新创建
@@ -274,8 +306,10 @@
             files[fileIndex].lastModified = draft.timestamp;
             localStorage.setItem('vditor_files', JSON.stringify(files));
 
-            // 如果当前打开的就是这个文件，更新编辑器内容
-            if (global.currentFileId === draft.fileId && global.vditor) {
+            // 如果当前打开的就是这个文件（或通过文件名匹配），更新编辑器内容
+            const isCurrentFile = global.currentFileId === draft.fileId || 
+                                  (draft.fileName && files[fileIndex].name === draft.fileName);
+            if (isCurrentFile && global.vditor) {
                 global.vditor.setValue(draft.content);
             }
 

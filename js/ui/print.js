@@ -277,6 +277,7 @@ async function downloadInCapacitor(data, filename, mimeType, isRawData = false) 
         var dialogTitle = isEn() ? 'Cloud Print Settings' : '云打印设置';
         if (mode === 'export-pdf') dialogTitle = isEn() ? 'Export PDF Settings' : '导出 PDF 设置';
         if (mode === 'export-html') dialogTitle = isEn() ? 'Export HTML Settings' : '导出 HTML 设置';
+        if (mode === 'export-docx') dialogTitle = isEn() ? 'Export Word Settings' : '导出 Word 设置';
         
         var title = '<h2 style="text-align:center;margin-bottom:20px;margin-top:0;">' + dialogTitle + '</h2>';
 
@@ -481,6 +482,13 @@ async function downloadInCapacitor(data, filename, mimeType, isRawData = false) 
                 <div style="display:flex;gap:10px;margin-top:20px;">
                     <button id="localConvertBtn" style="flex:1;padding:12px;font-weight:bold;background:#FF9800;color:white;border:none;border-radius:6px;cursor:pointer;">${isEn() ? 'Local Convert (Experimental)' : '本地转换（不支持公式）'}</button>
                     <button id="serverConvertBtn" style="flex:1;padding:12px;font-weight:bold;background:#2196F3;color:white;border:none;border-radius:6px;cursor:pointer;">${isEn() ? 'Server Convert' : '后端转换'}</button>
+                </div>
+            `;
+        } else if (mode === 'export-docx') {
+            var actionName = isEn() ? 'Export Word' : '导出 Word';
+            actionButtons = `
+                <div style="display:flex;gap:10px;margin-top:20px;">
+                    <button id="confirmExportBtn" style="flex:1;padding:12px;font-weight:bold;background:#2196F3;color:white;border:none;border-radius:6px;cursor:pointer;">${actionName}</button>
                 </div>
             `;
         } else {
