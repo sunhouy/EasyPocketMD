@@ -27,6 +27,7 @@ import './js/ui/dialog.js';
 import './js/ui/common.js';
 import './js/ui/render.js';
 import './js/ui/chart.js';
+import './js/ui/echarts-loader.js';
 import './js/ui/export.js';
 import './js/ui/upload.js';
 import './js/ui/share.js';

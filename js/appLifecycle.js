@@ -53,7 +53,7 @@
                 global.syncCurrentFileWithBeacon();
             }
 
-            console.log('[Lifecycle] Emergency save completed');
+            // console.log('[Lifecycle] Emergency save completed');
             return true;
         } catch (e) {
             console.error('[Lifecycle] Emergency save failed:', e);
@@ -139,7 +139,7 @@
             }
         });
 
-        console.log('[Lifecycle] Web lifecycle handlers initialized');
+        // console.log('[Lifecycle] Web lifecycle handlers initialized');
     }
 
     /**
@@ -157,18 +157,18 @@
             App.addListener('appStateChange', function(state) {
                 if (!state.isActive) {
                     // 应用进入后台
-                    console.log('[Lifecycle] App going to background');
+                    // console.log('[Lifecycle] App going to background');
                     emergencySave();
                 } else {
                     // 应用回到前台
-                    console.log('[Lifecycle] App coming to foreground');
+                    // console.log('[Lifecycle] App coming to foreground');
                     checkAndOfferDraftRecovery();
                 }
             });
 
             // 应用即将被终止
             App.addListener('pause', function() {
-                console.log('[Lifecycle] App pausing');
+                // console.log('[Lifecycle] App pausing');
                 emergencySave();
             });
 
@@ -189,7 +189,7 @@
                 }
             });
 
-            console.log('[Lifecycle] Capacitor lifecycle handlers initialized');
+            // console.log('[Lifecycle] Capacitor lifecycle handlers initialized');
         } catch (e) {
             console.warn('[Lifecycle] Failed to initialize Capacitor lifecycle:', e);
         }
@@ -205,18 +205,18 @@
         if (global.electron.ipcRenderer) {
             // 主进程请求关闭窗口
             global.electron.ipcRenderer.on('app-before-close', function() {
-                console.log('[Lifecycle] Electron app before close');
+                // console.log('[Lifecycle] Electron app before close');
                 emergencySave();
             });
 
             // 窗口即将关闭
             global.electron.ipcRenderer.on('window-before-close', function() {
-                console.log('[Lifecycle] Electron window before close');
+                // console.log('[Lifecycle] Electron window before close');
                 emergencySave();
             });
         }
 
-        console.log('[Lifecycle] Electron lifecycle handlers initialized');
+        // console.log('[Lifecycle] Electron lifecycle handlers initialized');
     }
 
     /**
@@ -239,15 +239,15 @@
 
                     if (status.shouldAutoRecover) {
                         // 草稿版本更新，直接自动恢复
-                        console.log('[Lifecycle] Draft is newer than cloud version, auto-recovering...');
+                        // console.log('[Lifecycle] Draft is newer than cloud version, auto-recovering...');
                         performDraftRecovery();
                     } else if (status.hasConflict) {
                         // 云端版本更新，显示冲突提示
-                        console.log('[Lifecycle] Cloud version is newer, showing conflict dialog...');
+                        // console.log('[Lifecycle] Cloud version is newer, showing conflict dialog...');
                         showDraftConflictDialog(status.draftInfo, status.cloudModified);
                     } else {
                         // 时间相近或云端更新，清除草稿，使用云端版本
-                        console.log('[Lifecycle] Cloud version is up-to-date, clearing draft...');
+                        // console.log('[Lifecycle] Cloud version is up-to-date, clearing draft...');
                         global.draftRecovery.clearDraft();
                     }
                 } catch (e) {
@@ -442,7 +442,7 @@
         if (isInitialized) return;
 
         const env = detectEnvironment();
-        console.log('[Lifecycle] Environment detected:', env);
+        // console.log('[Lifecycle] Environment detected:', env);
 
         // 初始化草稿恢复模块
         if (global.draftRecovery) {
@@ -464,7 +464,7 @@
         checkAndOfferDraftRecovery();
 
         isInitialized = true;
-        console.log('[Lifecycle] Lifecycle management initialized');
+        // console.log('[Lifecycle] Lifecycle management initialized');
     }
 
     // 导出公共 API

@@ -5,8 +5,22 @@
     function g(name) { return global[name]; }
     function isEn() { return window.i18n && window.i18n.getLanguage() === 'en'; }
 
-    // 图表模板定义 - 使用函数动态生成，支持数据输入
-    var chartTemplates = [
+    // 图表类型分类
+    var chartCategories = {
+        mermaid: {
+            name: isEn() ? 'Mermaid Charts' : 'Mermaid 图表',
+            icon: '<i class="fas fa-project-diagram"></i>',
+            description: isEn() ? 'Flowcharts, diagrams and more' : '流程图、图表等'
+        },
+        echarts: {
+            name: isEn() ? 'ECharts' : 'ECharts 图表',
+            icon: '<i class="fas fa-chart-pie"></i>',
+            description: isEn() ? 'Professional data visualization' : '专业数据可视化'
+        }
+    };
+
+    // Mermaid 图表模板
+    var mermaidTemplates = [
         {
             icon: '<i class="fas fa-project-diagram"></i>',
             name: '流程图 (Flowchart)',
@@ -22,10 +36,10 @@
                     var nextId = String.fromCharCode(65 + i + 1);
                     if (i < steps.length - 1) {
                         if (steps[i].indexOf('?') > -1 || steps[i].indexOf('决策') > -1) {
-                            code += '    ' + nodeId + '{' + steps[i] + '} -->|' + (isEn() ? 'Yes' : '是') + '| ' + nextId + '[' + steps[i+1] + ']\n';
+                            code += '    ' + nodeId + '{' + steps[i] + '} -->|' + (isEn() ? 'Yes' : '是') + '| ' + nextId + '[' + steps[i+1] + ']';
                             code += '    ' + nodeId + ' -->|' + (isEn() ? 'No' : '否') + '| ' + String.fromCharCode(65 + Math.max(0, i-1)) + '\n';
                         } else {
-                            code += '    ' + nodeId + '[' + steps[i] + '] --> ' + nextId + '[' + steps[i+1] + ']\n';
+                            code += '    ' + nodeId + '[' + steps[i] + '] --> ' + nextId + '[' + steps[i+1] + ']';
                         }
                     }
                 }
@@ -442,6 +456,7 @@
 
     var currentModal = null;
     var currentChart = null;
+    var currentCategory = 'echarts'; // 默认显示 ECharts
 
     function closeChartPicker() {
         if (currentModal && currentModal.parentNode) {
@@ -560,7 +575,7 @@
                         if (field.name.indexOf('line') === 0 || field.name.indexOf('bar') === 0) {
                             var match = field.name.match(/^(line|bar)(\d+)/);
                             if (match) {
-                                var num = parseInt(match[2]);
+                                var num = parseInt(match[1]);
                                 var fieldContainer = form.querySelector('[data-field-name="' + field.name + '"]');
                                 if (fieldContainer) {
                                     fieldContainer.style.display = num <= selectedCount ? 'block' : 'none';
@@ -731,6 +746,19 @@
         desc.style.cssText = 'font-size: 13px; color: ' + (nightMode ? '#aaa' : '#666') + '; margin-bottom: 20px;';
         container.appendChild(desc);
 
+        // 图表类型选择
+        var typeLabel = document.createElement('label');
+        typeLabel.textContent = isEn() ? 'Chart Type:' : '图表类型：';
+        typeLabel.style.cssText = 'display: block; margin-bottom: 8px; font-size: 14px; color: ' + (nightMode ? '#ddd' : '#333') + ';';
+        container.appendChild(typeLabel);
+
+        var typeSelect = document.createElement('select');
+        typeSelect.style.cssText = 'width: 100%; padding: 8px 12px; margin-bottom: 15px; border: 1px solid ' + (nightMode ? '#444' : '#ccc') + '; border-radius: 6px; font-size: 14px; background: ' + (nightMode ? '#222' : '#fafafa') + '; color: ' + (nightMode ? '#eee' : '#333') + ';';
+        typeSelect.innerHTML =
+            '<option value="echarts">ECharts (' + (isEn() ? 'Data Visualization' : '数据可视化') + ')</option>' +
+            '<option value="mermaid">Mermaid (' + (isEn() ? 'Flowcharts, Diagrams' : '流程图、图表') + ')</option>';
+        container.appendChild(typeSelect);
+
         // 示例提示
         var examples = document.createElement('div');
         examples.style.cssText = 'margin-bottom: 15px; padding: 10px; background: ' + (nightMode ? '#1a1a1a' : '#f0f0f0') + '; border-radius: 6px; font-size: 12px; color: ' + (nightMode ? '#888' : '#666') + ';';
@@ -738,12 +766,12 @@
             (isEn() ? 
                 '• Show me a login flowchart with email verification<br>' +
                 '• Create a sequence diagram for online payment<br>' +
-                '• Draw a class diagram for an e-commerce system with users, orders and products<br>' +
-                '• Make a Gantt chart for a 3-month software project' :
+                '• Draw a class diagram for an e-commerce system<br>' +
+                '• Make a line chart showing sales trend for 6 months' :
                 '• 显示一个带邮箱验证的登录流程图<br>' +
                 '• 创建一个在线支付的序列图<br>' +
-                '• 绘制一个电商系统的类图，包含用户、订单和商品<br>' +
-                '• 制作一个3个月软件项目的甘特图');
+                '• 绘制一个电商系统的类图<br>' +
+                '• 制作一个显示6个月销售趋势的折线图');
         container.appendChild(examples);
 
         // 输入框
@@ -754,7 +782,7 @@
 
         var input = document.createElement('textarea');
         input.rows = 4;
-        input.placeholder = isEn() ? 'e.g., A flowchart showing user registration process with email verification and password setup' : '例如：一个显示用户注册流程的流程图，包含邮箱验证和密码设置步骤';
+        input.placeholder = isEn() ? 'e.g., A flowchart showing user registration process' : '例如：一个显示用户注册流程的流程图';
         input.style.cssText = 'width: 100%; padding: 12px; border: 1px solid ' + (nightMode ? '#444' : '#ccc') + '; border-radius: 6px; font-size: 14px; background: ' + (nightMode ? '#222' : '#fafafa') + '; color: ' + (nightMode ? '#eee' : '#333') + '; box-sizing: border-box; resize: vertical;';
         container.appendChild(input);
 
@@ -794,6 +822,7 @@
 
         generateBtn.onclick = async function() {
             var description = input.value.trim();
+            var chartType = typeSelect.value;
             if (!description) {
                 global.showMessage(isEn() ? 'Please enter a description' : '请输入描述', 'error');
                 return;
@@ -813,6 +842,7 @@
                     },
                     body: JSON.stringify({
                         description: description,
+                        chartType: chartType,
                         language: isEn() ? 'en' : 'zh'
                     })
                 });
@@ -893,9 +923,25 @@
 
         // 标题
         var title = document.createElement('div');
-        title.textContent = isEn() ? 'Insert Mermaid Chart' : '插入Mermaid图表';
+        title.textContent = isEn() ? 'Insert Chart' : '插入图表';
         title.style.cssText = 'font-size: 18px; font-weight: 600; margin-bottom: 15px; text-align: center; color: ' + (nightMode ? '#eee' : '#333') + ';';
         container.appendChild(title);
+
+        // 分类切换标签
+        var categoryTabs = document.createElement('div');
+        categoryTabs.style.cssText = 'display: flex; gap: 10px; margin-bottom: 15px; border-bottom: 1px solid ' + (nightMode ? '#444' : '#ddd') + '; padding-bottom: 10px;';
+        
+        var echartsTab = document.createElement('button');
+        echartsTab.innerHTML = '<i class="fas fa-chart-pie"></i> ECharts';
+        echartsTab.style.cssText = 'flex: 1; padding: 10px; background: ' + (currentCategory === 'echarts' ? '#667eea' : (nightMode ? '#444' : '#f5f5f5')) + '; color: ' + (currentCategory === 'echarts' ? 'white' : (nightMode ? '#eee' : '#333')) + '; border: none; border-radius: 6px; cursor: pointer; font-size: 14px;';
+
+        var mermaidTab = document.createElement('button');
+        mermaidTab.innerHTML = '<i class="fas fa-project-diagram"></i> Mermaid';
+        mermaidTab.style.cssText = 'flex: 1; padding: 10px; background: ' + (currentCategory === 'mermaid' ? '#667eea' : (nightMode ? '#444' : '#f5f5f5')) + '; color: ' + (currentCategory === 'mermaid' ? 'white' : (nightMode ? '#eee' : '#333')) + '; border: none; border-radius: 6px; cursor: pointer; font-size: 14px;';
+
+        categoryTabs.appendChild(echartsTab);
+        categoryTabs.appendChild(mermaidTab);
+        container.appendChild(categoryTabs);
 
         // AI生成按钮
         var aiBtn = document.createElement('button');
@@ -976,25 +1022,163 @@
             });
         }
 
-        // 初始渲染
-        renderCharts(chartTemplates);
+        // 初始渲染 - 默认显示 ECharts
+        if (typeof window.echartsTemplates !== 'undefined' && window.echartsTemplates.length > 0) {
+            renderEChartsTemplates(window.echartsTemplates);
+        } else {
+            // 如果 echartsTemplates 还没加载，尝试预加载
+            chartGrid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 30px; color: ' + (nightMode ? '#aaa' : '#666') + ';">' +
+                '<i class="fas fa-spinner fa-spin" style="font-size: 32px; margin-bottom: 15px; color: #667eea;"></i>' +
+                '<div style="font-size: 14px;">' + (isEn() ? 'Loading ECharts templates...' : '加载 ECharts 模板中...') + '</div>' +
+                '</div>';
+
+            // 尝试延迟加载
+            setTimeout(function() {
+                if (typeof window.echartsTemplates !== 'undefined' && window.echartsTemplates.length > 0) {
+                    renderEChartsTemplates(window.echartsTemplates);
+                } else {
+                    // 如果加载失败，回退到 Mermaid
+                    currentCategory = 'mermaid';
+                    mermaidTab.style.background = '#667eea';
+                    mermaidTab.style.color = 'white';
+                    echartsTab.style.background = nightMode ? '#444' : '#f5f5f5';
+                    echartsTab.style.color = nightMode ? '#eee' : '#333';
+                    renderCharts(mermaidTemplates);
+                }
+            }, 500);
+        }
+
+        // 切换分类
+        echartsTab.onclick = function() {
+            currentCategory = 'echarts';
+            echartsTab.style.background = '#667eea';
+            echartsTab.style.color = 'white';
+            mermaidTab.style.background = nightMode ? '#444' : '#f5f5f5';
+            mermaidTab.style.color = nightMode ? '#eee' : '#333';
+
+            // 使用 echartsTemplates 渲染 ECharts 图表
+            if (typeof window.echartsTemplates !== 'undefined' && window.echartsTemplates.length > 0) {
+                renderEChartsTemplates(window.echartsTemplates);
+            } else {
+                // 如果 echartsTemplates 还没加载，显示加载提示
+                chartGrid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 30px; color: ' + (nightMode ? '#aaa' : '#666') + ';">' +
+                    '<i class="fas fa-spinner fa-spin" style="font-size: 32px; margin-bottom: 15px; color: #667eea;"></i>' +
+                    '<div style="font-size: 14px;">' + (isEn() ? 'Loading ECharts templates...' : '加载 ECharts 模板中...') + '</div>' +
+                    '</div>';
+
+                // 尝试延迟加载
+                setTimeout(function() {
+                    if (typeof window.echartsTemplates !== 'undefined' && window.echartsTemplates.length > 0) {
+                        renderEChartsTemplates(window.echartsTemplates);
+                    } else {
+                        chartGrid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 30px; color: ' + (nightMode ? '#aaa' : '#666') + ';">' +
+                            '<i class="fas fa-exclamation-triangle" style="font-size: 32px; margin-bottom: 15px; color: #f0ad4e;"></i>' +
+                            '<div style="font-size: 14px;">' + (isEn() ? 'Failed to load ECharts templates. Please refresh and try again.' : '加载 ECharts 模板失败，请刷新重试。') + '</div>' +
+                            '</div>';
+                    }
+                }, 1000);
+            }
+        };
+
+        mermaidTab.onclick = function() {
+            currentCategory = 'mermaid';
+            mermaidTab.style.background = '#667eea';
+            mermaidTab.style.color = 'white';
+            echartsTab.style.background = nightMode ? '#444' : '#f5f5f5';
+            echartsTab.style.color = nightMode ? '#eee' : '#333';
+            renderCharts(mermaidTemplates);
+        };
+
+        // 渲染 ECharts 模板
+        function renderEChartsTemplates(templates) {
+            chartGrid.innerHTML = '';
+
+            if (!templates || templates.length === 0) {
+                var emptyMsg = document.createElement('div');
+                emptyMsg.style.cssText = 'text-align: center; color: #888; padding: 30px; grid-column: 1/-1;';
+                emptyMsg.textContent = isEn() ? 'No ECharts templates available' : '暂无 ECharts 模板';
+                chartGrid.appendChild(emptyMsg);
+                return;
+            }
+
+            templates.forEach(function(template) {
+                var chartBtn = document.createElement('button');
+                chartBtn.style.cssText = 'padding: 15px; border: 2px solid transparent; background: ' + (nightMode ? '#3d3d3d' : '#f5f5f5') + '; cursor: pointer; border-radius: 8px; transition: all 0.2s; text-align: center; color: ' + (nightMode ? '#eee' : '#333') + ';';
+
+                var iconDiv = document.createElement('div');
+                iconDiv.style.cssText = 'font-size: 28px; margin-bottom: 8px; color: #667eea;';
+                iconDiv.innerHTML = template.icon;
+
+                var nameDiv = document.createElement('div');
+                nameDiv.style.cssText = 'font-weight: bold; font-size: 12px; margin-bottom: 4px;';
+                nameDiv.textContent = isEn() && template.nameEn ? template.nameEn : template.name;
+
+                var descDiv = document.createElement('div');
+                descDiv.style.cssText = 'font-size: 11px; color: ' + (nightMode ? '#aaa' : '#666') + '; line-height: 1.3;';
+                descDiv.textContent = template.description;
+
+                chartBtn.appendChild(iconDiv);
+                chartBtn.appendChild(nameDiv);
+                chartBtn.appendChild(descDiv);
+
+                chartBtn.onclick = function() {
+                    if (typeof window.showEChartsDataInput === 'function') {
+                        window.showEChartsDataInput(template);
+                        closeChartPicker();
+                    } else {
+                        global.showMessage(isEn() ? 'ECharts loader not ready' : 'ECharts 加载器未就绪', 'error');
+                    }
+                };
+
+                chartBtn.onmouseenter = function() {
+                    this.style.background = nightMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)';
+                    this.style.borderColor = '#667eea';
+                };
+
+                chartBtn.onmouseleave = function() {
+                    this.style.background = nightMode ? '#3d3d3d' : '#f5f5f5';
+                    this.style.borderColor = 'transparent';
+                };
+
+                chartGrid.appendChild(chartBtn);
+            });
+        }
 
         // 搜索功能
         searchBox.addEventListener('input', function() {
             var q = this.value.trim().toLowerCase();
             if (!q) {
-                renderCharts(chartTemplates);
+                if (currentCategory === 'mermaid') {
+                    renderCharts(mermaidTemplates);
+                } else {
+                    if (typeof window.echartsTemplates !== 'undefined') {
+                        renderEChartsTemplates(window.echartsTemplates);
+                    }
+                }
                 return;
             }
 
-            var results = chartTemplates.filter(function(chart) {
-                if (chart.name.toLowerCase().includes(q)) return true;
-                if (chart.description.toLowerCase().includes(q)) return true;
-                if (chart.keywords && chart.keywords.some(function(k) { return k.toLowerCase().includes(q); })) return true;
-                return false;
-            });
-
-            renderCharts(results);
+            if (currentCategory === 'mermaid') {
+                var results = mermaidTemplates.filter(function(chart) {
+                    if (chart.name.toLowerCase().includes(q)) return true;
+                    if (chart.description.toLowerCase().includes(q)) return true;
+                    if (chart.keywords && chart.keywords.some(function(k) { return k.toLowerCase().includes(q); })) return true;
+                    return false;
+                });
+                renderCharts(results);
+            } else {
+                // 搜索 ECharts 模板
+                if (typeof window.echartsTemplates !== 'undefined') {
+                    var echartsResults = window.echartsTemplates.filter(function(template) {
+                        var name = (isEn() && template.nameEn ? template.nameEn : template.name).toLowerCase();
+                        if (name.includes(q)) return true;
+                        if (template.description.toLowerCase().includes(q)) return true;
+                        if (template.keywords && template.keywords.some(function(k) { return k.toLowerCase().includes(q); })) return true;
+                        return false;
+                    });
+                    renderEChartsTemplates(echartsResults);
+                }
+            }
         });
 
         // 取消按钮

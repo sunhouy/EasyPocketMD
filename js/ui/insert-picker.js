@@ -32,7 +32,8 @@
         { id: 'divider', icon: 'fas fa-minus', name: isEn() ? 'Divider' : '分隔线', category: 'insert', keywords: ['divider', '分隔线'], insert: '\n---\n' },
         { id: 'emoji', icon: 'fas fa-smile', name: isEn() ? 'Emoji' : '表情', category: 'insert', keywords: ['emoji', '表情'], action: 'emoji' },
         { id: 'formula', icon: 'fas fa-superscript', name: isEn() ? 'Formula' : '公式', category: 'insert', keywords: ['formula', '公式', 'latex'], action: 'formula' },
-        { id: 'chart', icon: 'fas fa-chart-bar', name: isEn() ? 'Chart' : '图表', category: 'insert', keywords: ['chart', '图表', 'mermaid'], action: 'chart' }
+        { id: 'chart', icon: 'fas fa-chart-bar', name: isEn() ? 'Chart' : '图表', category: 'insert', keywords: ['chart', '图表', 'mermaid'], action: 'chart' },
+        { id: 'echarts', icon: 'fas fa-chart-pie', name: isEn() ? 'ECharts' : 'ECharts图表', category: 'insert', keywords: ['echarts', '图表', '高级图表'], action: 'echarts' }
     ];
 
     function closeInsertPicker() {
@@ -97,6 +98,10 @@
                 case 'chart':
                     closeInsertPicker();
                     if (typeof window.showChartPicker === 'function') window.showChartPicker();
+                    break;
+                case 'echarts':
+                    closeInsertPicker();
+                    if (typeof window.showEChartsPicker === 'function') window.showEChartsPicker();
                     break;
             }
         } else if (item.insert) {

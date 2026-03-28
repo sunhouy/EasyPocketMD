@@ -109,9 +109,9 @@ router.post('/pdf', (req, res) => {
         }
         
         // Clean up MathJax-related content before conversion
-        console.log('[PDF Debug] Cleaning MathJax content on backend...');
+        // console.log('[PDF Debug] Cleaning MathJax content on backend...');
         html = cleanMathJaxContent(html);
-        console.log('[PDF Debug] MathJax content cleaned on backend');
+        // console.log('[PDF Debug] MathJax content cleaned on backend');
 
         const filename = `${uuidv4()}.pdf`;
         // uploads folder is one level up from api/routes/ (api/routes/../uploads -> api/uploads -> no, server.js says ../uploads from api/)
@@ -142,7 +142,7 @@ router.post('/pdf', (req, res) => {
         
         const writeStream = fs.createWriteStream(filePath);
         
-        console.log('[PDF Debug] Starting wkhtmltopdf for filename:', filename);
+        // console.log('[PDF Debug] Starting wkhtmltopdf for filename:', filename);
         
         const pdfStream = wkhtmltopdf(html, options);
         
@@ -163,7 +163,7 @@ router.post('/pdf', (req, res) => {
                 if (fs.existsSync(filePath)) {
                     const stats = fs.statSync(filePath);
                     if (stats.size > 0) {
-                        console.log('[PDF Debug] PDF generation successful, size:', stats.size);
+                        // console.log('[PDF Debug] PDF generation successful, size:', stats.size);
                         if (!res.headersSent) {
                             res.json({
                                 code: 200,

@@ -157,7 +157,7 @@ document.addEventListener('DOMContentLoaded', function() {
         toolbar: ['emoji', 'br', 'bold', 'italic', 'strike', '|', 'line', 'quote', 'list', 'ordered-list', 'check', 'outdent', 'indent', 'code', 'inline-code', 'insert-after', 'insert-before', 'upload', 'link', 'table', 'record', 'edit-mode', 'both', 'preview', 'fullscreen', 'outline', 'code-theme', 'content-theme', 'export', 'info', 'help', 'br'],
         customWysiwygToolbar: function() {}, // 修复报错
         theme: window.nightMode ? 'dark' : 'classic',
-        mode: localStorage.getItem('vditor_editor_mode') || 'ir',
+        mode: localStorage.getItem('vditor_editor_mode') || 'wysiwyg',
         cache: { enable: true, id: 'vditor-mobile-optimized' },
         outline: { enable: window.userSettings.showOutline },
         hint: { emoji: {} },
@@ -218,12 +218,23 @@ document.addEventListener('DOMContentLoaded', function() {
                             window.draftRecovery.markDirty();
                         }
                     }
+                    // 延迟渲染 ECharts 图表（等待 DOM 更新）
+                    setTimeout(function() {
+                        if (typeof window.renderEChartsContainers === 'function') {
+                            window.renderEChartsContainers();
+                        }
+                    }, 500);
                 });
             }
 
             // 初始化应用生命周期管理（草稿恢复等）
             if (window.appLifecycle) {
                 window.appLifecycle.init();
+            }
+
+            // 渲染 ECharts 图表
+            if (typeof window.renderEChartsContainers === 'function') {
+                window.renderEChartsContainers();
             }
         }
     };

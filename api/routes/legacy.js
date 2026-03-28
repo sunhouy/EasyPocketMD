@@ -34,7 +34,7 @@ router.all('/index.php', upload.any(), async (req, res) => {
     // Merge query and body for easier access (PHP style $_REQUEST kind of)
     const data = { ...req.query, ...req.body };
     
-    console.log(`Processing request: ${action}, Method: ${method}`);
+    // console.log(`Processing request: ${action}, Method: ${method}`);
 
     try {
         switch (action) {

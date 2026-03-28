@@ -3070,6 +3070,310 @@ body.night-mode .ai-action-btn.secondary:hover {
     background: #3d3d3d;
 }
 
+/* PPT生成器夜间模式适配 */
+body.night-mode .ppt-source-btn {
+    background: #2d2d2d;
+    border-color: #444;
+    color: #eee !important;
+}
+
+body.night-mode .ppt-source-btn span {
+    color: #eee !important;
+}
+
+body.night-mode .ppt-source-btn.active {
+    background: rgba(74, 144, 226, 0.2);
+    border-color: #4a90e2;
+    color: #eee !important;
+}
+
+body.night-mode .ppt-source-btn.active span {
+    color: #eee !important;
+}
+
+body.night-mode #aiPPTTopicSection input {
+    background: #2d2d2d;
+    border-color: #444;
+    color: #eee;
+}
+
+body.night-mode #aiPPTOutlineSection h4 {
+    color: #eee;
+}
+
+body.night-mode #aiPPTOutlinePreview {
+    background: #2d2d2d;
+    border-color: #444;
+    color: #eee;
+}
+
+body.night-mode #aiPPTOutlinePreview li {
+    color: #ddd;
+}
+
+/* PPT编辑器夜间模式 */
+body.night-mode .ppt-editor-container {
+    background: #1a1a2e;
+}
+
+body.night-mode .ppt-editor-header {
+    background: #16213e;
+    border-bottom: 1px solid #0f3460;
+}
+
+body.night-mode .ppt-preview-panel {
+    background: #0f0f1a;
+}
+
+body.night-mode .ppt-pages-panel {
+    background: #16213e;
+    border-left-color: #0f3460;
+}
+
+/* PPT编辑器按钮夜间模式 */
+body.night-mode #pptEditorPrev,
+body.night-mode #pptEditorNext {
+    background: rgba(255,255,255,0.15) !important;
+    color: #eee !important;
+}
+
+body.night-mode #pptEditorPrev:hover,
+body.night-mode #pptEditorNext:hover {
+    background: rgba(255,255,255,0.25) !important;
+}
+
+body.night-mode #pptEditorRegen {
+    background: #2980b9 !important;
+}
+
+body.night-mode #pptEditorRegen:hover {
+    background: #3498db !important;
+}
+
+body.night-mode #pptEditorDownload {
+    background: #c0392b !important;
+}
+
+body.night-mode #pptEditorDownload:hover {
+    background: #e74c3c !important;
+}
+
+body.night-mode #pptEditorPageNum {
+    color: #eee !important;
+}
+
+body.night-mode #pptEditorAddPage {
+    border-color: #3498db !important;
+    color: #3498db !important;
+}
+
+body.night-mode #pptEditorAddPage:hover {
+    background: rgba(52, 152, 219, 0.2) !important;
+}
+
+/* PPT缩略图列表夜间模式 */
+body.night-mode .ppt-editor-thumb {
+    background: rgba(255,255,255,0.1) !important;
+    color: #eee !important;
+}
+
+body.night-mode .ppt-editor-thumb:hover {
+    background: rgba(255,255,255,0.2) !important;
+}
+
+body.night-mode .ppt-editor-thumb[data-active="true"] {
+    background: #4a90e2 !important;
+    color: white !important;
+}
+
+/* AI助手弹窗夜间模式 - 更全面的适配 */
+body.night-mode #aiAssistantModal .modal-content {
+    background: #2d2d2d;
+    color: #eee;
+}
+
+body.night-mode #aiAssistantModal .ai-menu-btn {
+    background: #3d3d3d;
+    border-color: #555;
+    color: #eee;
+}
+
+body.night-mode #aiAssistantModal .ai-menu-btn:hover {
+    background: #4d4d4d;
+    border-color: #4a90e2;
+}
+
+body.night-mode #aiAssistantModal .ai-option-btn {
+    background: #3d3d3d;
+    border-color: #555;
+    color: #eee;
+}
+
+body.night-mode #aiAssistantModal .ai-option-btn:hover {
+    background: #4a90e2;
+    border-color: #4a90e2;
+}
+
+body.night-mode #aiAssistantModal .ai-option-btn.active {
+    background: #4a90e2;
+    border-color: #4a90e2;
+}
+
+body.night-mode #aiAssistantModal .ai-textarea {
+    background: #3d3d3d;
+    border-color: #555;
+    color: #eee;
+}
+
+body.night-mode #aiAssistantModal .ai-textarea::placeholder {
+    color: #999;
+}
+
+body.night-mode #aiAssistantModal .ai-generate-btn {
+    background: #4a90e2;
+}
+
+body.night-mode #aiAssistantModal .ai-generate-btn:hover {
+    background: #357abd;
+}
+
+body.night-mode #aiAssistantModal .ai-result-content {
+    background: #3d3d3d;
+    border-color: #555;
+    color: #eee;
+}
+
+body.night-mode #aiAssistantModal h3,
+body.night-mode #aiAssistantModal h4 {
+    color: #eee;
+}
+
+body.night-mode #aiAssistantModal .ai-back-btn {
+    color: #aaa;
+}
+
+body.night-mode #aiAssistantModal .ai-back-btn:hover {
+    color: #4a90e2;
+}
+
+/* PPT输入区域夜间模式 */
+body.night-mode #aiPPTInputSection {
+    background: #2d2d2d;
+}
+
+body.night-mode #aiPPTInputSection h4 {
+    color: #eee;
+}
+
+body.night-mode #aiPPTInput {
+    background: #3d3d3d;
+    border-color: #555;
+    color: #eee;
+}
+
+body.night-mode #aiPPTInput::placeholder {
+    color: #888;
+}
+
+body.night-mode #aiPPTOutlineSection {
+    background: #2d2d2d;
+}
+
+body.night-mode #aiPPTOutlinePreview > div {
+    background: #3d3d3d !important;
+    border-color: #555 !important;
+}
+
+body.night-mode #aiPPTOutlinePreview strong {
+    color: #66b1ff !important;
+}
+
+body.night-mode #aiPPTOutlinePreview ul {
+    color: #ddd;
+}
+
+body.night-mode #aiPPTOutlinePreview li {
+    color: #ccc;
+}
+
+/* PPT编辑器加载动画夜间模式 */
+body.night-mode #pptEditorLoading {
+    color: #eee;
+}
+
+body.night-mode #pptEditorLoading i {
+    color: #4a90e2;
+}
+
+/* PPT预览容器夜间模式 */
+body.night-mode #pptEditorPreviewContainer {
+    box-shadow: 0 10px 40px rgba(0,0,0,0.8);
+}
+
+/* 自定义确认对话框夜间模式 */
+body.night-mode .confirm-dialog {
+    background: #2d2d2d;
+    color: #eee;
+}
+
+body.night-mode .confirm-dialog p {
+    color: #eee;
+}
+
+body.night-mode .confirm-dialog .confirm-cancel {
+    background: transparent;
+    border-color: #555;
+    color: #aaa;
+}
+
+body.night-mode .confirm-dialog .confirm-cancel:hover {
+    background: rgba(255,255,255,0.1);
+    color: #eee;
+}
+
+body.night-mode .confirm-dialog .confirm-ok {
+    background: #4a90e2;
+}
+
+body.night-mode .confirm-dialog .confirm-ok:hover {
+    background: #357abd;
+}
+
+/* 自定义输入对话框夜间模式 */
+body.night-mode .prompt-dialog {
+    background: #2d2d2d;
+    color: #eee;
+}
+
+body.night-mode .prompt-dialog p {
+    color: #eee;
+}
+
+body.night-mode .prompt-dialog .prompt-input {
+    background: #3d3d3d;
+    border-color: #555;
+    color: #eee;
+}
+
+body.night-mode .prompt-dialog .prompt-cancel {
+    background: transparent;
+    border-color: #555;
+    color: #aaa;
+}
+
+body.night-mode .prompt-dialog .prompt-cancel:hover {
+    background: rgba(255,255,255,0.1);
+    color: #eee;
+}
+
+body.night-mode .prompt-dialog .prompt-ok {
+    background: #4a90e2;
+}
+
+body.night-mode .prompt-dialog .prompt-ok:hover {
+    background: #357abd;
+}
+
 /* 响应式调整 */
 @media (max-width: 480px) {
     .ai-menu-grid {
