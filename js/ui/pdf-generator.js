@@ -37,7 +37,7 @@ async function initPdfMakeWithChineseFonts() {
         return pdfMake;
     }
     
-    console.log('[PDF Debug] Initializing pdfmake with Chinese fonts...');
+    // console.log('[PDF Debug] Initializing pdfmake with Chinese fonts...');
     
     try {
         // 先设置全局的 pdfMake 对象
@@ -50,7 +50,7 @@ async function initPdfMakeWithChineseFonts() {
         // 此时 window.pdfMake 应该已经有完整的 vfs 了
         pdfMake = window.pdfMake;
         
-        console.log('[PDF Debug] vfs keys:', Object.keys(pdfMake.vfs || {}));
+        // console.log('[PDF Debug] vfs keys:', Object.keys(pdfMake.vfs || {}));
         
     } catch (e) {
         console.error('[PDF Debug] Initialization failed:', e);
@@ -74,7 +74,7 @@ async function initPdfMakeWithChineseFonts() {
     };
     
     pdfMakeInitialized = true;
-    console.log('[PDF Debug] pdfmake with Chinese fonts initialized');
+    // console.log('[PDF Debug] pdfmake with Chinese fonts initialized');
     
     return pdfMake;
 }
@@ -86,9 +86,9 @@ async function initPdfMakeWithChineseFonts() {
  * @returns {Promise<string>} - Returns blob URL for the generated PDF
  */
 async function generatePDFLocal(htmlContent, settings) {
-    console.log('[PDF Debug] Starting local PDF generation...');
+    // console.log('[PDF Debug] Starting local PDF generation...');
     
-    console.log('[PDF Debug] Original htmlContent preview (first 500 chars):', htmlContent.substring(0, 500));
+    // console.log('[PDF Debug] Original htmlContent preview (first 500 chars):', htmlContent.substring(0, 500));
     
     // 按需初始化 pdfmake 并加载中文字体
     const currentPdfMake = await initPdfMakeWithChineseFonts();
@@ -105,7 +105,7 @@ async function generatePDFLocal(htmlContent, settings) {
         processedContent = processedContent.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
     }
     
-    console.log('[PDF Debug] Processed content preview (first 500 chars):', processedContent.substring(0, 500));
+    // console.log('[PDF Debug] Processed content preview (first 500 chars):', processedContent.substring(0, 500));
     
     // 首先创建临时 DOM 来处理图片和公式
     const tempDiv = document.createElement('div');
@@ -113,7 +113,7 @@ async function generatePDFLocal(htmlContent, settings) {
     
     // 处理图片：转换为 data URLs
     const images = tempDiv.querySelectorAll('img');
-    console.log('[PDF Debug] Found', images.length, 'images');
+    // console.log('[PDF Debug] Found', images.length, 'images');
     
     // 将所有图片转换为 data URLs
     const imagePromises = [];
@@ -140,7 +140,7 @@ async function generatePDFLocal(htmlContent, settings) {
                     try {
                         const dataUrl = canvas.toDataURL('image/png');
                         img.src = dataUrl;
-                        console.log('[PDF Debug] Image', index, 'converted to data URL');
+                        // console.log('[PDF Debug] Image', index, 'converted to data URL');
                     } catch (e) {
                         console.warn('[PDF Debug] Failed to convert image', index, ':', e);
                         img.remove();
@@ -164,7 +164,7 @@ async function generatePDFLocal(htmlContent, settings) {
     
     // 处理 LaTeX 公式：移除 SVG 元素
     const svgElements = tempDiv.querySelectorAll('svg');
-    console.log('[PDF Debug] Found', svgElements.length, 'SVG elements');
+    // console.log('[PDF Debug] Found', svgElements.length, 'SVG elements');
     
     // 移除所有 SVG 元素
     svgElements.forEach(svg => {
@@ -192,7 +192,7 @@ async function generatePDFLocal(htmlContent, settings) {
         </div>
     `;
 
-    console.log('[PDF Debug] Converting HTML to pdfmake content...');
+    // console.log('[PDF Debug] Converting HTML to pdfmake content...');
     
     const pdfMakeContent = htmlToPdfmake(fullHtml, {
         defaultStyles: {
@@ -205,7 +205,7 @@ async function generatePDFLocal(htmlContent, settings) {
         }
     });
 
-    console.log('[PDF Debug] htmlToPdfmake conversion done');
+    // console.log('[PDF Debug] htmlToPdfmake conversion done');
     
     // 后处理：确保所有图片宽度不超过页面宽度
     function limitImageWidth(content) {
@@ -235,7 +235,7 @@ async function generatePDFLocal(htmlContent, settings) {
     }
     
     limitImageWidth(pdfMakeContent);
-    console.log('[PDF Debug] Image width limiting done');
+    // console.log('[PDF Debug] Image width limiting done');
 
     const docDefinition = {
         content: pdfMakeContent,
@@ -251,13 +251,13 @@ async function generatePDFLocal(htmlContent, settings) {
         ]
     };
 
-    console.log('[PDF Debug] Creating pdfmake document...');
+    // console.log('[PDF Debug] Creating pdfmake document...');
 
     try {
         const pdfDoc = currentPdfMake.createPdf(docDefinition);
-        console.log('[PDF Debug] pdfmake document created');
+        // console.log('[PDF Debug] pdfmake document created');
         
-        console.log('[PDF Debug] Getting buffer...');
+        // console.log('[PDF Debug] Getting buffer...');
         const buffer = await new Promise((resolve, reject) => {
             pdfDoc.getBuffer((buffer) => {
                 resolve(buffer);
@@ -265,11 +265,11 @@ async function generatePDFLocal(htmlContent, settings) {
                 reject(error);
             });
         });
-        console.log('[PDF Debug] Buffer created, length:', buffer.length, 'bytes');
+        // console.log('[PDF Debug] Buffer created, length:', buffer.length, 'bytes');
         
         const blob = new Blob([buffer], { type: 'application/pdf' });
         const url = URL.createObjectURL(blob);
-        console.log('[PDF Debug] Blob URL created:', url);
+        // console.log('[PDF Debug] Blob URL created:', url);
         return url;
     } catch (error) {
         console.error('[PDF Debug] Local PDF generation error:', error);
@@ -350,9 +350,9 @@ export async function generatePDF(htmlContent, settings, filename) {
     } 
     
     // Clean up MathJax-related content before sending to backend
-    console.log('[PDF Debug] Cleaning MathJax content...');
+    // console.log('[PDF Debug] Cleaning MathJax content...');
     const cleanedHtmlContent = cleanMathJaxContent(htmlContent);
-    console.log('[PDF Debug] MathJax content cleaned');
+    // console.log('[PDF Debug] MathJax content cleaned');
     
     const fullHtml = `
         <!DOCTYPE html>
@@ -413,13 +413,13 @@ export async function generatePDF(htmlContent, settings, filename) {
  */
 export async function renderPDF(pdfUrl, container) {
     try {
-        console.log('[PDF Debug] Rendering PDF from URL:', pdfUrl);
+        // console.log('[PDF Debug] Rendering PDF from URL:', pdfUrl);
         
         // Ensure absolute URL
         if (pdfUrl && !pdfUrl.startsWith('http://') && !pdfUrl.startsWith('https://') && !pdfUrl.startsWith('blob:')) {
             const origin = window.getAppOrigin ? window.getAppOrigin() : window.location.origin;
             pdfUrl = origin + (pdfUrl.startsWith('/') ? '' : '/') + pdfUrl;
-            console.log('[PDF Debug] Converted to absolute URL:', pdfUrl);
+            // console.log('[PDF Debug] Converted to absolute URL:', pdfUrl);
         }
 
         const loadingTask = pdfjsLib.getDocument(pdfUrl);

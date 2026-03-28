@@ -1,10 +1,21 @@
 const db = require('../config/db');
 const historyManager = require('./HistoryManager');
+const Cache = require('../utils/cache');
 
 class FileManager {
     // Get user files
     async getUserFiles(username) {
         try {
+            // Try to get from cache first
+            const cached = await Cache.getUserFiles(username);
+            if (cached) {
+                return {
+                    code: 200,
+                    message: '获取文件列表成功 (缓存)',
+                    data: cached
+                };
+            }
+
             const [rows] = await db.execute(
                 'SELECT filename, content, last_modified FROM user_files WHERE username = ? ORDER BY last_modified DESC',
                 [username]
@@ -16,14 +27,19 @@ class FileManager {
                 last_modified: row.last_modified
             }));
 
+            const result = {
+                username,
+                files,
+                count: files.length
+            };
+
+            // Cache the result
+            await Cache.setUserFiles(username, result);
+
             return {
                 code: 200,
                 message: '获取文件列表成功',
-                data: {
-                    username,
-                    files,
-                    count: files.length
-                }
+                data: result
             };
         } catch (error) {
             return { code: 500, message: '获取文件列表失败: ' + error.message };
@@ -33,6 +49,16 @@ class FileManager {
     // Get file content
     async getFileContent(username, filename) {
         try {
+            // Try to get from cache first
+            const cached = await Cache.getFileContent(username, filename);
+            if (cached) {
+                return {
+                    code: 200,
+                    message: '获取文件内容成功 (缓存)',
+                    data: cached
+                };
+            }
+
             const [rows] = await db.execute(
                 'SELECT filename, content, last_modified FROM user_files WHERE username = ? AND filename = ?',
                 [username, filename]
@@ -43,14 +69,19 @@ class FileManager {
             }
 
             const row = rows[0];
+            const result = {
+                filename: row.filename,
+                content: row.content,
+                last_modified: row.last_modified
+            };
+
+            // Cache the result
+            await Cache.setFileContent(username, filename, result);
+
             return {
                 code: 200,
                 message: '获取文件内容成功',
-                data: {
-                    filename: row.filename,
-                    content: row.content,
-                    last_modified: row.last_modified
-                }
+                data: result
             };
         } catch (error) {
             return { code: 500, message: '获取文件内容失败: ' + error.message };
@@ -108,6 +139,10 @@ class FileManager {
             if (result.code !== 200) {
                 return result;
             }
+
+            // Invalidate cache after successful save
+            await Cache.deleteUserFiles(username);
+            await Cache.deleteFileContent(username, filename);
 
             if (createHistory) {
                 const historyResult = await historyManager.createHistory(username, filename, content);
@@ -173,6 +208,10 @@ class FileManager {
 
             await connection.commit();
 
+            // Invalidate cache after successful delete
+            await Cache.deleteUserFiles(username);
+            await Cache.deleteFileContent(username, filename);
+
             return {
                 code: 200,
                 message: '文件删除成功',
@@ -232,6 +271,9 @@ class FileManager {
             }
 
             await connection.commit();
+
+            // Invalidate all user file caches after sync
+            await Cache.invalidateUserFiles(username);
 
             return {
                 code: 200,

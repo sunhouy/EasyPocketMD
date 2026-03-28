@@ -457,12 +457,23 @@
             renderItems(results);
         });
 
-        // 取消按钮
-        var cancelBtn = document.createElement('button');
-        cancelBtn.textContent = isEn() ? 'Cancel' : '取消';
-        cancelBtn.style.cssText = 'margin-top: 15px; padding: 10px 20px; background: ' + (nightMode ? '#444' : '#f5f5f5') + '; color: ' + (nightMode ? '#eee' : '#333') + '; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; align-self: center;';
-        cancelBtn.onclick = closeInsertPicker;
-        container.appendChild(cancelBtn);
+        // 右上角关闭按钮
+        var closeBtn = document.createElement('button');
+        closeBtn.innerHTML = '<i class="fas fa-times"></i>';
+        closeBtn.style.cssText = 'position: absolute; top: 15px; right: 15px; width: 32px; height: 32px; background: ' + (nightMode ? '#444' : '#f5f5f5') + '; color: ' + (nightMode ? '#eee' : '#666') + '; border: none; border-radius: 50%; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; transition: all 0.2s;';
+        closeBtn.onmouseenter = function() {
+            this.style.background = '#dc3545';
+            this.style.color = 'white';
+        };
+        closeBtn.onmouseleave = function() {
+            this.style.background = (nightMode ? '#444' : '#f5f5f5');
+            this.style.color = (nightMode ? '#eee' : '#666');
+        };
+        closeBtn.onclick = closeInsertPicker;
+        container.appendChild(closeBtn);
+
+        // 设置容器为相对定位，以便关闭按钮绝对定位
+        container.style.position = 'relative';
 
         modal.appendChild(container);
         document.body.appendChild(modal);

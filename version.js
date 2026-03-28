@@ -29,7 +29,7 @@ function updateVersion() {
   const newVersion = incrementVersion(currentVersion);
   
   fs.writeFileSync(versionPath, JSON.stringify({ version: newVersion, updatedAt: new Date().toISOString() }, null, 2));
-  console.log(`Version updated: ${currentVersion} -> ${newVersion}`);
+  // console.log(`Version updated: ${currentVersion} -> ${newVersion}`);
   
   return newVersion;
 }

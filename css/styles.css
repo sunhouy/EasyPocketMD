@@ -2867,3 +2867,55 @@ body.night-mode .ai-action-btn.secondary:hover {
 body.night-mode .checkbox-group label:hover {
     background: #3d3d3d;
 }
+
+/* User menu dropdown night mode */
+body.night-mode .user-menu-dropdown {
+    background: #2d2d2d;
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+}
+
+body.night-mode .user-menu-dropdown .dropdown-item {
+    color: #ddd;
+}
+
+body.night-mode .user-menu-dropdown .dropdown-item:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+/* PPT source buttons */
+.ppt-source-btn-group {
+    display: flex;
+    gap: 10px;
+}
+
+.ppt-source-btn {
+    flex: 1;
+    padding: 12px;
+    border: 2px solid #ddd;
+    border-radius: 8px;
+    background: white;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    color: #333;
+    transition: all 0.3s ease;
+}
+
+.ppt-source-btn.active {
+    border-color: #4a90e2;
+    background: rgba(74, 144, 226, 0.1);
+}
+
+/* PPT source buttons night mode */
+body.night-mode .ppt-source-btn {
+    background: #2d2d2d;
+    border-color: #444;
+    color: #eee;
+}
+
+body.night-mode .ppt-source-btn.active {
+    background: rgba(74, 144, 226, 0.2);
+    border-color: #4a90e2;
+}

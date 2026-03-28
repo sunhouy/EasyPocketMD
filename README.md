@@ -1,10 +1,12 @@
 # EasyPocketMD
 
-A fast, cross-platform, and user-friendly Markdown editor that supports Windows, Linux, Android, iOS, and the web.
+AI-powered, superfast, cross-platform, and user-friendly online Markdown editor that supports Windows, Linux, Android, and the web.
 
 [![Build and Deploy](https://github.com/sunhouy/EasyPocketMD/actions/workflows/deploy.yml/badge.svg)](https://github.com/sunhouy/EasyPocketMD/actions/workflows/deploy.yml)
 [![Build Android APK](https://github.com/sunhouy/EasyPocketMD/actions/workflows/build-android.yml/badge.svg)](https://github.com/sunhouy/EasyPocketMD/actions/workflows/build-android.yml)
 [![Build Electron App](https://github.com/sunhouy/EasyPocketMD/actions/workflows/build-electron.yml/badge.svg)](https://github.com/sunhouy/EasyPocketMD/actions/workflows/build-electron.yml)
+[![Python 3.6+](https://img.shields.io/badge/python-3.6+-blue.svg)](https://www.python.org/downloads/)
+[![Node.js](https://img.shields.io/badge/node.js-%3E%3D18.0.0-brightgreen.svg)](https://nodejs.org/)
 
 <p align="center"><a href="README_zh_CN.md">中文</a> &nbsp;|&nbsp; <a href="https://md.yhsun.cn/">Demo</a></p>
 
@@ -98,6 +100,12 @@ DB_NAME=Database name
 ADMIN_USER=Administrator username
 ADMIN_PASSWORD=Administrator password
 BASE_URL=Website domain, e.g., https://md.yhsun.cn
+
+# Redis Configuration (optional, for file caching)
+REDIS_HOST=localhost
+REDIS_PORT=6379
+REDIS_PASSWORD=
+REDIS_DB=0
 ```
 
 ## Demo
