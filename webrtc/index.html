@@ -1,0 +1,933 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>WebRTC 一对一视频通话</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-gradient-start: #667eea;
+            --bg-gradient-end: #764ba2;
+            --container-bg: white;
+            --video-container-bg: #1a1a2e;
+            --video-box-bg: #16213e;
+            --control-panel-bg: white;
+            --control-panel-border: #eee;
+            --input-border: #ddd;
+            --input-bg: white;
+            --input-text: #333;
+            --status-color: #718096;
+            --label-bg: rgba(0,0,0,0.6);
+            --label-color: white;
+        }
+
+        /* 夜间模式 */
+        .night-mode {
+            --bg-gradient-start: #1a1a2e;
+            --bg-gradient-end: #16213e;
+            --container-bg: #0f0f1a;
+            --video-container-bg: #0a0a14;
+            --video-box-bg: #1a1a2e;
+            --control-panel-bg: #1a1a2e;
+            --control-panel-border: #2d2d44;
+            --input-border: #3d3d5c;
+            --input-bg: #0f0f1a;
+            --input-text: #e0e0e0;
+            --status-color: #a0a0b0;
+            --label-bg: rgba(0,0,0,0.8);
+            --label-color: #e0e0e0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, var(--bg-gradient-start) 0%, var(--bg-gradient-end) 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 10px;
+        }
+
+        /* 在模态框中时的样式调整 */
+        body.in-iframe {
+            padding: 0;
+            background: var(--container-bg);
+        }
+
+        body.in-iframe .container {
+            border-radius: 0;
+            box-shadow: none;
+            max-width: 100%;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        body.in-iframe .video-container {
+            flex: 1;
+            min-height: 0;
+        }
+
+        .container {
+            background: var(--container-bg);
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+            max-width: 1200px;
+            width: 100%;
+            transition: all 0.3s ease;
+        }
+
+        .video-container {
+            display: flex;
+            flex-wrap: wrap;
+            padding: 15px;
+            background: var(--video-container-bg);
+            gap: 15px;
+        }
+
+        .video-box {
+            flex: 1;
+            min-width: 280px;
+            min-height: 200px;
+            position: relative;
+            background: var(--video-box-bg);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .video-box video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            background: #0f0f1a;
+            transform: scaleX(-1);
+        }
+
+        .video-label {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            background: var(--label-bg);
+            color: var(--label-color);
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            z-index: 1;
+            transition: all 0.3s ease;
+        }
+
+        .control-panel {
+            padding: 15px;
+            background: var(--control-panel-bg);
+            border-top: 1px solid var(--control-panel-border);
+            transition: all 0.3s ease;
+        }
+
+        .room-control {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+        }
+
+        .room-control input {
+            flex: 1;
+            min-width: 120px;
+            padding: 10px 12px;
+            border: 1px solid var(--input-border);
+            border-radius: 8px;
+            font-size: 14px;
+            background: var(--input-bg);
+            color: var(--input-text);
+            transition: all 0.3s ease;
+        }
+
+        .room-control input::placeholder {
+            color: var(--status-color);
+        }
+
+        .room-control input[type="password"] {
+            min-width: 100px;
+        }
+
+        .room-control input[type="password"]:disabled {
+            background: #e0e0e0;
+            opacity: 0.5;
+        }
+
+        .room-control .checkbox-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            padding: 0 10px;
+            white-space: nowrap;
+            font-size: 14px;
+            color: var(--input-text);
+        }
+
+        .room-control .checkbox-wrapper input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+        }
+
+        .room-control .checkbox-wrapper label {
+            cursor: pointer;
+        }
+
+        /* 密码输入弹窗 */
+        .password-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .password-modal.show {
+            display: flex;
+        }
+
+        .password-modal-content {
+            background: var(--container-bg);
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+            max-width: 400px;
+            width: 90%;
+        }
+
+        .password-modal-content h3 {
+            margin-bottom: 20px;
+            color: var(--input-text);
+            text-align: center;
+        }
+
+        .password-modal-content input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid var(--input-border);
+            border-radius: 8px;
+            font-size: 16px;
+            background: var(--input-bg);
+            color: var(--input-text);
+            margin-bottom: 20px;
+        }
+
+        .password-modal-content .modal-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        .password-modal-content .modal-buttons button {
+            padding: 10px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .room-control button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s;
+            white-space: nowrap;
+        }
+
+        .call-control {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .call-control button {
+            padding: 12px 28px;
+            border: none;
+            border-radius: 30px;
+            font-size: 15px;
+            cursor: pointer;
+            transition: all 0.3s;
+            min-width: 100px;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #5a67d8;
+        }
+
+        .btn-primary:disabled {
+            background: #a0aec0;
+        }
+
+        .btn-danger {
+            background: #e53e3e;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #c53030;
+        }
+
+        .btn-danger:disabled {
+            background: #a0aec0;
+        }
+
+        .btn-success {
+            background: #48bb78;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #38a169;
+        }
+
+        .btn-success:disabled {
+            background: #a0aec0;
+        }
+
+        .btn-secondary {
+            background: #718096;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #4a5568;
+        }
+
+        .btn-secondary:disabled {
+            background: #a0aec0;
+        }
+
+        .status {
+            text-align: center;
+            padding: 10px;
+            font-size: 14px;
+            color: var(--status-color);
+            transition: all 0.3s ease;
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        @media (max-width: 768px) {
+            body {
+                padding: 5px;
+            }
+
+            .video-container {
+                flex-direction: column;
+                padding: 10px;
+                gap: 10px;
+            }
+
+            .video-box {
+                min-width: auto;
+                min-height: 180px;
+            }
+
+            .control-panel {
+                padding: 12px;
+            }
+
+            .room-control {
+                flex-direction: column;
+            }
+
+            .room-control input {
+                width: 100%;
+            }
+
+            .room-control button {
+                width: 100%;
+            }
+
+            .call-control button {
+                padding: 10px 20px;
+                font-size: 14px;
+                flex: 1;
+                min-width: 80px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .video-box {
+                min-height: 150px;
+            }
+
+            .call-control {
+                gap: 8px;
+            }
+
+            .call-control button {
+                padding: 8px 16px;
+                font-size: 13px;
+                min-width: 70px;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="video-container">
+        <div class="video-box">
+            <video id="localVideo" autoplay muted playsinline></video>
+            <div class="video-label">本地视频 (你)</div>
+        </div>
+        <div class="video-box">
+            <video id="remoteVideo" autoplay playsinline></video>
+            <div class="video-label">远程视频 (对方)</div>
+        </div>
+    </div>
+    <div class="control-panel">
+        <div class="room-control">
+            <input type="text" id="userId" placeholder="输入你的用户ID">
+            <input type="text" id="roomId" placeholder="输入房间号" value="room_001">
+            <div class="checkbox-wrapper">
+                <input type="checkbox" id="enablePassword">
+                <label for="enablePassword">设置密码</label>
+            </div>
+            <input type="password" id="roomPassword" placeholder="房间密码" disabled>
+            <button id="joinBtn" class="btn-primary">加入房间</button>
+            <button id="leaveBtn" class="btn-secondary" disabled>离开房间</button>
+        </div>
+        <div class="call-control">
+            <button id="startCameraBtn" class="btn-primary" disabled>打开摄像头</button>
+            <button id="callBtn" class="btn-success" disabled>呼叫对方</button>
+            <button id="hangupBtn" class="btn-danger" disabled>挂断</button>
+        </div>
+        <div class="status" id="status">未连接</div>
+    </div>
+</div>
+
+<!-- 密码输入弹窗 -->
+<div class="password-modal" id="passwordModal">
+    <div class="password-modal-content">
+        <h3>该房间需要密码</h3>
+        <input type="password" id="passwordInput" placeholder="请输入房间密码">
+        <div class="modal-buttons">
+            <button id="submitPasswordBtn" class="btn-primary">确认</button>
+            <button id="cancelPasswordBtn" class="btn-secondary">取消</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // 配置
+    const configuration = {
+        iceServers: [
+            { urls: "stun:stun.miwifi.com:3478" },
+            { urls: "stun:stun.l.google.com:19302" }
+        ]
+    };
+
+    // DOM 元素
+    const localVideo = document.getElementById('localVideo');
+    const remoteVideo = document.getElementById('remoteVideo');
+    const userIdInput = document.getElementById('userId');
+    const roomIdInput = document.getElementById('roomId');
+    const enablePasswordCheckbox = document.getElementById('enablePassword');
+    const roomPasswordInput = document.getElementById('roomPassword');
+    const joinBtn = document.getElementById('joinBtn');
+    const leaveBtn = document.getElementById('leaveBtn');
+    const startCameraBtn = document.getElementById('startCameraBtn');
+    const callBtn = document.getElementById('callBtn');
+    const hangupBtn = document.getElementById('hangupBtn');
+    const statusDiv = document.getElementById('status');
+    const passwordModal = document.getElementById('passwordModal');
+    const passwordInput = document.getElementById('passwordInput');
+    const submitPasswordBtn = document.getElementById('submitPasswordBtn');
+    const cancelPasswordBtn = document.getElementById('cancelPasswordBtn');
+
+    // 状态变量
+    let ws = null;                  // WebSocket 连接
+    let localStream = null;        // 本地视频流
+    let peerConnection = null;      // RTCPeerConnection
+    let currentRoomId = null;
+    let currentUserId = null;
+    let isInCall = false;           // 是否在通话中
+    let remoteUserId = null;        // 对方用户ID
+    let roomPassword = null;        // 房间密码
+    let isPasswordRequired = false; // 是否需要密码
+
+    // 设置状态
+    function setStatus(msg) {
+        statusDiv.textContent = msg;
+        console.log('[状态]', msg);
+    }
+
+    // 获取 URL 参数
+    function getUrlParam(param) {
+        const urlParams = new URLSearchParams(window.location.search);
+        return urlParams.get(param);
+    }
+
+    // 检测是否在 iframe 中
+    function isInIframe() {
+        try {
+            return window.self !== window.top;
+        } catch (e) {
+            return true;
+        }
+    }
+
+    // 初始化主题
+    function initTheme() {
+        // 检测是否在 iframe 中
+        if (isInIframe()) {
+            document.body.classList.add('in-iframe');
+        }
+
+        // 获取夜间模式参数
+        const darkMode = getUrlParam('darkMode') || getUrlParam('nightMode');
+        if (darkMode === 'true' || darkMode === '1') {
+            document.body.classList.add('night-mode');
+        }
+
+        // 同时检测父页面的主题（如果在 iframe 中）
+        if (isInIframe() && window.parent) {
+            try {
+                // 尝试从父页面获取主题信息
+                const parentDark = window.parent.document.body.classList.contains('night-mode') ||
+                    window.parent.document.documentElement.classList.contains('dark');
+                if (parentDark) {
+                    document.body.classList.add('night-mode');
+                }
+            } catch (e) {
+                // 跨域访问会失败，忽略错误
+            }
+        }
+    }
+
+    // 获取服务器地址（自动适配）
+    function getWsUrl() {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const host = window.location.host;
+        return `${protocol}//${host}`;
+    }
+
+    // 启用密码复选框事件
+    enablePasswordCheckbox.addEventListener('change', () => {
+        roomPasswordInput.disabled = !enablePasswordCheckbox.checked;
+        if (!enablePasswordCheckbox.checked) {
+            roomPasswordInput.value = '';
+        }
+    });
+
+    // 加入房间
+    joinBtn.addEventListener('click', () => {
+        const userId = userIdInput.value.trim();
+        const roomId = roomIdInput.value.trim();
+        const password = enablePasswordCheckbox.checked ? roomPasswordInput.value : null;
+
+        if (!userId || !roomId) {
+            alert('请输入用户ID和房间号');
+            return;
+        }
+
+        if (enablePasswordCheckbox.checked && !password) {
+            alert('请输入房间密码');
+            return;
+        }
+
+        currentUserId = userId;
+        currentRoomId = roomId;
+        roomPassword = password;
+
+        // 连接 WebSocket 信令服务器
+        const wsUrl = getWsUrl();
+        ws = new WebSocket(wsUrl);
+
+        ws.onopen = () => {
+            setStatus(`已连接到服务器，正在加入房间...`);
+            ws.send(JSON.stringify({
+                type: 'join',
+                userId: currentUserId,
+                roomId: currentRoomId,
+                password: roomPassword
+            }));
+        };
+
+        ws.onmessage = async (event) => {
+            const data = JSON.parse(event.data);
+            await handleSignaling(data);
+        };
+
+        ws.onerror = (error) => {
+            console.error('WebSocket错误:', error);
+            setStatus('连接服务器失败');
+        };
+
+        ws.onclose = () => {
+            setStatus('已断开连接');
+            resetCall();
+        };
+
+        joinBtn.disabled = true;
+        leaveBtn.disabled = false;
+        startCameraBtn.disabled = false;
+    });
+
+    // 离开房间
+    leaveBtn.addEventListener('click', () => {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: 'leave' }));
+            ws.close();
+        }
+        resetAll();
+        joinBtn.disabled = false;
+        leaveBtn.disabled = true;
+        startCameraBtn.disabled = true;
+        callBtn.disabled = true;
+        hangupBtn.disabled = true;
+        setStatus('已离开房间');
+    });
+
+    // 打开摄像头
+    startCameraBtn.addEventListener('click', async () => {
+        try {
+            localStream = await navigator.mediaDevices.getUserMedia({
+                video: true,
+                audio: true
+            });
+            localVideo.srcObject = localStream;
+            startCameraBtn.disabled = true;
+            callBtn.disabled = false;
+            setStatus('摄像头已打开，可以呼叫对方');
+        } catch (error) {
+            console.error('获取摄像头失败:', error);
+            setStatus('无法访问摄像头/麦克风，请检查权限');
+            alert('无法访问摄像头/麦克风，请检查浏览器权限设置');
+        }
+    });
+
+    // 呼叫对方
+    callBtn.addEventListener('click', async () => {
+        if (!localStream) {
+            alert('请先打开摄像头');
+            return;
+        }
+        await startCall();
+    });
+
+    // 挂断
+    hangupBtn.addEventListener('click', () => {
+        hangUp();
+    });
+
+    // 显示密码输入弹窗
+    function showPasswordModal() {
+        passwordModal.classList.add('show');
+        passwordInput.value = '';
+        passwordInput.focus();
+    }
+
+    // 隐藏密码输入弹窗
+    function hidePasswordModal() {
+        passwordModal.classList.remove('show');
+    }
+
+    // 提交密码
+    submitPasswordBtn.addEventListener('click', () => {
+        const inputPassword = passwordInput.value.trim();
+        if (!inputPassword) {
+            alert('请输入密码');
+            return;
+        }
+        // 发送密码验证
+        ws.send(JSON.stringify({
+            type: 'verify-password',
+            password: inputPassword
+        }));
+        hidePasswordModal();
+    });
+
+    // 取消密码输入
+    cancelPasswordBtn.addEventListener('click', () => {
+        hidePasswordModal();
+        if (ws) {
+            ws.close();
+        }
+        resetAll();
+        joinBtn.disabled = false;
+        leaveBtn.disabled = true;
+        setStatus('已取消加入房间');
+    });
+
+    // 密码输入框回车事件
+    passwordInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            submitPasswordBtn.click();
+        }
+    });
+
+    // 处理信令消息
+    async function handleSignaling(data) {
+        console.log('[信令]', data.type, data);
+
+        switch (data.type) {
+            case 'joined':
+                setStatus('已成功加入房间');
+                break;
+
+            case 'password-required':
+                setStatus('该房间需要密码');
+                showPasswordModal();
+                break;
+
+            case 'password-error':
+                alert('密码错误，请重试');
+                showPasswordModal();
+                break;
+
+            case 'user-joined':
+                setStatus(`用户 ${data.userId} 已加入房间，可以呼叫`);
+                remoteUserId = data.userId;
+                if (!isInCall) {
+                    callBtn.disabled = false;
+                }
+                break;
+
+            case 'user-left':
+                setStatus(`用户 ${data.userId} 已离开`);
+                if (remoteUserId === data.userId) {
+                    resetCall();
+                }
+                break;
+
+            case 'offer':
+                await handleOffer(data);
+                break;
+
+            case 'answer':
+                await handleAnswer(data);
+                break;
+
+            case 'ice-candidate':
+                await handleIceCandidate(data);
+                break;
+
+            default:
+                console.log('未知信令类型:', data.type);
+        }
+    }
+
+    // 开始呼叫
+    async function startCall() {
+        if (!localStream) return;
+
+        // 创建 RTCPeerConnection
+        peerConnection = new RTCPeerConnection(configuration);
+
+        // 添加本地流
+        localStream.getTracks().forEach(track => {
+            peerConnection.addTrack(track, localStream);
+        });
+
+        // 监听远程流
+        peerConnection.ontrack = (event) => {
+            console.log('收到远程流');
+            remoteVideo.srcObject = event.streams[0];
+        };
+
+        // 监听 ICE 候选
+        peerConnection.onicecandidate = (event) => {
+            if (event.candidate) {
+                ws.send(JSON.stringify({
+                    type: 'ice-candidate',
+                    data: event.candidate
+                }));
+            }
+        };
+
+        // 监听连接状态
+        peerConnection.onconnectionstatechange = () => {
+            console.log('连接状态:', peerConnection.connectionState);
+            if (peerConnection.connectionState === 'connected') {
+                setStatus('通话已建立');
+                isInCall = true;
+                callBtn.disabled = true;
+                hangupBtn.disabled = false;
+            } else if (peerConnection.connectionState === 'disconnected') {
+                setStatus('通话已断开');
+                resetCall();
+            }
+        };
+
+        // 创建 Offer
+        const offer = await peerConnection.createOffer();
+        await peerConnection.setLocalDescription(offer);
+
+        ws.send(JSON.stringify({
+            type: 'offer',
+            data: offer
+        }));
+
+        setStatus('正在呼叫对方...');
+    }
+
+    // 处理 Offer
+    async function handleOffer(data) {
+        // 创建 PeerConnection
+        peerConnection = new RTCPeerConnection(configuration);
+
+        // 添加本地流
+        if (localStream) {
+            localStream.getTracks().forEach(track => {
+                peerConnection.addTrack(track, localStream);
+            });
+        }
+
+        // 监听远程流
+        peerConnection.ontrack = (event) => {
+            console.log('收到远程流');
+            remoteVideo.srcObject = event.streams[0];
+        };
+
+        // 监听 ICE 候选
+        peerConnection.onicecandidate = (event) => {
+            if (event.candidate) {
+                ws.send(JSON.stringify({
+                    type: 'ice-candidate',
+                    data: event.candidate
+                }));
+            }
+        };
+
+        // 监听连接状态
+        peerConnection.onconnectionstatechange = () => {
+            if (peerConnection.connectionState === 'connected') {
+                setStatus('通话已建立');
+                isInCall = true;
+                callBtn.disabled = true;
+                hangupBtn.disabled = false;
+            }
+        };
+
+        // 设置远程描述
+        await peerConnection.setRemoteDescription(data.data);
+
+        // 创建 Answer
+        const answer = await peerConnection.createAnswer();
+        await peerConnection.setLocalDescription(answer);
+
+        ws.send(JSON.stringify({
+            type: 'answer',
+            data: answer
+        }));
+
+        setStatus('正在接听...');
+    }
+
+    // 处理 Answer
+    async function handleAnswer(data) {
+        if (peerConnection) {
+            await peerConnection.setRemoteDescription(data.data);
+            setStatus('通话建立中...');
+        }
+    }
+
+    // 处理 ICE 候选
+    async function handleIceCandidate(data) {
+        if (peerConnection) {
+            try {
+                await peerConnection.addIceCandidate(data.data);
+            } catch (error) {
+                console.error('添加ICE候选失败:', error);
+            }
+        }
+    }
+
+    // 挂断
+    function hangUp() {
+        if (peerConnection) {
+            peerConnection.close();
+            peerConnection = null;
+        }
+        remoteVideo.srcObject = null;
+        isInCall = false;
+        remoteUserId = null;
+        callBtn.disabled = false;
+        hangupBtn.disabled = true;
+        setStatus('已挂断');
+    }
+
+    // 重置通话状态
+    function resetCall() {
+        if (peerConnection) {
+            peerConnection.close();
+            peerConnection = null;
+        }
+        remoteVideo.srcObject = null;
+        isInCall = false;
+        remoteUserId = null;
+        callBtn.disabled = false;
+        hangupBtn.disabled = true;
+    }
+
+    // 完全重置
+    function resetAll() {
+        if (localStream) {
+            localStream.getTracks().forEach(track => track.stop());
+            localStream = null;
+        }
+        if (peerConnection) {
+            peerConnection.close();
+            peerConnection = null;
+        }
+        if (ws) {
+            ws.close();
+            ws = null;
+        }
+        localVideo.srcObject = null;
+        remoteVideo.srcObject = null;
+        isInCall = false;
+        remoteUserId = null;
+        currentRoomId = null;
+        currentUserId = null;
+        startCameraBtn.disabled = true;
+        callBtn.disabled = true;
+        hangupBtn.disabled = true;
+    }
+
+    // 页面关闭时清理
+    window.addEventListener('beforeunload', () => {
+        if (localStream) {
+            localStream.getTracks().forEach(track => track.stop());
+        }
+        if (ws) {
+            ws.close();
+        }
+    });
+
+    // 初始化
+    initTheme();
+
+    // 生成默认用户ID
+    userIdInput.value = 'user_' + Math.floor(Math.random() * 10000);
+</script>
+</body>
+</html>

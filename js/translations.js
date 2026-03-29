@@ -48,6 +48,19 @@
             // 差异对比
             diffTitle: '文件差异对比',
             diffInfo: '绿色表示新增，红色表示删除。',
+            selectFileToCompare: '选择要对比的文件',
+            currentFile: '当前文件',
+            compareFile: '对比文件',
+            pleaseSelectFile: '请先选择一个文件',
+            fileContentEmpty: '文件内容为空',
+
+            // 全文查找
+            findTitle: '全文查找',
+            findPlaceholder: '输入查找内容...',
+            findNext: '查找下一个',
+            findPrev: '查找上一个',
+            noMatchesFound: '未找到匹配内容',
+            matchesFound: '找到 {count} 个匹配',
 
             // 历史版本
             historyTitle: '历史版本',
@@ -105,6 +118,8 @@
             // 菜单
             share: '分享',
             myFiles: '我的文件',
+            fileDiff: '文件对比',
+            findInFile: '全文查找',
             cloudPrint: '云打印',
             presentationMode: '演示模式',
             presentationModeStarted: '已进入演示模式，按 ESC 键退出',
@@ -477,6 +492,19 @@
             // Diff comparison
             diffTitle: 'File Diff Comparison',
             diffInfo: 'Left side is local version, right side is server version. Green indicates additions, red indicates deletions.',
+            selectFileToCompare: 'Select File to Compare',
+            currentFile: 'Current File',
+            compareFile: 'Compare File',
+            pleaseSelectFile: 'Please select a file first',
+            fileContentEmpty: 'File content is empty',
+
+            // Find in file
+            findTitle: 'Find in File',
+            findPlaceholder: 'Enter search text...',
+            findNext: 'Find Next',
+            findPrev: 'Find Previous',
+            noMatchesFound: 'No matches found',
+            matchesFound: 'Found {count} matches',
 
             // History versions
             historyTitle: 'History Versions',
@@ -534,6 +562,8 @@
             // Menu
             share: 'Share',
             myFiles: 'My Files',
+            fileDiff: 'File Diff',
+            findInFile: 'Find in File',
             cloudPrint: 'Cloud Print',
             presentationMode: 'Presentation Mode',
             presentationModeStarted: 'Entered presentation mode, press ESC to exit',
