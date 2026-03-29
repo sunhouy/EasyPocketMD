@@ -8,8 +8,9 @@ function isEn() { return window.i18n && window.i18n.getLanguage() === 'en'; }
  * 导出 Markdown 为 DOCX 文件（后端转换方案）
  * @param {string} content - Markdown 内容
  * @param {Object} settings - 打印设置（可选）
+ * @param {string} customFilename - 自定义文件名（不含扩展名，可选）
  */
-async function exportDOCX(content, settings) {
+async function exportDOCX(content, settings, customFilename) {
     var loadingModal = null;
     var timeoutId = null;
 
@@ -81,18 +82,23 @@ async function exportDOCX(content, settings) {
         var blob = await response.blob();
 
         // 生成文件名
-        var filename = isEn() ? 'document' : '文档';
-        if (g('currentFileId') && typeof g('fileTree') !== 'undefined') {
-            try {
-                var currentNode = g('fileTree').jstree(true).get_node(g('currentFileId'));
-                if (currentNode) {
-                    filename = currentNode.text.replace(/\.md$/, '');
+        var filename;
+        if (customFilename) {
+            filename = customFilename + '.doc';
+        } else {
+            filename = isEn() ? 'document' : '文档';
+            if (g('currentFileId') && typeof g('fileTree') !== 'undefined') {
+                try {
+                    var currentNode = g('fileTree').jstree(true).get_node(g('currentFileId'));
+                    if (currentNode) {
+                        filename = currentNode.text.replace(/\.md$/, '');
+                    }
+                } catch (e) {
+                    // 忽略错误，使用默认文件名
                 }
-            } catch (e) {
-                // 忽略错误，使用默认文件名
             }
+            filename = filename + '_' + new Date().toISOString().slice(0, 10) + '.doc';
         }
-        filename = filename + '_' + new Date().toISOString().slice(0, 10) + '.doc';
 
         // 下载文件
         var url = URL.createObjectURL(blob);

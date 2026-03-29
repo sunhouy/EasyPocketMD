@@ -1,9 +1,9 @@
 import * as pdfjsLib from 'pdfjs-dist';
 import htmlToPdfmake from 'html-to-pdfmake';
 
-// Set worker source - use relative path for production build
+// Set worker source - use absolute path for production build
 // The worker file will be copied to assets directory by Vite
-pdfjsLib.GlobalWorkerOptions.workerSrc = './assets/pdf.worker.mjs';
+pdfjsLib.GlobalWorkerOptions.workerSrc = '/assets/pdf.worker.mjs';
 
 // 保存 pdfmake 实例，用于按需初始化
 let pdfMake = null;
