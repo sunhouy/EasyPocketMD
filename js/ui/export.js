@@ -139,9 +139,113 @@ function exportContent() {
 }
 
 
+// 获取当前文件名（不含扩展名）
+function getCurrentFileName() {
+    var defaultName = isEn() ? 'document' : '文档';
+    var currentFileId = g('currentFileId');
+    if (!currentFileId || typeof g('fileTree') === 'undefined') {
+        return defaultName;
+    }
+    try {
+        var currentNode = g('fileTree').jstree(true).get_node(currentFileId);
+        if (currentNode && currentNode.text) {
+            return currentNode.text.replace(/\.md$/i, '');
+        }
+    } catch (e) {
+        console.error('获取文件名失败:', e);
+    }
+    return defaultName;
+}
+
+// 显示文件名输入对话框
+function showFilenameDialog(defaultName, ext, callback) {
+    var nightMode = g('nightMode') === true;
+    var bg = nightMode ? '#2d2d2d' : 'white';
+    var textColor = nightMode ? '#eee' : '#333';
+    var borderColor = nightMode ? '#444' : '#ddd';
+
+    var modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:10000;';
+
+    var container = document.createElement('div');
+    container.style.cssText = 'background:' + bg + ';color:' + textColor + ';border-radius:12px;padding:25px;width:90%;max-width:400px;position:relative;';
+
+    var closeBtn = document.createElement('button');
+    closeBtn.innerHTML = '<i class="fas fa-times"></i>';
+    closeBtn.style.cssText = 'position:absolute;top:15px;right:15px;background:none;border:none;color:' + textColor + ';font-size:20px;cursor:pointer;';
+    closeBtn.onclick = function() { modal.remove(); };
+    container.appendChild(closeBtn);
+
+    var title = document.createElement('h2');
+    title.textContent = isEn() ? 'Enter File Name' : '输入文件名';
+    title.style.cssText = 'text-align:center;margin-bottom:20px;margin-top:0;font-size:18px;font-weight:600;';
+    container.appendChild(title);
+
+    var input = document.createElement('input');
+    input.type = 'text';
+    input.value = defaultName;
+    input.style.cssText = 'width:100%;padding:12px 15px;border:1px solid ' + borderColor + ';border-radius:8px;font-size:16px;background:' + (nightMode ? '#3d3d3d' : '#fff') + ';color:' + textColor + ';box-sizing:border-box;margin-bottom:20px;';
+    input.placeholder = isEn() ? 'File name' : '文件名';
+    container.appendChild(input);
+
+    var extLabel = document.createElement('div');
+    extLabel.textContent = '.' + ext;
+    extLabel.style.cssText = 'text-align:center;color:#667eea;font-size:14px;margin-bottom:20px;';
+    container.appendChild(extLabel);
+
+    var btnContainer = document.createElement('div');
+    btnContainer.style.cssText = 'display:flex;gap:10px;';
+
+    var cancelBtn = document.createElement('button');
+    cancelBtn.textContent = isEn() ? 'Cancel' : '取消';
+    cancelBtn.style.cssText = 'flex:1;padding:12px;border:1px solid ' + borderColor + ';border-radius:8px;background:transparent;color:' + textColor + ';font-size:16px;cursor:pointer;';
+    cancelBtn.onclick = function() { modal.remove(); };
+    btnContainer.appendChild(cancelBtn);
+
+    var confirmBtn = document.createElement('button');
+    confirmBtn.textContent = isEn() ? 'Download' : '下载';
+    confirmBtn.style.cssText = 'flex:1;padding:12px;border:none;border-radius:8px;background:#667eea;color:white;font-size:16px;cursor:pointer;';
+    confirmBtn.onclick = function() {
+        var filename = input.value.trim();
+        if (!filename) {
+            filename = defaultName;
+        }
+        modal.remove();
+        callback(filename);
+    };
+    btnContainer.appendChild(confirmBtn);
+
+    container.appendChild(btnContainer);
+    modal.appendChild(container);
+    document.body.appendChild(modal);
+
+    setTimeout(function() {
+        input.focus();
+        input.select();
+    }, 50);
+
+    input.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+            confirmBtn.click();
+        } else if (e.key === 'Escape') {
+            modal.remove();
+        }
+    });
+
+    modal.addEventListener('click', function(e) {
+        if (e.target === modal) {
+            modal.remove();
+        }
+    });
+}
+
 async function exportFile(content, ext) {
     var mimeTypes = { md: 'text/markdown', txt: 'text/plain', html: 'text/html', pdf: 'application/pdf' };
     var fileContent = content;
+
+    // 获取默认文件名
+    var defaultFileName = getCurrentFileName();
 
     // 纯文本导出：去掉 Markdown 标签
     if (ext === 'txt') {
@@ -172,39 +276,44 @@ async function exportFile(content, ext) {
                 const { generatePDF } = await getPDFGenerator();
                 var pdfUrl = await generatePDF(htmlContent, settings);
 
-                // 如果是 Capacitor 环境，使用特殊的下载逻辑
-                if (window.Capacitor && window.Capacitor.isNativePlatform()) {
-                    await downloadInCapacitor(pdfUrl, '文档_' + new Date().toISOString().slice(0, 10) + '.pdf', 'application/pdf');
-                    loadingModal.remove();
-                    return;
-                }
-
-                // 确保pdfUrl是完整的URL
-                var fullPdfUrl = pdfUrl;
-                if (!pdfUrl.startsWith('http://') && !pdfUrl.startsWith('https://') && !pdfUrl.startsWith('blob:')) {
-                    // 构建完整的URL
-                    var origin = window.getAppOrigin ? window.getAppOrigin() : window.location.origin;
-                    var baseUrl = origin;
-                    if (!pdfUrl.startsWith('/')) {
-                        baseUrl += '/' + window.location.pathname.split('/').slice(0, -1).join('/') + '/';
-                    }
-                    fullPdfUrl = baseUrl + pdfUrl;
-                }
-
-                // 创建下载链接
-                var a = document.createElement('a');
-                a.href = fullPdfUrl;
-                a.download = '文档_' + new Date().toISOString().slice(0, 10) + '.pdf';
-                a.target = '_blank'; // 新窗口打开以防下载失败
-                document.body.appendChild(a);
-                a.click();
-
-                setTimeout(function() {
-                    document.body.removeChild(a);
-                }, 100);
-
                 loadingModal.remove();
-                global.showMessage(isEn() ? 'Document exported as .pdf' : '文档已导出为.pdf格式');
+
+                // 显示文件名输入对话框
+                showFilenameDialog(defaultFileName, 'pdf', async function(filename) {
+                    var fullFilename = filename + '.pdf';
+
+                    // 如果是 Capacitor 环境，使用特殊的下载逻辑
+                    if (window.Capacitor && window.Capacitor.isNativePlatform()) {
+                        await downloadInCapacitor(pdfUrl, fullFilename, 'application/pdf');
+                        return;
+                    }
+
+                    // 确保pdfUrl是完整的URL
+                    var fullPdfUrl = pdfUrl;
+                    if (!pdfUrl.startsWith('http://') && !pdfUrl.startsWith('https://') && !pdfUrl.startsWith('blob:')) {
+                        // 构建完整的URL
+                        var origin = window.getAppOrigin ? window.getAppOrigin() : window.location.origin;
+                        var baseUrl = origin;
+                        if (!pdfUrl.startsWith('/')) {
+                            baseUrl += '/' + window.location.pathname.split('/').slice(0, -1).join('/') + '/';
+                        }
+                        fullPdfUrl = baseUrl + pdfUrl;
+                    }
+
+                    // 创建下载链接
+                    var a = document.createElement('a');
+                    a.href = fullPdfUrl;
+                    a.download = fullFilename;
+                    a.target = '_blank'; // 新窗口打开以防下载失败
+                    document.body.appendChild(a);
+                    a.click();
+
+                    setTimeout(function() {
+                        document.body.removeChild(a);
+                    }, 100);
+
+                    global.showMessage(isEn() ? 'Document exported as .pdf' : '文档已导出为.pdf格式');
+                });
             } catch (error) {
                 console.error('PDF导出错误:', error);
                 global.showMessage((isEn() ? 'PDF export failed: ' : 'PDF导出失败: ') + error.message);
@@ -249,26 +358,30 @@ async function exportFile(content, ext) {
 
                 loadingModal.remove();
 
-                var filename = '文档_' + new Date().toISOString().slice(0, 10) + '.html';
-                if (window.Capacitor && window.Capacitor.isNativePlatform()) {
-                    await downloadInCapacitor(finalHtml, filename, 'text/html', true);
-                    return;
-                }
+                // 显示文件名输入对话框
+                showFilenameDialog(defaultFileName, 'html', async function(filename) {
+                    var fullFilename = filename + '.html';
 
-                var blob = new Blob([finalHtml], { type: 'text/html' });
-                var url = URL.createObjectURL(blob);
-                var a = document.createElement('a');
-                a.href = url;
-                a.download = filename;
-                document.body.appendChild(a);
-                a.click();
+                    if (window.Capacitor && window.Capacitor.isNativePlatform()) {
+                        await downloadInCapacitor(finalHtml, fullFilename, 'text/html', true);
+                        return;
+                    }
 
-                setTimeout(function() {
-                    document.body.removeChild(a);
-                    window.URL.revokeObjectURL(url);
-                }, 100);
+                    var blob = new Blob([finalHtml], { type: 'text/html' });
+                    var url = URL.createObjectURL(blob);
+                    var a = document.createElement('a');
+                    a.href = url;
+                    a.download = fullFilename;
+                    document.body.appendChild(a);
+                    a.click();
 
-                global.showMessage(isEn() ? 'Document exported as .html' : '文档已导出为.html格式');
+                    setTimeout(function() {
+                        document.body.removeChild(a);
+                        window.URL.revokeObjectURL(url);
+                    }, 100);
+
+                    global.showMessage(isEn() ? 'Document exported as .html' : '文档已导出为.html格式');
+                });
             } catch (error) {
                 console.error('HTML导出错误:', error);
                 global.showMessage((isEn() ? 'HTML export failed: ' : 'HTML导出失败: ') + error.message);
@@ -291,25 +404,32 @@ async function exportFile(content, ext) {
             if (typeof global.exportDOCX !== 'function') {
                 await import('./docx-generator.js');
             }
-            await global.exportDOCX(content, settings);
+            // 显示文件名输入对话框，然后导出
+            showFilenameDialog(defaultFileName, 'docx', async function(filename) {
+                await global.exportDOCX(content, settings, filename);
+            });
         });
         return;
     }
 
-    var filename = '文档_' + new Date().toISOString().slice(0, 10) + '.' + ext;
-    if (window.Capacitor && window.Capacitor.isNativePlatform()) {
-        await downloadInCapacitor(fileContent, filename, mimeTypes[ext] || 'text/plain', true);
-        return;
-    }
+    // MD 和 TXT 导出逻辑
+    showFilenameDialog(defaultFileName, ext, async function(filename) {
+        var fullFilename = filename + '.' + ext;
 
-    var blob = new Blob([fileContent], { type: mimeTypes[ext] || 'text/plain' });
-    var url = URL.createObjectURL(blob);
-    var a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    a.click();
-    global.hideMobileActionSheet();
-    global.showMessage(isEn() ? 'Document exported as .' + ext : '文档已导出为.' + ext + '格式');
+        if (window.Capacitor && window.Capacitor.isNativePlatform()) {
+            await downloadInCapacitor(fileContent, fullFilename, mimeTypes[ext] || 'text/plain', true);
+            return;
+        }
+
+        var blob = new Blob([fileContent], { type: mimeTypes[ext] || 'text/plain' });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = fullFilename;
+        a.click();
+        global.hideMobileActionSheet();
+        global.showMessage(isEn() ? 'Document exported as .' + ext : '文档已导出为.' + ext + '格式');
+    });
 }
 
 /**
