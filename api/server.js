@@ -144,7 +144,13 @@ for (const p of potentialDistPaths) {
 }
 
 if (distPath) {
-    app.use(express.static(distPath));
+    app.use(express.static(distPath, {
+        setHeaders: (res, path) => {
+            if (path.endsWith('.mjs')) {
+                res.setHeader('Content-Type', 'text/javascript');
+            }
+        }
+    }));
     // SPA catch-all handler: for any request that doesn't match an API route or static file, send index.html
     app.get('*', (req, res, next) => {
         if (req.path.startsWith('/api')) {
@@ -156,7 +162,13 @@ if (distPath) {
     // Fallback to serving root for development (though Vite is recommended)
     // Note: Root index.html now uses modules, so it won't work directly without Vite
     if (!isTest) console.log('Frontend build (dist) not found. Serving from root directory.');
-    app.use(express.static(rootPath));
+    app.use(express.static(rootPath, {
+        setHeaders: (res, path) => {
+            if (path.endsWith('.mjs')) {
+                res.setHeader('Content-Type', 'text/javascript');
+            }
+        }
+    }));
     
     // SPA catch-all handler for root fallback
     app.get('*', (req, res, next) => {

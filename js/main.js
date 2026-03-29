@@ -453,6 +453,25 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         var mobileFileManagerBtn = document.getElementById('mobileFileManagerBtn');
         if (mobileFileManagerBtn) mobileFileManagerBtn.addEventListener('click', function() { window.showFileManager(); closeDrop(); });
+
+        // 文件对比按钮
+        var mobileFileDiffBtn = document.getElementById('mobileFileDiffBtn');
+        if (mobileFileDiffBtn) mobileFileDiffBtn.addEventListener('click', function() {
+            if (typeof window.showFileDiffDialog === 'function') {
+                window.showFileDiffDialog();
+            }
+            closeDrop();
+        });
+
+        // 全文查找按钮
+        var mobileFindBtn = document.getElementById('mobileFindBtn');
+        if (mobileFindBtn) mobileFindBtn.addEventListener('click', function() {
+            if (typeof window.showFindDialog === 'function') {
+                window.showFindDialog();
+            }
+            closeDrop();
+        });
+
         var mobilePrintBtn = document.getElementById('mobilePrintBtn');
         if (mobilePrintBtn) mobilePrintBtn.addEventListener('click', async function() {
             if (typeof window.showPrintDialog !== 'function') {
@@ -623,6 +642,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 closeDrop();
             } },
             { id: 'mobileFileManagerBtn', fn: function() { window.showFileManager(); closeDrop(); } },
+            { id: 'mobileFileDiffBtn', fn: function() { if (typeof window.showFileDiffDialog === 'function') window.showFileDiffDialog(); closeDrop(); } },
+            { id: 'mobileFindBtn', fn: function() { if (typeof window.showFindDialog === 'function') window.showFindDialog(); closeDrop(); } },
             { id: 'mobilePrintBtn', fn: async function() {
                 if (typeof window.showPrintDialog !== 'function') {
                     await import('./ui/print.js');
