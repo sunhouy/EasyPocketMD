@@ -247,10 +247,36 @@ jobs:
           lsof -ti:3001 | xargs kill -9 2>/dev/null || true
           sleep 1
 
+          # 检查敏感词文件是否存在
+          echo "检查敏感词文件..."
+          if [ ! -f "/www/wwwroot/static/sensitive.txt" ]; then
+            echo "⚠️ 警告: 敏感词文件不存在，敏感词检测功能将不可用"
+          else
+            echo "✓ 敏感词文件已存在"
+          fi
+
           # 启动新服务
           echo "启动新服务: $NEXT_NAME"
           cd "$NEXT_DIR"
+
+          # 导出所有必需的环境变量
           export PORT=$NEXT_PORT
+          export DB_HOST=${{ secrets.DB_HOST }}
+          export DB_PORT=${{ secrets.DB_PORT }}
+          export DB_USER=${{ secrets.DB_USER }}
+          export DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+          export DB_NAME=${{ secrets.DB_NAME }}
+          export REDIS_HOST=${{ secrets.REDIS_HOST }}
+          export REDIS_PORT=${{ secrets.REDIS_PORT }}
+          export REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}
+          export REDIS_DB=${{ secrets.REDIS_DB }}
+          export JWT_SECRET=${{ secrets.JWT_SECRET }}
+          export JWT_EXPIRES_IN=${{ secrets.JWT_EXPIRES_IN }}
+          export ADMIN_USER=${{ secrets.ADMIN_USER }}
+          export ADMIN_PASSWORD=${{ secrets.ADMIN_PASSWORD }}
+          export BASE_URL=${{ secrets.BASE_URL }}
+          export DASHSCOPE_API_KEY=${{ secrets.DASHSCOPE_API_KEY }}
+
           /www/server/nodejs/v24.14.1/bin/pm2 start api/server.js --name "$NEXT_NAME" --env production
 
           # 等待服务启动

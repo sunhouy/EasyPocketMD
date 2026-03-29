@@ -1,21 +1,30 @@
 const fs = require('fs');
 const path = require('path');
-const sensitiveWordFilter = require('sensitive-word-filter');
 
 // 敏感词文件路径
 const SENSITIVE_WORDS_PATH = '/www/wwwroot/static/sensitive.txt';
 
-// 使用库导出的 filter 函数
-const filter = {
-  addWords: function(words) {
-    // 该库不支持动态添加词，词库在模块加载时已固定
-    // 这里仅作为兼容接口
-  },
-  filter: sensitiveWordFilter.filter
-};
-
-// 是否已经加载过词库
+// 使用 Map 存储敏感词字典树
+let sensitiveWordMap = new Map();
 let isLoaded = false;
+let sensitiveWordsList = [];
+
+// 构建敏感词字典树
+function buildSensitiveWordMap(words) {
+  const map = new Map();
+  for (const word of words) {
+    if (!word || word.length === 0) continue;
+    let current = map;
+    for (const char of word) {
+      if (!current.has(char)) {
+        current.set(char, new Map());
+      }
+      current = current.get(char);
+    }
+    current.set('isEnd', true);
+  }
+  return map;
+}
 
 // 加载敏感词库
 function loadSensitiveWords() {
@@ -28,21 +37,21 @@ function loadSensitiveWords() {
       return;
     }
 
-    const words = fs.readFileSync(SENSITIVE_WORDS_PATH, 'utf-8')
+    sensitiveWordsList = fs.readFileSync(SENSITIVE_WORDS_PATH, 'utf-8')
       .split(/\r?\n/)
       .map(line => line.trim())
       .filter(Boolean);
 
-    // 使用新库的 addWords 方法批量添加
-    filter.addWords(words);
+    // 构建字典树
+    sensitiveWordMap = buildSensitiveWordMap(sensitiveWordsList);
     isLoaded = true;
-    console.log(`✅ 敏感词库加载完成，共 ${words.length} 个词`);
+    console.log(`✅ 敏感词库加载完成，共 ${sensitiveWordsList.length} 个词`);
   } catch (error) {
     console.error('❌ 加载敏感词库失败:', error.message);
   }
 }
 
-// 检查文本是否包含敏感词
+// 检查文本是否包含敏感词，并返回所有匹配的敏感词
 // 返回 { hasSensitive: boolean, words: string[] }
 function checkSensitiveWords(text) {
   if (!text || typeof text !== 'string') {
@@ -54,38 +63,59 @@ function checkSensitiveWords(text) {
     loadSensitiveWords();
   }
 
-  // 使用新库的 filter 方法检测并替换
-  const result = filter.filter(text);
-  const hasSensitive = result !== text;
-
-  if (hasSensitive) {
-    // 通过对比找出所有敏感词
-    const words = findSensitiveWords(text);
-    return { hasSensitive: true, words };
+  // 如果词库为空，直接返回
+  if (sensitiveWordsList.length === 0) {
+    return { hasSensitive: false, words: [] };
   }
 
-  return { hasSensitive: false, words: [] };
+  const foundWords = new Set();
+  const textLength = text.length;
+
+  // 遍历文本的每个位置
+  for (let i = 0; i < textLength; i++) {
+    let current = sensitiveWordMap;
+    let match = '';
+
+    for (let j = i; j < textLength; j++) {
+      const char = text[j];
+      if (!current.has(char)) {
+        break;
+      }
+      match += char;
+      current = current.get(char);
+
+      // 如果到达词尾，说明匹配到一个敏感词
+      if (current.has('isEnd')) {
+        foundWords.add(match);
+      }
+    }
+  }
+
+  const words = Array.from(foundWords);
+  return {
+    hasSensitive: words.length > 0,
+    words: words
+  };
 }
 
-// 辅助函数：找出文本中的所有敏感词
-function findSensitiveWords(text) {
-  const words = new Set();
-
-  // 使用简单的滑动窗口方法找出所有匹配的敏感词
-  // 由于 sensitive-word-filter 没有直接提供查找所有词的方法
-  // 我们通过分段检测来找出敏感词
-  const foundWords = [];
-
-  // 尝试找出所有敏感词（通过替换后对比）
-  let maskedText = filter.filter(text);
-  if (maskedText === text) {
-    return [];
+// 过滤敏感词，将敏感词替换为 ***
+function filterSensitiveWords(text, replacement = '***') {
+  if (!text || typeof text !== 'string') {
+    return text;
   }
 
-  // 使用库内部的字典树匹配来找出敏感词
-  // 由于库的限制，我们返回一个标识性的结果
-  // 实际应用中可以通过遍历敏感词列表来精确匹配
-  return ['敏感词'];
+  const checkResult = checkSensitiveWords(text);
+  if (!checkResult.hasSensitive) {
+    return text;
+  }
+
+  let filteredText = text;
+  for (const word of checkResult.words) {
+    const regex = new RegExp(word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
+    filteredText = filteredText.replace(regex, replacement);
+  }
+
+  return filteredText;
 }
 
 // 检查对象中的指定字段是否包含敏感词
@@ -117,7 +147,7 @@ function sensitiveMiddleware(req, res, next) {
 
   function filterText(text) {
     if (!text || typeof text !== 'string') return text;
-    return filter.filter(text, '***');
+    return filterSensitiveWords(text, '***');
   }
 
   // 递归处理 req.body / req.query / req.params
@@ -140,6 +170,7 @@ function sensitiveMiddleware(req, res, next) {
 module.exports = {
   loadSensitiveWords,
   checkSensitiveWords,
+  filterSensitiveWords,
   checkObjectFields,
   sensitiveMiddleware
 };
