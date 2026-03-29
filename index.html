@@ -435,6 +435,21 @@
     </div>
 </div>
 
+<!-- 视频通话模态窗口 -->
+<div class="modal-overlay" id="videoCallModalOverlay">
+    <div class="modal" style="position:relative;width:90vw;height:90vh;max-width:1200px;max-height:90vh;overflow:hidden;display:flex;flex-direction:column;padding:0;">
+        <div class="modal-header" style="flex-shrink:0;padding:15px 20px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center;">
+            <h2 data-i18n="videoCall">视频通话</h2>
+            <button class="modal-close-btn" id="closeVideoCallBtn" style="background:none;border:none;font-size:20px;cursor:pointer;">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="modal-content" style="flex:1;overflow:hidden;padding:0;">
+            <iframe id="videoCallIframe" src="" style="width:100%;height:100%;border:none;" allow="camera;microphone"></iframe>
+        </div>
+    </div>
+</div>
+
 <!-- 关于模态窗口 -->
 <div class="modal-overlay" id="aboutModalOverlay">
     <div class="modal" style="position:relative;max-height:85vh;overflow:hidden;display:flex;flex-direction:column;">
@@ -646,6 +661,7 @@
                 <button class="dropdown-item" id="mobileModeBtn"><i class="fas fa-exchange-alt"></i>  <span data-i18n="switchMode">切换编辑器模式</span></button>
                 <button class="dropdown-item" id="mobileImportBtn"><i class="fas fa-file-import"></i>  <span data-i18n="import">导入</span></button>
                 <button class="dropdown-item" id="mobileExportBtn"><i class="fas fa-file-export"></i>  <span data-i18n="export">导出</span></button>
+                <button class="dropdown-item" id="mobileVideoCallBtn"><i class="fas fa-video"></i>  <span data-i18n="videoCall">视频通话</span></button>
                 <button class="dropdown-item" id="mobileClearBtn"><i class="fas fa-trash-alt"></i>  <span data-i18n="clear">清空</span></button>
                 <button class="dropdown-item" id="aboutBtn"><i class="fas fa-info-circle"></i>  <span data-i18n="about">关于</span></button>
             </div>

@@ -115,6 +115,7 @@
             clear: '清空',
             clearConfirm: '确定要清空当前文件的内容吗？',
             contentCleared: '内容已清空',
+            videoCall: '视频通话',
 
             // 编辑器
             startEditing: '开始编辑...支持 Markdown 语法',
@@ -543,6 +544,7 @@
             clear: 'Clear',
             clearConfirm: 'Are you sure you want to clear the current file content?',
             contentCleared: 'Content cleared',
+            videoCall: 'Video Call',
 
             // Editor
             startEditing: 'Start editing... Supports Markdown syntax',
