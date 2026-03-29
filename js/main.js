@@ -493,6 +493,20 @@ document.addEventListener('DOMContentLoaded', function() {
         var aboutBtn = document.getElementById('aboutBtn');
         if (aboutBtn) aboutBtn.addEventListener('click', function() { window.showAboutDialog(); closeDrop(); });
 
+        var mobileVideoCallBtn = document.getElementById('mobileVideoCallBtn');
+        if (mobileVideoCallBtn) mobileVideoCallBtn.addEventListener('click', function() {
+            var modal = document.getElementById('videoCallModalOverlay');
+            var iframe = document.getElementById('videoCallIframe');
+            if (modal && iframe) {
+                // 传递夜间模式参数
+                var isDarkMode = window.nightMode || document.body.classList.contains('night-mode');
+                var url = 'https://webrtc.yhsun.cn/' + (isDarkMode ? '?darkMode=true' : '');
+                iframe.src = url;
+                modal.classList.add('show');
+            }
+            closeDrop();
+        });
+
         var mobileClearBtn = document.getElementById('mobileClearBtn');
         if (mobileClearBtn) mobileClearBtn.addEventListener('click', async function() {
             const confirmed = await window.customConfirm(window.i18n ? window.i18n.t('clearConfirm') : '确定要清空当前文件的内容吗？');
@@ -631,6 +645,18 @@ document.addEventListener('DOMContentLoaded', function() {
                     await import('./uncertainty-calculator.js');
                 }
                 if (typeof window.showUncertaintyCalculator === 'function') window.showUncertaintyCalculator();
+                closeDrop();
+            } },
+            { id: 'mobileVideoCallBtn', fn: function() {
+                var modal = document.getElementById('videoCallModalOverlay');
+                var iframe = document.getElementById('videoCallIframe');
+                if (modal && iframe) {
+                    // 传递夜间模式参数
+                    var isDarkMode = window.nightMode || document.body.classList.contains('night-mode');
+                    var url = 'https://webrtc.yhsun.cn/' + (isDarkMode ? '?darkMode=true' : '');
+                    iframe.src = url;
+                    modal.classList.add('show');
+                }
                 closeDrop();
             } },
             { id: 'mobileClearBtn', fn: async function() { const confirmed = await window.customConfirm(window.i18n ? window.i18n.t('clearConfirm') : '确定要清空当前文件的内容吗？'); if (confirmed) { if (window.vditor) window.vditor.setValue(''); window.showMessage(window.i18n ? window.i18n.t('contentCleared') : '内容已清空'); } closeDrop(); } },
@@ -998,6 +1024,24 @@ document.addEventListener('DOMContentLoaded', function() {
     var closeAboutBtn = document.getElementById('closeAboutBtn');
     if (closeAboutBtn) closeAboutBtn.addEventListener('click', function() {
         document.getElementById('aboutModalOverlay').classList.remove('show');
+    });
+
+    // 视频通话模态框关闭
+    var closeVideoCallBtn = document.getElementById('closeVideoCallBtn');
+    if (closeVideoCallBtn) closeVideoCallBtn.addEventListener('click', function() {
+        var modal = document.getElementById('videoCallModalOverlay');
+        var iframe = document.getElementById('videoCallIframe');
+        if (modal) modal.classList.remove('show');
+        if (iframe) iframe.src = ''; // 清空iframe以停止视频流
+    });
+
+    var videoCallModalOverlay = document.getElementById('videoCallModalOverlay');
+    if (videoCallModalOverlay) videoCallModalOverlay.addEventListener('click', function(e) {
+        if (e.target === this) {
+            this.classList.remove('show');
+            var iframe = document.getElementById('videoCallIframe');
+            if (iframe) iframe.src = '';
+        }
     });
 
     // 点击遮罩层关闭模态框
