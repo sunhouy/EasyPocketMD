@@ -44,7 +44,7 @@ self.addEventListener('fetch', event => {
 
   const url = new URL(request.url);
 
-  if (url.pathname.startsWith('/api/')) {
+  if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/uploads/')) {
     return;
   }
 
@@ -137,6 +137,10 @@ export default defineConfig({
         {
           src: 'icon-512.png',
           dest: '.'
+        },
+        {
+          src: 'node_modules/pdfjs-dist/build/pdf.worker.mjs',
+          dest: 'assets'
         }
       ]
     }),
