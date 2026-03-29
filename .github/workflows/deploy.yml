@@ -97,6 +97,7 @@ jobs:
         host: ${{ secrets.SERVER_HOST }}
         username: ${{ secrets.SERVER_USER }}
         password: ${{ secrets.SERVER_PASSWORD }}
+        timeout: 120s
         script: |
           set -e
           export PATH=$PATH:/www/server/nodejs/v24.14.1/bin
@@ -154,6 +155,7 @@ jobs:
         host: ${{ secrets.SERVER_HOST }}
         username: ${{ secrets.SERVER_USER }}
         password: ${{ secrets.SERVER_PASSWORD }}
+        timeout: 600s
         script: |
           set -e
           export PATH=$PATH:/www/server/nodejs/v24.14.1/bin
@@ -175,21 +177,48 @@ jobs:
             NEXT_DIR="$GREEN_DIR"
           fi
 
-          echo "解压部署包到 $NEXT_DIR..."
-          tar -xzf /tmp/deploy.tar.gz -C "$NEXT_DIR"
+          echo "[1/4] 解压部署包到 $NEXT_DIR..."
+          # 使用超时机制解压，避免卡死
+          timeout 120 tar -xzf /tmp/deploy.tar.gz -C "$NEXT_DIR" || {
+            echo "错误: 解压超时或失败"
+            exit 1
+          }
+          echo "✓ 解压完成"
 
           # 设置共享目录符号链接
+          echo "[2/4] 设置共享目录符号链接..."
           cd "$NEXT_DIR"
           rm -rf uploads user_uploads user_files
           ln -s "$SHARED_DIR/uploads" uploads
           ln -s "$SHARED_DIR/user_uploads" user_uploads
           ln -s "$SHARED_DIR/user_files" user_files
+          echo "✓ 符号链接创建完成"
 
-          # 安装依赖
-          echo "安装依赖..."
-          npm install --omit=dev --prefer-offline
+          # 安装依赖 - 使用更可靠的方式
+          echo "[3/4] 安装依赖..."
+          # 清理 npm 缓存，避免旧缓存问题
+          npm cache clean --force 2>/dev/null || true
+          
+          # 使用 npm ci 如果有 package-lock.json，否则使用 npm install
+          if [ -f "package-lock.json" ]; then
+            echo "使用 npm ci (基于 package-lock.json)..."
+            timeout 300 npm ci --omit=dev --prefer-offline --no-audit --no-fund || {
+              echo "npm ci 失败，尝试 npm install..."
+              timeout 300 npm install --omit=dev --prefer-offline --no-audit --no-fund
+            }
+          else
+            echo "使用 npm install..."
+            timeout 300 npm install --omit=dev --prefer-offline --no-audit --no-fund
+          fi
+          echo "✓ 依赖安装完成"
 
-          echo "部署目录准备完成: $NEXT_DIR"
+          # 验证安装
+          echo "[4/4] 验证安装..."
+          if [ ! -d "node_modules" ]; then
+            echo "错误: node_modules 目录不存在"
+            exit 1
+          fi
+          echo "✓ 部署目录准备完成: $NEXT_DIR"
 
     - name: Zero-downtime switch
       uses: appleboy/ssh-action@master
@@ -197,6 +226,7 @@ jobs:
         host: ${{ secrets.SERVER_HOST }}
         username: ${{ secrets.SERVER_USER }}
         password: ${{ secrets.SERVER_PASSWORD }}
+        timeout: 300s
         script: |
           set -e
           export PATH=$PATH:/www/server/nodejs/v24.14.1/bin
@@ -357,6 +387,7 @@ jobs:
         host: ${{ secrets.SERVER_HOST }}
         username: ${{ secrets.SERVER_USER }}
         password: ${{ secrets.SERVER_PASSWORD }}
+        timeout: 300s
         script: |
           set -e
           export PATH=$PATH:/www/server/nodejs/v24.14.1/bin
@@ -413,6 +444,7 @@ jobs:
         host: ${{ secrets.SERVER_HOST }}
         username: ${{ secrets.SERVER_USER }}
         password: ${{ secrets.SERVER_PASSWORD }}
+        timeout: 60s
         script: |
           # 清理临时文件
           rm -f /tmp/deploy.tar.gz
