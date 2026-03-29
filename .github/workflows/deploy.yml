@@ -99,6 +99,7 @@ jobs:
         password: ${{ secrets.SERVER_PASSWORD }}
         script: |
           set -e
+          export PATH=$PATH:/usr/local/bin:~/.npm-global/bin
 
           # 定义目录
           GREEN_DIR="/www/wwwroot/js_green"
@@ -155,6 +156,7 @@ jobs:
         password: ${{ secrets.SERVER_PASSWORD }}
         script: |
           set -e
+          export PATH=$PATH:/usr/local/bin:~/.npm-global/bin
 
           GREEN_DIR="/www/wwwroot/js_green"
           BLUE_DIR="/www/wwwroot/js_blue"
@@ -197,6 +199,7 @@ jobs:
         password: ${{ secrets.SERVER_PASSWORD }}
         script: |
           set -e
+          export PATH=$PATH:/usr/local/bin:~/.npm-global/bin
 
           GREEN_DIR="/www/wwwroot/js_green"
           BLUE_DIR="/www/wwwroot/js_blue"
@@ -306,6 +309,7 @@ jobs:
         password: ${{ secrets.SERVER_PASSWORD }}
         script: |
           set -e
+          export PATH=$PATH:/usr/local/bin:~/.npm-global/bin
 
           LINK_PATH="/www/wwwroot/js"
           if [ -L "$LINK_PATH" ]; then
