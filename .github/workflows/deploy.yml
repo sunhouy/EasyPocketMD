@@ -99,7 +99,7 @@ jobs:
         password: ${{ secrets.SERVER_PASSWORD }}
         script: |
           set -e
-          export PATH=$PATH:/usr/local/bin:~/.npm-global/bin
+          export PATH=$PATH:/www/server/nodejs/v24.14.1/bin
 
           # 定义目录
           GREEN_DIR="/www/wwwroot/js_green"
@@ -156,7 +156,7 @@ jobs:
         password: ${{ secrets.SERVER_PASSWORD }}
         script: |
           set -e
-          export PATH=$PATH:/usr/local/bin:~/.npm-global/bin
+          export PATH=$PATH:/www/server/nodejs/v24.14.1/bin
 
           GREEN_DIR="/www/wwwroot/js_green"
           BLUE_DIR="/www/wwwroot/js_blue"
@@ -199,7 +199,7 @@ jobs:
         password: ${{ secrets.SERVER_PASSWORD }}
         script: |
           set -e
-          export PATH=$PATH:/usr/local/bin:~/.npm-global/bin
+          export PATH=$PATH:/www/server/nodejs/v24.14.1/bin
 
           GREEN_DIR="/www/wwwroot/js_green"
           BLUE_DIR="/www/wwwroot/js_blue"
@@ -227,12 +227,12 @@ jobs:
           cd "$NEXT_DIR"
 
           # 启动或重启新服务（确保代码变更生效）
-          if ! pm2 describe "$NEXT_NAME" > /dev/null 2>&1; then
+          if ! /www/server/nodejs/v24.14.1/bin/pm2 describe "$NEXT_NAME" > /dev/null 2>&1; then
             echo "启动新服务: $NEXT_NAME"
-            PORT=3001 pm2 start api/server.js --name "$NEXT_NAME" --env production
+            PORT=3001 /www/server/nodejs/v24.14.1/bin/pm2 start api/server.js --name "$NEXT_NAME" --env production
           else
             echo "重启现有服务（确保代码变更生效）: $NEXT_NAME"
-            PORT=3001 pm2 restart "$NEXT_NAME" --update-env
+            PORT=3001 /www/server/nodejs/v24.14.1/bin/pm2 restart "$NEXT_NAME" --update-env
           fi
 
           # 等待服务启动
@@ -289,17 +289,16 @@ jobs:
           service nginx reload
 
           # 停止旧服务
-          if [ -n "$CURRENT_NAME" ] && pm2 describe "$CURRENT_NAME" > /dev/null 2>&1; then
+          if [ -n "$CURRENT_NAME" ] && /www/server/nodejs/v24.14.1/bin/pm2 describe "$CURRENT_NAME" > /dev/null 2>&1; then
             echo "停止旧服务: $CURRENT_NAME"
-            pm2 stop "$CURRENT_NAME" || true
-            pm2 delete "$CURRENT_NAME" || true
+            /www/server/nodejs/v24.14.1/bin/pm2 stop "$CURRENT_NAME" || true
+            /www/server/nodejs/v24.14.1/bin/pm2 delete "$CURRENT_NAME" || true
           fi
 
-          # 保存 PM2 配置
-          pm2 save
+          /www/server/nodejs/v24.14.1/bin/pm2 save
 
           echo "✓ 零停机部署完成！"
-          pm2 list
+          /www/server/nodejs/v24.14.1/bin/pm2 list
 
     - name: Setup and start print server (zero-downtime)
       uses: appleboy/ssh-action@master
@@ -309,7 +308,7 @@ jobs:
         password: ${{ secrets.SERVER_PASSWORD }}
         script: |
           set -e
-          export PATH=$PATH:/usr/local/bin:~/.npm-global/bin
+          export PATH=$PATH:/www/server/nodejs/v24.14.1/bin
 
           LINK_PATH="/www/wwwroot/js"
           if [ -L "$LINK_PATH" ]; then
@@ -340,13 +339,13 @@ jobs:
 
           # 零停机重启打印服务器
           echo "零停机重启打印服务器..."
-          if pm2 describe print-server > /dev/null 2>&1; then
-            pm2 reload print-server --update-env
+          if /www/server/nodejs/v24.14.1/bin/pm2 describe print-server > /dev/null 2>&1; then
+            /www/server/nodejs/v24.14.1/bin/pm2 reload print-server --update-env
           else
-            pm2 start print_server.py --name "print-server" --interpreter "$PYTHON_CMD" -- --host 0.0.0.0 --port 8770
+            /www/server/nodejs/v24.14.1/bin/pm2 start print_server.py --name "print-server" --interpreter "$PYTHON_CMD" -- --host 0.0.0.0 --port 8770
           fi
 
-          pm2 save
+          /www/server/nodejs/v24.14.1/bin/pm2 save
           echo "✓ 打印服务器热更新完成！"
 
     - name: Final cleanup
@@ -363,7 +362,7 @@ jobs:
           echo "=========================================="
           echo "✓ 零停机部署成功完成！"
           echo "=========================================="
-          pm2 list
+          /www/server/nodejs/v24.14.1/bin/pm2 list
 
   # 检查 print_client.py 是否变更
   check-print-changes:
