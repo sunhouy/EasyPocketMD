@@ -77,6 +77,10 @@
                 
                 if (localData) {
                     const blobUrl = global.IndexedDBManager.createBlobURL(localData.data, localData.contentType);
+                    // 注册 URL 映射，以便保存时能正确转换回原始 URL
+                    if (global.LocalImageManager && global.LocalImageManager.registerUrlPair) {
+                        global.LocalImageManager.registerUrlPair(url, blobUrl);
+                    }
                     cache.set(url, blobUrl);
                     
                     (async () => {
@@ -97,6 +101,10 @@
                                 }
                                 
                                 const newBlobUrl = global.IndexedDBManager.createBlobURL(result.data, result.contentType);
+                                // 注册新的 URL 映射
+                                if (global.LocalImageManager && global.LocalImageManager.registerUrlPair) {
+                                    global.LocalImageManager.registerUrlPair(url, newBlobUrl);
+                                }
                                 cache.set(url, newBlobUrl);
                                 refreshResourceInDOM(url, newBlobUrl, isImage);
                             }
@@ -116,8 +124,12 @@
                     result.lastModified,
                     result.etag
                 );
-                
+
                 const blobUrl = global.IndexedDBManager.createBlobURL(result.data, result.contentType);
+                // 注册 URL 映射，以便保存时能正确转换回原始 URL
+                if (global.LocalImageManager && global.LocalImageManager.registerUrlPair) {
+                    global.LocalImageManager.registerUrlPair(url, blobUrl);
+                }
                 cache.set(url, blobUrl);
                 return blobUrl;
             } catch (error) {

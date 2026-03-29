@@ -8,7 +8,8 @@
         const images = document.querySelectorAll('img');
         for (const img of images) {
             const src = img.src || img.getAttribute('data-original-src');
-            if (!src || src.startsWith('blob:') || src.startsWith('data:')) {
+            // 只处理本地图片，云端图片保持原链接
+            if (!src || src.startsWith('blob:') || src.startsWith('data:') || src.startsWith('http://') || src.startsWith('https://')) {
                 continue;
             }
 

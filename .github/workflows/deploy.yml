@@ -322,7 +322,9 @@ jobs:
             echo "更新 Nginx 配置..."
             cp "$NEXT_DIR/nginx.conf" /www/server/panel/vhost/nginx/md.yhsun.cn.conf
             # 确保 Nginx 配置指向正确的端口（使用当前活动的端口）
+            # 同时替换 localhost 和 127.0.0.1 的端口
             sed -i "s/proxy_pass http:\/\/localhost:[0-9]*/proxy_pass http:\/\/localhost:$NEXT_PORT/" /www/server/panel/vhost/nginx/md.yhsun.cn.conf
+            sed -i "s/proxy_pass http:\/\/127.0.0.1:[0-9]*/proxy_pass http:\/\/127.0.0.1:$NEXT_PORT/" /www/server/panel/vhost/nginx/md.yhsun.cn.conf
             # 确保 API 路由配置正确
             if ! grep -q "location /api/" /www/server/panel/vhost/nginx/md.yhsun.cn.conf; then
               echo "警告: Nginx 配置中缺少 /api/ 路由配置"
