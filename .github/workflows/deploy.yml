@@ -226,13 +226,21 @@ jobs:
           echo "在新目录启动服务: $NEXT_NAME"
           cd "$NEXT_DIR"
 
+          # 根据服务名称设置端口
+          if [ "$NEXT_NAME" = "md-server-green" ]; then
+            NEXT_PORT=3050
+          else
+            NEXT_PORT=3051
+          fi
+          echo "服务 $NEXT_NAME 将使用端口: $NEXT_PORT"
+
           # 启动或重启新服务（确保代码变更生效）
           if ! /www/server/nodejs/v24.14.1/bin/pm2 describe "$NEXT_NAME" > /dev/null 2>&1; then
             echo "启动新服务: $NEXT_NAME"
-            PORT=3001 /www/server/nodejs/v24.14.1/bin/pm2 start api/server.js --name "$NEXT_NAME" --env production
+            PORT=$NEXT_PORT /www/server/nodejs/v24.14.1/bin/pm2 start api/server.js --name "$NEXT_NAME" --env production
           else
             echo "重启现有服务（确保代码变更生效）: $NEXT_NAME"
-            PORT=3001 /www/server/nodejs/v24.14.1/bin/pm2 restart "$NEXT_NAME" --update-env
+            PORT=$NEXT_PORT /www/server/nodejs/v24.14.1/bin/pm2 restart "$NEXT_NAME" --update-env
           fi
 
           # 等待服务启动
@@ -242,7 +250,7 @@ jobs:
           # 验证服务健康状态
           echo "验证服务健康状态..."
           for i in {1..10}; do
-            if curl -s http://localhost:3001/api/health | grep -q '"code":200'; then
+            if curl -s http://localhost:$NEXT_PORT/api/health | grep -q '"code":200'; then
               echo "✓ 服务健康检查通过"
               break
             fi
@@ -277,8 +285,8 @@ jobs:
           if [ -f "$NEXT_DIR/nginx.conf" ]; then
             echo "更新 Nginx 配置..."
             cp "$NEXT_DIR/nginx.conf" /www/server/panel/vhost/nginx/md.yhsun.cn.conf
-            # 确保 Nginx 配置指向正确的端口
-            sed -i 's/proxy_pass http:\/\/localhost:[0-9]*/proxy_pass http:\/\/localhost:3001/' /www/server/panel/vhost/nginx/md.yhsun.cn.conf
+            # 确保 Nginx 配置指向正确的端口（使用当前活动的端口）
+            sed -i "s/proxy_pass http:\/\/localhost:[0-9]*/proxy_pass http:\/\/localhost:$NEXT_PORT/" /www/server/panel/vhost/nginx/md.yhsun.cn.conf
             # 确保 API 路由配置正确
             if ! grep -q "location /api/" /www/server/panel/vhost/nginx/md.yhsun.cn.conf; then
               echo "警告: Nginx 配置中缺少 /api/ 路由配置"
@@ -355,7 +363,7 @@ jobs:
           if /www/server/nodejs/v24.14.1/bin/pm2 describe print-server > /dev/null 2>&1; then
             /www/server/nodejs/v24.14.1/bin/pm2 reload print-server --update-env
           else
-            /www/server/nodejs/v24.14.1/bin/pm2 start print_server.py --name "print-server" --interpreter "$VENV_PYTHON" -- --host 0.0.0.0 --port 8770
+            /www/server/nodejs/v24.14.1/bin/pm2 start print_server.py --name "print-server" --interpreter "$VENV_PYTHON" -- --host 0.0.0.0 --port 3060
           fi
 
           /www/server/nodejs/v24.14.1/bin/pm2 save
