@@ -234,14 +234,18 @@ jobs:
           fi
           echo "服务 $NEXT_NAME 将使用端口: $NEXT_PORT"
 
-          # 启动或重启新服务（确保代码变更生效）
-          if ! /www/server/nodejs/v24.14.1/bin/pm2 describe "$NEXT_NAME" > /dev/null 2>&1; then
-            echo "启动新服务: $NEXT_NAME"
-            PORT=$NEXT_PORT /www/server/nodejs/v24.14.1/bin/pm2 start api/server.js --name "$NEXT_NAME" --env production
-          else
-            echo "重启现有服务（确保代码变更生效）: $NEXT_NAME"
-            PORT=$NEXT_PORT /www/server/nodejs/v24.14.1/bin/pm2 restart "$NEXT_NAME" --update-env
+          # 停止并删除旧服务（如果存在），确保使用新端口启动
+          if /www/server/nodejs/v24.14.1/bin/pm2 describe "$NEXT_NAME" > /dev/null 2>&1; then
+            echo "停止并删除旧服务: $NEXT_NAME"
+            /www/server/nodejs/v24.14.1/bin/pm2 stop "$NEXT_NAME" || true
+            /www/server/nodejs/v24.14.1/bin/pm2 delete "$NEXT_NAME" || true
+            sleep 2
           fi
+
+          # 启动新服务
+          echo "启动新服务: $NEXT_NAME"
+          cd "$NEXT_DIR"
+          PORT=$NEXT_PORT /www/server/nodejs/v24.14.1/bin/pm2 start api/server.js --name "$NEXT_NAME" --env production
 
           # 等待服务启动
           echo "等待服务启动..."
