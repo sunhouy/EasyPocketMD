@@ -286,7 +286,12 @@ jobs:
           fi
 
           # 重载 Nginx
-          service nginx reload
+          if [ -f /etc/init.d/nginx ]; then
+            /etc/init.d/nginx reload
+          else
+            nginx -s reload || service nginx reload
+          fi
+
 
           # 停止旧服务
           if [ -n "$CURRENT_NAME" ] && /www/server/nodejs/v24.14.1/bin/pm2 describe "$CURRENT_NAME" > /dev/null 2>&1; then
