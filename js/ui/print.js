@@ -387,19 +387,7 @@ async function downloadInCapacitor(data, filename, mimeType, isRawData = false) 
             <button class="align-btn" data-align="center" style="flex:1;padding:8px;background:${nightMode ? '#424242' : '#E0E0E0'};color:${textColor};border:none;border-radius:6px;cursor:pointer;">${isEn() ? 'Center' : '居中'}</button>
             <button class="align-btn" data-align="right" style="flex:1;padding:8px;background:${nightMode ? '#424242' : '#E0E0E0'};color:${textColor};border:none;border-radius:6px;cursor:pointer;">${isEn() ? 'Right' : '居右'}</button>
         </div>
-                        <div style="margin-top:10px;">
-                            <label style="display:flex;align-items:center;gap:10px;cursor:pointer;">
-                                <input type="checkbox" id="indentParagraph" checked style="width:18px;height:18px;">
-                                <span style="font-size:14px;">${isEn() ? 'Auto indent first line of each paragraph' : '每段段首自动空两格'}</span>
-                            </label>
-                        </div>
                     </div>
-                </div>
-                <div style="margin-top:15px;">
-                    <label style="display:flex;align-items:center;gap:10px;cursor:pointer;">
-                        <input type="checkbox" id="fitToPage" style="width:18px;height:18px;">
-                        <span style="font-size:14px;">${isEn() ? 'Auto fit to one page' : '自动排版至一页'}</span>
-                    </label>
                 </div>
             </div>
 
@@ -1098,11 +1086,24 @@ async function downloadInCapacitor(data, filename, mimeType, isRawData = false) 
         // AI智能排版按钮点击事件
         var aiLayoutBtn = modalContent.querySelector('#aiLayoutBtn');
         if (aiLayoutBtn) {
-            aiLayoutBtn.onclick = function() {
+            aiLayoutBtn.onclick = async function() {
                 if (global.showAILayoutDialog) {
                     global.showAILayoutDialog(modalContent, cleanup, printModal);
                 } else {
-                    console.error('AI Layout module not loaded');
+                    // 动态加载 AI 模块
+                    try {
+                        aiLayoutBtn.disabled = true;
+                        aiLayoutBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ' + (isEn() ? 'Loading...' : '加载中...');
+                        await import('./ai.js');
+                        if (global.showAILayoutDialog) {
+                            global.showAILayoutDialog(modalContent, cleanup, printModal);
+                        }
+                    } catch (error) {
+                        console.error('Failed to load AI Layout module:', error);
+                        global.showMessage((isEn() ? 'Failed to load AI Layout module: ' : '加载AI排版模块失败: ') + error.message, 'error');
+                        aiLayoutBtn.disabled = false;
+                        aiLayoutBtn.innerHTML = '<i class="fas fa-magic"></i> ' + (isEn() ? 'AI Smart Layout' : 'AI智能排版');
+                    }
                 }
             };
         }
@@ -1120,8 +1121,6 @@ async function downloadInCapacitor(data, filename, mimeType, isRawData = false) 
             // 使用 active 类选择器
             alignment: (modalContent.querySelector('.align-btn.active')?.getAttribute('data-align')) || 'left',
             titleAlignment: (modalContent.querySelector('.title-align-btn.active')?.getAttribute('data-align')) || 'center',
-            fitToPage: modalContent.querySelector('#fitToPage').checked,
-            indentParagraph: modalContent.querySelector('#indentParagraph').checked,
             // New settings
             useCustomHeadingSizes: modalContent.querySelector('#useCustomHeadingSizes') ? modalContent.querySelector('#useCustomHeadingSizes').checked : false,
             h1Size: modalContent.querySelector('#h1Size') ? modalContent.querySelector('#h1Size').value : 36,
@@ -1148,9 +1147,8 @@ async function downloadInCapacitor(data, filename, mimeType, isRawData = false) 
         var titleAlignment = settings.titleAlignment || 'center';
 
         // 从 settings 中获取并计算打印尺寸
-        var scale = settings.fitToPage ? 0.85 : 1.0;
-        var bodyFontSize = parseInt(settings.bodyFontSize) * scale;
-        var titleFontSize = parseInt(settings.titleFontSize) * scale;
+        var bodyFontSize = parseInt(settings.bodyFontSize);
+        var titleFontSize = parseInt(settings.titleFontSize);
         var lineHeight = parseFloat(settings.lineHeight || '1.2');
         var paragraphSpacing = parseFloat(settings.paragraphSpacing || '0.5');
         var titleSpacing = parseFloat(settings.titleSpacing || '0.8');
@@ -1160,12 +1158,12 @@ async function downloadInCapacitor(data, filename, mimeType, isRawData = false) 
         var headingSizes = {};
         if (settings.useCustomHeadingSizes) {
             headingSizes = {
-                1: parseInt(settings.h1Size) * scale,
-                2: parseInt(settings.h2Size) * scale,
-                3: parseInt(settings.h3Size) * scale,
-                4: parseInt(settings.h4Size) * scale,
-                5: parseInt(settings.h5Size) * scale,
-                6: parseInt(settings.h6Size) * scale
+                1: parseInt(settings.h1Size),
+                2: parseInt(settings.h2Size),
+                3: parseInt(settings.h3Size),
+                4: parseInt(settings.h4Size),
+                5: parseInt(settings.h5Size),
+                6: parseInt(settings.h6Size)
             };
         } else {
             headingSizes = {
@@ -1351,12 +1349,11 @@ async function downloadInCapacitor(data, filename, mimeType, isRawData = false) 
             // 段落
             if (!processed) {
                 var alignStyle = 'text-align:' + alignment + ';';
-                var indentStyle = settings.indentParagraph ? 'text-indent:2em;' : '';
                 var lineHeightStyle = 'line-height:' + lineHeight + ';';
                 var marginStyle = 'margin:0 0 ' + paragraphSpacing + 'em 0;';
                 var paddingStyle = 'padding:0;';
                 var processedLine = convertMarkdownElements(line);
-                html += '<p style="font-size:' + bodyFontSize + 'pt;' + marginStyle + paddingStyle + indentStyle + alignStyle + lineHeightStyle + '">' + processedLine + '</p>';
+                html += '<p style="font-size:' + bodyFontSize + 'pt;' + marginStyle + paddingStyle + alignStyle + lineHeightStyle + '">' + processedLine + '</p>';
                 processed = true;
             }
         }
@@ -1377,24 +1374,22 @@ async function downloadInCapacitor(data, filename, mimeType, isRawData = false) 
 
     function getPrintStyles(settings) {
         var margin = settings.pageMargin + 'mm';
-        var scale = settings.fitToPage ? 0.85 : 1.0;
-        var bodyFontSize = parseInt(settings.bodyFontSize) * scale;
-        var titleFontSize = parseInt(settings.titleFontSize) * scale;
+        var bodyFontSize = parseInt(settings.bodyFontSize);
+        var titleFontSize = parseInt(settings.titleFontSize);
         var lineHeight = parseFloat(settings.lineHeight || '1.2');
         var paragraphSpacing = parseFloat(settings.paragraphSpacing || '0.5');
         var titleSpacing = parseFloat(settings.titleSpacing || '0.8');
         var titleAlignment = settings.titleAlignment || 'center';
-        var listMargin = settings.fitToPage ? '6px' : '8px';
 
         // Calculate heading sizes for CSS
         var h1Size, h2Size, h3Size, h4Size, h5Size, h6Size;
         if (settings.useCustomHeadingSizes) {
-            h1Size = parseInt(settings.h1Size) * scale;
-            h2Size = parseInt(settings.h2Size) * scale;
-            h3Size = parseInt(settings.h3Size) * scale;
-            h4Size = parseInt(settings.h4Size) * scale;
-            h5Size = parseInt(settings.h5Size) * scale;
-            h6Size = parseInt(settings.h6Size) * scale;
+            h1Size = parseInt(settings.h1Size);
+            h2Size = parseInt(settings.h2Size);
+            h3Size = parseInt(settings.h3Size);
+            h4Size = parseInt(settings.h4Size);
+            h5Size = parseInt(settings.h5Size);
+            h6Size = parseInt(settings.h6Size);
         } else {
             h1Size = titleFontSize * 1.5;
             h2Size = titleFontSize * 1.3;
@@ -1436,7 +1431,7 @@ async function downloadInCapacitor(data, filename, mimeType, isRawData = false) 
                 background: #f8f9fa;
                 border: 1px solid #ddd;
                 border-radius: 4px;
-                padding: ${settings.fitToPage ? '10px' : '15px'};
+                padding: 15px;
                 font-family: monospace;
                 font-size: ${bodyFontSize * 0.9}pt;
                 overflow-x: auto;
@@ -1444,7 +1439,7 @@ async function downloadInCapacitor(data, filename, mimeType, isRawData = false) 
                 text-align: left;
             }
             li {
-                margin-bottom: ${listMargin};
+                margin-bottom: 8px;
                 text-align: ${settings.alignment || 'center'};
             }
             table {
@@ -1485,7 +1480,6 @@ async function downloadInCapacitor(data, filename, mimeType, isRawData = false) 
             }
             @media print {
                 body { -webkit-print-color-adjust: exact; }
-                ${settings.fitToPage ? '@page { size: auto; margin: 5mm; }' : ''}
             }
         `;
     }

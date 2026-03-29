@@ -1632,7 +1632,7 @@
             id: Date.now().toString(),
             name: isEn() ? 'Untitled' : '未命名文档', // 无前导斜杠
             type: 'file',
-            content: isEn() ? '# Welcome to Markdown Editor\n\nThis is a new document.\n\n## Features\n\n- Markdown syntax support\n- Real-time preview\n- Auto-save\n- Multi-file management\n\nStart writing!' : '# 欢迎使用 Markdown 编辑器\n\n这是一个新的文档。\n\n## 功能特性\n\n- 支持 Markdown 语法\n- 实时预览\n- 自动保存\n- 多文件管理\n\n开始编写吧！',
+            content: isEn() ? '# Welcome to EasyPocketMD\n\nThis is a new document. \n\nStart writing!' : '# 欢迎使用 EasyPocketMD\n\n这是一个新的文档。\n\n开始编写吧！',
             lastModified: Date.now(),
             isSynced: false
         };

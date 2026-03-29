@@ -44,8 +44,6 @@ async function exportDOCX(content, settings, customFilename) {
                 titleSpacing: '0.8',
                 alignment: 'left',
                 titleAlignment: 'center',
-                fitToPage: false,
-                indentParagraph: false,
                 useCustomHeadingSizes: false,
                 h1Size: '36',
                 h2Size: '31',
