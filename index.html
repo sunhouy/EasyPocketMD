@@ -547,10 +547,10 @@
                     <div style="margin-bottom:15px;">
                         <label style="display:block;margin-bottom:8px;font-weight:500;color:inherit;">生成方式</label>
                         <div style="display:flex;gap:10px;">
-                            <button id="aiPPTFromCurrent" class="ppt-source-btn active" style="flex:1;padding:12px;border:2px solid #4a90e2;border-radius:8px;background:rgba(74,144,226,0.1);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;color:#333;">
+                            <button id="aiPPTFromCurrent" class="ppt-source-btn active">
                                 <i class="fas fa-file-alt"></i> <span>根据本文件内容</span>
                             </button>
-                            <button id="aiPPTFromTopic" class="ppt-source-btn" style="flex:1;padding:12px;border:2px solid #ddd;border-radius:8px;background:white;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;color:#333;">
+                            <button id="aiPPTFromTopic" class="ppt-source-btn">
                                 <i class="fas fa-lightbulb"></i> <span>输入主题生成</span>
                             </button>
                         </div>
@@ -817,7 +817,12 @@
                 // 显示分享信息
                 showShareInfo(shareData);
             } else {
-                showToast((window.i18n ? window.i18n.t('getShareFailed') : '获取分享内容失败: ') + (result.message || '未知错误'), 'error');
+                // 处理敏感词检测错误
+                if (result.sensitive_words && result.sensitive_words.length > 0) {
+                    showSensitiveWordsError(result.sensitive_words);
+                } else {
+                    showToast((window.i18n ? window.i18n.t('getShareFailed') : '获取分享内容失败: ') + (result.message || '未知错误'), 'error');
+                }
                 // 重定向到密码页面或错误页面
                 if (result.code === 401) {
                     var viewUrl = (window.getApiBaseUrl ? window.getApiBaseUrl() : 'api') + '/share/view?share_id=' + shareId;
@@ -867,6 +872,12 @@
             modeToggle.style.display = 'none';
         }
 
+        // 隐藏保存按钮
+        const saveFileBtn = document.getElementById('saveFileBtn');
+        if (saveFileBtn) {
+            saveFileBtn.style.display = 'none';
+        }
+
         // 调整编辑器容器高度
         const editorContainer = document.querySelector('.editor-container');
         if (editorContainer) {
@@ -890,6 +901,48 @@
         infoMessage += ` (${t('mode')}: ${shareData.mode === 'view' ? t('viewOnly') : t('editable')})`;
 
         showToast(infoMessage, 'info');
+    }
+
+    function showSensitiveWordsError(sensitiveWords) {
+        const wordsStr = sensitiveWords.join('、');
+        const isEn = window.i18n && window.i18n.getLanguage() === 'en';
+        const title = isEn ? 'Content Blocked' : '内容被拦截';
+        const message = isEn
+            ? `This shared content contains sensitive words (${wordsStr}) and cannot be displayed.`
+            : `分享的内容包含敏感词（${wordsStr}），无法显示！`;
+
+        // 创建错误提示模态框
+        let errorModal = document.getElementById('sensitiveWordsErrorModal');
+        if (!errorModal) {
+            errorModal = document.createElement('div');
+            errorModal.id = 'sensitiveWordsErrorModal';
+            errorModal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:10001;';
+
+            const modalContent = document.createElement('div');
+            modalContent.style.cssText = 'background:white;color:#333;border-radius:12px;padding:30px;width:90%;max-width:400px;text-align:center;';
+            modalContent.innerHTML = `
+                <div style="margin-bottom:20px;color:#e74c3c;">
+                    <i class="fas fa-exclamation-circle" style="font-size:48px;"></i>
+                </div>
+                <h2 style="margin-bottom:15px;color:#333;">${title}</h2>
+                <p style="color:#666;margin-bottom:25px;line-height:1.6;">${message}</p>
+                <button onclick="document.getElementById('sensitiveWordsErrorModal').remove();" style="padding:10px 30px;background:#4a90e2;color:white;border:none;border-radius:6px;cursor:pointer;font-size:14px;">
+                    ${isEn ? 'OK' : '确定'}
+                </button>
+            `;
+
+            errorModal.appendChild(modalContent);
+            document.body.appendChild(errorModal);
+        }
+
+        // 隐藏编辑器内容（因为无法显示）
+        const vditorElement = document.getElementById('vditor');
+        if (vditorElement) {
+            vditorElement.style.display = 'none';
+        }
+
+        // 隐藏所有编辑相关元素
+        hideEditElements();
     }
 
     function showToast(message, type = 'info') {

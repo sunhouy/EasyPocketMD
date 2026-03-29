@@ -2882,16 +2882,45 @@ body.night-mode .user-menu-dropdown .dropdown-item:hover {
     background: rgba(255, 255, 255, 0.1);
 }
 
-/* PPT source buttons night mode */
+/* PPT 生成方式选择按钮 */
+.ppt-source-btn {
+    flex: 1;
+    padding: 12px;
+    border: 2px solid #ddd;
+    border-radius: 8px;
+    background: white;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    color: #333;
+    transition: all 0.2s ease;
+}
+
+.ppt-source-btn:hover {
+    border-color: #4a90e2;
+}
+
+.ppt-source-btn.active {
+    border-color: #4a90e2;
+    background: rgba(74, 144, 226, 0.1);
+}
+
+/* 夜间模式下的 PPT 源按钮 */
 body.night-mode .ppt-source-btn {
-    background: #2d2d2d !important;
-    border-color: #444 !important;
-    color: #eee !important;
+    border-color: #444;
+    background: #2d2d2d;
+    color: #eee;
+}
+
+body.night-mode .ppt-source-btn:hover {
+    border-color: #4a90e2;
 }
 
 body.night-mode .ppt-source-btn.active {
-    background: rgba(74, 144, 226, 0.2) !important;
-    border-color: #4a90e2 !important;
+    border-color: #4a90e2;
+    background: rgba(74, 144, 226, 0.2);
 }
 
 /* PPT editor modal night mode */

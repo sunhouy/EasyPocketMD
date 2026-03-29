@@ -423,7 +423,7 @@ jobs:
           echo "=========================================="
           /www/server/nodejs/v24.14.1/bin/pm2 list
 
-  # 检查 print_client.py 是否变更
+  # 检查打印客户端文件是否变更
   check-print-changes:
     runs-on: ubuntu-latest
     outputs:
@@ -436,8 +436,10 @@ jobs:
         filters: |
           print:
             - 'print/print_client.py'
+            - 'print/print_gui.py'
+            - 'print/requirements.txt'
 
-  # 构建打印客户端（条件执行）
+  # 构建打印客户端 GUI 版本（条件执行）
   build-print-client:
     needs: check-print-changes
     if: needs.check-print-changes.outputs.changed == 'true'
@@ -467,9 +469,9 @@ jobs:
         pip install -r print/requirements.txt
         pip install pyinstaller
 
-    - name: Build with PyInstaller
+    - name: Build GUI version with PyInstaller
       run: |
-        pyinstaller --onefile --console --name print_client_${{ matrix.target }} print/print_client.py
+        pyinstaller --onefile --windowed --name print_client_${{ matrix.target }} print/print_gui.py
 
     - name: Upload artifact
       uses: actions/upload-artifact@v4

@@ -91,8 +91,11 @@ class PrintServer:
             except Exception as e:
                 print(f"通知前端客户端时出错: {str(e)}")
 
-    async def handle_client(self, websocket, path):
-        """处理客户端连接（前端或打印客户端）"""
+    async def handle_client(self, websocket):
+        """处理客户端连接（前端或打印客户端）
+        
+        websockets 10.0+ 版本只接收 websocket 参数，不再接收 path 参数
+        """
         self.connections.add(websocket)
         client_type = "前端客户端"
 
@@ -310,7 +313,7 @@ class PrintServer:
                         await self.notify_frontend_clients()
                         break
             self.connections.remove(websocket)
-            print(f"{client_type}已断开连接: {websocket.remote_address}")
+            print(f"{client_type}已断开连接")
 
     async def forward_to_local_client(self, print_data):
         """转发打印请求到本地客户端"""

@@ -275,7 +275,19 @@
                     // 更新成功，显示结果
                     showShareResult(updateResult.data, shareModal);
                 } else {
-                    shareContent.querySelector('#shareError').textContent = updateResult.message || (isEn ? 'Update failed' : '更新失败');
+                    // 处理敏感词检测错误
+                    if (updateResult.sensitive_words && updateResult.sensitive_words.length > 0) {
+                        var wordsStr = updateResult.sensitive_words.join('、');
+                        var errorMsg;
+                        if (updateResult.sensitive_field === 'content') {
+                            errorMsg = (isEn ? 'File content contains sensitive words: ' : '文件内容包含敏感词') + wordsStr + (isEn ? ', cannot update share' : '，无法更新分享');
+                        } else {
+                            errorMsg = (isEn ? 'Filename contains sensitive words: ' : '文件名包含敏感词') + wordsStr + (isEn ? ', cannot update share' : '，无法更新分享');
+                        }
+                        shareContent.querySelector('#shareError').textContent = errorMsg;
+                    } else {
+                        shareContent.querySelector('#shareError').textContent = updateResult.message || (isEn ? 'Update failed' : '更新失败');
+                    }
                     shareContent.querySelector('#shareError').style.display = 'block';
                     btn.disabled = false;
                     btn.textContent = isEn ? 'Update Link' : '更新链接';

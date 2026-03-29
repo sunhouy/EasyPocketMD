@@ -86,7 +86,33 @@ router.get('/view', async (req, res) => {
 router.post('/get', async (req, res) => {
     const { share_id, password } = req.body;
     if (!share_id) return res.json({ code: 400, message: '缺少必要参数: share_id' });
-    res.json(await shareManager.getSharedFile(share_id, password));
+
+    const result = await shareManager.getSharedFile(share_id, password);
+
+    // 如果获取成功，检查内容是否包含敏感词
+    if (result.code === 200 && result.data) {
+        const filenameCheck = checkSensitiveWords(result.data.filename);
+        if (filenameCheck.hasSensitive) {
+            return res.json({
+                code: 400,
+                message: `分享的内容包含敏感词，无法显示`,
+                sensitive_words: filenameCheck.words,
+                sensitive_field: 'filename'
+            });
+        }
+
+        const contentCheck = checkSensitiveWords(result.data.content);
+        if (contentCheck.hasSensitive) {
+            return res.json({
+                code: 400,
+                message: `分享的内容包含敏感词，无法显示`,
+                sensitive_words: contentCheck.words,
+                sensitive_field: 'content'
+            });
+        }
+    }
+
+    res.json(result);
 });
 
 // Update shared file
@@ -124,8 +150,48 @@ router.post('/delete', verifyUser, async (req, res) => {
 
 // Update share properties
 router.post('/properties', verifyUser, async (req, res) => {
-    const { username, share_id, mode, expire_days } = req.body;
+    const { username, password, share_id, mode, expire_days } = req.body;
     if (!username || !share_id) return res.json({ code: 400, message: '缺少必要参数' });
+
+    // 获取分享对应的文件信息
+    const shareResult = await shareManager.getSharedFile(share_id);
+    if (shareResult.code !== 200) {
+        return res.json(shareResult);
+    }
+
+    const filename = shareResult.data.filename;
+
+    // 获取文件内容进行敏感词检测
+    const fileResult = await shareManager.getFileContentForShare(username, password, filename);
+    if (fileResult.code !== 200) {
+        return res.json(fileResult);
+    }
+
+    // 检查文件名是否包含敏感词
+    const filenameCheck = checkSensitiveWords(filename);
+    if (filenameCheck.hasSensitive) {
+        return res.json({
+            code: 400,
+            message: `文件名包含敏感词${filenameCheck.words.join('、')}，无法更新分享`,
+            sensitive_words: filenameCheck.words,
+            sensitive_field: 'filename'
+        });
+    }
+
+    // 检查文件内容是否包含敏感词
+    const fileContent = fileResult.data.content;
+    if (fileContent) {
+        const contentCheck = checkSensitiveWords(fileContent);
+        if (contentCheck.hasSensitive) {
+            return res.json({
+                code: 400,
+                message: `文件内容包含敏感词${contentCheck.words.join('、')}，无法更新分享`,
+                sensitive_words: contentCheck.words,
+                sensitive_field: 'content'
+            });
+        }
+    }
+
     res.json(await shareManager.updateShareProperties(username, share_id, mode, expire_days));
 });
 

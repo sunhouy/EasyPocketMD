@@ -1,3 +1,5 @@
 websockets
 Pillow
 pywin32; sys_platform == 'win32'
+PySide6
+qdarkstyle
