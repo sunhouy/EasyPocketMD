@@ -95,20 +95,20 @@ const registerLimiter = createLimiter({
     }
 });
 
-// 文件上传限流 - 放宽限制
+// 文件上传限流
 const uploadLimiter = createLimiter({
     windowMs: 15 * 60 * 1000, // 15分钟窗口
-    max: (req) => isAuthenticated(req) ? 100 : 30, // 登录用户100次，未登录30次
+    max: (req) => isAuthenticated(req) ? 1000 : 300, // 登录用户1000次，未登录300次
     message: {
         code: 429,
         message: '上传次数已达上限，请稍后再试'
     }
 });
 
-// 通用API限流 - 放宽限制
+// 通用API限流
 const apiLimiter = createLimiter({
     windowMs: 15 * 60 * 1000, // 15分钟窗口
-    max: (req) => isAuthenticated(req) ? 5000 : 1000, // 登录用户5000次，未登录1000次
+    max: (req) => isAuthenticated(req) ? 50000 : 10000, // 登录用户50000次，未登录10000次
     message: {
         code: 429,
         message: '请求过于频繁，请稍后再试'
@@ -118,7 +118,7 @@ const apiLimiter = createLimiter({
 // 文件操作限流 - 放宽限制
 const fileLimiter = createLimiter({
     windowMs: 15 * 60 * 1000, // 15分钟窗口
-    max: (req) => isAuthenticated(req) ? 3000 : 600, // 登录用户3000次，未登录600次
+    max: (req) => isAuthenticated(req) ? 30000 : 6000, // 登录用户3000次，未登录6000次
     message: {
         code: 429,
         message: '文件操作过于频繁，请稍后再试'
@@ -128,7 +128,7 @@ const fileLimiter = createLimiter({
 // 转换接口限流（HTML/PDF导出等）- 放宽限制
 const convertLimiter = createLimiter({
     windowMs: 60 * 60 * 1000, // 1小时窗口
-    max: (req) => isAuthenticated(req) ? 600 : 150, // 登录用户600次，未登录150次
+    max: (req) => isAuthenticated(req) ? 6000 : 1500, // 登录用户6000次，未登录1500次
     message: {
         code: 429,
         message: '转换次数已达上限，请稍后再试'
@@ -138,7 +138,7 @@ const convertLimiter = createLimiter({
 // 严格限流 - 用于敏感操作
 const strictLimiter = createLimiter({
     windowMs: 60 * 60 * 1000, // 1小时窗口
-    max: 10, // 最多10次
+    max: 100, // 最多100次
     message: {
         code: 429,
         message: '操作次数已达上限，请稍后再试'

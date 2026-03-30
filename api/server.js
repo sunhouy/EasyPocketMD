@@ -93,6 +93,7 @@ const convertRoutes = require('./routes/convert');
 const aiRoutes = require('./routes/ai');
 const userFilesRoutes = require('./routes/user_files');
 const pptExportRoutes = require('./routes/ppt-export');
+const gatusRoutes = require('./routes/gatus');
 const shareManager = require('./models/ShareManager');
 const { initShareCollabServer } = require('./realtime/shareCollabServer');
 
@@ -130,6 +131,10 @@ app.use('/api/ppt-export', convertLimiter, pptExportRoutes);
 
 // Legacy routes - general API rate limiting
 app.use('/api', apiLimiter, legacyRoutes);
+
+// Gatus monitoring routes - no rate limiting for monitoring
+app.use('/api/v1', gatusRoutes);
+app.use('/api/gatus', gatusRoutes);
 
 // Try to find the dist folder in multiple locations
 const potentialDistPaths = [

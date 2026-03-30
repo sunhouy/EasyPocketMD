@@ -2947,3 +2947,115 @@ body.night-mode .ppt-editor-thumb[data-active="true"] {
     background: #4a90e2 !important;
     color: white !important;
 }
+
+/* 服务状态弹窗样式 */
+.service-status-modal {
+    max-width: 500px;
+    width: 90vw;
+}
+
+.service-status-content {
+    padding: 15px;
+}
+
+.service-status-intro {
+    margin-bottom: 15px;
+    padding: 10px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    font-size: 13px;
+    color: #666;
+}
+
+.service-status-list {
+    min-height: 200px;
+}
+
+.service-status-item {
+    display: flex;
+    align-items: center;
+    padding: 12px;
+    border: 1px solid #eee;
+    border-radius: 8px;
+    margin-bottom: 8px;
+    background: #fff;
+    transition: all 0.2s ease;
+}
+
+.service-status-item:hover {
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.service-status-icon {
+    margin-right: 12px;
+    font-size: 20px;
+}
+
+.service-status-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.service-status-name {
+    font-weight: 500;
+    font-size: 14px;
+    color: #333;
+    margin-bottom: 2px;
+}
+
+.service-status-url {
+    font-size: 12px;
+    color: #999;
+    word-break: break-all;
+}
+
+.service-status-badge {
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.service-status-footer {
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 1px solid #eee;
+    text-align: center;
+    font-size: 12px;
+    color: #999;
+}
+
+.service-status-loading {
+    text-align: center;
+    padding: 30px;
+    color: #999;
+}
+
+/* 夜间模式下的服务状态样式 */
+body.night-mode .service-status-intro {
+    background: #2d2d2d;
+    color: #aaa;
+}
+
+body.night-mode .service-status-item {
+    background: #2d2d2d;
+    border-color: #444;
+}
+
+body.night-mode .service-status-item:hover {
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+
+body.night-mode .service-status-name {
+    color: #eee;
+}
+
+body.night-mode .service-status-url {
+    color: #888;
+}
+
+body.night-mode .service-status-footer {
+    border-top-color: #444;
+    color: #888;
+}

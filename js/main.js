@@ -512,6 +512,9 @@ document.addEventListener('DOMContentLoaded', function() {
         var aboutBtn = document.getElementById('aboutBtn');
         if (aboutBtn) aboutBtn.addEventListener('click', function() { window.showAboutDialog(); closeDrop(); });
 
+        var serviceStatusBtn = document.getElementById('serviceStatusBtn');
+        if (serviceStatusBtn) serviceStatusBtn.addEventListener('click', function() { window.showServiceStatusDialog(); closeDrop(); });
+
         var mobileVideoCallBtn = document.getElementById('mobileVideoCallBtn');
         if (mobileVideoCallBtn) mobileVideoCallBtn.addEventListener('click', function() {
             var modal = document.getElementById('videoCallModalOverlay');
@@ -681,6 +684,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 closeDrop();
             } },
             { id: 'mobileClearBtn', fn: async function() { const confirmed = await window.customConfirm(window.i18n ? window.i18n.t('clearConfirm') : '确定要清空当前文件的内容吗？'); if (confirmed) { if (window.vditor) window.vditor.setValue(''); window.showMessage(window.i18n ? window.i18n.t('contentCleared') : '内容已清空'); } closeDrop(); } },
+            { id: 'serviceStatusBtn', fn: function() { window.showServiceStatusDialog(); closeDrop(); } },
             // mobileSettingsBtn 已移到顶部工具栏
             { id: 'aboutBtn', fn: function() { window.showAboutDialog(); closeDrop(); } }
         ];
@@ -1156,6 +1160,172 @@ document.addEventListener('DOMContentLoaded', function() {
     if (closeAboutBtn) closeAboutBtn.addEventListener('click', function() {
         document.getElementById('aboutModalOverlay').classList.remove('show');
     });
+
+    // 服务状态对话框
+    window.showServiceStatusDialog = function() {
+        var modal = document.getElementById('serviceStatusModalOverlay');
+        if (modal) {
+            modal.classList.add('show');
+            loadServiceStatus();
+        }
+    };
+
+    var closeServiceStatusBtn = document.getElementById('closeServiceStatusBtn');
+    if (closeServiceStatusBtn) closeServiceStatusBtn.addEventListener('click', function() {
+        document.getElementById('serviceStatusModalOverlay').classList.remove('show');
+    });
+
+    var serviceStatusModalOverlay = document.getElementById('serviceStatusModalOverlay');
+    if (serviceStatusModalOverlay) serviceStatusModalOverlay.addEventListener('click', function(e) {
+        if (e.target === this) this.classList.remove('show');
+    });
+
+    // 加载服务状态
+    async function loadServiceStatus() {
+        var listContainer = document.getElementById('serviceStatusList');
+        if (!listContainer) return;
+
+        // 显示加载状态
+        listContainer.innerHTML = '<div class="service-status-loading" style="text-align:center;padding:30px;color:#999;"><i class="fas fa-spinner fa-spin" style="font-size:24px;margin-bottom:10px;"></i><p>' + (window.i18n ? window.i18n.t('loadingServiceStatus') : '正在加载服务状态...') + '</p></div>';
+
+        try {
+            // 获取Gatus监控数据
+            // 默认使用相对路径，可以通过配置覆盖
+            var gatusEndpoint = window.GATUS_ENDPOINT || '/api/v1/endpoints/statuses';
+            var response = await fetch(gatusEndpoint, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to fetch service status');
+            }
+
+            var data = await response.json();
+            renderServiceStatus(data);
+        } catch (error) {
+            console.error('加载服务状态失败:', error);
+            // 如果Gatus端点不可用，显示模拟数据或错误信息
+            renderServiceStatusFallback();
+        }
+    }
+
+    // 渲染服务状态
+    function renderServiceStatus(data) {
+        var listContainer = document.getElementById('serviceStatusList');
+        if (!listContainer) return;
+
+        if (!data || !Array.isArray(data) || data.length === 0) {
+            listContainer.innerHTML = '<div style="text-align:center;padding:30px;color:#999;"><i class="fas fa-exclamation-circle" style="font-size:24px;margin-bottom:10px;"></i><p>' + (window.i18n ? window.i18n.t('noServiceStatusData') : '暂无服务状态数据') + '</p></div>';
+            return;
+        }
+
+        var html = '<div class="service-status-grid">';
+        data.forEach(function(endpoint) {
+            var status = endpoint.status || 'unknown';
+            var statusClass = 'status-' + status.toLowerCase();
+            var statusIcon = status === 'healthy' ? 'fa-check-circle' : (status === 'unhealthy' ? 'fa-times-circle' : 'fa-question-circle');
+            var statusColor = status === 'healthy' ? '#28a745' : (status === 'unhealthy' ? '#dc3545' : '#ffc107');
+
+            html += '<div class="service-status-item" style="display:flex;align-items:center;padding:12px;border:1px solid #eee;border-radius:8px;margin-bottom:8px;background:#fff;">';
+            html += '<div class="service-status-icon" style="margin-right:12px;font-size:20px;color:' + statusColor + ';"><i class="fas ' + statusIcon + '"></i></div>';
+            html += '<div class="service-status-info" style="flex:1;">';
+            html += '<div class="service-status-name" style="font-weight:500;font-size:14px;color:#333;">' + (endpoint.name || 'Unknown Service') + '</div>';
+            html += '<div class="service-status-url" style="font-size:12px;color:#999;word-break:break-all;">' + (endpoint.url || '') + '</div>';
+            html += '</div>';
+            html += '<div class="service-status-badge" style="padding:4px 8px;border-radius:4px;font-size:12px;font-weight:500;background:' + (status === 'healthy' ? '#d4edda' : (status === 'unhealthy' ? '#f8d7da' : '#fff3cd')) + ';color:' + statusColor + ';">' + (status === 'healthy' ? (window.i18n ? window.i18n.t('statusHealthy') : '正常') : (status === 'unhealthy' ? (window.i18n ? window.i18n.t('statusUnhealthy') : '异常') : (window.i18n ? window.i18n.t('statusUnknown') : '未知'))) + '</div>';
+            html += '</div>';
+        });
+        html += '</div>';
+
+        listContainer.innerHTML = html;
+    }
+
+    // 渲染服务状态回退（当Gatus不可用时）
+    function renderServiceStatusFallback() {
+        var listContainer = document.getElementById('serviceStatusList');
+        if (!listContainer) return;
+
+        // 定义要监控的API端点列表
+        var endpoints = [
+            { name: 'API Health', url: '/api/health', method: 'GET' },
+            { name: 'Auth Service', url: '/api/auth/login', method: 'POST' },
+            { name: 'Files Service', url: '/api/files', method: 'GET' },
+            { name: 'Share Service', url: '/api/share/get', method: 'POST' },
+            { name: 'Convert Service', url: '/api/convert/markdown', method: 'POST' }
+        ];
+
+        var html = '<div class="service-status-grid">';
+        endpoints.forEach(function(endpoint) {
+            html += '<div class="service-status-item" style="display:flex;align-items:center;padding:12px;border:1px solid #eee;border-radius:8px;margin-bottom:8px;background:#fff;" data-endpoint="' + endpoint.url + '">';
+            html += '<div class="service-status-icon" style="margin-right:12px;font-size:20px;color:#ffc107;"><i class="fas fa-circle-notch fa-spin"></i></div>';
+            html += '<div class="service-status-info" style="flex:1;">';
+            html += '<div class="service-status-name" style="font-weight:500;font-size:14px;color:#333;">' + endpoint.name + '</div>';
+            html += '<div class="service-status-url" style="font-size:12px;color:#999;word-break:break-all;">' + endpoint.url + '</div>';
+            html += '</div>';
+            html += '<div class="service-status-badge" style="padding:4px 8px;border-radius:4px;font-size:12px;font-weight:500;background:#fff3cd;color:#856404;">' + (window.i18n ? window.i18n.t('statusChecking') : '检测中') + '</div>';
+            html += '</div>';
+        });
+        html += '</div>';
+
+        listContainer.innerHTML = html;
+
+        // 逐个检测端点
+        endpoints.forEach(function(endpoint) {
+            checkEndpointStatus(endpoint);
+        });
+    }
+
+    // 检测单个端点状态
+    async function checkEndpointStatus(endpoint) {
+        var item = document.querySelector('[data-endpoint="' + endpoint.url + '"]');
+        if (!item) return;
+
+        var iconEl = item.querySelector('.service-status-icon');
+        var badgeEl = item.querySelector('.service-status-badge');
+
+        try {
+            var startTime = Date.now();
+            var response;
+
+            if (endpoint.method === 'GET') {
+                response = await fetch(endpoint.url, { method: 'GET', cache: 'no-cache' });
+            } else {
+                // 对于POST请求，发送一个空的body来测试
+                response = await fetch(endpoint.url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({}),
+                    cache: 'no-cache'
+                });
+            }
+
+            var responseTime = Date.now() - startTime;
+            var isHealthy = response.ok || response.status === 401 || response.status === 403 || response.status === 400; // 这些状态码表示服务正在运行
+
+            if (isHealthy) {
+                iconEl.innerHTML = '<i class="fas fa-check-circle"></i>';
+                iconEl.style.color = '#28a745';
+                badgeEl.textContent = (window.i18n ? window.i18n.t('statusHealthy') : '正常') + ' (' + responseTime + 'ms)';
+                badgeEl.style.background = '#d4edda';
+                badgeEl.style.color = '#155724';
+            } else {
+                iconEl.innerHTML = '<i class="fas fa-times-circle"></i>';
+                iconEl.style.color = '#dc3545';
+                badgeEl.textContent = (window.i18n ? window.i18n.t('statusUnhealthy') : '异常') + ' (' + response.status + ')';
+                badgeEl.style.background = '#f8d7da';
+                badgeEl.style.color = '#721c24';
+            }
+        } catch (error) {
+            iconEl.innerHTML = '<i class="fas fa-times-circle"></i>';
+            iconEl.style.color = '#dc3545';
+            badgeEl.textContent = window.i18n ? window.i18n.t('statusOffline') : '离线';
+            badgeEl.style.background = '#f8d7da';
+            badgeEl.style.color = '#721c24';
+        }
+    }
 
     // 视频通话模态框关闭
     var closeVideoCallBtn = document.getElementById('closeVideoCallBtn');
