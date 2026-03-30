@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
+const http = require('http');
 
 // 加载敏感词库
 const { loadSensitiveWords } = require('./utils/sensitiveFilter');
@@ -91,6 +92,9 @@ const apiRoutes = require('./routes/api');
 const convertRoutes = require('./routes/convert');
 const aiRoutes = require('./routes/ai');
 const userFilesRoutes = require('./routes/user_files');
+const pptExportRoutes = require('./routes/ppt-export');
+const shareManager = require('./models/ShareManager');
+const { initShareCollabServer } = require('./realtime/shareCollabServer');
 
 // Use routes with rate limiting - MUST BE BEFORE SPA FALLBACK!
 // AI routes - strict rate limiting (especially for unauthenticated users)
@@ -120,6 +124,9 @@ app.use('/api/external', apiLimiter, apiRoutes);
 
 // Convert routes - rate limiting for export functions
 app.use('/api/convert', convertLimiter, convertRoutes);
+
+// PPT Export routes - rate limiting for PPT export
+app.use('/api/ppt-export', convertLimiter, pptExportRoutes);
 
 // Legacy routes - general API rate limiting
 app.use('/api', apiLimiter, legacyRoutes);
@@ -257,7 +264,9 @@ app.use((err, req, res, next) => {
 
 // Start server
 if (require.main === module) {
-    app.listen(port, () => {
+    const server = http.createServer(app);
+    initShareCollabServer(server, shareManager);
+    server.listen(port, () => {
         console.log(`Server is running on port ${port}`);
     });
 }

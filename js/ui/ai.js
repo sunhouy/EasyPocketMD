@@ -39,7 +39,7 @@
         
         modalContent.innerHTML = `
             <div style="text-align:center;margin-bottom:20px;">
-                <div style="font-size:40px;margin-bottom:10px;background:linear-gradient(135deg, #667eea 0%, #764ba2 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">
+                <div style="font-size:40px;margin-bottom:10px;background:linear-gradient(135deg, #4a90e2 0%, #357abd 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">
                     <i class="fas fa-magic"></i>
                 </div>
                 <h2 style="margin:0;">${isEn() ? 'AI Smart Layout' : 'AI智能排版'}</h2>
@@ -49,7 +49,7 @@
             <div style="margin-bottom:20px;">
                 <label style="display:block;margin-bottom:8px;font-weight:bold;">${isEn() ? 'Layout Style' : '排版风格'}</label>
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-                    <div class="ai-style-option selected" data-value="academic" style="border:2px solid #667eea;border-radius:8px;padding:10px;cursor:pointer;background:${nightMode ? '#3d3d3d' : '#f0f4ff'};">
+                    <div class="ai-style-option selected" data-value="academic" style="border:2px solid #4a90e2;border-radius:8px;padding:10px;cursor:pointer;background:${nightMode ? '#3d3d3d' : '#f0f4ff'};">
                         <div style="font-weight:bold;margin-bottom:5px;"><i class="fas fa-graduation-cap"></i> ${isEn() ? 'Academic' : '学术论文'}</div>
                         <div style="font-size:12px;color:${nightMode ? '#bbb' : '#666'};">${isEn() ? 'Rigorous and standardized, suitable for papers and reports' : '严谨规范，适合论文、报告'}</div>
                     </div>
@@ -74,7 +74,7 @@
             </div>
             
             <div style="display:flex;gap:10px;margin-top:25px;">
-                <button id="startAILayoutBtn" style="flex:2;padding:12px;font-weight:bold;background:linear-gradient(135deg, #667eea 0%, #764ba2 100%);color:white;border:none;border-radius:6px;cursor:pointer;font-size:16px;">
+                <button id="startAILayoutBtn" style="flex:2;padding:12px;font-weight:bold;background:linear-gradient(135deg, #4a90e2 0%, #357abd 100%);color:white;border:none;border-radius:6px;cursor:pointer;font-size:16px;">
                     <i class="fas fa-sparkles"></i> ${isEn() ? 'Start Smart Layout' : '开始智能排版'}
                 </button>
                 <button id="cancelAIBtn" style="flex:1;padding:12px;background:${nightMode ? '#555' : '#9E9E9E'};color:white;border:none;border-radius:6px;cursor:pointer;">${isEn() ? 'Cancel' : '取消'}</button>
@@ -94,7 +94,7 @@
                     opt.style.background = 'transparent';
                 });
                 this.classList.add('selected');
-                this.style.border = '2px solid #667eea';
+                this.style.border = '2px solid #4a90e2';
                 this.style.background = nightMode ? '#3d3d3d' : '#f0f4ff';
                 currentAISettings.style = this.getAttribute('data-value');
             };
@@ -141,9 +141,9 @@
         
         content.innerHTML = `
             <div style="margin-bottom:25px;position:relative;height:60px;">
-                <div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:50px;height:50px;border-radius:50%;border:3px solid transparent;border-top-color:#667eea;animation:spin 1s linear infinite;"></div>
-                <div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:30px;height:30px;border-radius:50%;border:3px solid transparent;border-top-color:#764ba2;animation:spin 1.5s linear infinite reverse;"></div>
-                <i class="fas fa-magic" style="font-size:20px;color:#667eea;position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);"></i>
+                <div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:50px;height:50px;border-radius:50%;border:3px solid transparent;border-top-color:#4a90e2;animation:spin 1s linear infinite;"></div>
+                <div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:30px;height:30px;border-radius:50%;border:3px solid transparent;border-top-color:#3a7bc8;animation:spin 1.5s linear infinite reverse;"></div>
+                <i class="fas fa-magic" style="font-size:20px;color:#4a90e2;position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);"></i>
             </div>
             <h3 style="margin:0 0 10px 0;font-size:20px;">${isEn() ? 'AI is thinking...' : 'AI正在思考中...'}</h3>
             <p id="aiLoadingStatus" style="margin:0;color:${nightMode ? '#aaa' : '#666'};font-size:14px;">${isEn() ? 'Analyzing document structure' : '正在分析文档结构'}</p>

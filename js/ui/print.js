@@ -286,7 +286,7 @@ async function downloadInCapacitor(data, filename, mimeType, isRawData = false) 
         if (mode === 'print') {
             aiSection = `
                 <div style="margin-bottom:20px;">
-                    <button id="aiLayoutBtn" style="width:100%;padding:12px;font-weight:bold;background:linear-gradient(135deg, #667eea 0%, #764ba2 100%);color:white;border:none;border-radius:6px;cursor:pointer;font-size:15px;">
+                    <button id="aiLayoutBtn" style="width:100%;padding:12px;font-weight:bold;background:linear-gradient(135deg, #4a90e2 0%, #357abd 100%);color:white;border:none;border-radius:6px;cursor:pointer;font-size:15px;">
                         <i class="fas fa-magic"></i> ${isEn() ? 'AI Smart Layout' : 'AI智能排版'}
                     </button>
                 </div>

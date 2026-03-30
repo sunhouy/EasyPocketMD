@@ -551,4 +551,160 @@ router.post('/generate', async (req, res) => {
     }
 });
 
+// AI Markdown Search endpoint
+router.post('/markdown', async (req, res) => {
+    try {
+        const { keyword, language } = req.body;
+
+        if (!keyword) {
+            return res.status(400).json({
+                code: 400,
+                message: 'Keyword is required'
+            });
+        }
+
+        // 检查关键词长度（最多10个字）
+        if (keyword.length > 10) {
+            return res.status(400).json({
+                code: 400,
+                message: language === 'en' ? 'Keyword too long (max 10 characters)' : '关键词过长（最多10个字）'
+            });
+        }
+
+        const apiKey = process.env.DASHSCOPE_API_KEY;
+        if (!apiKey) {
+            return res.status(500).json({
+                code: 500,
+                message: 'AI API Key is not configured on server'
+            });
+        }
+
+        // Construct system prompt based on language
+        const isEnglish = language === 'en';
+        const systemPrompt = isEnglish
+            ? `You are a Markdown expert. Given a user's search keyword, provide relevant Markdown code examples.
+Return the results in the following format (one example per line):
+display_name  markdown_code
+
+For example:
+Bold text  **bold text**
+Link  [link text](https://example.com)
+Table   Col1  Col2 \\n------------\\n A  B 
+Code block  \`\`\`\\ncode\n\`\`\`
+Quote  > quote text
+
+Provide 5-10 most relevant Markdown examples. Only return the list, no explanations.`
+            : `你是Markdown专家。根据用户的搜索关键词，提供相关的Markdown代码示例。
+请按以下格式返回结果（每行一个示例）：
+显示名称  markdown代码
+
+例如：
+粗体文字  **粗体文字**
+链接  [链接文字](https://example.com)
+表格   列1  列2 \\n------------\\n A  B 
+代码块  \`\`\`\\n代码\n\`\`\`
+引用  > 引用文字
+
+提供5-10个最相关的Markdown示例。只返回列表，不要解释。`;
+
+        const userPrompt = isEnglish
+            ? `Search for Markdown code examples related to: "${keyword}"`
+            : `搜索与"${keyword}"相关的Markdown代码示例`;
+
+        // Call DashScope API
+        const requestBody = JSON.stringify({
+            model: "qwen-turbo",
+            input: {
+                messages: [
+                    {
+                        role: "system",
+                        content: systemPrompt
+                    },
+                    {
+                        role: "user",
+                        content: userPrompt
+                    }
+                ]
+            },
+            parameters: {
+                result_format: "message"
+            }
+        });
+
+        const options = {
+            hostname: 'dashscope.aliyuncs.com',
+            path: '/api/v1/services/aigc/text-generation/generation',
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`,
+                'Content-Length': Buffer.byteLength(requestBody)
+            }
+        };
+
+        const apiRequest = https.request(options, (apiRes) => {
+            let data = '';
+
+            apiRes.on('data', (chunk) => {
+                data += chunk;
+            });
+
+            apiRes.on('end', () => {
+                if (apiRes.statusCode >= 200 && apiRes.statusCode < 300) {
+                    try {
+                        const response = JSON.parse(data);
+                        if (response.output && response.output.choices && response.output.choices.length > 0) {
+                            const aiContent = response.output.choices[0].message.content;
+                            res.json({
+                                code: 200,
+                                data: aiContent
+                            });
+                        } else {
+                            console.error('DashScope API unexpected response:', response);
+                            res.status(500).json({
+                                code: 500,
+                                message: 'AI processing failed',
+                                error: response.message || 'Unknown error'
+                            });
+                        }
+                    } catch (e) {
+                        console.error('Failed to parse DashScope response:', e);
+                        res.status(500).json({
+                            code: 500,
+                            message: 'Failed to parse AI response'
+                        });
+                    }
+                } else {
+                    console.error(`DashScope API Error: ${apiRes.statusCode}`, data);
+                    res.status(apiRes.statusCode).json({
+                        code: apiRes.statusCode,
+                        message: 'AI API request failed',
+                        error: data
+                    });
+                }
+            });
+        });
+
+        apiRequest.on('error', (e) => {
+            console.error('DashScope Request Error:', e);
+            res.status(500).json({
+                code: 500,
+                message: 'Network error calling AI service',
+                error: e.message
+            });
+        });
+
+        apiRequest.write(requestBody);
+        apiRequest.end();
+
+    } catch (error) {
+        console.error('AI Markdown Search error:', error);
+        return res.status(500).json({
+            code: 500,
+            message: 'Internal server error',
+            error: error.message
+        });
+    }
+});
+
 module.exports = router;

@@ -32,8 +32,7 @@
         { id: 'divider', icon: 'fas fa-minus', name: isEn() ? 'Divider' : '分隔线', category: 'insert', keywords: ['divider', '分隔线'], insert: '\n---\n' },
         { id: 'emoji', icon: 'fas fa-smile', name: isEn() ? 'Emoji' : '表情', category: 'insert', keywords: ['emoji', '表情'], action: 'emoji' },
         { id: 'formula', icon: 'fas fa-superscript', name: isEn() ? 'Formula' : '公式', category: 'insert', keywords: ['formula', '公式', 'latex'], action: 'formula' },
-        { id: 'chart', icon: 'fas fa-chart-bar', name: isEn() ? 'Chart' : '图表', category: 'insert', keywords: ['chart', '图表', 'mermaid'], action: 'chart' },
-        { id: 'echarts', icon: 'fas fa-chart-pie', name: isEn() ? 'ECharts' : 'ECharts图表', category: 'insert', keywords: ['echarts', '图表', '高级图表'], action: 'echarts' }
+        { id: 'chart', icon: 'fas fa-chart-bar', name: isEn() ? 'Chart' : '图表', category: 'insert', keywords: ['chart', '图表', 'mermaid'], action: 'chart' }
     ];
 
     function closeInsertPicker() {
@@ -145,12 +144,12 @@
         loadingDiv.style.cssText = 'text-align:center;padding:40px 0;grid-column: 1/-1;';
 
         var loadingIcon = document.createElement('div');
-        loadingIcon.innerHTML = '<i class="fas fa-magic" style="font-size: 32px; color: #667eea;"></i>';
+        loadingIcon.innerHTML = '<i class="fas fa-magic" style="font-size: 32px; color: #4a90e2;"></i>';
         loadingIcon.style.cssText = 'margin-bottom: 15px;';
 
         var loadingText = document.createElement('div');
         loadingText.textContent = isEn() ? 'AI is searching...' : 'AI搜索中...';
-        loadingText.style.cssText = 'color: #667eea; font-size: 14px;';
+        loadingText.style.cssText = 'color: #4a90e2; font-size: 14px;';
 
         loadingDiv.appendChild(loadingIcon);
         loadingDiv.appendChild(loadingText);
@@ -257,7 +256,7 @@
         // 添加AI搜索结果标题
         var resultHeader = document.createElement('div');
         resultHeader.style.cssText = 'grid-column: 1/-1; padding: 10px 0; border-bottom: 1px solid ' + (window.nightMode ? '#444' : '#eee') + '; margin-bottom: 10px;';
-        resultHeader.innerHTML = '<span style="color: #667eea; font-weight: bold;">' + (isEn() ? 'AI Search Results' : 'AI搜索结果') + '</span>';
+        resultHeader.innerHTML = '<span style="color: #4a90e2; font-weight: bold;">' + (isEn() ? 'AI Search Results' : 'AI搜索结果') + '</span>';
         grid.appendChild(resultHeader);
 
         // 渲染结果列表
@@ -282,7 +281,7 @@
 
             btn.onmouseenter = function() {
                 this.style.background = window.nightMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)';
-                this.style.borderColor = '#667eea';
+                this.style.borderColor = '#4a90e2';
             };
 
             btn.onmouseleave = function() {
@@ -387,7 +386,7 @@
                         var aiSearchLink = document.createElement('a');
                         aiSearchLink.href = 'javascript:void(0)';
                         aiSearchLink.textContent = isEn() ? 'Try AI Search' : '试试AI搜索';
-                        aiSearchLink.style.cssText = 'color: #667eea; text-decoration: underline; cursor: pointer; font-size: 14px;';
+                        aiSearchLink.style.cssText = 'color: #4a90e2; text-decoration: underline; cursor: pointer; font-size: 14px;';
                         aiSearchLink.addEventListener('click', function() {
                             performAISearch(searchKeyword);
                         });
@@ -404,7 +403,7 @@
                 btn.style.cssText = 'padding: 12px 8px; border: 2px solid transparent; background: ' + (nightMode ? '#3d3d3d' : '#f5f5f5') + '; cursor: pointer; border-radius: 8px; transition: all 0.2s; text-align: center; color: ' + (nightMode ? '#eee' : '#333') + '; min-height: 70px; display: flex; flex-direction: column; align-items: center; justify-content: center;';
 
                 var iconDiv = document.createElement('div');
-                iconDiv.style.cssText = 'font-size: 20px; margin-bottom: 6px; color: #667eea;';
+                iconDiv.style.cssText = 'font-size: 20px; margin-bottom: 6px; color: #4a90e2;';
                 iconDiv.innerHTML = '<i class="' + item.icon + '"></i>';
 
                 var nameDiv = document.createElement('div');
@@ -420,7 +419,7 @@
 
                 btn.onmouseenter = function() {
                     this.style.background = nightMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)';
-                    this.style.borderColor = '#667eea';
+                    this.style.borderColor = '#4a90e2';
                 };
 
                 btn.onmouseleave = function() {
@@ -457,12 +456,13 @@
             renderItems(results);
         });
 
-        // 取消按钮
-        var cancelBtn = document.createElement('button');
-        cancelBtn.textContent = isEn() ? 'Cancel' : '取消';
-        cancelBtn.style.cssText = 'margin-top: 15px; padding: 10px 20px; background: ' + (nightMode ? '#444' : '#f5f5f5') + '; color: ' + (nightMode ? '#eee' : '#333') + '; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; align-self: center;';
-        cancelBtn.onclick = closeInsertPicker;
-        container.appendChild(cancelBtn);
+        // 右上角关闭按钮
+        var closeBtn = document.createElement('button');
+        closeBtn.innerHTML = '<i class="fas fa-times"></i>';
+        closeBtn.style.cssText = 'position: absolute; top: 15px; right: 15px; width: 32px; height: 32px; background: ' + (nightMode ? '#444' : '#f5f5f5') + '; color: ' + (nightMode ? '#eee' : '#333') + '; border: none; border-radius: 50%; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center;';
+        closeBtn.onclick = closeInsertPicker;
+        container.style.position = 'relative';
+        container.appendChild(closeBtn);
 
         modal.appendChild(container);
         document.body.appendChild(modal);

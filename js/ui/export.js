@@ -98,7 +98,7 @@ function exportContent() {
     formats.forEach(function(f) {
         var optionBtn = document.createElement('button');
         optionBtn.style.cssText = 'display:flex;align-items:center;width:100%;padding:15px 20px;background:' + (nightMode ? '#3d3d3d' : '#f5f5f5') + ';border:none;border-radius:8px;margin-bottom:10px;text-align:left;font-size:16px;color:' + textColor + ';cursor:pointer;transition:background 0.2s;';
-        optionBtn.innerHTML = '<span style="font-size:20px;margin-right:15px;width:30px;text-align:center;color:#667eea;">' + f.icon + '</span><span>' + f.name + '</span>';
+        optionBtn.innerHTML = '<span style="font-size:20px;margin-right:15px;width:30px;text-align:center;color:#4a90e2;">' + f.icon + '</span><span>' + f.name + '</span>';
 
         optionBtn.onmouseenter = function() {
             this.style.background = nightMode ? '#4d4d4d' : '#e8e8e8';
@@ -191,7 +191,7 @@ function showFilenameDialog(defaultName, ext, callback) {
 
     var extLabel = document.createElement('div');
     extLabel.textContent = '.' + ext;
-    extLabel.style.cssText = 'text-align:center;color:#667eea;font-size:14px;margin-bottom:20px;';
+    extLabel.style.cssText = 'text-align:center;color:#4a90e2;font-size:14px;margin-bottom:20px;';
     container.appendChild(extLabel);
 
     var btnContainer = document.createElement('div');
@@ -205,7 +205,7 @@ function showFilenameDialog(defaultName, ext, callback) {
 
     var confirmBtn = document.createElement('button');
     confirmBtn.textContent = isEn() ? 'Download' : '下载';
-    confirmBtn.style.cssText = 'flex:1;padding:12px;border:none;border-radius:8px;background:#667eea;color:white;font-size:16px;cursor:pointer;';
+    confirmBtn.style.cssText = 'flex:1;padding:12px;border:none;border-radius:8px;background:#4a90e2;color:white;font-size:16px;cursor:pointer;';
     confirmBtn.onclick = function() {
         var filename = input.value.trim();
         if (!filename) {

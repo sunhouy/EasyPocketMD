@@ -18,7 +18,11 @@ describe('ShareManager', () => {
                     .mockResolvedValueOnce([[{ id: 1, password: 'hashed_password' }]]) // User check
                     .mockResolvedValueOnce([[{ id: 101 }]]) // File check
                     .mockResolvedValueOnce([[]]) // Existing share check
-                    .mockResolvedValueOnce([{ affectedRows: 1 }]), // Insert share
+                    .mockResolvedValueOnce([{ affectedRows: 1 }]) // Insert share
+                    .mockResolvedValueOnce([{ affectedRows: 0 }]), // Clear share_editors
+                beginTransaction: jest.fn().mockResolvedValue(),
+                commit: jest.fn().mockResolvedValue(),
+                rollback: jest.fn().mockResolvedValue(),
                 release: jest.fn()
             };
             db.getConnection.mockResolvedValue(mockConnection);
@@ -40,6 +44,9 @@ describe('ShareManager', () => {
         it('should return 401 if authentication fails', async () => {
             const mockConnection = {
                 execute: jest.fn().mockResolvedValueOnce([[{ id: 1, password: 'hashed' }]]),
+                beginTransaction: jest.fn().mockResolvedValue(),
+                commit: jest.fn().mockResolvedValue(),
+                rollback: jest.fn().mockResolvedValue(),
                 release: jest.fn()
             };
             db.getConnection.mockResolvedValue(mockConnection);
@@ -82,7 +89,8 @@ describe('ShareManager', () => {
                 .mockResolvedValueOnce([[
                     { share_id: 'sid', username: 'u', filename: 'f.md', mode: 'edit', password: null }
                 ]]) // getSharedFile internal
-                .mockResolvedValueOnce([]); // UPDATE user_files
+                .mockResolvedValueOnce([]) // UPDATE user_files
+                .mockResolvedValueOnce([[{ content: 'new content', last_modified: '2026-01-01 00:00:00' }]]); // SELECT updated content
 
             const result = await shareManager.updateSharedFile('sid', 'new content');
 
@@ -102,6 +110,20 @@ describe('ShareManager', () => {
             const result = await shareManager.updateSharedFile('sid', 'new content');
 
             expect(result.code).toBe(403);
+        });
+
+        it('should return 409 when optimistic version check fails', async () => {
+            db.execute
+                .mockResolvedValueOnce([[
+                    { share_id: 'sid', username: 'u', filename: 'f.md', mode: 'edit', password: null, content_version: 2 }
+                ]])
+                .mockResolvedValueOnce([{ affectedRows: 0 }])
+                .mockResolvedValueOnce([[{ content: 'latest', last_modified: '2026-01-01 00:00:00', content_version: 3 }]]);
+
+            const result = await shareManager.updateSharedFile('sid', 'new content', null, { baseVersion: 2 });
+
+            expect(result.code).toBe(409);
+            expect(result.data.content_version).toBe(3);
         });
     });
 });

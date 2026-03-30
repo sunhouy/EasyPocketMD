@@ -5,7 +5,7 @@
     function g(name) { return global[name]; }
     function t(key) { return window.i18n ? window.i18n.t(key) : key; }
 
-    async function createShareLink(filename, mode, sharePassword, expireDays) {
+    async function createShareLink(filename, mode, sharePassword, expireDays, editPolicy, editorUsernames, editPassword) {
         mode = mode || 'view';
         expireDays = expireDays || 7;
         var isEn = window.i18n && window.i18n.getLanguage() === 'en';
@@ -13,6 +13,15 @@
         try {
             var body = { username: g('currentUser').username, token: g('currentUser').token, password: g('currentUser').password, filename: filename, mode: mode, expire_days: expireDays };
             if (sharePassword && sharePassword.trim()) body.share_password = sharePassword.trim();
+            if (mode === 'edit') {
+                body.edit_policy = editPolicy || 'all';
+                if (Array.isArray(editorUsernames) && editorUsernames.length) {
+                    body.editor_usernames = editorUsernames;
+                }
+                if (editPassword && editPassword.trim()) {
+                    body.edit_password = editPassword.trim();
+                }
+            }
             var apiUrl = (global.getApiBaseUrl ? global.getApiBaseUrl() : 'api') + '/share/create';
             var response = await fetch(apiUrl, { 
                 method: 'POST', 
@@ -31,6 +40,29 @@
             }
             return { code: 500, message: (isEn ? 'Network error: ' : '网络错误: ') + (e.message || '') };
         }
+    }
+
+    function updateEditPolicyFields(container, selectedMode) {
+        var policyWrap = container.querySelector('.share-edit-policy-wrap');
+        if (!policyWrap) return;
+        policyWrap.style.display = selectedMode === 'edit' ? 'block' : 'none';
+        updateEditPolicyDetail(container);
+    }
+
+    function updateEditPolicyDetail(container) {
+        var selectedPolicyInput = container.querySelector('input[name="shareEditPolicy"]:checked');
+        var selectedPolicy = selectedPolicyInput ? selectedPolicyInput.value : 'all';
+        var specificWrap = container.querySelector('.share-specific-users-wrap');
+        var pwdWrap = container.querySelector('.share-edit-password-wrap');
+        if (specificWrap) specificWrap.style.display = selectedPolicy === 'specific' ? 'block' : 'none';
+        if (pwdWrap) pwdWrap.style.display = selectedPolicy === 'password' ? 'block' : 'none';
+    }
+
+    function parseEditorUsernames(raw) {
+        return String(raw || '')
+            .split(',')
+            .map(function(name) { return name.trim(); })
+            .filter(Boolean);
     }
 
     function showShareResult(shareData, oldModal) {
@@ -184,10 +216,30 @@
             
             <!-- 编辑选项 -->
             <div style="margin-bottom:15px;">
+                <label>${isEn ? 'View Password (optional)' : '访问密码（可选）'}</label>
+                <input id="sharePassword" type="text" value="" placeholder="${isEn ? 'Leave empty for no password' : '留空表示无需密码'}" style="width:100%;padding:8px;margin-top:5px;box-sizing:border-box;">
+            </div>
+
+            <div style="margin-bottom:15px;">
                 <label>${isEn ? 'Share Mode' : '分享模式'}</label>
                 <div style="margin-top:8px;">
                     <label><input type="radio" name="shareMode" value="view" ${existingShare.mode === 'view' ? 'checked' : ''}> ${isEn ? 'View only' : '仅查看'}</label>
                     <label><input type="radio" name="shareMode" value="edit" ${existingShare.mode === 'edit' ? 'checked' : ''}> ${isEn ? 'Editable' : '允许编辑'}</label>
+                </div>
+            </div>
+
+            <div class="share-edit-policy-wrap" style="margin-bottom:15px;display:${existingShare.mode === 'edit' ? 'block' : 'none'};">
+                <label>${isEn ? 'Edit Permission' : '编辑权限'}</label>
+                <div style="margin-top:8px;display:flex;flex-direction:column;gap:6px;">
+                    <label><input type="radio" name="shareEditPolicy" value="all" ${(existingShare.edit_policy || 'all') === 'all' ? 'checked' : ''}> ${isEn ? 'All viewers can edit' : '所有查看者可编辑'}</label>
+                    <label><input type="radio" name="shareEditPolicy" value="specific" ${(existingShare.edit_policy || 'all') === 'specific' ? 'checked' : ''}> ${isEn ? 'Only specific users can edit' : '仅特定用户可编辑'}</label>
+                    <label><input type="radio" name="shareEditPolicy" value="password" ${(existingShare.edit_policy || 'all') === 'password' ? 'checked' : ''}> ${isEn ? 'Enter edit password to edit' : '输入编辑密码可编辑'}</label>
+                </div>
+                <div class="share-specific-users-wrap" style="margin-top:8px;display:${(existingShare.edit_policy || 'all') === 'specific' ? 'block' : 'none'};">
+                    <input id="shareEditorUsers" type="text" value="${(existingShare.editor_usernames || []).join(', ')}" placeholder="${isEn ? 'Comma separated usernames, e.g. alice,bob' : '请输入用户名，多个用英文逗号分隔'}" style="width:100%;padding:8px;box-sizing:border-box;">
+                </div>
+                <div class="share-edit-password-wrap" style="margin-top:8px;display:${(existingShare.edit_policy || 'all') === 'password' ? 'block' : 'none'};">
+                    <input id="shareEditPassword" type="text" value="" placeholder="${isEn ? 'Set new edit password' : '设置新的编辑密码'}" style="width:100%;padding:8px;box-sizing:border-box;">
                 </div>
             </div>
             
@@ -206,6 +258,22 @@
             </div>
         `;
         shareContent.appendChild(contentDiv);
+
+        if (existingShare.has_password) {
+            var passwordInput = shareContent.querySelector('#sharePassword');
+            if (passwordInput) passwordInput.placeholder = isEn ? 'Keep empty to clear current view password' : '留空表示清除访问密码';
+        }
+
+        shareContent.querySelectorAll('input[name="shareMode"]').forEach(function(input) {
+            input.addEventListener('change', function() {
+                updateEditPolicyFields(shareContent, this.value);
+            });
+        });
+        shareContent.querySelectorAll('input[name="shareEditPolicy"]').forEach(function(input) {
+            input.addEventListener('change', function() {
+                updateEditPolicyDetail(shareContent);
+            });
+        });
 
         // 删除分享链接
         shareContent.querySelector('#shareDeleteBtn').onclick = async function() {
@@ -248,10 +316,30 @@
             btn.textContent = isEn ? 'Updating...' : '更新中...';
             var mode = shareContent.querySelector('input[name="shareMode"]:checked').value;
             var expireValue = shareContent.querySelector('#shareExpiry').value;
+            var sharePassword = shareContent.querySelector('#sharePassword').value;
+            var editPolicyInput = shareContent.querySelector('input[name="shareEditPolicy"]:checked');
+            var editPolicy = editPolicyInput ? editPolicyInput.value : 'all';
+            var editorUsernames = parseEditorUsernames(shareContent.querySelector('#shareEditorUsers') ? shareContent.querySelector('#shareEditorUsers').value : '');
+            var editPassword = shareContent.querySelector('#shareEditPassword') ? shareContent.querySelector('#shareEditPassword').value : '';
             var expireDays = parseInt(expireValue);
             // 只有当值为 NaN 时才使用默认值 7
             if (isNaN(expireDays)) {
                 expireDays = 7;
+            }
+
+            if (mode === 'edit' && editPolicy === 'specific' && editorUsernames.length === 0) {
+                shareContent.querySelector('#shareError').textContent = isEn ? 'Please input at least one editor username' : '请至少输入一个可编辑用户名';
+                shareContent.querySelector('#shareError').style.display = 'block';
+                btn.disabled = false;
+                btn.textContent = isEn ? 'Update Link' : '更新链接';
+                return;
+            }
+            if (mode === 'edit' && editPolicy === 'password' && !String(editPassword || '').trim() && !(existingShare.has_edit_password && !String(editPassword || '').trim())) {
+                shareContent.querySelector('#shareError').textContent = isEn ? 'Please set an edit password' : '请设置编辑密码';
+                shareContent.querySelector('#shareError').style.display = 'block';
+                btn.disabled = false;
+                btn.textContent = isEn ? 'Update Link' : '更新链接';
+                return;
             }
             try {
                 // 直接更新分享属性
@@ -261,7 +349,11 @@
                     password: g('currentUser').password,
                     share_id: existingShare.share_id,
                     mode: mode,
-                    expire_days: expireDays
+                    share_password: sharePassword,
+                    expire_days: expireDays,
+                    edit_policy: editPolicy,
+                    editor_usernames: editorUsernames,
+                    edit_password: editPassword
                 };
                 var updateUrl = (global.getApiBaseUrl ? global.getApiBaseUrl() : 'api') + '/share/properties';
                 var updateResponse = await fetch(updateUrl, { 
@@ -319,9 +411,27 @@
             <h2 style="text-align:center;margin-bottom:15px;margin-top:0;">${isEn ? 'Share Document' : '分享文档'}</h2>
             <p style="text-align:center;margin-bottom:20px;">${isEn ? 'File:' : '文件:'} ${filename}</p>
             <div style="margin-bottom:15px;">
+                <label>${isEn ? 'View Password (optional)' : '访问密码（可选）'}</label>
+                <input id="sharePassword" type="text" value="" placeholder="${isEn ? 'Leave empty for no password' : '留空表示无需密码'}" style="width:100%;padding:8px;margin-top:5px;box-sizing:border-box;">
+            </div>
+            <div style="margin-bottom:15px;">
                 <label>${isEn ? 'Share Mode' : '分享模式'}</label>
                 <div style="margin-top:8px;">
                     <label><input type="radio" name="shareMode" value="view" checked> ${isEn ? 'View only' : '仅查看'}</label> <label><input type="radio" name="shareMode" value="edit"> ${isEn ? 'Editable' : '允许编辑'}</label>
+                </div>
+            </div>
+            <div class="share-edit-policy-wrap" style="margin-bottom:15px;display:none;">
+                <label>${isEn ? 'Edit Permission' : '编辑权限'}</label>
+                <div style="margin-top:8px;display:flex;flex-direction:column;gap:6px;">
+                    <label><input type="radio" name="shareEditPolicy" value="all" checked> ${isEn ? 'All viewers can edit' : '所有查看者可编辑'}</label>
+                    <label><input type="radio" name="shareEditPolicy" value="specific"> ${isEn ? 'Only specific users can edit' : '仅特定用户可编辑'}</label>
+                    <label><input type="radio" name="shareEditPolicy" value="password"> ${isEn ? 'Enter edit password to edit' : '输入编辑密码可编辑'}</label>
+                </div>
+                <div class="share-specific-users-wrap" style="margin-top:8px;display:none;">
+                    <input id="shareEditorUsers" type="text" value="" placeholder="${isEn ? 'Comma separated usernames, e.g. alice,bob' : '请输入用户名，多个用英文逗号分隔'}" style="width:100%;padding:8px;box-sizing:border-box;">
+                </div>
+                <div class="share-edit-password-wrap" style="margin-top:8px;display:none;">
+                    <input id="shareEditPassword" type="text" value="" placeholder="${isEn ? 'Set edit password' : '设置编辑密码'}" style="width:100%;padding:8px;box-sizing:border-box;">
                 </div>
             </div>
             <div style="margin-bottom:15px;">
@@ -339,19 +449,51 @@
         `;
         shareContent.appendChild(contentDiv);
 
+        shareContent.querySelectorAll('input[name="shareMode"]').forEach(function(input) {
+            input.addEventListener('change', function() {
+                updateEditPolicyFields(shareContent, this.value);
+            });
+        });
+        shareContent.querySelectorAll('input[name="shareEditPolicy"]').forEach(function(input) {
+            input.addEventListener('change', function() {
+                updateEditPolicyDetail(shareContent);
+            });
+        });
+
         shareContent.querySelector('#shareCreateBtn').onclick = async function() {
             var btn = this;
             btn.disabled = true;
             btn.textContent = isEn ? 'Creating...' : '创建中...';
             var mode = shareContent.querySelector('input[name="shareMode"]:checked').value;
             var expireValue = shareContent.querySelector('#shareExpiry').value;
+            var sharePassword = shareContent.querySelector('#sharePassword').value;
+            var editPolicyInput = shareContent.querySelector('input[name="shareEditPolicy"]:checked');
+            var editPolicy = editPolicyInput ? editPolicyInput.value : 'all';
+            var editorUsernames = parseEditorUsernames(shareContent.querySelector('#shareEditorUsers') ? shareContent.querySelector('#shareEditorUsers').value : '');
+            var editPassword = shareContent.querySelector('#shareEditPassword') ? shareContent.querySelector('#shareEditPassword').value : '';
             var expireDays = parseInt(expireValue);
             // 只有当值为 NaN 时才使用默认值 7
             if (isNaN(expireDays)) {
                 expireDays = 7;
             }
+
+            if (mode === 'edit' && editPolicy === 'specific' && editorUsernames.length === 0) {
+                shareContent.querySelector('#shareError').textContent = isEn ? 'Please input at least one editor username' : '请至少输入一个可编辑用户名';
+                shareContent.querySelector('#shareError').style.display = 'block';
+                btn.disabled = false;
+                btn.textContent = isEn ? 'Create Share Link' : '创建分享链接';
+                return;
+            }
+
+            if (mode === 'edit' && editPolicy === 'password' && !String(editPassword || '').trim()) {
+                shareContent.querySelector('#shareError').textContent = isEn ? 'Please set an edit password' : '请设置编辑密码';
+                shareContent.querySelector('#shareError').style.display = 'block';
+                btn.disabled = false;
+                btn.textContent = isEn ? 'Create Share Link' : '创建分享链接';
+                return;
+            }
             try {
-                var result = await createShareLink(filename, mode, null, expireDays);
+                var result = await createShareLink(filename, mode, sharePassword, expireDays, editPolicy, editorUsernames, editPassword);
                 if (result.code === 200 && result.data) {
                     showShareResult(result.data, shareModal);
                 } else {

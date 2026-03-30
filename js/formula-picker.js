@@ -492,11 +492,34 @@ function showFormulaPicker() {
     `;
     formulaContainer.appendChild(formulaGrid);
 
+    // 右上角关闭按钮
+    const closeBtn = document.createElement('button');
+    closeBtn.innerHTML = '<i class="fas fa-times"></i>';
+    closeBtn.style.cssText = `
+        position: absolute;
+        top: 15px;
+        right: 15px;
+        width: 32px;
+        height: 32px;
+        background: ${(window.nightMode === true) ? '#444' : '#f5f5f5'};
+        color: ${(window.nightMode === true) ? '#eee' : '#333'};
+        border: none;
+        border-radius: 50%;
+        cursor: pointer;
+        font-size: 16px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    `;
+    closeBtn.onclick = closeFormulaPicker;
+    formulaContainer.style.position = 'relative';
+    formulaContainer.appendChild(closeBtn);
+
     // 创建底部按钮
     const bottomBar = document.createElement('div');
     bottomBar.style.cssText = `
         display: flex;
-        justify-content: space-between;
+        justify-content: flex-end;
         margin-top: 15px;
         padding-top: 15px;
         border-top: 1px solid ${(window.nightMode === true) ? '#444' : '#eee'};
@@ -514,20 +537,8 @@ function showFormulaPicker() {
         font-size: 14px;
     `;
 
-    const cancelBtn = document.createElement('button');
-    cancelBtn.textContent = isEn() ? 'Cancel' : '取消';
-    cancelBtn.style.cssText = `
-        padding: 10px 20px;
-        background: ${(window.nightMode === true) ? '#444' : '#f5f5f5'};
-        color: ${(window.nightMode === true) ? '#eee' : '#333'};
-        border: none;
-        border-radius: 6px;
-        cursor: pointer;
-        font-size: 14px;
-    `;
-
     const wrapInDollarBtn = document.createElement('button');
-    wrapInDollarBtn.textContent = isEn() ? 'Insert Inline' : '插入行内公式';
+    wrapInDollarBtn.textContent = isEn() ? 'Insert Inline' : '行内公式';
     wrapInDollarBtn.style.cssText = `
         padding: 10px 20px;
         background: #4a90e2;
@@ -540,7 +551,7 @@ function showFormulaPicker() {
     `;
 
     const wrapInDoubleDollarBtn = document.createElement('button');
-    wrapInDoubleDollarBtn.textContent = isEn() ? 'Insert Block' : '插入多行公式';
+    wrapInDoubleDollarBtn.textContent = isEn() ? 'Insert Block' : '多行公式';
     wrapInDoubleDollarBtn.style.cssText = `
         padding: 10px 20px;
         background: #4a90e2;
@@ -563,7 +574,6 @@ function showFormulaPicker() {
     buttonGroup.appendChild(wrapInDoubleDollarBtn);
 
     bottomBar.appendChild(buttonGroup);
-    bottomBar.appendChild(cancelBtn);
     formulaContainer.appendChild(bottomBar);
 
     formulaSheet.appendChild(formulaContainer);
@@ -664,7 +674,7 @@ function showFormulaPicker() {
                     const aiSearchLink = document.createElement('a');
                     aiSearchLink.href = 'javascript:void(0)';
                     aiSearchLink.textContent = isEn() ? 'Try AI Search' : '试试AI搜索';
-                    aiSearchLink.style.cssText = 'color: #667eea; text-decoration: underline; cursor: pointer; font-size: 14px;';
+                    aiSearchLink.style.cssText = 'color: #4a90e2; text-decoration: underline; cursor: pointer; font-size: 14px;';
                     aiSearchLink.addEventListener('click', function() {
                         performAISearch(searchKeyword);
                     });
@@ -822,9 +832,6 @@ function showFormulaPicker() {
         }
     });
 
-    // 取消按钮点击事件
-    cancelBtn.addEventListener('click', closeFormulaPicker);
-
     // 点击模态框外部关闭
     formulaSheet.addEventListener('click', (e) => {
         if (e.target === formulaSheet) {
@@ -872,12 +879,12 @@ async function performAISearch(keyword) {
     loadingDiv.style.cssText = 'text-align:center;padding:40px 0;grid-column: 1/-1;';
 
     const loadingIcon = document.createElement('div');
-    loadingIcon.innerHTML = '<i class="fas fa-magic" style="font-size: 32px; color: #667eea;"></i>';
+    loadingIcon.innerHTML = '<i class="fas fa-magic" style="font-size: 32px; color: #4a90e2;"></i>';
     loadingIcon.style.cssText = 'margin-bottom: 15px;';
 
     const loadingText = document.createElement('div');
     loadingText.textContent = isEn() ? 'AI is searching...' : 'AI搜索中...';
-    loadingText.style.cssText = 'color: #667eea; font-size: 14px;';
+    loadingText.style.cssText = 'color: #4a90e2; font-size: 14px;';
 
     loadingDiv.appendChild(loadingIcon);
     loadingDiv.appendChild(loadingText);
@@ -1016,7 +1023,7 @@ function renderAIFormulaResults(formulas, keyword) {
     // 添加AI搜索结果标题
     const resultHeader = document.createElement('div');
     resultHeader.style.cssText = 'grid-column: 1/-1; padding: 10px 0; border-bottom: 1px solid #eee; margin-bottom: 10px;';
-    resultHeader.innerHTML = `<span style="color: #667eea; font-weight: bold;">${isEn() ? 'AI Search Results' : 'AI搜索结果'}</span> <span style="color: #888; font-size: 12px;"></span>`;
+    resultHeader.innerHTML = `<span style="color: #4a90e2; font-weight: bold;">${isEn() ? 'AI Search Results' : 'AI搜索结果'}</span> <span style="color: #888; font-size: 12px;"></span>`;
     formulaGrid.appendChild(resultHeader);
 
     // 渲染公式列表
@@ -1062,8 +1069,8 @@ function renderAIFormulaResults(formulas, keyword) {
                 btn.style.borderColor = 'transparent';
                 btn.style.background = 'none';
             });
-            symbolBtn.style.borderColor = '#667eea';
-            symbolBtn.style.background = (window.nightMode === true) ? 'rgba(102, 126, 234, 0.2)' : 'rgba(102, 126, 234, 0.1)';
+            symbolBtn.style.borderColor = '#4a90e2';
+            symbolBtn.style.background = (window.nightMode === true) ? 'rgba(74, 144, 226, 0.2)' : 'rgba(74, 144, 226, 0.1)';
 
             // 保存选中的公式到全局变量供插入按钮使用
             window.selectedFormula = item;

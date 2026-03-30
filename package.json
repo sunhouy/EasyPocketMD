@@ -28,7 +28,7 @@
     "name": "sunhouyun",
     "email": "sunhouyun@yhsun.cn"
   },
-  "license": "ISC",
+  "license": "MIT",
   "bugs": {
     "url": "https://github.com/sunhouy/markdown/issues"
   },
@@ -67,6 +67,7 @@
     "sharp": "^0.34.5",
     "uuid": "^9.0.1",
     "vditor": "^3.11.2",
+    "ws": "^8.18.0",
     "wkhtmltopdf": "^0.4.0"
   },
   "devDependencies": {

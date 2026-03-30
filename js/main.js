@@ -883,6 +883,116 @@ document.addEventListener('DOMContentLoaded', function() {
         modal.classList.add('show');
     };
 
+    async function clearAllCacheStorage() {
+        if (!('caches' in window)) return;
+
+        if ('serviceWorker' in navigator) {
+            var registration = await navigator.serviceWorker.getRegistration('/');
+            if (registration && registration.active) {
+                await new Promise(function(resolve, reject) {
+                    var channel = new MessageChannel();
+                    var timeoutId = setTimeout(function() {
+                        reject(new Error('Service Worker clear cache timeout'));
+                    }, 2500);
+
+                    channel.port1.onmessage = function(event) {
+                        clearTimeout(timeoutId);
+                        var data = event.data || {};
+                        if (data.type === 'CLEAR_CACHE_ACK' && data.ok) {
+                            resolve();
+                            return;
+                        }
+                        reject(new Error(data.message || 'Service Worker clear cache failed'));
+                    };
+
+                    registration.active.postMessage({ type: 'CLEAR_CACHE_STORAGE' }, [channel.port2]);
+                });
+            }
+        }
+
+        // Window context fallback/second-pass to ensure all cache buckets are removed.
+        var cacheNames = await caches.keys();
+        await Promise.all(cacheNames.map(function(name) { return caches.delete(name); }));
+    }
+
+    async function clearAllIndexedDB() {
+        if (!('indexedDB' in window)) return;
+
+        if (indexedDB.databases) {
+            var dbs = await indexedDB.databases();
+            await Promise.all((dbs || []).map(function(dbInfo) {
+                if (!dbInfo || !dbInfo.name) return Promise.resolve();
+                return new Promise(function(resolve, reject) {
+                    var request = indexedDB.deleteDatabase(dbInfo.name);
+                    request.onsuccess = function() { resolve(); };
+                    request.onerror = function() { reject(request.error || new Error('Delete IndexedDB failed')); };
+                    request.onblocked = function() { resolve(); };
+                });
+            }));
+            return;
+        }
+
+        await new Promise(function(resolve, reject) {
+            var fallbackRequest = indexedDB.deleteDatabase('MarkdownEditorFiles');
+            fallbackRequest.onsuccess = function() { resolve(); };
+            fallbackRequest.onerror = function() { reject(fallbackRequest.error || new Error('Delete IndexedDB failed')); };
+            fallbackRequest.onblocked = function() { resolve(); };
+        });
+    }
+
+    async function clearAllServiceWorkers() {
+        if (!('serviceWorker' in navigator)) return;
+        var registrations = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(registrations.map(function(registration) { return registration.unregister(); }));
+    }
+
+    function clearAllCookies() {
+        var cookies = document.cookie ? document.cookie.split(';') : [];
+        var hostname = window.location.hostname;
+        var domainParts = hostname.split('.');
+        var domainVariants = [''];
+
+        if (domainParts.length > 1) {
+            for (var i = 0; i < domainParts.length - 1; i++) {
+                domainVariants.push('.' + domainParts.slice(i).join('.'));
+            }
+        }
+
+        cookies.forEach(function(cookie) {
+            var cookieName = cookie.split('=')[0].trim();
+            if (!cookieName) return;
+
+            domainVariants.forEach(function(domain) {
+                var domainPart = domain ? '; domain=' + domain : '';
+                document.cookie = cookieName + '=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/' + domainPart;
+            });
+        });
+    }
+
+    async function bindStorageManagementAction(buttonId, actionFn, confirmKey, successKey, failKey) {
+        var button = document.getElementById(buttonId);
+        if (!button) return;
+
+        button.addEventListener('click', async function() {
+            try {
+                var confirmMessage = window.i18n ? window.i18n.t(confirmKey) : '确认执行该操作吗？';
+                var confirmed = await window.customConfirm(confirmMessage);
+                if (!confirmed) return;
+
+                await actionFn();
+                window.showMessage(window.i18n ? window.i18n.t(successKey) : '操作成功', 'success');
+            } catch (error) {
+                console.error('[StorageManagement] Action failed:', error);
+                window.showMessage(window.i18n ? window.i18n.t(failKey) : '操作失败', 'error');
+            }
+        });
+    }
+
+    bindStorageManagementAction('clearCacheStorageBtn', clearAllCacheStorage, 'confirmClearCacheStorage', 'clearCacheStorageSuccess', 'clearCacheStorageFailed');
+    bindStorageManagementAction('clearIndexedDBBtn', clearAllIndexedDB, 'confirmClearIndexedDB', 'clearIndexedDBSuccess', 'clearIndexedDBFailed');
+    bindStorageManagementAction('clearServiceWorkerBtn', clearAllServiceWorkers, 'confirmClearServiceWorker', 'clearServiceWorkerSuccess', 'clearServiceWorkerFailed');
+    bindStorageManagementAction('clearCookiesBtn', clearAllCookies, 'confirmClearCookies', 'clearCookiesSuccess', 'clearCookiesFailed');
+
     // 保存设置
     var saveSettingsBtn = document.getElementById('saveSettingsBtn');
     if(saveSettingsBtn) saveSettingsBtn.addEventListener('click', function() {
