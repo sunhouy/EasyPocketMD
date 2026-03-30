@@ -878,6 +878,63 @@
         return { canEdit: false, editPassword: '' };
     }
 
+    function setSharedEditorLocked(locked) {
+        var container = document.getElementById('vditor');
+        if (!container) return;
+        var editableNodes = container.querySelectorAll('[contenteditable]');
+        editableNodes.forEach(function(node) {
+            node.setAttribute('contenteditable', locked ? 'false' : 'true');
+        });
+        var textInputs = container.querySelectorAll('textarea, input');
+        textInputs.forEach(function(node) {
+            node.readOnly = !!locked;
+        });
+    }
+
+    function deactivateSharedDocumentSession() {
+        if (!window.sharedDocState) return;
+        if (window.sharedDocState.saveTimer) clearTimeout(window.sharedDocState.saveTimer);
+        if (window.sharedDocState.pollTimer) clearInterval(window.sharedDocState.pollTimer);
+        if (window.sharedDocState.presenceTimer) clearInterval(window.sharedDocState.presenceTimer);
+        if (window.sharedDocState.localWatchTimer) clearInterval(window.sharedDocState.localWatchTimer);
+        if (window.sharedDocState.wsRetryTimer) clearTimeout(window.sharedDocState.wsRetryTimer);
+        if (window.sharedDocState.ws) {
+            try { window.sharedDocState.ws.close(); } catch (e) {}
+        }
+        window.sharedDocState = null;
+        setSharedEditorLocked(false);
+        var bar = document.getElementById('sharePresenceBar');
+        if (bar) bar.remove();
+    }
+
+    function activateSharedDocumentSession(shareData, options) {
+        options = options || {};
+        deactivateSharedDocumentSession();
+        window.sharedDocState = {
+            shareId: options.shareId || shareData.share_id,
+            sharePassword: options.sharePassword || '',
+            editPassword: options.editPassword || '',
+            canEdit: !!options.canEdit,
+            lastKnownContent: shareData.content || '',
+            lastModified: shareData.last_modified || null,
+            contentVersion: shareData.content_version || 1,
+            lastLocalEditAt: 0,
+            viewerId: options.viewerId || getSharedViewerId(),
+            viewerName: options.viewerName || getSharedViewerName(),
+            ownerFileId: options.ownerFileId || null,
+            isSaving: false,
+            saveTimer: null,
+            pollTimer: null,
+            presenceTimer: null,
+            localWatchTimer: null,
+            ws: null,
+            wsConnected: false,
+            wsRetryTimer: null
+        };
+        setSharedEditorLocked(!window.sharedDocState.canEdit);
+        startSharedDocRealtime();
+    }
+
     async function handleShareLink(shareId, password) {
         try {
             const result = await fetchShareData(shareId, password, '');
@@ -895,35 +952,25 @@
                 // 根据分享模式和编辑权限调整UI
                 if (shareData.mode === 'view' || !editAccess.canEdit) {
                     hideEditElements();
+                    setSharedEditorLocked(true);
                 } else {
                     if (shareData.is_expired) {
                         hideEditElements();
+                        setSharedEditorLocked(true);
                         showToast(window.i18n ? window.i18n.t('shareLinkExpired') : '分享链接已过期，无法编辑', 'error');
+                    } else {
+                        setSharedEditorLocked(false);
                     }
                 }
 
-                window.sharedDocState = {
+                activateSharedDocumentSession(shareData, {
                     shareId: shareId,
                     sharePassword: password || '',
                     editPassword: editAccess.editPassword || '',
                     canEdit: editAccess.canEdit && !shareData.is_expired,
-                    lastKnownContent: shareData.content || '',
-                    lastModified: shareData.last_modified || null,
-                    contentVersion: shareData.content_version || 1,
-                    lastLocalEditAt: 0,
                     viewerId: getSharedViewerId(),
-                    viewerName: getSharedViewerName(),
-                    isSaving: false,
-                    saveTimer: null,
-                    pollTimer: null,
-                    presenceTimer: null,
-                    localWatchTimer: null,
-                    ws: null,
-                    wsConnected: false,
-                    wsRetryTimer: null
-                };
-
-                startSharedDocRealtime();
+                    viewerName: getSharedViewerName()
+                });
 
                 // 隐藏登录提示
                 if (window.showLoginModal) {
@@ -1233,6 +1280,10 @@
         heartbeatSharePresence();
         window.sharedDocState.presenceTimer = setInterval(heartbeatSharePresence, 5000);
     }
+
+    window.activateSharedDocumentSession = activateSharedDocumentSession;
+    window.deactivateSharedDocumentSession = deactivateSharedDocumentSession;
+    window.scheduleSharedDocSync = scheduleSharedDocSync;
 
     function hideEditElements() {
         // 隐藏顶部工具栏

@@ -106,7 +106,7 @@
         var bg = nightMode ? '#2d2d2d' : 'white';
         var textColor = nightMode ? '#eee' : '#333';
         var shareContent = document.createElement('div');
-        shareContent.style.cssText = 'background:' + bg + ';color:' + textColor + ';border-radius:12px;padding:25px;width:90%;max-width:500px;position:relative;';
+        shareContent.style.cssText = 'background:' + bg + ';color:' + textColor + ';border-radius:12px;padding:25px;width:90%;max-width:500px;max-height:85vh;overflow-y:auto;position:relative;';
 
         // 右上角关闭按钮
         var closeBtn = document.createElement('button');

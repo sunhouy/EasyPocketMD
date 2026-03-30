@@ -79,6 +79,16 @@ describe('ShareManager', () => {
 
             expect(result.code).toBe(401);
         });
+
+        it('should allow owner to access shared file without view password', async () => {
+            db.execute.mockResolvedValueOnce([[
+                { share_id: 'sid', username: 'owner', filename: 'f.md', content: 'c', password: 'sp', mode: 'edit' }
+            ]]);
+
+            const result = await shareManager.getSharedFile('sid', null, { editorUsername: 'owner' });
+
+            expect(result.code).toBe(200);
+        });
     });
 
     describe('updateSharedFile', () => {
