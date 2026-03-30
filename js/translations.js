@@ -149,6 +149,18 @@
             contentCleared: '内容已清空',
             videoCall: '视频通话',
 
+            // 服务状态
+            serviceStatus: '服务状态',
+            serviceStatusIntro: '实时监控所有API接口的运行状态',
+            loadingServiceStatus: '正在加载服务状态...',
+            noServiceStatusData: '暂无服务状态数据',
+            statusHealthy: '正常',
+            statusUnhealthy: '异常',
+            statusUnknown: '未知',
+            statusChecking: '检测中',
+            statusOffline: '离线',
+            poweredByGatus: 'Powered by Gatus',
+
             // 编辑器
             startEditing: '开始编辑...支持 Markdown 语法',
             format: '格式',
@@ -176,6 +188,10 @@
             getShareFailed: '获取分享内容失败: ',
             networkError: '网络错误，请重试',
             shareDocument: '分享文档',
+            onlineUsers: '在线用户',
+            shareConnConnecting: '连接中',
+            shareConnConnected: '已连接',
+            shareConnPolling: '降级轮询',
             expired: '已过期',
             expiresAt: '有效期至',
             mode: '模式',
@@ -614,6 +630,18 @@
             contentCleared: 'Content cleared',
             videoCall: 'Video Call',
 
+            // Service Status
+            serviceStatus: 'Service Status',
+            serviceStatusIntro: 'Real-time monitoring of all API endpoints',
+            loadingServiceStatus: 'Loading service status...',
+            noServiceStatusData: 'No service status data available',
+            statusHealthy: 'Healthy',
+            statusUnhealthy: 'Unhealthy',
+            statusUnknown: 'Unknown',
+            statusChecking: 'Checking',
+            statusOffline: 'Offline',
+            poweredByGatus: 'Powered by Gatus',
+
             // Editor
             startEditing: 'Start editing... Supports Markdown syntax',
             format: 'Format',
@@ -641,6 +669,10 @@
             getShareFailed: 'Failed to get share content: ',
             networkError: 'Network error, please try again',
             shareDocument: 'Share document',
+            onlineUsers: 'Online users',
+            shareConnConnecting: 'Connecting',
+            shareConnConnected: 'Connected',
+            shareConnPolling: 'Polling fallback',
             expired: 'Expired',
             expiresAt: 'Expires at',
             mode: 'Mode',

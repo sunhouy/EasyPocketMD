@@ -483,6 +483,32 @@
     </div>
 </div>
 
+<!-- 服务状态模态窗口 -->
+<div class="modal-overlay" id="serviceStatusModalOverlay">
+    <div class="modal service-status-modal" style="position:relative;max-height:85vh;overflow:hidden;display:flex;flex-direction:column;">
+        <button class="modal-close-btn" id="closeServiceStatusBtn" style="position:absolute;top:15px;right:15px;background:none;border:none;font-size:20px;cursor:pointer;z-index:10;">
+            <i class="fas fa-times"></i>
+        </button>
+        <div class="modal-header" style="flex-shrink:0;">
+            <h2 data-i18n="serviceStatus">服务状态</h2>
+        </div>
+        <div class="modal-content service-status-content" style="flex:1;overflow-y:auto;padding:15px;">
+            <div class="service-status-intro" style="margin-bottom:15px;padding:10px;background:#f8f9fa;border-radius:8px;font-size:13px;color:#666;">
+                <i class="fas fa-info-circle"></i> <span data-i18n="serviceStatusIntro">实时监控所有API接口的运行状态</span>
+            </div>
+            <div id="serviceStatusList" class="service-status-list">
+                <div class="service-status-loading" style="text-align:center;padding:30px;color:#999;">
+                    <i class="fas fa-spinner fa-spin" style="font-size:24px;margin-bottom:10px;"></i>
+                    <p data-i18n="loadingServiceStatus">正在加载服务状态...</p>
+                </div>
+            </div>
+            <div class="service-status-footer" style="margin-top:15px;padding-top:15px;border-top:1px solid #eee;text-align:center;font-size:12px;color:#999;">
+                <span data-i18n="poweredByGatus">Powered by Gatus</span>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- AI助手模态窗口 -->
 <div class="modal-overlay" id="aiModalOverlay">
     <div class="modal ai-modal" style="position:relative;max-height:85vh;overflow:hidden;display:flex;flex-direction:column;">
@@ -677,6 +703,7 @@
                 <button class="dropdown-item" id="mobileExportBtn"><i class="fas fa-file-export"></i>  <span data-i18n="export">导出</span></button>
                 <button class="dropdown-item" id="mobileVideoCallBtn"><i class="fas fa-video"></i>  <span data-i18n="videoCall">视频通话</span></button>
                 <button class="dropdown-item" id="mobileClearBtn"><i class="fas fa-trash-alt"></i>  <span data-i18n="clear">清空</span></button>
+                <button class="dropdown-item" id="serviceStatusBtn"><i class="fas fa-heartbeat"></i>  <span data-i18n="serviceStatus">服务状态</span></button>
                 <button class="dropdown-item" id="aboutBtn"><i class="fas fa-info-circle"></i>  <span data-i18n="about">关于</span></button>
             </div>
         </div>
@@ -891,6 +918,32 @@
         });
     }
 
+    function getShareConnectionStatusInfo(status) {
+        var s = status || 'connecting';
+        if (s === 'connected') {
+            return {
+                color: '#2da44e',
+                text: window.i18n ? window.i18n.t('shareConnConnected') : 'Connected'
+            };
+        }
+        if (s === 'polling') {
+            return {
+                color: '#f39c12',
+                text: window.i18n ? window.i18n.t('shareConnPolling') : 'Polling fallback'
+            };
+        }
+        return {
+            color: '#4a90e2',
+            text: window.i18n ? window.i18n.t('shareConnConnecting') : 'Connecting'
+        };
+    }
+
+    function updateShareConnectionStatus(status) {
+        if (!window.sharedDocState) return;
+        window.sharedDocState.connectionStatus = status;
+        renderSharePresence(window.sharedDocState.onlineUsers || []);
+    }
+
     function deactivateSharedDocumentSession() {
         if (!window.sharedDocState) return;
         if (window.sharedDocState.saveTimer) clearTimeout(window.sharedDocState.saveTimer);
@@ -898,6 +951,7 @@
         if (window.sharedDocState.presenceTimer) clearInterval(window.sharedDocState.presenceTimer);
         if (window.sharedDocState.localWatchTimer) clearInterval(window.sharedDocState.localWatchTimer);
         if (window.sharedDocState.wsRetryTimer) clearTimeout(window.sharedDocState.wsRetryTimer);
+        if (window.sharedDocState.wsGraceTimer) clearTimeout(window.sharedDocState.wsGraceTimer);
         if (window.sharedDocState.ws) {
             try { window.sharedDocState.ws.close(); } catch (e) {}
         }
@@ -909,9 +963,34 @@
 
     function activateSharedDocumentSession(shareData, options) {
         options = options || {};
+        var targetShareId = options.shareId || shareData.share_id;
+        var targetOwnerFileId = options.ownerFileId || null;
+        var sameSession =
+            window.sharedDocState &&
+            window.sharedDocState.shareId === targetShareId &&
+            window.sharedDocState.ownerFileId === targetOwnerFileId;
+
+        if (sameSession) {
+            window.sharedDocState.sharePassword = options.sharePassword || window.sharedDocState.sharePassword || '';
+            window.sharedDocState.editPassword = options.editPassword || window.sharedDocState.editPassword || '';
+            window.sharedDocState.canEdit = !!options.canEdit;
+            window.sharedDocState.viewerId = options.viewerId || window.sharedDocState.viewerId;
+            window.sharedDocState.viewerName = options.viewerName || window.sharedDocState.viewerName;
+            window.sharedDocState.lastModified = shareData.last_modified || window.sharedDocState.lastModified;
+            window.sharedDocState.contentVersion = shareData.content_version || window.sharedDocState.contentVersion;
+            if (typeof shareData.content === 'string') {
+                window.sharedDocState.lastKnownContent = shareData.content;
+            }
+            setSharedEditorLocked(!window.sharedDocState.canEdit);
+            if (!window.sharedDocState.wsConnected) {
+                connectShareWebSocket();
+            }
+            return;
+        }
+
         deactivateSharedDocumentSession();
         window.sharedDocState = {
-            shareId: options.shareId || shareData.share_id,
+            shareId: targetShareId,
             sharePassword: options.sharePassword || '',
             editPassword: options.editPassword || '',
             canEdit: !!options.canEdit,
@@ -921,7 +1000,7 @@
             lastLocalEditAt: 0,
             viewerId: options.viewerId || getSharedViewerId(),
             viewerName: options.viewerName || getSharedViewerName(),
-            ownerFileId: options.ownerFileId || null,
+            ownerFileId: targetOwnerFileId,
             isSaving: false,
             saveTimer: null,
             pollTimer: null,
@@ -929,7 +1008,10 @@
             localWatchTimer: null,
             ws: null,
             wsConnected: false,
-            wsRetryTimer: null
+            wsRetryTimer: null,
+            wsGraceTimer: null,
+            connectionStatus: 'connecting',
+            onlineUsers: []
         };
         setSharedEditorLocked(!window.sharedDocState.canEdit);
         startSharedDocRealtime();
@@ -1124,16 +1206,21 @@
             viewer_id: window.sharedDocState.viewerId,
             viewer_name: window.sharedDocState.viewerName,
             editor_username: window.currentUser && window.currentUser.username ? window.currentUser.username : '',
-            editor_token: window.currentUser && window.currentUser.token ? window.currentUser.token : '',
-            editor_password: window.currentUser && window.currentUser.password ? window.currentUser.password : ''
+            editor_token: window.currentUser && window.currentUser.token ? window.currentUser.token : ''
         });
 
         var socket = new WebSocket(getShareWsUrl() + '?' + query.toString());
         window.sharedDocState.ws = socket;
+        updateShareConnectionStatus('connecting');
 
         socket.onopen = function() {
             if (!window.sharedDocState) return;
             window.sharedDocState.wsConnected = true;
+            if (window.sharedDocState.wsGraceTimer) {
+                clearTimeout(window.sharedDocState.wsGraceTimer);
+                window.sharedDocState.wsGraceTimer = null;
+            }
+            updateShareConnectionStatus('connected');
             if (window.sharedDocState.pollTimer) {
                 clearInterval(window.sharedDocState.pollTimer);
                 window.sharedDocState.pollTimer = null;
@@ -1150,6 +1237,7 @@
             }
 
             if (payload.type === 'presence') {
+                window.sharedDocState.onlineUsers = payload.online_users || [];
                 renderSharePresence(payload.online_users || []);
                 return;
             }
@@ -1190,6 +1278,7 @@
             if (!window.sharedDocState) return;
             window.sharedDocState.wsConnected = false;
             window.sharedDocState.ws = null;
+            updateShareConnectionStatus('polling');
             if (!window.sharedDocState.pollTimer) {
                 window.sharedDocState.pollTimer = setInterval(pollSharedDocContent, 2500);
             }
@@ -1217,7 +1306,13 @@
         var names = (onlineUsers || []).slice(0, 5).map(function(u) {
             return u.is_editing ? (u.viewer_name + '...') : u.viewer_name;
         });
-        bar.textContent = (window.i18n ? window.i18n.t('onlineUsers') : '在线用户') + ': ' + (names.length ? names.join(', ') : '-');
+        var statusInfo = getShareConnectionStatusInfo(window.sharedDocState ? window.sharedDocState.connectionStatus : 'connecting');
+        bar.innerHTML =
+            '<span style="display:inline-flex;align-items:center;gap:6px;margin-right:10px;">' +
+            '<span style="width:8px;height:8px;border-radius:50%;background:' + statusInfo.color + ';display:inline-block;"></span>' +
+            '<span>' + statusInfo.text + '</span>' +
+            '</span>' +
+            '<span>' + (window.i18n ? window.i18n.t('onlineUsers') : '在线用户') + ': ' + (names.length ? names.join(', ') : '-') + '</span>';
     }
 
     async function heartbeatSharePresence() {
@@ -1245,6 +1340,7 @@
             });
             const result = await response.json();
             if (result.code === 200 && result.data) {
+                window.sharedDocState.onlineUsers = result.data.online_users || [];
                 renderSharePresence(result.data.online_users || []);
             }
         } catch (err) {
@@ -1259,6 +1355,7 @@
         if (window.sharedDocState.presenceTimer) clearInterval(window.sharedDocState.presenceTimer);
         if (window.sharedDocState.localWatchTimer) clearInterval(window.sharedDocState.localWatchTimer);
         if (window.sharedDocState.wsRetryTimer) clearTimeout(window.sharedDocState.wsRetryTimer);
+        if (window.sharedDocState.wsGraceTimer) clearTimeout(window.sharedDocState.wsGraceTimer);
 
         if (window.sharedDocState.canEdit) {
             window.sharedDocState.localWatchTimer = setInterval(function() {
@@ -1273,9 +1370,14 @@
 
         // WebSocket 优先，轮询作为降级保障
         connectShareWebSocket();
-        if (!window.sharedDocState.wsConnected) {
-            window.sharedDocState.pollTimer = setInterval(pollSharedDocContent, window.sharedDocState.canEdit ? 2200 : 3000);
-        }
+        updateShareConnectionStatus('connecting');
+        window.sharedDocState.wsGraceTimer = setTimeout(function() {
+            if (!window.sharedDocState || window.sharedDocState.wsConnected) return;
+            updateShareConnectionStatus('polling');
+            if (!window.sharedDocState.pollTimer) {
+                window.sharedDocState.pollTimer = setInterval(pollSharedDocContent, window.sharedDocState.canEdit ? 2200 : 3000);
+            }
+        }, 1800);
 
         heartbeatSharePresence();
         window.sharedDocState.presenceTimer = setInterval(heartbeatSharePresence, 5000);
