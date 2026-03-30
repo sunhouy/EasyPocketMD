@@ -93,23 +93,26 @@ jobs:
           if [ -f "$MANIFEST_FILE" ]; then
             # 添加 CAMERA 权限（如果不存在）
             if ! grep -q 'android.permission.CAMERA' "$MANIFEST_FILE"; then
-              sed -i '/<manifest/i\    <uses-permission android:name="android.permission.CAMERA" />' "$MANIFEST_FILE"
+              sed -i '/<manifest[^>]*>/a\    <uses-permission android:name="android.permission.CAMERA" />' "$MANIFEST_FILE"
             fi
             
             # 添加 RECORD_AUDIO 权限（如果不存在）
             if ! grep -q 'android.permission.RECORD_AUDIO' "$MANIFEST_FILE"; then
-              sed -i '/<manifest/i\    <uses-permission android:name="android.permission.RECORD_AUDIO" />' "$MANIFEST_FILE"
+              sed -i '/<manifest[^>]*>/a\    <uses-permission android:name="android.permission.RECORD_AUDIO" />' "$MANIFEST_FILE"
             fi
             
             # 添加 MODIFY_AUDIO_SETTINGS 权限（如果不存在）
             if ! grep -q 'android.permission.MODIFY_AUDIO_SETTINGS' "$MANIFEST_FILE"; then
-              sed -i '/<manifest/i\    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />' "$MANIFEST_FILE"
+              sed -i '/<manifest[^>]*>/a\    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />' "$MANIFEST_FILE"
             fi
             
             # 添加 INTERNET 权限（如果不存在）
             if ! grep -q 'android.permission.INTERNET' "$MANIFEST_FILE"; then
-              sed -i '/<manifest/i\    <uses-permission android:name="android.permission.INTERNET" />' "$MANIFEST_FILE"
+              sed -i '/<manifest[^>]*>/a\    <uses-permission android:name="android.permission.INTERNET" />' "$MANIFEST_FILE"
             fi
+
+            # 快速校验 XML 是否可解析，尽早暴露格式问题
+            python3 -c "import xml.etree.ElementTree as ET; ET.parse('$MANIFEST_FILE'); print('AndroidManifest.xml XML validation passed')"
             
             echo "AndroidManifest.xml 权限配置完成："
             grep -E 'uses-permission' "$MANIFEST_FILE" || echo "未找到权限声明"
