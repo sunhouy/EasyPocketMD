@@ -34,7 +34,11 @@ describe('Share API Integration', () => {
                     .mockResolvedValueOnce([[{ id: 1, password: 'hashed' }]]) // User
                     .mockResolvedValueOnce([[{ id: 101 }]]) // File
                     .mockResolvedValueOnce([[]]) // Existing share
-                    .mockResolvedValueOnce([{ affectedRows: 1 }]), // Insert
+                    .mockResolvedValueOnce([{ affectedRows: 1 }]) // Insert
+                    .mockResolvedValueOnce([{ affectedRows: 0 }]), // Clear share_editors
+                beginTransaction: jest.fn().mockResolvedValue(),
+                commit: jest.fn().mockResolvedValue(),
+                rollback: jest.fn().mockResolvedValue(),
                 release: jest.fn()
             };
             db.getConnection
@@ -90,7 +94,8 @@ describe('Share API Integration', () => {
                 .mockResolvedValueOnce([[
                     { share_id: 'sid', username: 'u', filename: 'f.md', mode: 'edit', password: null }
                 ]]) // getSharedFile
-                .mockResolvedValueOnce([]); // UPDATE user_files
+                .mockResolvedValueOnce([]) // UPDATE user_files
+                .mockResolvedValueOnce([[{ content: 'new content', last_modified: '2026-01-01 00:00:00' }]]); // SELECT updated content
 
             const res = await request(app)
                 .post('/api/share/update')
@@ -98,6 +103,23 @@ describe('Share API Integration', () => {
 
             expect(res.status).toBe(200);
             expect(res.body.code).toBe(200);
+        });
+
+        it('should return conflict when base_version is stale', async () => {
+            db.execute
+                .mockResolvedValueOnce([[
+                    { share_id: 'sid', username: 'u', filename: 'f.md', mode: 'edit', password: null, content_version: 2 }
+                ]]) // getSharedFile
+                .mockResolvedValueOnce([{ affectedRows: 0 }]) // optimistic update failed
+                .mockResolvedValueOnce([[{ content: 'latest content', last_modified: '2026-01-01 00:00:00', content_version: 3 }]]);
+
+            const res = await request(app)
+                .post('/api/share/update')
+                .send({ share_id: 'sid', content: 'my content', base_version: 2 });
+
+            expect(res.status).toBe(200);
+            expect(res.body.code).toBe(409);
+            expect(res.body.data.content_version).toBe(3);
         });
     });
 });

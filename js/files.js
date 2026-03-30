@@ -2329,7 +2329,7 @@
         html = html.replace(/\*\*(.+?)\*\*/g, '<strong style="color: #e74c3c;">$1</strong>');
         html = html.replace(/\*(.+?)\*/g, '<em style="color: #e67e22;">$1</em>');
         html = html.replace(/`([^`]+)`/g, '<code style="background: #f0f0f0; padding: 2px 4px; border-radius: 3px; color: #c7254e;">$1</code>');
-        html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" style="color: #3498db;">$1</a>');
+        html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" style="color: #4a90e2;">$1</a>');
         return html.replace(/\n/g, '<br>');
     }
 
@@ -2850,30 +2850,37 @@
         dialog.id = 'findDialogModal';
         dialog.style.cssText = 'position:fixed;top:80px;right:40px;background:' + bgColor + ';color:' + textColor + ';border-radius:12px;padding:20px;width:380px;box-shadow:0 4px 20px rgba(0,0,0,0.3);z-index:10001;border:1px solid ' + borderColor + ';display:flex;flex-direction:column;';
         dialog.innerHTML =
-            '<div id="findDialogHeader" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;cursor:move;user-select:none;">' +
+            '<div id="findDialogHeader" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;cursor:move;user-select:none;touch-action:none;">' +
                 '<h3 style="margin:0;font-size:16px;">' + (isEn() ? 'Find and Replace' : '查找和替换') + '</h3>' +
                 '<button id="closeFindBtn" style="background:none;border:none;font-size:20px;cursor:pointer;color:' + secondaryTextColor + ';padding:0;">&times;</button>' +
             '</div>' +
-            '<div style="margin-bottom:10px;">' +
+            '<div style="margin-bottom:10px;display:flex;align-items:center;gap:8px;">' +
+                '<button id="toggleReplaceBtn" style="background:none;border:none;cursor:pointer;color:' + secondaryTextColor + ';padding:4px;font-size:14px;transition:transform 0.2s;">' +
+                    '<i class="fas fa-chevron-right" id="toggleReplaceIcon"></i>' +
+                '</button>' +
                 '<input type="text" id="findInput" placeholder="' + (isEn() ? 'Enter search text...' : '输入查找内容...') + '" ' +
-                    'style="width:100%;padding:8px 12px;border:1px solid ' + borderColor + ';border-radius:6px;font-size:13px;background:' + inputBg + ';color:' + textColor + ';box-sizing:border-box;outline:none;">' +
+                    'style="flex:1;padding:8px 12px;border:1px solid ' + borderColor + ';border-radius:6px;font-size:13px;background:' + inputBg + ';color:' + textColor + ';box-sizing:border-box;outline:none;">' +
             '</div>' +
-            '<div style="margin-bottom:15px;">' +
+            '<div id="replaceContainer" style="margin-bottom:15px;display:none;">' +
                 '<input type="text" id="replaceInput" placeholder="' + (isEn() ? 'Enter replacement...' : '输入替换内容...') + '" ' +
                     'style="width:100%;padding:8px 12px;border:1px solid ' + borderColor + ';border-radius:6px;font-size:13px;background:' + inputBg + ';color:' + textColor + ';box-sizing:border-box;outline:none;">' +
             '</div>' +
-            '<div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;margin-bottom:10px;">' +
+            '<div id="replaceButtonsContainer" style="display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;margin-bottom:10px;display:none;">' +
                 '<button id="replaceBtn" style="padding:6px 12px;background:' + (nightMode ? '#3d3d3d' : '#f0f0f0') + ';color:' + textColor + ';border:1px solid ' + borderColor + ';border-radius:6px;cursor:pointer;font-size:12px;">' + (isEn() ? 'Replace' : '替换') + '</button>' +
                 '<button id="replaceAllBtn" style="padding:6px 12px;background:' + (nightMode ? '#3d3d3d' : '#f0f0f0') + ';color:' + textColor + ';border:1px solid ' + borderColor + ';border-radius:6px;cursor:pointer;font-size:12px;">' + (isEn() ? 'Replace All' : '全部替换') + '</button>' +
-                '<button id="findPrevBtn" style="padding:6px 12px;background:' + (nightMode ? '#667eea' : '#667eea') + ';color:white;border:none;border-radius:6px;cursor:pointer;font-size:12px;">' + (isEn() ? 'Prev' : '上一个') + '</button>' +
-                '<button id="findNextBtn" style="padding:6px 12px;background:' + (nightMode ? '#667eea' : '#667eea') + ';color:white;border:none;border-radius:6px;cursor:pointer;font-size:12px;">' + (isEn() ? 'Next' : '下一个') + '</button>' +
+            '</div>' +
+            '<div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;margin-bottom:10px;">' +
+                '<button id="findPrevBtn" style="padding:6px 12px;background:' + (nightMode ? '#4a90e2' : '#4a90e2') + ';color:white;border:none;border-radius:6px;cursor:pointer;font-size:12px;">' + (isEn() ? 'Prev' : '上一个') + '</button>' +
+                '<button id="findNextBtn" style="padding:6px 12px;background:' + (nightMode ? '#4a90e2' : '#4a90e2') + ';color:white;border:none;border-radius:6px;cursor:pointer;font-size:12px;">' + (isEn() ? 'Next' : '下一个') + '</button>' +
             '</div>' +
             '<div id="findStatus" style="font-size:12px;color:' + secondaryTextColor + ';"></div>';
         document.body.appendChild(dialog);
-        // 拖动逻辑
+        // 拖动逻辑（支持鼠标和触摸）
         const header = dialog.querySelector('#findDialogHeader');
         let isDragging = false;
         let startX, startY, startLeft, startTop;
+
+        // 鼠标拖动
         header.addEventListener('mousedown', function(e) {
             if (e.target.id === 'closeFindBtn') return;
             isDragging = true;
@@ -2882,26 +2889,81 @@
             const rect = dialog.getBoundingClientRect();
             startLeft = rect.left;
             startTop = rect.top;
-            // 改变样式以防文字被选中
             document.body.style.userSelect = 'none';
         });
+
         document.addEventListener('mousemove', function(e) {
             if (!isDragging) return;
             const dx = e.clientX - startX;
             const dy = e.clientY - startY;
-            // 计算新位置并防止超出视口
             let newLeft = startLeft + dx;
             let newTop = startTop + dy;
             newLeft = Math.max(0, Math.min(newLeft, window.innerWidth - dialog.offsetWidth));
             newTop = Math.max(0, Math.min(newTop, window.innerHeight - dialog.offsetHeight));
             dialog.style.left = newLeft + 'px';
             dialog.style.top = newTop + 'px';
-            dialog.style.right = 'auto'; // 覆盖初始的 right 样式
+            dialog.style.right = 'auto';
         });
+
         document.addEventListener('mouseup', function() {
             if (isDragging) {
                 isDragging = false;
                 document.body.style.userSelect = '';
+            }
+        });
+
+        // 触摸拖动（手机支持）
+        header.addEventListener('touchstart', function(e) {
+            if (e.target.id === 'closeFindBtn') return;
+            isDragging = true;
+            const touch = e.touches[0];
+            startX = touch.clientX;
+            startY = touch.clientY;
+            const rect = dialog.getBoundingClientRect();
+            startLeft = rect.left;
+            startTop = rect.top;
+            document.body.style.userSelect = 'none';
+        }, { passive: false });
+
+        document.addEventListener('touchmove', function(e) {
+            if (!isDragging) return;
+            e.preventDefault();
+            const touch = e.touches[0];
+            const dx = touch.clientX - startX;
+            const dy = touch.clientY - startY;
+            let newLeft = startLeft + dx;
+            let newTop = startTop + dy;
+            newLeft = Math.max(0, Math.min(newLeft, window.innerWidth - dialog.offsetWidth));
+            newTop = Math.max(0, Math.min(newTop, window.innerHeight - dialog.offsetHeight));
+            dialog.style.left = newLeft + 'px';
+            dialog.style.top = newTop + 'px';
+            dialog.style.right = 'auto';
+        }, { passive: false });
+
+        document.addEventListener('touchend', function() {
+            if (isDragging) {
+                isDragging = false;
+                document.body.style.userSelect = '';
+            }
+        });
+
+        // 替换区域显示/隐藏控制
+        const toggleReplaceBtn = dialog.querySelector('#toggleReplaceBtn');
+        const toggleReplaceIcon = dialog.querySelector('#toggleReplaceIcon');
+        const replaceContainer = dialog.querySelector('#replaceContainer');
+        const replaceButtonsContainer = dialog.querySelector('#replaceButtonsContainer');
+        let isReplaceVisible = false;
+
+        toggleReplaceBtn.addEventListener('click', function() {
+            isReplaceVisible = !isReplaceVisible;
+            if (isReplaceVisible) {
+                toggleReplaceIcon.style.transform = 'rotate(90deg)';
+                replaceContainer.style.display = 'block';
+                replaceButtonsContainer.style.display = 'flex';
+            } else {
+                toggleReplaceIcon.style.transform = 'rotate(0deg)';
+                replaceContainer.style.display = 'none';
+                replaceButtonsContainer.style.display = 'none';
             }
         });
         // 查找状态
@@ -3096,29 +3158,31 @@
             const replaceText = replaceInput.value;
             const editorElement = getEditorElement();
             if (!editorElement) return;
-            // 聚焦到编辑器，使用 document.execCommand 替换可以保留 Vditor 的撤销历史和状态
+            // 聚焦到编辑器
             editorElement.focus();
             // 获取当前的高亮节点
             const marks = editorElement.querySelectorAll('mark.find-highlight');
             if (marks.length > 0) {
                 const mark = marks[0];
-                const selection = window.getSelection();
-                const range = document.createRange();
-                range.selectNodeContents(mark);
-                selection.removeAllRanges();
-                selection.addRange(range);
-                // 去除 mark 然后替换文本
-                document.execCommand('insertText', false, replaceText);
+                const parent = mark.parentNode;
+                // 先获取要替换的文本内容
+                const textNode = document.createTextNode(replaceText);
+                // 用新文本节点替换 mark 元素
+                parent.replaceChild(textNode, mark);
+                parent.normalize();
                 // 替换后需要重新解析内容建立新的索引
                 setTimeout(() => {
                     performFind();
                 }, 50);
             } else {
-                // 如果没有 mark 但有选区
-                 document.execCommand('insertText', false, replaceText);
-                 setTimeout(() => {
-                     performFind();
-                 }, 50);
+                // 如果没有 mark 但有选区，使用 document.execCommand 替换
+                const selection = window.getSelection();
+                if (selection.rangeCount > 0 && !selection.isCollapsed) {
+                    document.execCommand('insertText', false, replaceText);
+                }
+                setTimeout(() => {
+                    performFind();
+                }, 50);
             }
         }
         // 全部替换
@@ -3134,7 +3198,7 @@
             if (vditor) {
                 let text = vditor.getValue();
                 // 使用正则表达式全局替换，保持大小写不敏感
-                const escapeRegExp = (string) => string.replace(/[.*+?^${}()|[]\\]/g, '\\$&');
+                const escapeRegExp = (string) => string.replace(/[.*+?^${}()|[\]\\-]/g, '\\$&');
                 const regex = new RegExp(escapeRegExp(searchText), 'gi');
                 const matchCount = (text.match(regex) || []).length;
                 if (matchCount > 0) {

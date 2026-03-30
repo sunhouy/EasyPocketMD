@@ -639,18 +639,21 @@
         // 初始预览
         updatePreview();
 
+        // 右上角关闭按钮
+        var closeBtn = document.createElement('button');
+        closeBtn.innerHTML = '<i class="fas fa-times"></i>';
+        closeBtn.style.cssText = 'position: absolute; top: 15px; right: 15px; width: 32px; height: 32px; background: ' + (nightMode ? '#444' : '#f5f5f5') + '; color: ' + (nightMode ? '#eee' : '#333') + '; border: none; border-radius: 50%; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center;';
+        closeBtn.onclick = closeChartPicker;
+        container.style.position = 'relative';
+        container.appendChild(closeBtn);
+
         // 按钮栏
         var buttonBar = document.createElement('div');
         buttonBar.style.cssText = 'display: flex; gap: 10px; justify-content: flex-end;';
 
-        var cancelBtn = document.createElement('button');
-        cancelBtn.textContent = isEn() ? 'Cancel' : '取消';
-        cancelBtn.style.cssText = 'padding: 10px 20px; background: ' + (nightMode ? '#444' : '#f5f5f5') + '; color: ' + (nightMode ? '#eee' : '#333') + '; border: none; border-radius: 6px; cursor: pointer; font-size: 14px;';
-        cancelBtn.onclick = closeChartPicker;
-
         var insertBtn = document.createElement('button');
         insertBtn.innerHTML = '<i class="fas fa-plus"></i> ' + (isEn() ? 'Insert' : '插入');
-        insertBtn.style.cssText = 'padding: 10px 20px; background: #667eea; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px;';
+        insertBtn.style.cssText = 'padding: 10px 20px; background: #4a90e2; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px;';
         insertBtn.onclick = function() {
             var data = {};
             for (var key in formData) {
@@ -676,7 +679,6 @@
             }
         };
 
-        buttonBar.appendChild(cancelBtn);
         buttonBar.appendChild(insertBtn);
         container.appendChild(buttonBar);
 
@@ -802,7 +804,7 @@
 
         // 标题
         var title = document.createElement('div');
-        title.innerHTML = '<i class="fas fa-magic" style="color: #667eea;"></i> ' + (isEn() ? 'AI Chart Generator' : 'AI图表生成器');
+        title.innerHTML = '<i class="fas fa-magic" style="color: #4a90e2;"></i> ' + (isEn() ? 'AI Chart Generator' : 'AI图表生成器');
         title.style.cssText = 'font-size: 18px; font-weight: 600; margin-bottom: 5px; color: ' + (nightMode ? '#eee' : '#333') + ';';
         container.appendChild(title);
 
@@ -860,18 +862,21 @@
 
         container.appendChild(resultContainer);
 
+        // 右上角关闭按钮
+        var closeBtn = document.createElement('button');
+        closeBtn.innerHTML = '<i class="fas fa-times"></i>';
+        closeBtn.style.cssText = 'position: absolute; top: 15px; right: 15px; width: 32px; height: 32px; background: ' + (nightMode ? '#444' : '#f5f5f5') + '; color: ' + (nightMode ? '#eee' : '#333') + '; border: none; border-radius: 50%; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center;';
+        closeBtn.onclick = closeChartPicker;
+        container.style.position = 'relative';
+        container.appendChild(closeBtn);
+
         // 按钮栏
         var buttonBar = document.createElement('div');
         buttonBar.style.cssText = 'display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;';
 
-        var cancelBtn = document.createElement('button');
-        cancelBtn.textContent = isEn() ? 'Cancel' : '取消';
-        cancelBtn.style.cssText = 'padding: 10px 20px; background: ' + (nightMode ? '#444' : '#f5f5f5') + '; color: ' + (nightMode ? '#eee' : '#333') + '; border: none; border-radius: 6px; cursor: pointer; font-size: 14px;';
-        cancelBtn.onclick = closeChartPicker;
-
         var generateBtn = document.createElement('button');
         generateBtn.innerHTML = '<i class="fas fa-magic"></i> ' + (isEn() ? 'Generate' : '生成');
-        generateBtn.style.cssText = 'padding: 10px 20px; background: #667eea; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px;';
+        generateBtn.style.cssText = 'padding: 10px 20px; background: #4a90e2; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px;';
 
         var insertBtn = document.createElement('button');
         insertBtn.innerHTML = '<i class="fas fa-plus"></i> ' + (isEn() ? 'Insert' : '插入');
@@ -933,7 +938,6 @@
             }
         };
 
-        buttonBar.appendChild(cancelBtn);
         buttonBar.appendChild(generateBtn);
         buttonBar.appendChild(insertBtn);
         container.appendChild(buttonBar);
@@ -992,11 +996,11 @@
 
         var echartsTab = document.createElement('button');
         echartsTab.innerHTML = '<i class="fas fa-chart-pie"></i> ECharts';
-        echartsTab.style.cssText = 'flex: 1; padding: 10px; background: ' + (currentCategory === 'echarts' ? '#667eea' : (nightMode ? '#444' : '#f5f5f5')) + '; color: ' + (currentCategory === 'echarts' ? 'white' : (nightMode ? '#eee' : '#333')) + '; border: none; border-radius: 6px; cursor: pointer; font-size: 14px;';
+        echartsTab.style.cssText = 'flex: 1; padding: 10px; background: ' + (currentCategory === 'echarts' ? '#4a90e2' : (nightMode ? '#444' : '#f5f5f5')) + '; color: ' + (currentCategory === 'echarts' ? 'white' : (nightMode ? '#eee' : '#333')) + '; border: none; border-radius: 6px; cursor: pointer; font-size: 14px;';
 
         var mermaidTab = document.createElement('button');
         mermaidTab.innerHTML = '<i class="fas fa-project-diagram"></i> Mermaid';
-        mermaidTab.style.cssText = 'flex: 1; padding: 10px; background: ' + (currentCategory === 'mermaid' ? '#667eea' : (nightMode ? '#444' : '#f5f5f5')) + '; color: ' + (currentCategory === 'mermaid' ? 'white' : (nightMode ? '#eee' : '#333')) + '; border: none; border-radius: 6px; cursor: pointer; font-size: 14px;';
+        mermaidTab.style.cssText = 'flex: 1; padding: 10px; background: ' + (currentCategory === 'mermaid' ? '#4a90e2' : (nightMode ? '#444' : '#f5f5f5')) + '; color: ' + (currentCategory === 'mermaid' ? 'white' : (nightMode ? '#eee' : '#333')) + '; border: none; border-radius: 6px; cursor: pointer; font-size: 14px;';
 
         categoryTabs.appendChild(echartsTab);
         categoryTabs.appendChild(mermaidTab);
@@ -1005,7 +1009,7 @@
         // AI生成按钮
         var aiBtn = document.createElement('button');
         aiBtn.innerHTML = '<i class="fas fa-magic"></i> ' + (isEn() ? 'AI Generate' : 'AI生成');
-        aiBtn.style.cssText = 'width: 100%; padding: 8px; margin-bottom: 12px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 500;';
+        aiBtn.style.cssText = 'width: 100%; padding: 8px; margin-bottom: 12px; background: linear-gradient(135deg, #4a90e2 0%, #357abd 100%); color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 500;';
         aiBtn.onclick = showAIGenerateDialog;
         container.appendChild(aiBtn);
 
@@ -1038,7 +1042,7 @@
                 chartBtn.style.cssText = 'padding: 12px; border: 2px solid transparent; background: ' + (nightMode ? '#3d3d3d' : '#f5f5f5') + '; cursor: pointer; border-radius: 8px; transition: all 0.2s; text-align: center; color: ' + (nightMode ? '#eee' : '#333') + ';';
 
                 var iconDiv = document.createElement('div');
-                iconDiv.style.cssText = 'font-size: 24px; margin-bottom: 6px; color: #667eea;';
+                iconDiv.style.cssText = 'font-size: 24px; margin-bottom: 6px; color: #4a90e2;';
                 iconDiv.innerHTML = chart.icon;
 
                 var nameDiv = document.createElement('div');
@@ -1058,7 +1062,7 @@
 
                 chartBtn.onmouseenter = function() {
                     this.style.background = nightMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)';
-                    this.style.borderColor = '#667eea';
+                    this.style.borderColor = '#4a90e2';
                 };
 
                 chartBtn.onmouseleave = function() {
@@ -1078,7 +1082,7 @@
         } else {
             // 如果 echartsTemplates 还没加载，尝试预加载
             chartGrid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 30px; color: ' + (nightMode ? '#aaa' : '#666') + ';">' +
-                '<i class="fas fa-spinner fa-spin" style="font-size: 32px; margin-bottom: 15px; color: #667eea;"></i>' +
+                '<i class="fas fa-spinner fa-spin" style="font-size: 32px; margin-bottom: 15px; color: #4a90e2;"></i>' +
                 '<div style="font-size: 14px;">' + (isEn() ? 'Loading ECharts templates...' : '加载 ECharts 模板中...') + '</div>' +
                 '</div>';
 
@@ -1089,7 +1093,7 @@
                 } else {
                     // 如果加载失败，回退到 Mermaid
                     currentCategory = 'mermaid';
-                    mermaidTab.style.background = '#667eea';
+                    mermaidTab.style.background = '#4a90e2';
                     mermaidTab.style.color = 'white';
                     echartsTab.style.background = nightMode ? '#444' : '#f5f5f5';
                     echartsTab.style.color = nightMode ? '#eee' : '#333';
@@ -1101,7 +1105,7 @@
         // 切换分类
         echartsTab.onclick = function() {
             currentCategory = 'echarts';
-            echartsTab.style.background = '#667eea';
+            echartsTab.style.background = '#4a90e2';
             echartsTab.style.color = 'white';
             mermaidTab.style.background = nightMode ? '#444' : '#f5f5f5';
             mermaidTab.style.color = nightMode ? '#eee' : '#333';
@@ -1112,7 +1116,7 @@
             } else {
                 // 如果 echartsTemplates 还没加载，显示加载提示
                 chartGrid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 30px; color: ' + (nightMode ? '#aaa' : '#666') + ';">' +
-                    '<i class="fas fa-spinner fa-spin" style="font-size: 32px; margin-bottom: 15px; color: #667eea;"></i>' +
+                    '<i class="fas fa-spinner fa-spin" style="font-size: 32px; margin-bottom: 15px; color: #4a90e2;"></i>' +
                     '<div style="font-size: 14px;">' + (isEn() ? 'Loading ECharts templates...' : '加载 ECharts 模板中...') + '</div>' +
                     '</div>';
 
@@ -1132,7 +1136,7 @@
 
         mermaidTab.onclick = function() {
             currentCategory = 'mermaid';
-            mermaidTab.style.background = '#667eea';
+            mermaidTab.style.background = '#4a90e2';
             mermaidTab.style.color = 'white';
             echartsTab.style.background = nightMode ? '#444' : '#f5f5f5';
             echartsTab.style.color = nightMode ? '#eee' : '#333';
@@ -1156,7 +1160,7 @@
                 chartBtn.style.cssText = 'padding: 12px; border: 2px solid transparent; background: ' + (nightMode ? '#3d3d3d' : '#f5f5f5') + '; cursor: pointer; border-radius: 8px; transition: all 0.2s; text-align: center; color: ' + (nightMode ? '#eee' : '#333') + ';';
 
                 var iconDiv = document.createElement('div');
-                iconDiv.style.cssText = 'font-size: 24px; margin-bottom: 6px; color: #667eea;';
+                iconDiv.style.cssText = 'font-size: 24px; margin-bottom: 6px; color: #4a90e2;';
                 iconDiv.innerHTML = template.icon;
 
                 var nameDiv = document.createElement('div');
@@ -1177,7 +1181,7 @@
 
                 chartBtn.onmouseenter = function() {
                     this.style.background = nightMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)';
-                    this.style.borderColor = '#667eea';
+                    this.style.borderColor = '#4a90e2';
                 };
 
                 chartBtn.onmouseleave = function() {
@@ -1226,12 +1230,13 @@
             }
         });
 
-        // 取消按钮
-        var cancelBtn = document.createElement('button');
-        cancelBtn.textContent = isEn() ? 'Cancel' : '取消';
-        cancelBtn.style.cssText = 'margin-top: 15px; padding: 10px 20px; background: ' + (nightMode ? '#444' : '#f5f5f5') + '; color: ' + (nightMode ? '#eee' : '#333') + '; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; align-self: center;';
-        cancelBtn.onclick = closeChartPicker;
-        container.appendChild(cancelBtn);
+        // 右上角关闭按钮
+        var closeBtn = document.createElement('button');
+        closeBtn.innerHTML = '<i class="fas fa-times"></i>';
+        closeBtn.style.cssText = 'position: absolute; top: 15px; right: 15px; width: 32px; height: 32px; background: ' + (nightMode ? '#444' : '#f5f5f5') + '; color: ' + (nightMode ? '#eee' : '#333') + '; border: none; border-radius: 50%; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center;';
+        closeBtn.onclick = closeChartPicker;
+        container.style.position = 'relative';
+        container.appendChild(closeBtn);
 
         modal.appendChild(container);
         document.body.appendChild(modal);

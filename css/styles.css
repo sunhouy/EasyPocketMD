@@ -456,6 +456,10 @@ body.keyboard-open .editor-container {
     background: #e5e5e5;
 }
 
+.modal-btn.full-width {
+    width: 100%;
+}
+
 .modal-message {
     margin-top: 15px;
     padding: 10px;
@@ -578,7 +582,7 @@ body.keyboard-open .editor-container {
 
 .folder-icon {
     margin-right: 8px;
-    color: #f7b731;
+    color: #7f5e18;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -631,7 +635,7 @@ body.keyboard-open .editor-container {
 .jstree-default .jstree-clicked {
     background: transparent !important;
     box-shadow: none !important;
-    color: #0366d6 !important;
+    color: #4a90e2 !important;
     font-weight: 500;
     border: none !important;
 }
@@ -870,7 +874,7 @@ body.keyboard-open .editor-container {
 
 .diff-info {
     background: #e3f2fd;
-    border-left: 4px solid #2196f3;
+    border-left: 4px solid #4a90e2;
     padding: 12px;
     margin-bottom: 15px;
     border-radius: 4px;
@@ -1828,7 +1832,7 @@ body.night-mode .jstree-default .jstree-hovered {
 body.night-mode .jstree-default .jstree-clicked {
     background: transparent !important;
     box-shadow: none !important;
-    color: #58a6ff !important;
+    color: #4a90e2 !important;
     border: none !important;
 }
 body.night-mode .jstree-default .jstree-wholerow {
@@ -2133,6 +2137,7 @@ body.night-mode .jstree-default a {
 .ai-modal {
     max-width: 500px;
     width: 90%;
+    animation: none;
 }
 
 .ai-menu-grid {
@@ -2612,7 +2617,7 @@ body.night-mode .diff-view-btn:hover {
 
 body.night-mode .diff-info {
     background: #1e3a5f;
-    border-left-color: #64b5f6;
+    border-left-color: #4a90e2;
 }
 
 body.night-mode .diff-container {

@@ -166,7 +166,7 @@
         const modal = document.getElementById('loginModalOverlay');
         if (!modal) return;
         modal.classList.add('show');
-        switchToLoginTab();
+        switchToRegisterTab();
         bindModalEvents();
         document.addEventListener('keydown', handleModalKeydown);
     }
@@ -179,10 +179,8 @@
     }
 
     function bindModalEvents() {
-        const loginCancelBtn = document.getElementById('loginCancelBtn');
-        const registerCancelBtn = document.getElementById('registerCancelBtn');
-        if (loginCancelBtn) loginCancelBtn.onclick = hideLoginModal;
-        if (registerCancelBtn) registerCancelBtn.onclick = hideLoginModal;
+        const loginModalCloseBtn = document.getElementById('loginModalCloseBtn');
+        if (loginModalCloseBtn) loginModalCloseBtn.onclick = hideLoginModal;
 
         const loginSubmitBtn = document.getElementById('loginSubmitBtn');
         if (loginSubmitBtn) loginSubmitBtn.onclick = login;
@@ -218,8 +216,14 @@
         if (registerTabBtn) registerTabBtn.classList.remove('active');
         if (loginForm) loginForm.style.display = 'flex';
         if (registerForm) registerForm.style.display = 'none';
-        if (modalTitle) modalTitle.textContent = t('login');
+        if (modalTitle) modalTitle.textContent = t('loginRegister');
         if (modalSubtitle) modalSubtitle.textContent = t('pleaseLoginToSave');
+        // 清空消息
+        const loginMessage = document.getElementById('loginMessage');
+        if (loginMessage) {
+            loginMessage.textContent = '';
+            loginMessage.className = 'modal-message';
+        }
     }
 
     function switchToRegisterTab() {
@@ -233,8 +237,14 @@
         if (loginTabBtn) loginTabBtn.classList.remove('active');
         if (loginForm) loginForm.style.display = 'none';
         if (registerForm) registerForm.style.display = 'flex';
-        if (modalTitle) modalTitle.textContent = t('register');
+        if (modalTitle) modalTitle.textContent = t('loginRegister');
         if (modalSubtitle) modalSubtitle.textContent = t('registerNewAccount');
+        // 清空消息
+        const registerMessage = document.getElementById('registerMessage');
+        if (registerMessage) {
+            registerMessage.textContent = '';
+            registerMessage.className = 'modal-message';
+        }
     }
 
     async function login() {
@@ -342,7 +352,7 @@
                         body: JSON.stringify({ username: username, password: password })
                     });
                     const loginResult = global.parseJsonResponse ? await global.parseJsonResponse(loginResponse) : await loginResponse.json();
-                    
+
                     if (loginResult.code === 200) {
                         global.currentUser = {
                             username: username,
@@ -364,6 +374,46 @@
                         // 登录失败，但仍显示注册成功，让用户手动登录
                         message.textContent = t('registerSuccessAutoLogin');
                         message.className = 'modal-message success';
+                        setTimeout(() => {
+                            switchToLoginTab();
+                        }, 1500);
+                    }
+                } else if (result.code === 409) {
+                    // 用户已存在，尝试自动登录
+                    message.textContent = t('userExistsTryingLogin');
+                    message.className = 'modal-message';
+
+                    const loginResponse = await fetch((global.getApiBaseUrl ? global.getApiBaseUrl() : 'api') + '/auth/login', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ username: username, password: password })
+                    });
+                    const loginResult = global.parseJsonResponse ? await global.parseJsonResponse(loginResponse) : await loginResponse.json();
+
+                    if (loginResult.code === 200) {
+                        // 密码正确，自动登录成功
+                        global.currentUser = {
+                            username: username,
+                            token: loginResult.data.token,
+                            password: password
+                        };
+                        localStorage.setItem('vditor_user', JSON.stringify(global.currentUser));
+                        message.textContent = t('autoLoginSuccess');
+                        message.className = 'modal-message success';
+
+                        setTimeout(() => {
+                            hideLoginModal();
+                            showUserInfo();
+                            global.showMessage(t('loginSuccessStartSync'));
+                            if (global.startAutoSync) global.startAutoSync();
+                            if (global.loadFilesFromServer) global.loadFilesFromServer();
+                            // 隐藏顶部提示横幅
+                            if (global.hideTopNoticeBanner) global.hideTopNoticeBanner();
+                        }, 1500);
+                    } else {
+                        // 密码错误
+                        message.textContent = t('userExistsPasswordIncorrect');
+                        message.className = 'modal-message error';
                         setTimeout(() => {
                             switchToLoginTab();
                         }, 1500);

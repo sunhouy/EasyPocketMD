@@ -8,7 +8,7 @@
     <link rel="icon" type="image/x-icon" href="icon.png">
     <!-- PWA: manifest & theme color -->
     <link rel="manifest" href="/manifest.webmanifest">
-    <meta name="theme-color" content="#0366d6">
+    <meta name="theme-color" content="#4a90e2">
     <!-- Cookies 提示样式 -->
     <style>
         .cookie-consent-banner {
@@ -35,7 +35,7 @@
             margin-right: 12px;
         }
         .cookie-consent-banner button {
-            background: #0366d6;
+            background: #4a90e2;
             border: none;
             color: white;
             padding: 8px 16px;
@@ -48,7 +48,7 @@
             transition: background 0.2s;
         }
         .cookie-consent-banner button:hover {
-            background: #0353b0;
+            background: #3a7bc8;
         }
         /* 顶部提示横幅 - 通用样式 */
         .top-notice-banner {
@@ -102,7 +102,7 @@
                 border-color: rgba(255,255,255,0.1);
             }
             .cookie-consent-banner button {
-                background: #0a6cf5;
+                background: #4a90e2;
             }
         }
         /* 小屏幕适配 */
@@ -190,34 +190,22 @@
 
 <!-- 登录注册模态窗口 -->
 <div class="modal-overlay" id="loginModalOverlay">
-    <div class="modal">
+    <div class="modal login-modal">
+        <!-- 右上角关闭按钮 -->
+        <button class="modal-close-btn" id="loginModalCloseBtn" style="position:absolute;top:15px;right:15px;background:none;border:none;font-size:20px;cursor:pointer;z-index:10;">
+            <i class="fas fa-times"></i>
+        </button>
         <div class="modal-header">
             <h2 id="modalTitle" data-i18n="loginRegister">登录/注册</h2>
             <p id="modalSubtitle" data-i18n="loginSubtitle">登录后文档将保存至服务器</p>
         </div>
 
         <div class="modal-tabs">
-            <button class="tab-btn active" id="loginTabBtn" data-i18n="login">登录</button>
-            <button class="tab-btn" id="registerTabBtn" data-i18n="register">注册</button>
+            <button class="tab-btn active" id="registerTabBtn" data-i18n="register">注册</button>
+            <button class="tab-btn" id="loginTabBtn" data-i18n="login">登录</button>
         </div>
 
-        <div class="modal-form" id="loginForm">
-            <div class="form-group">
-                <label for="loginUsername" data-i18n="username">用户名</label>
-                <input type="text" id="loginUsername" data-i18n-placeholder="enterUsername" placeholder="请输入用户名">
-            </div>
-            <div class="form-group">
-                <label for="loginPassword" data-i18n="password">密码</label>
-                <input type="password" id="loginPassword" data-i18n-placeholder="enterPassword" placeholder="请输入密码">
-            </div>
-            <div class="modal-message" id="loginMessage"></div>
-            <div class="modal-actions">
-                <button class="modal-btn primary" id="loginSubmitBtn" data-i18n="login">登录</button>
-                <button class="modal-btn secondary" id="loginCancelBtn" data-i18n="cancel">取消</button>
-            </div>
-        </div>
-
-        <div class="modal-form" id="registerForm" style="display: none;">
+        <div class="modal-form" id="registerForm">
             <div class="form-group">
                 <label for="registerUsername" data-i18n="username">用户名</label>
                 <input type="text" id="registerUsername" data-i18n-placeholder="enterUsername" placeholder="请输入用户名">
@@ -232,8 +220,22 @@
             </div>
             <div class="modal-message" id="registerMessage"></div>
             <div class="modal-actions">
-                <button class="modal-btn primary" id="registerSubmitBtn" data-i18n="register">注册</button>
-                <button class="modal-btn secondary" id="registerCancelBtn" data-i18n="cancel">取消</button>
+                <button class="modal-btn primary full-width" id="registerSubmitBtn" data-i18n="register">注册</button>
+            </div>
+        </div>
+
+        <div class="modal-form" id="loginForm" style="display: none;">
+            <div class="form-group">
+                <label for="loginUsername" data-i18n="username">用户名</label>
+                <input type="text" id="loginUsername" data-i18n-placeholder="enterUsername" placeholder="请输入用户名">
+            </div>
+            <div class="form-group">
+                <label for="loginPassword" data-i18n="password">密码</label>
+                <input type="password" id="loginPassword" data-i18n-placeholder="enterPassword" placeholder="请输入密码">
+            </div>
+            <div class="modal-message" id="loginMessage"></div>
+            <div class="modal-actions">
+                <button class="modal-btn primary full-width" id="loginSubmitBtn" data-i18n="login">登录</button>
             </div>
         </div>
     </div>
@@ -428,6 +430,15 @@
                     <!-- 动态生成 -->
                 </div>
             </div>
+            <div class="form-group">
+                <label data-i18n="storageManagement">空间管理</label>
+                <div class="space-management-actions" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:8px;">
+                    <button type="button" class="modal-btn secondary" id="clearCacheStorageBtn" data-i18n="clearCacheStorage">清空 Cache Storage</button>
+                    <button type="button" class="modal-btn secondary" id="clearIndexedDBBtn" data-i18n="clearIndexedDB">清空 IndexedDB</button>
+                    <button type="button" class="modal-btn secondary" id="clearServiceWorkerBtn" data-i18n="clearServiceWorker">清空 Service Worker</button>
+                    <button type="button" class="modal-btn secondary" id="clearCookiesBtn" data-i18n="clearCookies">清空 Cookies</button>
+                </div>
+            </div>
             <div class="modal-actions" style="flex-shrink:0;padding-top:10px;">
                 <button class="modal-btn primary" id="saveSettingsBtn" data-i18n="save">保存</button>
             </div>
@@ -515,6 +526,7 @@
                     <button class="ai-option-btn" data-write-type="notice">📢 <span data-i18n="notice">通知</span></button>
                     <button class="ai-option-btn" data-write-type="application">📄 <span data-i18n="application">申请</span></button>
                     <button class="ai-option-btn" data-write-type="certificate">📜 <span data-i18n="certificate">证明</span></button>
+                    <button class="ai-option-btn" data-write-type="other">🔧 <span data-i18n="other">其他</span></button>
                 </div>
                 <div class="ai-input-area">
                     <textarea id="aiWriteInput" placeholder="请输入主题或要求..." data-i18n-placeholder="aiWritePlaceholder"></textarea>
@@ -706,23 +718,23 @@
                 <button id="pptEditorClose" style="background:none;border:none;color:white;font-size:20px;cursor:pointer;padding:5px;">
                     <i class="fas fa-arrow-left"></i>
                 </button>
-                <span style="font-size:16px;font-weight:500;">PPT页面编辑</span>
+                <span style="font-size:16px;font-weight:500;">编辑</span>
             </div>
             <div style="display:flex;gap:10px;">
                 <button id="pptEditorPrev" style="padding:8px 15px;background:rgba(255,255,255,0.2);border:none;border-radius:6px;color:white;cursor:pointer;font-size:13px;">
-                    <i class="fas fa-chevron-left"></i> 上一页
+                    <i class="fas fa-chevron-left"></i>
                 </button>
                 <span id="pptEditorPageNum" style="padding:8px 15px;font-size:14px;">1 / 5</span>
                 <button id="pptEditorNext" style="padding:8px 15px;background:rgba(255,255,255,0.2);border:none;border-radius:6px;color:white;cursor:pointer;font-size:13px;">
-                    下一页 <i class="fas fa-chevron-right"></i>
+                    <i class="fas fa-chevron-right"></i>
                 </button>
             </div>
             <div style="display:flex;gap:10px;">
-                <button id="pptEditorRegen" style="padding:8px 15px;background:#3498db;border:none;border-radius:6px;color:white;cursor:pointer;font-size:13px;">
+                <button id="pptEditorRegen" style="padding:8px 15px;background:#4a90e2;border:none;border-radius:6px;color:white;cursor:pointer;font-size:13px;">
                     <i class="fas fa-redo"></i> 重新生成
                 </button>
                 <button id="pptEditorDownload" style="padding:8px 15px;background:#e74c3c;border:none;border-radius:6px;color:white;cursor:pointer;font-size:13px;">
-                    <i class="fas fa-download"></i> 下载PPT
+                    <i class="fas fa-download"></i> 下载
                 </button>
             </div>
         </div>
@@ -746,7 +758,7 @@
             <div class="ppt-pages-panel" style="flex:1;background:#16213e;border-top:1px solid #0f3460;display:flex;flex-direction:column;min-height:150px;max-height:200px;">
                 <div style="padding:10px 15px;border-bottom:1px solid #0f3460;display:flex;justify-content:space-between;align-items:center;">
                     <h4 style="margin:0;color:white;font-size:14px;">页面列表</h4>
-                    <button id="pptEditorAddPage" style="padding:6px 12px;background:transparent;border:1px dashed #3498db;border-radius:6px;color:#3498db;cursor:pointer;font-size:12px;">
+                    <button id="pptEditorAddPage" style="padding:6px 12px;background:transparent;border:1px dashed #4a90e2;border-radius:6px;color:#4a90e2;cursor:pointer;font-size:12px;">
                         <i class="fas fa-plus"></i> 添加
                     </button>
                 </div>
@@ -788,22 +800,87 @@
         }
     });
 
+    window.sharedDocState = null;
+
+    function getSharedViewerId() {
+        var key = 'shared_viewer_id';
+        var id = localStorage.getItem(key);
+        if (!id) {
+            id = 'viewer-' + Math.random().toString(36).slice(2, 10);
+            localStorage.setItem(key, id);
+        }
+        return id;
+    }
+
+    function getSharedViewerName() {
+        if (window.currentUser && window.currentUser.username) {
+            return window.currentUser.username;
+        }
+        return 'Guest-' + getSharedViewerId().slice(-4);
+    }
+
+    function getEditorIdentityPayload() {
+        if (!window.currentUser || !window.currentUser.username) return {};
+        return {
+            editor_username: window.currentUser.username,
+            editor_token: window.currentUser.token,
+            editor_password: window.currentUser.password
+        };
+    }
+
+    async function fetchShareData(shareId, password, editPassword) {
+        var apiUrl = (window.getApiBaseUrl ? window.getApiBaseUrl() : 'api') + '/share/get';
+        const response = await fetch(apiUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                share_id: shareId,
+                password: password,
+                edit_password: editPassword || '',
+                ...getEditorIdentityPayload()
+            })
+        });
+        return await response.json();
+    }
+
+    async function resolveEditAccess(shareData, shareId, sharePassword) {
+        var editPassword = '';
+        var canEdit = !!shareData.can_edit;
+
+        if (shareData.mode !== 'edit') {
+            return { canEdit: false, editPassword: '' };
+        }
+
+        if (canEdit) {
+            return { canEdit: true, editPassword: '' };
+        }
+
+        if (shareData.edit_policy === 'specific') {
+            showToast(window.i18n ? window.i18n.t('pleaseLoginFirst') : '此文档仅指定用户可编辑，请先登录正确账号', 'info');
+            return { canEdit: false, editPassword: '' };
+        }
+
+        if (shareData.edit_policy === 'password') {
+            editPassword = window.prompt(window.i18n ? window.i18n.t('enterPassword') : '请输入编辑密码');
+            if (!editPassword) {
+                return { canEdit: false, editPassword: '' };
+            }
+            const refreshed = await fetchShareData(shareId, sharePassword, editPassword);
+            if (refreshed.code === 200 && refreshed.data && refreshed.data.can_edit) {
+                return { canEdit: true, editPassword: editPassword };
+            }
+            showToast((window.i18n ? window.i18n.t('passwordError') : '编辑密码错误'), 'error');
+            return { canEdit: false, editPassword: '' };
+        }
+
+        return { canEdit: false, editPassword: '' };
+    }
+
     async function handleShareLink(shareId, password) {
         try {
-            // 从API获取分享的文档内容
-            var apiUrl = (window.getApiBaseUrl ? window.getApiBaseUrl() : 'api') + '/share/get';
-            const response = await fetch(apiUrl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    share_id: shareId,
-                    password: password
-                })
-            });
-
-            const result = await response.json();
+            const result = await fetchShareData(shareId, password, '');
 
             if (result.code === 200) {
                 const shareData = result.data;
@@ -813,18 +890,40 @@
                     window.vditor.setValue(shareData.content);
                 }
 
-                // 根据分享模式调整UI
-                if (shareData.mode === 'view') {
-                    // 仅查看模式：隐藏工具栏和编辑相关元素
+                const editAccess = await resolveEditAccess(shareData, shareId, password);
+
+                // 根据分享模式和编辑权限调整UI
+                if (shareData.mode === 'view' || !editAccess.canEdit) {
                     hideEditElements();
                 } else {
-                    // 可编辑模式：保留工具栏
-                    // 检查是否过期
                     if (shareData.is_expired) {
                         hideEditElements();
                         showToast(window.i18n ? window.i18n.t('shareLinkExpired') : '分享链接已过期，无法编辑', 'error');
                     }
                 }
+
+                window.sharedDocState = {
+                    shareId: shareId,
+                    sharePassword: password || '',
+                    editPassword: editAccess.editPassword || '',
+                    canEdit: editAccess.canEdit && !shareData.is_expired,
+                    lastKnownContent: shareData.content || '',
+                    lastModified: shareData.last_modified || null,
+                    contentVersion: shareData.content_version || 1,
+                    lastLocalEditAt: 0,
+                    viewerId: getSharedViewerId(),
+                    viewerName: getSharedViewerName(),
+                    isSaving: false,
+                    saveTimer: null,
+                    pollTimer: null,
+                    presenceTimer: null,
+                    localWatchTimer: null,
+                    ws: null,
+                    wsConnected: false,
+                    wsRetryTimer: null
+                };
+
+                startSharedDocRealtime();
 
                 // 隐藏登录提示
                 if (window.showLoginModal) {
@@ -833,7 +932,7 @@
                 }
 
                 // 显示分享信息
-                showShareInfo(shareData);
+                showShareInfo({ ...shareData, can_edit: window.sharedDocState.canEdit });
             } else {
                 // 处理敏感词检测错误
                 if (result.sensitive_words && result.sensitive_words.length > 0) {
@@ -851,6 +950,288 @@
             console.error('处理分享链接失败:', error);
             showToast(window.i18n ? window.i18n.t('networkError') : '网络错误，请重试', 'error');
         }
+    }
+
+    async function syncSharedDocContent() {
+        if (!window.sharedDocState || !window.sharedDocState.canEdit || !window.vditor) return;
+        if (window.sharedDocState.isSaving) return;
+
+        var currentContent = window.vditor.getValue();
+        if (currentContent === window.sharedDocState.lastKnownContent) return;
+
+        // WebSocket online path
+        if (window.sharedDocState.ws && window.sharedDocState.wsConnected && window.sharedDocState.ws.readyState === WebSocket.OPEN) {
+            window.sharedDocState.isSaving = true;
+            window.sharedDocState.ws.send(JSON.stringify({
+                type: 'update_content',
+                content: currentContent,
+                base_version: window.sharedDocState.contentVersion
+            }));
+            return;
+        }
+
+        window.sharedDocState.isSaving = true;
+        try {
+            var apiUrl = (window.getApiBaseUrl ? window.getApiBaseUrl() : 'api') + '/share/update';
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    share_id: window.sharedDocState.shareId,
+                    content: currentContent,
+                    password: window.sharedDocState.sharePassword,
+                    edit_password: window.sharedDocState.editPassword,
+                    viewer_id: window.sharedDocState.viewerId,
+                    viewer_name: window.sharedDocState.viewerName,
+                    base_version: window.sharedDocState.contentVersion,
+                    ...getEditorIdentityPayload()
+                })
+            });
+            const result = await response.json();
+            if (result.code === 200 && result.data) {
+                window.sharedDocState.lastKnownContent = result.data.content || currentContent;
+                window.sharedDocState.lastModified = result.data.last_modified || window.sharedDocState.lastModified;
+                window.sharedDocState.contentVersion = result.data.content_version || window.sharedDocState.contentVersion;
+            } else if (result.code === 409 && result.data) {
+                window.sharedDocState.lastKnownContent = result.data.content || window.sharedDocState.lastKnownContent;
+                window.sharedDocState.lastModified = result.data.last_modified || window.sharedDocState.lastModified;
+                window.sharedDocState.contentVersion = result.data.content_version || window.sharedDocState.contentVersion;
+                if (window.vditor) {
+                    window.vditor.setValue(window.sharedDocState.lastKnownContent);
+                }
+                showToast(window.i18n ? '检测到并发冲突，已刷新为最新内容' : 'Conflict detected. Loaded latest content.', 'error');
+            }
+        } catch (err) {
+            console.error('共享文档同步失败:', err);
+        } finally {
+            window.sharedDocState.isSaving = false;
+        }
+    }
+
+    function scheduleSharedDocSync() {
+        if (!window.sharedDocState || !window.sharedDocState.canEdit) return;
+        window.sharedDocState.lastLocalEditAt = Date.now();
+        if (window.sharedDocState.saveTimer) {
+            clearTimeout(window.sharedDocState.saveTimer);
+        }
+        window.sharedDocState.saveTimer = setTimeout(syncSharedDocContent, 1000);
+    }
+
+    async function pollSharedDocContent() {
+        if (!window.sharedDocState) return;
+        try {
+            var apiUrl = (window.getApiBaseUrl ? window.getApiBaseUrl() : 'api') + '/share/poll';
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    share_id: window.sharedDocState.shareId,
+                    password: window.sharedDocState.sharePassword,
+                    since: window.sharedDocState.lastModified,
+                    edit_password: window.sharedDocState.editPassword,
+                    ...getEditorIdentityPayload()
+                })
+            });
+            const result = await response.json();
+            if (result.code !== 200 || !result.data) return;
+
+            window.sharedDocState.lastModified = result.data.last_modified || window.sharedDocState.lastModified;
+            window.sharedDocState.contentVersion = result.data.content_version || window.sharedDocState.contentVersion;
+            if (!result.data.changed) return;
+
+            var remoteContent = result.data.content || '';
+            var localContent = window.vditor ? window.vditor.getValue() : '';
+            var localRecentlyEdited = Date.now() - window.sharedDocState.lastLocalEditAt < 1500;
+            if (!localRecentlyEdited && window.vditor && remoteContent !== localContent) {
+                window.vditor.setValue(remoteContent);
+                window.sharedDocState.lastKnownContent = remoteContent;
+            }
+        } catch (err) {
+            console.error('共享文档轮询失败:', err);
+        }
+    }
+
+    function getShareWsUrl() {
+        var apiBase = window.getApiBaseUrl ? window.getApiBaseUrl() : '/api';
+        var normalized = apiBase.replace(/\/$/, '');
+        var wsBase;
+        if (/^https?:\/\//i.test(normalized)) {
+            wsBase = normalized.replace(/^http/i, 'ws');
+        } else {
+            var prefix = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
+            wsBase = prefix + window.location.host + (normalized.startsWith('/') ? normalized : '/' + normalized);
+        }
+        return wsBase + '/share/ws';
+    }
+
+    function connectShareWebSocket() {
+        if (!window.sharedDocState) return;
+        if (window.sharedDocState.ws && (window.sharedDocState.ws.readyState === WebSocket.OPEN || window.sharedDocState.ws.readyState === WebSocket.CONNECTING)) {
+            return;
+        }
+
+        var query = new URLSearchParams({
+            share_id: window.sharedDocState.shareId,
+            password: window.sharedDocState.sharePassword || '',
+            edit_password: window.sharedDocState.editPassword || '',
+            viewer_id: window.sharedDocState.viewerId,
+            viewer_name: window.sharedDocState.viewerName,
+            editor_username: window.currentUser && window.currentUser.username ? window.currentUser.username : '',
+            editor_token: window.currentUser && window.currentUser.token ? window.currentUser.token : '',
+            editor_password: window.currentUser && window.currentUser.password ? window.currentUser.password : ''
+        });
+
+        var socket = new WebSocket(getShareWsUrl() + '?' + query.toString());
+        window.sharedDocState.ws = socket;
+
+        socket.onopen = function() {
+            if (!window.sharedDocState) return;
+            window.sharedDocState.wsConnected = true;
+            if (window.sharedDocState.pollTimer) {
+                clearInterval(window.sharedDocState.pollTimer);
+                window.sharedDocState.pollTimer = null;
+            }
+        };
+
+        socket.onmessage = function(event) {
+            if (!window.sharedDocState) return;
+            var payload;
+            try {
+                payload = JSON.parse(event.data || '{}');
+            } catch (error) {
+                return;
+            }
+
+            if (payload.type === 'presence') {
+                renderSharePresence(payload.online_users || []);
+                return;
+            }
+
+            if (payload.type === 'ready' || payload.type === 'doc_updated') {
+                if (payload.last_modified) {
+                    window.sharedDocState.lastModified = payload.last_modified;
+                }
+                if (payload.content_version) {
+                    window.sharedDocState.contentVersion = payload.content_version;
+                }
+
+                var localRecentlyEdited = Date.now() - window.sharedDocState.lastLocalEditAt < 1200;
+                var isSelfUpdate = payload.updated_by && payload.updated_by === window.sharedDocState.viewerId;
+                if ((isSelfUpdate || !localRecentlyEdited) && typeof payload.content === 'string') {
+                    if (window.vditor && window.vditor.getValue() !== payload.content) {
+                        window.vditor.setValue(payload.content);
+                    }
+                    window.sharedDocState.lastKnownContent = payload.content;
+                }
+                window.sharedDocState.isSaving = false;
+                return;
+            }
+
+            if (payload.type === 'conflict' && payload.latest) {
+                window.sharedDocState.lastKnownContent = payload.latest.content || window.sharedDocState.lastKnownContent;
+                window.sharedDocState.lastModified = payload.latest.last_modified || window.sharedDocState.lastModified;
+                window.sharedDocState.contentVersion = payload.latest.content_version || window.sharedDocState.contentVersion;
+                if (window.vditor) {
+                    window.vditor.setValue(window.sharedDocState.lastKnownContent);
+                }
+                window.sharedDocState.isSaving = false;
+                showToast(window.i18n ? '检测到并发冲突，已刷新为最新版本' : 'Conflict detected. Loaded latest version.', 'error');
+            }
+        };
+
+        socket.onclose = function() {
+            if (!window.sharedDocState) return;
+            window.sharedDocState.wsConnected = false;
+            window.sharedDocState.ws = null;
+            if (!window.sharedDocState.pollTimer) {
+                window.sharedDocState.pollTimer = setInterval(pollSharedDocContent, 2500);
+            }
+            if (window.sharedDocState.wsRetryTimer) {
+                clearTimeout(window.sharedDocState.wsRetryTimer);
+            }
+            window.sharedDocState.wsRetryTimer = setTimeout(connectShareWebSocket, 3000);
+        };
+
+        socket.onerror = function() {
+            if (socket.readyState !== WebSocket.OPEN) {
+                socket.close();
+            }
+        };
+    }
+
+    function renderSharePresence(onlineUsers) {
+        var bar = document.getElementById('sharePresenceBar');
+        if (!bar) {
+            bar = document.createElement('div');
+            bar.id = 'sharePresenceBar';
+            bar.style.cssText = 'position:fixed;top:64px;left:50%;transform:translateX(-50%);z-index:10002;background:rgba(36,41,46,0.92);color:#fff;padding:6px 12px;border-radius:20px;font-size:12px;max-width:90vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
+            document.body.appendChild(bar);
+        }
+        var names = (onlineUsers || []).slice(0, 5).map(function(u) {
+            return u.is_editing ? (u.viewer_name + '...') : u.viewer_name;
+        });
+        bar.textContent = (window.i18n ? window.i18n.t('onlineUsers') : '在线用户') + ': ' + (names.length ? names.join(', ') : '-');
+    }
+
+    async function heartbeatSharePresence() {
+        if (!window.sharedDocState) return;
+        if (window.sharedDocState.ws && window.sharedDocState.wsConnected && window.sharedDocState.ws.readyState === WebSocket.OPEN) {
+            window.sharedDocState.ws.send(JSON.stringify({
+                type: 'heartbeat',
+                is_editing: (Date.now() - window.sharedDocState.lastLocalEditAt) < 5000
+            }));
+            return;
+        }
+        try {
+            var apiUrl = (window.getApiBaseUrl ? window.getApiBaseUrl() : 'api') + '/share/presence';
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    share_id: window.sharedDocState.shareId,
+                    password: window.sharedDocState.sharePassword,
+                    viewer_id: window.sharedDocState.viewerId,
+                    viewer_name: window.sharedDocState.viewerName,
+                    can_edit: window.sharedDocState.canEdit,
+                    is_editing: (Date.now() - window.sharedDocState.lastLocalEditAt) < 5000
+                })
+            });
+            const result = await response.json();
+            if (result.code === 200 && result.data) {
+                renderSharePresence(result.data.online_users || []);
+            }
+        } catch (err) {
+            console.error('共享文档在线状态上报失败:', err);
+        }
+    }
+
+    function startSharedDocRealtime() {
+        if (!window.sharedDocState) return;
+
+        if (window.sharedDocState.pollTimer) clearInterval(window.sharedDocState.pollTimer);
+        if (window.sharedDocState.presenceTimer) clearInterval(window.sharedDocState.presenceTimer);
+        if (window.sharedDocState.localWatchTimer) clearInterval(window.sharedDocState.localWatchTimer);
+        if (window.sharedDocState.wsRetryTimer) clearTimeout(window.sharedDocState.wsRetryTimer);
+
+        if (window.sharedDocState.canEdit) {
+            window.sharedDocState.localWatchTimer = setInterval(function() {
+                if (window.vditor && window.sharedDocState && window.sharedDocState.canEdit) {
+                    var current = window.vditor.getValue();
+                    if (current !== window.sharedDocState.lastKnownContent) {
+                        scheduleSharedDocSync();
+                    }
+                }
+            }, 1200);
+        }
+
+        // WebSocket 优先，轮询作为降级保障
+        connectShareWebSocket();
+        if (!window.sharedDocState.wsConnected) {
+            window.sharedDocState.pollTimer = setInterval(pollSharedDocContent, window.sharedDocState.canEdit ? 2200 : 3000);
+        }
+
+        heartbeatSharePresence();
+        window.sharedDocState.presenceTimer = setInterval(heartbeatSharePresence, 5000);
     }
 
     function hideEditElements() {
@@ -916,7 +1297,8 @@
                 infoMessage += ` (${t('expiresAt')}: ${expiryDate.toLocaleString()})`;
             }
         }
-        infoMessage += ` (${t('mode')}: ${shareData.mode === 'view' ? t('viewOnly') : t('editable')})`;
+        var modeText = shareData.mode === 'view' ? t('viewOnly') : (shareData.can_edit ? t('editable') : (window.i18n ? '可查看（无编辑权限）' : 'view only, no edit permission'));
+        infoMessage += ` (${t('mode')}: ${modeText})`;
 
         showToast(infoMessage, 'info');
     }
@@ -1019,10 +1401,31 @@
         const isLocalFile = window.location.protocol === 'file:';
         
         if ('serviceWorker' in navigator && !isElectron && !isCapacitor && !isLocalFile) {
-            window.addEventListener('load', function() {
-                navigator.serviceWorker.register('./sw.js').catch(function(err) {
+            window.addEventListener('load', async function() {
+                try {
+                    const registrations = await navigator.serviceWorker.getRegistrations();
+                    const expectedScript = new URL('/sw.js', window.location.origin).href;
+                    const expectedScope = new URL('/', window.location.origin).href;
+
+                    await Promise.all(registrations.map(function(reg) {
+                        const worker = reg.active || reg.waiting || reg.installing;
+                        const scriptUrl = worker ? worker.scriptURL : '';
+                        const isExpected = reg.scope === expectedScope && scriptUrl === expectedScript;
+                        if (isExpected) return Promise.resolve();
+
+                        if (scriptUrl && scriptUrl.indexOf('/sw.js') !== -1) {
+                            return reg.unregister();
+                        }
+                        return Promise.resolve();
+                    }));
+
+                    await navigator.serviceWorker.register('/sw.js', {
+                        scope: '/',
+                        updateViaCache: 'none'
+                    });
+                } catch (err) {
                     console.warn('ServiceWorker registration failed:', err);
-                });
+                }
             });
         }
     })();

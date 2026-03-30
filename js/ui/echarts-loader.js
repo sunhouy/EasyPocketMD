@@ -55,8 +55,8 @@
     var echartsTemplates = [
         {
             icon: '<i class="fas fa-chart-line"></i>',
-            name: 'ECharts 折线图',
-            nameEn: 'ECharts Line Chart',
+            name: '折线图',
+            nameEn: 'Line Chart',
             keywords: ['echarts', 'line', '折线图', '趋势'],
             description: isEn() ? 'Professional line chart with ECharts' : '使用ECharts的专业折线图',
             type: 'echarts-line',
@@ -164,8 +164,8 @@
         },
         {
             icon: '<i class="fas fa-chart-bar"></i>',
-            name: 'ECharts 柱状图',
-            nameEn: 'ECharts Bar Chart',
+            name: '柱状图',
+            nameEn: 'Bar Chart',
             keywords: ['echarts', 'bar', '柱状图', '条形图'],
             description: isEn() ? 'Professional bar chart with ECharts' : '使用ECharts的专业柱状图',
             type: 'echarts-bar',
@@ -258,8 +258,8 @@
         },
         {
             icon: '<i class="fas fa-chart-pie"></i>',
-            name: 'ECharts 饼图',
-            nameEn: 'ECharts Pie Chart',
+            name: '饼图',
+            nameEn: 'Pie Chart',
             keywords: ['echarts', 'pie', '饼图', '环形图'],
             description: isEn() ? 'Professional pie chart with ECharts' : '使用ECharts的专业饼图',
             type: 'echarts-pie',
@@ -340,8 +340,8 @@
         },
         {
             icon: '<i class="fas fa-braille"></i>',
-            name: 'ECharts 散点图',
-            nameEn: 'ECharts Scatter Chart',
+            name: '散点图',
+            nameEn: 'Scatter Chart',
             keywords: ['echarts', 'scatter', '散点图'],
             description: isEn() ? 'Professional scatter chart with ECharts' : '使用ECharts的专业散点图',
             type: 'echarts-scatter',
@@ -410,8 +410,8 @@
         },
         {
             icon: '<i class="fas fa-bullseye"></i>',
-            name: 'ECharts 雷达图',
-            nameEn: 'ECharts Radar Chart',
+            name: '雷达图',
+            nameEn: 'Radar Chart',
             keywords: ['echarts', 'radar', '雷达图'],
             description: isEn() ? 'Professional radar chart with ECharts' : '使用ECharts的专业雷达图',
             type: 'echarts-radar',
@@ -509,8 +509,8 @@
         },
         {
             icon: '<i class="fas fa-filter"></i>',
-            name: 'ECharts 漏斗图',
-            nameEn: 'ECharts Funnel Chart',
+            name: '漏斗图',
+            nameEn: 'Funnel Chart',
             keywords: ['echarts', 'funnel', '漏斗图'],
             description: isEn() ? 'Professional funnel chart with ECharts' : '使用ECharts的专业漏斗图',
             type: 'echarts-funnel',
@@ -596,8 +596,8 @@
         },
         {
             icon: '<i class="fas fa-tachometer-alt"></i>',
-            name: 'ECharts 仪表盘',
-            nameEn: 'ECharts Gauge Chart',
+            name: '仪表盘',
+            nameEn: 'Gauge Chart',
             keywords: ['echarts', 'gauge', '仪表盘', '速度表'],
             description: isEn() ? 'Professional gauge chart with ECharts' : '使用ECharts的专业仪表盘',
             type: 'echarts-gauge',
@@ -654,8 +654,8 @@
         },
         {
             icon: '<i class="fas fa-th"></i>',
-            name: 'ECharts 热力图',
-            nameEn: 'ECharts Heatmap',
+            name: '热力图',
+            nameEn: 'Heatmap',
             keywords: ['echarts', 'heatmap', '热力图', '热图'],
             description: isEn() ? 'Professional heatmap with ECharts' : '使用ECharts的专业热力图',
             type: 'echarts-heatmap',
@@ -731,8 +731,8 @@
         },
         {
             icon: '<i class="fas fa-sitemap"></i>',
-            name: 'ECharts 树图',
-            nameEn: 'ECharts Treemap',
+            name: '树图',
+            nameEn: 'Treemap',
             keywords: ['echarts', 'treemap', '树图', '矩形树图'],
             description: isEn() ? 'Professional treemap with ECharts' : '使用ECharts的专业树图',
             type: 'echarts-treemap',
@@ -794,8 +794,8 @@
         },
         {
             icon: '<i class="fas fa-sun"></i>',
-            name: 'ECharts 旭日图',
-            nameEn: 'ECharts Sunburst',
+            name: '旭日图',
+            nameEn: 'Sunburst',
             keywords: ['echarts', 'sunburst', '旭日图', '多层饼图'],
             description: isEn() ? 'Professional sunburst chart with ECharts' : '使用ECharts的专业旭日图',
             type: 'echarts-sunburst',
@@ -855,8 +855,8 @@
         },
         {
             icon: '<i class="fas fa-project-diagram"></i>',
-            name: 'ECharts 桑基图',
-            nameEn: 'ECharts Sankey',
+            name: '桑基图',
+            nameEn: 'Sankey',
             keywords: ['echarts', 'sankey', '桑基图', '流向图'],
             description: isEn() ? 'Professional sankey diagram with ECharts' : '使用ECharts的专业桑基图',
             type: 'echarts-sankey',
@@ -937,8 +937,8 @@
         },
         {
             icon: '<i class="fas fa-network-wired"></i>',
-            name: 'ECharts 关系图',
-            nameEn: 'ECharts Graph',
+            name: '关系图',
+            nameEn: 'Graph',
             keywords: ['echarts', 'graph', '关系图', '网络图', '力导向图'],
             description: isEn() ? 'Professional graph/network with ECharts' : '使用ECharts的专业关系图',
             type: 'echarts-graph',
@@ -1033,8 +1033,8 @@
         },
         {
             icon: '<i class="fas fa-chart-line"></i>',
-            name: 'ECharts K线图',
-            nameEn: 'ECharts Candlestick',
+            name: 'K线图',
+            nameEn: 'Candlestick',
             keywords: ['echarts', 'candlestick', 'k线图', '蜡烛图', '股票'],
             description: isEn() ? 'Professional candlestick chart with ECharts' : '使用ECharts的专业K线图',
             type: 'echarts-candlestick',
@@ -1096,8 +1096,8 @@
         },
         {
             icon: '<i class="fas fa-box"></i>',
-            name: 'ECharts 箱线图',
-            nameEn: 'ECharts Boxplot',
+            name: '箱线图',
+            nameEn: 'Boxplot',
             keywords: ['echarts', 'boxplot', '箱线图', '盒须图'],
             description: isEn() ? 'Professional boxplot with ECharts' : '使用ECharts的专业箱线图',
             type: 'echarts-boxplot',
@@ -1163,8 +1163,8 @@
         },
         {
             icon: '<i class="fas fa-image"></i>',
-            name: 'ECharts 象形柱图',
-            nameEn: 'ECharts PictorialBar',
+            name: '象形柱图',
+            nameEn: 'PictorialBar',
             keywords: ['echarts', 'pictorialBar', '象形柱图', '图标柱状图'],
             description: isEn() ? 'Professional pictorial bar chart with ECharts' : '使用ECharts的专业象形柱图',
             type: 'echarts-pictorialbar',
@@ -1184,7 +1184,7 @@
                     }, {
                         type: 'pictorialBar',
                         symbol: 'path://M0,10 L10,10 C5.5,10 5.5,5 5,0 C4.5,5 4.5,10 0,10 z',
-                        itemStyle: { color: '#5470c6' },
+                        itemStyle: { color: '#4a90e2' },
                         data: [123, 60, 25, 18],
                         z: 20,
                         symbolClip: true
@@ -1216,7 +1216,7 @@
                     }, {
                         type: 'pictorialBar',
                         symbol: 'path://M0,10 L10,10 C5.5,10 5.5,5 5,0 C4.5,5 4.5,10 0,10 z',
-                        itemStyle: { color: '#5470c6' },
+                        itemStyle: { color: '#4a90e2' },
                         data: values,
                         z: 20,
                         symbolClip: true
@@ -1226,8 +1226,8 @@
         },
         {
             icon: '<i class="fas fa-water"></i>',
-            name: 'ECharts 主题河流图',
-            nameEn: 'ECharts ThemeRiver',
+            name: '主题河流图',
+            nameEn: 'ThemeRiver',
             keywords: ['echarts', 'themeriver', '主题河流图', '河流图'],
             description: isEn() ? 'Professional theme river chart with ECharts' : '使用ECharts的专业主题河流图',
             type: 'echarts-themeriver',
@@ -1513,23 +1513,26 @@
         // 初始预览
         setTimeout(updatePreview, 100);
 
-        // 按钮栏
-        var buttonBar = document.createElement('div');
-        buttonBar.style.cssText = 'display: flex; gap: 10px; justify-content: flex-end;';
-
-        var cancelBtn = document.createElement('button');
-        cancelBtn.textContent = isEn() ? 'Cancel' : '取消';
-        cancelBtn.style.cssText = 'padding: 10px 20px; background: ' + (nightMode ? '#444' : '#f5f5f5') + '; color: ' + (nightMode ? '#eee' : '#333') + '; border: none; border-radius: 6px; cursor: pointer; font-size: 14px;';
-        cancelBtn.onclick = function() {
+        // 右上角关闭按钮
+        var closeBtn = document.createElement('button');
+        closeBtn.innerHTML = '<i class="fas fa-times"></i>';
+        closeBtn.style.cssText = 'position: absolute; top: 15px; right: 15px; width: 32px; height: 32px; background: ' + (nightMode ? '#444' : '#f5f5f5') + '; color: ' + (nightMode ? '#eee' : '#333') + '; border: none; border-radius: 50%; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center;';
+        closeBtn.onclick = function() {
             if (previewChart) {
                 previewChart.dispose();
             }
             document.body.removeChild(modal);
         };
+        container.style.position = 'relative';
+        container.appendChild(closeBtn);
+
+        // 按钮栏
+        var buttonBar = document.createElement('div');
+        buttonBar.style.cssText = 'display: flex; gap: 10px; justify-content: flex-end;';
 
         var insertBtn = document.createElement('button');
         insertBtn.innerHTML = '<i class="fas fa-plus"></i> ' + (isEn() ? 'Insert' : '插入');
-        insertBtn.style.cssText = 'padding: 10px 20px; background: #667eea; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px;';
+        insertBtn.style.cssText = 'padding: 10px 20px; background: #4a90e2; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px;';
         insertBtn.onclick = function() {
             var data = {};
             for (var key in formData) {
@@ -1594,7 +1597,6 @@
             }
         };
 
-        buttonBar.appendChild(cancelBtn);
         buttonBar.appendChild(insertBtn);
         container.appendChild(buttonBar);
 
@@ -1672,7 +1674,7 @@
                 chartBtn.style.cssText = 'padding: 15px; border: 2px solid transparent; background: ' + (nightMode ? '#3d3d3d' : '#f5f5f5') + '; cursor: pointer; border-radius: 8px; transition: all 0.2s; text-align: center; color: ' + (nightMode ? '#eee' : '#333') + ';';
 
                 var iconDiv = document.createElement('div');
-                iconDiv.style.cssText = 'font-size: 28px; margin-bottom: 8px; color: #667eea;';
+                iconDiv.style.cssText = 'font-size: 28px; margin-bottom: 8px; color: #4a90e2;';
                 iconDiv.innerHTML = template.icon;
 
                 var nameDiv = document.createElement('div');
@@ -1694,7 +1696,7 @@
 
                 chartBtn.onmouseenter = function() {
                     this.style.background = nightMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)';
-                    this.style.borderColor = '#667eea';
+                    this.style.borderColor = '#4a90e2';
                 };
 
                 chartBtn.onmouseleave = function() {
@@ -1728,14 +1730,15 @@
             renderCharts(results);
         });
 
-        // 取消按钮
-        var cancelBtn = document.createElement('button');
-        cancelBtn.textContent = isEn() ? 'Cancel' : '取消';
-        cancelBtn.style.cssText = 'margin-top: 15px; padding: 10px 20px; background: ' + (nightMode ? '#444' : '#f5f5f5') + '; color: ' + (nightMode ? '#eee' : '#333') + '; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; align-self: center;';
-        cancelBtn.onclick = function() {
+        // 右上角关闭按钮
+        var closeBtn = document.createElement('button');
+        closeBtn.innerHTML = '<i class="fas fa-times"></i>';
+        closeBtn.style.cssText = 'position: absolute; top: 15px; right: 15px; width: 32px; height: 32px; background: ' + (nightMode ? '#444' : '#f5f5f5') + '; color: ' + (nightMode ? '#eee' : '#333') + '; border: none; border-radius: 50%; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center;';
+        closeBtn.onclick = function() {
             document.body.removeChild(modal);
         };
-        container.appendChild(cancelBtn);
+        container.style.position = 'relative';
+        container.appendChild(closeBtn);
 
         modal.appendChild(container);
         document.body.appendChild(modal);

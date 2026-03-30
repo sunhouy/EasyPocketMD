@@ -28,11 +28,12 @@
             optionEl.addEventListener('click', function() { option.action(); hideMobileActionSheet(); });
             actionSheet.appendChild(optionEl);
         });
-        var cancelEl = document.createElement('button');
-        cancelEl.style.cssText = 'display:block;width:90%;margin:15px auto 0;padding:15px;background:' + (nightMode ? '#555' : '#9E9E9E') + ';border:none;border-radius:12px;font-size:16px;font-weight:600;text-align:center;color:' + (nightMode ? '#eee' : '#333') + ';';
-        cancelEl.textContent = window.i18n ? window.i18n.t('cancel') : '取消';
-        cancelEl.addEventListener('click', hideMobileActionSheet);
-        actionSheet.appendChild(cancelEl);
+        // 右上角关闭按钮
+        var closeBtn = document.createElement('button');
+        closeBtn.innerHTML = '<i class="fas fa-times"></i>';
+        closeBtn.style.cssText = 'position:absolute;top:10px;right:10px;width:28px;height:28px;background:' + (nightMode ? '#555' : '#f5f5f5') + ';border:none;border-radius:50%;font-size:14px;color:' + (nightMode ? '#eee' : '#333') + ';cursor:pointer;display:flex;align-items:center;justify-content:center;';
+        closeBtn.addEventListener('click', hideMobileActionSheet);
+        actionSheet.appendChild(closeBtn);
         actionSheet.classList.add('show');
         overlay.classList.add('show');
         overlay.onclick = hideMobileActionSheet;

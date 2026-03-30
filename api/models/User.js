@@ -53,7 +53,7 @@ class User {
             // Check if username exists
             const [rows] = await connection.execute('SELECT id FROM users WHERE username = ?', [username]);
             if (rows.length > 0) {
-                return { code: 400, message: '用户名已存在' };
+                return { code: 409, message: '用户名已存在' };
             }
 
             // Hash password

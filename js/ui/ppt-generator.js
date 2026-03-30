@@ -496,12 +496,12 @@ ${page.content.map((c, i) => '要点' + (i + 1) + '：' + c).join('\n')}
             html += '<div class="ppt-editor-thumb" data-index="' + i + '" data-active="' + isActive + '" style="flex-shrink:0;width:140px;padding:10px;border-radius:6px;cursor:pointer;transition:all 0.2s;position:relative;' + bgStyle + '">';
             
             // 删除按钮
-            html += '<button class="ppt-delete-page-btn" data-delete-index="' + i + '" style="position:absolute;top:2px;right:2px;width:20px;height:20px;border:none;border-radius:50%;background:rgba(231,76,60,0.8);color:white;font-size:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10;opacity:0;transition:opacity 0.2s;">';
+            html += '<button class="ppt-delete-page-btn" data-delete-index="' + i + '" style="position:absolute;top:2px;right:2px;width:20px;height:20px;border:none;border-radius:50%;background:rgba(231,76,60,0.8);color:white;font-size:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10;opacity:1;transition:opacity 0.2s;">';
             html += '<i class="fas fa-times"></i>';
             html += '</button>';
             
             // 在当前页后插入新页的按钮
-            html += '<button class="ppt-insert-page-btn" data-insert-index="' + i + '" style="position:absolute;top:2px;right:24px;width:20px;height:20px;border:none;border-radius:50%;background:rgba(52,152,219,0.8);color:white;font-size:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10;opacity:0;transition:opacity 0.2s;" title="在此页后插入">';
+            html += '<button class="ppt-insert-page-btn" data-insert-index="' + i + '" style="position:absolute;top:2px;right:24px;width:20px;height:20px;border:none;border-radius:50%;background:rgba(52,152,219,0.8);color:white;font-size:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10;opacity:1;transition:opacity 0.2s;" title="在此页后插入">';
             html += '<i class="fas fa-plus"></i>';
             html += '</button>';
             
@@ -523,21 +523,6 @@ ${page.content.map((c, i) => '要点' + (i + 1) + '：' + c).join('\n')}
                     return;
                 }
                 selectPage(parseInt(this.getAttribute('data-index')));
-            });
-            
-            // 鼠标悬停显示按钮
-            thumb.addEventListener('mouseenter', function() {
-                var deleteBtn = this.querySelector('.ppt-delete-page-btn');
-                var insertBtn = this.querySelector('.ppt-insert-page-btn');
-                if (deleteBtn) deleteBtn.style.opacity = '1';
-                if (insertBtn) insertBtn.style.opacity = '1';
-            });
-            
-            thumb.addEventListener('mouseleave', function() {
-                var deleteBtn = this.querySelector('.ppt-delete-page-btn');
-                var insertBtn = this.querySelector('.ppt-insert-page-btn');
-                if (deleteBtn) deleteBtn.style.opacity = '0';
-                if (insertBtn) insertBtn.style.opacity = '0';
             });
         });
         
@@ -806,64 +791,69 @@ ${page.content.map((c, i) => '要点' + (i + 1) + '：' + c).join('\n')}
         }
     }
 
-    // 实际下载 - 使用html-to-pptx库
+    // 实际下载 - 调用后端 API 生成 PPT
     async function doDownloadPPT() {
         var btn = document.getElementById('pptEditorDownload');
         if (!btn) return;
-        
+
         var originalText = btn.innerHTML;
         btn.disabled = true;
         btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 生成中...';
 
         try {
-            // 动态导入html-to-pptx
-            const htmlToPptx = await import('html-to-pptx');
-            const { downloadHtmlToPpt } = htmlToPptx;
-            
-            // 创建临时容器来存放所有PPT页面
-            // 注意：元素必须是可见的，否则getBoundingClientRect会失败
-            // 使用visibility:visible但移出屏幕
-            var container = document.createElement('div');
-            container.id = 'ppt-export-container';
-            container.style.cssText = 'position:fixed;top:-10000px;left:-10000px;width:1px;height:1px;overflow:visible;z-index:-1;';
-            
-            // 定义页面尺寸 - 使用16:9比例
-            var slideWidth = 1000;
-            var slideHeight = 562.5;
-            
-            // 为每页创建DOM元素
-            for (var i = 0; i < pptState.outline.length; i++) {
-                var html = pptState.pages[i];
-                var page = pptState.outline[i];
-                
-                var pageDiv = document.createElement('div');
-                pageDiv.className = 'h-ppt-page';
-                pageDiv.style.cssText = 'width:' + slideWidth + 'px;height:' + slideHeight + 'px;position:relative;background:#ffffff;overflow:hidden;box-sizing:border-box;';
-                
-                if (html) {
-                    // 包装内容，添加内边距
-                    pageDiv.innerHTML = '<div style="width:100%;height:100%;padding:40px;box-sizing:border-box;">' + html + '</div>';
-                } else {
-                    // 空白页
-                    pageDiv.innerHTML = '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:#999;font-size:24px;">第' + (i + 1) + '页</div>';
+            // 准备请求数据
+            var exportData = {
+                topic: pptState.topic || 'PPT',
+                pages: pptState.pages,
+                outline: pptState.outline,
+                ratio: pptState.ratio
+            };
+
+            // 调用后端 API
+            var apiUrl = (global.getApiBaseUrl ? global.getApiBaseUrl() : '/api') + '/ppt-export';
+
+            var response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + (g('currentUser') ? (g('currentUser').token || g('currentUser').username) : '')
+                },
+                body: JSON.stringify(exportData)
+            });
+
+            if (!response.ok) {
+                // 尝试解析错误信息
+                var errorData;
+                try {
+                    errorData = await response.json();
+                } catch (e) {
+                    throw new Error('HTTP ' + response.status);
                 }
-                
-                container.appendChild(pageDiv);
+                throw new Error(errorData.message || '导出失败');
             }
-            
-            document.body.appendChild(container);
-            
-            // 等待DOM渲染完成
-            await new Promise(function(r) { setTimeout(r, 500); });
-            
-            // 使用html-to-pptx导出
-            // 参数：类名, 文件名（不需要.pptx后缀）
+
+            // 获取文件名
+            var contentDisposition = response.headers.get('Content-Disposition');
             var fileName = pptState.topic || 'PPT';
-            await downloadHtmlToPpt('h-ppt-page', fileName);
-            
-            // 清理临时容器
-            document.body.removeChild(container);
-            
+            if (contentDisposition) {
+                var filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+                if (filenameMatch) {
+                    fileName = decodeURIComponent(filenameMatch[1].replace(/['"]/g, ''));
+                }
+            }
+            fileName = fileName.replace(/\.pptx$/i, '') + '.pptx';
+
+            // 下载文件
+            var blob = await response.blob();
+            var url = window.URL.createObjectURL(blob);
+            var a = document.createElement('a');
+            a.href = url;
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+
             if (global.showMessage) {
                 global.showMessage('PPT下载成功', 'success');
             }
