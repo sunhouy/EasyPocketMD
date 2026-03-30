@@ -227,7 +227,9 @@ class ShareManager {
 
             const share = rows[0];
 
-            if (share.password) {
+            const isOwnerAccess = options && options.editorUsername && options.editorUsername === share.username;
+
+            if (share.password && !isOwnerAccess) {
                 if (!password) return { code: 401, message: '需要访问密码' };
                 if (share.password !== password) return { code: 403, message: '密码错误' };
             }

@@ -43,6 +43,93 @@
         global.pendingServerSync = loadPendingServerSync();
     }
 
+    // ---------- 共享在线文档（所有者视角） ----------
+    let ownerShareCache = { updatedAt: 0, byFilename: {} };
+
+    async function refreshOwnerShareCache(force) {
+        if (!g('currentUser')) return ownerShareCache.byFilename;
+        const now = Date.now();
+        if (!force && (now - ownerShareCache.updatedAt < 30000)) {
+            return ownerShareCache.byFilename;
+        }
+        try {
+            var api = global.getApiBaseUrl ? global.getApiBaseUrl() : 'api';
+            const response = await fetch(api + '/share/list?username=' + encodeURIComponent(g('currentUser').username), {
+                method: 'GET',
+                headers: { 'Authorization': 'Bearer ' + g('currentUser').token }
+            });
+            const result = global.parseJsonResponse ? await global.parseJsonResponse(response) : await response.json();
+            const byFilename = {};
+            if (result.code === 200 && result.data && Array.isArray(result.data.shares)) {
+                result.data.shares.forEach(function(share) {
+                    if (share.mode === 'edit' && !share.is_expired && share.filename) {
+                        byFilename[share.filename] = share;
+                    }
+                });
+            }
+            ownerShareCache = { updatedAt: now, byFilename: byFilename };
+            return byFilename;
+        } catch (error) {
+            console.warn('刷新共享缓存失败:', error);
+            return ownerShareCache.byFilename;
+        }
+    }
+
+    async function activateOwnerSharedSession(file, fileContent) {
+        if (!file || !g('currentUser')) return false;
+        const byFilename = await refreshOwnerShareCache(false);
+        const shareMeta = byFilename[file.name];
+        if (!shareMeta || !shareMeta.share_id) {
+            if (typeof global.deactivateSharedDocumentSession === 'function') {
+                global.deactivateSharedDocumentSession();
+            }
+            return false;
+        }
+
+        try {
+            var api = global.getApiBaseUrl ? global.getApiBaseUrl() : 'api';
+            const response = await fetch(api + '/share/get', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    share_id: shareMeta.share_id,
+                    editor_username: g('currentUser').username,
+                    editor_token: g('currentUser').token,
+                    editor_password: g('currentUser').password
+                })
+            });
+            const result = global.parseJsonResponse ? await global.parseJsonResponse(response) : await response.json();
+            if (result.code !== 200 || !result.data) {
+                return false;
+            }
+
+            const sharedContent = result.data.content || fileContent || '';
+            // 所有者打开共享在线文档时，以服务器内容为准，避免刷新后回退到本地旧版本。
+            file.content = sharedContent;
+            file.lastModified = Date.now();
+            localStorage.setItem('vditor_files', JSON.stringify(g('files')));
+            if (g('vditor')) {
+                g('vditor').setValue(sharedContent);
+            }
+
+            if (typeof global.activateSharedDocumentSession === 'function') {
+                global.activateSharedDocumentSession(result.data, {
+                    shareId: shareMeta.share_id,
+                    sharePassword: '',
+                    editPassword: '',
+                    canEdit: true,
+                    viewerId: 'owner-' + (g('currentUser').username || 'user'),
+                    viewerName: g('currentUser').username,
+                    ownerFileId: file.id
+                });
+            }
+            return true;
+        } catch (error) {
+            console.warn('启用共享在线文档会话失败:', error);
+            return false;
+        }
+    }
+
     // ---------- 辅助函数：路径处理 ----------
     function normalizePath(input) {
         let path = input.trim();
@@ -163,6 +250,7 @@
         if (!g('currentUser')) return;
         try {
             global.showSyncStatus(isEn() ? 'Loading files from server...' : '正在从服务器加载文件...');
+            await refreshOwnerShareCache(true);
             var api = global.getApiBaseUrl ? global.getApiBaseUrl() : 'api';
             const response = await fetch(api + '/files?username=' + encodeURIComponent(g('currentUser').username), {
                 headers: { 'Authorization': 'Bearer ' + g('currentUser').token }
@@ -270,6 +358,7 @@
     function detectConflicts(localFiles, serverFiles) {
         const conflicts = [];
         const pendingServerSync = g('pendingServerSync') || {};
+        const editableSharedByFilename = ownerShareCache.byFilename || {};
         const serverFileMap = {};
         serverFiles.forEach(function(f) { serverFileMap[f.name] = f; });
 
@@ -282,6 +371,13 @@
 
             const serverFile = serverFileMap[localFile.name];
             if (serverFile) {
+                // 对于“所有者已开启共享编辑”的文件，刷新时始终以服务器版本为准。
+                if (editableSharedByFilename[localFile.name]) {
+                    localFile.content = serverFile.content;
+                    localFile.lastModified = serverFile.lastModified || Date.now();
+                    localFile.isSynced = true;
+                    return;
+                }
                 if (serverFile.content !== localFile.content) {
                     conflicts.push({
                         type: 'content',
@@ -1763,6 +1859,9 @@
         }
         
         if (g('vditor')) g('vditor').setValue(content);
+
+        await activateOwnerSharedSession(file, content);
+
         expandActiveFile();
         global.startAutoSave();
         global.showMessage(isEn() ? 'File opened: ' + file.name : '已打开文件: ' + file.name);
@@ -1853,6 +1952,17 @@
         file.lastModified = Date.now();
         localStorage.setItem('vditor_files', JSON.stringify(files));
         g('unsavedChanges')[currentFileId] = false;
+
+        // 在线共享文档由 share websocket/update 通道负责写入，避免 owner 普通保存覆盖实时协作状态。
+        if (
+            global.sharedDocState &&
+            global.sharedDocState.canEdit &&
+            global.sharedDocState.ownerFileId === currentFileId &&
+            typeof global.scheduleSharedDocSync === 'function'
+        ) {
+            global.scheduleSharedDocSync();
+            return;
+        }
 
         // 保存成功后清除草稿（因为已经正式保存到 localStorage）
         if (global.draftRecovery) {
