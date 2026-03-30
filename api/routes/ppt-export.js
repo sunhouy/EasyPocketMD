@@ -55,23 +55,12 @@ router.post('/', async (req, res) => {
 
         // 生成文件并发送给客户端
         const fileName = `${topic || 'PPT'}_${Date.now()}.pptx`;
+        const pptBuffer = await pptx.write({ outputType: 'nodebuffer' });
 
-        // 设置响应头
+        // 仅在生成成功后写响应头，避免错误分支出现 headers 冲突
         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.presentationml.presentation');
         res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(fileName)}"`);
-
-        // 写入响应流
-        await pptx.write({ outputType: 'stream' })
-            .then(stream => {
-                stream.pipe(res);
-            })
-            .catch(err => {
-                console.error('PPT 生成失败:', err);
-                res.status(500).json({
-                    code: 500,
-                    message: 'PPT 生成失败: ' + err.message
-                });
-            });
+        return res.status(200).send(pptBuffer);
 
     } catch (error) {
         console.error('PPT 导出错误:', error);
