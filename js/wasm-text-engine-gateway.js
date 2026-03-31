@@ -2,7 +2,7 @@
     'use strict';
 
     const state = {
-        enabled: false,
+        enabled: true,
         ready: false,
         disabledByError: false,
         initPromise: null,
@@ -12,20 +12,14 @@
     };
 
     function getEnabledFlag() {
-        const override = localStorage.getItem('vditor_enable_wasm_text_engine');
-        if (override === 'true' || override === 'false') {
-            return override === 'true';
-        }
-        if (global.userSettings && typeof global.userSettings.enableWasmTextEngine === 'boolean') {
-            return global.userSettings.enableWasmTextEngine;
-        }
-        return false;
+        // 对所有用户默认启用智能文本引擎；失败时自动降级到 JS 兜底。
+        return true;
     }
 
     function warnOnce(message) {
         if (state.warned) return;
         state.warned = true;
-        console.warn('[wasm-text-engine]', message);
+        console.warn('[text-engine]', message);
     }
 
     function isBuildTimeWasmPresent() {
@@ -65,7 +59,7 @@
 
     async function init(options) {
         if (state.disabledByError) {
-            return { code: 500, message: state.initError || 'wasm gateway disabled' };
+            return { code: 500, message: state.initError || 'text engine disabled' };
         }
 
         state.enabled = getEnabledFlag();
@@ -76,7 +70,7 @@
         if (!isBuildTimeWasmPresent()) {
             return {
                 code: 500,
-                message: 'WASM artifact was not packaged in this build. Run: npm run wasm:text:build && npm run build'
+                message: 'Text engine artifact was not packaged in this build'
             };
         }
 
@@ -98,7 +92,7 @@
                 if (!modulePath) {
                     return {
                         code: 500,
-                        message: 'WASM artifact not found. Build it with: npm run wasm:text:build && npm run build'
+                        message: 'Text engine artifact not found'
                     };
                 }
 
@@ -112,7 +106,7 @@
             } catch (error) {
                 state.disabledByError = true;
                 state.initError = error && error.message ? error.message : 'unknown init error';
-                warnOnce('init failed, fallback to JS implementation: ' + state.initError);
+                warnOnce('init failed, fallback to built-in implementation: ' + state.initError);
                 return { code: 500, message: state.initError };
             }
         })();
@@ -166,12 +160,12 @@
     }
 
     function merge3(baseText, localText, remoteText, strategy) {
-        if (!isUsable()) return { code: 500, message: 'wasm merge unavailable' };
+        if (!isUsable()) return { code: 500, message: 'smart merge unavailable' };
         return state.client.merge3(baseText || '', localText || '', remoteText || '', strategy || 'manual');
     }
 
     function rebuildIndex(files) {
-        if (!isUsable()) return { code: 500, message: 'wasm search unavailable' };
+        if (!isUsable()) return { code: 500, message: 'smart search unavailable' };
         const docs = Array.isArray(files) ? files : [];
 
         state.client.clearIndex();
@@ -184,7 +178,7 @@
     }
 
     function searchFiles(query, options) {
-        if (!isUsable()) return { code: 500, message: 'wasm search unavailable' };
+        if (!isUsable()) return { code: 500, message: 'smart search unavailable' };
         const rebuildRes = rebuildIndex(global.files || []);
         if (!rebuildRes || rebuildRes.code !== 200) {
             return rebuildRes;
@@ -193,7 +187,7 @@
     }
 
     function findInText(text, query, options) {
-        if (!isUsable()) return { code: 500, message: 'wasm find unavailable' };
+        if (!isUsable()) return { code: 500, message: 'smart find unavailable' };
         const res = state.client.findInText(text || '', query || '', options || {});
         if (!res || res.code !== 200 || !res.data) return res;
 
@@ -219,12 +213,12 @@
     }
 
     function replaceAllText(text, query, replacement, options) {
-        if (!isUsable()) return { code: 500, message: 'wasm replace unavailable' };
+        if (!isUsable()) return { code: 500, message: 'smart replace unavailable' };
         return state.client.replaceAllText(text || '', query || '', replacement || '', options || {});
     }
 
     function searchFilesDetailed(query, options) {
-        if (!isUsable()) return { code: 500, message: 'wasm search unavailable' };
+        if (!isUsable()) return { code: 500, message: 'smart search unavailable' };
 
         const files = Array.isArray(global.files) ? global.files : [];
         const results = [];

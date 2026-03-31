@@ -791,7 +791,7 @@
     function showMergePreviewModal(conflict) {
         const gateway = global.wasmTextEngineGateway;
         if (!gateway || typeof gateway.merge3 !== 'function') {
-            global.showMessage(isEn() ? 'WASM merge is unavailable' : 'WASM 合并功能不可用', 'error');
+            global.showMessage(isEn() ? 'Smart merge is unavailable' : '智能合并功能不可用', 'error');
             return;
         }
 
@@ -861,7 +861,7 @@
             if (conflict.type === 'delete') {
                 conflictItem.innerHTML = '<div ' + highlightStyle + ' style="flex:1; padding: 8px;"><strong style="color: #dc3545;">' + (isCurrentFile ? '📝 ' : '⚠️ ') + conflict.filename + (isCurrentFile ? ' (' + (isEn() ? 'Currently editing' : '当前正在编辑') + ')' : '') + '</strong><div class="conflict-details"><div style="color: #dc3545;">' + (isEn() ? 'This file has been deleted on the server' : '该文件在服务器上已经删除') + '</div><div>' + (isEn() ? 'Local modified time: ' : '本地修改时间: ') + new Date(conflict.localModified).toLocaleString() + '</div></div><div style="margin-top: 8px;"><label style="margin-right: 15px;"><input type="radio" name="conflict-' + index + '" value="upload">' + (isEn() ? 'Re-upload to server' : '重新上传到服务器') + '</label><label><input type="radio" name="conflict-' + index + '" value="delete" checked>' + (isEn() ? 'Delete local file' : '删除本地文件') + '</label></div></div>';
             } else {
-                conflictItem.innerHTML = '<div ' + highlightStyle + ' style="flex:1; padding: 8px;"><strong>' + (isCurrentFile ? '📝 ' : '') + conflict.filename + (isCurrentFile ? ' (' + (isEn() ? 'Currently editing' : '当前正在编辑') + ')' : '') + '</strong><div class="conflict-details"><div>' + (isEn() ? 'Local modified time: ' : '本地修改时间: ') + new Date(conflict.localModified).toLocaleString() + '</div><div>' + (isEn() ? 'Server modified time: ' : '服务器修改时间: ') + new Date(conflict.serverModified).toLocaleString() + '</div></div><div style="margin-top: 8px;"><label style="margin-right: 15px;"><input type="radio" name="conflict-' + index + '" value="local"' + (isCurrentFile ? ' checked' : '') + '>' + (isEn() ? 'Use local version' : '使用本地版本') + '</label><label style="margin-right: 15px;"><input type="radio" name="conflict-' + index + '" value="server"' + (isCurrentFile ? '' : ' checked') + '>' + (isEn() ? 'Use server version' : '使用服务器版本') + '</label><label><input type="radio" name="conflict-' + index + '" value="merge">' + (isEn() ? 'Use WASM merge' : '使用 WASM 合并') + '</label></div></div><button class="diff-view-btn" data-index="' + index + '" title="' + (isEn() ? 'View differences' : '查看差异') + '"><i class="fas fa-columns"></i></button><button class="merge-preview-btn" data-index="' + index + '" title="' + (isEn() ? 'WASM merge preview' : 'WASM 合并预览') + '"><i class="fas fa-code-branch"></i></button>';
+                conflictItem.innerHTML = '<div ' + highlightStyle + ' style="flex:1; padding: 8px;"><strong>' + (isCurrentFile ? '📝 ' : '') + conflict.filename + (isCurrentFile ? ' (' + (isEn() ? 'Currently editing' : '当前正在编辑') + ')' : '') + '</strong><div class="conflict-details"><div>' + (isEn() ? 'Local modified time: ' : '本地修改时间: ') + new Date(conflict.localModified).toLocaleString() + '</div><div>' + (isEn() ? 'Server modified time: ' : '服务器修改时间: ') + new Date(conflict.serverModified).toLocaleString() + '</div></div><div style="margin-top: 8px;"><label style="margin-right: 15px;"><input type="radio" name="conflict-' + index + '" value="local"' + (isCurrentFile ? ' checked' : '') + '>' + (isEn() ? 'Use local version' : '使用本地版本') + '</label><label style="margin-right: 15px;"><input type="radio" name="conflict-' + index + '" value="server"' + (isCurrentFile ? '' : ' checked') + '>' + (isEn() ? 'Use server version' : '使用服务器版本') + '</label><label><input type="radio" name="conflict-' + index + '" value="merge">' + (isEn() ? 'Use smart merge' : '使用智能合并') + '</label></div></div><button class="diff-view-btn" data-index="' + index + '" title="' + (isEn() ? 'View differences' : '查看差异') + '"><i class="fas fa-columns"></i></button><button class="smart-merge-btn" data-index="' + index + '" title="' + (isEn() ? 'Use smart merge' : '使用智能合并') + '"><i class="fas fa-wand-magic-sparkles"></i></button><button class="merge-preview-btn" data-index="' + index + '" title="' + (isEn() ? 'Smart merge preview' : '智能合并预览') + '"><i class="fas fa-code-branch"></i></button>';
             }
             conflictList.appendChild(conflictItem);
         });
@@ -878,6 +878,15 @@
             btn.addEventListener('click', function(e) {
                 e.stopPropagation();
                 const index = parseInt(this.getAttribute('data-index'));
+                showMergePreviewModal(conflicts[index]);
+            });
+        });
+        conflictList.querySelectorAll('.smart-merge-btn').forEach(function(btn) {
+            btn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                const index = parseInt(this.getAttribute('data-index'), 10);
+                const mergeInput = document.querySelector('input[name="conflict-' + index + '"][value="merge"]');
+                if (mergeInput) mergeInput.checked = true;
                 showMergePreviewModal(conflicts[index]);
             });
         });
@@ -3200,7 +3209,7 @@
             '<div id="findStatus" style="font-size:12px;color:' + secondaryTextColor + ';"></div>' +
             '<div id="wasmSearchPanel" style="margin-top:12px;border-top:1px solid ' + borderColor + ';padding-top:10px;display:none;">' +
                 '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">' +
-                    '<span style="font-size:12px;color:' + secondaryTextColor + ';">' + (isEn() ? 'Cross-file search (WASM)' : '跨文件搜索（WASM）') + '</span>' +
+                    '<span style="font-size:12px;color:' + secondaryTextColor + ';">' + (isEn() ? 'Cross-file search' : '跨文件搜索') + '</span>' +
                     '<button id="wasmSearchBtn" style="padding:4px 10px;background:' + (nightMode ? '#3d3d3d' : '#f0f0f0') + ';color:' + textColor + ';border:1px solid ' + borderColor + ';border-radius:6px;cursor:pointer;font-size:12px;">' + (isEn() ? 'Search Files' : '搜索文件') + '</button>' +
                 '</div>' +
                 '<div id="wasmSearchResults" style="max-height:180px;overflow:auto;font-size:12px;"></div>' +
@@ -3314,9 +3323,96 @@
         const wasmSearchResults = dialog.querySelector('#wasmSearchResults');
 
         const gateway = global.wasmTextEngineGateway;
-        const wasmAvailable = gateway && typeof gateway.ensureReady === 'function' && gateway.getStatus && gateway.getStatus().enabled;
-        if (wasmAvailable && wasmSearchPanel) {
-            wasmSearchPanel.style.display = 'block';
+        const smartEngineAvailable = gateway && typeof gateway.ensureReady === 'function';
+        if (wasmSearchPanel) wasmSearchPanel.style.display = 'block';
+
+        function normalizeForSearch(text, caseSensitive) {
+            const source = String(text || '');
+            return caseSensitive ? source : source.toLocaleLowerCase();
+        }
+
+        function jsFindInText(text, query, options) {
+            const sourceText = String(text || '');
+            const keyword = String(query || '');
+            if (!keyword) return { code: 200, message: 'ok', data: { query: '', count: 0, matches: [] } };
+            const opts = options || {};
+            const source = normalizeForSearch(sourceText, !!opts.caseSensitive);
+            const needle = normalizeForSearch(keyword, !!opts.caseSensitive);
+            const out = [];
+            let startAt = 0;
+            while (startAt <= source.length) {
+                const idx = source.indexOf(needle, startAt);
+                if (idx === -1) break;
+                const end = idx + keyword.length;
+                out.push({
+                    start: idx,
+                    end: end,
+                    snippet: sourceText.slice(Math.max(0, idx - 30), Math.min(sourceText.length, end + 30))
+                });
+                startAt = idx + Math.max(1, keyword.length);
+            }
+            return { code: 200, message: 'ok', data: { query: keyword, count: out.length, matches: out } };
+        }
+
+        function jsSearchFilesDetailed(query, options) {
+            const rows = [];
+            let totalMatches = 0;
+            (g('files') || []).forEach(function(file) {
+                if (!file || file.type !== 'file') return;
+                const res = jsFindInText(file.content || '', query || '', options || {});
+                const list = res && res.data && Array.isArray(res.data.matches) ? res.data.matches : [];
+                if (list.length === 0) return;
+                const hits = list.map(function(hit, index) {
+                    return { index: index, start: hit.start, end: hit.end, snippet: hit.snippet || '' };
+                });
+                totalMatches += hits.length;
+                rows.push({ docId: String(file.id), filename: file.name || '', matchCount: hits.length, hits: hits });
+            });
+            return { code: 200, message: 'ok', data: { query: query || '', files: rows, fileCount: rows.length, totalMatches: totalMatches } };
+        }
+
+        async function smartFindInText(text, query, options) {
+            if (smartEngineAvailable) {
+                const readyRes = await gateway.ensureReady();
+                if (readyRes && readyRes.code === 200) {
+                    const engineRes = gateway.findInText(text || '', query || '', options || {});
+                    if (engineRes && engineRes.code === 200 && engineRes.data && Array.isArray(engineRes.data.matches)) {
+                        return engineRes;
+                    }
+                }
+            }
+            return jsFindInText(text || '', query || '', options || {});
+        }
+
+        async function smartSearchFilesDetailed(query, options) {
+            if (smartEngineAvailable) {
+                const readyRes = await gateway.ensureReady();
+                if (readyRes && readyRes.code === 200) {
+                    const engineRes = gateway.searchFilesDetailed(query || '', options || {});
+                    if (engineRes && engineRes.code === 200 && engineRes.data) return engineRes;
+                }
+            }
+            return jsSearchFilesDetailed(query || '', options || {});
+        }
+
+        async function smartReplaceAll(text, query, replacement, options) {
+            if (smartEngineAvailable) {
+                const readyRes = await gateway.ensureReady();
+                if (readyRes && readyRes.code === 200) {
+                    const engineRes = gateway.replaceAllText(text || '', query || '', replacement || '', options || {});
+                    if (engineRes && engineRes.code === 200 && engineRes.data) return engineRes;
+                }
+            }
+            const sourceText = String(text || '');
+            const keyword = String(query || '');
+            if (!keyword) return { code: 200, message: 'ok', data: { text: sourceText, replaced: 0 } };
+            const findRes = jsFindInText(sourceText, keyword, options || {});
+            const count = findRes && findRes.data ? (findRes.data.count || 0) : 0;
+            if (count === 0) return { code: 200, message: 'ok', data: { text: sourceText, replaced: 0 } };
+            const caseSensitive = !!(options && options.caseSensitive);
+            const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const flags = caseSensitive ? 'g' : 'gi';
+            return { code: 200, message: 'ok', data: { text: sourceText.replace(new RegExp(escaped, flags), replacement || ''), replaced: count } };
         }
 
         function getCurrentEditorText() {
@@ -3340,11 +3436,6 @@
         setTimeout(() => findInput.focus(), 100);
         // 执行查找
         async function performFind() {
-            if (!wasmAvailable) {
-                findStatus.textContent = isEn() ? 'WASM unavailable' : 'WASM 不可用';
-                findStatus.style.color = '#dc3545';
-                return;
-            }
             searchText = findInput.value.trim();
             if (!searchText) {
                 findStatus.textContent = '';
@@ -3353,14 +3444,7 @@
                 return;
             }
 
-            const readyRes = await gateway.ensureReady();
-            if (!readyRes || readyRes.code !== 200) {
-                findStatus.textContent = escapeHtml((readyRes && readyRes.message) || (isEn() ? 'WASM unavailable' : 'WASM 不可用'));
-                findStatus.style.color = '#dc3545';
-                return;
-            }
-
-            const res = gateway.findInText(getCurrentEditorText(), searchText, { caseSensitive: false });
+            const res = await smartFindInText(getCurrentEditorText(), searchText, { caseSensitive: false });
             matches = (res && res.code === 200 && res.data && Array.isArray(res.data.matches)) ? res.data.matches : [];
             if (matches.length === 0) {
                 findStatus.textContent = isEn() ? 'No matches found' : '未找到匹配内容';
@@ -3392,7 +3476,7 @@
                 html += '<div style="padding:6px 8px;border:1px solid ' + borderColor + ';border-radius:6px;margin-bottom:8px;">' +
                     '<div style="font-weight:600;">' + escapeHtml(item.filename || '') + ' (' + item.matchCount + ')</div>';
                 (item.hits || []).forEach(function(hit) {
-                    html += '<div class="wasm-search-hit" data-file-id="' + String(item.docId) + '" data-start="' + hit.start + '" data-end="' + hit.end + '" style="margin-top:5px;padding:5px 6px;border-radius:5px;background:' + (nightMode ? '#3a3a3a' : '#f6f6f6') + ';cursor:pointer;max-height:66px;overflow:auto;">' +
+                    html += '<div class="cross-search-hit" data-file-id="' + String(item.docId) + '" data-start="' + hit.start + '" data-end="' + hit.end + '" style="margin-top:5px;padding:5px 6px;border-radius:5px;background:' + (nightMode ? '#3a3a3a' : '#f6f6f6') + ';cursor:pointer;white-space:pre-wrap;word-break:break-word;">' +
                         escapeHtml(hit.snippet || '') +
                     '</div>';
                 });
@@ -3400,7 +3484,7 @@
             });
             wasmSearchResults.innerHTML = html;
 
-            wasmSearchResults.querySelectorAll('.wasm-search-hit').forEach(function(el) {
+            wasmSearchResults.querySelectorAll('.cross-search-hit').forEach(function(el) {
                 el.addEventListener('click', async function() {
                     const fileId = this.getAttribute('data-file-id');
                     const start = parseInt(this.getAttribute('data-start') || '0', 10);
@@ -3417,22 +3501,13 @@
         }
 
         async function runWasmSearch() {
-            if (!wasmAvailable) return;
             const keyword = findInput.value.trim();
             if (!keyword) {
                 if (wasmSearchResults) wasmSearchResults.innerHTML = '';
                 return;
             }
 
-            const initRes = await gateway.ensureReady();
-            if (!initRes || initRes.code !== 200) {
-                if (wasmSearchResults) {
-                    wasmSearchResults.innerHTML = '<div style="color:#dc3545;">' + (isEn() ? 'WASM unavailable' : 'WASM 不可用') + '</div>';
-                }
-                return;
-            }
-
-            const res = gateway.searchFilesDetailed(keyword, { caseSensitive: false });
+            const res = await smartSearchFilesDetailed(keyword, { caseSensitive: false });
             if (!res || res.code !== 200) {
                 if (wasmSearchResults) {
                     wasmSearchResults.innerHTML = '<div style="color:#dc3545;">' + escapeHtml((res && res.message) || (isEn() ? 'Search failed' : '搜索失败')) + '</div>';
@@ -3579,7 +3654,7 @@
             const replaceText = replaceInput.value;
             const vditor = g('vditor');
             if (!vditor) return;
-            const replaceRes = gateway.replaceAllText(vditor.getValue() || '', searchText, replaceText, { caseSensitive: false });
+            const replaceRes = await smartReplaceAll(vditor.getValue() || '', searchText, replaceText, { caseSensitive: false });
             if (!replaceRes || replaceRes.code !== 200 || !replaceRes.data) return;
             vditor.setValue(replaceRes.data.text || '', true);
             findStatus.textContent = (isEn() ? 'Replaced ' : '已替换 ') + (replaceRes.data.replaced || 0) + (isEn() ? ' occurrences' : ' 处');
