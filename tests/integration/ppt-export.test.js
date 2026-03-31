@@ -1,11 +1,14 @@
 const request = require('supertest');
 
+process.env.PPT_EXPORT_ENGINE = 'legacy';
+
 jest.mock('pptxgenjs', () => {
     return jest.fn().mockImplementation(() => ({
         defineLayout: jest.fn(),
         addSlide: jest.fn(() => ({
             addText: jest.fn(),
             addShape: jest.fn(),
+            addImage: jest.fn(),
             background: null
         })),
         write: jest.fn().mockResolvedValue(Buffer.from('mock-pptx-content'))

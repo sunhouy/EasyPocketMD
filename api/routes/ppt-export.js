@@ -2,6 +2,9 @@ const express = require('express');
 const router = express.Router();
 const PptxGenJS = require('pptxgenjs');
 
+const DEFAULT_EXPORT_ENGINE = process.env.PPT_EXPORT_ENGINE || (process.env.NODE_ENV === 'test' ? 'legacy' : 'browser');
+let browserInstancePromise = null;
+
 /**
  * PPT 导出 API
  * 接收前端传来的 PPT 数据，使用 pptxgenjs 在服务端生成 PPT 文件
@@ -11,6 +14,7 @@ const PptxGenJS = require('pptxgenjs');
 router.post('/', async (req, res) => {
     try {
         const { topic, pages, outline, ratio = '16:9' } = req.body;
+        const exportEngine = resolveExportEngine(req.body && req.body.engine);
 
         if (!pages || !Array.isArray(pages) || pages.length === 0) {
             return res.status(400).json({
@@ -44,9 +48,12 @@ router.post('/', async (req, res) => {
             // 创建新幻灯片
             const slide = pptx.addSlide();
 
-            // 解析 HTML 内容并转换为 PPT 元素
+            // 优先使用浏览器渲染导出（样式一致性更高），失败回退 legacy 解析
             if (pageHtml) {
-                await addHtmlToSlide(slide, pageHtml, pageOutline, ratio);
+                const rendered = await addBrowserRenderedSlide(slide, pageHtml, ratio, exportEngine);
+                if (!rendered) {
+                    await addHtmlToSlide(slide, pageHtml, pageOutline, ratio);
+                }
             } else {
                 // 空白页或待生成页面
                 addPlaceholderSlide(slide, pageOutline, i + 1, ratio);
@@ -68,6 +75,134 @@ router.post('/', async (req, res) => {
             code: 500,
             message: '服务器内部错误: ' + error.message
         });
+    }
+});
+
+function resolveExportEngine(requestedEngine) {
+    const candidate = (requestedEngine || DEFAULT_EXPORT_ENGINE || '').toString().toLowerCase();
+    return candidate === 'browser' ? 'browser' : 'legacy';
+}
+
+function getSlideSize(ratio) {
+    return ratio === '16:9'
+        ? { width: 10, height: 5.625 }
+        : { width: 10, height: 7.5 };
+}
+
+async function addBrowserRenderedSlide(slide, html, ratio, exportEngine) {
+    if (exportEngine !== 'browser') return false;
+
+    try {
+        const screenshotData = await renderHtmlToPngDataUrl(html, ratio);
+        const { width, height } = getSlideSize(ratio);
+        slide.addImage({
+            data: screenshotData,
+            x: 0,
+            y: 0,
+            w: width,
+            h: height
+        });
+        return true;
+    } catch (error) {
+        console.error('PPT browser render failed, fallback to legacy engine:', error.message);
+        return false;
+    }
+}
+
+async function renderHtmlToPngDataUrl(rawHtml, ratio) {
+    const chromium = getPlaywrightChromium();
+    const browser = await getBrowserInstance(chromium);
+    const page = await browser.newPage({
+        viewport: ratio === '16:9'
+            ? { width: 1600, height: 900 }
+            : { width: 1200, height: 900 }
+    });
+
+    try {
+        const normalizedHtml = normalizeHtmlInput(rawHtml);
+        const wrapped = wrapSlideHtml(normalizedHtml, ratio);
+        await page.setContent(wrapped, { waitUntil: 'networkidle' });
+
+        // 等待字体和布局稳定，避免截图抖动
+        await page.evaluate(async () => {
+            if (document.fonts && document.fonts.ready) {
+                await document.fonts.ready;
+            }
+        });
+
+        const node = await page.$('#ppt-slide-root');
+        if (!node) {
+            throw new Error('render root not found');
+        }
+        const imageBuffer = await node.screenshot({ type: 'png' });
+        return `data:image/png;base64,${imageBuffer.toString('base64')}`;
+    } finally {
+        await page.close();
+    }
+}
+
+function wrapSlideHtml(innerHtml, ratio) {
+    const size = ratio === '16:9'
+        ? { width: 1600, height: 900 }
+        : { width: 1200, height: 900 };
+
+    return `<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: ${size.width}px;
+      height: ${size.height}px;
+      overflow: hidden;
+      background: #ffffff;
+      font-family: "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", Arial, sans-serif;
+    }
+    #ppt-slide-root {
+      width: ${size.width}px;
+      height: ${size.height}px;
+      overflow: hidden;
+      box-sizing: border-box;
+      position: relative;
+    }
+    #ppt-slide-root *, #ppt-slide-root *::before, #ppt-slide-root *::after {
+      box-sizing: border-box;
+    }
+  </style>
+</head>
+<body>
+  <div id="ppt-slide-root">${innerHtml}</div>
+</body>
+</html>`;
+}
+
+function getPlaywrightChromium() {
+    try {
+        return require('playwright').chromium;
+    } catch (error) {
+        throw new Error('playwright not installed. Run: npm install playwright && npx playwright install chromium');
+    }
+}
+
+async function getBrowserInstance(chromium) {
+    if (!browserInstancePromise) {
+        browserInstancePromise = chromium.launch({
+            headless: true,
+            args: ['--no-sandbox', '--disable-setuid-sandbox']
+        });
+    }
+    return browserInstancePromise;
+}
+
+process.on('exit', async () => {
+    if (!browserInstancePromise) return;
+    try {
+        const browser = await browserInstancePromise;
+        await browser.close();
+    } catch (e) {
+        // ignore shutdown errors
     }
 });
 
@@ -393,8 +528,7 @@ function isDarkColor(hexColor) {
  * 添加空白占位幻灯片
  */
 function addPlaceholderSlide(slide, outline, pageNum, ratio) {
-    const slideWidth = ratio === '16:9' ? 10 : 10;
-    const slideHeight = ratio === '16:9' ? 5.625 : 7.5;
+    const { width: slideWidth, height: slideHeight } = getSlideSize(ratio);
 
     slide.background = { color: 'F5F5F5' };
 
