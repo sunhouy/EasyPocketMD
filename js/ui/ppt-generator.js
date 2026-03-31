@@ -536,70 +536,236 @@ ${userOutline ? '用户提供的参考大纲：\n' + userOutline + '\n\n' : ''}
         var textColor = scheme.textColor;
         var subtitleColor = scheme.subtitleColor;
         var accentColor = scheme.accentColor;
-        
-        var prompt = `第${page.number}页：${pageTitle}
-${page.content.map((c, i) => '要点' + (i + 1) + '：' + c).join('\n')}
 
-生成本页PPT，${aspectRatio}比例，返回HTML格式。
+        var prompt = buildPageJsonPrompt(page, pageTitle, aspectRatio, {
+            bgColor: bgColor,
+            textColor: textColor,
+            subtitleColor: subtitleColor,
+            accentColor: accentColor,
+            schemeName: scheme.name
+        });
 
-样式设计要求（必须使用丰富的CSS样式）：
-1. 背景设计：
-   - 使用渐变背景（linear-gradient）或纯色背景
-   - 可以添加装饰性元素（如左上角/右下角色块、线条等）
-   - 背景色参考：${bgColor}
+        var aiResult = await callAIAPI(prompt, '');
+        var pageJson = parsePptPageJson(aiResult, page, pageTitle, index);
+        var html = renderPageFromJson(pageJson, {
+            bgColor: bgColor,
+            textColor: textColor,
+            subtitleColor: subtitleColor,
+            accentColor: accentColor,
+            schemeName: scheme.name
+        });
 
-2. 标题样式：
-   - 使用大字号（4vw-6vw），粗体
-   - 添加文字阴影或底部边框装饰
-   - 颜色：${textColor}
-   - 可以添加图标或装饰符号
-
-3. 内容区域：
-   - 使用卡片式布局或分栏布局
-   - 每个要点使用独立的样式块
-   - 添加圆角（border-radius: 8px-16px）
-   - 添加阴影效果（box-shadow）
-   - 使用图标（如●、▸、→、★等）作为列表标记
-
-4. 配色方案：${scheme.name}
-   - 主背景：${bgColor}
-   - 主文字：${textColor}
-   - 副标题/说明文字：${subtitleColor}
-   - 强调色：${accentColor}
-
-5. 布局要求：
-   - 使用Flexbox或Grid布局
-   - 内容居中对齐或合理分布
-   - 适当的间距（margin/padding使用百分比或vw/vh）
-   - 确保内容不溢出，不使用滚动条
-
-6. 视觉效果：
-   - 添加过渡动画（hover效果）
-   - 使用渐变文字或背景
-   - 添加装饰性边框或分隔线
-   - 使用Font Awesome图标类（如fas fa-star等）
-
-7. 技术规范：
-   - 使用相对单位（vw, vh, %）
-   - 所有容器使用box-sizing: border-box
-   - 不要使用固定像素值
-   - 确保内容完整显示在页面内
-
-示例格式：
-&lt;div style="width:100%;height:100%;padding:6%;box-sizing:border-box;background:linear-gradient(135deg, ${bgColor} 0%, ${subtitleColor}20 100%);display:flex;flex-direction:column;justify-content:center;"&gt;
-  &lt;h1 style="font-size:5vw;font-weight:bold;color:${textColor};text-align:center;margin:0 0 4% 0;text-shadow:2px 2px 4px rgba(0,0,0,0.1);"&gt;标题&lt;/h1&gt;
-  &lt;div style="display:flex;flex-direction:column;gap:3%;"&gt;
-    &lt;div style="background:rgba(255,255,255,0.1);padding:3%;border-radius:12px;border-left:4px solid ${accentColor};"&gt;
-      &lt;span style="font-size:2.8vw;color:${textColor};"&gt;▸ 要点内容&lt;/span&gt;
-    &lt;/div&gt;
-  &lt;/div&gt;
-&lt;/div&gt;
-
-直接返回HTML代码，确保样式丰富美观。`;
-
-        var html = await callAIAPI(prompt, '');
-        
         pptState.pages[index] = normalizePptHtml(html);
+    }
+
+    function buildPageJsonPrompt(page, pageTitle, aspectRatio, scheme) {
+        var points = (page.content || []).slice(0, 6).map(function(item, idx) {
+            return '- 要点' + (idx + 1) + ': ' + item;
+        }).join('\n');
+
+        return `你是PPT内容助手。请根据以下信息生成单页内容，必须返回纯 JSON，不要返回 HTML/Markdown/解释。
+
+页面主题：${pageTitle}
+页面要点：
+${points || '- 无'}
+画面比例：${aspectRatio}
+配色参考：${scheme.schemeName}（主色 ${scheme.bgColor}，文字 ${scheme.textColor}，强调 ${scheme.accentColor}）
+
+硬性要求：
+1. 仅输出一个 JSON 对象，不要代码块。
+2. 字段中的文案禁止出现“第x页”“第1页”“第2页”等页码描述。
+3. 文案简洁，每条要点不超过30字。
+4. layout 只能是 "cover"、"content"、"two-column" 之一。
+5. icon 为单个 emoji 或短符号（最多2字符）。
+6. emphasis 为 1-3 条重点短句（每条不超过16字）。
+
+JSON 结构：
+{
+  "layout": "content",
+  "title": "",
+  "subtitle": "",
+  "icon": "",
+  "emphasis": ["", ""],
+  "bullets": ["", ""],
+  "highlights": ["", ""],
+  "leftTitle": "",
+  "leftBullets": ["", ""],
+  "rightTitle": "",
+  "rightBullets": ["", ""]
+}`;
+    }
+
+    function parsePptPageJson(raw, page, fallbackTitle, index) {
+        var fallback = {
+            layout: index === 0 ? 'cover' : 'content',
+            title: sanitizePageText(fallbackTitle || page.title || ''),
+            subtitle: '',
+            icon: index === 0 ? '🎯' : '📌',
+            emphasis: [],
+            bullets: (page.content || []).slice(0, 5).map(sanitizePageText).filter(Boolean),
+            highlights: [],
+            leftTitle: '核心要点',
+            leftBullets: (page.content || []).slice(0, 3).map(sanitizePageText).filter(Boolean),
+            rightTitle: '补充说明',
+            rightBullets: (page.content || []).slice(3, 6).map(sanitizePageText).filter(Boolean)
+        };
+
+        if (!raw || typeof raw !== 'string') return fallback;
+
+        var cleaned = raw.trim()
+            .replace(/^```(?:json)?\s*/i, '')
+            .replace(/\s*```\s*$/i, '');
+
+        var parsed = null;
+        try {
+            parsed = JSON.parse(cleaned);
+        } catch (e) {
+            var start = cleaned.indexOf('{');
+            var end = cleaned.lastIndexOf('}');
+            if (start !== -1 && end !== -1 && end > start) {
+                try {
+                    parsed = JSON.parse(cleaned.slice(start, end + 1));
+                } catch (ignore) {
+                    parsed = null;
+                }
+            }
+        }
+
+        if (!parsed || typeof parsed !== 'object') return fallback;
+
+        var layout = sanitizePageText(readStringField(parsed, ['layout', 'type', 'layoutType'])).toLowerCase();
+        if (layout !== 'cover' && layout !== 'content' && layout !== 'two-column') {
+            layout = fallback.layout;
+        }
+
+        var bullets = readArrayField(parsed, ['bullets', 'points', 'items', '要点']);
+        var emphasis = readArrayField(parsed, ['emphasis', 'keyMessage', '重点']);
+        var highlights = readArrayField(parsed, ['highlights', 'keywords', '亮点']);
+        var leftBullets = readArrayField(parsed, ['leftBullets', 'leftPoints', 'leftItems']);
+        var rightBullets = readArrayField(parsed, ['rightBullets', 'rightPoints', 'rightItems']);
+
+        return {
+            layout: layout,
+            title: sanitizePageText(readStringField(parsed, ['title', '标题'])) || fallback.title,
+            subtitle: sanitizePageText(readStringField(parsed, ['subtitle', 'summary', '副标题'])),
+            icon: normalizePageIcon(readStringField(parsed, ['icon', 'emoji', 'symbol'])) || fallback.icon,
+            emphasis: normalizeTextArray(emphasis, 3),
+            bullets: normalizeTextArray(bullets, 6) || fallback.bullets,
+            highlights: normalizeTextArray(highlights, 4),
+            leftTitle: sanitizePageText(readStringField(parsed, ['leftTitle', 'leftHeader'])) || fallback.leftTitle,
+            leftBullets: normalizeTextArray(leftBullets, 4) || fallback.leftBullets,
+            rightTitle: sanitizePageText(readStringField(parsed, ['rightTitle', 'rightHeader'])) || fallback.rightTitle,
+            rightBullets: normalizeTextArray(rightBullets, 4) || fallback.rightBullets
+        };
+    }
+
+    function renderPageFromJson(pageData, scheme) {
+        var title = escapeHtml(pageData.title || '');
+        var subtitle = escapeHtml(pageData.subtitle || '');
+        var icon = escapeHtml(pageData.icon || '');
+        var emphasis = (pageData.emphasis || []).map(escapeHtml);
+        var bullets = (pageData.bullets || []).map(escapeHtml);
+        var highlights = (pageData.highlights || []).map(escapeHtml);
+        var leftBullets = (pageData.leftBullets || []).map(escapeHtml);
+        var rightBullets = (pageData.rightBullets || []).map(escapeHtml);
+        var base = 'width:100%;height:100%;padding:5.5%;box-sizing:border-box;overflow:hidden;background:linear-gradient(140deg,' + scheme.bgColor + ' 0%,' + scheme.bgColor + 'dd 60%,' + scheme.accentColor + '26 100%);color:' + scheme.textColor + ';font-family:Arial,\'Microsoft YaHei\',sans-serif;';
+
+        if (pageData.layout === 'cover') {
+            return '<div style="' + base + 'display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;gap:2.5%;">'
+                + '<h1 style="margin:0;font-size:5.2vw;line-height:1.2;max-width:90%;">' + (icon ? (icon + ' ') : '') + title + '</h1>'
+                + (subtitle ? '<p style="margin:0;font-size:2.1vw;color:' + scheme.subtitleColor + ';max-width:78%;">' + subtitle + '</p>' : '')
+                + (emphasis.length ? '<div style="display:flex;flex-wrap:wrap;justify-content:center;gap:1.2%;max-width:82%;">' + emphasis.map(function(item) {
+                    return '<span style="padding:0.6% 1.3%;border-radius:10px;background:rgba(255,255,255,0.16);font-size:1.7vw;color:' + scheme.textColor + ';">' + item + '</span>';
+                }).join('') + '</div>' : '')
+                + (highlights.length ? '<div style="display:flex;flex-wrap:wrap;justify-content:center;gap:1.2%;margin-top:2%;">' + highlights.map(function(item) {
+                    return '<span style="padding:0.6% 1.2%;border-radius:999px;background:' + scheme.accentColor + '33;color:' + scheme.textColor + ';font-size:1.6vw;">' + item + '</span>';
+                }).join('') + '</div>' : '')
+                + '</div>';
+        }
+
+        if (pageData.layout === 'two-column') {
+            return '<div style="' + base + 'display:flex;flex-direction:column;">'
+                + '<h1 style="margin:0 0 2.5% 0;font-size:3.6vw;line-height:1.2;">' + (icon ? (icon + ' ') : '') + title + '</h1>'
+                + (emphasis.length ? '<div style="display:flex;flex-wrap:wrap;gap:1.1%;margin:0 0 2.2% 0;">' + emphasis.map(function(item) {
+                    return '<span style="padding:0.45% 1%;border-radius:999px;background:' + scheme.accentColor + '2e;color:' + scheme.textColor + ';font-size:1.55vw;">' + item + '</span>';
+                }).join('') + '</div>' : '')
+                + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:2.2%;height:80%;">'
+                + renderColumnBlock(escapeHtml(pageData.leftTitle || '核心信息'), leftBullets, scheme, icon)
+                + renderColumnBlock(escapeHtml(pageData.rightTitle || '补充信息'), rightBullets, scheme, icon)
+                + '</div>'
+                + '</div>';
+        }
+
+        return '<div style="' + base + 'display:flex;flex-direction:column;">'
+            + '<h1 style="margin:0 0 2.2% 0;font-size:3.8vw;line-height:1.2;">' + (icon ? (icon + ' ') : '') + title + '</h1>'
+            + (subtitle ? '<p style="margin:0 0 2.8% 0;color:' + scheme.subtitleColor + ';font-size:2vw;">' + subtitle + '</p>' : '')
+            + (emphasis.length ? '<div style="display:flex;flex-wrap:wrap;gap:1%;margin:0 0 2.3% 0;">' + emphasis.map(function(item) {
+                return '<span style="padding:0.45% 0.95%;border-radius:8px;background:' + scheme.accentColor + '2e;color:' + scheme.textColor + ';font-size:1.55vw;">' + item + '</span>';
+            }).join('') + '</div>' : '')
+            + '<div style="display:flex;flex-direction:column;gap:1.8%;">'
+            + (bullets.length ? bullets.map(function(item) {
+                return '<div style="display:flex;align-items:flex-start;gap:1.2%;padding:1.4% 1.8%;border-radius:12px;background:rgba(255,255,255,0.14);border-left:0.35vw solid ' + scheme.accentColor + ';">'
+                    + '<span style="font-size:2.1vw;color:' + scheme.accentColor + ';line-height:1;">' + (icon || '▸') + '</span>'
+                    + '<span style="font-size:2.1vw;line-height:1.35;color:' + scheme.textColor + ';">' + item + '</span>'
+                    + '</div>';
+            }).join('') : '<div style="font-size:2.1vw;color:' + scheme.subtitleColor + ';">暂无要点</div>')
+            + '</div>'
+            + '</div>';
+    }
+
+    function renderColumnBlock(title, items, scheme, icon) {
+        var content = items.length ? items.map(function(item) {
+            return '<li style="margin:0 0 1.3% 0;line-height:1.4;font-size:1.85vw;color:' + scheme.textColor + ';">' + item + '</li>';
+        }).join('') : '<li style="font-size:1.85vw;color:' + scheme.subtitleColor + ';">暂无内容</li>';
+        return '<div style="background:rgba(255,255,255,0.14);border:1px solid rgba(255,255,255,0.18);border-radius:14px;padding:4.2% 4.8%;overflow:hidden;">'
+            + '<h3 style="margin:0 0 3% 0;font-size:2.2vw;color:' + scheme.accentColor + ';">' + (icon ? (icon + ' ') : '') + title + '</h3>'
+            + '<ul style="margin:0;padding-left:1.4em;">' + content + '</ul>'
+            + '</div>';
+    }
+
+    function normalizePageIcon(iconText) {
+        var icon = sanitizePageText(iconText || '').trim();
+        if (!icon) return '';
+        // 限制 icon 为短符号，避免模型返回完整短语
+        if (icon.length > 2) {
+            return icon.charAt(0);
+        }
+        return icon;
+    }
+
+    function readStringField(obj, keys) {
+        for (var i = 0; i < keys.length; i++) {
+            if (typeof obj[keys[i]] === 'string') {
+                return obj[keys[i]];
+            }
+        }
+        return '';
+    }
+
+    function readArrayField(obj, keys) {
+        for (var i = 0; i < keys.length; i++) {
+            if (Array.isArray(obj[keys[i]])) {
+                return obj[keys[i]];
+            }
+        }
+        return [];
+    }
+
+    function normalizeTextArray(arr, maxLen) {
+        if (!Array.isArray(arr)) return [];
+        return arr
+            .map(function(item) { return sanitizePageText(String(item || '')); })
+            .filter(Boolean)
+            .slice(0, maxLen || 6);
+    }
+
+    function sanitizePageText(text) {
+        if (!text) return '';
+        return text
+            .replace(/第\s*\d+\s*页[：:]?/gi, '')
+            .replace(/page\s*\d+[：:]?/gi, '')
+            .replace(/\s+/g, ' ')
+            .trim();
     }
 
     // 渲染编辑器页面列表 - 水平排列
