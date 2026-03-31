@@ -67,6 +67,53 @@ std::string toAsciiLower(const std::string& input) {
     return out;
 }
 
+bool isUtf8Continuation(unsigned char ch) {
+    return (ch & 0xC0) == 0x80;
+}
+
+size_t clampUtf8Start(const std::string& text, size_t pos) {
+    if (pos >= text.size()) return text.size();
+    while (pos > 0 && isUtf8Continuation(static_cast<unsigned char>(text[pos]))) {
+        --pos;
+    }
+    return pos;
+}
+
+size_t clampUtf8End(const std::string& text, size_t pos) {
+    if (pos >= text.size()) return text.size();
+    while (pos < text.size() && isUtf8Continuation(static_cast<unsigned char>(text[pos]))) {
+        ++pos;
+    }
+    return pos;
+}
+
+std::string utf8SafeSlice(const std::string& text, size_t start, size_t end) {
+    size_t s = clampUtf8Start(text, std::min(start, text.size()));
+    size_t e = clampUtf8End(text, std::min(end, text.size()));
+    if (e < s) e = s;
+    return text.substr(s, e - s);
+}
+
+std::vector<std::pair<size_t, size_t> > findAllByteRanges(
+    const std::string& text,
+    const std::string& query,
+    bool caseSensitive
+) {
+    std::vector<std::pair<size_t, size_t> > matches;
+    if (query.empty()) return matches;
+
+    const std::string hay = caseSensitive ? text : toAsciiLower(text);
+    const std::string needle = caseSensitive ? query : toAsciiLower(query);
+
+    size_t pos = hay.find(needle, 0);
+    while (pos != std::string::npos) {
+        matches.push_back(std::make_pair(pos, pos + needle.size()));
+        pos = hay.find(needle, pos + 1);
+    }
+
+    return matches;
+}
+
 std::vector<std::string> tokenize(const std::string& text, bool caseSensitive) {
     std::vector<std::string> tokens;
     std::string current;
@@ -363,11 +410,36 @@ std::string WasmTextEngine::search(const std::string& query, int limit, bool cas
         if (i > 0) items << ",";
         std::unordered_map<std::string, std::string>::const_iterator docIt = impl_->docs.find(rows[i].first);
         const std::string& text = docIt != impl_->docs.end() ? docIt->second : std::string();
-        std::string snippet = text.substr(0, 120);
+        std::vector<std::pair<size_t, size_t> > hits = findAllByteRanges(text, query, caseSensitive);
+        std::string snippet;
+        if (!hits.empty()) {
+            const size_t start = (hits[0].first > 24) ? (hits[0].first - 24) : 0;
+            const size_t end = std::min(text.size(), hits[0].second + 24);
+            snippet = utf8SafeSlice(text, start, end);
+        } else {
+            snippet = utf8SafeSlice(text, 0, 120);
+        }
+
+        std::ostringstream hitJson;
+        hitJson << "[";
+        for (size_t h = 0; h < hits.size(); ++h) {
+            if (h > 0) hitJson << ",";
+            const size_t hs = (hits[h].first > 24) ? (hits[h].first - 24) : 0;
+            const size_t he = std::min(text.size(), hits[h].second + 24);
+            hitJson << "{"
+                    << "\"start\":" << hits[h].first << ","
+                    << "\"end\":" << hits[h].second << ","
+                    << "\"snippet\":\"" << jsonEscape(utf8SafeSlice(text, hs, he)) << "\""
+                    << "}";
+        }
+        hitJson << "]";
+
         items << "{"
               << "\"docId\":\"" << jsonEscape(rows[i].first) << "\","
               << "\"score\":" << rows[i].second << ","
-              << "\"snippet\":\"" << jsonEscape(snippet) << "\""
+              << "\"snippet\":\"" << jsonEscape(snippet) << "\","
+              << "\"matchCount\":" << hits.size() << ","
+              << "\"hits\":" << hitJson.str()
               << "}";
     }
     items << "]";
@@ -428,6 +500,72 @@ std::string WasmTextEngine::similarity(const std::string& leftText, const std::s
         << "\"distance\":" << dist
         << "}";
 
+    return out.str();
+}
+
+std::string WasmTextEngine::findInText(const std::string& text, const std::string& query, bool caseSensitive) const {
+    if (query.empty()) {
+        return "{\"query\":\"\",\"matches\":[],\"count\":0}";
+    }
+
+    std::vector<std::pair<size_t, size_t> > hits = findAllByteRanges(text, query, caseSensitive);
+
+    std::ostringstream matches;
+    matches << "[";
+    for (size_t i = 0; i < hits.size(); ++i) {
+        if (i > 0) matches << ",";
+        const size_t hs = (hits[i].first > 24) ? (hits[i].first - 24) : 0;
+        const size_t he = std::min(text.size(), hits[i].second + 24);
+        matches << "{"
+                << "\"start\":" << hits[i].first << ","
+                << "\"end\":" << hits[i].second << ","
+                << "\"snippet\":\"" << jsonEscape(utf8SafeSlice(text, hs, he)) << "\""
+                << "}";
+    }
+    matches << "]";
+
+    std::ostringstream out;
+    out << "{"
+        << "\"query\":\"" << jsonEscape(query) << "\","
+        << "\"count\":" << hits.size() << ","
+        << "\"matches\":" << matches.str()
+        << "}";
+    return out.str();
+}
+
+std::string WasmTextEngine::replaceAllText(
+    const std::string& text,
+    const std::string& query,
+    const std::string& replacement,
+    bool caseSensitive
+) const {
+    if (query.empty()) {
+        std::ostringstream unchanged;
+        unchanged << "{\"text\":\"" << jsonEscape(text) << "\",\"replaced\":0}";
+        return unchanged.str();
+    }
+
+    std::vector<std::pair<size_t, size_t> > hits = findAllByteRanges(text, query, caseSensitive);
+    if (hits.empty()) {
+        std::ostringstream unchanged;
+        unchanged << "{\"text\":\"" << jsonEscape(text) << "\",\"replaced\":0}";
+        return unchanged.str();
+    }
+
+    std::ostringstream rebuilt;
+    size_t cursor = 0;
+    for (size_t i = 0; i < hits.size(); ++i) {
+        rebuilt << text.substr(cursor, hits[i].first - cursor);
+        rebuilt << replacement;
+        cursor = hits[i].second;
+    }
+    rebuilt << text.substr(cursor);
+
+    std::ostringstream out;
+    out << "{"
+        << "\"text\":\"" << jsonEscape(rebuilt.str()) << "\","
+        << "\"replaced\":" << hits.size()
+        << "}";
     return out.str();
 }
 

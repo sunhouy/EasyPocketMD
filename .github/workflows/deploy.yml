@@ -15,6 +15,10 @@ on:
 permissions:
   contents: write
 
+env:
+  NODE_VERSION: '20'
+  REMOTE_NODE_BIN: '/www/server/nodejs/v24.14.1/bin'
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -25,7 +29,7 @@ jobs:
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '24'
+        node-version: ${{ env.NODE_VERSION }}
 
     - name: Setup Emscripten
       run: |
@@ -39,7 +43,7 @@ jobs:
         echo "$HOME/emsdk/upstream/emscripten" >> "$GITHUB_PATH"
 
     - name: Install dependencies
-      run: npm install
+      run: npm ci
 
     - name: Build WASM text engine
       run: npm run wasm:text:build
@@ -62,7 +66,7 @@ jobs:
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '24'
+        node-version: ${{ env.NODE_VERSION }}
 
 
     - name: Setup Emscripten
@@ -82,7 +86,7 @@ jobs:
         rm -rf **/node_modules || true
 
     - name: Install dependencies
-      run: npm install
+      run: npm ci
 
     - name: Build WASM text engine
       run: npm run wasm:text:build
@@ -140,7 +144,7 @@ jobs:
         timeout: 120s
         script: |
           set -e
-          export PATH=$PATH:/www/server/nodejs/v24.14.1/bin
+          export PATH="$PATH:${{ env.REMOTE_NODE_BIN }}"
 
           # 定义目录
           GREEN_DIR="/www/wwwroot/js_green"
@@ -199,7 +203,7 @@ jobs:
         timeout: 600s
         script: |
           set -e
-          export PATH=$PATH:/www/server/nodejs/v24.14.1/bin
+          export PATH="$PATH:${{ env.REMOTE_NODE_BIN }}"
 
           GREEN_DIR="/www/wwwroot/js_green"
           BLUE_DIR="/www/wwwroot/js_blue"
@@ -284,7 +288,8 @@ jobs:
         timeout: 300s
         script: |
           set -e
-          export PATH=$PATH:/www/server/nodejs/v24.14.1/bin
+          export PATH="$PATH:${{ env.REMOTE_NODE_BIN }}"
+          PM2_BIN="${{ env.REMOTE_NODE_BIN }}/pm2"
 
           GREEN_DIR="/www/wwwroot/js_green"
           BLUE_DIR="/www/wwwroot/js_blue"
@@ -321,10 +326,10 @@ jobs:
 
           # 清理所有可能使用旧端口的 md-server 服务
           echo "清理所有旧的 md-server 服务..."
-          /www/server/nodejs/v24.14.1/bin/pm2 stop md-server-green 2>/dev/null || true
-          /www/server/nodejs/v24.14.1/bin/pm2 delete md-server-green 2>/dev/null || true
-          /www/server/nodejs/v24.14.1/bin/pm2 stop md-server-blue 2>/dev/null || true
-          /www/server/nodejs/v24.14.1/bin/pm2 delete md-server-blue 2>/dev/null || true
+          "$PM2_BIN" stop md-server-green 2>/dev/null || true
+          "$PM2_BIN" delete md-server-green 2>/dev/null || true
+          "$PM2_BIN" stop md-server-blue 2>/dev/null || true
+          "$PM2_BIN" delete md-server-blue 2>/dev/null || true
           sleep 3
 
           # 确保端口 3001 被释放（杀死占用进程）
@@ -364,7 +369,7 @@ jobs:
           export PPT_EXPORT_ENGINE=browser
           export PLAYWRIGHT_BROWSERS_PATH=/www/wwwroot/js_shared/ms-playwright
 
-          /www/server/nodejs/v24.14.1/bin/pm2 start api/server.js --name "$NEXT_NAME" --env production
+          "$PM2_BIN" start api/server.js --name "$NEXT_NAME" --env production
 
           # 等待服务启动
           echo "等待服务启动..."
@@ -429,14 +434,14 @@ jobs:
           # 停止旧服务（如果还有的话）
           if [ -n "$CURRENT_NAME" ]; then
             echo "检查并停止旧服务: $CURRENT_NAME"
-            /www/server/nodejs/v24.14.1/bin/pm2 stop "$CURRENT_NAME" 2>/dev/null || true
-            /www/server/nodejs/v24.14.1/bin/pm2 delete "$CURRENT_NAME" 2>/dev/null || true
+            "$PM2_BIN" stop "$CURRENT_NAME" 2>/dev/null || true
+            "$PM2_BIN" delete "$CURRENT_NAME" 2>/dev/null || true
           fi
 
-          /www/server/nodejs/v24.14.1/bin/pm2 save
+          "$PM2_BIN" save
 
           echo "✓ 零停机部署完成！"
-          /www/server/nodejs/v24.14.1/bin/pm2 list
+          "$PM2_BIN" list
 
     - name: Setup and start print server (zero-downtime)
       uses: appleboy/ssh-action@master
@@ -447,7 +452,8 @@ jobs:
         timeout: 300s
         script: |
           set -e
-          export PATH=$PATH:/www/server/nodejs/v24.14.1/bin
+          export PATH="$PATH:${{ env.REMOTE_NODE_BIN }}"
+          PM2_BIN="${{ env.REMOTE_NODE_BIN }}/pm2"
 
           LINK_PATH="/www/wwwroot/js"
           if [ -L "$LINK_PATH" ]; then
@@ -486,13 +492,13 @@ jobs:
 
           # 零停机重启打印服务器
           echo "零停机重启打印服务器..."
-          if /www/server/nodejs/v24.14.1/bin/pm2 describe print-server > /dev/null 2>&1; then
-            /www/server/nodejs/v24.14.1/bin/pm2 reload print-server --update-env
+          if "$PM2_BIN" describe print-server > /dev/null 2>&1; then
+            "$PM2_BIN" reload print-server --update-env
           else
-            /www/server/nodejs/v24.14.1/bin/pm2 start print_server.py --name "print-server" --interpreter "$VENV_PYTHON" -- --host 0.0.0.0 --port 3060
+            "$PM2_BIN" start print_server.py --name "print-server" --interpreter "$VENV_PYTHON" -- --host 0.0.0.0 --port 3060
           fi
 
-          /www/server/nodejs/v24.14.1/bin/pm2 save
+          "$PM2_BIN" save
           echo "✓ 打印服务器热更新完成！"
 
     - name: Final cleanup
@@ -510,7 +516,7 @@ jobs:
           echo "=========================================="
           echo "✓ 零停机部署成功完成！"
           echo "=========================================="
-          /www/server/nodejs/v24.14.1/bin/pm2 list
+          "${{ env.REMOTE_NODE_BIN }}/pm2" list
 
   # 检查打印客户端文件是否变更
   check-print-changes:

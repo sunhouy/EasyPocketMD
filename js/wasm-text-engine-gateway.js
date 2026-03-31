@@ -126,6 +126,23 @@
         return true;
     }
 
+    async function ensureReady() {
+        if (isUsable()) return { code: 200, message: 'ready' };
+        return init();
+    }
+
+    function byteOffsetToUtf16Index(text, byteOffset) {
+        try {
+            const encoder = new TextEncoder();
+            const decoder = new TextDecoder();
+            const bytes = encoder.encode(text || '');
+            const end = Math.max(0, Math.min(byteOffset || 0, bytes.length));
+            return decoder.decode(bytes.slice(0, end)).length;
+        } catch (e) {
+            return Math.max(0, Math.min(byteOffset || 0, (text || '').length));
+        }
+    }
+
     function diff(leftText, rightText) {
         if (!isUsable()) return null;
 
@@ -175,11 +192,90 @@
         return state.client.search(query || '', options || {});
     }
 
+    function findInText(text, query, options) {
+        if (!isUsable()) return { code: 500, message: 'wasm find unavailable' };
+        const res = state.client.findInText(text || '', query || '', options || {});
+        if (!res || res.code !== 200 || !res.data) return res;
+
+        const normalized = {
+            query: res.data.query || query || '',
+            count: Number(res.data.count || 0),
+            matches: []
+        };
+
+        const raw = Array.isArray(res.data.matches) ? res.data.matches : [];
+        raw.forEach(function(item) {
+            const startByte = Number(item.start || 0);
+            const endByte = Number(item.end || startByte);
+            normalized.matches.push({
+                start: byteOffsetToUtf16Index(text || '', startByte),
+                end: byteOffsetToUtf16Index(text || '', endByte),
+                snippet: item.snippet || ''
+            });
+        });
+
+        normalized.count = normalized.matches.length;
+        return { code: 200, message: 'ok', data: normalized };
+    }
+
+    function replaceAllText(text, query, replacement, options) {
+        if (!isUsable()) return { code: 500, message: 'wasm replace unavailable' };
+        return state.client.replaceAllText(text || '', query || '', replacement || '', options || {});
+    }
+
+    function searchFilesDetailed(query, options) {
+        if (!isUsable()) return { code: 500, message: 'wasm search unavailable' };
+
+        const files = Array.isArray(global.files) ? global.files : [];
+        const results = [];
+        let totalMatches = 0;
+
+        files.forEach(function(file) {
+            if (!file || file.type !== 'file') return;
+            const res = findInText(file.content || '', query || '', options || {});
+            if (!res || res.code !== 200 || !res.data || !Array.isArray(res.data.matches) || res.data.matches.length === 0) {
+                return;
+            }
+
+            const hits = res.data.matches.map(function(hit, idx) {
+                return {
+                    index: idx,
+                    start: hit.start,
+                    end: hit.end,
+                    snippet: hit.snippet || ''
+                };
+            });
+
+            totalMatches += hits.length;
+            results.push({
+                docId: String(file.id),
+                filename: file.name || '',
+                matchCount: hits.length,
+                hits: hits
+            });
+        });
+
+        return {
+            code: 200,
+            message: 'ok',
+            data: {
+                query: query || '',
+                files: results,
+                fileCount: results.length,
+                totalMatches: totalMatches
+            }
+        };
+    }
+
     global.wasmTextEngineGateway = {
         init: init,
+        ensureReady: ensureReady,
         diff: diff,
         merge3: merge3,
         searchFiles: searchFiles,
+        searchFilesDetailed: searchFilesDetailed,
+        findInText: findInText,
+        replaceAllText: replaceAllText,
         getStatus: function() {
             return {
                 enabled: getEnabledFlag(),

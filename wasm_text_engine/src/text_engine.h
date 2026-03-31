@@ -25,6 +25,13 @@ public:
 
     std::string analyze(const std::string& text) const;
     std::string similarity(const std::string& leftText, const std::string& rightText) const;
+    std::string findInText(const std::string& text, const std::string& query, bool caseSensitive) const;
+    std::string replaceAllText(
+        const std::string& text,
+        const std::string& query,
+        const std::string& replacement,
+        bool caseSensitive
+    ) const;
 
 private:
     struct Impl;
