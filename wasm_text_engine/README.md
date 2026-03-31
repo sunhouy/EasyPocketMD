@@ -81,4 +81,16 @@ localStorage.setItem('vditor_enable_wasm_text_engine', 'true');
 location.reload();
 ```
 
+发布前避免 `404 /wasm_text_engine/text_engine.js`：
+
+```bash
+npm run wasm:text:build
+npm run build
+```
+
+然后确认发布目录包含：
+
+- `dist/wasm_text_engine/text_engine.js`
+- `dist/wasm_text_engine/text_engine.wasm`
+
 

@@ -4,7 +4,9 @@ import { readFileSync, existsSync, writeFileSync, readFile, cpSync } from 'node:
 import { join, resolve } from 'node:path';
 
 const versionPath = join(__dirname, 'version.json');
-const hasWasmTextEngineDist = existsSync(join(__dirname, 'wasm_text_engine', 'dist', 'text_engine.js'));
+const wasmJsPath = join(__dirname, 'wasm_text_engine', 'dist', 'text_engine.js');
+const wasmBinPath = join(__dirname, 'wasm_text_engine', 'dist', 'text_engine.wasm');
+const hasWasmTextEngineDist = existsSync(wasmJsPath) && existsSync(wasmBinPath);
 let cacheVersion = 'v1';
 if (existsSync(versionPath)) {
   try {
@@ -120,6 +122,9 @@ self.addEventListener('fetch', event => {
 
 export default defineConfig({
   base: './',
+  define: {
+    __WASM_TEXT_ENGINE_PRESENT__: JSON.stringify(hasWasmTextEngineDist)
+  },
   server: {
     port: 8080,
     proxy: {
