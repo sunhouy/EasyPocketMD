@@ -33,8 +33,26 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
+
+      - name: Setup Emscripten
+        run: |
+          if [ ! -d "$HOME/emsdk" ]; then
+            git clone https://github.com/emscripten-core/emsdk.git "$HOME/emsdk"
+          fi
+          cd "$HOME/emsdk"
+          ./emsdk install 3.1.57
+          ./emsdk activate 3.1.57
+          echo "$HOME/emsdk" >> "$GITHUB_PATH"
+          echo "$HOME/emsdk/upstream/emscripten" >> "$GITHUB_PATH"
+
       - name: Install dependencies
         run: npm install
+
+      - name: Build WASM text engine
+        run: npm run wasm:text:build
+
+      - name: Verify WASM source artifacts
+        run: npm run wasm:text:verify
 
       - name: Extract version from tag
         id: extract-version
@@ -74,6 +92,9 @@ jobs:
 
       - name: Build web app
         run: npm run build
+
+      - name: Verify WASM packaged in dist
+        run: npm run wasm:text:verify:dist
 
       - name: Add Android platform
         run: |

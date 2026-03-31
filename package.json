@@ -20,7 +20,9 @@
     "cap:build:android": "npm run cap:sync && cd android && ./gradlew assembleRelease",
     "cap:assets": "npx capacitor-assets generate --android",
     "wasm:text:build": "bash wasm_text_engine/scripts/build_wasm.sh",
-    "wasm:text:test": "bash wasm_text_engine/scripts/run_native_tests.sh"
+    "wasm:text:test": "bash wasm_text_engine/scripts/run_native_tests.sh",
+    "wasm:text:verify": "node scripts/verify-wasm-artifacts.js source",
+    "wasm:text:verify:dist": "node scripts/verify-wasm-artifacts.js dist"
   },
   "repository": {
     "type": "git",

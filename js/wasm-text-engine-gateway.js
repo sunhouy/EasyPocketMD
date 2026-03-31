@@ -28,6 +28,13 @@
         console.warn('[wasm-text-engine]', message);
     }
 
+    function isBuildTimeWasmPresent() {
+        if (typeof __WASM_TEXT_ENGINE_PRESENT__ === 'boolean') {
+            return __WASM_TEXT_ENGINE_PRESENT__;
+        }
+        return true;
+    }
+
     async function pickAvailableModulePath(explicitPath) {
         const candidates = explicitPath
             ? [explicitPath]
@@ -64,6 +71,13 @@
         state.enabled = getEnabledFlag();
         if (!state.enabled) {
             return { code: 200, message: 'disabled', data: { enabled: false, ready: false } };
+        }
+
+        if (!isBuildTimeWasmPresent()) {
+            return {
+                code: 500,
+                message: 'WASM artifact was not packaged in this build. Run: npm run wasm:text:build && npm run build'
+            };
         }
 
         if (state.ready) {
