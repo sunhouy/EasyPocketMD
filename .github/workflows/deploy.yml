@@ -43,7 +43,7 @@ jobs:
         echo "$HOME/emsdk/upstream/emscripten" >> "$GITHUB_PATH"
 
     - name: Install dependencies
-      run: npm ci
+      run: npm install --no-audit --no-fund
 
     - name: Build WASM text engine
       run: npm run wasm:text:build
@@ -86,7 +86,7 @@ jobs:
         rm -rf **/node_modules || true
 
     - name: Install dependencies
-      run: npm ci
+      run: npm install --no-audit --no-fund
 
     - name: Build WASM text engine
       run: npm run wasm:text:build
