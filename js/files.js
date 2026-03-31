@@ -246,10 +246,9 @@
     }
 
     // ---------- 服务器同步相关 ----------
-    async function loadFilesFromServer() {
+    async function loadFilesFromServer(preserveFileName) {
         if (!g('currentUser')) return;
         try {
-            global.showSyncStatus(isEn() ? 'Loading files from server...' : '正在从服务器加载文件...');
             await refreshOwnerShareCache(true);
             var api = global.getApiBaseUrl ? global.getApiBaseUrl() : 'api';
             const response = await fetch(api + '/files?username=' + encodeURIComponent(g('currentUser').username), {
@@ -273,7 +272,7 @@
                             name = name.substring(0, name.length - 1);
                         }
                     }
-                    
+
                     return {
                         ...f,
                         name: name,
@@ -296,7 +295,7 @@
                         }
                     }
                 });
-                
+
                 serverFiles.forEach(f => {
                     if (folderPaths.has(f.name)) {
                         f.type = 'folder';
@@ -313,21 +312,61 @@
                 // 这些文件不应弹冲突窗口，应直接上传并保存到用户服务器上。
                 await uploadLocalOnlyFilesToServerIfNeeded(localFiles, serverFiles);
 
+                // 检查是否需要保留当前编辑的文件（登录前正在编辑的文件）
+                // 如果服务器上有同名文件且内容不同，需要弹冲突处理
+                let currentFileConflict = null;
+                if (preserveFileName) {
+                    const serverFile = serverFiles.find(f => f.name === preserveFileName && f.type === 'file');
+                    const localFile = localFiles.find(f => f.name === preserveFileName && f.type === 'file');
+                    if (serverFile && localFile && serverFile.content !== localFile.content) {
+                        // 存在同名文件且内容不同，标记为冲突
+                        currentFileConflict = {
+                            type: 'content',
+                            filename: preserveFileName,
+                            localContent: localFile.content,
+                            serverContent: serverFile.content,
+                            localModified: localFile.lastModified,
+                            serverModified: serverFile.lastModified || Date.now()
+                        };
+                    }
+                }
+
                 const conflicts = detectConflicts(localFiles, serverFiles);
+                if (currentFileConflict) {
+                    // 确保当前文件冲突在冲突列表中
+                    const existingConflict = conflicts.find(c => c.filename === preserveFileName);
+                    if (!existingConflict) {
+                        conflicts.push(currentFileConflict);
+                    }
+                }
+
                 if (conflicts.length > 0) {
-                    showConflictResolution(conflicts, serverFiles);
+                    // 保存 preserveFileName 以便冲突解决后恢复
+                    showConflictResolution(conflicts, serverFiles, preserveFileName);
                 } else {
                     mergeFiles(localFiles, serverFiles);
                     loadFiles();
-                    if (g('files').length > 0) openFirstFile();
-                    else createDefaultFile();
-                    
+
+                    // 如果有指定要保留的文件，尝试打开它
+                    if (preserveFileName) {
+                        const preservedFile = g('files').find(f => f.name === preserveFileName && f.type === 'file');
+                        if (preservedFile) {
+                            openFile(preservedFile.id);
+                        } else if (g('files').length > 0) {
+                            openFirstFile();
+                        } else {
+                            createDefaultFile();
+                        }
+                    } else {
+                        if (g('files').length > 0) openFirstFile();
+                        else createDefaultFile();
+                    }
+
                     // 自动同步待同步列表中的文件（用户强制退出时未同步的文件）
                     // 这些文件已经使用了本地版本，现在立即同步到服务器
                     const pendingServerSync = g('pendingServerSync') || {};
                     const pendingFileIds = Object.keys(pendingServerSync).filter(id => pendingServerSync[id]);
                     if (pendingFileIds.length > 0) {
-                        global.showSyncStatus(isEn() ? 'Auto-syncing...' : '正在自动同步...', 'syncing');
                         setTimeout(() => {
                             (async () => {
                                 for (const fileId of pendingFileIds) {
@@ -337,11 +376,8 @@
                                         console.warn('自动同步文件失败:', fileId, e);
                                     }
                                 }
-                                global.showSyncStatus(isEn() ? 'File sync completed' : '文件同步完成', 'success');
                             })();
                         }, 1000);
-                    } else {
-                        global.showSyncStatus(isEn() ? 'File sync completed' : '文件同步完成', 'success');
                     }
                 }
             } else {
@@ -352,6 +388,101 @@
             console.error('从服务器加载文件失败:', error);
             global.showSyncStatus(isEn() ? 'Sync failed, using local files' : '同步失败，使用本地文件', 'error');
             loadLocalFiles();
+        }
+    }
+
+    function normalizeServerFileRecord(f) {
+        let type = 'file';
+        let content = f.content;
+        let name = (f.name || '').startsWith('/') ? f.name.substring(1) : (f.name || '');
+
+        if (name.endsWith('/') || content === '{"meta":"folder"}' || content === '{"type":"folder"}') {
+            type = 'folder';
+            content = '';
+            if (name.endsWith('/')) name = name.substring(0, name.length - 1);
+        }
+
+        return {
+            ...f,
+            name,
+            type,
+            content,
+            lastModified: f.last_modified || f.lastModified || Date.now()
+        };
+    }
+
+    async function fetchServerFileSnapshot(filename) {
+        if (!g('currentUser') || !filename) return null;
+        const api = global.getApiBaseUrl ? global.getApiBaseUrl() : 'api';
+        const url = api + '/files/content?username=' + encodeURIComponent(g('currentUser').username) + '&filename=' + encodeURIComponent(filename);
+
+        const response = await fetch(url, {
+            method: 'GET',
+            headers: { 'Authorization': 'Bearer ' + g('currentUser').token }
+        });
+        const result = global.parseJsonResponse ? await global.parseJsonResponse(response) : await response.json();
+
+        if (result.code === 404) return null;
+        if (result.code !== 200 || !result.data) throw new Error(result.message || 'Failed to fetch server snapshot');
+
+        return {
+            content: result.data.content || '',
+            lastModified: result.data.last_modified || Date.now()
+        };
+    }
+
+    async function pullServerUpdatesForCleanFiles() {
+        if (!g('currentUser')) return;
+
+        const files = g('files') || [];
+        const currentFileId = g('currentFileId');
+        const vditor = g('vditor');
+        const lastSyncedContent = g('lastSyncedContent') || {};
+        const unsavedChanges = g('unsavedChanges') || {};
+        const pendingServerSync = g('pendingServerSync') || {};
+
+        const api = global.getApiBaseUrl ? global.getApiBaseUrl() : 'api';
+        const response = await fetch(api + '/files?username=' + encodeURIComponent(g('currentUser').username), {
+            method: 'GET',
+            headers: { 'Authorization': 'Bearer ' + g('currentUser').token }
+        });
+        const result = global.parseJsonResponse ? await global.parseJsonResponse(response) : await response.json();
+        if (result.code !== 200 || !result.data || !Array.isArray(result.data.files)) return;
+
+        const serverMap = {};
+        result.data.files.map(normalizeServerFileRecord).forEach(function(sf) {
+            serverMap[sf.name] = sf;
+        });
+
+        let hasLocalUpdate = false;
+        files.forEach(function(file) {
+            if (!file || file.type !== 'file') return;
+            if (pendingServerSync[file.id]) return;
+
+            const serverFile = serverMap[file.name];
+            if (!serverFile || serverFile.type !== 'file') return;
+
+            const editorContent = (vditor && file.id === currentFileId) ? vditor.getValue() : file.content;
+            const baseContent = lastSyncedContent[file.id];
+            const hasLocalChanges = !file.isSynced || unsavedChanges[file.id] || editorContent !== baseContent;
+            if (hasLocalChanges) return;
+
+            if (serverFile.content !== editorContent) {
+                file.content = serverFile.content;
+                file.lastModified = serverFile.lastModified || Date.now();
+                file.isSynced = true;
+                lastSyncedContent[file.id] = serverFile.content;
+                unsavedChanges[file.id] = false;
+                if (vditor && file.id === currentFileId) {
+                    vditor.setValue(serverFile.content);
+                }
+                hasLocalUpdate = true;
+            }
+        });
+
+        if (hasLocalUpdate) {
+            localStorage.setItem('vditor_files', JSON.stringify(files));
+            global.showSyncStatus(isEn() ? 'Updated local files from server changes' : '已拉取服务器更新到本地', 'success');
         }
     }
 
@@ -703,7 +834,7 @@
     // 暴露到全局以便冲突模态窗口调用
     global.showDiffModal = showDiffModal;
 
-    function showConflictResolution(conflicts, serverFiles) {
+    function showConflictResolution(conflicts, serverFiles, preserveFileName) {
         const conflictModal = document.getElementById('conflictModalOverlay');
         const conflictList = document.getElementById('conflictList');
         if (!conflictModal || !conflictList) return;
@@ -712,14 +843,18 @@
             const conflictItem = document.createElement('div');
             conflictItem.className = 'conflict-option';
 
+            // 如果是当前正在编辑的文件，高亮显示
+            const isCurrentFile = preserveFileName && conflict.filename === preserveFileName;
+            const highlightStyle = isCurrentFile ? 'style="border: 2px solid #007bff; background: #e7f3ff;"' : '';
+
             if (conflict.type === 'delete') {
-                conflictItem.innerHTML = '<div style="flex:1;"><strong style="color: #dc3545;">⚠️ ' + conflict.filename + '</strong><div class="conflict-details"><div style="color: #dc3545;">' + (isEn() ? 'This file has been deleted on the server' : '该文件在服务器上已经删除') + '</div><div>' + (isEn() ? 'Local modified time: ' : '本地修改时间: ') + new Date(conflict.localModified).toLocaleString() + '</div></div><div style="margin-top: 8px;"><label style="margin-right: 15px;"><input type="radio" name="conflict-' + index + '" value="upload">' + (isEn() ? 'Re-upload to server' : '重新上传到服务器') + '</label><label><input type="radio" name="conflict-' + index + '" value="delete" checked>' + (isEn() ? 'Delete local file' : '删除本地文件') + '</label></div></div>';
+                conflictItem.innerHTML = '<div ' + highlightStyle + ' style="flex:1; padding: 8px;"><strong style="color: #dc3545;">' + (isCurrentFile ? '📝 ' : '⚠️ ') + conflict.filename + (isCurrentFile ? ' (' + (isEn() ? 'Currently editing' : '当前正在编辑') + ')' : '') + '</strong><div class="conflict-details"><div style="color: #dc3545;">' + (isEn() ? 'This file has been deleted on the server' : '该文件在服务器上已经删除') + '</div><div>' + (isEn() ? 'Local modified time: ' : '本地修改时间: ') + new Date(conflict.localModified).toLocaleString() + '</div></div><div style="margin-top: 8px;"><label style="margin-right: 15px;"><input type="radio" name="conflict-' + index + '" value="upload">' + (isEn() ? 'Re-upload to server' : '重新上传到服务器') + '</label><label><input type="radio" name="conflict-' + index + '" value="delete" checked>' + (isEn() ? 'Delete local file' : '删除本地文件') + '</label></div></div>';
             } else {
-                conflictItem.innerHTML = '<div style="flex:1;"><strong>' + conflict.filename + '</strong><div class="conflict-details"><div>' + (isEn() ? 'Local modified time: ' : '本地修改时间: ') + new Date(conflict.localModified).toLocaleString() + '</div><div>' + (isEn() ? 'Server modified time: ' : '服务器修改时间: ') + new Date(conflict.serverModified).toLocaleString() + '</div></div><div style="margin-top: 8px;"><label style="margin-right: 15px;"><input type="radio" name="conflict-' + index + '" value="local">' + (isEn() ? 'Use local version' : '使用本地版本') + '</label><label><input type="radio" name="conflict-' + index + '" value="server" checked>' + (isEn() ? 'Use server version' : '使用服务器版本') + '</label></div></div><button class="diff-view-btn" data-index="' + index + '" title="' + (isEn() ? 'View differences' : '查看差异') + '"><i class="fas fa-columns"></i></button>';
+                conflictItem.innerHTML = '<div ' + highlightStyle + ' style="flex:1; padding: 8px;"><strong>' + (isCurrentFile ? '📝 ' : '') + conflict.filename + (isCurrentFile ? ' (' + (isEn() ? 'Currently editing' : '当前正在编辑') + ')' : '') + '</strong><div class="conflict-details"><div>' + (isEn() ? 'Local modified time: ' : '本地修改时间: ') + new Date(conflict.localModified).toLocaleString() + '</div><div>' + (isEn() ? 'Server modified time: ' : '服务器修改时间: ') + new Date(conflict.serverModified).toLocaleString() + '</div></div><div style="margin-top: 8px;"><label style="margin-right: 15px;"><input type="radio" name="conflict-' + index + '" value="local"' + (isCurrentFile ? ' checked' : '') + '>' + (isEn() ? 'Use local version' : '使用本地版本') + '</label><label><input type="radio" name="conflict-' + index + '" value="server"' + (isCurrentFile ? '' : ' checked') + '>' + (isEn() ? 'Use server version' : '使用服务器版本') + '</label></div></div><button class="diff-view-btn" data-index="' + index + '" title="' + (isEn() ? 'View differences' : '查看差异') + '"><i class="fas fa-columns"></i></button>';
             }
             conflictList.appendChild(conflictItem);
         });
-        
+
         // 绑定查看差异按钮事件
         conflictList.querySelectorAll('.diff-view-btn').forEach(function(btn) {
             btn.addEventListener('click', function(e) {
@@ -743,7 +878,7 @@
                 if (serverInput) serverInput.checked = true;
                 if (deleteInput) deleteInput.checked = true;
             });
-            resolveConflicts(conflicts, serverFiles);
+            resolveConflicts(conflicts, serverFiles, preserveFileName);
             global.showMessage(isEn() ? 'Using server version by default' : '已默认使用服务器版本');
         };
 
@@ -753,24 +888,24 @@
             }
         };
 
-        if (resolveBtn) resolveBtn.onclick = function() { 
+        if (resolveBtn) resolveBtn.onclick = function() {
             document.removeEventListener('keydown', handleEsc);
-            resolveConflicts(conflicts, serverFiles); 
-            conflictModal.classList.remove('show'); 
+            resolveConflicts(conflicts, serverFiles, preserveFileName);
+            conflictModal.classList.remove('show');
         };
         if (cancelBtn) cancelBtn.onclick = handleDefaultResolution;
         if (closeBtn) closeBtn.onclick = handleDefaultResolution;
-        
+
         // 点击外部区域关闭
         conflictModal.onclick = function(e) {
             if (e.target === conflictModal) handleDefaultResolution();
         };
-        
+
         // 监听 Esc 键
         document.addEventListener('keydown', handleEsc);
     }
 
-    function resolveConflicts(conflicts, serverFiles) {
+    function resolveConflicts(conflicts, serverFiles, preserveFileName) {
         const localFiles = JSON.parse(localStorage.getItem('vditor_files') || '[]');
         const vditor = g('vditor');
         const currentFileId = g('currentFileId');
@@ -822,9 +957,21 @@
         });
 
         loadFiles();
-        if (g('files').length > 0) openFirstFile();
+
+        // 如果有指定要保留的文件，尝试打开它
+        if (preserveFileName) {
+            const preservedFile = g('files').find(f => f.name === preserveFileName && f.type === 'file');
+            if (preservedFile) {
+                openFile(preservedFile.id);
+            } else if (g('files').length > 0) {
+                openFirstFile();
+            } else {
+                createDefaultFile();
+            }
+        } else {
+            if (g('files').length > 0) openFirstFile();
+        }
         global.showMessage(isEn() ? 'Conflict resolved, files synced' : '冲突已解决，文件已同步');
-        global.showSyncStatus(isEn() ? 'File sync completed' : '文件同步完成', 'success');
     }
 
     function mergeFiles(localFiles, serverFiles) {
@@ -2336,6 +2483,12 @@
 
     async function syncAllFiles() {
         if (!g('currentUser')) return;
+        try {
+            await pullServerUpdatesForCleanFiles();
+        } catch (e) {
+            console.warn('拉取服务器更新失败:', e);
+        }
+
         const files = g('files');
         const currentFileId = g('currentFileId');
         const vditor = g('vditor');
@@ -2347,13 +2500,10 @@
             return pendingServerSync[file.id] || !file.isSynced || currentContent !== lastSyncedContent[file.id];
         });
         if (filesToSync.length === 0) return;
-        global.showSyncStatus(isEn() ? 'Syncing ' + filesToSync.length + ' files...' : '正在同步...');
         try {
             for (var i = 0; i < filesToSync.length; i++) await global.syncFileToServer(filesToSync[i].id);
-            global.showSyncStatus(isEn() ? 'All files synced' : '所有文件同步完成', 'success');
         } catch (error) {
             console.error('同步失败', error);
-            global.showSyncStatus(isEn() ? 'Sync failed' : '同步失败', 'error');
         }
     }
 
@@ -2373,6 +2523,33 @@
             }
         } else {
             content = (g('vditor') && file.id === g('currentFileId') ? g('vditor').getValue() : file.content);
+
+            // 先检查服务器是否已被其他端更新，避免本地静默覆盖远程新内容
+            const baseContent = (g('lastSyncedContent') || {})[fileId];
+            if (baseContent !== undefined) {
+                const serverSnapshot = await fetchServerFileSnapshot(file.name);
+                if (serverSnapshot && serverSnapshot.content !== baseContent) {
+                    if (content !== baseContent) {
+                        markPendingServerSync(fileId, true);
+                        global.showMessage(isEn() ? 'Conflict detected: server has newer content, please resolve it first' : '检测到冲突：服务器有更新内容，请先处理冲突', 'warning');
+                        await loadFilesFromServer(file.name);
+                        return false;
+                    }
+
+                    // 本地未改但服务器已变更：直接拉取服务器版本，保持本地最新
+                    file.content = serverSnapshot.content;
+                    file.lastModified = serverSnapshot.lastModified || Date.now();
+                    file.isSynced = true;
+                    if (g('vditor') && file.id === g('currentFileId')) {
+                        g('vditor').setValue(serverSnapshot.content);
+                    }
+                    localStorage.setItem('vditor_files', JSON.stringify(files));
+                    g('lastSyncedContent')[fileId] = serverSnapshot.content;
+                    g('unsavedChanges')[fileId] = false;
+                    markPendingServerSync(fileId, false);
+                    return true;
+                }
+            }
         }
 
         try {

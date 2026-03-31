@@ -65,7 +65,7 @@
             .filter(Boolean);
     }
 
-    function showShareResult(shareData, oldModal) {
+    function showShareResult(shareData, oldModal, mode) {
         if (oldModal) oldModal.remove();
         var nightMode = g('nightMode') === true;
         var isEn = window.i18n && window.i18n.getLanguage() === 'en';
@@ -82,8 +82,22 @@
                 global.showMessage(t('linkCopied'));
             });
         };
-        modalContent.querySelector('.share-close-btn').onclick = function() { resultModal.remove(); };
-        resultModal.addEventListener('click', function(e) { if (e.target === resultModal) resultModal.remove(); });
+        modalContent.querySelector('.share-close-btn').onclick = function() {
+            resultModal.remove();
+            // 如果是可编辑模式，刷新页面以进入协作模式
+            if (mode === 'edit') {
+                window.location.reload();
+            }
+        };
+        resultModal.addEventListener('click', function(e) {
+            if (e.target === resultModal) {
+                resultModal.remove();
+                // 如果是可编辑模式，刷新页面以进入协作模式
+                if (mode === 'edit') {
+                    window.location.reload();
+                }
+            }
+        });
     }
 
     function showShareDialog() {
@@ -365,7 +379,7 @@
 
                 if (updateResult.code === 200 && updateResult.data) {
                     // 更新成功，显示结果
-                    showShareResult(updateResult.data, shareModal);
+                    showShareResult(updateResult.data, shareModal, mode);
                 } else {
                     // 处理敏感词检测错误
                     if (updateResult.sensitive_words && updateResult.sensitive_words.length > 0) {
@@ -495,7 +509,7 @@
             try {
                 var result = await createShareLink(filename, mode, sharePassword, expireDays, editPolicy, editorUsernames, editPassword);
                 if (result.code === 200 && result.data) {
-                    showShareResult(result.data, shareModal);
+                    showShareResult(result.data, shareModal, mode);
                 } else {
                     // 处理敏感词检测错误
                     if (result.sensitive_words && result.sensitive_words.length > 0) {

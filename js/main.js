@@ -233,12 +233,8 @@ document.addEventListener('DOMContentLoaded', function() {
                             window.draftRecovery.markDirty();
                         }
                     }
-                    // 延迟渲染 ECharts 图表（等待 DOM 更新）
-                    setTimeout(function() {
-                        if (typeof window.renderEChartsContainers === 'function') {
-                            window.renderEChartsContainers();
-                        }
-                    }, 500);
+                    // ECharts 懒加载：只在用户点击图表或滚动到可见区域时渲染
+                    // 不再在每次输入时自动渲染，提升编辑性能
                     // 处理图片懒加载
                     setTimeout(function() {
                         if (window.LazyImageLoader && window.LazyImageLoader.processVditorImages) {
@@ -253,10 +249,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 window.appLifecycle.init();
             }
 
-            // 渲染 ECharts 图表
-            if (typeof window.renderEChartsContainers === 'function') {
-                window.renderEChartsContainers();
-            }
+            // ECharts 懒加载：图表将在用户滚动到可见区域或点击时渲染
+            // 不再在初始化时自动渲染所有图表，提升首屏加载性能
         }
     };
 

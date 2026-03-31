@@ -25,6 +25,9 @@ jobs:
           - os: ubuntu-latest
             script: build:electron:linux
             artifactName: md-electron-linux
+          - os: macos-latest
+            script: build:electron:mac
+            artifactName: md-electron-mac
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout source
@@ -106,6 +109,12 @@ jobs:
           name: md-electron-linux
           path: downloads/electron/linux
 
+      - name: Download macOS Electron artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: md-electron-mac
+          path: downloads/electron/mac
+
       - name: Prepare release assets
         run: |
           # Extract version from tag (e.g., v1.2.3 -> 1.2.3)
@@ -133,6 +142,12 @@ jobs:
           
           # Copy Linux deb files
           cp downloads/electron/linux/*.deb release/ || true
+          
+          # Copy Linux AppImage files
+          cp downloads/electron/linux/*.AppImage release/ || true
+          
+          # Copy macOS dmg files
+          cp downloads/electron/mac/*.dmg release/ || true
 
       - name: Upload Electron assets to GitHub Release
         uses: softprops/action-gh-release@v2
@@ -141,6 +156,8 @@ jobs:
           files: |
             release/easypocketmd-*.exe
             release/*.deb
+            release/*.AppImage
+            release/*.dmg
 
   deploy-electron:
     needs: build-electron

@@ -2928,24 +2928,252 @@ body.night-mode .ppt-source-btn.active {
     background: rgba(74, 144, 226, 0.2);
 }
 
-/* PPT editor modal night mode */
+/* PPT editor modal night mode - PPT页面始终保持白底黑字 */
 body.night-mode #pptEditorModal {
-    background: #1e1e1e !important;
+    background: #1a1a2e !important;
 }
 
-body.night-mode #pptEditorPreview {
-    background: #2d2d2d !important;
+/* PPT预览区域在夜间模式下保持深色背景，但PPT内容本身白底黑字 */
+body.night-mode .ppt-preview-panel {
+    background: linear-gradient(135deg, #16213e 0%, #1a1a2e 100%) !important;
 }
 
-body.night-mode .ppt-editor-thumb {
-    background: #2d2d2d !important;
-    border-color: #444 !important;
-    color: #eee !important;
+/* PPT页面内容容器 */
+#pptEditorPreviewContainer {
+    background: transparent !important;
+    border-radius: 0;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+    overflow: hidden;
 }
 
-body.night-mode .ppt-editor-thumb[data-active="true"] {
-    background: #4a90e2 !important;
-    color: white !important;
+/* PPT幻灯片内容 - 不强制覆盖 AI 生成样式，保持与导出源一致 */
+.ppt-slide-content {
+    background: transparent;
+    color: inherit;
+}
+
+/* PPT预览区域 - 确保内容填满 */
+#pptEditorPreview {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#pptEditorPreview > div {
+    width: 100%;
+    height: 100%;
+}
+
+/* 页面列表面板美化 */
+.ppt-pages-panel {
+    background: linear-gradient(180deg, #1e3a5f 0%, #16213e 100%) !important;
+    border-top: 1px solid rgba(74, 144, 226, 0.3) !important;
+}
+
+/* 页面列表标题 */
+.ppt-pages-panel h4 {
+    color: #ffffff !important;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+}
+
+/* PPT编辑器缩略图样式优化 */
+.ppt-editor-thumb {
+    background: rgba(255,255,255,0.1) !important;
+    border: 2px solid transparent;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(10px);
+}
+
+.ppt-editor-thumb:hover {
+    background: rgba(255,255,255,0.15) !important;
+    border-color: rgba(74, 144, 226, 0.5);
+    transform: translateY(-2px);
+}
+
+.ppt-editor-thumb[data-active="true"] {
+    background: linear-gradient(135deg, #4a90e2 0%, #357abd 100%) !important;
+    border-color: #4a90e2;
+    box-shadow: 0 4px 15px rgba(74, 144, 226, 0.4);
+}
+
+/* 缩略图中的文字颜色 - 已生成状态始终白色 */
+.ppt-editor-thumb .page-status-text,
+.ppt-editor-thumb .page-number,
+.ppt-editor-thumb .page-title {
+    color: #ffffff !important;
+}
+
+/* 确保第x页和已生成文字清晰可见 */
+.ppt-editor-thumb div {
+    color: #ffffff !important;
+}
+
+.ppt-editor-thumb[data-active="true"] div,
+.ppt-editor-thumb[data-active="true"] span,
+.ppt-editor-thumb[data-active="true"] i {
+    color: #ffffff !important;
+}
+
+/* 删除和插入按钮样式 */
+.ppt-delete-page-btn {
+    background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%) !important;
+    box-shadow: 0 2px 5px rgba(231, 76, 60, 0.3);
+}
+
+.ppt-insert-page-btn {
+    background: linear-gradient(135deg, #27ae60 0%, #219a52 100%) !important;
+    box-shadow: 0 2px 5px rgba(39, 174, 96, 0.3);
+}
+
+/* PPT配色方案选择器样式 */
+.ppt-color-scheme-selector {
+    display: flex;
+    gap: 8px;
+    padding: 10px 15px;
+    background: rgba(255,255,255,0.05);
+    border-radius: 8px;
+    margin: 0 15px;
+}
+
+.ppt-color-scheme-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: 3px solid transparent;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    position: relative;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+
+.ppt-color-scheme-btn:hover {
+    transform: scale(1.1);
+}
+
+.ppt-color-scheme-btn.active {
+    border-color: #4a90e2;
+    box-shadow: 0 0 0 2px #fff, 0 0 0 4px #4a90e2;
+}
+
+.ppt-color-scheme-btn::after {
+    content: attr(data-label);
+    position: absolute;
+    bottom: -20px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 10px;
+    white-space: nowrap;
+    color: #fff;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.ppt-color-scheme-btn:hover::after {
+    opacity: 1;
+}
+
+/* 配色方案颜色定义 */
+.ppt-scheme-white-black {
+    background: linear-gradient(135deg, #ffffff 50%, #2c3e50 50%) !important;
+}
+
+.ppt-scheme-black-white {
+    background: linear-gradient(135deg, #1a1a1a 50%, #ffffff 50%) !important;
+}
+
+.ppt-scheme-traffic-light {
+    background: linear-gradient(135deg, #2d5016 50%, #c0392b 50%) !important;
+}
+
+.ppt-scheme-traditional {
+    background: linear-gradient(135deg, #1e3a5f 50%, #ffffff 50%) !important;
+}
+
+.ppt-scheme-business {
+    background: linear-gradient(135deg, #34495e 50%, #ecf0f1 50%) !important;
+}
+
+/* 大纲预览界面的配色方案选择器容器 */
+#aiPPTOutlineSection .ppt-color-scheme-selector {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+/* 夜间模式下的配色方案选择器 */
+body.night-mode .ppt-color-scheme-selector {
+    background: rgba(0,0,0,0.2);
+}
+
+/* 大纲预览界面配色方案容器 - 夜间模式 */
+body.night-mode #aiPPTOutlineSection div[style*="background:#f0f4f8"] {
+    background: #2d3a4a !important;
+}
+
+body.night-mode #aiPPTOutlineSection label[style*="color:#555"] {
+    color: #ddd !important;
+}
+
+/* PPT编辑器头部样式优化 */
+.ppt-editor-header {
+    background: linear-gradient(135deg, #1e3a5f 0%, #2c3e50 100%) !important;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+}
+
+/* 添加页面按钮 */
+#pptEditorAddPage {
+    background: transparent !important;
+    border: 1px dashed rgba(74, 144, 226, 0.6) !important;
+    color: #4a90e2 !important;
+    transition: all 0.2s ease;
+}
+
+#pptEditorAddPage:hover {
+    background: rgba(74, 144, 226, 0.1) !important;
+    border-style: solid !important;
+}
+
+/* 重新生成和下载按钮美化 */
+#pptEditorRegen {
+    background: linear-gradient(135deg, #4a90e2 0%, #357abd 100%) !important;
+    box-shadow: 0 2px 8px rgba(74, 144, 226, 0.3);
+    transition: all 0.2s ease;
+}
+
+#pptEditorRegen:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(74, 144, 226, 0.4);
+}
+
+#pptEditorDownload {
+    background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%) !important;
+    box-shadow: 0 2px 8px rgba(231, 76, 60, 0.3);
+    transition: all 0.2s ease;
+}
+
+#pptEditorDownload:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(231, 76, 60, 0.4);
+}
+
+/* 上一页/下一页按钮 */
+#pptEditorPrev, #pptEditorNext {
+    background: rgba(255,255,255,0.1) !important;
+    transition: all 0.2s ease;
+}
+
+#pptEditorPrev:hover, #pptEditorNext:hover {
+    background: rgba(255,255,255,0.2) !important;
+}
+
+/* 页码显示 */
+#pptEditorPageNum {
+    background: rgba(0,0,0,0.2);
+    border-radius: 6px;
+    font-weight: 500;
 }
 
 /* 服务状态弹窗样式 */

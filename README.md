@@ -1,118 +1,160 @@
-# EasyPocketMD
+# ✍️ EasyPocketMD
 
-AI-powered, superfast, cross-platform, and user-friendly online Markdown editor that supports Windows, Linux, Android, and the web.
+**AI powered · Superfast · Cross Platform**
+
+<p align="center"><a href="README_zh_CN.md">中文</a> &nbsp;|&nbsp; <a href="https://md.yhsun.cn/">Demo</a></p>
+
+A Markdown editor that removes the learning curve — insert formatted text, LaTeX formulas, and diagrams without memorizing any syntax. With intelligent search and AI assistance, everything is just a few clicks away.
+
+Real-time collaboration, AI-assisted writing, and a smooth editing experience — all wrapped in a beautiful Material Design interface.
+
+If you find this useful, please ⭐ star the repo – it means a lot to me.
 
 [![Build and Deploy](https://github.com/sunhouy/EasyPocketMD/actions/workflows/deploy.yml/badge.svg)](https://github.com/sunhouy/EasyPocketMD/actions/workflows/deploy.yml)
 [![Build Android APK](https://github.com/sunhouy/EasyPocketMD/actions/workflows/build-android.yml/badge.svg)](https://github.com/sunhouy/EasyPocketMD/actions/workflows/build-android.yml)
 [![Build Electron App](https://github.com/sunhouy/EasyPocketMD/actions/workflows/build-electron.yml/badge.svg)](https://github.com/sunhouy/EasyPocketMD/actions/workflows/build-electron.yml)
+
 [![Python 3.6+](https://img.shields.io/badge/python-3.6+-blue.svg)](https://www.python.org/downloads/)
 [![Node.js](https://img.shields.io/badge/node.js-%3E%3D18.0.0-brightgreen.svg)](https://nodejs.org/)
 
-<p align="center"><a href="README_zh_CN.md">中文</a> &nbsp;|&nbsp; <a href="https://md.yhsun.cn/">Demo</a></p>
+## 📖 Table of Contents
+- [Features](#-features)
+- [Quick Start](#-quick-start)
+- [Comparison](#-how-we-compare)
+- [Architecture](#-project-architecture)
+- [Deployment](#-deployment)
+- [Demo](#-demo)
+- [License](#-license)
 
-<br />
+## ✨ Features
 
-这个项目是我投入了大量时间和心血的作品，我希望它能真正帮助到大家。如果你觉得它有用，或者认可我的努力，请给一个 ⭐️ Star 支持我！你的每一个 Star 都是我持续改进的动力，也是对我最大的鼓励。谢谢！
+### 🤖 AI Integration
 
-This project is something I’ve invested significant time and effort into, and I truly hope it can be helpful to others. If you find it useful or appreciate my work, please give it a ⭐️ Star to support me! Every Star you give is a huge encouragement and motivation for me to keep improving.
+- AI Writing Assistant – Help write, rewrite, auto-format, and even generate PPT slides from your document.
 
-## Advantages
-
-### Use Markdown Anywhere
-
-Whether on mobile or computer, you can use EasyPocketMD to edit Markdown documents. The multi-platform interface adopts a unified design style, providing you with a consistent operating experience.
-
+- Smart Charts & Formulas – Generate LaTeX formulas and diagrams with AI prompts — no manual coding required.
 <div style="display: flex; justify-content: center; gap: 20px;">
   <img src="readme/1_1.png" height="300px"/>
   <img src="readme/1_2.png" height="300px"/>
 </div>
 
-### Zero Learning Curve, Start Instantly
+### 👥 Collaboration & Communication
 
-No need to memorize any Markdown syntax. The bottom toolbar provides buttons for commonly used formatting options, such as bold, italic, headings, lists, quotes, code blocks, links, images, etc., allowing one-click insertion. Supports three operation modes: WYSIWYG / Instant Rendering / Split-Screen Preview, there's always an option that suits you.
+- Real-time Collaboration – Share documents and work together seamlessly.
 
+- Encrypted Video Call – Built-in two-person encrypted video call with dual-stack IPv6 support.
 <div style="display: flex; justify-content: center; gap: 20px;">
   <img src="readme/2_1.png" height="300px"/>
   <img src="readme/2_2.png" height="300px"/>
 </div>
 
-### Rich Extension Support
-
-The editor rapidly renders LaTeX formulas, mermaid diagrams, and even musical scores and chemical equations. Edited documents can be directly exported to HTML and PDF formats, with extremely convenient formatting options. What Word can do, this can do too, but faster and more lightweight. Your local txt and Markdown documents can be directly imported and edited here.
-
+### ✍️ Editing Experience
+- Three Preview Modes – WYSIWYG, live rendering, and split-screen preview.
+- Efficient Editing – Quick insertion of Markdown, LaTeX formulas, and charts. Full-text search and file diff support.
+- Version Control – Browse history and compare differences between versions.
 <div style="display: flex; justify-content: center; gap: 20px;">
   <img src="readme/3_1.png" height="300px"/>
   <img src="readme/3_2.png" height="300px"/>
 </div>
 
-### Never Worry About File Loss
+### 🔗 Compatibility & Design
+- Cross Platform – Works seamlessly across devices.
+- File Import / Export – Import local documents; export to TXT, DOC, PDF, and more.
+- Cloud Print – Print remotely via the cloud print client.
+- Available on Windows, Linux, Android and the web — with consistent behavior across all platforms.
+- Modern UI – Clean Material Design with day/night mode support.
 
-All edited documents are automatically saved to the local database. If logged into an account, they will automatically sync with the server and synchronize all content across devices. If files conflict on different devices, we will prompt you to decide which version to use. We save any modifications you make in real-time; even if the editor is suddenly closed or the computer is restarted, no data will be lost. We also keep version history, allowing you to view and restore to previous states at any time.
+## 🚀 Quick Start
+### Prerequisites
+- Node.js ≥ 18.0
+- Python ≥ 3.6
+- MySQL ≥ 5.7
+- Redis ≥ 6.0
+- npm ≥ 9.0
 
-<div style="display: flex; justify-content: center; gap: 20px;">
-  <img src="readme/4_1.png" height="300px"/>
-  <img src="readme/4_2.png" height="300px"/>
-</div>
+### Installation
 
-### Leading Cloud Printing Features
+1. Clone the repository
+```bash
+git clone https://github.com/sunhouy/EasyPocketMD.git
+cd md
+```
 
-Install the cloud printing client on a computer connected to a printer, and you can use the cloud printing function from any device to print documents. On your mobile phone, you can preview how the document will look after printing and configure all settings. The powerful AI intelligent layout function saves you time, allowing you to focus on writing the document while we handle the rest.
+2. Install Node.js dependencies
+```bash
+npm install
+```
 
-<div style="display: flex; justify-content: center; gap: 20px;">
-  <img src="readme/5_1.png" height="300px"/>
-  <img src="readme/5_2.png" height="300px"/>
-</div>
+3. Copy the example configuration file and edit it with your own values:
+```
+cp .env.example .env
+```
 
-### Strong Privacy Protection
+4. Set up databases
+Create the MySQL database and tables. You can find the schema in db.sql. Ensure Redis is running.
 
-Your files and any uploaded content are encrypted and stored locally and on the server. You can share documents and manage access time and permissions. We use the latest libraries and promptly fix security vulnerabilities to ensure your privacy is not compromised.
+5. Build the frontend
+```bash
+npm run build
+```
 
-<div style="display: flex; justify-content: center; gap: 20px;">
-  <img src="readme/6_1.png" height="300px"/>
-  <img src="readme/6_2.png" height="300px"/>
-</div>
+6. Start the application
+```bash
+npm start
+```
+For production (using PM2):
+```bash
+npm install -g pm2
+pm2 start api/server.js --name "easypocketmd"
+```
 
-### Highly Personalized Experience
+7. Cloud Printing Service
 
-The buttons on the bottom toolbar, font size, whether to show the outline, day/night mode, and language can all be set according to personal preference. We save your choices and automatically apply them the next time you open the app. You can modify these options at any time in the settings.
+## 📊 How We Compare
 
-## Project Architecture
+| Feature                     | **Ours** | Typora | Obsidian | Notion | VS Code | Joplin                 |
+|-----------------------------|---------|--------|----------|--------|---------|------------------------|
+| **Data Privacy**            | 🔒 Local + Cloud | Local | Local | Cloud-only | Local | Local + Cloud optional |
+| **AI Writing Assistant**    | ✅ Native | ❌ | ❌ (via plugin) | ❌ | ❌ (via plugin) | ❌                      |
+| **AI Charts & Formulas**    | ✅ Native | ❌ | ❌ | ❌ | ❌ | ❌                      |
+| **AI PPT Generation**       | ✅ Native | ❌ | ❌ | ❌ | ❌ | ❌                      |
+| **Mobile Experience**       | 📱 First-class | Basic | Basic | Good | None | Basic                  |
+| **Real-time Collaboration** | ✅ E2EE encrypted | ❌ | ❌ | ✅ | ✅ (Live Share) | ❌                      |
+| **Encrypted Video Call**    | ✅ Built-in | ❌ | ❌ | ❌ | ❌ | ❌                      |
+| **Cloud Print**             | ✅ Native | ❌ | ❌ | ❌ | ❌ | ❌                      |
+| **Price**                   | Free / Open Source | $15 one-time | Free / $50/yr sync | Free tier | Free | Free                   |
+
+
+## 🏗️ Project Architecture
 
 The project uses a JavaScript + Python architecture. The backend is implemented with Node.js, while the cloud printing server and client are implemented with Python. The frontend is developed with native JavaScript, ensuring excellent performance.
-api/ Backend API interfaces
-assets/ Capacitor application resources
-css/ Frontend CSS styles
-js/ Frontend JavaScript scripts
-print/ Cloud printing server and client code
+```
+api/     Backend API interfaces
+assets/  Capacitor application resources
+css/     Frontend CSS styles
+js/      Frontend JavaScript scripts
+print/   Cloud printing server and client code
 scripts/ Deployment scripts
-tests/ Test scripts
-
-## Deployment
-
-- This website is automatically tested and deployed via GitHub Actions. Please add a .env file in the web directory to store sensitive information, formatted as follows.
-
+tests/   Test scripts
 ```
-DB_HOST=Database address
-DB_PORT=Database port
-DB_USER=Database username
-DB_PASSWORD=Database password
-DB_NAME=Database name
-ADMIN_USER=Administrator username
-ADMIN_PASSWORD=Administrator password
-BASE_URL=Website domain, e.g., https://md.yhsun.cn
+## 🌐 Deployment
 
-# Redis Configuration (optional, for file caching)
-REDIS_HOST=localhost
-REDIS_PORT=6379
-REDIS_PASSWORD=
-REDIS_DB=0
-```
+This website is automatically tested and deployed via GitHub Actions. Following Repository secrets are required for deployment:
 
-## Demo
+
+## 🎬 Demo
 
 <https://md.yhsun.cn/>
-`Test account test, test password 123456`
 
-## Contact
-
+## 📧 Contact
 `18763177732@139.com`
+
+## 📄 License
+This project is licensed under the MIT License.
+
+## 🙌 Acknowledgements
+Built with ❤️ using modern web technologies and open source tools.
+
+I'm deeply grateful to all the open‑source projects and their contributors that made EasyPocketMD possible.  
+
+See [DEPENDENCIES.md](./DEPENDENCIES.md) for the complete list of dependencies and licenses.

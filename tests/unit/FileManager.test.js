@@ -1,6 +1,7 @@
 const fileManager = require('../../api/models/FileManager');
 const db = require('../../api/config/db');
 const historyManager = require('../../api/models/HistoryManager');
+const crypto = require('crypto');
 
 // Mock dependencies
 jest.mock('../../api/config/db');
@@ -96,6 +97,59 @@ describe('FileManager', () => {
             expect(mockConnection.execute).toHaveBeenCalledWith(
                 expect.stringContaining('INSERT INTO user_files'),
                 ['testuser', 'new.md', 'new content']
+            );
+        });
+
+        it('should return 409 when base_last_modified is stale', async () => {
+            const mockConnection = {
+                execute: jest.fn().mockResolvedValueOnce([[{
+                    id: 1,
+                    content: 'server content',
+                    last_modified: '2024-01-02T00:00:00.000Z'
+                }]]),
+                release: jest.fn()
+            };
+            db.getConnection.mockResolvedValue(mockConnection);
+
+            const result = await fileManager.saveFile(
+                'testuser',
+                'test.md',
+                'new content',
+                { base_last_modified: '2024-01-01T00:00:00.000Z' }
+            );
+
+            expect(result.code).toBe(409);
+            expect(result.data.filename).toBe('test.md');
+            expect(result.data.server_last_modified).toBe('2024-01-02T00:00:00.000Z');
+            expect(mockConnection.execute).toHaveBeenCalledTimes(1);
+        });
+
+        it('should allow update when base_hash matches current server content', async () => {
+            const currentContent = 'server content';
+            const baseHash = crypto.createHash('sha256').update(currentContent, 'utf8').digest('hex');
+            const mockConnection = {
+                execute: jest.fn()
+                    .mockResolvedValueOnce([[{
+                        id: 1,
+                        content: currentContent,
+                        last_modified: '2024-01-02T00:00:00.000Z'
+                    }]])
+                    .mockResolvedValueOnce([]),
+                release: jest.fn()
+            };
+            db.getConnection.mockResolvedValue(mockConnection);
+
+            const result = await fileManager.saveFile(
+                'testuser',
+                'test.md',
+                'new content',
+                { base_hash: baseHash }
+            );
+
+            expect(result.code).toBe(200);
+            expect(mockConnection.execute).toHaveBeenCalledWith(
+                expect.stringContaining('UPDATE user_files SET content = ?, last_modified = NOW()'),
+                ['new content', 'testuser', 'test.md']
             );
         });
     });

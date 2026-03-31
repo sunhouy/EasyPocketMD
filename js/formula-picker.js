@@ -453,7 +453,7 @@ function showFormulaPicker() {
     const searchBox = document.createElement('input');
     searchBox.type = 'text';
     searchBox.placeholder = isEn() ? 'Search (max 10 chars)...' : '搜索（最多10字）...';
-    searchBox.maxLength = 10;
+    searchBox.maxLength = 20;
     searchBox.style.cssText = `
         width: 100%;
         padding: 8px 12px;

@@ -75,18 +75,20 @@ router.post('/', async (req, res) => {
  * 将 HTML 内容转换为 PPT 幻灯片元素
  */
 async function addHtmlToSlide(slide, html, outline, ratio) {
+    const normalizedHtml = normalizeHtmlInput(html);
+
     // 解析 HTML 中的基本结构
     // 提取标题
-    const titleMatch = html.match(/<h1[^>]*>(.*?)<\/h1>/i) ||
-                       html.match(/<h2[^>]*>(.*?)<\/h2>/i) ||
-                       html.match(/<h3[^>]*>(.*?)<\/h3>/i);
+    const titleMatch = normalizedHtml.match(/<h1[^>]*>(.*?)<\/h1>/i) ||
+                       normalizedHtml.match(/<h2[^>]*>(.*?)<\/h2>/i) ||
+                       normalizedHtml.match(/<h3[^>]*>(.*?)<\/h3>/i);
     const title = titleMatch ? stripHtml(titleMatch[1]) : (outline.title || '');
 
     // 提取列表项
     const listItems = [];
     const listRegex = /<li[^>]*>(.*?)<\/li>/gi;
     let match;
-    while ((match = listRegex.exec(html)) !== null) {
+    while ((match = listRegex.exec(normalizedHtml)) !== null) {
         const itemText = stripHtml(match[1]);
         if (itemText) {
             listItems.push(itemText);
@@ -105,34 +107,28 @@ async function addHtmlToSlide(slide, html, outline, ratio) {
     // 提取段落文本
     const paragraphs = [];
     const pRegex = /<p[^>]*>(.*?)<\/p>/gi;
-    while ((match = pRegex.exec(html)) !== null) {
+    while ((match = pRegex.exec(normalizedHtml)) !== null) {
         const pText = stripHtml(match[1]);
         if (pText && !listItems.includes(pText)) {
             paragraphs.push(pText);
         }
     }
 
-    // 获取背景色
-    const bgMatch = html.match(/background[:\s]+([^;"]+)/i) ||
-                    html.match(/background-color[:\s]+([^;"]+)/i);
-    let bgColor = 'FFFFFF';
-    if (bgMatch) {
-        const bgValue = bgMatch[1].trim();
-        if (bgValue.startsWith('#')) {
-            bgColor = bgValue.replace('#', '');
-        } else if (bgValue.includes('1e1e1e') || bgValue.includes('0d0d0d')) {
-            // 深色背景
-            bgColor = '1E1E1E';
-        }
-    }
+    const stylePalette = extractStylePalette(normalizedHtml);
+    const bgColor = stylePalette.bgColor;
 
     // 判断是否为深色背景
-    const isDarkBg = bgColor === '1E1E1E' || bgColor === '2D2D2D' || bgColor === '333333';
-    const textColor = isDarkBg ? 'FFFFFF' : '2C3E50';
-    const subtitleColor = isDarkBg ? 'E0E0E0' : '34495E';
+    const isDarkBg = isDarkColor(bgColor);
+    const textColor = stylePalette.textColor || (isDarkBg ? 'FFFFFF' : '2C3E50');
+    const subtitleColor = stylePalette.subtitleColor || (isDarkBg ? 'E0E0E0' : '34495E');
 
     // 设置幻灯片背景
     slide.background = { color: bgColor };
+
+    // 渐变背景场景使用强调色形状块补偿导出视觉
+    if (stylePalette.gradient && stylePalette.gradient.isGradient) {
+        addGradientAccentShapes(slide, stylePalette.gradient, ratio);
+    }
 
     // 计算布局参数
     const slideWidth = ratio === '16:9' ? 10 : 10;
@@ -219,6 +215,178 @@ async function addHtmlToSlide(slide, html, outline, ratio) {
         align: 'right',
         fontFace: 'Microsoft YaHei'
     });
+}
+
+function normalizeHtmlInput(rawHtml) {
+    if (!rawHtml || typeof rawHtml !== 'string') return '';
+
+    let html = rawHtml.trim();
+    html = html.replace(/^```(?:html)?\s*/i, '').replace(/\s*```\s*$/i, '');
+
+    if (html.includes('&lt;') || html.includes('&gt;') || html.includes('&amp;')) {
+        html = decodeHtmlEntities(html);
+    }
+
+    html = html.replace(/<html[^>]*>|<\/html>/gi, '');
+    html = html.replace(/<head[^>]*>[\s\S]*?<\/head>/gi, '');
+    html = html.replace(/<body[^>]*>|<\/body>/gi, '');
+
+    if (!/<[a-z][\s\S]*>/i.test(html) && /&lt;\/?[a-z]/i.test(html)) {
+        html = decodeHtmlEntities(html);
+    }
+
+    return html.trim();
+}
+
+function decodeHtmlEntities(text) {
+    if (!text) return '';
+    return text
+        .replace(/&nbsp;/g, ' ')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&amp;/g, '&')
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'");
+}
+
+function extractStylePalette(html) {
+    const firstTagStyleMatch = html.match(/<[^>]+style\s*=\s*['\"]([^'\"]+)['\"][^>]*>/i);
+    const styleText = firstTagStyleMatch ? firstTagStyleMatch[1] : '';
+
+    const bgRaw = extractCssValue(styleText, 'background') || extractCssValue(styleText, 'background-color');
+    const gradient = parseLinearGradientColors(bgRaw);
+    const titleStyleMatch = html.match(/<h[1-3][^>]+style\s*=\s*['\"]([^'\"]+)['\"][^>]*>/i);
+    const titleStyle = titleStyleMatch ? titleStyleMatch[1] : '';
+
+    const bgColor = (gradient.isGradient ? gradient.primaryColor : parseCssColor(bgRaw)) || 'FFFFFF';
+    const textColor = parseCssColor(extractCssValue(titleStyle, 'color') || extractCssValue(styleText, 'color'));
+    const subtitleColor = parseCssColor(extractCssValue(styleText, 'color')) || gradient.accentColor;
+
+    return { bgColor, textColor, subtitleColor, gradient };
+}
+
+function parseLinearGradientColors(backgroundValue) {
+    if (!backgroundValue) {
+        return { isGradient: false, primaryColor: '', accentColor: '' };
+    }
+
+    const raw = backgroundValue.trim();
+    if (!/linear-gradient\s*\(/i.test(raw)) {
+        return { isGradient: false, primaryColor: '', accentColor: '' };
+    }
+
+    const colorTokenRegex = /#(?:[0-9a-f]{3}|[0-9a-f]{6})\b|rgba?\([^\)]*\)|\b[a-z]+\b/gi;
+    const colors = [];
+    let tokenMatch;
+    while ((tokenMatch = colorTokenRegex.exec(raw)) !== null) {
+        const color = parseCssColor(tokenMatch[0]);
+        if (color && !colors.includes(color)) {
+            colors.push(color);
+        }
+    }
+
+    const primaryColor = colors[0] || '';
+    const accentColor = colors[1] || colors[0] || '';
+
+    return {
+        isGradient: !!primaryColor,
+        primaryColor,
+        accentColor
+    };
+}
+
+function addGradientAccentShapes(slide, gradient, ratio) {
+    const shapeType = PptxGenJS.ShapeType ? PptxGenJS.ShapeType.rect : 'rect';
+    const slideWidth = 10;
+    const slideHeight = ratio === '16:9' ? 5.625 : 7.5;
+    const accent = gradient.accentColor || gradient.primaryColor || '4A90E2';
+
+    slide.addShape(shapeType, {
+        x: 0,
+        y: 0,
+        w: 0.22,
+        h: slideHeight,
+        fill: { color: accent, transparency: 40 },
+        line: { color: accent, transparency: 100 }
+    });
+
+    slide.addShape(shapeType, {
+        x: slideWidth - 2.0,
+        y: slideHeight - 1.0,
+        w: 2.0,
+        h: 1.0,
+        fill: { color: accent, transparency: 55 },
+        line: { color: accent, transparency: 100 }
+    });
+}
+
+function extractCssValue(styleText, property) {
+    if (!styleText) return '';
+    const regex = new RegExp(`${property}\\s*:\\s*([^;]+)`, 'i');
+    const match = styleText.match(regex);
+    return match ? match[1].trim() : '';
+}
+
+function parseCssColor(rawValue) {
+    if (!rawValue) return '';
+    const value = rawValue.trim().toLowerCase();
+
+    // linear-gradient(...) 等场景，提取第一个可识别颜色
+    const gradientHex = value.match(/#([0-9a-f]{3}|[0-9a-f]{6})\b/i);
+    if (gradientHex) {
+        return normalizeHexColor(gradientHex[0]);
+    }
+
+    const hexMatch = value.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
+    if (hexMatch) {
+        return normalizeHexColor(hexMatch[0]);
+    }
+
+    const rgbMatch = value.match(/rgba?\((\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
+    if (rgbMatch) {
+        const r = Number(rgbMatch[1]);
+        const g = Number(rgbMatch[2]);
+        const b = Number(rgbMatch[3]);
+        return toHexColor(r, g, b);
+    }
+
+    const named = {
+        white: 'FFFFFF',
+        black: '000000',
+        red: 'FF0000',
+        green: '008000',
+        blue: '0000FF',
+        gray: '808080',
+        grey: '808080',
+        yellow: 'FFFF00',
+        orange: 'FFA500'
+    };
+    return named[value] || '';
+}
+
+function normalizeHexColor(hex) {
+    const raw = hex.replace('#', '').toUpperCase();
+    if (raw.length === 3) {
+        return `${raw[0]}${raw[0]}${raw[1]}${raw[1]}${raw[2]}${raw[2]}`;
+    }
+    return raw;
+}
+
+function toHexColor(r, g, b) {
+    const clamp = (n) => Math.max(0, Math.min(255, n));
+    return [clamp(r), clamp(g), clamp(b)]
+        .map((n) => n.toString(16).padStart(2, '0'))
+        .join('')
+        .toUpperCase();
+}
+
+function isDarkColor(hexColor) {
+    if (!hexColor || hexColor.length !== 6) return false;
+    const r = parseInt(hexColor.slice(0, 2), 16);
+    const g = parseInt(hexColor.slice(2, 4), 16);
+    const b = parseInt(hexColor.slice(4, 6), 16);
+    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+    return luminance < 0.5;
 }
 
 /**
