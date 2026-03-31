@@ -861,7 +861,7 @@
             if (conflict.type === 'delete') {
                 conflictItem.innerHTML = '<div ' + highlightStyle + ' style="flex:1; padding: 8px;"><strong style="color: #dc3545;">' + (isCurrentFile ? '📝 ' : '⚠️ ') + conflict.filename + (isCurrentFile ? ' (' + (isEn() ? 'Currently editing' : '当前正在编辑') + ')' : '') + '</strong><div class="conflict-details"><div style="color: #dc3545;">' + (isEn() ? 'This file has been deleted on the server' : '该文件在服务器上已经删除') + '</div><div>' + (isEn() ? 'Local modified time: ' : '本地修改时间: ') + new Date(conflict.localModified).toLocaleString() + '</div></div><div style="margin-top: 8px;"><label style="margin-right: 15px;"><input type="radio" name="conflict-' + index + '" value="upload">' + (isEn() ? 'Re-upload to server' : '重新上传到服务器') + '</label><label><input type="radio" name="conflict-' + index + '" value="delete" checked>' + (isEn() ? 'Delete local file' : '删除本地文件') + '</label></div></div>';
             } else {
-                conflictItem.innerHTML = '<div ' + highlightStyle + ' style="flex:1; padding: 8px;"><strong>' + (isCurrentFile ? '📝 ' : '') + conflict.filename + (isCurrentFile ? ' (' + (isEn() ? 'Currently editing' : '当前正在编辑') + ')' : '') + '</strong><div class="conflict-details"><div>' + (isEn() ? 'Local modified time: ' : '本地修改时间: ') + new Date(conflict.localModified).toLocaleString() + '</div><div>' + (isEn() ? 'Server modified time: ' : '服务器修改时间: ') + new Date(conflict.serverModified).toLocaleString() + '</div></div><div style="margin-top: 8px;"><label style="margin-right: 15px;"><input type="radio" name="conflict-' + index + '" value="local"' + (isCurrentFile ? ' checked' : '') + '>' + (isEn() ? 'Use local version' : '使用本地版本') + '</label><label><input type="radio" name="conflict-' + index + '" value="server"' + (isCurrentFile ? '' : ' checked') + '>' + (isEn() ? 'Use server version' : '使用服务器版本') + '</label></div></div><button class="diff-view-btn" data-index="' + index + '" title="' + (isEn() ? 'View differences' : '查看差异') + '"><i class="fas fa-columns"></i></button><button class="merge-preview-btn" data-index="' + index + '" title="' + (isEn() ? 'WASM merge preview' : 'WASM 合并预览') + '"><i class="fas fa-code-branch"></i></button>';
+                conflictItem.innerHTML = '<div ' + highlightStyle + ' style="flex:1; padding: 8px;"><strong>' + (isCurrentFile ? '📝 ' : '') + conflict.filename + (isCurrentFile ? ' (' + (isEn() ? 'Currently editing' : '当前正在编辑') + ')' : '') + '</strong><div class="conflict-details"><div>' + (isEn() ? 'Local modified time: ' : '本地修改时间: ') + new Date(conflict.localModified).toLocaleString() + '</div><div>' + (isEn() ? 'Server modified time: ' : '服务器修改时间: ') + new Date(conflict.serverModified).toLocaleString() + '</div></div><div style="margin-top: 8px;"><label style="margin-right: 15px;"><input type="radio" name="conflict-' + index + '" value="local"' + (isCurrentFile ? ' checked' : '') + '>' + (isEn() ? 'Use local version' : '使用本地版本') + '</label><label style="margin-right: 15px;"><input type="radio" name="conflict-' + index + '" value="server"' + (isCurrentFile ? '' : ' checked') + '>' + (isEn() ? 'Use server version' : '使用服务器版本') + '</label><label><input type="radio" name="conflict-' + index + '" value="merge">' + (isEn() ? 'Use WASM merge' : '使用 WASM 合并') + '</label></div></div><button class="diff-view-btn" data-index="' + index + '" title="' + (isEn() ? 'View differences' : '查看差异') + '"><i class="fas fa-columns"></i></button><button class="merge-preview-btn" data-index="' + index + '" title="' + (isEn() ? 'WASM merge preview' : 'WASM 合并预览') + '"><i class="fas fa-code-branch"></i></button>';
             }
             conflictList.appendChild(conflictItem);
         });
@@ -952,16 +952,35 @@
                     }
                 }
             } else {
-                const useLocal = selection.value === 'local';
-                if (useLocal) {
+                if (selection.value === 'local') {
                     const serverFileIndex = serverFiles.findIndex(function(f) { return f.name === conflict.filename; });
                     if (serverFileIndex !== -1) serverFiles[serverFileIndex].content = conflict.localContent;
-                } else {
+                } else if (selection.value === 'server') {
                     const localFileIndex = localFiles.findIndex(function(f) { return f.name === conflict.filename; });
                     if (localFileIndex !== -1) {
                         localFiles[localFileIndex].content = conflict.serverContent;
                         localFiles[localFileIndex].lastModified = conflict.serverModified;
                         if (currentFileId === localFiles[localFileIndex].id && vditor) vditor.setValue(conflict.serverContent);
+                    }
+                } else if (selection.value === 'merge') {
+                    const localFile = localFiles.find(function(f) { return f.name === conflict.filename; });
+                    const baseText = localFile && localFile.id ? (g('lastSyncedContent')[localFile.id] || '') : '';
+                    const gateway = global.wasmTextEngineGateway;
+                    const mergeRes = gateway && typeof gateway.merge3 === 'function'
+                        ? gateway.merge3(baseText, conflict.localContent || '', conflict.serverContent || '', 'manual')
+                        : null;
+                    const mergedText = mergeRes && mergeRes.code === 200 && mergeRes.data ? (mergeRes.data.mergedText || '') : (conflict.localContent || '');
+
+                    const serverFileIndex = serverFiles.findIndex(function(f) { return f.name === conflict.filename; });
+                    if (serverFileIndex !== -1) {
+                        serverFiles[serverFileIndex].content = mergedText;
+                        serverFiles[serverFileIndex].lastModified = Date.now();
+                    }
+                    const localFileIndex = localFiles.findIndex(function(f) { return f.name === conflict.filename; });
+                    if (localFileIndex !== -1) {
+                        localFiles[localFileIndex].content = mergedText;
+                        localFiles[localFileIndex].lastModified = Date.now();
+                        if (currentFileId === localFiles[localFileIndex].id && vditor) vditor.setValue(mergedText);
                     }
                 }
             }
