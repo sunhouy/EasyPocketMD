@@ -268,7 +268,7 @@
     }
 
     // 插入到编辑器
-    function insertAIResultToEditor() {
+    async function insertAIResultToEditor() {
         var result = currentAIState.lastResult;
         if (!result || !g('vditor')) return;
 
@@ -285,6 +285,20 @@
         if (global.showMessage) {
             global.showMessage(isEn() ? 'Content inserted' : '内容已插入', 'success');
         }
+
+        // 自动保存文件
+        if (typeof global.saveCurrentFile === 'function') {
+            try {
+                await global.saveCurrentFile(true);
+            } catch (e) {
+                console.error('AI内容插入后保存失败:', e);
+            }
+        }
+
+        // 刷新页面以显示格式
+        setTimeout(function() {
+            window.location.reload();
+        }, 500);
     }
 
     // 初始化事件监听

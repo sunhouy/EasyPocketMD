@@ -1,8 +1,25 @@
 const db = require('../config/db');
 const historyManager = require('./HistoryManager');
 const Cache = require('../utils/cache');
+const crypto = require('crypto');
 
 class FileManager {
+    computeContentHash(content = '') {
+        return crypto.createHash('sha256').update(String(content), 'utf8').digest('hex');
+    }
+
+    toTimestampMillis(value) {
+        if (value === undefined || value === null || value === '') return null;
+        if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+        const parsed = Date.parse(value);
+        return Number.isNaN(parsed) ? null : parsed;
+    }
+
+    normalizeDbLastModified(value) {
+        const ms = this.toTimestampMillis(value);
+        return ms === null ? null : new Date(ms).toISOString();
+    }
+
     // Get user files
     async getUserFiles(username) {
         try {
@@ -89,15 +106,44 @@ class FileManager {
     }
 
     // Save file
-    async saveFile(username, filename, content = '') {
+    async saveFile(username, filename, content = '', optimisticLock = {}) {
         try {
             const connection = await db.getConnection();
             try {
                 // Check if file exists
                 const [rows] = await connection.execute(
-                    'SELECT id FROM user_files WHERE username = ? AND filename = ?',
+                    'SELECT id, content, last_modified FROM user_files WHERE username = ? AND filename = ?',
                     [username, filename]
                 );
+
+                const hasBaseLastModified = optimisticLock.base_last_modified !== undefined && optimisticLock.base_last_modified !== null && optimisticLock.base_last_modified !== '';
+                const hasBaseHash = typeof optimisticLock.base_hash === 'string' && optimisticLock.base_hash.trim() !== '';
+                const shouldCheckOptimisticLock = hasBaseLastModified || hasBaseHash;
+
+                if (rows.length > 0 && shouldCheckOptimisticLock) {
+                    const existing = rows[0];
+                    const serverLastModifiedMs = this.toTimestampMillis(existing.last_modified);
+                    const baseLastModifiedMs = this.toTimestampMillis(optimisticLock.base_last_modified);
+                    const serverHash = this.computeContentHash(existing.content || '');
+                    const baseHash = hasBaseHash ? optimisticLock.base_hash.trim() : null;
+
+                    const timestampMismatch = hasBaseLastModified && baseLastModifiedMs !== null && serverLastModifiedMs !== null && baseLastModifiedMs !== serverLastModifiedMs;
+                    const hashMismatch = hasBaseHash && baseHash !== serverHash;
+
+                    if (timestampMismatch || hashMismatch) {
+                        return {
+                            code: 409,
+                            message: '文件已被其他设备更新，请先同步后再保存',
+                            data: {
+                                username,
+                                filename,
+                                server_last_modified: this.normalizeDbLastModified(existing.last_modified),
+                                server_hash: serverHash,
+                                server_content: existing.content || ''
+                            }
+                        };
+                    }
+                }
 
                 let message;
                 if (rows.length > 0) {
@@ -136,9 +182,9 @@ class FileManager {
     }
 
     // Save file with history
-    async saveFileWithHistory(username, filename, content, createHistory = false) {
+    async saveFileWithHistory(username, filename, content, createHistory = false, optimisticLock = {}) {
         try {
-            const result = await this.saveFile(username, filename, content);
+            const result = await this.saveFile(username, filename, content, optimisticLock);
 
             if (result.code !== 200) {
                 return result;

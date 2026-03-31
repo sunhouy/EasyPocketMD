@@ -286,12 +286,37 @@
                     message.textContent = t('loginSuccessSyncing');
                     message.className = 'modal-message success';
 
-                    setTimeout(() => {
+                    setTimeout(async () => {
                         hideLoginModal();
                         showUserInfo();
                         global.showMessage(t('loginSuccessStartSync'));
+
+                        // 登录前保存当前编辑的内容到本地存储
+                        const currentFileId = global.currentFileId;
+                        const vditor = global.vditor;
+                        let currentFileName = null;
+                        let currentFileContent = null;
+
+                        if (currentFileId && vditor) {
+                            const files = JSON.parse(localStorage.getItem('vditor_files') || '[]');
+                            const currentFile = files.find(f => f.id === currentFileId);
+                            if (currentFile) {
+                                currentFileName = currentFile.name;
+                                currentFileContent = vditor.getValue();
+                                // 更新本地存储中的内容
+                                currentFile.content = currentFileContent;
+                                currentFile.lastModified = Date.now();
+                                localStorage.setItem('vditor_files', JSON.stringify(files));
+                            }
+                        }
+
                         if (global.startAutoSync) global.startAutoSync();
-                        if (global.loadFilesFromServer) global.loadFilesFromServer();
+
+                        // 加载服务器文件，传入当前文件名以便处理冲突
+                        if (global.loadFilesFromServer) {
+                            await global.loadFilesFromServer(currentFileName);
+                        }
+
                         // 隐藏顶部提示横幅
                         if (global.hideTopNoticeBanner) global.hideTopNoticeBanner();
                     }, 1500);
@@ -363,12 +388,36 @@
                         message.textContent = t('registerSuccessAutoLogin');
                         message.className = 'modal-message success';
 
-                        setTimeout(() => {
+                        setTimeout(async () => {
                             hideLoginModal();
                             showUserInfo();
                             global.showMessage(t('registerSuccessStartSync'));
+
+                            // 登录前保存当前编辑的内容到本地存储
+                            const currentFileId = global.currentFileId;
+                            const vditor = global.vditor;
+                            let currentFileName = null;
+                            let currentFileContent = null;
+
+                            if (currentFileId && vditor) {
+                                const files = JSON.parse(localStorage.getItem('vditor_files') || '[]');
+                                const currentFile = files.find(f => f.id === currentFileId);
+                                if (currentFile) {
+                                    currentFileName = currentFile.name;
+                                    currentFileContent = vditor.getValue();
+                                    // 更新本地存储中的内容
+                                    currentFile.content = currentFileContent;
+                                    currentFile.lastModified = Date.now();
+                                    localStorage.setItem('vditor_files', JSON.stringify(files));
+                                }
+                            }
+
                             if (global.startAutoSync) global.startAutoSync();
-                            if (global.loadFilesFromServer) global.loadFilesFromServer();
+
+                            // 加载服务器文件，传入当前文件名以便处理冲突
+                            if (global.loadFilesFromServer) {
+                                await global.loadFilesFromServer(currentFileName);
+                            }
                         }, 1500);
                     } else {
                         // 登录失败，但仍显示注册成功，让用户手动登录
@@ -401,12 +450,37 @@
                         message.textContent = t('autoLoginSuccess');
                         message.className = 'modal-message success';
 
-                        setTimeout(() => {
+                        setTimeout(async () => {
                             hideLoginModal();
                             showUserInfo();
                             global.showMessage(t('loginSuccessStartSync'));
+
+                            // 登录前保存当前编辑的内容到本地存储
+                            const currentFileId = global.currentFileId;
+                            const vditor = global.vditor;
+                            let currentFileName = null;
+                            let currentFileContent = null;
+
+                            if (currentFileId && vditor) {
+                                const files = JSON.parse(localStorage.getItem('vditor_files') || '[]');
+                                const currentFile = files.find(f => f.id === currentFileId);
+                                if (currentFile) {
+                                    currentFileName = currentFile.name;
+                                    currentFileContent = vditor.getValue();
+                                    // 更新本地存储中的内容
+                                    currentFile.content = currentFileContent;
+                                    currentFile.lastModified = Date.now();
+                                    localStorage.setItem('vditor_files', JSON.stringify(files));
+                                }
+                            }
+
                             if (global.startAutoSync) global.startAutoSync();
-                            if (global.loadFilesFromServer) global.loadFilesFromServer();
+
+                            // 加载服务器文件，传入当前文件名以便处理冲突
+                            if (global.loadFilesFromServer) {
+                                await global.loadFilesFromServer(currentFileName);
+                            }
+
                             // 隐藏顶部提示横幅
                             if (global.hideTopNoticeBanner) global.hideTopNoticeBanner();
                         }, 1500);

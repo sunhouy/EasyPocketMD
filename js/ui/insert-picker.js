@@ -32,7 +32,9 @@
         { id: 'divider', icon: 'fas fa-minus', name: isEn() ? 'Divider' : '分隔线', category: 'insert', keywords: ['divider', '分隔线'], insert: '\n---\n' },
         { id: 'emoji', icon: 'fas fa-smile', name: isEn() ? 'Emoji' : '表情', category: 'insert', keywords: ['emoji', '表情'], action: 'emoji' },
         { id: 'formula', icon: 'fas fa-superscript', name: isEn() ? 'Formula' : '公式', category: 'insert', keywords: ['formula', '公式', 'latex'], action: 'formula' },
-        { id: 'chart', icon: 'fas fa-chart-bar', name: isEn() ? 'Chart' : '图表', category: 'insert', keywords: ['chart', '图表', 'mermaid'], action: 'chart' }
+        { id: 'chart', icon: 'fas fa-chart-bar', name: isEn() ? 'Chart' : '图表', category: 'insert', keywords: ['chart', '图表', 'mermaid'], action: 'chart' },
+        { id: 'footnote', icon: 'fas fa-sticky-note', name: isEn() ? 'Footnote' : '脚注', category: 'insert', keywords: ['footnote', '脚注', 'note'], action: 'footnote' },
+        { id: 'mindmap', icon: 'fas fa-brain', name: isEn() ? 'Mind Map' : '脑图', category: 'insert', keywords: ['mindmap', '脑图', '思维导图'], action: 'mindmap' }
     ];
 
     function closeInsertPicker() {
@@ -119,6 +121,14 @@
                 case 'echarts':
                     closeInsertPicker();
                     if (typeof window.showEChartsPicker === 'function') window.showEChartsPicker();
+                    break;
+                case 'footnote':
+                    closeInsertPicker();
+                    showFootnotePicker();
+                    break;
+                case 'mindmap':
+                    closeInsertPicker();
+                    showMindmapPicker();
                     break;
             }
         } else if (item.insert) {
@@ -350,7 +360,7 @@
         var searchBox = document.createElement('input');
         searchBox.type = 'text';
         searchBox.placeholder = isEn() ? 'Search (max 10 chars)...' : '搜索（最多10字）...';
-        searchBox.maxLength = 10;
+        searchBox.maxLength = 20;
         searchBox.style.cssText = 'width: 100%; padding: 10px 12px; margin-bottom: 15px; border: 1px solid ' + (nightMode ? '#444' : '#ccc') + '; border-radius: 6px; font-size: 14px; background: ' + (nightMode ? '#222' : '#fafafa') + '; color: ' + (nightMode ? '#eee' : '#333') + '; outline: none; box-sizing: border-box;';
         container.appendChild(searchBox);
 
@@ -487,6 +497,299 @@
         searchBox.focus();
     }
 
+    // 脚注选择器
+    function showFootnotePicker() {
+        var nightMode = g('nightMode') === true;
+
+        // 创建模态框
+        var modal = document.createElement('div');
+        modal.className = 'footnote-picker-modal';
+        modal.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); z-index: 2000; display: flex; flex-direction: column; align-items: center; justify-content: center;';
+
+        // 创建容器
+        var container = document.createElement('div');
+        container.style.cssText = 'background: ' + (nightMode ? '#2d2d2d' : 'white') + '; border-radius: 12px; padding: 20px; width: 90%; max-width: 500px; max-height: 85vh; overflow: hidden; display: flex; flex-direction: column;';
+
+        // 标题
+        var title = document.createElement('div');
+        title.textContent = isEn() ? 'Insert Footnote' : '插入脚注';
+        title.style.cssText = 'font-size: 18px; font-weight: 600; margin-bottom: 15px; text-align: center; color: ' + (nightMode ? '#eee' : '#333') + ';';
+        container.appendChild(title);
+
+        // 说明文字
+        var desc = document.createElement('div');
+        var footnoteExampleEn = '<p style="margin-bottom:10px;color:' + (nightMode ? '#aaa' : '#666') + ';font-size:13px;">Footnote format:</p><pre style="background:' + (nightMode ? '#1a1a1a' : '#f5f5f5') + ';padding:10px;border-radius:6px;font-size:12px;overflow-x:auto;color:' + (nightMode ? '#eee' : '#333') + ';">Text with footnote[^1]\\n\\n[^1]: First footnote definition.\\n[^bignote]: Footnote definitions can use multiple paragraphs.</pre>';
+        var footnoteExampleZh = '<p style="margin-bottom:10px;color:' + (nightMode ? '#aaa' : '#666') + ';font-size:13px;">脚注格式：</p><pre style="background:' + (nightMode ? '#1a1a1a' : '#f5f5f5') + ';padding:10px;border-radius:6px;font-size:12px;overflow-x:auto;color:' + (nightMode ? '#eee' : '#333') + ';">带有脚注的文本[^1]\\n\\n[^1]: 第一个脚注定义。\\n[^bignote]: 脚注定义可使用多段内容。</pre>';
+        desc.innerHTML = isEn() ? footnoteExampleEn : footnoteExampleZh;
+        desc.style.cssText = 'margin-bottom: 20px;';
+        container.appendChild(desc);
+
+        // 脚注ID输入
+        var idLabel = document.createElement('label');
+        idLabel.textContent = isEn() ? 'Footnote ID:' : '脚注标识：';
+        idLabel.style.cssText = 'display: block; margin-bottom: 8px; font-size: 14px; color: ' + (nightMode ? '#ddd' : '#333') + ';';
+        container.appendChild(idLabel);
+
+        var idInput = document.createElement('input');
+        idInput.type = 'text';
+        idInput.placeholder = isEn() ? 'e.g., 1, note1, ref' : '如：1、note1、ref';
+        idInput.style.cssText = 'width: 100%; padding: 10px 12px; margin-bottom: 15px; border: 1px solid ' + (nightMode ? '#444' : '#ccc') + '; border-radius: 6px; font-size: 14px; background: ' + (nightMode ? '#222' : '#fafafa') + '; color: ' + (nightMode ? '#eee' : '#333') + '; box-sizing: border-box;';
+        container.appendChild(idInput);
+
+        // 脚注内容输入
+        var contentLabel = document.createElement('label');
+        contentLabel.textContent = isEn() ? 'Footnote Content:' : '脚注内容：';
+        contentLabel.style.cssText = 'display: block; margin-bottom: 8px; font-size: 14px; color: ' + (nightMode ? '#ddd' : '#333') + ';';
+        container.appendChild(contentLabel);
+
+        var contentInput = document.createElement('textarea');
+        contentInput.placeholder = isEn() ? 'Enter footnote content...' : '输入脚注内容...';
+        contentInput.rows = 4;
+        contentInput.style.cssText = 'width: 100%; padding: 10px 12px; margin-bottom: 20px; border: 1px solid ' + (nightMode ? '#444' : '#ccc') + '; border-radius: 6px; font-size: 14px; background: ' + (nightMode ? '#222' : '#fafafa') + '; color: ' + (nightMode ? '#eee' : '#333') + '; box-sizing: border-box; resize: vertical;';
+        container.appendChild(contentInput);
+
+        // 按钮栏
+        var buttonBar = document.createElement('div');
+        buttonBar.style.cssText = 'display: flex; gap: 10px; justify-content: flex-end;';
+
+        var cancelBtn = document.createElement('button');
+        cancelBtn.textContent = isEn() ? 'Cancel' : '取消';
+        cancelBtn.style.cssText = 'padding: 10px 20px; background: ' + (nightMode ? '#444' : '#f5f5f5') + '; color: ' + (nightMode ? '#eee' : '#333') + '; border: none; border-radius: 6px; cursor: pointer; font-size: 14px;';
+        cancelBtn.onclick = function() {
+            document.body.removeChild(modal);
+        };
+        buttonBar.appendChild(cancelBtn);
+
+        var insertBtn = document.createElement('button');
+        insertBtn.innerHTML = '<i class="fas fa-plus"></i> ' + (isEn() ? 'Insert' : '插入');
+        insertBtn.style.cssText = 'padding: 10px 20px; background: #4a90e2; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px;';
+        insertBtn.onclick = function() {
+            var footnoteId = idInput.value.trim() || '1';
+            var footnoteContent = contentInput.value.trim() || (isEn() ? 'Footnote content' : '脚注内容');
+
+            // 生成脚注文本
+            var footnoteText = '[^' + footnoteId + ']';
+            var footnoteDef = '\n\n[^' + footnoteId + ']: ' + footnoteContent;
+
+            // 插入脚注引用
+            insertText(footnoteText);
+
+            // 延迟插入脚注定义到文档末尾
+            setTimeout(function() {
+                try {
+                    if (g('vditor')) {
+                        var currentValue = g('vditor').getValue();
+                        g('vditor').setValue(currentValue + footnoteDef);
+                    }
+                } catch (e) {
+                    console.error('插入脚注定义错误', e);
+                }
+            }, 100);
+
+            document.body.removeChild(modal);
+        };
+        buttonBar.appendChild(insertBtn);
+
+        container.appendChild(buttonBar);
+
+        // 右上角关闭按钮
+        var closeBtn = document.createElement('button');
+        closeBtn.innerHTML = '<i class="fas fa-times"></i>';
+        closeBtn.style.cssText = 'position: absolute; top: 15px; right: 15px; width: 32px; height: 32px; background: ' + (nightMode ? '#444' : '#f5f5f5') + '; color: ' + (nightMode ? '#eee' : '#333') + '; border: none; border-radius: 50%; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center;';
+        closeBtn.onclick = function() {
+            document.body.removeChild(modal);
+        };
+        container.style.position = 'relative';
+        container.appendChild(closeBtn);
+
+        modal.appendChild(container);
+        document.body.appendChild(modal);
+
+        // 点击外部关闭
+        modal.addEventListener('click', function(e) {
+            if (e.target === modal) {
+                document.body.removeChild(modal);
+            }
+        });
+
+        // 键盘事件
+        function handleKeydown(e) {
+            if (e.key === 'Escape') {
+                document.body.removeChild(modal);
+                document.removeEventListener('keydown', handleKeydown);
+            }
+        }
+        document.addEventListener('keydown', handleKeydown);
+
+        // 聚焦输入框
+        idInput.focus();
+    }
+
+    // 脑图选择器
+    function showMindmapPicker() {
+        var nightMode = g('nightMode') === true;
+
+        // 创建模态框
+        var modal = document.createElement('div');
+        modal.className = 'mindmap-picker-modal';
+        modal.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); z-index: 2000; display: flex; flex-direction: column; align-items: center; justify-content: center;';
+
+        // 创建容器
+        var container = document.createElement('div');
+        container.style.cssText = 'background: ' + (nightMode ? '#2d2d2d' : 'white') + '; border-radius: 12px; padding: 20px; width: 90%; max-width: 600px; max-height: 85vh; overflow: hidden; display: flex; flex-direction: column;';
+
+        // 标题
+        var title = document.createElement('div');
+        title.textContent = isEn() ? 'Insert Mind Map' : '插入脑图';
+        title.style.cssText = 'font-size: 18px; font-weight: 600; margin-bottom: 15px; text-align: center; color: ' + (nightMode ? '#eee' : '#333') + ';';
+        container.appendChild(title);
+
+        // 说明文字
+        var desc = document.createElement('div');
+        desc.innerHTML = isEn() ?
+            '<p style="margin-bottom:10px;color:' + (nightMode ? '#aaa' : '#666') + ';font-size:13px;">Use Markdown list format to create mind map:</p>' :
+            '<p style="margin-bottom:10px;color:' + (nightMode ? '#aaa' : '#666') + ';font-size:13px;">使用 Markdown 列表格式创建脑图：</p>';
+        desc.style.cssText = 'margin-bottom: 15px;';
+        container.appendChild(desc);
+
+        // 脑图内容输入
+        var contentLabel = document.createElement('label');
+        contentLabel.textContent = isEn() ? 'Mind Map Content:' : '脑图内容：';
+        contentLabel.style.cssText = 'display: block; margin-bottom: 8px; font-size: 14px; color: ' + (nightMode ? '#ddd' : '#333') + ';';
+        container.appendChild(contentLabel);
+
+        var contentInput = document.createElement('textarea');
+        contentInput.placeholder = isEn() ?
+            '- Main Topic\n  - Subtopic 1\n    - Detail 1\n    - Detail 2\n  - Subtopic 2\n    - Detail 3' :
+            '- 主题\n  - 子主题1\n    - 细节1\n    - 细节2\n  - 子主题2\n    - 细节3';
+        contentInput.rows = 10;
+        contentInput.style.cssText = 'width: 100%; padding: 10px 12px; margin-bottom: 15px; border: 1px solid ' + (nightMode ? '#444' : '#ccc') + '; border-radius: 6px; font-size: 14px; background: ' + (nightMode ? '#222' : '#fafafa') + '; color: ' + (nightMode ? '#eee' : '#333') + '; box-sizing: border-box; resize: vertical; font-family: monospace;';
+        container.appendChild(contentInput);
+
+        // 方向选择
+        var directionLabel = document.createElement('label');
+        directionLabel.textContent = isEn() ? 'Direction:' : '方向：';
+        directionLabel.style.cssText = 'display: block; margin-bottom: 8px; font-size: 14px; color: ' + (nightMode ? '#ddd' : '#333') + ';';
+        container.appendChild(directionLabel);
+
+        var directionSelect = document.createElement('select');
+        directionSelect.style.cssText = 'width: 100%; padding: 10px 12px; margin-bottom: 20px; border: 1px solid ' + (nightMode ? '#444' : '#ccc') + '; border-radius: 6px; font-size: 14px; background: ' + (nightMode ? '#222' : '#fafafa') + '; color: ' + (nightMode ? '#eee' : '#333') + '; box-sizing: border-box;';
+
+        var directions = [
+            { value: 'LR', label: isEn() ? 'Left to Right' : '从左到右' },
+            { value: 'RL', label: isEn() ? 'Right to Left' : '从右到左' },
+            { value: 'TB', label: isEn() ? 'Top to Bottom' : '从上到下' },
+            { value: 'BT', label: isEn() ? 'Bottom to Top' : '从下到上' }
+        ];
+
+        directions.forEach(function(dir) {
+            var option = document.createElement('option');
+            option.value = dir.value;
+            option.textContent = dir.label;
+            directionSelect.appendChild(option);
+        });
+        container.appendChild(directionSelect);
+
+        // 按钮栏
+        var buttonBar = document.createElement('div');
+        buttonBar.style.cssText = 'display: flex; gap: 10px; justify-content: flex-end;';
+
+        var cancelBtn = document.createElement('button');
+        cancelBtn.textContent = isEn() ? 'Cancel' : '取消';
+        cancelBtn.style.cssText = 'padding: 10px 20px; background: ' + (nightMode ? '#444' : '#f5f5f5') + '; color: ' + (nightMode ? '#eee' : '#333') + '; border: none; border-radius: 6px; cursor: pointer; font-size: 14px;';
+        cancelBtn.onclick = function() {
+            document.body.removeChild(modal);
+        };
+        buttonBar.appendChild(cancelBtn);
+
+        var insertBtn = document.createElement('button');
+        insertBtn.innerHTML = '<i class="fas fa-plus"></i> ' + (isEn() ? 'Insert' : '插入');
+        insertBtn.style.cssText = 'padding: 10px 20px; background: #4a90e2; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px;';
+        insertBtn.onclick = function() {
+            var mindmapContent = contentInput.value.trim();
+            var direction = directionSelect.value;
+
+            if (!mindmapContent) {
+                mindmapContent = isEn() ?
+                    '- Main Topic\n  - Subtopic 1\n  - Subtopic 2' :
+                    '- 主题\n  - 子主题1\n  - 子主题2';
+            }
+
+            // 生成 Mermaid 脑图代码
+            var mermaidCode = '```mermaid\nmindmap\n  root(("' + (isEn() ? 'Main Topic' : '主题') + '"))\n';
+
+            // 解析列表并转换为脑图格式
+            var lines = mindmapContent.split('\n');
+            var currentIndent = 0;
+            var indentStack = [0];
+
+            lines.forEach(function(line) {
+                if (!line.trim()) return;
+
+                // 计算缩进级别
+                var indent = 0;
+                var trimmedLine = line;
+                while (trimmedLine.startsWith(' ') || trimmedLine.startsWith('\t')) {
+                    indent++;
+                    trimmedLine = trimmedLine.substring(1);
+                }
+
+                // 移除列表标记
+                trimmedLine = trimmedLine.replace(/^[-*+]+\s*/, '').trim();
+                if (!trimmedLine) return;
+
+                // 计算相对缩进级别
+                var level = Math.floor(indent / 2) + 1;
+
+                // 生成脑图节点
+                var indentStr = '    '.repeat(level);
+                mermaidCode += indentStr + trimmedLine + '\n';
+            });
+
+            mermaidCode += '```';
+
+            insertText(mermaidCode);
+            document.body.removeChild(modal);
+        };
+        buttonBar.appendChild(insertBtn);
+
+        container.appendChild(buttonBar);
+
+        // 右上角关闭按钮
+        var closeBtn = document.createElement('button');
+        closeBtn.innerHTML = '<i class="fas fa-times"></i>';
+        closeBtn.style.cssText = 'position: absolute; top: 15px; right: 15px; width: 32px; height: 32px; background: ' + (nightMode ? '#444' : '#f5f5f5') + '; color: ' + (nightMode ? '#eee' : '#333') + '; border: none; border-radius: 50%; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center;';
+        closeBtn.onclick = function() {
+            document.body.removeChild(modal);
+        };
+        container.style.position = 'relative';
+        container.appendChild(closeBtn);
+
+        modal.appendChild(container);
+        document.body.appendChild(modal);
+
+        // 点击外部关闭
+        modal.addEventListener('click', function(e) {
+            if (e.target === modal) {
+                document.body.removeChild(modal);
+            }
+        });
+
+        // 键盘事件
+        function handleKeydown(e) {
+            if (e.key === 'Escape') {
+                document.body.removeChild(modal);
+                document.removeEventListener('keydown', handleKeydown);
+            }
+        }
+        document.addEventListener('keydown', handleKeydown);
+
+        // 聚焦输入框
+        contentInput.focus();
+    }
+
     global.showInsertPicker = showInsertPicker;
+    global.showFootnotePicker = showFootnotePicker;
+    global.showMindmapPicker = showMindmapPicker;
 
 })(typeof window !== 'undefined' ? window : this);

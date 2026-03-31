@@ -39,11 +39,23 @@ router.get('/content', verifyUser, async (req, res) => {
 
 // Save file
 router.post('/save', verifyUser, async (req, res) => {
-    const { username, filename, content, create_history } = req.body;
+    const { username, filename, content, create_history, base_last_modified, base_hash } = req.body;
     if (!username || !filename) return res.json({ code: 400, message: '缺少必要参数' });
     
     const shouldCreateHistory = create_history === 'true' || create_history === true;
-    res.json(await fileManager.saveFileWithHistory(username, filename, content, shouldCreateHistory));
+    const result = await fileManager.saveFileWithHistory(
+        username,
+        filename,
+        content,
+        shouldCreateHistory,
+        { base_last_modified, base_hash }
+    );
+
+    if (result.code === 409) {
+        return res.status(409).json(result);
+    }
+
+    res.json(result);
 });
 
 // Delete file
