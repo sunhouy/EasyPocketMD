@@ -1,0 +1,14 @@
+{
+  "name": "wasm-text-engine",
+  "private": true,
+  "version": "0.1.0",
+  "description": "C++/WASM text engine for diff, merge3 and full-text search",
+  "type": "module",
+  "scripts": {
+    "build": "bash ./scripts/build_wasm.sh",
+    "test:native": "bash ./scripts/run_native_tests.sh",
+    "test:wasm": "node ./tests/wasm_smoke.mjs"
+  }
+}
+
+

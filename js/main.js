@@ -77,6 +77,9 @@ document.addEventListener('DOMContentLoaded', function() {
     if (typeof window.userSettings.showOutline !== 'boolean') {
         window.userSettings.showOutline = false; // 默认不显示大纲
     }
+    if (typeof window.userSettings.enableWasmTextEngine !== 'boolean') {
+        window.userSettings.enableWasmTextEngine = false; // 默认关闭，按需灰度启用
+    }
 
     // 初始化主题
     initTheme();
@@ -255,6 +258,15 @@ document.addEventListener('DOMContentLoaded', function() {
     };
 
     window.vditor = new Vditor('vditor', editorConfig);
+
+    if (window.wasmTextEngineGateway && typeof window.wasmTextEngineGateway.init === 'function') {
+        const wasmStatus = window.wasmTextEngineGateway.getStatus ? window.wasmTextEngineGateway.getStatus() : { enabled: false };
+        if (wasmStatus.enabled) {
+            window.wasmTextEngineGateway.init().catch(function(error) {
+                console.warn('WASM text engine init failed:', error);
+            });
+        }
+    }
 
     // 顶部提示横幅相关函数
     let currentNoticeType = null;

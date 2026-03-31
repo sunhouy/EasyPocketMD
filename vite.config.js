@@ -4,6 +4,7 @@ import { readFileSync, existsSync, writeFileSync, readFile, cpSync } from 'node:
 import { join, resolve } from 'node:path';
 
 const versionPath = join(__dirname, 'version.json');
+const hasWasmTextEngineDist = existsSync(join(__dirname, 'wasm_text_engine', 'dist', 'text_engine.js'));
 let cacheVersion = 'v1';
 if (existsSync(versionPath)) {
   try {
@@ -191,7 +192,11 @@ export default defineConfig({
         {
           src: 'node_modules/pdfjs-dist/build/pdf.worker.mjs',
           dest: 'assets'
-        }
+        },
+        ...(hasWasmTextEngineDist ? [{
+          src: 'wasm_text_engine/dist/*',
+          dest: 'wasm_text_engine'
+        }] : [])
       ]
     }),
     {
