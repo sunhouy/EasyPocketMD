@@ -14,6 +14,7 @@ window.Vditor = Vditor;
 import './js/translations.js';
 import './js/utils.js';
 import './js/auth.js';
+import './js/wasm-text-engine-gateway.js';
 import './js/files.js';
 import './js/indexedDB.js';
 import './js/resourceLoader.js';

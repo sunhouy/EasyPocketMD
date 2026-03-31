@@ -18,7 +18,9 @@
     "cap:sync": "npm run build && cap sync",
     "cap:open:android": "cap open android",
     "cap:build:android": "npm run cap:sync && cd android && ./gradlew assembleRelease",
-    "cap:assets": "npx capacitor-assets generate --android"
+    "cap:assets": "npx capacitor-assets generate --android",
+    "wasm:text:build": "bash wasm_text_engine/scripts/build_wasm.sh",
+    "wasm:text:test": "bash wasm_text_engine/scripts/run_native_tests.sh"
   },
   "repository": {
     "type": "git",

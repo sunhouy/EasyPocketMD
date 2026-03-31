@@ -691,6 +691,14 @@
      * 返回格式：[{type: 'same'|'added'|'removed', left: string, right: string}]
      */
     function computeDiff(leftText, rightText) {
+        const gateway = global.wasmTextEngineGateway;
+        if (gateway && typeof gateway.diff === 'function') {
+            const wasmDiff = gateway.diff(leftText, rightText);
+            if (Array.isArray(wasmDiff) && wasmDiff.length >= 0) {
+                return wasmDiff;
+            }
+        }
+
         const leftLines = leftText.split('\n');
         const rightLines = rightText.split('\n');
         
@@ -830,7 +838,61 @@
         };
         document.addEventListener('keydown', handleEsc);
     }
-    
+
+    function showMergePreviewModal(conflict) {
+        const gateway = global.wasmTextEngineGateway;
+        if (!gateway || typeof gateway.merge3 !== 'function') {
+            global.showMessage(isEn() ? 'WASM merge is unavailable' : 'WASM 合并功能不可用', 'error');
+            return;
+        }
+
+        const files = g('files') || [];
+        const matched = files.find(function(f) {
+            return f && f.type === 'file' && f.name === conflict.filename;
+        });
+        const baseText = matched && matched.id && g('lastSyncedContent')
+            ? (g('lastSyncedContent')[matched.id] || '')
+            : '';
+
+        const res = gateway.merge3(baseText, conflict.localContent || '', conflict.serverContent || '', 'manual');
+        if (!res || res.code !== 200 || !res.data) {
+            global.showMessage((isEn() ? 'Merge preview failed: ' : '合并预览失败：') + ((res && res.message) || ''), 'error');
+            return;
+        }
+
+        const nightMode = g('nightMode') === true;
+        const modal = document.createElement('div');
+        modal.className = 'modal-overlay';
+        modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;z-index:10003;';
+
+        const panel = document.createElement('div');
+        panel.style.cssText = 'background:' + (nightMode ? '#2d2d2d' : '#fff') + ';color:' + (nightMode ? '#eee' : '#222') + ';width:92vw;max-width:1100px;height:82vh;border-radius:10px;display:flex;flex-direction:column;overflow:hidden;';
+        panel.innerHTML =
+            '<div style="padding:12px 16px;border-bottom:1px solid ' + (nightMode ? '#444' : '#ddd') + ';display:flex;justify-content:space-between;align-items:center;">' +
+                '<div><strong>' + (isEn() ? 'Merge Preview' : '合并预览') + '</strong> - ' + escapeHtml(conflict.filename || '') + '</div>' +
+                '<button id="closeMergePreviewBtn" style="background:none;border:none;font-size:22px;cursor:pointer;color:' + (nightMode ? '#eee' : '#333') + ';">&times;</button>' +
+            '</div>' +
+            '<div style="padding:8px 16px;font-size:12px;color:' + (nightMode ? '#aaa' : '#666') + ';border-bottom:1px solid ' + (nightMode ? '#444' : '#eee') + ';">' +
+                (isEn() ? 'Conflicts: ' : '冲突数：') + (res.data.conflictCount || 0) +
+            '</div>' +
+            '<div style="flex:1;overflow:auto;padding:12px 16px;">' +
+                '<pre style="white-space:pre-wrap;word-break:break-word;margin:0;font-family:monospace;line-height:1.45;">' + escapeHtml(res.data.mergedText || '') + '</pre>' +
+            '</div>';
+
+        modal.appendChild(panel);
+        document.body.appendChild(modal);
+
+        const close = function() {
+            if (modal.parentNode) modal.parentNode.removeChild(modal);
+        };
+
+        const closeBtn = panel.querySelector('#closeMergePreviewBtn');
+        if (closeBtn) closeBtn.onclick = close;
+        modal.onclick = function(e) {
+            if (e.target === modal) close();
+        };
+    }
+
     // 暴露到全局以便冲突模态窗口调用
     global.showDiffModal = showDiffModal;
 
@@ -850,7 +912,7 @@
             if (conflict.type === 'delete') {
                 conflictItem.innerHTML = '<div ' + highlightStyle + ' style="flex:1; padding: 8px;"><strong style="color: #dc3545;">' + (isCurrentFile ? '📝 ' : '⚠️ ') + conflict.filename + (isCurrentFile ? ' (' + (isEn() ? 'Currently editing' : '当前正在编辑') + ')' : '') + '</strong><div class="conflict-details"><div style="color: #dc3545;">' + (isEn() ? 'This file has been deleted on the server' : '该文件在服务器上已经删除') + '</div><div>' + (isEn() ? 'Local modified time: ' : '本地修改时间: ') + new Date(conflict.localModified).toLocaleString() + '</div></div><div style="margin-top: 8px;"><label style="margin-right: 15px;"><input type="radio" name="conflict-' + index + '" value="upload">' + (isEn() ? 'Re-upload to server' : '重新上传到服务器') + '</label><label><input type="radio" name="conflict-' + index + '" value="delete" checked>' + (isEn() ? 'Delete local file' : '删除本地文件') + '</label></div></div>';
             } else {
-                conflictItem.innerHTML = '<div ' + highlightStyle + ' style="flex:1; padding: 8px;"><strong>' + (isCurrentFile ? '📝 ' : '') + conflict.filename + (isCurrentFile ? ' (' + (isEn() ? 'Currently editing' : '当前正在编辑') + ')' : '') + '</strong><div class="conflict-details"><div>' + (isEn() ? 'Local modified time: ' : '本地修改时间: ') + new Date(conflict.localModified).toLocaleString() + '</div><div>' + (isEn() ? 'Server modified time: ' : '服务器修改时间: ') + new Date(conflict.serverModified).toLocaleString() + '</div></div><div style="margin-top: 8px;"><label style="margin-right: 15px;"><input type="radio" name="conflict-' + index + '" value="local"' + (isCurrentFile ? ' checked' : '') + '>' + (isEn() ? 'Use local version' : '使用本地版本') + '</label><label><input type="radio" name="conflict-' + index + '" value="server"' + (isCurrentFile ? '' : ' checked') + '>' + (isEn() ? 'Use server version' : '使用服务器版本') + '</label></div></div><button class="diff-view-btn" data-index="' + index + '" title="' + (isEn() ? 'View differences' : '查看差异') + '"><i class="fas fa-columns"></i></button>';
+                conflictItem.innerHTML = '<div ' + highlightStyle + ' style="flex:1; padding: 8px;"><strong>' + (isCurrentFile ? '📝 ' : '') + conflict.filename + (isCurrentFile ? ' (' + (isEn() ? 'Currently editing' : '当前正在编辑') + ')' : '') + '</strong><div class="conflict-details"><div>' + (isEn() ? 'Local modified time: ' : '本地修改时间: ') + new Date(conflict.localModified).toLocaleString() + '</div><div>' + (isEn() ? 'Server modified time: ' : '服务器修改时间: ') + new Date(conflict.serverModified).toLocaleString() + '</div></div><div style="margin-top: 8px;"><label style="margin-right: 15px;"><input type="radio" name="conflict-' + index + '" value="local"' + (isCurrentFile ? ' checked' : '') + '>' + (isEn() ? 'Use local version' : '使用本地版本') + '</label><label><input type="radio" name="conflict-' + index + '" value="server"' + (isCurrentFile ? '' : ' checked') + '>' + (isEn() ? 'Use server version' : '使用服务器版本') + '</label></div></div><button class="diff-view-btn" data-index="' + index + '" title="' + (isEn() ? 'View differences' : '查看差异') + '"><i class="fas fa-columns"></i></button><button class="merge-preview-btn" data-index="' + index + '" title="' + (isEn() ? 'WASM merge preview' : 'WASM 合并预览') + '"><i class="fas fa-code-branch"></i></button>';
             }
             conflictList.appendChild(conflictItem);
         });
@@ -861,6 +923,13 @@
                 e.stopPropagation();
                 const index = parseInt(this.getAttribute('data-index'));
                 showDiffModal(conflicts[index]);
+            });
+        });
+        conflictList.querySelectorAll('.merge-preview-btn').forEach(function(btn) {
+            btn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                const index = parseInt(this.getAttribute('data-index'));
+                showMergePreviewModal(conflicts[index]);
             });
         });
         conflictModal.classList.add('show');
@@ -3160,7 +3229,14 @@
                 '<button id="findPrevBtn" style="padding:6px 12px;background:' + (nightMode ? '#4a90e2' : '#4a90e2') + ';color:white;border:none;border-radius:6px;cursor:pointer;font-size:12px;">' + (isEn() ? 'Prev' : '上一个') + '</button>' +
                 '<button id="findNextBtn" style="padding:6px 12px;background:' + (nightMode ? '#4a90e2' : '#4a90e2') + ';color:white;border:none;border-radius:6px;cursor:pointer;font-size:12px;">' + (isEn() ? 'Next' : '下一个') + '</button>' +
             '</div>' +
-            '<div id="findStatus" style="font-size:12px;color:' + secondaryTextColor + ';"></div>';
+            '<div id="findStatus" style="font-size:12px;color:' + secondaryTextColor + ';"></div>' +
+            '<div id="wasmSearchPanel" style="margin-top:12px;border-top:1px solid ' + borderColor + ';padding-top:10px;display:none;">' +
+                '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">' +
+                    '<span style="font-size:12px;color:' + secondaryTextColor + ';">' + (isEn() ? 'Cross-file search (WASM)' : '跨文件搜索（WASM）') + '</span>' +
+                    '<button id="wasmSearchBtn" style="padding:4px 10px;background:' + (nightMode ? '#3d3d3d' : '#f0f0f0') + ';color:' + textColor + ';border:1px solid ' + borderColor + ';border-radius:6px;cursor:pointer;font-size:12px;">' + (isEn() ? 'Search Files' : '搜索文件') + '</button>' +
+                '</div>' +
+                '<div id="wasmSearchResults" style="max-height:180px;overflow:auto;font-size:12px;"></div>' +
+            '</div>';
         document.body.appendChild(dialog);
         // 拖动逻辑（支持鼠标和触摸）
         const header = dialog.querySelector('#findDialogHeader');
@@ -3265,6 +3341,15 @@
         const replaceBtn = dialog.querySelector('#replaceBtn');
         const replaceAllBtn = dialog.querySelector('#replaceAllBtn');
         const closeBtn = dialog.querySelector('#closeFindBtn');
+        const wasmSearchPanel = dialog.querySelector('#wasmSearchPanel');
+        const wasmSearchBtn = dialog.querySelector('#wasmSearchBtn');
+        const wasmSearchResults = dialog.querySelector('#wasmSearchResults');
+
+        const gateway = global.wasmTextEngineGateway;
+        const wasmAvailable = gateway && typeof gateway.searchFiles === 'function' && gateway.getStatus && gateway.getStatus().enabled;
+        if (wasmAvailable && wasmSearchPanel) {
+            wasmSearchPanel.style.display = 'block';
+        }
         // 获取编辑器可搜索的DOM节点
         function getEditorElement() {
             const vditor = g('vditor');
@@ -3286,6 +3371,7 @@
             if (!searchText) {
                 findStatus.textContent = '';
                 clearHighlights();
+                if (wasmSearchResults) wasmSearchResults.innerHTML = '';
                 return;
             }
             const editorElement = getEditorElement();
@@ -3324,6 +3410,64 @@
                 }
                 highlightMatch(currentMatchIndex);
             }
+        }
+
+        function renderWasmSearchResults(data) {
+            if (!wasmSearchResults) return;
+            const rows = (data && Array.isArray(data.results)) ? data.results : [];
+            if (rows.length === 0) {
+                wasmSearchResults.innerHTML = '<div style="color:' + secondaryTextColor + ';">' + (isEn() ? 'No file matches' : '没有匹配文件') + '</div>';
+                return;
+            }
+
+            const files = g('files') || [];
+            let html = '';
+            rows.forEach(function(item) {
+                const file = files.find(function(f) { return f && String(f.id) === String(item.docId); });
+                if (!file) return;
+                html += '<div class="wasm-search-hit" data-file-id="' + String(file.id) + '" style="padding:6px 8px;border:1px solid ' + borderColor + ';border-radius:6px;margin-bottom:6px;cursor:pointer;">' +
+                    '<div style="font-weight:500;">' + escapeHtml(file.name || '') + '</div>' +
+                    '<div style="margin-top:4px;color:' + secondaryTextColor + ';">' + escapeHtml((item.snippet || '').slice(0, 100)) + '</div>' +
+                '</div>';
+            });
+            wasmSearchResults.innerHTML = html;
+
+            wasmSearchResults.querySelectorAll('.wasm-search-hit').forEach(function(el) {
+                el.addEventListener('click', function() {
+                    const fileId = this.getAttribute('data-file-id');
+                    if (fileId && typeof global.openFile === 'function') {
+                        global.openFile(fileId);
+                        global.showMessage((isEn() ? 'Opened file: ' : '已打开文件：') + (this.querySelector('div') ? this.querySelector('div').textContent : ''), 'info');
+                    }
+                });
+            });
+        }
+
+        async function runWasmSearch() {
+            if (!wasmAvailable) return;
+            const keyword = findInput.value.trim();
+            if (!keyword) {
+                if (wasmSearchResults) wasmSearchResults.innerHTML = '';
+                return;
+            }
+
+            const initRes = gateway.getStatus().ready ? { code: 200 } : await gateway.init();
+            if (!initRes || initRes.code !== 200) {
+                if (wasmSearchResults) {
+                    wasmSearchResults.innerHTML = '<div style="color:#dc3545;">' + (isEn() ? 'WASM unavailable' : 'WASM 不可用') + '</div>';
+                }
+                return;
+            }
+
+            const res = gateway.searchFiles(keyword, { limit: 20, caseSensitive: false, wholeWord: false });
+            if (!res || res.code !== 200) {
+                if (wasmSearchResults) {
+                    wasmSearchResults.innerHTML = '<div style="color:#dc3545;">' + escapeHtml((res && res.message) || (isEn() ? 'Search failed' : '搜索失败')) + '</div>';
+                }
+                return;
+            }
+
+            renderWasmSearchResults(res.data);
         }
         // 清除所有高亮标记
         function clearAllHighlightMarks() {
@@ -3522,6 +3666,7 @@
         findPrevBtn.onclick = findPrev;
         replaceBtn.onclick = doReplace;
         replaceAllBtn.onclick = doReplaceAll;
+        if (wasmSearchBtn) wasmSearchBtn.onclick = runWasmSearch;
         // 关闭对话框并清除高亮
         function closeFindDialog() {
             clearAllHighlightMarks();
