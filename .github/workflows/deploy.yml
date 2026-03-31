@@ -74,6 +74,8 @@ jobs:
         ADMIN_PASSWORD=${{ secrets.ADMIN_PASSWORD }}
         BASE_URL=${{ secrets.BASE_URL }}
         DASHSCOPE_API_KEY=${{ secrets.DASHSCOPE_API_KEY }}
+        PPT_EXPORT_ENGINE=browser
+        PLAYWRIGHT_BROWSERS_PATH=/www/wwwroot/js_shared/ms-playwright
         EOF
 
     - name: Create SSL certificates
@@ -107,9 +109,10 @@ jobs:
           BLUE_DIR="/www/wwwroot/js_blue"
           SHARED_DIR="/www/wwwroot/js_shared"
           LINK_PATH="/www/wwwroot/js"
+          PLAYWRIGHT_BROWSERS_PATH="$SHARED_DIR/ms-playwright"
 
           # 创建必要的目录
-          mkdir -p "$GREEN_DIR" "$BLUE_DIR" "$SHARED_DIR/uploads" "$SHARED_DIR/user_uploads" "$SHARED_DIR/user_files"
+          mkdir -p "$GREEN_DIR" "$BLUE_DIR" "$SHARED_DIR/uploads" "$SHARED_DIR/user_uploads" "$SHARED_DIR/user_files" "$PLAYWRIGHT_BROWSERS_PATH"
 
           # 确定当前和下一个部署目录
           if [ -L "$LINK_PATH" ]; then
@@ -164,6 +167,7 @@ jobs:
           BLUE_DIR="/www/wwwroot/js_blue"
           SHARED_DIR="/www/wwwroot/js_shared"
           LINK_PATH="/www/wwwroot/js"
+          PLAYWRIGHT_BROWSERS_PATH="$SHARED_DIR/ms-playwright"
 
           # 确定目标目录
           if [ -L "$LINK_PATH" ]; then
@@ -196,6 +200,7 @@ jobs:
 
           # 安装依赖 - 使用更可靠的方式
           echo "[3/4] 安装依赖..."
+          export PLAYWRIGHT_BROWSERS_PATH
           # 清理 npm 缓存，避免旧缓存问题
           npm cache clean --force 2>/dev/null || true
           
@@ -209,6 +214,18 @@ jobs:
           else
             echo "使用 npm install..."
             timeout 300 npm install --omit=dev --prefer-offline --no-audit --no-fund
+          fi
+
+          echo "安装 Playwright Chromium..."
+          if timeout 600 npx playwright install --with-deps chromium; then
+            echo "✓ Playwright Chromium 安装完成（含系统依赖）"
+          else
+            echo "--with-deps 安装失败，尝试仅安装 Chromium..."
+            timeout 600 npx playwright install chromium || {
+              echo "错误: Playwright Chromium 安装失败"
+              exit 1
+            }
+            echo "✓ Playwright Chromium 安装完成"
           fi
           echo "✓ 依赖安装完成"
 
@@ -306,6 +323,8 @@ jobs:
           export ADMIN_PASSWORD=${{ secrets.ADMIN_PASSWORD }}
           export BASE_URL=${{ secrets.BASE_URL }}
           export DASHSCOPE_API_KEY=${{ secrets.DASHSCOPE_API_KEY }}
+          export PPT_EXPORT_ENGINE=browser
+          export PLAYWRIGHT_BROWSERS_PATH=/www/wwwroot/js_shared/ms-playwright
 
           /www/server/nodejs/v24.14.1/bin/pm2 start api/server.js --name "$NEXT_NAME" --env production
 
