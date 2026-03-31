@@ -91,6 +91,33 @@ export class WasmTextEngineClient {
         }
     }
 
+    findInText(text, query, options) {
+        var opts = options || {};
+        try {
+            return ok(JSON.parse(this.engine.findInText(
+                text || '',
+                query || '',
+                !!opts.caseSensitive
+            )));
+        } catch (e) {
+            return err('findInText failed: ' + e.message);
+        }
+    }
+
+    replaceAllText(text, query, replacement, options) {
+        var opts = options || {};
+        try {
+            return ok(JSON.parse(this.engine.replaceAllText(
+                text || '',
+                query || '',
+                replacement || '',
+                !!opts.caseSensitive
+            )));
+        } catch (e) {
+            return err('replaceAllText failed: ' + e.message);
+        }
+    }
+
     similarity(leftText, rightText) {
         try {
             return ok(JSON.parse(this.engine.similarity(leftText || '', rightText || '')));

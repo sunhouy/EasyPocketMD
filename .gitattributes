@@ -26,13 +26,16 @@
 *.tar   binary
 *.gz    binary
 
-# 标记生成的文件，让 GitHub 在 PR 中默认折叠它们
+# 标记生成的文件
 package-lock.json    linguist-generated
 yarn.lock            linguist-generated
 pnpm-lock.yaml       linguist-generated
 dist/                linguist-generated
 build/               linguist-generated
 coverage/            linguist-generated
-*.log                 linguist-generated
+*.log                linguist-generated
+
+tests/               linguist-vendored
+webrtc/**            linguist-documentation
 
 .github/workflows/*.yml linguist-detectable=true

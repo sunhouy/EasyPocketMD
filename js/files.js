@@ -692,62 +692,11 @@
      */
     function computeDiff(leftText, rightText) {
         const gateway = global.wasmTextEngineGateway;
-        if (gateway && typeof gateway.diff === 'function') {
-            const wasmDiff = gateway.diff(leftText, rightText);
-            if (Array.isArray(wasmDiff) && wasmDiff.length >= 0) {
-                return wasmDiff;
-            }
+        if (!gateway || typeof gateway.diff !== 'function') {
+            return [];
         }
-
-        const leftLines = leftText.split('\n');
-        const rightLines = rightText.split('\n');
-        
-        // 使用动态规划计算LCS
-        const m = leftLines.length;
-        const n = rightLines.length;
-        const dp = Array(m + 1).fill(null).map(() => Array(n + 1).fill(0));
-        
-        for (let i = 1; i <= m; i++) {
-            for (let j = 1; j <= n; j++) {
-                if (leftLines[i - 1] === rightLines[j - 1]) {
-                    dp[i][j] = dp[i - 1][j - 1] + 1;
-                } else {
-                    dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]);
-                }
-            }
-        }
-        
-        // 回溯构建差异
-        const result = [];
-        let i = m, j = n;
-        
-        while (i > 0 || j > 0) {
-            if (i > 0 && j > 0 && leftLines[i - 1] === rightLines[j - 1]) {
-                result.unshift({
-                    type: 'same',
-                    left: leftLines[i - 1],
-                    right: rightLines[j - 1]
-                });
-                i--;
-                j--;
-            } else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) {
-                result.unshift({
-                    type: 'added',
-                    left: '',
-                    right: rightLines[j - 1]
-                });
-                j--;
-            } else {
-                result.unshift({
-                    type: 'removed',
-                    left: leftLines[i - 1],
-                    right: ''
-                });
-                i--;
-            }
-        }
-        
-        return result;
+        const wasmDiff = gateway.diff(leftText, rightText);
+        return Array.isArray(wasmDiff) ? wasmDiff : [];
     }
     
     /**
@@ -3346,9 +3295,14 @@
         const wasmSearchResults = dialog.querySelector('#wasmSearchResults');
 
         const gateway = global.wasmTextEngineGateway;
-        const wasmAvailable = gateway && typeof gateway.searchFiles === 'function' && gateway.getStatus && gateway.getStatus().enabled;
+        const wasmAvailable = gateway && typeof gateway.ensureReady === 'function' && gateway.getStatus && gateway.getStatus().enabled;
         if (wasmAvailable && wasmSearchPanel) {
             wasmSearchPanel.style.display = 'block';
+        }
+
+        function getCurrentEditorText() {
+            const vditor = g('vditor');
+            return vditor ? (vditor.getValue() || '') : '';
         }
         // 获取编辑器可搜索的DOM节点
         function getEditorElement() {
@@ -3366,7 +3320,12 @@
         // 聚焦输入框
         setTimeout(() => findInput.focus(), 100);
         // 执行查找
-        function performFind() {
+        async function performFind() {
+            if (!wasmAvailable) {
+                findStatus.textContent = isEn() ? 'WASM unavailable' : 'WASM 不可用';
+                findStatus.style.color = '#dc3545';
+                return;
+            }
             searchText = findInput.value.trim();
             if (!searchText) {
                 findStatus.textContent = '';
@@ -3374,37 +3333,22 @@
                 if (wasmSearchResults) wasmSearchResults.innerHTML = '';
                 return;
             }
-            const editorElement = getEditorElement();
-            if (!editorElement) return;
-            let domText = '';
-            const walkerAll = document.createTreeWalker(
-                editorElement,
-                NodeFilter.SHOW_TEXT,
-                null,
-                false
-            );
-            let nodeAll;
-            while (nodeAll = walkerAll.nextNode()) {
-                domText += nodeAll.textContent;
+
+            const readyRes = await gateway.ensureReady();
+            if (!readyRes || readyRes.code !== 200) {
+                findStatus.textContent = escapeHtml((readyRes && readyRes.message) || (isEn() ? 'WASM unavailable' : 'WASM 不可用'));
+                findStatus.style.color = '#dc3545';
+                return;
             }
-            matches = [];
-            // 查找所有匹配位置
-            let index = domText.toLowerCase().indexOf(searchText.toLowerCase());
-            while (index !== -1) {
-                matches.push({
-                    start: index,
-                    end: index + searchText.length,
-                    text: domText.substring(index, index + searchText.length)
-                });
-                index = domText.toLowerCase().indexOf(searchText.toLowerCase(), index + 1);
-            }
+
+            const res = gateway.findInText(getCurrentEditorText(), searchText, { caseSensitive: false });
+            matches = (res && res.code === 200 && res.data && Array.isArray(res.data.matches)) ? res.data.matches : [];
             if (matches.length === 0) {
                 findStatus.textContent = isEn() ? 'No matches found' : '未找到匹配内容';
                 findStatus.style.color = '#dc3545';
             } else {
                 findStatus.textContent = (isEn() ? 'Found ' : '找到 ') + matches.length + (isEn() ? ' matches' : ' 个匹配');
                 findStatus.style.color = secondaryTextColor;
-                // 如果��前索引超出范围，重置为0
                 if (currentMatchIndex < 0 || currentMatchIndex >= matches.length) {
                     currentMatchIndex = 0;
                 }
@@ -3414,30 +3358,40 @@
 
         function renderWasmSearchResults(data) {
             if (!wasmSearchResults) return;
-            const rows = (data && Array.isArray(data.results)) ? data.results : [];
-            if (rows.length === 0) {
+            const rows = (data && Array.isArray(data.files)) ? data.files : [];
+            if (rows.length === 0 || !data.totalMatches) {
                 wasmSearchResults.innerHTML = '<div style="color:' + secondaryTextColor + ';">' + (isEn() ? 'No file matches' : '没有匹配文件') + '</div>';
                 return;
             }
 
-            const files = g('files') || [];
-            let html = '';
-            rows.forEach(function(item) {
-                const file = files.find(function(f) { return f && String(f.id) === String(item.docId); });
-                if (!file) return;
-                html += '<div class="wasm-search-hit" data-file-id="' + String(file.id) + '" style="padding:6px 8px;border:1px solid ' + borderColor + ';border-radius:6px;margin-bottom:6px;cursor:pointer;">' +
-                    '<div style="font-weight:500;">' + escapeHtml(file.name || '') + '</div>' +
-                    '<div style="margin-top:4px;color:' + secondaryTextColor + ';">' + escapeHtml((item.snippet || '').slice(0, 100)) + '</div>' +
+            let html = '<div style="margin-bottom:8px;color:' + secondaryTextColor + ';">' +
+                (isEn() ? 'Matched files: ' : '匹配文件数：') + data.fileCount + '，' +
+                (isEn() ? 'total matches: ' : '总匹配数：') + data.totalMatches +
                 '</div>';
+
+            rows.forEach(function(item) {
+                html += '<div style="padding:6px 8px;border:1px solid ' + borderColor + ';border-radius:6px;margin-bottom:8px;">' +
+                    '<div style="font-weight:600;">' + escapeHtml(item.filename || '') + ' (' + item.matchCount + ')</div>';
+                (item.hits || []).forEach(function(hit) {
+                    html += '<div class="wasm-search-hit" data-file-id="' + String(item.docId) + '" data-start="' + hit.start + '" data-end="' + hit.end + '" style="margin-top:5px;padding:5px 6px;border-radius:5px;background:' + (nightMode ? '#3a3a3a' : '#f6f6f6') + ';cursor:pointer;max-height:66px;overflow:auto;">' +
+                        escapeHtml(hit.snippet || '') +
+                    '</div>';
+                });
+                html += '</div>';
             });
             wasmSearchResults.innerHTML = html;
 
             wasmSearchResults.querySelectorAll('.wasm-search-hit').forEach(function(el) {
-                el.addEventListener('click', function() {
+                el.addEventListener('click', async function() {
                     const fileId = this.getAttribute('data-file-id');
+                    const start = parseInt(this.getAttribute('data-start') || '0', 10);
+                    const end = parseInt(this.getAttribute('data-end') || '0', 10);
                     if (fileId && typeof global.openFile === 'function') {
-                        global.openFile(fileId);
-                        global.showMessage((isEn() ? 'Opened file: ' : '已打开文件：') + (this.querySelector('div') ? this.querySelector('div').textContent : ''), 'info');
+                        await global.openFile(fileId);
+                        clearHighlights();
+                        matches = [{ start: start, end: end, snippet: this.textContent || '' }];
+                        currentMatchIndex = 0;
+                        highlightMatch(currentMatchIndex);
                     }
                 });
             });
@@ -3451,7 +3405,7 @@
                 return;
             }
 
-            const initRes = gateway.getStatus().ready ? { code: 200 } : await gateway.init();
+            const initRes = await gateway.ensureReady();
             if (!initRes || initRes.code !== 200) {
                 if (wasmSearchResults) {
                     wasmSearchResults.innerHTML = '<div style="color:#dc3545;">' + (isEn() ? 'WASM unavailable' : 'WASM 不可用') + '</div>';
@@ -3459,7 +3413,7 @@
                 return;
             }
 
-            const res = gateway.searchFiles(keyword, { limit: 20, caseSensitive: false, wholeWord: false });
+            const res = gateway.searchFilesDetailed(keyword, { caseSensitive: false });
             if (!res || res.code !== 200) {
                 if (wasmSearchResults) {
                     wasmSearchResults.innerHTML = '<div style="color:#dc3545;">' + escapeHtml((res && res.message) || (isEn() ? 'Search failed' : '搜索失败')) + '</div>';
@@ -3563,92 +3517,63 @@
             currentMatchIndex = -1;
         }
         // 查找下一个
-        function findNext() {
+        async function findNext() {
             if (matches.length === 0 || searchText !== findInput.value.trim()) {
-                performFind();
+                await performFind();
                 return;
             }
             currentMatchIndex = (currentMatchIndex + 1) % matches.length;
             highlightMatch(currentMatchIndex);
         }
         // 查找上一个
-        function findPrev() {
+        async function findPrev() {
             if (matches.length === 0 || searchText !== findInput.value.trim()) {
-                performFind();
+                await performFind();
                 return;
             }
             currentMatchIndex = (currentMatchIndex - 1 + matches.length) % matches.length;
             highlightMatch(currentMatchIndex);
         }
         // 执行替换功能
-        function doReplace() {
+        async function doReplace() {
             if (matches.length === 0 || currentMatchIndex < 0) {
-                performFind();
+                await performFind();
                 if (matches.length === 0) return; // 还是没匹配到就算了
             }
             const replaceText = replaceInput.value;
-            const editorElement = getEditorElement();
-            if (!editorElement) return;
-            // 聚焦到编辑器
-            editorElement.focus();
-            // 获取当前的高亮节点
-            const marks = editorElement.querySelectorAll('mark.find-highlight');
-            if (marks.length > 0) {
-                const mark = marks[0];
-                const parent = mark.parentNode;
-                // 先获取要替换的文本内容
-                const textNode = document.createTextNode(replaceText);
-                // 用新文本节点替换 mark 元素
-                parent.replaceChild(textNode, mark);
-                parent.normalize();
-                // 替换后需要重新解析内容建立新的索引
-                setTimeout(() => {
-                    performFind();
-                }, 50);
-            } else {
-                // 如果没有 mark 但有选区，使用 document.execCommand 替换
-                const selection = window.getSelection();
-                if (selection.rangeCount > 0 && !selection.isCollapsed) {
-                    document.execCommand('insertText', false, replaceText);
-                }
-                setTimeout(() => {
-                    performFind();
-                }, 50);
+            const vditor = g('vditor');
+            if (!vditor) return;
+            const currentText = vditor.getValue() || '';
+            const target = matches[currentMatchIndex];
+            const newText = currentText.slice(0, target.start) + replaceText + currentText.slice(target.end);
+            vditor.setValue(newText, true);
+            await performFind();
+            if (matches.length > 0) {
+                currentMatchIndex = Math.min(currentMatchIndex, matches.length - 1);
+                highlightMatch(currentMatchIndex);
             }
         }
         // 全部替换
-        function doReplaceAll() {
-            performFind();
+        async function doReplaceAll() {
+            await performFind();
             if (matches.length === 0) return;
             const replaceText = replaceInput.value;
-            const editorElement = getEditorElement();
-            if (!editorElement) return;
-            editorElement.focus();
-            // 高效写法：直接在原始文本上整体操作 Vditor
             const vditor = g('vditor');
-            if (vditor) {
-                let text = vditor.getValue();
-                // 使用正则表达式全局替换，保持大小写不敏感
-                const escapeRegExp = (string) => string.replace(/[.*+?^${}()|[\]\\-]/g, '\\$&');
-                const regex = new RegExp(escapeRegExp(searchText), 'gi');
-                const matchCount = (text.match(regex) || []).length;
-                if (matchCount > 0) {
-                    const newText = text.replace(regex, replaceText);
-                    // 重新设置内容
-                    vditor.setValue(newText, true);
-                    findStatus.textContent = (isEn() ? 'Replaced ' : '已替换 ') + matchCount + (isEn() ? ' occurrences' : ' 处');
-                    findStatus.style.color = '#28a745';
-                    clearHighlights();
-                    matches = [];
-                    currentMatchIndex = -1;
-                }
-            }
+            if (!vditor) return;
+            const replaceRes = gateway.replaceAllText(vditor.getValue() || '', searchText, replaceText, { caseSensitive: false });
+            if (!replaceRes || replaceRes.code !== 200 || !replaceRes.data) return;
+            vditor.setValue(replaceRes.data.text || '', true);
+            findStatus.textContent = (isEn() ? 'Replaced ' : '已替换 ') + (replaceRes.data.replaced || 0) + (isEn() ? ' occurrences' : ' 处');
+            findStatus.style.color = '#28a745';
+            clearHighlights();
+            matches = [];
+            currentMatchIndex = -1;
         }
         // 绑定事件
         let findTimeout;
         findInput.addEventListener('input', function() {
             clearTimeout(findTimeout);
-            findTimeout = setTimeout(performFind, 200);
+            findTimeout = setTimeout(function() { performFind(); }, 200);
         });
         findInput.addEventListener('keydown', function(e) {
             if (e.key === 'Enter') {
