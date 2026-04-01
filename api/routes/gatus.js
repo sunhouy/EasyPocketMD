@@ -54,6 +54,12 @@ const ENDPOINTS_TO_MONITOR = [
         group: 'convert'
     },
     {
+        name: 'Convert DOCX',
+        url: '/api/convert/docx',
+        method: 'POST',
+        group: 'convert'
+    },
+    {
         name: 'AI Layout',
         url: '/api/ai/layout',
         method: 'POST',
@@ -97,6 +103,8 @@ async function checkEndpointStatus(endpoint, baseUrl) {
                 testBody = { share_id: 'test' };
             } else if (endpoint.url.includes('user_files')) {
                 testBody = { username: 'test', password: 'test' };
+            } else if (endpoint.url.includes('convert/docx')) {
+                testBody = { markdown: '# Test' };
             } else if (endpoint.url.includes('convert')) {
                 testBody = { content: '# Test' };
             } else if (endpoint.url.includes('ai')) {

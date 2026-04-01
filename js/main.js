@@ -870,8 +870,184 @@ document.addEventListener('DOMContentLoaded', function() {
             toolbarSettings.appendChild(label);
         });
 
+        // 每次打开设置都默认折叠空间管理详情
+        var storageManagementDetails = document.getElementById('storageManagementDetails');
+        var storageUsagePanel = document.getElementById('storageUsagePanel');
+        if (storageManagementDetails) {
+            storageManagementDetails.open = false;
+        }
+        if (storageUsagePanel) {
+            storageUsagePanel.style.display = 'none';
+        }
+
         modal.classList.add('show');
     };
+
+    function formatStorageBytes(bytes) {
+        if (typeof bytes !== 'number' || !isFinite(bytes) || bytes < 0) {
+            return window.i18n ? window.i18n.t('storageUsageUnavailable') : 'Unavailable';
+        }
+        if (bytes === 0) return '0 B';
+        var units = ['B', 'KB', 'MB', 'GB', 'TB'];
+        var index = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+        var value = bytes / Math.pow(1024, index);
+        return value.toFixed(value >= 100 || index === 0 ? 0 : 1) + ' ' + units[index];
+    }
+
+    function estimateLocalStorageBytes() {
+        try {
+            var total = 0;
+            for (var i = 0; i < localStorage.length; i++) {
+                var key = localStorage.key(i);
+                if (!key) continue;
+                var value = localStorage.getItem(key) || '';
+                total += new Blob([key]).size + new Blob([value]).size;
+            }
+            return total;
+        } catch (error) {
+            console.warn('[StorageManagement] estimateLocalStorageBytes failed:', error);
+            return null;
+        }
+    }
+
+    function estimateCookieBytes() {
+        try {
+            return new Blob([document.cookie || '']).size;
+        } catch (error) {
+            console.warn('[StorageManagement] estimateCookieBytes failed:', error);
+            return null;
+        }
+    }
+
+    async function estimateCacheStorageBytesFromEntries() {
+        if (!('caches' in window)) return 0;
+        var total = 0;
+        var cacheNames = await caches.keys();
+
+        for (var i = 0; i < cacheNames.length; i++) {
+            var cache = await caches.open(cacheNames[i]);
+            var requests = await cache.keys();
+
+            for (var j = 0; j < requests.length; j++) {
+                var response = await cache.match(requests[j]);
+                if (!response) continue;
+
+                var contentLength = parseInt(response.headers.get('content-length') || '0', 10);
+                if (contentLength > 0) {
+                    total += contentLength;
+                    continue;
+                }
+
+                try {
+                    var clonedResponse = response.clone();
+                    var buffer = await clonedResponse.arrayBuffer();
+                    total += buffer.byteLength || 0;
+                } catch (error) {
+                    // 某些响应体不可读取时忽略，继续统计其余条目
+                }
+            }
+        }
+
+        return total;
+    }
+
+    async function getStorageEstimateDetails() {
+        if (!navigator.storage || !navigator.storage.estimate) return null;
+        try {
+            return await navigator.storage.estimate();
+        } catch (error) {
+            console.warn('[StorageManagement] navigator.storage.estimate failed:', error);
+            return null;
+        }
+    }
+
+    async function getServiceWorkerRegistrationCount() {
+        if (!('serviceWorker' in navigator)) return 0;
+        try {
+            var registrations = await navigator.serviceWorker.getRegistrations();
+            return registrations.length;
+        } catch (error) {
+            console.warn('[StorageManagement] getRegistrations failed:', error);
+            return 0;
+        }
+    }
+
+    function renderStorageUsageRows(rows) {
+        var listEl = document.getElementById('storageUsageList');
+        if (!listEl) return;
+
+        listEl.innerHTML = rows.map(function(row) {
+            return '<div style="display:flex;justify-content:space-between;gap:8px;padding:6px 8px;border:1px solid #e8e8e8;border-radius:6px;background:#fff;">' +
+                '<span style="color:#666;">' + row.label + '</span>' +
+                '<strong style="font-weight:600;">' + row.value + '</strong>' +
+                '</div>';
+        }).join('');
+    }
+
+    async function updateStorageUsageDetails() {
+        var usagePanelEl = document.getElementById('storageUsagePanel');
+        var loadingEl = document.getElementById('storageUsageLoading');
+        if (!usagePanelEl || !loadingEl) return;
+
+        usagePanelEl.style.display = 'block';
+        loadingEl.style.display = 'block';
+
+        var t = function(key) { return window.i18n ? window.i18n.t(key) : key; };
+        loadingEl.textContent = t('storageUsageCalculating');
+
+        try {
+            var estimate = await getStorageEstimateDetails();
+            var details = estimate && estimate.usageDetails ? estimate.usageDetails : {};
+
+            var localStorageBytes = estimateLocalStorageBytes();
+            var indexedDBBytes = (typeof details.indexedDB === 'number') ? details.indexedDB : null;
+            var cacheStorageBytes = null;
+            if (typeof details.caches === 'number') {
+                cacheStorageBytes = details.caches;
+            } else if (typeof details.cacheStorage === 'number') {
+                cacheStorageBytes = details.cacheStorage;
+            } else {
+                cacheStorageBytes = await estimateCacheStorageBytesFromEntries();
+            }
+
+            var cookieBytes = estimateCookieBytes();
+            var serviceWorkerCount = await getServiceWorkerRegistrationCount();
+
+            renderStorageUsageRows([
+                { label: t('storageLocalStorage'), value: formatStorageBytes(localStorageBytes) },
+                { label: t('storageIndexedDBUsage'), value: formatStorageBytes(indexedDBBytes) },
+                { label: t('storageCacheStorageUsage'), value: formatStorageBytes(cacheStorageBytes) },
+                { label: t('storageCookiesUsage'), value: formatStorageBytes(cookieBytes) },
+                { label: t('storageServiceWorkersUsage'), value: t('storageServiceWorkerCount').replace('{count}', String(serviceWorkerCount)) }
+            ]);
+            loadingEl.style.display = 'none';
+        } catch (error) {
+            console.error('[StorageManagement] updateStorageUsageDetails failed:', error);
+            renderStorageUsageRows([
+                { label: t('storageLocalStorage'), value: t('storageUsageUnavailable') },
+                { label: t('storageIndexedDBUsage'), value: t('storageUsageUnavailable') },
+                { label: t('storageCacheStorageUsage'), value: t('storageUsageUnavailable') },
+                { label: t('storageCookiesUsage'), value: t('storageUsageUnavailable') },
+                { label: t('storageServiceWorkersUsage'), value: t('storageUsageUnavailable') }
+            ]);
+            loadingEl.style.display = 'none';
+        }
+    }
+
+    function initStorageManagementPanel() {
+        var detailsEl = document.getElementById('storageManagementDetails');
+        if (!detailsEl) return;
+
+        detailsEl.addEventListener('toggle', function() {
+            if (detailsEl.open) {
+                updateStorageUsageDetails();
+                return;
+            }
+
+            var usagePanelEl = document.getElementById('storageUsagePanel');
+            if (usagePanelEl) usagePanelEl.style.display = 'none';
+        });
+    }
 
     async function clearAllCacheStorage() {
         if (!('caches' in window)) return;
@@ -971,6 +1147,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 await actionFn();
                 window.showMessage(window.i18n ? window.i18n.t(successKey) : '操作成功', 'success');
+                var detailsEl = document.getElementById('storageManagementDetails');
+                if (detailsEl && detailsEl.open) {
+                    updateStorageUsageDetails();
+                }
             } catch (error) {
                 console.error('[StorageManagement] Action failed:', error);
                 window.showMessage(window.i18n ? window.i18n.t(failKey) : '操作失败', 'error');
@@ -982,6 +1162,7 @@ document.addEventListener('DOMContentLoaded', function() {
     bindStorageManagementAction('clearIndexedDBBtn', clearAllIndexedDB, 'confirmClearIndexedDB', 'clearIndexedDBSuccess', 'clearIndexedDBFailed');
     bindStorageManagementAction('clearServiceWorkerBtn', clearAllServiceWorkers, 'confirmClearServiceWorker', 'clearServiceWorkerSuccess', 'clearServiceWorkerFailed');
     bindStorageManagementAction('clearCookiesBtn', clearAllCookies, 'confirmClearCookies', 'clearCookiesSuccess', 'clearCookiesFailed');
+    initStorageManagementPanel();
 
     // 保存设置
     var saveSettingsBtn = document.getElementById('saveSettingsBtn');

@@ -3,9 +3,13 @@ const router = express.Router();
 const markdownIt = require('markdown-it');
 const markdownItTaskLists = require('markdown-it-task-lists');
 const markdownItMathjax3 = require('markdown-it-mathjax3');
+const markdownItFootnote = require('markdown-it-footnote');
 const wkhtmltopdf = require('wkhtmltopdf');
 const path = require('path');
 const fs = require('fs');
+const fsp = require('fs/promises');
+const os = require('os');
+const { spawn } = require('child_process');
 const { v4: uuidv4 } = require('uuid');
 
 // Initialize markdown-it with common options
@@ -20,6 +24,7 @@ const md = markdownIt({
 // Use plugins
 md.use(markdownItTaskLists);
 md.use(markdownItMathjax3);
+md.use(markdownItFootnote);
 
 /**
  * Clean up MathJax-related content from HTML (Node.js version using regex)
@@ -211,162 +216,210 @@ router.post('/pdf', (req, res) => {
     }
 });
 
-// Word (DOCX) Conversion endpoint
-router.post('/docx', async (req, res) => {
-    try {
-        let { markdown, settings } = req.body;
-        
-        if (!markdown) {
-            return res.status(400).json({ 
-                code: 400, 
-                message: 'Markdown content is required' 
-            });
-        }
-        
-        // Process mermaid diagrams - replace with placeholder text
-        // Mermaid diagrams need to be rendered on frontend, backend can't generate images
-        let processedMarkdown = markdown.replace(/```mermaid\n([\s\S]*?)```/g, (match, content) => {
-            return `<div style="border: 1px solid #ddd; padding: 10px; margin: 10px 0; background: #f9f9f9; text-align: center;">
-                <p style="color: #666; margin: 0;">[Mermaid Diagram]</p>
-                <pre style="text-align: left; margin: 5px 0;">${content.trim()}</pre>
-            </div>`;
-        });
-        
-        // Render markdown to HTML
-        let html = md.render(processedMarkdown);
-        
-        // Process MathJax content - convert to Word-compatible format
-        // Keep the SVG rendering of formulas
-        html = html.replace(/<mjx-container[^>]*>([\s\S]*?)<\/mjx-container>/gi, (match, content) => {
-            // Extract SVG from the content
-            const svgMatch = content.match(/<svg[\s\S]*?<\/svg>/i);
-            if (svgMatch) {
-                // Wrap the SVG in a div with appropriate styling
-                return `<div style="text-align: center; margin: 1em 0;">${svgMatch[0]}</div>`;
-            }
-            // If no SVG found, try to extract the formula text
-            const texMatch = content.match(/\\\[([\s\S]*?)\\\]/);
-            if (texMatch) {
-                return `<div style="text-align: center; margin: 1em 0; font-style: italic;">[Formula: ${texMatch[1].trim()}]</div>`;
-            }
-            return '';
-        });
-        
-        // Remove MathJax scripts and assistive elements
-        html = html.replace(/<script[^>]*src[^>]*mathjax[^>]*>[\s\S]*?<\/script>/gi, '');
-        html = html.replace(/<script[^>]*id[^>]*MathJax[^>]*>[\s\S]*?<\/script>/gi, '');
-        html = html.replace(/<mjx-assistive-mml[^>]*>[\s\S]*?<\/mjx-assistive-mml>/gi, '');
-        
-        // Get settings with defaults
-        const margin = settings?.pageMargin || '25';
-        const bodyFontSize = settings?.bodyFontSize || '12';
-        const lineHeight = settings?.lineHeight || '1.5';
-        const titleFontSize = settings?.titleFontSize || '18';
-        
-        // Build Word-readable HTML MIME format
-        const wordHtml = `<html xmlns:o="urn:schemas-microsoft-com:office:office" 
-      xmlns:w="urn:schemas-microsoft-com:office:word" 
-      xmlns="http://www.w3.org/TR/REC-html40">
+function toFiniteNumber(value, fallback) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function toSafeAlign(value, fallback) {
+    const normalized = String(value || '').toLowerCase();
+    if (normalized === 'left' || normalized === 'center' || normalized === 'right' || normalized === 'justify') {
+        return normalized;
+    }
+    return fallback;
+}
+
+function buildDocxStyledHtml(markdown, settings = {}) {
+    const pageMargin = toFiniteNumber(settings.pageMargin, 25);
+    const bodyFontSize = toFiniteNumber(settings.bodyFontSize, 12);
+    const lineHeight = toFiniteNumber(settings.lineHeight, 1.5);
+    const paragraphSpacing = toFiniteNumber(settings.paragraphSpacing, 0.5);
+    const titleFontSize = toFiniteNumber(settings.titleFontSize, 18);
+    const useCustomHeadingSizes = settings.useCustomHeadingSizes === true;
+
+    const bodyAlignment = toSafeAlign(settings.alignment, 'left');
+    const headingAlignment = toSafeAlign(settings.titleAlignment, 'left');
+    const imgWidth = settings.imgWidth || '100%';
+    const imgHeight = settings.imgHeight || 'auto';
+
+    const headingSizes = {
+        h1: useCustomHeadingSizes ? toFiniteNumber(settings.h1Size, 32) : titleFontSize * 2,
+        h2: useCustomHeadingSizes ? toFiniteNumber(settings.h2Size, 28) : titleFontSize * 1.6,
+        h3: useCustomHeadingSizes ? toFiniteNumber(settings.h3Size, 24) : titleFontSize * 1.35,
+        h4: useCustomHeadingSizes ? toFiniteNumber(settings.h4Size, 20) : titleFontSize * 1.2,
+        h5: useCustomHeadingSizes ? toFiniteNumber(settings.h5Size, 18) : titleFontSize,
+        h6: useCustomHeadingSizes ? toFiniteNumber(settings.h6Size, 16) : Math.max(14, titleFontSize * 0.9)
+    };
+
+    const processedMarkdown = String(markdown || '').replace(/```mermaid\n([\s\S]*?)```/g, (match, content) => {
+        return `\n> [Mermaid Diagram]\n>\n> ${String(content || '').trim().split('\n').join('\n> ')}\n`;
+    });
+
+    let html = md.render(processedMarkdown);
+    html = cleanMathJaxContent(html);
+
+    return `<!DOCTYPE html>
+<html lang="zh-CN">
 <head>
-    <meta charset="utf-8">
-    <title>Document</title>
-    <!--[if gte mso 9]>
-    <xml>
-        <w:WordDocument>
-            <w:View>Print</w:View>
-            <w:Zoom>100</w:Zoom>
-            <w:DoNotOptimizeForBrowser/>
-        </w:WordDocument>
-    </xml>
-    <![endif]-->
+    <meta charset="utf-8" />
     <style>
-        <!--
-        @page {
-            size: 21cm 29.7cm;
-            margin: ${margin}mm;
-        }
-        @page Section1 {
-            margin: ${margin}mm;
-        }
-        div.Section1 {
-            page: Section1;
-        }
+        @page { margin: ${pageMargin}mm; }
         body {
-            font-family: "SimSun", "宋体", serif;
+            font-family: "Noto Serif CJK SC", "SimSun", "Microsoft YaHei", serif;
             font-size: ${bodyFontSize}pt;
             line-height: ${lineHeight};
+            text-align: ${bodyAlignment};
+            word-break: break-word;
+        }
+        p {
+            margin: 0 0 ${paragraphSpacing}em 0;
         }
         h1, h2, h3, h4, h5, h6 {
-            font-weight: bold;
-            margin: 1em 0;
+            text-align: ${headingAlignment};
+            margin: 1em 0 0.6em 0;
+            font-weight: 700;
         }
-        h1 { font-size: ${parseInt(bodyFontSize) * 2}pt; }
-        h2 { font-size: ${parseInt(bodyFontSize) * 1.5}pt; }
-        h3 { font-size: ${parseInt(bodyFontSize) * 1.25}pt; }
-        p {
-            margin: 0 0 0.5em 0;
+        h1 { font-size: ${headingSizes.h1}pt; }
+        h2 { font-size: ${headingSizes.h2}pt; }
+        h3 { font-size: ${headingSizes.h3}pt; }
+        h4 { font-size: ${headingSizes.h4}pt; }
+        h5 { font-size: ${headingSizes.h5}pt; }
+        h6 { font-size: ${headingSizes.h6}pt; }
+        pre {
+            background: #f7f7f7;
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+            padding: 10px;
+            white-space: pre-wrap;
+        }
+        code {
+            font-family: "Consolas", "Courier New", monospace;
+        }
+        blockquote {
+            border-left: 3px solid #d0d0d0;
+            margin: 0.8em 0;
+            padding-left: 0.8em;
+            color: #555;
         }
         table {
             border-collapse: collapse;
             width: 100%;
+            margin: 0.8em 0;
         }
-        td, th {
-            border: 1px solid #000;
-            padding: 8px;
+        th, td {
+            border: 1px solid #333;
+            padding: 6px 8px;
         }
         th {
-            background-color: #f8f9fa;
-            font-weight: bold;
-        }
-        code {
-            background: #f5f5f5;
-            padding: 2px 4px;
-            font-family: monospace;
-        }
-        pre {
-            background: #f5f5f5;
-            padding: 10px;
-            overflow-x: auto;
-            border: 1px solid #ddd;
-        }
-        svg {
-            max-width: 100%;
-            height: auto;
+            background: #f0f0f0;
         }
         img {
-            max-width: 100%;
-            height: auto;
             display: block;
-            margin: 1em auto;
+            width: ${imgWidth};
+            height: ${imgHeight};
+            max-width: 100%;
+            margin: 0.8em auto;
         }
-        -->
     </style>
 </head>
 <body>
-    <div class="Section1">
-        ${html}
-    </div>
+${html}
 </body>
 </html>`;
+}
 
-        // Generate filename
-        const filename = `document_${new Date().toISOString().slice(0, 10)}.doc`;
-        
-        // Set headers for file download
-        res.setHeader('Content-Type', 'application/msword');
-        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-        
-        // Send the Word HTML with BOM for UTF-8
-        const bom = Buffer.from([0xEF, 0xBB, 0xBF]);
-        const content = Buffer.from(wordHtml, 'utf8');
-        res.send(Buffer.concat([bom, content]));
+async function runPandocDocx(inputContent, options = {}) {
+    const tempDir = await fsp.mkdtemp(path.join(os.tmpdir(), 'easypocketmd-docx-'));
+    const inputFormat = options.inputFormat || 'markdown+task_lists+tex_math_dollars+tex_math_single_backslash+fenced_code_blocks+pipe_tables';
+    const inputExt = inputFormat === 'html' ? 'html' : 'md';
+    const inputPath = path.join(tempDir, `input.${inputExt}`);
+    const outputPath = path.join(tempDir, 'output.docx');
 
+    try {
+        await fsp.writeFile(inputPath, inputContent, 'utf8');
+
+        const args = [
+            inputPath,
+            '-f',
+            inputFormat,
+            '-t',
+            'docx',
+            '-o',
+            outputPath,
+            '--standalone'
+        ];
+
+        const configuredReference = (options.referenceDocx || process.env.PANDOC_REFERENCE_DOCX || '').trim();
+        if (configuredReference) {
+            const referencePath = path.isAbsolute(configuredReference)
+                ? configuredReference
+                : path.join(process.cwd(), configuredReference);
+            if (fs.existsSync(referencePath)) {
+                args.push('--reference-doc', referencePath);
+            }
+        }
+
+        await new Promise((resolve, reject) => {
+            const child = spawn('pandoc', args, {
+                windowsHide: true
+            });
+
+            let stderr = '';
+
+            child.stderr.on('data', (chunk) => {
+                stderr += chunk.toString();
+            });
+
+            child.on('error', (error) => {
+                reject(error);
+            });
+
+            child.on('close', (code) => {
+                if (code === 0) {
+                    resolve();
+                    return;
+                }
+                reject(new Error(`Pandoc exited with code ${code}: ${stderr || 'unknown error'}`));
+            });
+        });
+
+        return await fsp.readFile(outputPath);
+    } finally {
+        await fsp.rm(tempDir, { recursive: true, force: true }).catch(() => {});
+    }
+}
+
+// Word (DOCX) Conversion endpoint (Pandoc)
+router.post('/docx', async (req, res) => {
+    try {
+        const { markdown, referenceDocx, settings } = req.body || {};
+
+        if (!markdown || typeof markdown !== 'string') {
+            return res.status(400).json({
+                code: 400,
+                message: 'Markdown content is required'
+            });
+        }
+
+        const styledHtml = buildDocxStyledHtml(markdown, settings || {});
+        const docxBuffer = await runPandocDocx(styledHtml, {
+            referenceDocx,
+            inputFormat: 'html'
+        });
+        const filename = `document_${new Date().toISOString().slice(0, 10)}.docx`;
+
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+        res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`);
+        return res.status(200).send(docxBuffer);
     } catch (error) {
         console.error('DOCX conversion endpoint error:', error);
+
+        const missingPandoc = error && (error.code === 'ENOENT' || /pandoc/i.test(error.message || ''));
         return res.status(500).json({
             code: 500,
-            message: 'Server error during DOCX conversion',
-            error: error.message
+            message: missingPandoc
+                ? 'Pandoc is not installed or not available in PATH'
+                : 'DOCX conversion failed: ' + (error.message || 'unknown error')
         });
     }
 });

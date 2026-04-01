@@ -60,6 +60,7 @@
     "jspdf": "^4.2.1",
     "jstree": "^3.3.17",
     "markdown-it": "^14.1.1",
+    "markdown-it-footnote": "^4.0.0",
     "markdown-it-mathjax3": "^5.2.0",
     "markdown-it-task-lists": "^2.1.1",
     "multer": "^2.1.1",
@@ -73,8 +74,8 @@
     "sharp": "^0.34.5",
     "uuid": "^9.0.1",
     "vditor": "^3.11.2",
-    "ws": "^8.18.0",
-    "wkhtmltopdf": "^0.4.0"
+    "wkhtmltopdf": "^0.4.0",
+    "ws": "^8.18.0"
   },
   "devDependencies": {
     "@capacitor/android": "^6.1.2",

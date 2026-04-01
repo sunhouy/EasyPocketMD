@@ -4,6 +4,42 @@ const app = require('../../api/server');
 const request = require('supertest');
 const wkhtmltopdf = require('wkhtmltopdf');
 
+jest.mock('child_process', () => {
+    const EventEmitter = require('events');
+    const fsPromises = require('fs/promises');
+    const { PassThrough } = require('stream');
+
+    return {
+        spawn: jest.fn((command, args) => {
+            const proc = new EventEmitter();
+            proc.stdout = new PassThrough();
+            proc.stderr = new PassThrough();
+
+            setImmediate(async () => {
+                try {
+                    if (command !== 'pandoc') {
+                        throw new Error('Unexpected command: ' + command);
+                    }
+                    const outputIndex = args.indexOf('-o');
+                    const outputPath = outputIndex >= 0 ? args[outputIndex + 1] : null;
+                    if (!outputPath) {
+                        throw new Error('Missing output path');
+                    }
+
+                    await fsPromises.writeFile(outputPath, Buffer.from('fake-docx-content'));
+                    proc.emit('close', 0);
+                } catch (error) {
+                    proc.stderr.write(error.message);
+                    proc.stderr.end();
+                    proc.emit('close', 1);
+                }
+            });
+
+            return proc;
+        })
+    };
+});
+
 // Mock wkhtmltopdf
 jest.mock('wkhtmltopdf', () => {
     const { PassThrough } = require('stream');
@@ -51,6 +87,35 @@ describe('Convert API Integration', () => {
             expect(res.status).toBe(200);
             expect(res.body.code).toBe(200);
             expect(res.body.url).toMatch(/^\/uploads\/.*\.pdf$/);
+        });
+    });
+
+    describe('POST /api/convert/docx', () => {
+        it('should export docx binary successfully', async () => {
+            const res = await request(app)
+                .post('/api/convert/docx')
+                .buffer(true)
+                .parse((response, callback) => {
+                    const chunks = [];
+                    response.on('data', chunk => chunks.push(chunk));
+                    response.on('end', () => callback(null, Buffer.concat(chunks)));
+                })
+                .send({ markdown: '# 标题\n\n正文内容' })
+                .expect(200);
+
+            expect(res.headers['content-type']).toContain('application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+            expect(res.headers['content-disposition']).toContain('.docx');
+            expect(Buffer.isBuffer(res.body)).toBe(true);
+            expect(res.body.length).toBeGreaterThan(0);
+        });
+
+        it('should return 400 when markdown is missing', async () => {
+            const res = await request(app)
+                .post('/api/convert/docx')
+                .send({})
+                .expect(400);
+
+            expect(res.body.code).toBe(400);
         });
     });
 });
