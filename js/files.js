@@ -3400,10 +3400,14 @@
         if (existingModal) {
             existingModal.remove();
         }
-        // 创建非模态的浮动对话框
+        // 创建带透明蒙版的浮动对话框
+        const overlay = document.createElement('div');
+        overlay.id = 'findDialogOverlay';
+        overlay.style.cssText = 'position:fixed;inset:0;background:' + (nightMode ? 'rgba(0,0,0,0.32)' : 'rgba(20,24,32,0.14)') + ';backdrop-filter:blur(1.5px);-webkit-backdrop-filter:blur(1.5px);z-index:10000;';
+
         const dialog = document.createElement('div');
         dialog.id = 'findDialogModal';
-        dialog.style.cssText = 'position:fixed;top:80px;right:40px;background:' + bgColor + ';color:' + textColor + ';border-radius:12px;padding:20px;width:380px;box-shadow:0 4px 20px rgba(0,0,0,0.3);z-index:10001;border:1px solid ' + borderColor + ';display:flex;flex-direction:column;';
+        dialog.style.cssText = 'position:fixed;top:80px;right:40px;background:' + (nightMode ? 'rgba(45,45,45,0.92)' : 'rgba(255,255,255,0.9)') + ';color:' + textColor + ';border-radius:12px;padding:20px;width:380px;box-shadow:0 8px 28px rgba(0,0,0,0.28);z-index:10001;border:1px solid ' + borderColor + ';display:flex;flex-direction:column;';
         dialog.innerHTML =
             '<div id="findDialogHeader" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;cursor:move;user-select:none;touch-action:none;">' +
                 '<h3 style="margin:0;font-size:16px;">' + (isEn() ? 'Find and Replace' : '查找和替换') + '</h3>' +
@@ -3432,10 +3436,14 @@
             '<div id="wasmSearchPanel" style="margin-top:12px;border-top:1px solid ' + borderColor + ';padding-top:10px;display:none;">' +
                 '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">' +
                     '<span style="font-size:12px;color:' + secondaryTextColor + ';">' + (isEn() ? 'Cross-file search' : '跨文件搜索') + '</span>' +
-                    '<button id="wasmSearchBtn" style="padding:4px 10px;background:' + (nightMode ? '#3d3d3d' : '#f0f0f0') + ';color:' + textColor + ';border:1px solid ' + borderColor + ';border-radius:6px;cursor:pointer;font-size:12px;">' + (isEn() ? 'Search Files' : '搜索文件') + '</button>' +
+                    '<div style="display:flex;align-items:center;gap:6px;">' +
+                        '<button id="toggleCrossSearchBtn" style="padding:4px 8px;background:none;color:' + secondaryTextColor + ';border:1px solid ' + borderColor + ';border-radius:6px;cursor:pointer;font-size:12px;">' + (isEn() ? 'Collapse' : '收起') + '</button>' +
+                        '<button id="wasmSearchBtn" style="padding:4px 10px;background:' + (nightMode ? '#3d3d3d' : '#f0f0f0') + ';color:' + textColor + ';border:1px solid ' + borderColor + ';border-radius:6px;cursor:pointer;font-size:12px;">' + (isEn() ? 'Search Files' : '搜索文件') + '</button>' +
+                    '</div>' +
                 '</div>' +
                 '<div id="wasmSearchResults" style="max-height:180px;overflow:auto;font-size:12px;"></div>' +
             '</div>';
+        document.body.appendChild(overlay);
         document.body.appendChild(dialog);
         // 拖动逻辑（支持鼠标和触摸）
         const header = dialog.querySelector('#findDialogHeader');
@@ -3545,6 +3553,8 @@
         const wasmSearchPanel = dialog.querySelector('#wasmSearchPanel');
         const wasmSearchBtn = dialog.querySelector('#wasmSearchBtn');
         const wasmSearchResults = dialog.querySelector('#wasmSearchResults');
+        const toggleCrossSearchBtn = dialog.querySelector('#toggleCrossSearchBtn');
+        let isCrossSearchCollapsed = false;
 
         const gateway = global.wasmTextEngineGateway;
         const smartEngineAvailable = gateway && typeof gateway.ensureReady === 'function';
@@ -3745,17 +3755,33 @@
                 (isEn() ? 'total matches: ' : '总匹配数：') + data.totalMatches +
                 '</div>';
 
-            rows.forEach(function(item) {
+            rows.forEach(function(item, rowIndex) {
                 html += '<div style="padding:6px 8px;border:1px solid ' + borderColor + ';border-radius:6px;margin-bottom:8px;">' +
-                    '<div style="font-weight:600;">' + escapeHtml(item.filename || '') + ' (' + item.matchCount + ')</div>';
+                    '<div class="cross-search-file-header" data-file-block-id="crossFileBlock_' + rowIndex + '" style="font-weight:600;display:flex;align-items:center;justify-content:space-between;cursor:pointer;">' +
+                        '<span>' + escapeHtml(item.filename || '') + ' (' + item.matchCount + ')</span>' +
+                        '<span class="cross-search-file-chevron" style="color:' + secondaryTextColor + ';">▾</span>' +
+                    '</div>' +
+                    '<div id="crossFileBlock_' + rowIndex + '" style="margin-top:4px;">';
                 (item.hits || []).forEach(function(hit) {
                     html += '<div class="cross-search-hit" data-file-id="' + String(item.docId) + '" data-start="' + hit.start + '" data-end="' + hit.end + '" style="margin-top:5px;padding:5px 6px;border-radius:5px;background:' + (nightMode ? '#3a3a3a' : '#f6f6f6') + ';cursor:pointer;white-space:pre-wrap;word-break:break-word;">' +
                         escapeHtml(hit.snippet || '') +
                     '</div>';
                 });
-                html += '</div>';
+                html += '</div></div>';
             });
             wasmSearchResults.innerHTML = html;
+
+            wasmSearchResults.querySelectorAll('.cross-search-file-header').forEach(function(el) {
+                el.addEventListener('click', function() {
+                    const blockId = this.getAttribute('data-file-block-id');
+                    const body = blockId ? wasmSearchResults.querySelector('#' + blockId) : null;
+                    const chevron = this.querySelector('.cross-search-file-chevron');
+                    if (!body) return;
+                    const hidden = body.style.display === 'none';
+                    body.style.display = hidden ? 'block' : 'none';
+                    if (chevron) chevron.textContent = hidden ? '▾' : '▸';
+                });
+            });
 
             wasmSearchResults.querySelectorAll('.cross-search-hit').forEach(function(el) {
                 el.addEventListener('click', async function() {
@@ -3886,7 +3912,7 @@
         }
 
         // 高亮匹配项
-        function highlightMatch(index) {
+        function highlightMatch(index, allowRetry) {
             if (matches.length === 0 || index < 0 || index >= matches.length) return;
             // 更新状态
             findStatus.textContent = (isEn() ? 'Match ' : '匹配 ') + (index + 1) + ' / ' + matches.length;
@@ -3896,8 +3922,14 @@
                 const inputSelEnd = findInput.selectionEnd;
                 const editorElement = getEditorElement();
                 if (editorElement) {
+                    visibleMatches = findMatchesInVisibleText(searchText);
                     const highlight = pickHighlightByIndex(index);
                     if (!highlight) {
+                        if (allowRetry !== false) {
+                            setTimeout(function() {
+                                highlightMatch(index, false);
+                            }, 90);
+                        }
                         findInput.focus();
                         if (typeof inputSelStart === 'number' && typeof inputSelEnd === 'number') {
                             findInput.setSelectionRange(inputSelStart, inputSelEnd);
@@ -4047,12 +4079,25 @@
         replaceBtn.onclick = doReplace;
         replaceAllBtn.onclick = doReplaceAll;
         if (wasmSearchBtn) wasmSearchBtn.onclick = runWasmSearch;
+        if (toggleCrossSearchBtn) {
+            toggleCrossSearchBtn.onclick = function() {
+                isCrossSearchCollapsed = !isCrossSearchCollapsed;
+                if (wasmSearchResults) wasmSearchResults.style.display = isCrossSearchCollapsed ? 'none' : 'block';
+                toggleCrossSearchBtn.textContent = isCrossSearchCollapsed
+                    ? (isEn() ? 'Expand' : '展开')
+                    : (isEn() ? 'Collapse' : '收起');
+            };
+        }
         // 关闭对话框并清除高亮
         function closeFindDialog() {
             clearVisualHighlights();
+            if (overlay && overlay.parentNode) overlay.parentNode.removeChild(overlay);
             dialog.remove();
         }
         closeBtn.onclick = closeFindDialog;
+        overlay.onclick = function() {
+            closeFindDialog();
+        };
         // ESC键关闭
         const handleEsc = function(e) {
             if (e.key === 'Escape') {
