@@ -68,7 +68,6 @@
     "pdfjs-dist": "^4.4.168",
     "pdfmake": "^0.3.7",
     "pdfmake-support-chinese-fonts": "^1.0.3",
-    "playwright": "^1.54.2",
     "pptxgenjs": "^4.0.1",
     "sensitive-word-filter": "^1.0.2",
     "sharp": "^0.34.5",
