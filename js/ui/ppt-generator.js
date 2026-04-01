@@ -19,7 +19,8 @@
         topic: '',              // 主题
         source: 'current',      // 生成方式: current(本文件) / topic(主题)
         cacheKey: '.ppt_draft_', // 缓存键前缀
-        colorScheme: 'white-black' // 配色方案: white-black, black-white, traffic-light, traditional, business
+        colorScheme: 'white-black', // 配色方案: white-black, black-white, traffic-light, traditional, business
+        isAcademic: false
     };
 
     // 配色方案定义
@@ -137,7 +138,10 @@
                     function(newOutline) {
                         if (newOutline !== null) {
                             document.getElementById('aiPPTInput').value = newOutline;
-                            parseOutline(newOutline);
+                            parseOutline(newOutline, {
+                                topic: pptState.topic,
+                                isAcademic: pptState.isAcademic
+                            });
                             renderOutlinePreview();
                         }
                     }
@@ -319,6 +323,7 @@
         }
 
         pptState.topic = topic || 'PPT演示';
+        pptState.isAcademic = detectAcademicContext([pptState.topic, fileContent, input].join('\n'));
         
         var btn = document.getElementById('aiPPTGenerateOutline');
         var originalText = btn.innerHTML;
@@ -327,13 +332,19 @@
 
         try {
             if (input && input.includes('第') && input.includes('页')) {
-                parseOutline(input);
+                parseOutline(input, {
+                    topic: pptState.topic,
+                    isAcademic: pptState.isAcademic
+                });
             } else {
                 // 构建提示词
                 var prompt = buildOutlinePrompt(topic, fileContent, input);
                 var result = await callAIAPI(prompt, '');
                 document.getElementById('aiPPTInput').value = result;
-                parseOutline(result);
+                parseOutline(result, {
+                    topic: pptState.topic,
+                    isAcademic: pptState.isAcademic
+                });
             }
             
             renderOutlinePreview();
@@ -351,11 +362,12 @@
 
     // 构建大纲生成提示词
     function buildOutlinePrompt(topic, fileContent, userOutline) {
-        var ratio = pptState.ratio;
+        var contextText = [topic || '', fileContent || '', userOutline || ''].join('\n');
+        var isAcademic = detectAcademicContext(contextText);
         var prompt = '';
         
         if (pptState.source === 'current' && fileContent) {
-            prompt = `请根据以下文件内容生成一个PPT大纲，共5-8页。
+            prompt = `请根据以下文件内容生成一个PPT大纲，页数由内容复杂度自动决定（5-30页）。
 
 文件内容：
 ${fileContent.substring(0, 3000)}
@@ -363,50 +375,75 @@ ${fileContent.substring(0, 3000)}
 ${topic ? 'PPT主题：' + topic : ''}
 
 要求：
-1. 每页必须有一个具体的、有意义的标题，不能只是"标题"二字
-2. 标题应该概括该页的核心内容
-3. 每页包含2-4个要点
-4. 第一页是封面页，包含PPT主题
-5. 内容要基于文件内容提炼，不要脱离原文
+1. 必须包含：封面页、目录页、正文页、致谢页。
+2. ${isAcademic ? '这是学术/研究类主题，必须增加参考资料页（放在致谢前）。' : '若判断为学术内容（论文/实验/研究报告），需要增加参考资料页。'}
+3. 页数不要凑数，按信息量决定，最少5页，最多30页。
+4. 每页标题必须具体，不能使用“标题”“内容页”等空泛词。
+5. 正文页每页2-5个要点，且尽量避免重复。
+6. 目录页的要点应列出主要章节，不要写空话。
 
 输出格式：
 第1页：封面页标题
 要点1：具体内容
 要点2：具体内容
 
-第2页：具体章节标题
+第2页：目录
+要点1：章节A
+要点2：章节B
+
+第3页：具体章节标题
 要点1：具体内容
 要点2：具体内容
 
-请确保每个标题都是有意义的。`;
+...（按需扩展）
+
+最后1页：致谢
+要点1：感谢语/问答引导
+
+${isAcademic ? '倒数第2页：参考资料\n要点1：文献1\n要点2：文献2\n' : ''}
+
+请只输出大纲正文，不要解释。`;
         } else {
-            prompt = `请为主题"${topic}"生成一个详细的PPT大纲，包含5-8页。
+            prompt = `请为主题"${topic}"生成一个详细的PPT大纲，页数由内容复杂度自动决定（5-30页）。
 
 ${userOutline ? '用户提供的参考大纲：\n' + userOutline + '\n\n' : ''}
 
 要求：
-1. 每页必须有一个具体的、有意义的标题，不能只是"标题"二字
-2. 标题应该概括该页的核心内容
-3. 每页包含2-4个要点，每个要点要具体
-4. 第一页是封面页
+1. 必须包含：封面页、目录页、正文页、致谢页。
+2. ${isAcademic ? '这是学术/研究类主题，必须增加参考资料页（放在致谢前）。' : '若判断为学术内容（论文/实验/研究报告），需要增加参考资料页。'}
+3. 页数不要凑数，按信息量决定，最少5页，最多30页。
+4. 每页标题必须具体，不能使用“标题”“内容页”等空泛词。
+5. 正文页每页2-5个要点，且尽量避免重复。
+6. 目录页的要点应列出主要章节，不要写空话。
 
 输出格式：
 第1页：封面页标题
 要点1：具体内容
 要点2：具体内容
 
-第2页：具体章节标题
+第2页：目录
+要点1：章节A
+要点2：章节B
+
+第3页：具体章节标题
 要点1：具体内容
 要点2：具体内容
 
-请确保每个标题都是有意义的。`;
+...（按需扩展）
+
+最后1页：致谢
+要点1：感谢语/问答引导
+
+${isAcademic ? '倒数第2页：参考资料\n要点1：文献1\n要点2：文献2\n' : ''}
+
+请只输出大纲正文，不要解释。`;
         }
         
         return prompt;
     }
 
     // 解析大纲
-    function parseOutline(text) {
+    function parseOutline(text, options) {
         var pages = [];
         var currentPage = null;
         
@@ -442,9 +479,146 @@ ${userOutline ? '用户提供的参考大纲：\n' + userOutline + '\n\n' : ''}
         if (currentPage) {
             pages.push(currentPage);
         }
+
+        pages = normalizeOutlinePages(pages, options || {});
         
         pptState.outline = pages;
         pptState.pages = new Array(pages.length).fill(null);
+    }
+
+    function detectAcademicContext(text) {
+        if (!text) return false;
+        var source = String(text).toLowerCase();
+        return /(论文|研究|实验|文献|参考资料|学术|模型|方法|study|research|paper|dataset|methodology|reference)/.test(source);
+    }
+
+    function normalizeOutlinePages(rawPages, options) {
+        var pages = Array.isArray(rawPages) ? rawPages.map(function(page, idx) {
+            return {
+                number: idx + 1,
+                title: sanitizePageText(page && page.title ? page.title : ('第' + (idx + 1) + '页')),
+                content: Array.isArray(page && page.content) ? page.content.map(sanitizePageText).filter(Boolean).slice(0, 5) : [],
+                role: inferPageRole(page && page.title ? page.title : '', idx)
+            };
+        }).filter(function(p) {
+            return p.title;
+        }) : [];
+
+        var topic = sanitizePageText(options.topic || pptState.topic || 'PPT演示');
+        var isAcademic = typeof options.isAcademic === 'boolean' ? options.isAcademic : detectAcademicContext(topic + '\n' + JSON.stringify(pages));
+        pptState.isAcademic = isAcademic;
+
+        if (!pages.length) {
+            pages = [makeOutlinePage(topic, ['演讲主题', '演讲人'], 'cover')];
+        }
+
+        var coverIndex = findPageIndexByRole(pages, 'cover');
+        if (coverIndex === -1) {
+            pages.unshift(makeOutlinePage(topic, ['演讲主题', '演讲人'], 'cover'));
+        } else if (coverIndex > 0) {
+            pages.unshift(pages.splice(coverIndex, 1)[0]);
+        }
+
+        if (!pages[0].title || /^(封面|标题|首页)$/i.test(pages[0].title)) {
+            pages[0].title = topic || '主题汇报';
+        }
+        pages[0].role = 'cover';
+
+        var tocIndex = findPageIndexByRole(pages, 'toc');
+        if (tocIndex === -1) {
+            pages.splice(1, 0, makeOutlinePage('目录', [], 'toc'));
+        } else if (tocIndex !== 1) {
+            pages.splice(1, 0, pages.splice(tocIndex, 1)[0]);
+        }
+
+        var thanksIndex = findPageIndexByRole(pages, 'thanks');
+        if (thanksIndex === -1) {
+            pages.push(makeOutlinePage('致谢', ['感谢聆听', '欢迎提问交流'], 'thanks'));
+        } else if (thanksIndex !== pages.length - 1) {
+            pages.push(pages.splice(thanksIndex, 1)[0]);
+        }
+
+        if (isAcademic) {
+            var refIndex = findPageIndexByRole(pages, 'references');
+            var lastIndex = pages.length - 1;
+            if (refIndex === -1) {
+                pages.splice(lastIndex, 0, makeOutlinePage('参考资料', ['文献来源1', '文献来源2'], 'references'));
+            } else if (refIndex > lastIndex - 1) {
+                pages.splice(lastIndex, 0, pages.splice(refIndex, 1)[0]);
+            }
+        }
+
+        while (pages.length < 5) {
+            var insertPos = pages.length - 1;
+            if (isAcademic && insertPos > 0 && pages[insertPos - 1].role === 'references') {
+                insertPos -= 1;
+            }
+            pages.splice(insertPos, 0, makeOutlinePage('核心内容 ' + insertPos, ['关键观点', '案例支撑', '阶段结论'], 'body'));
+        }
+
+        if (pages.length > 30) {
+            var fixed = [];
+            fixed.push(pages[0]);
+            fixed.push(pages[1]);
+            var tail = [];
+            if (isAcademic) {
+                var refPage = pages.find(function(p) { return p.role === 'references'; });
+                if (refPage) tail.push(refPage);
+            }
+            tail.push(pages[pages.length - 1]);
+
+            var bodyPages = pages.slice(2, pages.length - 1).filter(function(p) {
+                return p.role !== 'references' && p.role !== 'thanks' && p.role !== 'cover' && p.role !== 'toc';
+            });
+            var maxBody = Math.max(0, 30 - fixed.length - tail.length);
+            pages = fixed.concat(bodyPages.slice(0, maxBody)).concat(tail);
+        }
+
+        var bodyTitles = pages.filter(function(p) {
+            return p.role !== 'cover' && p.role !== 'toc' && p.role !== 'thanks' && p.role !== 'references';
+        }).map(function(p) {
+            return p.title;
+        }).slice(0, 8);
+
+        if (pages[1]) {
+            pages[1].title = '目录';
+            pages[1].role = 'toc';
+            pages[1].content = bodyTitles.length ? bodyTitles : ['背景与目标', '核心内容', '总结'];
+        }
+
+        for (var i = 0; i < pages.length; i++) {
+            pages[i].number = i + 1;
+            if (!pages[i].role || pages[i].role === 'body') {
+                pages[i].role = inferPageRole(pages[i].title || '', i, pages.length, isAcademic);
+            }
+        }
+
+        return pages;
+    }
+
+    function makeOutlinePage(title, content, role) {
+        return {
+            number: 0,
+            title: sanitizePageText(title || ''),
+            content: Array.isArray(content) ? content.map(sanitizePageText).filter(Boolean) : [],
+            role: role || 'body'
+        };
+    }
+
+    function findPageIndexByRole(pages, role) {
+        for (var i = 0; i < pages.length; i++) {
+            if (pages[i] && pages[i].role === role) return i;
+        }
+        return -1;
+    }
+
+    function inferPageRole(title, index, total, isAcademic) {
+        var t = String(title || '').toLowerCase();
+        if (index === 0 || /(封面|标题|开场|title slide|cover)/.test(t)) return 'cover';
+        if (index === 1 || /(目录|议程|agenda|contents?)/.test(t)) return 'toc';
+        if (/(致谢|感谢|thanks|thank you|q&a)/.test(t) || index === total - 1) return 'thanks';
+        if ((isAcademic || /(论文|研究|study|paper|research)/.test(t)) && /(参考|文献|references?|bibliography)/.test(t)) return 'references';
+        return 'body';
     }
 
     // 渲染大纲预览
@@ -536,6 +710,8 @@ ${userOutline ? '用户提供的参考大纲：\n' + userOutline + '\n\n' : ''}
         var textColor = scheme.textColor;
         var subtitleColor = scheme.subtitleColor;
         var accentColor = scheme.accentColor;
+        var pageRole = page.role || inferPageRole(pageTitle, index, (pptState.outline || []).length, pptState.isAcademic);
+        var preferredLayout = suggestLayoutForPage(page, index, (pptState.outline || []).length);
 
         var prompt = buildPageJsonPrompt(page, pageTitle, aspectRatio, {
             bgColor: bgColor,
@@ -543,10 +719,14 @@ ${userOutline ? '用户提供的参考大纲：\n' + userOutline + '\n\n' : ''}
             subtitleColor: subtitleColor,
             accentColor: accentColor,
             schemeName: scheme.name
+        }, {
+            role: pageRole,
+            preferredLayout: preferredLayout
         });
 
         var aiResult = await callAIAPI(prompt, '');
-        var pageJson = parsePptPageJson(aiResult, page, pageTitle, index);
+        var pageJson = parsePptPageJson(aiResult, page, pageTitle, index, preferredLayout, pageRole);
+        pageJson.role = pageRole;
         pageJson.themeToken = pptState.colorScheme;
         pageJson.scheme = {
             bgColor: bgColor,
@@ -558,39 +738,80 @@ ${userOutline ? '用户提供的参考大纲：\n' + userOutline + '\n\n' : ''}
         pptState.pages[index] = pageJson;
     }
 
-    function buildPageJsonPrompt(page, pageTitle, aspectRatio, scheme) {
+        function suggestLayoutForPage(page, index, total) {
+                var role = page && page.role ? page.role : inferPageRole(page && page.title ? page.title : '', index, total, pptState.isAcademic);
+                if (role === 'cover') return 'cover';
+                if (role === 'toc') return 'toc';
+                if (role === 'thanks') return 'thanks';
+                if (role === 'references') return 'references';
+
+                var title = String((page && page.title) || '').toLowerCase();
+                if (/(时间|里程碑|阶段|进展|timeline|roadmap)/.test(title)) return 'timeline';
+                if (/(对比|比较|差异|优劣|vs|versus)/.test(title)) return 'comparison';
+                if (/(数据|指标|统计|增长|结果|kpi|metric|result)/.test(title)) return 'stats';
+                if (/(总结|结论|启示|观点|takeaway|conclusion)/.test(title)) return 'quote';
+                if (/(架构|模块|框架|体系|组成|structure|architecture)/.test(title)) return 'two-column';
+                if (/(案例|产品|图示|图片|界面|demo|screenshot)/.test(title)) return index % 2 === 0 ? 'image-left' : 'image-right';
+
+                var cycle = ['content', 'two-column', 'timeline', 'comparison', 'stats', 'quote', 'image-right'];
+                return cycle[index % cycle.length];
+        }
+
+        function buildPageJsonPrompt(page, pageTitle, aspectRatio, scheme, pageMeta) {
         var points = (page.content || []).slice(0, 6).map(function(item, idx) {
             return '- 要点' + (idx + 1) + ': ' + item;
         }).join('\n');
 
-            return `你是PPT内容助手。请根据以下信息生成单页内容，必须返回纯 JSON，不要返回 HTML/Markdown/解释。
+                return `你是PPT内容助手。请根据以下信息生成单页内容，必须返回纯 JSON，不要返回 HTML/Markdown/解释。
 
 页面主题：${pageTitle}
 页面要点：
 ${points || '- 无'}
 画面比例：${aspectRatio}
+页面角色：${pageMeta && pageMeta.role ? pageMeta.role : 'body'}
+建议布局：${pageMeta && pageMeta.preferredLayout ? pageMeta.preferredLayout : 'content'}
 配色参考：${scheme.schemeName}（主色 ${scheme.bgColor}，文字 ${scheme.textColor}，强调 ${scheme.accentColor}）
 
 硬性要求：
 1. 仅输出一个 JSON 对象，不要代码块。
 2. 字段中的文案禁止出现“第x页”“第1页”“第2页”等页码描述。
 3. 文案简洁，主点不超过30字，二级点不超过20字。
-4. layout 只能是 "cover"、"content"、"two-column"、"image-left"、"image-right" 之一。
+4. layout 只能是 "cover"、"toc"、"content"、"two-column"、"image-left"、"image-right"、"timeline"、"comparison"、"stats"、"quote"、"references"、"thanks" 之一。
 5. bullets 最多 8 条，每条允许最多 2 条 subBullets。
 6. 如果没有可靠图片链接，image 填 null。
+7. role 为 toc 时优先产出 sections；role 为 stats 时优先产出 stats；role 为 quote 时提供 quote；role 为 references 时给出 sections 或 bullets。
 
 JSON 结构：
 {
-    "layout": "content",
+    "layout": "${pageMeta && pageMeta.preferredLayout ? pageMeta.preferredLayout : 'content'}",
+    "role": "${pageMeta && pageMeta.role ? pageMeta.role : 'body'}",
     "themeToken": "${pptState.colorScheme}",
   "title": "",
   "subtitle": "",
+    "highlights": ["", ""],
     "bullets": [
         {
             "text": "",
             "subBullets": ["", ""]
         }
     ],
+    "sections": [
+        {
+            "title": "",
+            "items": ["", ""]
+        }
+    ],
+    "stats": [
+        {
+            "label": "",
+            "value": "",
+            "note": ""
+        }
+    ],
+    "quote": {
+        "text": "",
+        "author": ""
+    },
     "image": {
         "url": "",
         "caption": "",
@@ -599,9 +820,10 @@ JSON 结构：
 }`;
     }
 
-    function parsePptPageJson(raw, page, fallbackTitle, index) {
+        function parsePptPageJson(raw, page, fallbackTitle, index, expectedLayout, expectedRole) {
         var fallback = {
-            layout: index === 0 ? 'cover' : 'content',
+                        layout: expectedLayout || (index === 0 ? 'cover' : 'content'),
+                        role: expectedRole || (page && page.role ? page.role : 'body'),
             themeToken: pptState.colorScheme,
             title: sanitizePageText(fallbackTitle || page.title || ''),
             subtitle: '',
@@ -610,6 +832,10 @@ JSON 结构：
             }).filter(function(item) {
                 return item.text;
             }),
+                        highlights: (page.content || []).slice(0, 3).map(sanitizePageText).filter(Boolean),
+                        sections: [],
+                        stats: [],
+                        quote: null,
             image: null
         };
 
@@ -637,15 +863,27 @@ JSON 结构：
         if (!parsed || typeof parsed !== 'object') return fallback;
 
         var layout = sanitizePageText(readStringField(parsed, ['layout', 'type', 'layoutType'])).toLowerCase();
-        if (layout !== 'cover' && layout !== 'content' && layout !== 'two-column' && layout !== 'image-left' && layout !== 'image-right') {
+        var role = sanitizePageText(readStringField(parsed, ['role', 'pageRole'])).toLowerCase() || fallback.role;
+        var validLayouts = ['cover', 'toc', 'content', 'two-column', 'image-left', 'image-right', 'timeline', 'comparison', 'stats', 'quote', 'references', 'thanks'];
+        if (validLayouts.indexOf(layout) === -1) {
             layout = fallback.layout;
         }
+
+        if (role === 'cover') layout = 'cover';
+        if (role === 'toc') layout = 'toc';
+        if (role === 'thanks') layout = 'thanks';
+        if (role === 'references') layout = 'references';
 
         var rawBullets = readArrayField(parsed, ['bullets', 'points', 'items', '要点']);
         var bullets = normalizeBulletItems(rawBullets);
         if (!bullets.length) {
             bullets = fallback.bullets;
         }
+
+        var highlights = normalizeTextArray(readArrayField(parsed, ['highlights', 'keywords', 'tags']), 4);
+        var sections = normalizeSections(readArrayField(parsed, ['sections', 'columns', 'groups']));
+        var stats = normalizeStats(readArrayField(parsed, ['stats', 'metrics', 'dataCards']));
+        var quote = normalizeQuote(parsed.quote || readStringField(parsed, ['quoteText', 'quote']));
 
         var image = null;
         if (parsed.image && typeof parsed.image === 'object') {
@@ -661,10 +899,15 @@ JSON 结构：
 
         return {
             layout: layout,
+            role: role,
             themeToken: sanitizePageText(readStringField(parsed, ['themeToken', 'theme'])) || pptState.colorScheme,
             title: sanitizePageText(readStringField(parsed, ['title', '标题'])) || fallback.title,
             subtitle: sanitizePageText(readStringField(parsed, ['subtitle', 'summary', '副标题'])),
             bullets: bullets,
+            highlights: highlights,
+            sections: sections,
+            stats: stats,
+            quote: quote,
             image: image
         };
     }
@@ -674,28 +917,149 @@ JSON 结构：
         var title = escapeHtml(pageData.title || '');
         var subtitle = escapeHtml(pageData.subtitle || '');
         var bullets = normalizeBulletItems(pageData.bullets);
+        var highlights = normalizeTextArray(pageData.highlights || [], 4);
+        var sections = normalizeSections(pageData.sections || []);
+        var stats = normalizeStats(pageData.stats || []);
+        var quote = normalizeQuote(pageData.quote || null);
         var leftBullets = bullets.slice(0, Math.ceil(bullets.length / 2));
         var rightBullets = bullets.slice(Math.ceil(bullets.length / 2));
         var image = pageData.image && pageData.image.url ? pageData.image : null;
-        var base = 'width:100%;height:100%;padding:5.5%;box-sizing:border-box;overflow:hidden;background:linear-gradient(140deg,' + activeScheme.bgColor + ' 0%,' + activeScheme.bgColor + 'dd 60%,' + activeScheme.accentColor + '26 100%);color:' + activeScheme.textColor + ';font-family:Arial,\'Microsoft YaHei\',sans-serif;';
+        var base = 'position:relative;width:100%;height:100%;padding:5.5%;box-sizing:border-box;overflow:hidden;background:linear-gradient(140deg,' + activeScheme.bgColor + ' 0%,' + activeScheme.bgColor + 'dd 60%,' + activeScheme.accentColor + '26 100%);color:' + activeScheme.textColor + ';font-family:Arial,\'Microsoft YaHei\',sans-serif;';
+        var deco = '<div style="position:absolute;left:0;top:0;width:1.8%;height:100%;background:' + activeScheme.accentColor + '66;"></div>'
+            + '<div style="position:absolute;right:-5%;top:-8%;width:30%;height:42%;border-radius:999px;background:' + activeScheme.accentColor + '2b;"></div>'
+            + '<div style="position:absolute;right:0;bottom:0;width:22%;height:12%;background:' + activeScheme.accentColor + '44;border-top-left-radius:18px;"></div>';
 
         if (pageData.layout === 'cover') {
             return '<div style="' + base + 'display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;gap:2.5%;">'
+                + deco
                 + '<h1 style="margin:0;font-size:5.2vw;line-height:1.2;max-width:90%;">' + title + '</h1>'
                 + (subtitle ? '<p style="margin:0;font-size:2.1vw;color:' + activeScheme.subtitleColor + ';max-width:78%;">' + subtitle + '</p>' : '')
-                + (bullets.length ? '<div style="display:flex;flex-direction:column;gap:1.4%;max-width:82%;">' + bullets.slice(0, 3).map(function(item) {
-                    return '<div style="padding:0.8% 1.3%;border-radius:10px;background:rgba(255,255,255,0.16);font-size:1.8vw;color:' + activeScheme.textColor + ';">• ' + escapeHtml(item.text) + '</div>';
+                + (highlights.length ? '<div style="display:flex;flex-wrap:wrap;justify-content:center;gap:1.2%;margin-top:1%;">' + highlights.map(function(item) {
+                    return '<span style="padding:0.55% 1.2%;border-radius:999px;background:' + activeScheme.accentColor + '2f;font-size:1.4vw;">' + escapeHtml(item) + '</span>';
                 }).join('') + '</div>' : '')
+                + (bullets.length ? '<div style="display:flex;flex-direction:column;gap:1.4%;max-width:82%;position:relative;z-index:1;">' + bullets.slice(0, 3).map(function(item) {
+                    return '<div style="padding:0.8% 1.3%;border-radius:10px;background:rgba(255,255,255,0.16);border:1px solid rgba(255,255,255,0.24);font-size:1.8vw;color:' + activeScheme.textColor + ';">• ' + escapeHtml(item.text) + '</div>';
+                }).join('') + '</div>' : '')
+                + '</div>';
+        }
+
+        if (pageData.layout === 'toc') {
+            var tocItems = (sections.length ? sections.map(function(sec) { return sec.title; }) : bullets.map(function(item) { return item.text; })).slice(0, 10);
+            return '<div style="' + base + 'display:flex;flex-direction:column;">'
+                + deco
+                + '<h1 style="margin:0 0 2.8% 0;font-size:3.9vw;line-height:1.2;">' + title + '</h1>'
+                + (subtitle ? '<p style="margin:0 0 2.5% 0;color:' + activeScheme.subtitleColor + ';font-size:1.9vw;">' + subtitle + '</p>' : '')
+                + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:2%;height:76%;">'
+                + renderTocColumn(tocItems.slice(0, Math.ceil(tocItems.length / 2)), activeScheme, 1)
+                + renderTocColumn(tocItems.slice(Math.ceil(tocItems.length / 2)), activeScheme, Math.ceil(tocItems.length / 2) + 1)
+                + '</div>'
                 + '</div>';
         }
 
         if (pageData.layout === 'two-column') {
             return '<div style="' + base + 'display:flex;flex-direction:column;">'
+                + deco
                 + '<h1 style="margin:0 0 2.5% 0;font-size:3.6vw;line-height:1.2;">' + title + '</h1>'
                 + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:2.2%;height:80%;">'
                 + renderColumnBlock('核心信息', leftBullets, activeScheme)
                 + renderColumnBlock('补充信息', rightBullets, activeScheme)
                 + '</div>'
+                + '</div>';
+        }
+
+        if (pageData.layout === 'timeline') {
+            var timelineItems = (sections.length ? sections.map(function(sec) {
+                return { title: sec.title, desc: (sec.items || []).slice(0, 1).join(' / ') };
+            }) : bullets.map(function(item) {
+                return { title: item.text, desc: (item.subBullets || []).slice(0, 1).join(' / ') };
+            })).slice(0, 6);
+
+            return '<div style="' + base + 'display:flex;flex-direction:column;">'
+                + deco
+                + '<h1 style="margin:0 0 2.4% 0;font-size:3.7vw;line-height:1.2;">' + title + '</h1>'
+                + '<div style="position:relative;height:80%;padding-left:4%;">'
+                + '<div style="position:absolute;left:1.2%;top:2%;bottom:2%;width:0.35%;background:' + activeScheme.accentColor + '66;border-radius:6px;"></div>'
+                + timelineItems.map(function(item, idx) {
+                    return '<div style="position:relative;margin-bottom:2.6%;padding:1.2% 1.6% 1.2% 2.2%;border-radius:12px;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.2);">'
+                        + '<div style="position:absolute;left:-1.55%;top:36%;width:1.1%;height:24%;border-radius:999px;background:' + activeScheme.accentColor + ';"></div>'
+                        + '<div style="font-size:2vw;font-weight:600;">' + escapeHtml(item.title) + '</div>'
+                        + (item.desc ? '<div style="font-size:1.4vw;color:' + activeScheme.subtitleColor + ';margin-top:0.4%;">' + escapeHtml(item.desc) + '</div>' : '')
+                        + '</div>';
+                }).join('')
+                + '</div>'
+                + '</div>';
+        }
+
+        if (pageData.layout === 'comparison') {
+            var compareSections = sections.length >= 2 ? sections.slice(0, 2) : [
+                { title: '方案 A', items: leftBullets.map(function(item) { return item.text; }) },
+                { title: '方案 B', items: rightBullets.map(function(item) { return item.text; }) }
+            ];
+            return '<div style="' + base + 'display:flex;flex-direction:column;">'
+                + deco
+                + '<h1 style="margin:0 0 2.5% 0;font-size:3.6vw;line-height:1.2;">' + title + '</h1>'
+                + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:2.2%;height:80%;">'
+                + renderSectionCard(compareSections[0], activeScheme)
+                + renderSectionCard(compareSections[1], activeScheme)
+                + '</div>'
+                + '</div>';
+        }
+
+        if (pageData.layout === 'stats') {
+            var statItems = stats.slice(0, 6);
+            if (!statItems.length) {
+                statItems = bullets.slice(0, 4).map(function(item, idx) {
+                    return { label: '指标' + (idx + 1), value: item.text, note: (item.subBullets || []).join(' / ') };
+                });
+            }
+            return '<div style="' + base + 'display:flex;flex-direction:column;">'
+                + deco
+                + '<h1 style="margin:0 0 2.2% 0;font-size:3.7vw;line-height:1.2;">' + title + '</h1>'
+                + '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1.6%;height:78%;">'
+                + statItems.map(function(item) {
+                    return '<div style="padding:8% 7%;border-radius:14px;background:rgba(255,255,255,0.16);border:1px solid rgba(255,255,255,0.22);display:flex;flex-direction:column;justify-content:space-between;">'
+                        + '<div style="font-size:1.4vw;color:' + activeScheme.subtitleColor + ';">' + escapeHtml(item.label) + '</div>'
+                        + '<div style="font-size:2.8vw;font-weight:700;line-height:1.1;color:' + activeScheme.accentColor + ';">' + escapeHtml(item.value) + '</div>'
+                        + '<div style="font-size:1.2vw;color:' + activeScheme.subtitleColor + ';">' + escapeHtml(item.note || '') + '</div>'
+                        + '</div>';
+                }).join('')
+                + '</div>'
+                + '</div>';
+        }
+
+        if (pageData.layout === 'quote') {
+            var quoteText = quote && quote.text ? quote.text : (bullets[0] ? bullets[0].text : title);
+            var quoteAuthor = quote && quote.author ? quote.author : '';
+            return '<div style="' + base + 'display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;">'
+                + deco
+                + '<div style="font-size:8vw;line-height:0.8;color:' + activeScheme.accentColor + ';">“</div>'
+                + '<div style="max-width:84%;font-size:2.8vw;line-height:1.45;font-weight:600;">' + escapeHtml(quoteText) + '</div>'
+                + (quoteAuthor ? '<div style="margin-top:2%;font-size:1.6vw;color:' + activeScheme.subtitleColor + ';">—— ' + escapeHtml(quoteAuthor) + '</div>' : '')
+                + '</div>';
+        }
+
+        if (pageData.layout === 'references') {
+            var refs = sections.length ? sections.reduce(function(acc, sec) {
+                return acc.concat(sec.items || []);
+            }, []) : bullets.map(function(item) { return item.text; });
+            refs = refs.slice(0, 10);
+            return '<div style="' + base + 'display:flex;flex-direction:column;">'
+                + deco
+                + '<h1 style="margin:0 0 2.4% 0;font-size:3.6vw;line-height:1.2;">' + title + '</h1>'
+                + '<ol style="margin:0;padding:0 0 0 1.5em;display:flex;flex-direction:column;gap:1.1%;">'
+                + refs.map(function(item) {
+                    return '<li style="font-size:1.45vw;line-height:1.35;padding:0.65% 1%;border-radius:8px;background:rgba(255,255,255,0.12);">' + escapeHtml(item) + '</li>';
+                }).join('')
+                + '</ol>'
+                + '</div>';
+        }
+
+        if (pageData.layout === 'thanks') {
+            return '<div style="' + base + 'display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;gap:2%;">'
+                + deco
+                + '<h1 style="margin:0;font-size:5vw;line-height:1.15;">' + title + '</h1>'
+                + (subtitle ? '<p style="margin:0;font-size:2vw;color:' + activeScheme.subtitleColor + ';">' + subtitle + '</p>' : '')
+                + '<div style="font-size:1.8vw;color:' + activeScheme.accentColor + ';">Q & A</div>'
                 + '</div>';
         }
 
@@ -717,6 +1081,7 @@ JSON 结构：
                 + '</div>';
 
             return '<div style="' + base + 'display:flex;flex-direction:column;">'
+                + deco
                 + '<h1 style="margin:0 0 2.2% 0;font-size:3.8vw;line-height:1.2;">' + title + '</h1>'
                 + (subtitle ? '<p style="margin:0 0 2.8% 0;color:' + activeScheme.subtitleColor + ';font-size:2vw;">' + subtitle + '</p>' : '')
                 + '<div style="display:flex;gap:2%;height:75%;">'
@@ -726,8 +1091,12 @@ JSON 结构：
         }
 
         return '<div style="' + base + 'display:flex;flex-direction:column;">'
+            + deco
             + '<h1 style="margin:0 0 2.2% 0;font-size:3.8vw;line-height:1.2;">' + title + '</h1>'
             + (subtitle ? '<p style="margin:0 0 2.8% 0;color:' + activeScheme.subtitleColor + ';font-size:2vw;">' + subtitle + '</p>' : '')
+            + (highlights.length ? '<div style="display:flex;flex-wrap:wrap;gap:1%;margin:0 0 2.1% 0;">' + highlights.map(function(item) {
+                return '<span style="padding:0.45% 1%;border-radius:999px;background:' + activeScheme.accentColor + '2f;font-size:1.35vw;">' + escapeHtml(item) + '</span>';
+            }).join('') + '</div>' : '')
             + '<div style="display:flex;flex-direction:column;gap:1.8%;">'
             + (bullets.length ? bullets.map(function(item) {
                 var subs = (item.subBullets || []).map(function(sub) {
@@ -739,6 +1108,33 @@ JSON 结构：
                     + '</div>';
             }).join('') : '<div style="font-size:2.1vw;color:' + activeScheme.subtitleColor + ';">暂无要点</div>')
             + '</div>'
+            + '</div>';
+    }
+
+    function renderTocColumn(items, scheme, startNo) {
+        if (!items.length) {
+            return '<div style="padding:5%;border-radius:12px;background:rgba(255,255,255,0.13);">暂无章节</div>';
+        }
+        return '<div style="padding:5%;border-radius:12px;background:rgba(255,255,255,0.13);border:1px solid rgba(255,255,255,0.2);display:flex;flex-direction:column;gap:1.2%;">'
+            + items.map(function(item, idx) {
+                return '<div style="display:flex;align-items:center;gap:1.1%;font-size:1.75vw;line-height:1.3;">'
+                    + '<span style="display:inline-flex;align-items:center;justify-content:center;width:1.6em;height:1.6em;border-radius:999px;background:' + scheme.accentColor + '38;color:' + scheme.textColor + ';font-size:0.75em;">' + (startNo + idx) + '</span>'
+                    + '<span>' + escapeHtml(item) + '</span>'
+                    + '</div>';
+            }).join('')
+            + '</div>';
+    }
+
+    function renderSectionCard(section, scheme) {
+        section = section || { title: '', items: [] };
+        var items = Array.isArray(section.items) ? section.items : [];
+        return '<div style="background:rgba(255,255,255,0.14);border:1px solid rgba(255,255,255,0.18);border-radius:14px;padding:4.2% 4.8%;overflow:hidden;">'
+            + '<h3 style="margin:0 0 3% 0;font-size:2.2vw;color:' + scheme.accentColor + ';">' + escapeHtml(section.title || '维度') + '</h3>'
+            + '<ul style="margin:0;padding-left:1.4em;display:flex;flex-direction:column;gap:0.8%;">'
+            + (items.length ? items.map(function(item) {
+                return '<li style="font-size:1.65vw;line-height:1.35;">' + escapeHtml(item) + '</li>';
+            }).join('') : '<li style="font-size:1.65vw;color:' + scheme.subtitleColor + ';">暂无内容</li>')
+            + '</ul>'
             + '</div>';
     }
 
@@ -776,6 +1172,54 @@ JSON 结构：
                 subBullets: subs
             };
         }).filter(Boolean).slice(0, 12);
+    }
+
+    function normalizeSections(items) {
+        if (!Array.isArray(items)) return [];
+        return items.map(function(item) {
+            if (!item || typeof item !== 'object') {
+                var line = sanitizePageText(item || '');
+                if (!line) return null;
+                return { title: line, items: [] };
+            }
+            var title = sanitizePageText(item.title || item.header || item.name || '');
+            var lines = Array.isArray(item.items)
+                ? item.items.map(function(it) { return sanitizePageText(it); }).filter(Boolean).slice(0, 5)
+                : [];
+            if (!title && !lines.length) return null;
+            return { title: title || (lines[0] || '章节'), items: lines };
+        }).filter(Boolean).slice(0, 8);
+    }
+
+    function normalizeStats(items) {
+        if (!Array.isArray(items)) return [];
+        return items.map(function(item) {
+            if (!item || typeof item !== 'object') return null;
+            var label = sanitizePageText(item.label || item.name || item.title || '');
+            var value = sanitizePageText(item.value || item.data || '');
+            var note = sanitizePageText(item.note || item.desc || item.description || '');
+            if (!label && !value) return null;
+            return {
+                label: label || '指标',
+                value: value || '--',
+                note: note
+            };
+        }).filter(Boolean).slice(0, 6);
+    }
+
+    function normalizeQuote(raw) {
+        if (!raw) return null;
+        if (typeof raw === 'string') {
+            var textOnly = sanitizePageText(raw);
+            return textOnly ? { text: textOnly, author: '' } : null;
+        }
+        if (typeof raw === 'object') {
+            var text = sanitizePageText(raw.text || raw.quote || '');
+            var author = sanitizePageText(raw.author || raw.from || '');
+            if (!text) return null;
+            return { text: text, author: author };
+        }
+        return null;
     }
 
     function readStringField(obj, keys) {
@@ -1156,10 +1600,15 @@ JSON 结构：
                     if (page && typeof page === 'object' && !Array.isArray(page)) {
                         return {
                             layout: page.layout || (idx === 0 ? 'cover' : 'content'),
+                            role: page.role || (pptState.outline[idx] && pptState.outline[idx].role) || 'body',
                             themeToken: page.themeToken || pptState.colorScheme,
                             title: sanitizePageText(page.title || ''),
                             subtitle: sanitizePageText(page.subtitle || ''),
                             bullets: normalizeBulletItems(page.bullets),
+                            highlights: normalizeTextArray(page.highlights || [], 4),
+                            sections: normalizeSections(page.sections || []),
+                            stats: normalizeStats(page.stats || []),
+                            quote: normalizeQuote(page.quote || null),
                             image: page.image && page.image.url ? {
                                 url: page.image.url,
                                 caption: sanitizePageText(page.image.caption || ''),
@@ -1172,10 +1621,15 @@ JSON 结构：
                     var title = pptState.outline[idx] ? pptState.outline[idx].title : ('第' + (idx + 1) + '页');
                     return {
                         layout: idx === 0 ? 'cover' : 'content',
+                        role: (pptState.outline[idx] && pptState.outline[idx].role) || 'body',
                         themeToken: pptState.colorScheme,
                         title: sanitizePageText(title),
                         subtitle: '',
                         bullets: [],
+                        highlights: [],
+                        sections: [],
+                        stats: [],
+                        quote: null,
                         image: null
                     };
                 }),

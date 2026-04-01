@@ -17,6 +17,9 @@ const MAX_SUB_BULLET_LEN = 30;
 const MAX_IMAGE_CAPTION_LEN = 46;
 const MAX_BULLETS_PER_SLIDE = 5;
 const MAX_SUB_BULLETS_PER_BULLET = 2;
+const MAX_SECTIONS_PER_SLIDE = 8;
+const MAX_STATS_PER_SLIDE = 6;
+const MAX_HIGHLIGHTS = 4;
 
 // POST /api/ppt-export - 导出可编辑 PPT
 router.post('/', async (req, res) => {
@@ -73,40 +76,80 @@ router.post('/', async (req, res) => {
 function normalizeSlideSpec(rawPage, outlineItem, index) {
     const fallbackBullets = normalizeBullets((outlineItem.content || []).map(item => ({ text: item })));
     const fallbackTitle = sanitizeText(outlineItem.title || `第${index + 1}页`, MAX_TITLE_LEN);
+    const fallbackRole = inferRoleByTitle(fallbackTitle, index);
 
     if (!rawPage || typeof rawPage !== 'object' || Array.isArray(rawPage)) {
         return {
-            layout: index === 0 ? 'cover' : 'content',
+            layout: roleToLayout(fallbackRole, index),
+            role: fallbackRole,
             themeToken: 'white-black',
             title: fallbackTitle,
             subtitle: '',
             bullets: fallbackBullets,
+            highlights: [],
+            sections: [],
+            stats: [],
+            quote: null,
             image: null,
             continuation: false
         };
     }
 
-    const layout = normalizeLayout(rawPage.layout, index);
+    const role = normalizeRole(rawPage.role, fallbackRole, index);
+    const layout = normalizeLayout(rawPage.layout || roleToLayout(role, index), index, role);
     const title = sanitizeText(rawPage.title || fallbackTitle, MAX_TITLE_LEN);
     const subtitle = sanitizeText(rawPage.subtitle || '', MAX_SUBTITLE_LEN);
     const bullets = normalizeBullets(rawPage.bullets);
+    const sections = normalizeSections(rawPage.sections);
+    const stats = normalizeStats(rawPage.stats);
+    const quote = normalizeQuote(rawPage.quote);
+    const highlights = normalizeTextItems(rawPage.highlights, MAX_HIGHLIGHTS, 28);
 
     return {
         layout,
+        role,
         themeToken: resolveThemeToken(rawPage.themeToken || rawPage.theme || 'white-black'),
         title: title || fallbackTitle,
         subtitle,
         bullets: bullets.length ? bullets : fallbackBullets,
+        highlights,
+        sections,
+        stats,
+        quote,
         image: normalizeImage(rawPage.image),
         continuation: !!rawPage.continuation
     };
 }
 
-function normalizeLayout(layout, index) {
+function normalizeLayout(layout, index, role) {
     const raw = String(layout || '').toLowerCase();
-    if (raw === 'cover' || raw === 'content' || raw === 'two-column') return raw;
-    if (raw === 'image-left' || raw === 'image-right') return raw;
-    return index === 0 ? 'cover' : 'content';
+    const valid = ['cover', 'toc', 'content', 'two-column', 'image-left', 'image-right', 'timeline', 'comparison', 'stats', 'quote', 'references', 'thanks'];
+    if (valid.includes(raw)) return raw;
+    return roleToLayout(role, index);
+}
+
+function normalizeRole(role, fallbackRole, index) {
+    const raw = String(role || '').toLowerCase().trim();
+    if (['cover', 'toc', 'body', 'references', 'thanks'].includes(raw)) return raw;
+    if (index === 0) return 'cover';
+    return fallbackRole || 'body';
+}
+
+function roleToLayout(role, index) {
+    if (role === 'cover' || index === 0) return 'cover';
+    if (role === 'toc') return 'toc';
+    if (role === 'references') return 'references';
+    if (role === 'thanks') return 'thanks';
+    return 'content';
+}
+
+function inferRoleByTitle(title, index) {
+    const t = String(title || '').toLowerCase();
+    if (index === 0 || /(封面|标题|title|cover)/.test(t)) return 'cover';
+    if (/(目录|议程|agenda|contents?)/.test(t)) return 'toc';
+    if (/(参考|文献|references?|bibliography)/.test(t)) return 'references';
+    if (/(致谢|感谢|thanks|thank you|q&a)/.test(t)) return 'thanks';
+    return 'body';
 }
 
 function resolveThemeToken(token) {
@@ -148,6 +191,65 @@ function normalizeImage(rawImage) {
     };
 }
 
+function normalizeSections(rawSections) {
+    if (!Array.isArray(rawSections)) return [];
+    return rawSections.map(section => {
+        if (!section || typeof section !== 'object') {
+            const line = sanitizeText(section, MAX_BULLET_LEN);
+            if (!line) return null;
+            return { title: line, items: [] };
+        }
+
+        const title = sanitizeText(section.title || section.header || section.name || '', MAX_BULLET_LEN);
+        const items = Array.isArray(section.items)
+            ? section.items.map(item => sanitizeText(item, MAX_BULLET_LEN)).filter(Boolean).slice(0, 6)
+            : [];
+
+        if (!title && !items.length) return null;
+        return {
+            title: title || (items[0] || '章节'),
+            items
+        };
+    }).filter(Boolean).slice(0, 16);
+}
+
+function normalizeStats(rawStats) {
+    if (!Array.isArray(rawStats)) return [];
+    return rawStats.map(item => {
+        if (!item || typeof item !== 'object') return null;
+        const label = sanitizeText(item.label || item.name || item.title || '', 18);
+        const value = sanitizeText(item.value || item.data || '', 20);
+        const note = sanitizeText(item.note || item.desc || item.description || '', 28);
+        if (!label && !value) return null;
+        return {
+            label: label || '指标',
+            value: value || '--',
+            note
+        };
+    }).filter(Boolean).slice(0, 18);
+}
+
+function normalizeQuote(rawQuote) {
+    if (!rawQuote) return null;
+    if (typeof rawQuote === 'string') {
+        const text = sanitizeText(rawQuote, 160);
+        return text ? { text, author: '' } : null;
+    }
+    if (typeof rawQuote !== 'object') return null;
+    const text = sanitizeText(rawQuote.text || rawQuote.quote || '', 160);
+    const author = sanitizeText(rawQuote.author || rawQuote.from || '', 36);
+    if (!text) return null;
+    return { text, author };
+}
+
+function normalizeTextItems(items, maxCount, maxLen) {
+    if (!Array.isArray(items)) return [];
+    return items
+        .map(item => sanitizeText(item, maxLen))
+        .filter(Boolean)
+        .slice(0, maxCount);
+}
+
 function sanitizeText(text, maxLen) {
     if (!text) return '';
     let value = String(text)
@@ -164,8 +266,39 @@ function sanitizeText(text, maxLen) {
 }
 
 function paginateSlideSpec(spec) {
-    if (spec.layout === 'cover') {
+    if (spec.layout === 'cover' || spec.layout === 'thanks' || spec.layout === 'quote') {
         return [spec];
+    }
+
+    if (spec.layout === 'stats') {
+        const chunks = [];
+        const source = Array.isArray(spec.stats) ? spec.stats : [];
+        const total = Math.max(1, Math.ceil(source.length / MAX_STATS_PER_SLIDE));
+        for (let i = 0; i < total; i++) {
+            chunks.push({
+                ...spec,
+                stats: source.slice(i * MAX_STATS_PER_SLIDE, (i + 1) * MAX_STATS_PER_SLIDE),
+                continuation: i > 0
+            });
+        }
+        return chunks;
+    }
+
+    if (spec.layout === 'toc' || spec.layout === 'timeline' || spec.layout === 'references') {
+        const sections = Array.isArray(spec.sections) ? spec.sections : [];
+        if (!sections.length) {
+            return [{ ...spec, continuation: false }];
+        }
+        const chunks = [];
+        const total = Math.max(1, Math.ceil(sections.length / MAX_SECTIONS_PER_SLIDE));
+        for (let i = 0; i < total; i++) {
+            chunks.push({
+                ...spec,
+                sections: sections.slice(i * MAX_SECTIONS_PER_SLIDE, (i + 1) * MAX_SECTIONS_PER_SLIDE),
+                continuation: i > 0
+            });
+        }
+        return chunks;
     }
 
     if (spec.layout === 'two-column') {
@@ -240,8 +373,22 @@ function renderSlideFromSpec(slide, spec, ratio, pageNo) {
 
     if (spec.layout === 'cover') {
         addCoverBullets(slide, spec, palette, slideWidth, slideHeight, margin);
+    } else if (spec.layout === 'toc') {
+        renderTocSlide(slide, spec, palette, ratio);
     } else if (spec.layout === 'two-column') {
         renderTwoColumn(slide, spec, palette, ratio);
+    } else if (spec.layout === 'timeline') {
+        renderTimelineSlide(slide, spec, palette, ratio);
+    } else if (spec.layout === 'comparison') {
+        renderComparisonSlide(slide, spec, palette, ratio);
+    } else if (spec.layout === 'stats') {
+        renderStatsSlide(slide, spec, palette, ratio);
+    } else if (spec.layout === 'quote') {
+        renderQuoteSlide(slide, spec, palette, ratio);
+    } else if (spec.layout === 'references') {
+        renderReferencesSlide(slide, spec, palette, ratio);
+    } else if (spec.layout === 'thanks') {
+        renderThanksSlide(slide, spec, palette, ratio);
     } else {
         renderContentWithOptionalImage(slide, spec, palette, ratio);
     }
@@ -295,6 +442,290 @@ function addCoverBullets(slide, spec, palette, slideWidth, slideHeight, margin) 
             align: 'center'
         });
     }
+}
+
+function renderTocSlide(slide, spec, palette, ratio) {
+    const { width: slideWidth, height: slideHeight } = getSlideSize(ratio);
+    const margin = 0.55;
+    const topY = 1.85;
+    const columnGap = 0.35;
+    const columnWidth = (slideWidth - margin * 2 - columnGap) / 2;
+
+    const tocItems = (spec.sections || []).map(section => section.title).filter(Boolean);
+    const fallbackItems = (spec.bullets || []).map(item => item.text).filter(Boolean);
+    const items = (tocItems.length ? tocItems : fallbackItems).slice(0, 12);
+    const left = items.slice(0, Math.ceil(items.length / 2));
+    const right = items.slice(Math.ceil(items.length / 2));
+
+    addCardShape(slide, { x: margin - 0.03, y: topY - 0.08, w: columnWidth + 0.06, h: slideHeight - topY - 0.66 }, palette, 88);
+    addCardShape(slide, { x: margin + columnWidth + columnGap - 0.03, y: topY - 0.08, w: columnWidth + 0.06, h: slideHeight - topY - 0.66 }, palette, 88);
+
+    addNumberedList(slide, left, { x: margin, y: topY, w: columnWidth, h: slideHeight - topY - 0.8 }, palette, 1);
+    addNumberedList(slide, right, { x: margin + columnWidth + columnGap, y: topY, w: columnWidth, h: slideHeight - topY - 0.8 }, palette, left.length + 1);
+}
+
+function renderTimelineSlide(slide, spec, palette, ratio) {
+    const { width: slideWidth, height: slideHeight } = getSlideSize(ratio);
+    const margin = 0.65;
+    const topY = 1.85;
+    const maxY = slideHeight - 0.75;
+
+    const source = (spec.sections || []).map(section => ({
+        title: section.title,
+        desc: (section.items || []).slice(0, 1).join(' / ')
+    }));
+
+    const fallback = (spec.bullets || []).map(item => ({
+        title: item.text,
+        desc: (item.subBullets || []).slice(0, 1).join(' / ')
+    }));
+
+    const timeline = (source.length ? source : fallback).slice(0, 6);
+    slide.addShape(getRectShapeType(), {
+        x: margin + 0.2,
+        y: topY,
+        w: 0.08,
+        h: Math.max(0.5, maxY - topY),
+        line: { color: palette.accent, transparency: 100 },
+        fill: { color: palette.accent, transparency: 35 }
+    });
+
+    let y = topY;
+    timeline.forEach((item) => {
+        if (y > maxY - 0.5) return;
+        slide.addShape(getEllipseShapeType(), {
+            x: margin + 0.07,
+            y: y + 0.08,
+            w: 0.32,
+            h: 0.22,
+            line: { color: palette.accent, transparency: 100 },
+            fill: { color: palette.accent, transparency: 0 }
+        });
+        addCardShape(slide, { x: margin + 0.45, y: y, w: slideWidth - margin - 0.95, h: 0.56 }, palette, 84);
+        slide.addText(item.title || '', {
+            x: margin + 0.62,
+            y: y + 0.06,
+            w: slideWidth - margin - 1.25,
+            h: 0.22,
+            fontSize: 15,
+            color: palette.text,
+            fontFace: 'Microsoft YaHei',
+            bold: true
+        });
+        if (item.desc) {
+            slide.addText(item.desc, {
+                x: margin + 0.62,
+                y: y + 0.28,
+                w: slideWidth - margin - 1.25,
+                h: 0.18,
+                fontSize: 11,
+                color: palette.sub,
+                fontFace: 'Microsoft YaHei'
+            });
+        }
+        y += 0.66;
+    });
+}
+
+function renderComparisonSlide(slide, spec, palette, ratio) {
+    const { width: slideWidth, height: slideHeight } = getSlideSize(ratio);
+    const margin = 0.55;
+    const topY = 1.85;
+    const columnGap = 0.35;
+    const columnWidth = (slideWidth - margin * 2 - columnGap) / 2;
+
+    const sections = (spec.sections || []).slice(0, 2);
+    const left = sections[0] || {
+        title: '方案 A',
+        items: (spec.bullets || []).slice(0, Math.ceil((spec.bullets || []).length / 2)).map(item => item.text)
+    };
+    const right = sections[1] || {
+        title: '方案 B',
+        items: (spec.bullets || []).slice(Math.ceil((spec.bullets || []).length / 2)).map(item => item.text)
+    };
+
+    renderSectionCardOnSlide(slide, left, { x: margin, y: topY, w: columnWidth, h: slideHeight - topY - 0.8 }, palette);
+    renderSectionCardOnSlide(slide, right, { x: margin + columnWidth + columnGap, y: topY, w: columnWidth, h: slideHeight - topY - 0.8 }, palette);
+}
+
+function renderStatsSlide(slide, spec, palette, ratio) {
+    const { width: slideWidth, height: slideHeight } = getSlideSize(ratio);
+    const margin = 0.55;
+    const topY = 1.85;
+
+    const stats = (spec.stats || []).slice(0, 6);
+    const items = stats.length
+        ? stats
+        : (spec.bullets || []).slice(0, 6).map((item, idx) => ({
+            label: `指标${idx + 1}`,
+            value: item.text,
+            note: (item.subBullets || []).join(' / ')
+        }));
+
+    const columns = 3;
+    const rows = Math.max(1, Math.ceil(items.length / columns));
+    const gapX = 0.22;
+    const gapY = 0.2;
+    const cardW = (slideWidth - margin * 2 - gapX * (columns - 1)) / columns;
+    const cardH = (slideHeight - topY - 0.8 - gapY * (rows - 1)) / rows;
+
+    items.forEach((item, idx) => {
+        const row = Math.floor(idx / columns);
+        const col = idx % columns;
+        const x = margin + col * (cardW + gapX);
+        const y = topY + row * (cardH + gapY);
+        addCardShape(slide, { x, y, w: cardW, h: cardH }, palette, 82);
+        slide.addText(item.label || '', {
+            x: x + 0.12,
+            y: y + 0.08,
+            w: cardW - 0.24,
+            h: 0.16,
+            fontSize: 10,
+            color: palette.sub,
+            fontFace: 'Microsoft YaHei'
+        });
+        slide.addText(item.value || '--', {
+            x: x + 0.12,
+            y: y + cardH * 0.34,
+            w: cardW - 0.24,
+            h: 0.22,
+            fontSize: fitFontByLength(24, 14, String(item.value || '').length),
+            color: palette.accent,
+            bold: true,
+            fontFace: 'Microsoft YaHei',
+            align: 'center'
+        });
+        if (item.note) {
+            slide.addText(item.note, {
+                x: x + 0.12,
+                y: y + cardH - 0.24,
+                w: cardW - 0.24,
+                h: 0.14,
+                fontSize: 9,
+                color: palette.sub,
+                fontFace: 'Microsoft YaHei',
+                align: 'center'
+            });
+        }
+    });
+}
+
+function renderQuoteSlide(slide, spec, palette, ratio) {
+    const { width: slideWidth, height: slideHeight } = getSlideSize(ratio);
+    const quote = spec.quote || {
+        text: (spec.bullets && spec.bullets[0] ? spec.bullets[0].text : spec.title),
+        author: ''
+    };
+
+    slide.addText('“', {
+        x: slideWidth / 2 - 0.6,
+        y: 1.6,
+        w: 1.2,
+        h: 0.8,
+        fontSize: 58,
+        color: palette.accent,
+        fontFace: 'Microsoft YaHei',
+        align: 'center'
+    });
+
+    slide.addText(quote.text || '', {
+        x: 1.1,
+        y: 2.15,
+        w: slideWidth - 2.2,
+        h: 1.5,
+        fontSize: fitFontByLength(28, 16, String(quote.text || '').length),
+        color: palette.text,
+        bold: true,
+        fontFace: 'Microsoft YaHei',
+        align: 'center',
+        valign: 'mid'
+    });
+
+    if (quote.author) {
+        slide.addText(`—— ${quote.author}`, {
+            x: 0.9,
+            y: 4.05,
+            w: slideWidth - 1.8,
+            h: 0.25,
+            fontSize: 12,
+            color: palette.sub,
+            fontFace: 'Microsoft YaHei',
+            align: 'right'
+        });
+    }
+}
+
+function renderReferencesSlide(slide, spec, palette, ratio) {
+    const { width: slideWidth, height: slideHeight } = getSlideSize(ratio);
+    const margin = 0.6;
+    const topY = 1.85;
+    const refs = [];
+
+    (spec.sections || []).forEach(section => {
+        (section.items || []).forEach(item => {
+            if (item) refs.push(item);
+        });
+    });
+
+    if (!refs.length) {
+        (spec.bullets || []).forEach(item => {
+            if (item && item.text) refs.push(item.text);
+        });
+    }
+
+    const list = refs.slice(0, 10);
+    let y = topY;
+    list.forEach((item, idx) => {
+        if (y > slideHeight - 0.65) return;
+        addCardShape(slide, { x: margin, y: y - 0.02, w: slideWidth - margin * 2, h: 0.3 }, palette, 88);
+        slide.addText(`${idx + 1}. ${item}`, {
+            x: margin + 0.1,
+            y,
+            w: slideWidth - margin * 2 - 0.2,
+            h: 0.25,
+            fontSize: 11,
+            color: palette.text,
+            fontFace: 'Microsoft YaHei'
+        });
+        y += 0.36;
+    });
+}
+
+function renderThanksSlide(slide, spec, palette, ratio) {
+    const { width: slideWidth } = getSlideSize(ratio);
+    slide.addText(spec.title || '致谢', {
+        x: 0,
+        y: 2.1,
+        w: slideWidth,
+        h: 0.9,
+        fontSize: 44,
+        color: palette.text,
+        bold: true,
+        fontFace: 'Microsoft YaHei',
+        align: 'center'
+    });
+
+    slide.addText(spec.subtitle || '感谢聆听，欢迎交流', {
+        x: 0,
+        y: 3.15,
+        w: slideWidth,
+        h: 0.38,
+        fontSize: 16,
+        color: palette.sub,
+        fontFace: 'Microsoft YaHei',
+        align: 'center'
+    });
+
+    slide.addText('Q & A', {
+        x: 0,
+        y: 3.68,
+        w: slideWidth,
+        h: 0.28,
+        fontSize: 14,
+        color: palette.accent,
+        fontFace: 'Microsoft YaHei',
+        align: 'center'
+    });
 }
 
 function renderTwoColumn(slide, spec, palette, ratio) {
@@ -443,6 +874,71 @@ function addBulletBlock(slide, bullets, rect, palette) {
         });
 
         y += 0.08;
+    });
+}
+
+function addNumberedList(slide, items, rect, palette, startNo) {
+    if (!Array.isArray(items) || !items.length) return;
+    let y = rect.y;
+    const maxY = rect.y + rect.h;
+    items.forEach((item, idx) => {
+        if (!item || y >= maxY - 0.3) return;
+        const order = (startNo || 1) + idx;
+        addCardShape(slide, { x: rect.x, y: y - 0.02, w: rect.w, h: 0.29 }, palette, 86);
+        slide.addText(`${order}`, {
+            x: rect.x + 0.08,
+            y,
+            w: 0.18,
+            h: 0.22,
+            fontSize: 10,
+            color: palette.accent,
+            bold: true,
+            fontFace: 'Microsoft YaHei',
+            align: 'center'
+        });
+        slide.addText(item, {
+            x: rect.x + 0.32,
+            y,
+            w: rect.w - 0.35,
+            h: 0.22,
+            fontSize: 12,
+            color: palette.text,
+            fontFace: 'Microsoft YaHei'
+        });
+        y += 0.35;
+    });
+}
+
+function renderSectionCardOnSlide(slide, section, rect, palette) {
+    addCardShape(slide, rect, palette, 86);
+    const title = sanitizeText(section && section.title ? section.title : '维度', MAX_BULLET_LEN);
+    const items = Array.isArray(section && section.items) ? section.items : [];
+
+    slide.addText(title, {
+        x: rect.x + 0.12,
+        y: rect.y + 0.08,
+        w: rect.w - 0.24,
+        h: 0.22,
+        fontSize: 16,
+        color: palette.accent,
+        bold: true,
+        fontFace: 'Microsoft YaHei'
+    });
+
+    let y = rect.y + 0.38;
+    const maxY = rect.y + rect.h - 0.1;
+    items.slice(0, 7).forEach(item => {
+        if (!item || y > maxY - 0.2) return;
+        slide.addText(`• ${item}`, {
+            x: rect.x + 0.15,
+            y,
+            w: rect.w - 0.3,
+            h: 0.2,
+            fontSize: 12,
+            color: palette.text,
+            fontFace: 'Microsoft YaHei'
+        });
+        y += 0.23;
     });
 }
 
