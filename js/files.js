@@ -3400,11 +3400,7 @@
         if (existingModal) {
             existingModal.remove();
         }
-        // 创建带透明蒙版的浮动对话框
-        const overlay = document.createElement('div');
-        overlay.id = 'findDialogOverlay';
-        overlay.style.cssText = 'position:fixed;inset:0;background:' + (nightMode ? 'rgba(0,0,0,0.32)' : 'rgba(20,24,32,0.14)') + ';backdrop-filter:blur(1.5px);-webkit-backdrop-filter:blur(1.5px);z-index:10000;';
-
+        // 仅窗口本身使用半透明蒙版效果，不遮挡整个页面
         const dialog = document.createElement('div');
         dialog.id = 'findDialogModal';
         dialog.style.cssText = 'position:fixed;top:80px;right:40px;background:' + (nightMode ? 'rgba(45,45,45,0.92)' : 'rgba(255,255,255,0.9)') + ';color:' + textColor + ';border-radius:12px;padding:20px;width:380px;box-shadow:0 8px 28px rgba(0,0,0,0.28);z-index:10001;border:1px solid ' + borderColor + ';display:flex;flex-direction:column;';
@@ -3443,7 +3439,6 @@
                 '</div>' +
                 '<div id="wasmSearchResults" style="max-height:180px;overflow:auto;font-size:12px;"></div>' +
             '</div>';
-        document.body.appendChild(overlay);
         document.body.appendChild(dialog);
         // 拖动逻辑（支持鼠标和触摸）
         const header = dialog.querySelector('#findDialogHeader');
@@ -4091,13 +4086,9 @@
         // 关闭对话框并清除高亮
         function closeFindDialog() {
             clearVisualHighlights();
-            if (overlay && overlay.parentNode) overlay.parentNode.removeChild(overlay);
             dialog.remove();
         }
         closeBtn.onclick = closeFindDialog;
-        overlay.onclick = function() {
-            closeFindDialog();
-        };
         // ESC键关闭
         const handleEsc = function(e) {
             if (e.key === 'Escape') {
