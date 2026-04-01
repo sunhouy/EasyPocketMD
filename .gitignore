@@ -15,6 +15,7 @@ temp_uploads/
 user_files/
 print/.venv/
 wasm_test_engine/build-native/
+doc/
 
 js/ui.js.bak
 *.tmp
