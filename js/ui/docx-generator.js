@@ -99,18 +99,49 @@ async function exportDOCX(content, settings, customFilename) {
         }
 
         // 下载文件
-        var url = URL.createObjectURL(blob);
-        var a = document.createElement('a');
-        a.href = url;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
+        if (window.Capacitor && window.Capacitor.isNativePlatform()) {
+            // Capacitor 环境：使用 blob 转 base64 后分享
+            const base64Data = await new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                    const base64 = reader.result.split(',')[1];
+                    resolve(base64);
+                };
+                reader.readAsDataURL(blob);
+            });
 
-        // 清理
-        setTimeout(function() {
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-        }, 100);
+            const { Filesystem, Directory } = await import('@capacitor/filesystem');
+            const { Share } = await import('@capacitor/share');
+
+            // 写入临时文件
+            const writeResult = await Filesystem.writeFile({
+                path: filename,
+                data: base64Data,
+                directory: Directory.Cache
+            });
+
+            // 分享文件（在移动端弹出保存/分享对话框）
+            await Share.share({
+                title: filename,
+                text: filename,
+                url: writeResult.uri,
+                dialogTitle: isEn() ? 'Save or Share File' : '保存或分享文件'
+            });
+        } else {
+            // 普通浏览器环境
+            var url = URL.createObjectURL(blob);
+            var a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+
+            // 清理
+            setTimeout(function() {
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }, 100);
+        }
 
         // 清除超时
         if (timeoutId) clearTimeout(timeoutId);
