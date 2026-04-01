@@ -247,45 +247,52 @@
     function searchFilesDetailed(query, options) {
         if (!isUsable()) return { code: 500, message: 'smart search unavailable' };
 
-        const files = Array.isArray(global.files) ? global.files : [];
-        const results = [];
-        let totalMatches = 0;
+        try {
+            const files = Array.isArray(global.files) ? global.files : [];
+            const results = [];
+            let totalMatches = 0;
 
-        files.forEach(function(file) {
-            if (!file || file.type !== 'file') return;
-            const res = findInText(file.content || '', query || '', options || {});
-            if (!res || res.code !== 200 || !res.data || !Array.isArray(res.data.matches) || res.data.matches.length === 0) {
-                return;
-            }
+            files.forEach(function(file) {
+                if (!file || file.type !== 'file') return;
+                const res = findInText(file.content || '', query || '', options || {});
+                if (!res || res.code !== 200) {
+                    throw new Error((res && res.message) || 'findInText failed in searchFilesDetailed');
+                }
+                if (!res.data || !Array.isArray(res.data.matches) || res.data.matches.length === 0) {
+                    return;
+                }
 
-            const hits = res.data.matches.map(function(hit, idx) {
-                return {
-                    index: idx,
-                    start: hit.start,
-                    end: hit.end,
-                    snippet: hit.snippet || ''
-                };
+                const hits = res.data.matches.map(function(hit, idx) {
+                    return {
+                        index: idx,
+                        start: hit.start,
+                        end: hit.end,
+                        snippet: hit.snippet || ''
+                    };
+                });
+
+                totalMatches += hits.length;
+                results.push({
+                    docId: String(file.id),
+                    filename: file.name || '',
+                    matchCount: hits.length,
+                    hits: hits
+                });
             });
 
-            totalMatches += hits.length;
-            results.push({
-                docId: String(file.id),
-                filename: file.name || '',
-                matchCount: hits.length,
-                hits: hits
-            });
-        });
-
-        return {
-            code: 200,
-            message: 'ok',
-            data: {
-                query: query || '',
-                files: results,
-                fileCount: results.length,
-                totalMatches: totalMatches
-            }
-        };
+            return {
+                code: 200,
+                message: 'ok',
+                data: {
+                    query: query || '',
+                    files: results,
+                    fileCount: results.length,
+                    totalMatches: totalMatches
+                }
+            };
+        } catch (e) {
+            return { code: 500, message: 'smart search failed: ' + (e && e.message ? e.message : 'unknown error') };
+        }
     }
 
     global.wasmTextEngineGateway = {

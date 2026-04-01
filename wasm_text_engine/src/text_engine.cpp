@@ -71,6 +71,11 @@ bool isUtf8Continuation(unsigned char ch) {
     return (ch & 0xC0) == 0x80;
 }
 
+bool isUtf8Boundary(const std::string& text, size_t pos) {
+    if (pos == 0 || pos >= text.size()) return true;
+    return !isUtf8Continuation(static_cast<unsigned char>(text[pos]));
+}
+
 size_t clampUtf8Start(const std::string& text, size_t pos) {
     if (pos >= text.size()) return text.size();
     while (pos > 0 && isUtf8Continuation(static_cast<unsigned char>(text[pos]))) {
@@ -107,7 +112,11 @@ std::vector<std::pair<size_t, size_t> > findAllByteRanges(
 
     size_t pos = hay.find(needle, 0);
     while (pos != std::string::npos) {
-        matches.push_back(std::make_pair(pos, pos + needle.size()));
+        const size_t end = pos + needle.size();
+        // Ensure match does not split UTF-8 code points.
+        if (isUtf8Boundary(text, pos) && isUtf8Boundary(text, end)) {
+            matches.push_back(std::make_pair(pos, end));
+        }
         pos = hay.find(needle, pos + 1);
     }
 

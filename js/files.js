@@ -2061,6 +2061,11 @@
     }
 
     async function openFile(fileId) {
+        // 先保存当前文档
+        if (typeof global.saveCurrentFile === 'function' && g('currentFileId')) {
+            await global.saveCurrentFile(true);
+        }
+
         const files = g('files');
         const file = files.find(f => f.id === fileId && f.type === 'file');
         if (!file) {
@@ -2994,7 +2999,12 @@
     /**
      * 显示文件对比对话框
      */
-    function showFileDiffDialog() {
+    async function showFileDiffDialog() {
+        // 先保存当前文档
+        if (typeof global.saveCurrentFile === 'function' && g('currentFileId')) {
+            await global.saveCurrentFile(true);
+        }
+
         const currentFileId = g('currentFileId');
         if (!currentFileId) {
             global.showMessage(isEn() ? 'Please open a file first' : '请先打开一个文件', 'warning');
@@ -3196,7 +3206,12 @@
     /**
      * 显示全文查找对话框
      */
-    function showFindDialog() {
+    async function showFindDialog() {
+        // 先保存当前文档
+        if (typeof global.saveCurrentFile === 'function' && g('currentFileId')) {
+            await global.saveCurrentFile(true);
+        }
+
         const nightMode = g('nightMode') === true;
         const bgColor = nightMode ? '#2d2d2d' : 'white';
         const textColor = nightMode ? '#eee' : '#333';

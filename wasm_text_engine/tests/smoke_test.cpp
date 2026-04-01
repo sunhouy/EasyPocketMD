@@ -29,6 +29,10 @@ int main() {
     std::string simJson = engine.similarity("abc", "abd");
     assert(simJson.find("\"distance\":1") != std::string::npos);
 
+    std::string utf8FindJson = engine.findInText("此刻是测试🙂此刻", "此刻", false);
+    assert(utf8FindJson.find("\"count\":2") != std::string::npos);
+    assert(utf8FindJson.find("\"start\":0") != std::string::npos);
+
     std::cout << "smoke test passed" << std::endl;
     return 0;
 }

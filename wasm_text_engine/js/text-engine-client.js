@@ -6,6 +6,10 @@ function err(message) {
     return { code: 500, message: message || 'error' };
 }
 
+function hasMethod(engine, name) {
+    return !!(engine && typeof engine[name] === 'function');
+}
+
 export class WasmTextEngineClient {
     constructor() {
         this.module = null;
@@ -20,6 +24,9 @@ export class WasmTextEngineClient {
             var factory = mod.default;
             this.module = await factory(opts.moduleOptions || {});
             this.engine = new this.module.WasmTextEngine();
+            if (!hasMethod(this.engine, 'diff') || !hasMethod(this.engine, 'merge3') || !hasMethod(this.engine, 'findInText')) {
+                return err('init failed: wasm engine methods are incomplete (possibly stale artifact)');
+            }
             return ok({ ready: true }, 'initialized');
         } catch (e) {
             return err('init failed: ' + e.message);
@@ -94,6 +101,9 @@ export class WasmTextEngineClient {
     findInText(text, query, options) {
         var opts = options || {};
         try {
+            if (!hasMethod(this.engine, 'findInText')) {
+                return err('findInText failed: wasm method findInText is unavailable');
+            }
             return ok(JSON.parse(this.engine.findInText(
                 text || '',
                 query || '',
@@ -107,6 +117,9 @@ export class WasmTextEngineClient {
     replaceAllText(text, query, replacement, options) {
         var opts = options || {};
         try {
+            if (!hasMethod(this.engine, 'replaceAllText')) {
+                return err('replaceAllText failed: wasm method replaceAllText is unavailable');
+            }
             return ok(JSON.parse(this.engine.replaceAllText(
                 text || '',
                 query || '',
