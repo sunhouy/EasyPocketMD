@@ -634,6 +634,10 @@ async function downloadInCapacitor(data, filename, mimeType, isRawData = false) 
         var previewBtn = modalContent.querySelector('#printPreviewBtn');
         if (previewBtn) {
             previewBtn.onclick = global.debounce(async function() {
+                // 先保存当前文档
+                if (typeof global.saveCurrentFile === 'function' && g('currentFileId')) {
+                    await global.saveCurrentFile(true);
+                }
                 cleanup();
                 await showPrintPreview(getPrintSettings(modalContent));
             }, 500);

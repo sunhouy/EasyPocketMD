@@ -325,6 +325,11 @@
 
         // 更新分享链接
         shareContent.querySelector('#shareUpdateBtn').onclick = async function() {
+            // 先保存当前文档
+            if (typeof global.saveCurrentFile === 'function') {
+                await global.saveCurrentFile(true);
+            }
+
             var btn = this;
             btn.disabled = true;
             btn.textContent = isEn ? 'Updating...' : '更新中...';
@@ -475,6 +480,11 @@
         });
 
         shareContent.querySelector('#shareCreateBtn').onclick = async function() {
+            // 先保存当前文档
+            if (typeof global.saveCurrentFile === 'function') {
+                await global.saveCurrentFile(true);
+            }
+
             var btn = this;
             btn.disabled = true;
             btn.textContent = isEn ? 'Creating...' : '创建中...';

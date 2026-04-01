@@ -260,8 +260,20 @@ document.addEventListener('DOMContentLoaded', function() {
     window.vditor = new Vditor('vditor', editorConfig);
 
     if (window.wasmTextEngineGateway && typeof window.wasmTextEngineGateway.init === 'function') {
-        window.wasmTextEngineGateway.init().catch(function(error) {
-            console.warn('Smart text engine init failed, fallback to built-in implementation:', error);
+        window.wasmTextEngineGateway.init().then(function(res) {
+            var status = typeof window.wasmTextEngineGateway.getStatus === 'function'
+                ? window.wasmTextEngineGateway.getStatus()
+                : null;
+            if (res && res.code === 200) {
+                console.info('[text-engine] wasm ready', { init: res, status: status });
+            } else {
+                console.warn('[text-engine] wasm unavailable, fallback to built-in implementation', { init: res, status: status });
+            }
+        }).catch(function(error) {
+            var status = typeof window.wasmTextEngineGateway.getStatus === 'function'
+                ? window.wasmTextEngineGateway.getStatus()
+                : null;
+            console.warn('[text-engine] wasm init failed, fallback to built-in implementation', { error: error, status: status });
         });
     }
 
@@ -743,36 +755,7 @@ document.addEventListener('DOMContentLoaded', function() {
     var historyModalOverlay = document.getElementById('historyModalOverlay');
     if (historyModalOverlay) historyModalOverlay.addEventListener('click', function(e) { if (e.target === this) this.classList.remove('show'); });
 
-    window.addEventListener('beforeunload', function(e) {
-        var unsaved = window.unsavedChanges || {};
-        var hasUnsaved = false;
-        (window.files || []).forEach(function(file) { if (unsaved[file.id]) hasUnsaved = true; });
-        if (hasUnsaved) {
-            e.preventDefault();
-            e.returnValue = window.i18n ? window.i18n.t('confirmLeave') : '您有未保存的文件，确定要离开吗？';
-            // beforeunload 中的异步操作通常不会可靠执行，改为使用 sendBeacon 进行服务器同步
-            try {
-                if (typeof window.syncCurrentFileWithBeacon === 'function') {
-                    window.syncCurrentFileWithBeacon();
-                }
-            } catch (e) {}
-        }
-    });
-
-    // 页面关闭/切后台时，使用 sendBeacon 尽最大努力保存当前文件到服务器
-    function tryBeaconSaveOnLeave() {
-        try {
-            if (typeof window.syncCurrentFileWithBeacon === 'function') {
-                window.syncCurrentFileWithBeacon();
-            }
-        } catch (e) {}
-    }
-
-    // pagehide 比 beforeunload 更适合移动端/浏览器回收页面
-    window.addEventListener('pagehide', tryBeaconSaveOnLeave);
-    document.addEventListener('visibilitychange', function() {
-        if (document.visibilityState === 'hidden') tryBeaconSaveOnLeave();
-    });
+    // 页面离开/切后台相关保存逻辑统一由 appLifecycle 管理，避免重复触发。
 
     // 渲染底部工具栏
     window.renderBottomToolbar = function() {

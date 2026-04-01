@@ -9,6 +9,10 @@
     // 保存原始的文件列表引用，用于紧急保存
     let isInitialized = false;
     let capacitorApp = null;
+    let capacitorDialog = null;
+    let leaveSaveInFlight = false;
+    let lastLeaveSaveAt = 0;
+    const LEAVE_SAVE_COOLDOWN_MS = 1200;
 
     /**
      * 检测运行环境
@@ -59,6 +63,38 @@
             console.error('[Lifecycle] Emergency save failed:', e);
             return false;
         }
+    }
+
+    /**
+     * 切后台/退出时统一调度一次保存，避免 pause 与 appStateChange 重复触发。
+     */
+    function scheduleLeaveSave(reason) {
+        const now = Date.now();
+        if (leaveSaveInFlight) return;
+        if (now - lastLeaveSaveAt < LEAVE_SAVE_COOLDOWN_MS) return;
+
+        leaveSaveInFlight = true;
+        lastLeaveSaveAt = now;
+
+        try {
+            emergencySave();
+        } catch (e) {
+            console.warn('[Lifecycle] leave save failed (' + reason + '):', e);
+        } finally {
+            // 给连续事件（pause + appStateChange）一个短窗口，窗口后允许下一次保存。
+            setTimeout(function() {
+                leaveSaveInFlight = false;
+            }, LEAVE_SAVE_COOLDOWN_MS);
+        }
+    }
+
+    function loadCapacitorDialogPlugin() {
+        if (capacitorDialog) return capacitorDialog;
+        if (global.Capacitor && global.Capacitor.Plugins && global.Capacitor.Plugins.Dialog) {
+            capacitorDialog = global.Capacitor.Plugins.Dialog;
+            return capacitorDialog;
+        }
+        return null;
     }
 
     /**
@@ -217,32 +253,31 @@
     function initCapacitorLifecycle() {
         if (!global.Capacitor) return;
 
-        // 动态导入 Capacitor App 插件
+        // 通过 Capacitor 注入的原生插件对象注册生命周期监听。
         try {
-            const { App } = require('@capacitor/app');
-            capacitorApp = App;
+            capacitorApp = global.Capacitor.Plugins ? global.Capacitor.Plugins.App : null;
+
+            if (!capacitorApp || typeof capacitorApp.addListener !== 'function') {
+                console.warn('[Lifecycle] Capacitor App plugin unavailable');
+                return;
+            }
 
             // 应用状态变化（前台/后台）
-            App.addListener('appStateChange', function(state) {
+            capacitorApp.addListener('appStateChange', function(state) {
                 if (!state.isActive) {
-                    // 应用进入后台
-                    // console.log('[Lifecycle] App going to background');
-                    emergencySave();
+                    scheduleLeaveSave('capacitor:appStateChange:hidden');
                 } else {
-                    // 应用回到前台
-                    // console.log('[Lifecycle] App coming to foreground');
                     checkAndOfferDraftRecovery();
                 }
             });
 
-            // 应用即将被终止
-            App.addListener('pause', function() {
-                // console.log('[Lifecycle] App pausing');
-                emergencySave();
+            // pause 在 Android 切后台/切任务时会触发，作为 appStateChange 的补充。
+            capacitorApp.addListener('pause', function() {
+                scheduleLeaveSave('capacitor:pause');
             });
 
             // Android 返回按钮处理
-            App.addListener('backButton', function() {
+            capacitorApp.addListener('backButton', function() {
                 // 检查是否有未保存的更改
                 const unsaved = global.unsavedChanges || {};
                 const hasUnsaved = (global.files || []).some(f => unsaved[f.id]);
@@ -250,11 +285,11 @@
                 if (hasUnsaved) {
                     // 显示确认对话框
                     if (confirm(global.i18n ? global.i18n.t('confirmLeave') : '您有未保存的文件，确定要离开吗？')) {
-                        emergencySave();
-                        App.exitApp();
+                        scheduleLeaveSave('capacitor:backButton');
+                        capacitorApp.exitApp();
                     }
                 } else {
-                    App.exitApp();
+                    capacitorApp.exitApp();
                 }
             });
 
@@ -375,17 +410,31 @@
         if (env.isCapacitor && capacitorApp) {
             // Capacitor 环境使用原生对话框
             try {
-                const { Dialog } = require('@capacitor/dialog');
-                Dialog.confirm({
-                    title: title,
-                    message: message
-                }).then(function(result) {
-                    if (result.value) {
+                const Dialog = loadCapacitorDialogPlugin();
+                if (Dialog && typeof Dialog.confirm === 'function') {
+                    Dialog.confirm({
+                        title: title,
+                        message: message
+                    }).then(function(result) {
+                        if (result.value) {
+                            performDraftRecovery();
+                        } else {
+                            global.draftRecovery.clearDraft();
+                        }
+                    }).catch(function() {
+                        if (confirm(message)) {
+                            performDraftRecovery();
+                        } else {
+                            global.draftRecovery.clearDraft();
+                        }
+                    });
+                } else {
+                    if (confirm(message)) {
                         performDraftRecovery();
                     } else {
                         global.draftRecovery.clearDraft();
                     }
-                });
+                }
             } catch (e) {
                 // 回退到普通 confirm
                 if (confirm(message)) {
@@ -429,23 +478,37 @@
         if (env.isCapacitor && capacitorApp) {
             // Capacitor 环境使用原生对话框
             try {
-                const { Dialog } = require('@capacitor/dialog');
-                Dialog.confirm({
-                    title: title,
-                    message: message
-                }).then(function(result) {
-                    if (result.value) {
-                        // 使用云端版本，清除草稿
-                        global.draftRecovery.clearDraft();
-                        const msg = isEn ? 'Using server version' : '已使用云端版本';
-                        if (global.showMessage) {
-                            global.showMessage(msg, 'info');
+                const Dialog = loadCapacitorDialogPlugin();
+                if (Dialog && typeof Dialog.confirm === 'function') {
+                    Dialog.confirm({
+                        title: title,
+                        message: message
+                    }).then(function(result) {
+                        if (result.value) {
+                            // 使用云端版本，清除草稿
+                            global.draftRecovery.clearDraft();
+                            const msg = isEn ? 'Using server version' : '已使用云端版本';
+                            if (global.showMessage) {
+                                global.showMessage(msg, 'info');
+                            }
+                        } else {
+                            // 恢复本地草稿
+                            performDraftRecovery();
                         }
+                    }).catch(function() {
+                        if (confirm(message)) {
+                            global.draftRecovery.clearDraft();
+                        } else {
+                            performDraftRecovery();
+                        }
+                    });
+                } else {
+                    if (confirm(message)) {
+                        global.draftRecovery.clearDraft();
                     } else {
-                        // 恢复本地草稿
                         performDraftRecovery();
                     }
-                });
+                }
             } catch (e) {
                 // 回退到普通 confirm
                 if (confirm(message)) {

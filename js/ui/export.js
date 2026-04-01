@@ -56,8 +56,14 @@ async function getPDFGenerator() {
     return { generatePDF: global.generatePDF, renderPDF: global.renderPDF };
 }
 
-function exportContent() {
+async function exportContent() {
     if (!g('vditor')) return;
+
+    // 先保存当前文档
+    if (typeof global.saveCurrentFile === 'function' && g('currentFileId')) {
+        await global.saveCurrentFile(true);
+    }
+
     var content = g('vditor').getValue();
     var formats = [
         { name: isEn() ? 'Markdown File (.md)' : 'Markdown文件 (.md)', ext: 'md', icon: '<i class="fas fa-file-code"></i>' },
