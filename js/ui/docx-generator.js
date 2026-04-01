@@ -33,28 +33,8 @@ async function exportDOCX(content, settings, customFilename) {
             }
         }, 60000);
 
-        // 如果没有提供设置，使用默认设置
-        if (!settings) {
-            settings = {
-                titleFontSize: '18',
-                bodyFontSize: '12',
-                pageMargin: '25',
-                lineHeight: '1.5',
-                paragraphSpacing: '0.5',
-                titleSpacing: '0.8',
-                alignment: 'left',
-                titleAlignment: 'center',
-                useCustomHeadingSizes: false,
-                h1Size: '36',
-                h2Size: '31',
-                h3Size: '26',
-                h4Size: '24',
-                h5Size: '21',
-                h6Size: '19',
-                imgWidth: '100%',
-                imgHeight: 'auto'
-            };
-        }
+        // Pandoc 路径下设置参数暂未直连使用，保留兼容字段
+        if (!settings) settings = {};
 
         // 调用后端 API 生成 Word 文档
         var api = global.getApiBaseUrl ? global.getApiBaseUrl() : 'api';
@@ -82,7 +62,7 @@ async function exportDOCX(content, settings, customFilename) {
         // 生成文件名
         var filename;
         if (customFilename) {
-            filename = customFilename + '.doc';
+            filename = customFilename + '.docx';
         } else {
             filename = isEn() ? 'document' : '文档';
             if (g('currentFileId') && typeof g('fileTree') !== 'undefined') {
@@ -95,7 +75,7 @@ async function exportDOCX(content, settings, customFilename) {
                     // 忽略错误，使用默认文件名
                 }
             }
-            filename = filename + '_' + new Date().toISOString().slice(0, 10) + '.doc';
+            filename = filename + '_' + new Date().toISOString().slice(0, 10) + '.docx';
         }
 
         // 下载文件
@@ -153,7 +133,7 @@ async function exportDOCX(content, settings, customFilename) {
 
         // 显示成功消息
         if (global.showMessage) {
-            global.showMessage(isEn() ? 'Document exported as .doc' : '文档已导出为 .doc 格式');
+            global.showMessage(isEn() ? 'Document exported as .docx' : '文档已导出为 .docx 格式');
         }
 
         return true;

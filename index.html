@@ -433,12 +433,21 @@
             </div>
             <div class="form-group">
                 <label data-i18n="storageManagement">空间管理</label>
-                <div class="space-management-actions" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:8px;">
-                    <button type="button" class="modal-btn secondary" id="clearCacheStorageBtn" data-i18n="clearCacheStorage">清空 Cache Storage</button>
-                    <button type="button" class="modal-btn secondary" id="clearIndexedDBBtn" data-i18n="clearIndexedDB">清空 IndexedDB</button>
-                    <button type="button" class="modal-btn secondary" id="clearServiceWorkerBtn" data-i18n="clearServiceWorker">清空 Service Worker</button>
-                    <button type="button" class="modal-btn secondary" id="clearCookiesBtn" data-i18n="clearCookies">清空 Cookies</button>
-                </div>
+                <details id="storageManagementDetails" style="margin-top:8px;">
+                    <summary id="storageManagementSummary" style="cursor:pointer;user-select:none;font-size:13px;color:#666;">
+                        <span data-i18n="expandStorageManagement">展开空间管理详情</span>
+                    </summary>
+                    <div id="storageUsagePanel" style="display:none;margin-top:10px;padding:10px;border:1px solid #e6e6e6;border-radius:8px;background:#fafafa;">
+                        <div id="storageUsageLoading" data-i18n="storageUsageCalculating" style="font-size:12px;color:#777;">正在计算存储占用...</div>
+                        <div id="storageUsageList" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 10px;font-size:13px;line-height:1.5;"></div>
+                    </div>
+                    <div class="space-management-actions" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:10px;">
+                        <button type="button" class="modal-btn secondary" id="clearCacheStorageBtn" data-i18n="clearCacheStorage">清空 Cache Storage</button>
+                        <button type="button" class="modal-btn secondary" id="clearIndexedDBBtn" data-i18n="clearIndexedDB">清空 IndexedDB</button>
+                        <button type="button" class="modal-btn secondary" id="clearServiceWorkerBtn" data-i18n="clearServiceWorker">清空 Service Worker</button>
+                        <button type="button" class="modal-btn secondary" id="clearCookiesBtn" data-i18n="clearCookies">清空 Cookies</button>
+                    </div>
+                </details>
             </div>
             <div class="modal-actions" style="flex-shrink:0;padding-top:10px;">
                 <button class="modal-btn primary" id="saveSettingsBtn" data-i18n="save">保存</button>

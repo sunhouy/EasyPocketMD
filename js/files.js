@@ -3692,6 +3692,8 @@
             // 更新状态
             findStatus.textContent = (isEn() ? 'Match ' : '匹配 ') + (index + 1) + ' / ' + matches.length;
             try {
+                const inputSelStart = findInput.selectionStart;
+                const inputSelEnd = findInput.selectionEnd;
                 const editorElement = getEditorElement();
                 if (editorElement) {
                     const highlight = pickHighlightByIndex(index);
@@ -3727,20 +3729,11 @@
                         let rect = null;
                         let targetNode = null;
                         try {
-                            const selection = window.getSelection();
-                            if (selection) {
-                                selection.removeAllRanges();
-                                selection.addRange(range);
-                            }
                             addRangeHighlightOverlay(range);
                             rect = range.getBoundingClientRect();
                             targetNode = textNodes[0].node.parentElement;
                         } catch (e) {
-                            const selection = window.getSelection();
-                            if (selection) {
-                                selection.removeAllRanges();
-                                selection.addRange(range);
-                            }
+                            addRangeHighlightOverlay(range);
                             rect = range.getBoundingClientRect();
                             targetNode = textNodes[0].node.parentElement;
                         }
@@ -3755,6 +3748,12 @@
                                     }
                                 }
                             }
+                        }
+
+                        // Keep typing focus in find box; do not move caret into editor content.
+                        findInput.focus();
+                        if (typeof inputSelStart === 'number' && typeof inputSelEnd === 'number') {
+                            findInput.setSelectionRange(inputSelStart, inputSelEnd);
                         }
                     }
                 }
