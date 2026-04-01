@@ -809,23 +809,49 @@
             return;
         }
 
-        const nightMode = g('nightMode') === true;
+        const previewConflicts = Array.isArray(res.data.conflicts) ? res.data.conflicts : [];
+        const conflictListHtml = previewConflicts.length
+            ? '<div class="merge-preview-conflicts">' +
+                previewConflicts.map(function(item) {
+                    return '<div class="merge-preview-conflict-item">' +
+                        '<span class="merge-preview-conflict-line">' + (isEn() ? 'Line ' : '第 ') + escapeHtml(String(item.line || '')) + (isEn() ? '' : ' 行') + '</span>' +
+                        '<span class="merge-preview-conflict-values">L: ' + escapeHtml(item.local || '') + ' | R: ' + escapeHtml(item.remote || '') + '</span>' +
+                    '</div>';
+                }).join('') +
+            '</div>'
+            : '';
+
         const modal = document.createElement('div');
-        modal.className = 'modal-overlay';
-        modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;z-index:10003;';
+        modal.className = 'modal-overlay show merge-preview-overlay';
 
         const panel = document.createElement('div');
-        panel.style.cssText = 'background:' + (nightMode ? '#2d2d2d' : '#fff') + ';color:' + (nightMode ? '#eee' : '#222') + ';width:92vw;max-width:1100px;height:82vh;border-radius:10px;display:flex;flex-direction:column;overflow:hidden;';
+        panel.className = 'merge-preview-panel';
         panel.innerHTML =
-            '<div style="padding:12px 16px;border-bottom:1px solid ' + (nightMode ? '#444' : '#ddd') + ';display:flex;justify-content:space-between;align-items:center;">' +
-                '<div><strong>' + (isEn() ? 'Merge Preview' : '合并预览') + '</strong> - ' + escapeHtml(conflict.filename || '') + '</div>' +
-                '<button id="closeMergePreviewBtn" style="background:none;border:none;font-size:22px;cursor:pointer;color:' + (nightMode ? '#eee' : '#333') + ';">&times;</button>' +
+            '<div class="merge-preview-header">' +
+                '<div><strong>' + (isEn() ? 'Smart Merge Preview' : '智能合并预览') + '</strong> - ' + escapeHtml(conflict.filename || '') + '</div>' +
+                '<button id="closeMergePreviewBtn" class="merge-preview-close-btn">&times;</button>' +
             '</div>' +
-            '<div style="padding:8px 16px;font-size:12px;color:' + (nightMode ? '#aaa' : '#666') + ';border-bottom:1px solid ' + (nightMode ? '#444' : '#eee') + ';">' +
+            '<div class="merge-preview-meta">' +
                 (isEn() ? 'Conflicts: ' : '冲突数：') + (res.data.conflictCount || 0) +
             '</div>' +
-            '<div style="flex:1;overflow:auto;padding:12px 16px;">' +
-                '<pre style="white-space:pre-wrap;word-break:break-word;margin:0;font-family:monospace;line-height:1.45;">' + escapeHtml(res.data.mergedText || '') + '</pre>' +
+            conflictListHtml +
+            '<div class="merge-preview-body">' +
+                '<div class="merge-preview-column">' +
+                    '<div class="merge-preview-block">' +
+                        '<div class="merge-preview-block-title">' + (isEn() ? 'Local Version' : '本地版本') + '</div>' +
+                        '<pre class="merge-preview-code">' + escapeHtml(conflict.localContent || '') + '</pre>' +
+                    '</div>' +
+                    '<div class="merge-preview-block">' +
+                        '<div class="merge-preview-block-title">' + (isEn() ? 'Server Version' : '服务器版本') + '</div>' +
+                        '<pre class="merge-preview-code">' + escapeHtml(conflict.serverContent || '') + '</pre>' +
+                    '</div>' +
+                '</div>' +
+                '<div class="merge-preview-column">' +
+                    '<div class="merge-preview-block merge-preview-result">' +
+                        '<div class="merge-preview-block-title">' + (isEn() ? 'Merged Result' : '合并结果') + '</div>' +
+                        '<pre class="merge-preview-code">' + escapeHtml(res.data.mergedText || '') + '</pre>' +
+                    '</div>' +
+                '</div>' +
             '</div>';
 
         modal.appendChild(panel);
@@ -840,6 +866,14 @@
         modal.onclick = function(e) {
             if (e.target === modal) close();
         };
+
+        const handleEsc = function(e) {
+            if (e.key === 'Escape') {
+                close();
+                document.removeEventListener('keydown', handleEsc);
+            }
+        };
+        document.addEventListener('keydown', handleEsc);
     }
 
     // 暴露到全局以便冲突模态窗口调用
@@ -854,14 +888,17 @@
             const conflictItem = document.createElement('div');
             conflictItem.className = 'conflict-option';
 
-            // 如果是当前正在编辑的文件，高亮显示
+            // 当前编辑文件仅显示标识，不再使用强制高亮边框
             const isCurrentFile = preserveFileName && conflict.filename === preserveFileName;
-            const highlightStyle = isCurrentFile ? 'style="border: 2px solid #007bff; background: #e7f3ff;"' : '';
+            const currentFileClass = isCurrentFile ? ' is-current-file' : '';
+            const currentFileTag = isCurrentFile
+                ? '<span class="current-file-tag">' + (isEn() ? 'Currently editing' : '当前正在编辑') + '</span>'
+                : '';
 
             if (conflict.type === 'delete') {
-                conflictItem.innerHTML = '<div ' + highlightStyle + ' style="flex:1; padding: 8px;"><strong style="color: #dc3545;">' + (isCurrentFile ? '📝 ' : '⚠️ ') + conflict.filename + (isCurrentFile ? ' (' + (isEn() ? 'Currently editing' : '当前正在编辑') + ')' : '') + '</strong><div class="conflict-details"><div style="color: #dc3545;">' + (isEn() ? 'This file has been deleted on the server' : '该文件在服务器上已经删除') + '</div><div>' + (isEn() ? 'Local modified time: ' : '本地修改时间: ') + new Date(conflict.localModified).toLocaleString() + '</div></div><div style="margin-top: 8px;"><label style="margin-right: 15px;"><input type="radio" name="conflict-' + index + '" value="upload">' + (isEn() ? 'Re-upload to server' : '重新上传到服务器') + '</label><label><input type="radio" name="conflict-' + index + '" value="delete" checked>' + (isEn() ? 'Delete local file' : '删除本地文件') + '</label></div></div>';
+                conflictItem.innerHTML = '<div class="conflict-main' + currentFileClass + '" style="flex:1; padding: 8px;"><strong style="color: #dc3545;">' + (isCurrentFile ? '📝 ' : '⚠️ ') + conflict.filename + '</strong>' + currentFileTag + '<div class="conflict-details"><div style="color: #dc3545;">' + (isEn() ? 'This file has been deleted on the server' : '该文件在服务器上已经删除') + '</div><div>' + (isEn() ? 'Local modified time: ' : '本地修改时间: ') + new Date(conflict.localModified).toLocaleString() + '</div></div><div style="margin-top: 8px;"><label style="margin-right: 15px;"><input type="radio" name="conflict-' + index + '" value="upload">' + (isEn() ? 'Re-upload to server' : '重新上传到服务器') + '</label><label><input type="radio" name="conflict-' + index + '" value="delete" checked>' + (isEn() ? 'Delete local file' : '删除本地文件') + '</label></div></div>';
             } else {
-                conflictItem.innerHTML = '<div ' + highlightStyle + ' style="flex:1; padding: 8px;"><strong>' + (isCurrentFile ? '📝 ' : '') + conflict.filename + (isCurrentFile ? ' (' + (isEn() ? 'Currently editing' : '当前正在编辑') + ')' : '') + '</strong><div class="conflict-details"><div>' + (isEn() ? 'Local modified time: ' : '本地修改时间: ') + new Date(conflict.localModified).toLocaleString() + '</div><div>' + (isEn() ? 'Server modified time: ' : '服务器修改时间: ') + new Date(conflict.serverModified).toLocaleString() + '</div></div><div style="margin-top: 8px;"><label style="margin-right: 15px;"><input type="radio" name="conflict-' + index + '" value="local"' + (isCurrentFile ? ' checked' : '') + '>' + (isEn() ? 'Use local version' : '使用本地版本') + '</label><label style="margin-right: 15px;"><input type="radio" name="conflict-' + index + '" value="server"' + (isCurrentFile ? '' : ' checked') + '>' + (isEn() ? 'Use server version' : '使用服务器版本') + '</label><label><input type="radio" name="conflict-' + index + '" value="merge">' + (isEn() ? 'Use smart merge' : '使用智能合并') + '</label></div></div><button class="diff-view-btn" data-index="' + index + '" title="' + (isEn() ? 'View differences' : '查看差异') + '"><i class="fas fa-columns"></i></button><button class="smart-merge-btn" data-index="' + index + '" title="' + (isEn() ? 'Use smart merge' : '使用智能合并') + '"><i class="fas fa-wand-magic-sparkles"></i></button><button class="merge-preview-btn" data-index="' + index + '" title="' + (isEn() ? 'Smart merge preview' : '智能合并预览') + '"><i class="fas fa-code-branch"></i></button>';
+                conflictItem.innerHTML = '<div class="conflict-main' + currentFileClass + '" style="flex:1; padding: 8px;"><strong>' + (isCurrentFile ? '📝 ' : '') + conflict.filename + '</strong>' + currentFileTag + '<div class="conflict-details"><div>' + (isEn() ? 'Local modified time: ' : '本地修改时间: ') + new Date(conflict.localModified).toLocaleString() + '</div><div>' + (isEn() ? 'Server modified time: ' : '服务器修改时间: ') + new Date(conflict.serverModified).toLocaleString() + '</div></div><div style="margin-top: 8px;"><label style="margin-right: 15px;"><input type="radio" name="conflict-' + index + '" value="local"' + (isCurrentFile ? ' checked' : '') + '>' + (isEn() ? 'Use local version' : '使用本地版本') + '</label><label style="margin-right: 15px;"><input type="radio" name="conflict-' + index + '" value="server"' + (isCurrentFile ? '' : ' checked') + '>' + (isEn() ? 'Use server version' : '使用服务器版本') + '</label><label><input type="radio" name="conflict-' + index + '" value="merge">' + (isEn() ? 'Use smart merge' : '使用智能合并') + '</label></div></div><button class="diff-view-btn" data-index="' + index + '" title="' + (isEn() ? 'View differences' : '查看差异') + '"><i class="fas fa-columns"></i></button><button class="merge-preview-btn" data-index="' + index + '" title="' + (isEn() ? 'Smart merge preview' : '智能合并预览') + '"><i class="fas fa-code-branch"></i></button>';
             }
             conflictList.appendChild(conflictItem);
         });
@@ -878,13 +915,6 @@
             btn.addEventListener('click', function(e) {
                 e.stopPropagation();
                 const index = parseInt(this.getAttribute('data-index'));
-                showMergePreviewModal(conflicts[index]);
-            });
-        });
-        conflictList.querySelectorAll('.smart-merge-btn').forEach(function(btn) {
-            btn.addEventListener('click', function(e) {
-                e.stopPropagation();
-                const index = parseInt(this.getAttribute('data-index'), 10);
                 const mergeInput = document.querySelector('input[name="conflict-' + index + '"][value="merge"]');
                 if (mergeInput) mergeInput.checked = true;
                 showMergePreviewModal(conflicts[index]);
@@ -3377,11 +3407,33 @@
                 if (readyRes && readyRes.code === 200) {
                     const engineRes = gateway.findInText(text || '', query || '', options || {});
                     if (engineRes && engineRes.code === 200 && engineRes.data && Array.isArray(engineRes.data.matches)) {
+                        console.info('[cross-search] findInText handled by wasm', {
+                            query: query || '',
+                            count: engineRes.data.matches.length
+                        });
                         return engineRes;
                     }
+                    console.warn('[cross-search] findInText wasm returned invalid result, fallback to js', {
+                        query: query || '',
+                        code: engineRes && engineRes.code,
+                        message: engineRes && engineRes.message
+                    });
+                } else {
+                    console.warn('[cross-search] findInText wasm not ready, fallback to js', {
+                        query: query || '',
+                        code: readyRes && readyRes.code,
+                        message: readyRes && readyRes.message
+                    });
                 }
+            } else {
+                console.info('[cross-search] findInText wasm unavailable, using js fallback', { query: query || '' });
             }
-            return jsFindInText(text || '', query || '', options || {});
+            const fallbackRes = jsFindInText(text || '', query || '', options || {});
+            console.info('[cross-search] findInText handled by js fallback', {
+                query: query || '',
+                count: fallbackRes && fallbackRes.data ? (fallbackRes.data.count || 0) : 0
+            });
+            return fallbackRes;
         }
 
         async function smartSearchFilesDetailed(query, options) {
@@ -3389,10 +3441,36 @@
                 const readyRes = await gateway.ensureReady();
                 if (readyRes && readyRes.code === 200) {
                     const engineRes = gateway.searchFilesDetailed(query || '', options || {});
-                    if (engineRes && engineRes.code === 200 && engineRes.data) return engineRes;
+                    if (engineRes && engineRes.code === 200 && engineRes.data) {
+                        console.info('[cross-search] searchFilesDetailed handled by wasm', {
+                            query: query || '',
+                            fileCount: engineRes.data.fileCount || 0,
+                            totalMatches: engineRes.data.totalMatches || 0
+                        });
+                        return engineRes;
+                    }
+                    console.warn('[cross-search] searchFilesDetailed wasm returned invalid result, fallback to js', {
+                        query: query || '',
+                        code: engineRes && engineRes.code,
+                        message: engineRes && engineRes.message
+                    });
+                } else {
+                    console.warn('[cross-search] searchFilesDetailed wasm not ready, fallback to js', {
+                        query: query || '',
+                        code: readyRes && readyRes.code,
+                        message: readyRes && readyRes.message
+                    });
                 }
+            } else {
+                console.info('[cross-search] searchFilesDetailed wasm unavailable, using js fallback', { query: query || '' });
             }
-            return jsSearchFilesDetailed(query || '', options || {});
+            const fallbackRes = jsSearchFilesDetailed(query || '', options || {});
+            console.info('[cross-search] searchFilesDetailed handled by js fallback', {
+                query: query || '',
+                fileCount: fallbackRes.data ? (fallbackRes.data.fileCount || 0) : 0,
+                totalMatches: fallbackRes.data ? (fallbackRes.data.totalMatches || 0) : 0
+            });
+            return fallbackRes;
         }
 
         async function smartReplaceAll(text, query, replacement, options) {

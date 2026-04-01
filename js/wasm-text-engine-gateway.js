@@ -125,16 +125,40 @@
         return init();
     }
 
-    function byteOffsetToUtf16Index(text, byteOffset) {
-        try {
-            const encoder = new TextEncoder();
-            const decoder = new TextDecoder();
-            const bytes = encoder.encode(text || '');
-            const end = Math.max(0, Math.min(byteOffset || 0, bytes.length));
-            return decoder.decode(bytes.slice(0, end)).length;
-        } catch (e) {
-            return Math.max(0, Math.min(byteOffset || 0, (text || '').length));
+    function utf8ByteLengthOfCodePoint(codePoint) {
+        if (codePoint <= 0x7f) return 1;
+        if (codePoint <= 0x7ff) return 2;
+        if (codePoint <= 0xffff) return 3;
+        return 4;
+    }
+
+    // Convert UTF-8 byte offset (from WASM) to JS UTF-16 index (for DOM highlight/slice).
+    function byteToCharIndex(text, byteOffset) {
+        const source = String(text || '');
+        const target = Math.max(0, Number(byteOffset) || 0);
+        let bytesSeen = 0;
+        let utf16Index = 0;
+
+        for (const ch of source) {
+            if (bytesSeen >= target) break;
+            const cp = ch.codePointAt(0) || 0;
+            const cpBytes = utf8ByteLengthOfCodePoint(cp);
+            if (bytesSeen + cpBytes > target) break;
+            bytesSeen += cpBytes;
+            utf16Index += ch.length;
         }
+
+        return utf16Index;
+    }
+
+    function buildSnippetByCharIndex(text, startIndex, endIndex, sideChars) {
+        const source = String(text || '');
+        const start = Math.max(0, Math.min(Number(startIndex) || 0, source.length));
+        const end = Math.max(start, Math.min(Number(endIndex) || start, source.length));
+        const radius = Math.max(0, Number(sideChars) || 30);
+        const left = Math.max(0, start - radius);
+        const right = Math.min(source.length, end + radius);
+        return source.slice(left, right);
     }
 
     function diff(leftText, rightText) {
@@ -201,10 +225,13 @@
         raw.forEach(function(item) {
             const startByte = Number(item.start || 0);
             const endByte = Number(item.end || startByte);
+            const startChar = byteToCharIndex(text || '', startByte);
+            const endChar = byteToCharIndex(text || '', endByte);
             normalized.matches.push({
-                start: byteOffsetToUtf16Index(text || '', startByte),
-                end: byteOffsetToUtf16Index(text || '', endByte),
-                snippet: item.snippet || ''
+                start: startChar,
+                end: Math.max(startChar, endChar),
+                // Keep snippet semantics aligned with frontend JS fallback (char-index based slicing).
+                snippet: buildSnippetByCharIndex(text || '', startChar, endChar, 30)
             });
         });
 
