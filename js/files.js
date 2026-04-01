@@ -3680,6 +3680,28 @@
             });
         }
 
+        function getEditorScrollContainer(editorElement) {
+            if (!editorElement) return null;
+            return editorElement.closest('.vditor-ir') ||
+                editorElement.closest('.vditor-wysiwyg') ||
+                editorElement.closest('.vditor-sv') ||
+                editorElement;
+        }
+
+        function scrollEditorToApproximatePosition(startIndex) {
+            const editorElement = getEditorElement();
+            if (!editorElement) return;
+            const container = getEditorScrollContainer(editorElement);
+            if (!container || typeof container.scrollTo !== 'function') return;
+
+            const fullText = getCurrentEditorText();
+            const total = Math.max(1, fullText.length);
+            const ratio = Math.max(0, Math.min(1, (Number(startIndex) || 0) / total));
+            const maxScrollTop = Math.max(0, container.scrollHeight - container.clientHeight);
+            const targetTop = Math.round(maxScrollTop * ratio);
+            container.scrollTo({ top: targetTop, behavior: 'smooth' });
+        }
+
         function pickHighlightByIndex(index) {
             if (visibleMatches.length > index) return visibleMatches[index];
             if (visibleMatches.length > 0) return visibleMatches[0];
@@ -3692,12 +3714,19 @@
             // 更新状态
             findStatus.textContent = (isEn() ? 'Match ' : '匹配 ') + (index + 1) + ' / ' + matches.length;
             try {
+                scrollEditorToApproximatePosition(matches[index].start);
                 const inputSelStart = findInput.selectionStart;
                 const inputSelEnd = findInput.selectionEnd;
                 const editorElement = getEditorElement();
                 if (editorElement) {
                     const highlight = pickHighlightByIndex(index);
-                    if (!highlight) return;
+                    if (!highlight) {
+                        findInput.focus();
+                        if (typeof inputSelStart === 'number' && typeof inputSelEnd === 'number') {
+                            findInput.setSelectionRange(inputSelStart, inputSelEnd);
+                        }
+                        return;
+                    }
 
                     clearVisualHighlights();
                     // 创建范围并选择文本
@@ -3739,13 +3768,10 @@
                         }
                         // 滚动到可视区域
                         if (rect && rect.height > 0) {
-                            const container = editorElement.closest('.vditor-ir') || editorElement.closest('.vditor-wysiwyg') || editorElement.closest('.vditor-sv') || editorElement;
+                            const container = getEditorScrollContainer(editorElement);
                             if (container && targetNode) {
-                                const containerRect = container.getBoundingClientRect();
-                                if (rect.top < containerRect.top || rect.bottom > containerRect.bottom) {
-                                    if (targetNode.scrollIntoView) {
-                                        targetNode.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                                    }
+                                if (targetNode.scrollIntoView) {
+                                    targetNode.scrollIntoView({ behavior: 'smooth', block: 'center' });
                                 }
                             }
                         }

@@ -1,7 +1,5 @@
 const request = require('supertest');
 
-process.env.PPT_EXPORT_ENGINE = 'legacy';
-
 jest.mock('pptxgenjs', () => {
     return jest.fn().mockImplementation(() => ({
         defineLayout: jest.fn(),
@@ -26,7 +24,16 @@ describe('PPT Export Integration', () => {
         const payload = {
             topic: '测试导出',
             ratio: '16:9',
-            pages: ['<h1>第一页标题</h1><ul><li>要点一</li><li>要点二</li></ul>'],
+            pages: [{
+                layout: 'content',
+                themeToken: 'business',
+                title: '第一页标题',
+                subtitle: '小结说明',
+                bullets: [
+                    { text: '要点一', subBullets: ['子要点A'] },
+                    { text: '要点二', subBullets: [] }
+                ]
+            }],
             outline: [{ number: 1, title: '第一页标题', content: ['要点一', '要点二'] }]
         };
 
@@ -57,12 +64,12 @@ describe('PPT Export Integration', () => {
         expect(typeof res.body.message).toBe('string');
     });
 
-    it('should decode escaped html and use extracted title/content', async () => {
+    it('should fallback to outline data when page payload is invalid', async () => {
         const payload = {
-            topic: '转义HTML',
+            topic: 'fallback',
             ratio: '16:9',
-            pages: ['```html\n&lt;div style="background:#1a1a1a;color:#ffffff"&gt;&lt;h1&gt;转义标题&lt;/h1&gt;&lt;ul&gt;&lt;li&gt;转义要点&lt;/li&gt;&lt;/ul&gt;&lt;/div&gt;\n```'],
-            outline: [{ number: 1, title: '备用标题', content: [] }]
+            pages: ['not-an-object'],
+            outline: [{ number: 1, title: '备用标题', content: ['备用要点'] }]
         };
 
         await request(app)
@@ -73,24 +80,33 @@ describe('PPT Export Integration', () => {
         const pptInstance = PptxGenJS.mock.results[PptxGenJS.mock.results.length - 1].value;
         const firstSlide = pptInstance.addSlide.mock.results[0].value;
 
-        expect(firstSlide.background).toEqual({ color: '1A1A1A' });
-        expect(firstSlide.addShape).not.toHaveBeenCalled();
+        expect(firstSlide.background).toEqual({ color: 'FFFFFF' });
         expect(firstSlide.addText).toHaveBeenCalledWith(
-            expect.stringContaining('转义标题'),
-            expect.objectContaining({ color: 'FFFFFF' })
+            expect.stringContaining('备用标题'),
+            expect.objectContaining({ color: '2C3E50' })
         );
         expect(firstSlide.addText).toHaveBeenCalledWith(
-            expect.stringContaining('转义要点'),
-            expect.objectContaining({ color: 'FFFFFF' })
+            expect.stringContaining('备用要点'),
+            expect.objectContaining({ color: '2C3E50' })
         );
     });
 
-    it('should map linear-gradient to base background and accent shapes', async () => {
+    it('should paginate long bullet list into multiple editable slides', async () => {
+        const longBullets = Array.from({ length: 11 }, (_, i) => ({
+            text: `要点${i + 1}`,
+            subBullets: []
+        }));
+
         const payload = {
-            topic: '渐变测试',
+            topic: '分页测试',
             ratio: '16:9',
-            pages: ['<div style="background:linear-gradient(135deg, #1e3a5f 0%, #f39c12 100%);color:#ffffff;"><h1>渐变标题</h1><ul><li>要点A</li></ul></div>'],
-            outline: [{ number: 1, title: '渐变标题', content: ['要点A'] }]
+            pages: [{
+                layout: 'content',
+                themeToken: 'traditional',
+                title: '分页主题',
+                bullets: longBullets
+            }],
+            outline: [{ number: 1, title: '分页主题', content: [] }]
         };
 
         await request(app)
@@ -99,16 +115,7 @@ describe('PPT Export Integration', () => {
             .expect(200);
 
         const pptInstance = PptxGenJS.mock.results[PptxGenJS.mock.results.length - 1].value;
-        const firstSlide = pptInstance.addSlide.mock.results[0].value;
-
-        expect(firstSlide.background).toEqual({ color: '1E3A5F' });
-        expect(firstSlide.addShape).toHaveBeenCalled();
-        expect(firstSlide.addShape).toHaveBeenCalledWith(
-            expect.anything(),
-            expect.objectContaining({
-                fill: expect.objectContaining({ color: 'F39C12' })
-            })
-        );
+        expect(pptInstance.addSlide).toHaveBeenCalledTimes(3);
     });
 });
 

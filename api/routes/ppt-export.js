@@ -2,37 +2,40 @@ const express = require('express');
 const router = express.Router();
 const PptxGenJS = require('pptxgenjs');
 
-const DEFAULT_EXPORT_ENGINE = process.env.PPT_EXPORT_ENGINE || (process.env.NODE_ENV === 'test' ? 'legacy' : 'browser');
-let browserInstancePromise = null;
+const THEME_MAP = {
+    'white-black': { bg: 'FFFFFF', text: '2C3E50', sub: '34495E', accent: '4A90E2' },
+    'black-white': { bg: '1A1A1A', text: 'FFFFFF', sub: 'E0E0E0', accent: '4A90E2' },
+    'traffic-light': { bg: '2D5016', text: 'C0392B', sub: 'E74C3C', accent: 'F1C40F' },
+    'traditional': { bg: '1E3A5F', text: 'FFFFFF', sub: 'ECF0F1', accent: 'F39C12' },
+    'business': { bg: '34495E', text: 'ECF0F1', sub: 'BDC3C7', accent: '3498DB' }
+};
 
-/**
- * PPT 导出 API
- * 接收前端传来的 PPT 数据，使用 pptxgenjs 在服务端生成 PPT 文件
- */
+const MAX_TITLE_LEN = 56;
+const MAX_SUBTITLE_LEN = 88;
+const MAX_BULLET_LEN = 42;
+const MAX_SUB_BULLET_LEN = 30;
+const MAX_IMAGE_CAPTION_LEN = 46;
+const MAX_BULLETS_PER_SLIDE = 5;
+const MAX_SUB_BULLETS_PER_BULLET = 2;
 
-// POST /api/ppt-export - 导出 PPT
+// POST /api/ppt-export - 导出可编辑 PPT
 router.post('/', async (req, res) => {
     try {
-        const { topic, pages, outline, ratio = '16:9' } = req.body;
-        const exportEngine = resolveExportEngine(req.body && req.body.engine);
+        const { topic, pages, outline, ratio = '16:9' } = req.body || {};
 
-        if (!pages || !Array.isArray(pages) || pages.length === 0) {
+        if (!Array.isArray(pages) || pages.length === 0) {
             return res.status(400).json({
                 code: 400,
                 message: 'PPT 页面数据不能为空'
             });
         }
 
-        // 创建 PPT 实例
         const pptx = new PptxGenJS();
-
-        // 设置 PPT 元数据
         pptx.title = topic || 'PPT演示';
         pptx.author = 'EasyPocketMD';
         pptx.subject = topic || 'PPT演示';
         pptx.company = 'EasyPocketMD';
 
-        // 设置幻灯片尺寸
         if (ratio === '16:9') {
             pptx.defineLayout({ name: '16:9', width: 10, height: 5.625 });
         } else {
@@ -40,535 +43,384 @@ router.post('/', async (req, res) => {
         }
         pptx.layout = ratio === '16:9' ? '16:9' : '4:3';
 
-        // 遍历所有页面生成幻灯片
         for (let i = 0; i < pages.length; i++) {
-            const pageHtml = pages[i];
-            const pageOutline = outline && outline[i] ? outline[i] : { title: `第${i + 1}页`, content: [] };
+            const pageOutline = outline && outline[i] ? outline[i] : { number: i + 1, title: `第${i + 1}页`, content: [] };
+            const slideSpec = normalizeSlideSpec(pages[i], pageOutline, i);
+            const chunks = paginateSlideSpec(slideSpec);
 
-            // 创建新幻灯片
-            const slide = pptx.addSlide();
-
-            // 优先使用浏览器渲染导出（样式一致性更高），失败回退 legacy 解析
-            if (pageHtml) {
-                const rendered = await addBrowserRenderedSlide(slide, pageHtml, ratio, exportEngine);
-                if (!rendered) {
-                    await addHtmlToSlide(slide, pageHtml, pageOutline, ratio);
-                }
-            } else {
-                // 空白页或待生成页面
-                addPlaceholderSlide(slide, pageOutline, i + 1, ratio);
-            }
+            chunks.forEach((chunk, chunkIndex) => {
+                const slide = pptx.addSlide();
+                const pageNo = `${pageOutline.number || i + 1}${chunkIndex > 0 ? '-' + (chunkIndex + 1) : ''}`;
+                renderSlideFromSpec(slide, chunk, ratio, pageNo);
+            });
         }
 
-        // 生成文件并发送给客户端
         const fileName = `${topic || 'PPT'}_${Date.now()}.pptx`;
         const pptBuffer = await pptx.write({ outputType: 'nodebuffer' });
 
-        // 仅在生成成功后写响应头，避免错误分支出现 headers 冲突
         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.presentationml.presentation');
         res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(fileName)}"`);
         return res.status(200).send(pptBuffer);
-
     } catch (error) {
         console.error('PPT 导出错误:', error);
-        res.status(500).json({
+        return res.status(500).json({
             code: 500,
             message: '服务器内部错误: ' + error.message
         });
     }
 });
 
-function resolveExportEngine(requestedEngine) {
-    const candidate = (requestedEngine || DEFAULT_EXPORT_ENGINE || '').toString().toLowerCase();
-    return candidate === 'browser' ? 'browser' : 'legacy';
+function normalizeSlideSpec(rawPage, outlineItem, index) {
+    const fallbackBullets = normalizeBullets((outlineItem.content || []).map(item => ({ text: item })));
+    const fallbackTitle = sanitizeText(outlineItem.title || `第${index + 1}页`, MAX_TITLE_LEN);
+
+    if (!rawPage || typeof rawPage !== 'object' || Array.isArray(rawPage)) {
+        return {
+            layout: index === 0 ? 'cover' : 'content',
+            themeToken: 'white-black',
+            title: fallbackTitle,
+            subtitle: '',
+            bullets: fallbackBullets,
+            image: null,
+            continuation: false
+        };
+    }
+
+    const layout = normalizeLayout(rawPage.layout, index);
+    const title = sanitizeText(rawPage.title || fallbackTitle, MAX_TITLE_LEN);
+    const subtitle = sanitizeText(rawPage.subtitle || '', MAX_SUBTITLE_LEN);
+    const bullets = normalizeBullets(rawPage.bullets);
+
+    return {
+        layout,
+        themeToken: resolveThemeToken(rawPage.themeToken || rawPage.theme || 'white-black'),
+        title: title || fallbackTitle,
+        subtitle,
+        bullets: bullets.length ? bullets : fallbackBullets,
+        image: normalizeImage(rawPage.image),
+        continuation: !!rawPage.continuation
+    };
+}
+
+function normalizeLayout(layout, index) {
+    const raw = String(layout || '').toLowerCase();
+    if (raw === 'cover' || raw === 'content' || raw === 'two-column') return raw;
+    if (raw === 'image-left' || raw === 'image-right') return raw;
+    return index === 0 ? 'cover' : 'content';
+}
+
+function resolveThemeToken(token) {
+    const key = String(token || '').trim();
+    return THEME_MAP[key] ? key : 'white-black';
+}
+
+function normalizeBullets(rawBullets) {
+    if (!Array.isArray(rawBullets)) return [];
+
+    return rawBullets
+        .map(item => {
+            if (typeof item === 'string') {
+                return {
+                    text: sanitizeText(item, MAX_BULLET_LEN),
+                    subBullets: []
+                };
+            }
+            if (!item || typeof item !== 'object') return null;
+            const text = sanitizeText(item.text || item.title || item.label || '', MAX_BULLET_LEN);
+            const subBullets = Array.isArray(item.subBullets)
+                ? item.subBullets.map(sub => sanitizeText(sub, MAX_SUB_BULLET_LEN)).filter(Boolean).slice(0, MAX_SUB_BULLETS_PER_BULLET)
+                : [];
+            if (!text) return null;
+            return { text, subBullets };
+        })
+        .filter(Boolean)
+        .slice(0, 30);
+}
+
+function normalizeImage(rawImage) {
+    if (!rawImage || typeof rawImage !== 'object') return null;
+    const url = sanitizeText(rawImage.url || rawImage.data || '', 3000);
+    if (!url) return null;
+    return {
+        url,
+        caption: sanitizeText(rawImage.caption || '', MAX_IMAGE_CAPTION_LEN),
+        fit: String(rawImage.fit || 'contain').toLowerCase() === 'cover' ? 'cover' : 'contain'
+    };
+}
+
+function sanitizeText(text, maxLen) {
+    if (!text) return '';
+    let value = String(text)
+        .replace(/\s+/g, ' ')
+        .replace(/第\s*\d+\s*页[：:]?/gi, '')
+        .replace(/page\s*\d+[：:]?/gi, '')
+        .trim();
+
+    if (!value) return '';
+    if (value.length > maxLen) {
+        value = value.slice(0, Math.max(1, maxLen - 1)).trim() + '…';
+    }
+    return value;
+}
+
+function paginateSlideSpec(spec) {
+    if (spec.layout === 'cover') {
+        return [spec];
+    }
+
+    if (spec.layout === 'two-column') {
+        const left = spec.bullets.slice(0, Math.ceil(spec.bullets.length / 2));
+        const right = spec.bullets.slice(Math.ceil(spec.bullets.length / 2));
+        const maxPerCol = 4;
+        const pageCount = Math.max(1, Math.ceil(Math.max(left.length, right.length) / maxPerCol));
+        const chunks = [];
+
+        for (let i = 0; i < pageCount; i++) {
+            const leftChunk = left.slice(i * maxPerCol, (i + 1) * maxPerCol);
+            const rightChunk = right.slice(i * maxPerCol, (i + 1) * maxPerCol);
+            chunks.push({
+                ...spec,
+                bullets: leftChunk.concat(rightChunk),
+                leftBullets: leftChunk,
+                rightBullets: rightChunk,
+                continuation: i > 0
+            });
+        }
+
+        return chunks;
+    }
+
+    const chunks = [];
+    const total = Math.max(1, Math.ceil(spec.bullets.length / MAX_BULLETS_PER_SLIDE));
+    for (let i = 0; i < total; i++) {
+        chunks.push({
+            ...spec,
+            bullets: spec.bullets.slice(i * MAX_BULLETS_PER_SLIDE, (i + 1) * MAX_BULLETS_PER_SLIDE),
+            continuation: i > 0
+        });
+    }
+    return chunks;
+}
+
+function renderSlideFromSpec(slide, spec, ratio, pageNo) {
+    const palette = THEME_MAP[spec.themeToken] || THEME_MAP['white-black'];
+    const { width: slideWidth, height: slideHeight } = getSlideSize(ratio);
+    const margin = 0.55;
+
+    slide.background = { color: palette.bg };
+
+    const titleText = spec.continuation ? `${spec.title}（续）` : spec.title;
+    const titleFont = fitFontByLength(spec.layout === 'cover' ? 38 : 30, 22, titleText.length);
+
+    slide.addText(titleText, {
+        x: margin,
+        y: margin,
+        w: slideWidth - margin * 2,
+        h: spec.layout === 'cover' ? 0.95 : 0.8,
+        fontSize: titleFont,
+        bold: true,
+        color: palette.text,
+        fontFace: 'Microsoft YaHei',
+        align: spec.layout === 'cover' ? 'center' : 'left'
+    });
+
+    if (spec.subtitle) {
+        slide.addText(spec.subtitle, {
+            x: margin,
+            y: spec.layout === 'cover' ? 1.7 : 1.4,
+            w: slideWidth - margin * 2,
+            h: 0.45,
+            fontSize: fitFontByLength(16, 12, spec.subtitle.length),
+            color: palette.sub,
+            fontFace: 'Microsoft YaHei',
+            align: spec.layout === 'cover' ? 'center' : 'left'
+        });
+    }
+
+    if (spec.layout === 'cover') {
+        addCoverBullets(slide, spec, palette, slideWidth, slideHeight, margin);
+    } else if (spec.layout === 'two-column') {
+        renderTwoColumn(slide, spec, palette, ratio);
+    } else {
+        renderContentWithOptionalImage(slide, spec, palette, ratio);
+    }
+
+    slide.addText(String(pageNo || ''), {
+        x: slideWidth - margin - 0.35,
+        y: slideHeight - margin * 0.85,
+        w: 0.35,
+        h: 0.25,
+        fontSize: 9,
+        color: palette.sub,
+        fontFace: 'Microsoft YaHei',
+        align: 'right'
+    });
+}
+
+function addCoverBullets(slide, spec, palette, slideWidth, slideHeight, margin) {
+    const bullets = (spec.bullets || []).slice(0, 3);
+    if (!bullets.length) return;
+
+    const startY = 2.3;
+    bullets.forEach((item, idx) => {
+        slide.addText(`• ${item.text}`, {
+            x: margin + 0.4,
+            y: startY + idx * 0.55,
+            w: slideWidth - (margin + 0.4) * 2,
+            h: 0.45,
+            fontSize: fitFontByLength(18, 13, item.text.length),
+            color: palette.text,
+            fontFace: 'Microsoft YaHei',
+            align: 'center'
+        });
+    });
+
+    if (spec.image && spec.image.caption) {
+        slide.addText(spec.image.caption, {
+            x: margin,
+            y: slideHeight - margin - 0.65,
+            w: slideWidth - margin * 2,
+            h: 0.4,
+            fontSize: 11,
+            color: palette.sub,
+            fontFace: 'Microsoft YaHei',
+            align: 'center'
+        });
+    }
+}
+
+function renderTwoColumn(slide, spec, palette, ratio) {
+    const { width: slideWidth, height: slideHeight } = getSlideSize(ratio);
+    const margin = 0.55;
+    const topY = 1.85;
+    const columnGap = 0.35;
+    const columnWidth = (slideWidth - margin * 2 - columnGap) / 2;
+
+    const leftBullets = Array.isArray(spec.leftBullets) ? spec.leftBullets : spec.bullets.slice(0, Math.ceil(spec.bullets.length / 2));
+    const rightBullets = Array.isArray(spec.rightBullets) ? spec.rightBullets : spec.bullets.slice(Math.ceil(spec.bullets.length / 2));
+
+    addBulletBlock(slide, leftBullets, {
+        x: margin,
+        y: topY,
+        w: columnWidth,
+        h: slideHeight - topY - 0.8
+    }, palette);
+
+    addBulletBlock(slide, rightBullets, {
+        x: margin + columnWidth + columnGap,
+        y: topY,
+        w: columnWidth,
+        h: slideHeight - topY - 0.8
+    }, palette);
+}
+
+function renderContentWithOptionalImage(slide, spec, palette, ratio) {
+    const { width: slideWidth, height: slideHeight } = getSlideSize(ratio);
+    const margin = 0.55;
+    const topY = 1.85;
+    const bodyHeight = slideHeight - topY - 0.8;
+
+    if (spec.image && isDataImage(spec.image.url)) {
+        const imageOnLeft = spec.layout === 'image-left';
+        const imageWidth = slideWidth * 0.34;
+        const textWidth = slideWidth - margin * 2 - imageWidth - 0.3;
+        const imageX = imageOnLeft ? margin : slideWidth - margin - imageWidth;
+        const textX = imageOnLeft ? imageX + imageWidth + 0.3 : margin;
+
+        slide.addImage({
+            data: spec.image.url,
+            x: imageX,
+            y: topY,
+            w: imageWidth,
+            h: bodyHeight
+        });
+
+        addBulletBlock(slide, spec.bullets, {
+            x: textX,
+            y: topY,
+            w: textWidth,
+            h: bodyHeight
+        }, palette);
+
+        if (spec.image.caption) {
+            slide.addText(spec.image.caption, {
+                x: imageX,
+                y: slideHeight - 0.95,
+                w: imageWidth,
+                h: 0.3,
+                fontSize: 10,
+                color: palette.sub,
+                fontFace: 'Microsoft YaHei',
+                align: 'center'
+            });
+        }
+
+        return;
+    }
+
+    addBulletBlock(slide, spec.bullets, {
+        x: margin,
+        y: topY,
+        w: slideWidth - margin * 2,
+        h: bodyHeight
+    }, palette);
+}
+
+function addBulletBlock(slide, bullets, rect, palette) {
+    if (!Array.isArray(bullets) || bullets.length === 0) return;
+
+    let y = rect.y;
+    const maxY = rect.y + rect.h;
+
+    bullets.forEach((item) => {
+        if (!item || !item.text || y >= maxY - 0.3) return;
+
+        const mainFont = fitFontByLength(17, 12, item.text.length);
+        slide.addText(`• ${item.text}`, {
+            x: rect.x,
+            y,
+            w: rect.w,
+            h: 0.38,
+            fontSize: mainFont,
+            color: palette.text,
+            fontFace: 'Microsoft YaHei',
+            bold: true
+        });
+        y += 0.43;
+
+        (item.subBullets || []).slice(0, MAX_SUB_BULLETS_PER_BULLET).forEach(sub => {
+            if (!sub || y >= maxY - 0.25) return;
+            slide.addText(`- ${sub}`, {
+                x: rect.x + 0.25,
+                y,
+                w: rect.w - 0.25,
+                h: 0.3,
+                fontSize: fitFontByLength(13, 10, sub.length),
+                color: palette.sub,
+                fontFace: 'Microsoft YaHei'
+            });
+            y += 0.31;
+        });
+
+        y += 0.08;
+    });
+}
+
+function fitFontByLength(base, min, length) {
+    if (!length || length <= 14) return base;
+    if (length >= 70) return min;
+    const ratio = (length - 14) / (70 - 14);
+    return Math.max(min, Math.round(base - (base - min) * ratio));
+}
+
+function isDataImage(url) {
+    return typeof url === 'string' && /^data:image\//i.test(url);
 }
 
 function getSlideSize(ratio) {
     return ratio === '16:9'
         ? { width: 10, height: 5.625 }
         : { width: 10, height: 7.5 };
-}
-
-async function addBrowserRenderedSlide(slide, html, ratio, exportEngine) {
-    if (exportEngine !== 'browser') return false;
-
-    try {
-        const screenshotData = await renderHtmlToPngDataUrl(html, ratio);
-        const { width, height } = getSlideSize(ratio);
-        slide.addImage({
-            data: screenshotData,
-            x: 0,
-            y: 0,
-            w: width,
-            h: height
-        });
-        return true;
-    } catch (error) {
-        console.error('PPT browser render failed, fallback to legacy engine:', error.message);
-        return false;
-    }
-}
-
-async function renderHtmlToPngDataUrl(rawHtml, ratio) {
-    const chromium = getPlaywrightChromium();
-    const browser = await getBrowserInstance(chromium);
-    const page = await browser.newPage({
-        viewport: ratio === '16:9'
-            ? { width: 1600, height: 900 }
-            : { width: 1200, height: 900 }
-    });
-
-    try {
-        const normalizedHtml = normalizeHtmlInput(rawHtml);
-        const wrapped = wrapSlideHtml(normalizedHtml, ratio);
-        await page.setContent(wrapped, { waitUntil: 'networkidle' });
-
-        // 等待字体和布局稳定，避免截图抖动
-        await page.evaluate(async () => {
-            if (document.fonts && document.fonts.ready) {
-                await document.fonts.ready;
-            }
-        });
-
-        const node = await page.$('#ppt-slide-root');
-        if (!node) {
-            throw new Error('render root not found');
-        }
-        const imageBuffer = await node.screenshot({ type: 'png' });
-        return `data:image/png;base64,${imageBuffer.toString('base64')}`;
-    } finally {
-        await page.close();
-    }
-}
-
-function wrapSlideHtml(innerHtml, ratio) {
-    const size = ratio === '16:9'
-        ? { width: 1600, height: 900 }
-        : { width: 1200, height: 900 };
-
-    return `<!doctype html>
-<html>
-<head>
-  <meta charset="utf-8" />
-  <style>
-    html, body {
-      margin: 0;
-      padding: 0;
-      width: ${size.width}px;
-      height: ${size.height}px;
-      overflow: hidden;
-      background: #ffffff;
-      font-family: "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", Arial, sans-serif;
-    }
-    #ppt-slide-root {
-      width: ${size.width}px;
-      height: ${size.height}px;
-      overflow: hidden;
-      box-sizing: border-box;
-      position: relative;
-    }
-    #ppt-slide-root *, #ppt-slide-root *::before, #ppt-slide-root *::after {
-      box-sizing: border-box;
-    }
-  </style>
-</head>
-<body>
-  <div id="ppt-slide-root">${innerHtml}</div>
-</body>
-</html>`;
-}
-
-function getPlaywrightChromium() {
-    try {
-        return require('playwright').chromium;
-    } catch (error) {
-        throw new Error('playwright not installed. Run: npm install playwright && npx playwright install chromium');
-    }
-}
-
-async function getBrowserInstance(chromium) {
-    if (!browserInstancePromise) {
-        browserInstancePromise = chromium.launch({
-            headless: true,
-            args: ['--no-sandbox', '--disable-setuid-sandbox']
-        });
-    }
-    return browserInstancePromise;
-}
-
-process.on('exit', async () => {
-    if (!browserInstancePromise) return;
-    try {
-        const browser = await browserInstancePromise;
-        await browser.close();
-    } catch (e) {
-        // ignore shutdown errors
-    }
-});
-
-/**
- * 将 HTML 内容转换为 PPT 幻灯片元素
- */
-async function addHtmlToSlide(slide, html, outline, ratio) {
-    const normalizedHtml = normalizeHtmlInput(html);
-
-    // 解析 HTML 中的基本结构
-    // 提取标题
-    const titleMatch = normalizedHtml.match(/<h1[^>]*>(.*?)<\/h1>/i) ||
-                       normalizedHtml.match(/<h2[^>]*>(.*?)<\/h2>/i) ||
-                       normalizedHtml.match(/<h3[^>]*>(.*?)<\/h3>/i);
-    const title = titleMatch ? stripHtml(titleMatch[1]) : (outline.title || '');
-
-    // 提取列表项
-    const listItems = [];
-    const listRegex = /<li[^>]*>(.*?)<\/li>/gi;
-    let match;
-    while ((match = listRegex.exec(normalizedHtml)) !== null) {
-        const itemText = stripHtml(match[1]);
-        if (itemText) {
-            listItems.push(itemText);
-        }
-    }
-
-    // 如果没有从 HTML 中提取到列表项，使用大纲中的内容
-    if (listItems.length === 0 && outline.content && Array.isArray(outline.content)) {
-        outline.content.forEach(item => {
-            if (typeof item === 'string') {
-                listItems.push(item);
-            }
-        });
-    }
-
-    // 提取段落文本
-    const paragraphs = [];
-    const pRegex = /<p[^>]*>(.*?)<\/p>/gi;
-    while ((match = pRegex.exec(normalizedHtml)) !== null) {
-        const pText = stripHtml(match[1]);
-        if (pText && !listItems.includes(pText)) {
-            paragraphs.push(pText);
-        }
-    }
-
-    const stylePalette = extractStylePalette(normalizedHtml);
-    const bgColor = stylePalette.bgColor;
-
-    // 判断是否为深色背景
-    const isDarkBg = isDarkColor(bgColor);
-    const textColor = stylePalette.textColor || (isDarkBg ? 'FFFFFF' : '2C3E50');
-    const subtitleColor = stylePalette.subtitleColor || (isDarkBg ? 'E0E0E0' : '34495E');
-
-    // 设置幻灯片背景
-    slide.background = { color: bgColor };
-
-    // 渐变背景场景使用强调色形状块补偿导出视觉
-    if (stylePalette.gradient && stylePalette.gradient.isGradient) {
-        addGradientAccentShapes(slide, stylePalette.gradient, ratio);
-    }
-
-    // 计算布局参数
-    const slideWidth = ratio === '16:9' ? 10 : 10;
-    const slideHeight = ratio === '16:9' ? 5.625 : 7.5;
-    const margin = 0.5;
-    const contentWidth = slideWidth - margin * 2;
-
-    // 添加标题
-    if (title) {
-        slide.addText(title, {
-            x: margin,
-            y: margin,
-            w: contentWidth,
-            h: 0.8,
-            fontSize: 28,
-            bold: true,
-            color: textColor,
-            align: 'center',
-            fontFace: 'Microsoft YaHei'
-        });
-    }
-
-    // 添加列表项
-    if (listItems.length > 0) {
-        const startY = title ? 1.2 : margin;
-        const itemHeight = 0.6;
-        const maxItems = Math.min(listItems.length, 6);
-
-        for (let i = 0; i < maxItems; i++) {
-            const itemY = startY + i * itemHeight;
-
-            // 添加项目符号
-            slide.addText('•', {
-                x: margin + 0.1,
-                y: itemY,
-                w: 0.3,
-                h: itemHeight,
-                fontSize: 20,
-                color: subtitleColor,
-                align: 'center',
-                fontFace: 'Microsoft YaHei'
-            });
-
-            // 添加列表文本
-            slide.addText(listItems[i], {
-                x: margin + 0.5,
-                y: itemY,
-                w: contentWidth - 0.6,
-                h: itemHeight,
-                fontSize: 16,
-                color: subtitleColor,
-                valign: 'middle',
-                fontFace: 'Microsoft YaHei',
-                wrap: true
-            });
-        }
-    }
-
-    // 添加段落文本（如果没有列表项）
-    if (listItems.length === 0 && paragraphs.length > 0) {
-        const startY = title ? 1.2 : margin;
-        const combinedText = paragraphs.slice(0, 3).join('\n\n');
-
-        slide.addText(combinedText, {
-            x: margin,
-            y: startY,
-            w: contentWidth,
-            h: slideHeight - startY - margin,
-            fontSize: 14,
-            color: subtitleColor,
-            fontFace: 'Microsoft YaHei',
-            wrap: true
-        });
-    }
-
-    // 添加页码
-    slide.addText(`${outline.number || 1}`, {
-        x: slideWidth - margin - 0.5,
-        y: slideHeight - margin - 0.3,
-        w: 0.5,
-        h: 0.3,
-        fontSize: 10,
-        color: isDarkBg ? '888888' : '999999',
-        align: 'right',
-        fontFace: 'Microsoft YaHei'
-    });
-}
-
-function normalizeHtmlInput(rawHtml) {
-    if (!rawHtml || typeof rawHtml !== 'string') return '';
-
-    let html = rawHtml.trim();
-    html = html.replace(/^```(?:html)?\s*/i, '').replace(/\s*```\s*$/i, '');
-
-    if (html.includes('&lt;') || html.includes('&gt;') || html.includes('&amp;')) {
-        html = decodeHtmlEntities(html);
-    }
-
-    html = html.replace(/<html[^>]*>|<\/html>/gi, '');
-    html = html.replace(/<head[^>]*>[\s\S]*?<\/head>/gi, '');
-    html = html.replace(/<body[^>]*>|<\/body>/gi, '');
-
-    if (!/<[a-z][\s\S]*>/i.test(html) && /&lt;\/?[a-z]/i.test(html)) {
-        html = decodeHtmlEntities(html);
-    }
-
-    return html.trim();
-}
-
-function decodeHtmlEntities(text) {
-    if (!text) return '';
-    return text
-        .replace(/&nbsp;/g, ' ')
-        .replace(/&lt;/g, '<')
-        .replace(/&gt;/g, '>')
-        .replace(/&amp;/g, '&')
-        .replace(/&quot;/g, '"')
-        .replace(/&#39;/g, "'");
-}
-
-function extractStylePalette(html) {
-    const firstTagStyleMatch = html.match(/<[^>]+style\s*=\s*['\"]([^'\"]+)['\"][^>]*>/i);
-    const styleText = firstTagStyleMatch ? firstTagStyleMatch[1] : '';
-
-    const bgRaw = extractCssValue(styleText, 'background') || extractCssValue(styleText, 'background-color');
-    const gradient = parseLinearGradientColors(bgRaw);
-    const titleStyleMatch = html.match(/<h[1-3][^>]+style\s*=\s*['\"]([^'\"]+)['\"][^>]*>/i);
-    const titleStyle = titleStyleMatch ? titleStyleMatch[1] : '';
-
-    const bgColor = (gradient.isGradient ? gradient.primaryColor : parseCssColor(bgRaw)) || 'FFFFFF';
-    const textColor = parseCssColor(extractCssValue(titleStyle, 'color') || extractCssValue(styleText, 'color'));
-    const subtitleColor = parseCssColor(extractCssValue(styleText, 'color')) || gradient.accentColor;
-
-    return { bgColor, textColor, subtitleColor, gradient };
-}
-
-function parseLinearGradientColors(backgroundValue) {
-    if (!backgroundValue) {
-        return { isGradient: false, primaryColor: '', accentColor: '' };
-    }
-
-    const raw = backgroundValue.trim();
-    if (!/linear-gradient\s*\(/i.test(raw)) {
-        return { isGradient: false, primaryColor: '', accentColor: '' };
-    }
-
-    const colorTokenRegex = /#(?:[0-9a-f]{3}|[0-9a-f]{6})\b|rgba?\([^\)]*\)|\b[a-z]+\b/gi;
-    const colors = [];
-    let tokenMatch;
-    while ((tokenMatch = colorTokenRegex.exec(raw)) !== null) {
-        const color = parseCssColor(tokenMatch[0]);
-        if (color && !colors.includes(color)) {
-            colors.push(color);
-        }
-    }
-
-    const primaryColor = colors[0] || '';
-    const accentColor = colors[1] || colors[0] || '';
-
-    return {
-        isGradient: !!primaryColor,
-        primaryColor,
-        accentColor
-    };
-}
-
-function addGradientAccentShapes(slide, gradient, ratio) {
-    const shapeType = PptxGenJS.ShapeType ? PptxGenJS.ShapeType.rect : 'rect';
-    const slideWidth = 10;
-    const slideHeight = ratio === '16:9' ? 5.625 : 7.5;
-    const accent = gradient.accentColor || gradient.primaryColor || '4A90E2';
-
-    slide.addShape(shapeType, {
-        x: 0,
-        y: 0,
-        w: 0.22,
-        h: slideHeight,
-        fill: { color: accent, transparency: 40 },
-        line: { color: accent, transparency: 100 }
-    });
-
-    slide.addShape(shapeType, {
-        x: slideWidth - 2.0,
-        y: slideHeight - 1.0,
-        w: 2.0,
-        h: 1.0,
-        fill: { color: accent, transparency: 55 },
-        line: { color: accent, transparency: 100 }
-    });
-}
-
-function extractCssValue(styleText, property) {
-    if (!styleText) return '';
-    const regex = new RegExp(`${property}\\s*:\\s*([^;]+)`, 'i');
-    const match = styleText.match(regex);
-    return match ? match[1].trim() : '';
-}
-
-function parseCssColor(rawValue) {
-    if (!rawValue) return '';
-    const value = rawValue.trim().toLowerCase();
-
-    // linear-gradient(...) 等场景，提取第一个可识别颜色
-    const gradientHex = value.match(/#([0-9a-f]{3}|[0-9a-f]{6})\b/i);
-    if (gradientHex) {
-        return normalizeHexColor(gradientHex[0]);
-    }
-
-    const hexMatch = value.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
-    if (hexMatch) {
-        return normalizeHexColor(hexMatch[0]);
-    }
-
-    const rgbMatch = value.match(/rgba?\((\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
-    if (rgbMatch) {
-        const r = Number(rgbMatch[1]);
-        const g = Number(rgbMatch[2]);
-        const b = Number(rgbMatch[3]);
-        return toHexColor(r, g, b);
-    }
-
-    const named = {
-        white: 'FFFFFF',
-        black: '000000',
-        red: 'FF0000',
-        green: '008000',
-        blue: '0000FF',
-        gray: '808080',
-        grey: '808080',
-        yellow: 'FFFF00',
-        orange: 'FFA500'
-    };
-    return named[value] || '';
-}
-
-function normalizeHexColor(hex) {
-    const raw = hex.replace('#', '').toUpperCase();
-    if (raw.length === 3) {
-        return `${raw[0]}${raw[0]}${raw[1]}${raw[1]}${raw[2]}${raw[2]}`;
-    }
-    return raw;
-}
-
-function toHexColor(r, g, b) {
-    const clamp = (n) => Math.max(0, Math.min(255, n));
-    return [clamp(r), clamp(g), clamp(b)]
-        .map((n) => n.toString(16).padStart(2, '0'))
-        .join('')
-        .toUpperCase();
-}
-
-function isDarkColor(hexColor) {
-    if (!hexColor || hexColor.length !== 6) return false;
-    const r = parseInt(hexColor.slice(0, 2), 16);
-    const g = parseInt(hexColor.slice(2, 4), 16);
-    const b = parseInt(hexColor.slice(4, 6), 16);
-    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-    return luminance < 0.5;
-}
-
-/**
- * 添加空白占位幻灯片
- */
-function addPlaceholderSlide(slide, outline, pageNum, ratio) {
-    const { width: slideWidth, height: slideHeight } = getSlideSize(ratio);
-
-    slide.background = { color: 'F5F5F5' };
-
-    slide.addText(`第 ${pageNum} 页`, {
-        x: 0,
-        y: slideHeight / 2 - 0.5,
-        w: slideWidth,
-        h: 1,
-        fontSize: 32,
-        color: '999999',
-        align: 'center',
-        fontFace: 'Microsoft YaHei'
-    });
-
-    slide.addText('（待生成）', {
-        x: 0,
-        y: slideHeight / 2 + 0.3,
-        w: slideWidth,
-        h: 0.5,
-        fontSize: 16,
-        color: 'BBBBBB',
-        align: 'center',
-        fontFace: 'Microsoft YaHei'
-    });
-}
-
-/**
- * 去除 HTML 标签
- */
-function stripHtml(html) {
-    if (!html) return '';
-    return html
-        .replace(/<[^>]+>/g, '')
-        .replace(/&nbsp;/g, ' ')
-        .replace(/&lt;/g, '<')
-        .replace(/&gt;/g, '>')
-        .replace(/&amp;/g, '&')
-        .replace(/&quot;/g, '"')
-        .replace(/&#39;/g, "'")
-        .trim();
 }
 
 module.exports = router;

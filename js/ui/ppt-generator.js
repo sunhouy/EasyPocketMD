@@ -12,7 +12,7 @@
     // PPT生成状态
     var pptState = {
         outline: null,           // 大纲数据
-        pages: [],              // 每页HTML内容
+        pages: [],              // 每页 Slide DSL JSON
         currentPage: 0,         // 当前编辑的页面
         isGenerating: false,    // 是否正在生成
         ratio: '16:9',          // PPT比例
@@ -547,15 +547,15 @@ ${userOutline ? '用户提供的参考大纲：\n' + userOutline + '\n\n' : ''}
 
         var aiResult = await callAIAPI(prompt, '');
         var pageJson = parsePptPageJson(aiResult, page, pageTitle, index);
-        var html = renderPageFromJson(pageJson, {
+        pageJson.themeToken = pptState.colorScheme;
+        pageJson.scheme = {
             bgColor: bgColor,
             textColor: textColor,
             subtitleColor: subtitleColor,
             accentColor: accentColor,
             schemeName: scheme.name
-        });
-
-        pptState.pages[index] = normalizePptHtml(html);
+        };
+        pptState.pages[index] = pageJson;
     }
 
     function buildPageJsonPrompt(page, pageTitle, aspectRatio, scheme) {
@@ -563,7 +563,7 @@ ${userOutline ? '用户提供的参考大纲：\n' + userOutline + '\n\n' : ''}
             return '- 要点' + (idx + 1) + ': ' + item;
         }).join('\n');
 
-        return `你是PPT内容助手。请根据以下信息生成单页内容，必须返回纯 JSON，不要返回 HTML/Markdown/解释。
+            return `你是PPT内容助手。请根据以下信息生成单页内容，必须返回纯 JSON，不要返回 HTML/Markdown/解释。
 
 页面主题：${pageTitle}
 页面要点：
@@ -574,40 +574,43 @@ ${points || '- 无'}
 硬性要求：
 1. 仅输出一个 JSON 对象，不要代码块。
 2. 字段中的文案禁止出现“第x页”“第1页”“第2页”等页码描述。
-3. 文案简洁，每条要点不超过30字。
-4. layout 只能是 "cover"、"content"、"two-column" 之一。
-5. icon 为单个 emoji 或短符号（最多2字符）。
-6. emphasis 为 1-3 条重点短句（每条不超过16字）。
+3. 文案简洁，主点不超过30字，二级点不超过20字。
+4. layout 只能是 "cover"、"content"、"two-column"、"image-left"、"image-right" 之一。
+5. bullets 最多 8 条，每条允许最多 2 条 subBullets。
+6. 如果没有可靠图片链接，image 填 null。
 
 JSON 结构：
 {
-  "layout": "content",
+    "layout": "content",
+    "themeToken": "${pptState.colorScheme}",
   "title": "",
   "subtitle": "",
-  "icon": "",
-  "emphasis": ["", ""],
-  "bullets": ["", ""],
-  "highlights": ["", ""],
-  "leftTitle": "",
-  "leftBullets": ["", ""],
-  "rightTitle": "",
-  "rightBullets": ["", ""]
+    "bullets": [
+        {
+            "text": "",
+            "subBullets": ["", ""]
+        }
+    ],
+    "image": {
+        "url": "",
+        "caption": "",
+        "fit": "contain"
+    }
 }`;
     }
 
     function parsePptPageJson(raw, page, fallbackTitle, index) {
         var fallback = {
             layout: index === 0 ? 'cover' : 'content',
+            themeToken: pptState.colorScheme,
             title: sanitizePageText(fallbackTitle || page.title || ''),
             subtitle: '',
-            icon: index === 0 ? '🎯' : '📌',
-            emphasis: [],
-            bullets: (page.content || []).slice(0, 5).map(sanitizePageText).filter(Boolean),
-            highlights: [],
-            leftTitle: '核心要点',
-            leftBullets: (page.content || []).slice(0, 3).map(sanitizePageText).filter(Boolean),
-            rightTitle: '补充说明',
-            rightBullets: (page.content || []).slice(3, 6).map(sanitizePageText).filter(Boolean)
+            bullets: (page.content || []).slice(0, 6).map(function(item) {
+                return { text: sanitizePageText(item), subBullets: [] };
+            }).filter(function(item) {
+                return item.text;
+            }),
+            image: null
         };
 
         if (!raw || typeof raw !== 'string') return fallback;
@@ -634,103 +637,145 @@ JSON 结构：
         if (!parsed || typeof parsed !== 'object') return fallback;
 
         var layout = sanitizePageText(readStringField(parsed, ['layout', 'type', 'layoutType'])).toLowerCase();
-        if (layout !== 'cover' && layout !== 'content' && layout !== 'two-column') {
+        if (layout !== 'cover' && layout !== 'content' && layout !== 'two-column' && layout !== 'image-left' && layout !== 'image-right') {
             layout = fallback.layout;
         }
 
-        var bullets = readArrayField(parsed, ['bullets', 'points', 'items', '要点']);
-        var emphasis = readArrayField(parsed, ['emphasis', 'keyMessage', '重点']);
-        var highlights = readArrayField(parsed, ['highlights', 'keywords', '亮点']);
-        var leftBullets = readArrayField(parsed, ['leftBullets', 'leftPoints', 'leftItems']);
-        var rightBullets = readArrayField(parsed, ['rightBullets', 'rightPoints', 'rightItems']);
+        var rawBullets = readArrayField(parsed, ['bullets', 'points', 'items', '要点']);
+        var bullets = normalizeBulletItems(rawBullets);
+        if (!bullets.length) {
+            bullets = fallback.bullets;
+        }
+
+        var image = null;
+        if (parsed.image && typeof parsed.image === 'object') {
+            var imageUrl = sanitizePageText(parsed.image.url || parsed.image.data || '');
+            if (imageUrl) {
+                image = {
+                    url: imageUrl,
+                    caption: sanitizePageText(parsed.image.caption || ''),
+                    fit: sanitizePageText(parsed.image.fit || '').toLowerCase() === 'cover' ? 'cover' : 'contain'
+                };
+            }
+        }
 
         return {
             layout: layout,
+            themeToken: sanitizePageText(readStringField(parsed, ['themeToken', 'theme'])) || pptState.colorScheme,
             title: sanitizePageText(readStringField(parsed, ['title', '标题'])) || fallback.title,
             subtitle: sanitizePageText(readStringField(parsed, ['subtitle', 'summary', '副标题'])),
-            icon: normalizePageIcon(readStringField(parsed, ['icon', 'emoji', 'symbol'])) || fallback.icon,
-            emphasis: normalizeTextArray(emphasis, 3),
-            bullets: normalizeTextArray(bullets, 6) || fallback.bullets,
-            highlights: normalizeTextArray(highlights, 4),
-            leftTitle: sanitizePageText(readStringField(parsed, ['leftTitle', 'leftHeader'])) || fallback.leftTitle,
-            leftBullets: normalizeTextArray(leftBullets, 4) || fallback.leftBullets,
-            rightTitle: sanitizePageText(readStringField(parsed, ['rightTitle', 'rightHeader'])) || fallback.rightTitle,
-            rightBullets: normalizeTextArray(rightBullets, 4) || fallback.rightBullets
+            bullets: bullets,
+            image: image
         };
     }
 
     function renderPageFromJson(pageData, scheme) {
+        var activeScheme = scheme || pageData.scheme || colorSchemes[pageData.themeToken] || colorSchemes['white-black'];
         var title = escapeHtml(pageData.title || '');
         var subtitle = escapeHtml(pageData.subtitle || '');
-        var icon = escapeHtml(pageData.icon || '');
-        var emphasis = (pageData.emphasis || []).map(escapeHtml);
-        var bullets = (pageData.bullets || []).map(escapeHtml);
-        var highlights = (pageData.highlights || []).map(escapeHtml);
-        var leftBullets = (pageData.leftBullets || []).map(escapeHtml);
-        var rightBullets = (pageData.rightBullets || []).map(escapeHtml);
-        var base = 'width:100%;height:100%;padding:5.5%;box-sizing:border-box;overflow:hidden;background:linear-gradient(140deg,' + scheme.bgColor + ' 0%,' + scheme.bgColor + 'dd 60%,' + scheme.accentColor + '26 100%);color:' + scheme.textColor + ';font-family:Arial,\'Microsoft YaHei\',sans-serif;';
+        var bullets = normalizeBulletItems(pageData.bullets);
+        var leftBullets = bullets.slice(0, Math.ceil(bullets.length / 2));
+        var rightBullets = bullets.slice(Math.ceil(bullets.length / 2));
+        var image = pageData.image && pageData.image.url ? pageData.image : null;
+        var base = 'width:100%;height:100%;padding:5.5%;box-sizing:border-box;overflow:hidden;background:linear-gradient(140deg,' + activeScheme.bgColor + ' 0%,' + activeScheme.bgColor + 'dd 60%,' + activeScheme.accentColor + '26 100%);color:' + activeScheme.textColor + ';font-family:Arial,\'Microsoft YaHei\',sans-serif;';
 
         if (pageData.layout === 'cover') {
             return '<div style="' + base + 'display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;gap:2.5%;">'
-                + '<h1 style="margin:0;font-size:5.2vw;line-height:1.2;max-width:90%;">' + (icon ? (icon + ' ') : '') + title + '</h1>'
-                + (subtitle ? '<p style="margin:0;font-size:2.1vw;color:' + scheme.subtitleColor + ';max-width:78%;">' + subtitle + '</p>' : '')
-                + (emphasis.length ? '<div style="display:flex;flex-wrap:wrap;justify-content:center;gap:1.2%;max-width:82%;">' + emphasis.map(function(item) {
-                    return '<span style="padding:0.6% 1.3%;border-radius:10px;background:rgba(255,255,255,0.16);font-size:1.7vw;color:' + scheme.textColor + ';">' + item + '</span>';
-                }).join('') + '</div>' : '')
-                + (highlights.length ? '<div style="display:flex;flex-wrap:wrap;justify-content:center;gap:1.2%;margin-top:2%;">' + highlights.map(function(item) {
-                    return '<span style="padding:0.6% 1.2%;border-radius:999px;background:' + scheme.accentColor + '33;color:' + scheme.textColor + ';font-size:1.6vw;">' + item + '</span>';
+                + '<h1 style="margin:0;font-size:5.2vw;line-height:1.2;max-width:90%;">' + title + '</h1>'
+                + (subtitle ? '<p style="margin:0;font-size:2.1vw;color:' + activeScheme.subtitleColor + ';max-width:78%;">' + subtitle + '</p>' : '')
+                + (bullets.length ? '<div style="display:flex;flex-direction:column;gap:1.4%;max-width:82%;">' + bullets.slice(0, 3).map(function(item) {
+                    return '<div style="padding:0.8% 1.3%;border-radius:10px;background:rgba(255,255,255,0.16);font-size:1.8vw;color:' + activeScheme.textColor + ';">• ' + escapeHtml(item.text) + '</div>';
                 }).join('') + '</div>' : '')
                 + '</div>';
         }
 
         if (pageData.layout === 'two-column') {
             return '<div style="' + base + 'display:flex;flex-direction:column;">'
-                + '<h1 style="margin:0 0 2.5% 0;font-size:3.6vw;line-height:1.2;">' + (icon ? (icon + ' ') : '') + title + '</h1>'
-                + (emphasis.length ? '<div style="display:flex;flex-wrap:wrap;gap:1.1%;margin:0 0 2.2% 0;">' + emphasis.map(function(item) {
-                    return '<span style="padding:0.45% 1%;border-radius:999px;background:' + scheme.accentColor + '2e;color:' + scheme.textColor + ';font-size:1.55vw;">' + item + '</span>';
-                }).join('') + '</div>' : '')
+                + '<h1 style="margin:0 0 2.5% 0;font-size:3.6vw;line-height:1.2;">' + title + '</h1>'
                 + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:2.2%;height:80%;">'
-                + renderColumnBlock(escapeHtml(pageData.leftTitle || '核心信息'), leftBullets, scheme, icon)
-                + renderColumnBlock(escapeHtml(pageData.rightTitle || '补充信息'), rightBullets, scheme, icon)
+                + renderColumnBlock('核心信息', leftBullets, activeScheme)
+                + renderColumnBlock('补充信息', rightBullets, activeScheme)
+                + '</div>'
+                + '</div>';
+        }
+
+        if ((pageData.layout === 'image-left' || pageData.layout === 'image-right') && image) {
+            var imageBlock = '<div style="width:34%;height:100%;border-radius:14px;overflow:hidden;background:rgba(255,255,255,0.14);display:flex;align-items:center;justify-content:center;">'
+                + '<img src="' + escapeHtml(image.url) + '" style="max-width:100%;max-height:100%;object-fit:contain;" />'
+                + '</div>';
+            var textBlock = '<div style="width:64%;display:flex;flex-direction:column;gap:1.8%;">'
+                + (bullets.length ? bullets.map(function(item) {
+                    var subs = (item.subBullets || []).map(function(sub) {
+                        return '<div style="font-size:1.5vw;line-height:1.3;color:' + activeScheme.subtitleColor + ';margin-top:0.5%;">- ' + escapeHtml(sub) + '</div>';
+                    }).join('');
+                    return '<div style="padding:1.4% 1.8%;border-radius:12px;background:rgba(255,255,255,0.14);border-left:0.35vw solid ' + activeScheme.accentColor + ';">'
+                        + '<div style="font-size:2.1vw;line-height:1.35;color:' + activeScheme.textColor + ';">' + escapeHtml(item.text) + '</div>'
+                        + subs
+                        + '</div>';
+                }).join('') : '<div style="font-size:2.1vw;color:' + activeScheme.subtitleColor + ';">暂无要点</div>')
+                + (image.caption ? '<div style="font-size:1.4vw;color:' + activeScheme.subtitleColor + ';margin-top:1%;">' + escapeHtml(image.caption) + '</div>' : '')
+                + '</div>';
+
+            return '<div style="' + base + 'display:flex;flex-direction:column;">'
+                + '<h1 style="margin:0 0 2.2% 0;font-size:3.8vw;line-height:1.2;">' + title + '</h1>'
+                + (subtitle ? '<p style="margin:0 0 2.8% 0;color:' + activeScheme.subtitleColor + ';font-size:2vw;">' + subtitle + '</p>' : '')
+                + '<div style="display:flex;gap:2%;height:75%;">'
+                + (pageData.layout === 'image-left' ? (imageBlock + textBlock) : (textBlock + imageBlock))
                 + '</div>'
                 + '</div>';
         }
 
         return '<div style="' + base + 'display:flex;flex-direction:column;">'
-            + '<h1 style="margin:0 0 2.2% 0;font-size:3.8vw;line-height:1.2;">' + (icon ? (icon + ' ') : '') + title + '</h1>'
-            + (subtitle ? '<p style="margin:0 0 2.8% 0;color:' + scheme.subtitleColor + ';font-size:2vw;">' + subtitle + '</p>' : '')
-            + (emphasis.length ? '<div style="display:flex;flex-wrap:wrap;gap:1%;margin:0 0 2.3% 0;">' + emphasis.map(function(item) {
-                return '<span style="padding:0.45% 0.95%;border-radius:8px;background:' + scheme.accentColor + '2e;color:' + scheme.textColor + ';font-size:1.55vw;">' + item + '</span>';
-            }).join('') + '</div>' : '')
+            + '<h1 style="margin:0 0 2.2% 0;font-size:3.8vw;line-height:1.2;">' + title + '</h1>'
+            + (subtitle ? '<p style="margin:0 0 2.8% 0;color:' + activeScheme.subtitleColor + ';font-size:2vw;">' + subtitle + '</p>' : '')
             + '<div style="display:flex;flex-direction:column;gap:1.8%;">'
             + (bullets.length ? bullets.map(function(item) {
-                return '<div style="display:flex;align-items:flex-start;gap:1.2%;padding:1.4% 1.8%;border-radius:12px;background:rgba(255,255,255,0.14);border-left:0.35vw solid ' + scheme.accentColor + ';">'
-                    + '<span style="font-size:2.1vw;color:' + scheme.accentColor + ';line-height:1;">' + (icon || '▸') + '</span>'
-                    + '<span style="font-size:2.1vw;line-height:1.35;color:' + scheme.textColor + ';">' + item + '</span>'
+                var subs = (item.subBullets || []).map(function(sub) {
+                    return '<div style="font-size:1.5vw;line-height:1.3;color:' + activeScheme.subtitleColor + ';margin-top:0.5%;">- ' + escapeHtml(sub) + '</div>';
+                }).join('');
+                return '<div style="display:flex;align-items:flex-start;gap:1.2%;padding:1.4% 1.8%;border-radius:12px;background:rgba(255,255,255,0.14);border-left:0.35vw solid ' + activeScheme.accentColor + ';">'
+                    + '<span style="font-size:2.1vw;color:' + activeScheme.accentColor + ';line-height:1;">▸</span>'
+                    + '<span style="font-size:2.1vw;line-height:1.35;color:' + activeScheme.textColor + ';">' + escapeHtml(item.text) + subs + '</span>'
                     + '</div>';
-            }).join('') : '<div style="font-size:2.1vw;color:' + scheme.subtitleColor + ';">暂无要点</div>')
+            }).join('') : '<div style="font-size:2.1vw;color:' + activeScheme.subtitleColor + ';">暂无要点</div>')
             + '</div>'
             + '</div>';
     }
 
-    function renderColumnBlock(title, items, scheme, icon) {
+    function renderColumnBlock(title, items, scheme) {
         var content = items.length ? items.map(function(item) {
-            return '<li style="margin:0 0 1.3% 0;line-height:1.4;font-size:1.85vw;color:' + scheme.textColor + ';">' + item + '</li>';
+            var text = escapeHtml(item.text || '');
+            var sub = (item.subBullets || []).map(function(subItem) {
+                return '<div style="font-size:1.4vw;color:' + scheme.subtitleColor + ';line-height:1.2;">- ' + escapeHtml(subItem) + '</div>';
+            }).join('');
+            return '<li style="margin:0 0 1.3% 0;line-height:1.4;font-size:1.85vw;color:' + scheme.textColor + ';">' + text + sub + '</li>';
         }).join('') : '<li style="font-size:1.85vw;color:' + scheme.subtitleColor + ';">暂无内容</li>';
         return '<div style="background:rgba(255,255,255,0.14);border:1px solid rgba(255,255,255,0.18);border-radius:14px;padding:4.2% 4.8%;overflow:hidden;">'
-            + '<h3 style="margin:0 0 3% 0;font-size:2.2vw;color:' + scheme.accentColor + ';">' + (icon ? (icon + ' ') : '') + title + '</h3>'
+            + '<h3 style="margin:0 0 3% 0;font-size:2.2vw;color:' + scheme.accentColor + ';">' + title + '</h3>'
             + '<ul style="margin:0;padding-left:1.4em;">' + content + '</ul>'
             + '</div>';
     }
 
-    function normalizePageIcon(iconText) {
-        var icon = sanitizePageText(iconText || '').trim();
-        if (!icon) return '';
-        // 限制 icon 为短符号，避免模型返回完整短语
-        if (icon.length > 2) {
-            return icon.charAt(0);
-        }
-        return icon;
+    function normalizeBulletItems(items) {
+        if (!Array.isArray(items)) return [];
+        return items.map(function(item) {
+            if (typeof item === 'string') {
+                return {
+                    text: sanitizePageText(item),
+                    subBullets: []
+                };
+            }
+            if (!item || typeof item !== 'object') return null;
+            var text = sanitizePageText(item.text || item.title || item.label || '');
+            var subs = Array.isArray(item.subBullets)
+                ? item.subBullets.map(function(sub) { return sanitizePageText(sub); }).filter(Boolean).slice(0, 2)
+                : [];
+            if (!text) return null;
+            return {
+                text: text,
+                subBullets: subs
+            };
+        }).filter(Boolean).slice(0, 12);
     }
 
     function readStringField(obj, keys) {
@@ -936,8 +981,15 @@ JSON 结构：
         var container = document.getElementById('pptEditorPreview');
         var wrapper = document.getElementById('pptEditorPreviewContainer');
         if (!container || !wrapper) return;
-        
-        var html = normalizePptHtml(pptState.pages[index]);
+        var pageData = pptState.pages[index];
+        var html = '';
+
+        if (pageData && typeof pageData === 'object' && !Array.isArray(pageData)) {
+            html = renderPageFromJson(pageData, pageData.scheme || colorSchemes[pageData.themeToken] || colorSchemes[pptState.colorScheme] || colorSchemes['white-black']);
+        } else {
+            // 兼容旧草稿中的字符串 HTML
+            html = normalizePptHtml(pageData);
+        }
         
         if (!html) {
             container.innerHTML = '<p style="text-align:center;color:#999;padding-top:100px;">页面尚未生成</p>';
@@ -1100,7 +1152,33 @@ JSON 结构：
             // 准备请求数据
             var exportData = {
                 topic: pptState.topic || 'PPT',
-                pages: pptState.pages,
+                pages: pptState.pages.map(function(page, idx) {
+                    if (page && typeof page === 'object' && !Array.isArray(page)) {
+                        return {
+                            layout: page.layout || (idx === 0 ? 'cover' : 'content'),
+                            themeToken: page.themeToken || pptState.colorScheme,
+                            title: sanitizePageText(page.title || ''),
+                            subtitle: sanitizePageText(page.subtitle || ''),
+                            bullets: normalizeBulletItems(page.bullets),
+                            image: page.image && page.image.url ? {
+                                url: page.image.url,
+                                caption: sanitizePageText(page.image.caption || ''),
+                                fit: page.image.fit === 'cover' ? 'cover' : 'contain'
+                            } : null
+                        };
+                    }
+
+                    // 兼容旧草稿：字符串页面降级为简单可编辑页
+                    var title = pptState.outline[idx] ? pptState.outline[idx].title : ('第' + (idx + 1) + '页');
+                    return {
+                        layout: idx === 0 ? 'cover' : 'content',
+                        themeToken: pptState.colorScheme,
+                        title: sanitizePageText(title),
+                        subtitle: '',
+                        bullets: [],
+                        image: null
+                    };
+                }),
                 outline: pptState.outline,
                 ratio: pptState.ratio
             };
