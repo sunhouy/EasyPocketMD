@@ -53,12 +53,20 @@ function cleanMathJaxContent(html) {
         // 3. Process <mjx-container> elements
         // We need to find all mjx-container elements and extract the SVG
         // This is a bit complex with regex, but we'll use a function to replace
-        cleaned = cleaned.replace(/<mjx-container[^>]*>([\s\S]*?)<\/mjx-container>/gi, (match, content) => {
+        cleaned = cleaned.replace(/<mjx-container([^>]*)>([\s\S]*?)<\/mjx-container>/gi, (match, attrs, content) => {
             // Extract SVG from the content
             const svgMatch = content.match(/<svg[\s\S]*?<\/svg>/i);
             if (svgMatch) {
-                // Wrap the SVG in a div with appropriate styling
-                return `<div style="text-align: center; margin: 1em 0;">${svgMatch[0]}</div>`;
+                const isDisplayMath = /display\s*=\s*"true"/i.test(attrs || '');
+                const svg = svgMatch[0]
+                    .replace(/<svg\b/i, '<svg preserveAspectRatio="xMidYMid meet"')
+                    .replace(/\sstyle\s*=\s*"[^"]*"/i, '');
+
+                if (isDisplayMath) {
+                    return `<div class="docx-math-svg docx-math-display">${svg}</div>`;
+                }
+
+                return `<span class="docx-math-svg docx-math-inline">${svg}</span>`;
             }
             // If no SVG found, remove the container
             return '';
@@ -315,10 +323,29 @@ function buildDocxStyledHtml(markdown, settings = {}) {
         }
         img {
             display: block;
-            width: ${imgWidth};
+            width: auto;
             height: ${imgHeight};
             max-width: 100%;
             margin: 0.8em auto;
+        }
+        .docx-math-svg {
+            line-height: 1;
+        }
+        .docx-math-inline {
+            display: inline-block;
+            vertical-align: middle;
+            margin: 0 0.1em;
+        }
+        .docx-math-display {
+            display: block;
+            text-align: center;
+            margin: 0.8em 0;
+        }
+        .docx-math-svg svg {
+            display: inline-block;
+            width: auto;
+            height: auto;
+            max-width: ${imgWidth};
         }
     </style>
 </head>
