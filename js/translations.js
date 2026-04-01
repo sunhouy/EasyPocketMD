@@ -55,7 +55,7 @@
             fileContentEmpty: '文件内容为空',
 
             // 全文查找
-            findTitle: '全文查找',
+            findTitle: '查找和替换',
             findPlaceholder: '输入查找内容...',
             findNext: '查找下一个',
             findPrev: '查找上一个',
@@ -145,7 +145,7 @@
             share: '分享',
             myFiles: '我的文件',
             fileDiff: '文件对比',
-            findInFile: '全文查找',
+            findInFile: '查找和替换',
             cloudPrint: '云打印',
             presentationMode: '演示模式',
             presentationModeStarted: '已进入演示模式，按 ESC 键退出',
