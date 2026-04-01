@@ -177,6 +177,7 @@
             formula: '公式',
             chart: '图表',
             uncertainty: '不确定度计算器',
+            uncertaintyEasterEggUnlocked: '彩蛋已解锁：不确定度计算器按钮已显示',
             undo: '撤销',
             redo: '重做',
 
@@ -667,6 +668,7 @@
             formula: 'Formula',
             chart: 'Chart',
             uncertainty: 'Uncertainty',
+            uncertaintyEasterEggUnlocked: 'Easter egg unlocked: Uncertainty button is now visible',
             undo: 'Undo',
             redo: 'Redo',
 

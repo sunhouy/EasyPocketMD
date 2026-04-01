@@ -27,10 +27,101 @@ document.addEventListener('DOMContentLoaded', function() {
     window.lastSyncedContent = {};
     window.unsavedChanges = {};
     window.vditor = null;
+    var TOOLBAR_EASTER_EGG_KEY = 'vditor_uncertainty_unlocked';
+    var toolbarEasterEggTapCount = 0;
+    var toolbarEasterEggLastTapAt = 0;
+    window.toolbarUncertaintyUnlocked = localStorage.getItem(TOOLBAR_EASTER_EGG_KEY) === 'true';
+
+    function isToolbarButtonVisible(btnConfig) {
+        if (!btnConfig) return false;
+        return !btnConfig.isEasterEgg || window.toolbarUncertaintyUnlocked;
+    }
+
+    function getVisibleToolbarButtons() {
+        return window.allToolbarButtons.filter(isToolbarButtonVisible);
+    }
+
+    async function handleBottomSave() {
+        if (window.saveCurrentFile) {
+            await window.saveCurrentFile(true);
+            var t = function(key) { return window.i18n ? window.i18n.t(key) : key; };
+            window.showMessage(t('saveSuccess') || '保存成功', 'success');
+        }
+    }
+
+    async function handleBottomExport() {
+        if (typeof window.exportContent !== 'function') {
+            await import('./ui/export.js');
+        }
+        window.exportContent();
+    }
+
+    async function handleBottomShare() {
+        if (typeof window.showShareDialog !== 'function') {
+            await import('./ui/share.js');
+        }
+        window.showShareDialog();
+    }
+
+    function handleBottomFileList() {
+        var sidebar = document.getElementById('fileListSidebar');
+        if (sidebar) sidebar.classList.toggle('show');
+    }
+
+    function renderToolbarButtonSettings() {
+        var toolbarSettings = document.getElementById('toolbarButtonsSettings');
+        if (!toolbarSettings) return;
+        toolbarSettings.innerHTML = '';
+
+        var currentButtons = window.userSettings.toolbarButtons || window.defaultToolbarButtons;
+        getVisibleToolbarButtons().forEach(function(btnConfig) {
+            var label = document.createElement('label');
+            var checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.value = btnConfig.id;
+            checkbox.checked = currentButtons.includes(btnConfig.id);
+
+            label.appendChild(checkbox);
+            var buttonText = (window.i18n && btnConfig.textKey) ? window.i18n.t(btnConfig.textKey) : btnConfig.text;
+            label.appendChild(document.createTextNode(' ' + buttonText));
+            toolbarSettings.appendChild(label);
+        });
+    }
+
+    function bindToolbarEasterEggTrigger() {
+        var title = document.querySelector('#settingsModalOverlay [data-i18n="bottomToolbarButtons"]');
+        if (!title || title.dataset.easterEggBound === '1') return;
+
+        title.dataset.easterEggBound = '1';
+        title.addEventListener('click', function() {
+            if (window.toolbarUncertaintyUnlocked) return;
+
+            var now = Date.now();
+            if (now - toolbarEasterEggLastTapAt > 1500) {
+                toolbarEasterEggTapCount = 0;
+            }
+            toolbarEasterEggLastTapAt = now;
+            toolbarEasterEggTapCount += 1;
+
+            if (toolbarEasterEggTapCount >= 5) {
+                window.toolbarUncertaintyUnlocked = true;
+                localStorage.setItem(TOOLBAR_EASTER_EGG_KEY, 'true');
+                toolbarEasterEggTapCount = 0;
+                renderToolbarButtonSettings();
+                window.showMessage(window.i18n ? window.i18n.t('uncertaintyEasterEggUnlocked') : '彩蛋已解锁：不确定度计算器按钮已显示', 'success');
+            }
+        });
+    }
 
     // 工具栏配置（使用翻译函数）
     window.allToolbarButtons = [
         { id: 'mobileInsertBtn', icon: 'fas fa-plus', textKey: 'insert', fn: function() { if (typeof window.showInsertPicker === 'function') window.showInsertPicker(); else window.showInsertMenu(); } },
+        { id: 'mobileBottomSaveBtn', icon: 'fas fa-save', textKey: 'save', fn: handleBottomSave },
+        { id: 'mobileBottomSettingsBtn', icon: 'fas fa-cog', textKey: 'settings', fn: function() { window.showSettingsDialog(); } },
+        { id: 'mobileBottomImportBtn', icon: 'fas fa-file-import', textKey: 'import', fn: function() { window.importFiles(); } },
+        { id: 'mobileBottomExportBtn', icon: 'fas fa-file-export', textKey: 'export', fn: handleBottomExport },
+        { id: 'mobileBottomShareBtn', icon: 'fas fa-share-alt', textKey: 'share', fn: handleBottomShare },
+        { id: 'mobileBottomFileListBtn', icon: 'fas fa-folder-open', textKey: 'fileListTitle', fn: handleBottomFileList },
         { id: 'mobileFormulaBtn', icon: 'fas fa-superscript', textKey: 'formula', fn: async function() {
             if (typeof window.showFormulaPicker !== 'function') {
                 await import('./formula-picker.js');
@@ -43,7 +134,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             if (typeof window.showChartPicker === 'function') window.showChartPicker();
         } },
-        { id: 'mobileUncertaintyBtn', icon: 'fas fa-calculator', textKey: 'uncertainty', fn: async function() {
+        { id: 'mobileUncertaintyBtn', icon: 'fas fa-calculator', textKey: 'uncertainty', isEasterEgg: true, fn: async function() {
             if (typeof window.showUncertaintyCalculator !== 'function') {
                 await import('./uncertainty-calculator.js');
             }
@@ -80,6 +171,8 @@ document.addEventListener('DOMContentLoaded', function() {
     if (typeof window.userSettings.enableWasmTextEngine !== 'boolean') {
         window.userSettings.enableWasmTextEngine = true;
     }
+
+    bindToolbarEasterEggTrigger();
 
     // 初始化主题
     initTheme();
@@ -557,14 +650,7 @@ document.addEventListener('DOMContentLoaded', function() {
         var mobileSettingsBtn = document.getElementById('mobileSettingsBtn');
         if (mobileSettingsBtn) mobileSettingsBtn.addEventListener('click', function() { window.showSettingsDialog(); });
         var saveFileBtn = document.getElementById('saveFileBtn');
-        if (saveFileBtn) saveFileBtn.addEventListener('click', async function() {
-            if (window.saveCurrentFile) {
-                await window.saveCurrentFile(true);
-                // 自定义保存成功提示
-                var t = function(key) { return window.i18n ? window.i18n.t(key) : key; };
-                window.showMessage(t('saveSuccess') || '保存成功', 'success');
-            }
-        });
+        if (saveFileBtn) saveFileBtn.addEventListener('click', handleBottomSave);
 
         var mobileLoginBtn = document.getElementById('mobileLoginBtn');
         if (mobileLoginBtn) mobileLoginBtn.addEventListener('click', window.handleLoginButtonClick);
@@ -727,13 +813,7 @@ document.addEventListener('DOMContentLoaded', function() {
         var btns = [
             { id: 'mobileLoginBtn', fn: window.handleLoginButtonClick },
             { id: 'mobileSettingsBtn', fn: window.showSettingsDialog },
-            { id: 'saveFileBtn', fn: async function() {
-                if (window.saveCurrentFile) {
-                    await window.saveCurrentFile(true);
-                    var t = function(key) { return window.i18n ? window.i18n.t(key) : key; };
-                    window.showMessage(t('saveSuccess') || '保存成功', 'success');
-                }
-            }},
+            { id: 'saveFileBtn', fn: handleBottomSave },
             { id: 'modeToggle', fn: window.toggleNightMode },
             { id: 'mobileFileBtn', fn: function() { document.getElementById('fileListSidebar').classList.toggle('show'); } }
         ];
@@ -764,9 +844,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
         toolbarContainer.innerHTML = '';
         var buttons = window.userSettings.toolbarButtons || window.defaultToolbarButtons;
+        var visibleButtons = getVisibleToolbarButtons();
 
         buttons.forEach(function(btnId) {
-            var btnConfig = window.allToolbarButtons.find(function(b) { return b.id === btnId; });
+            var btnConfig = visibleButtons.find(function(b) { return b.id === btnId; });
             if (btnConfig) {
                 var btn = document.createElement('button');
                 btn.className = 'bottom-btn';
@@ -853,22 +934,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         // 生成工具栏按钮选择
-        var toolbarSettings = document.getElementById('toolbarButtonsSettings');
-        toolbarSettings.innerHTML = '';
-        var currentButtons = window.userSettings.toolbarButtons || window.defaultToolbarButtons;
-
-        window.allToolbarButtons.forEach(function(btnConfig) {
-            var label = document.createElement('label');
-            var checkbox = document.createElement('input');
-            checkbox.type = 'checkbox';
-            checkbox.value = btnConfig.id;
-            checkbox.checked = currentButtons.includes(btnConfig.id);
-
-            label.appendChild(checkbox);
-            var buttonText = (window.i18n && btnConfig.textKey) ? window.i18n.t(btnConfig.textKey) : btnConfig.text;
-            label.appendChild(document.createTextNode(' ' + buttonText));
-            toolbarSettings.appendChild(label);
-        });
+        renderToolbarButtonSettings();
 
         // 每次打开设置都默认折叠空间管理详情
         var storageManagementDetails = document.getElementById('storageManagementDetails');
