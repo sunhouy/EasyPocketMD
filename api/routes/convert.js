@@ -356,14 +356,29 @@ ${html}
 }
 
 function normalizeDocxMarkdown(markdown) {
-    return String(markdown || '').replace(/```mermaid\n([\s\S]*?)```/g, (match, content) => {
+    let normalized = String(markdown || '');
+
+    normalized = normalized.replace(/```mermaid\n([\s\S]*?)```/g, (match, content) => {
         return `\n> [Mermaid Diagram]\n>\n> ${String(content || '').trim().split('\n').join('\n> ')}\n`;
     });
+
+    // Support formulas exported as escaped delimiters: \\(...\\), \\[...\\]
+    normalized = normalized
+        .replace(/\\\\\[([\s\S]*?)\\\\\]/g, (_, expr) => `$$\n${String(expr || '').trim()}\n$$`)
+        .replace(/\\\\\(([\s\S]*?)\\\\\)/g, (_, expr) => `$${String(expr || '').trim()}$`);
+
+    // Some editor pipelines may escape dollar delimiters, causing pandoc to treat
+    // formulas as plain text. Normalize common escaped forms back to math delimiters.
+    normalized = normalized
+        .replace(/\\\$\\\$([\s\S]*?)\\\$\\\$/g, (_, expr) => `$$\n${String(expr || '').trim()}\n$$`)
+        .replace(/\\\$([^\n$]+?)\\\$/g, (_, expr) => `$${String(expr || '').trim()}$`);
+
+    return normalized;
 }
 
 async function runPandocDocx(inputContent, options = {}) {
     const tempDir = await fsp.mkdtemp(path.join(os.tmpdir(), 'easypocketmd-docx-'));
-    const inputFormat = options.inputFormat || 'markdown+task_lists+tex_math_dollars+tex_math_single_backslash+fenced_code_blocks+pipe_tables';
+    const inputFormat = options.inputFormat || 'markdown+task_lists+tex_math_dollars+tex_math_single_backslash+tex_math_double_backslash+fenced_code_blocks+pipe_tables';
     const inputExt = inputFormat === 'html' ? 'html' : 'md';
     const inputPath = path.join(tempDir, `input.${inputExt}`);
     const outputPath = path.join(tempDir, 'output.docx');
@@ -441,7 +456,7 @@ router.post('/docx', async (req, res) => {
         const docxBuffer = useNativeMath
             ? await runPandocDocx(normalizeDocxMarkdown(markdown), {
                 referenceDocx,
-                inputFormat: 'markdown+task_lists+tex_math_dollars+tex_math_single_backslash+fenced_code_blocks+pipe_tables'
+                inputFormat: 'markdown+task_lists+tex_math_dollars+tex_math_single_backslash+tex_math_double_backslash+fenced_code_blocks+pipe_tables'
             })
             : await runPandocDocx(buildDocxStyledHtml(markdown, docxSettings), {
                 referenceDocx,

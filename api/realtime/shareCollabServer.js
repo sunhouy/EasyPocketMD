@@ -177,6 +177,9 @@ function initShareCollabServer(httpServer, shareManager) {
                 payload.type === 'video_call_invite' ||
                 payload.type === 'video_call_response' ||
                 payload.type === 'video_signal' ||
+                payload.type === 'video_offer' ||
+                payload.type === 'video_answer' ||
+                payload.type === 'video_ice_candidate' ||
                 payload.type === 'video_call_hangup'
             ) {
                 if (!socket.ctx.canEdit) {
@@ -247,13 +250,45 @@ function initShareCollabServer(httpServer, shareManager) {
                     }));
                     return;
                 }
+
+                if (payload.type === 'video_offer') {
+                    targetClient.send(JSON.stringify({
+                        type: 'video_offer',
+                        call_id: callId,
+                        from_viewer_id: socket.ctx.viewerId,
+                        from_viewer_name: socket.ctx.viewerName,
+                        sdp: payload.sdp || ''
+                    }));
+                    return;
+                }
+
+                if (payload.type === 'video_answer') {
+                    targetClient.send(JSON.stringify({
+                        type: 'video_answer',
+                        call_id: callId,
+                        from_viewer_id: socket.ctx.viewerId,
+                        from_viewer_name: socket.ctx.viewerName,
+                        sdp: payload.sdp || ''
+                    }));
+                    return;
+                }
+
+                if (payload.type === 'video_ice_candidate') {
+                    targetClient.send(JSON.stringify({
+                        type: 'video_ice_candidate',
+                        call_id: callId,
+                        from_viewer_id: socket.ctx.viewerId,
+                        from_viewer_name: socket.ctx.viewerName,
+                        candidate: payload.candidate || null
+                    }));
+                    return;
+                }
             }
 
             if (
                 payload.type === 'video_room_join' ||
                 payload.type === 'video_room_leave' ||
-                payload.type === 'video_room_signal' ||
-                payload.type === 'video_sfu_join'
+                payload.type === 'video_room_signal'
             ) {
                 if (!socket.ctx.canEdit) {
                     socket.send(JSON.stringify({ type: 'error', code: 403, message: 'no edit permission for group video call' }));
@@ -294,17 +329,6 @@ function initShareCollabServer(httpServer, shareManager) {
                             viewer_name: socket.ctx.viewerName
                         }));
                     });
-                    return;
-                }
-
-                if (payload.type === 'video_sfu_join') {
-                    socket.send(JSON.stringify({
-                        type: 'video_sfu_entry',
-                        code: 200,
-                        room_id: socket.ctx.shareId,
-                        strategy: 'external_sfu',
-                        message: 'sfu entry placeholder'
-                    }));
                     return;
                 }
 

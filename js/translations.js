@@ -224,8 +224,6 @@
             videoRoomJoined: '已加入多人通话房间',
             videoRoomPeerJoined: '有用户加入多人通话',
             videoRoomPeerLeft: '有用户离开多人通话',
-            videoSfuEntry: 'SFU入口',
-            videoSfuEntryHint: '已请求 SFU 入口，请接入专用 SFU 服务',
 
             // 文件操作
             notLoggedIn: '未登录',
@@ -734,8 +732,6 @@
             videoRoomJoined: 'Joined the group call room',
             videoRoomPeerJoined: 'A user joined the group call',
             videoRoomPeerLeft: 'A user left the group call',
-            videoSfuEntry: 'SFU Entry',
-            videoSfuEntryHint: 'SFU entry requested, please connect an SFU service',
 
             // File operations
             notLoggedIn: 'Not logged in',
