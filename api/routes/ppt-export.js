@@ -208,6 +208,7 @@ function renderSlideFromSpec(slide, spec, ratio, pageNo) {
     const margin = 0.55;
 
     slide.background = { color: palette.bg };
+    addDecorativeBackground(slide, palette, ratio, spec.layout);
 
     const titleText = spec.continuation ? `${spec.title}（续）` : spec.title;
     const titleFont = fitFontByLength(spec.layout === 'cover' ? 38 : 30, 22, titleText.length);
@@ -263,6 +264,13 @@ function addCoverBullets(slide, spec, palette, slideWidth, slideHeight, margin) 
 
     const startY = 2.3;
     bullets.forEach((item, idx) => {
+        addCardShape(slide, {
+            x: margin + 0.65,
+            y: startY + idx * 0.55 - 0.03,
+            w: slideWidth - (margin + 0.65) * 2,
+            h: 0.43
+        }, palette, 82);
+
         slide.addText(`• ${item.text}`, {
             x: margin + 0.4,
             y: startY + idx * 0.55,
@@ -298,6 +306,20 @@ function renderTwoColumn(slide, spec, palette, ratio) {
 
     const leftBullets = Array.isArray(spec.leftBullets) ? spec.leftBullets : spec.bullets.slice(0, Math.ceil(spec.bullets.length / 2));
     const rightBullets = Array.isArray(spec.rightBullets) ? spec.rightBullets : spec.bullets.slice(Math.ceil(spec.bullets.length / 2));
+
+    addCardShape(slide, {
+        x: margin - 0.03,
+        y: topY - 0.08,
+        w: columnWidth + 0.06,
+        h: slideHeight - topY - 0.66
+    }, palette, 88);
+
+    addCardShape(slide, {
+        x: margin + columnWidth + columnGap - 0.03,
+        y: topY - 0.08,
+        w: columnWidth + 0.06,
+        h: slideHeight - topY - 0.66
+    }, palette, 88);
 
     addBulletBlock(slide, leftBullets, {
         x: margin,
@@ -335,6 +357,8 @@ function renderContentWithOptionalImage(slide, spec, palette, ratio) {
             h: bodyHeight
         });
 
+        addImageFrame(slide, { x: imageX, y: topY, w: imageWidth, h: bodyHeight }, palette);
+
         addBulletBlock(slide, spec.bullets, {
             x: textX,
             y: topY,
@@ -358,6 +382,13 @@ function renderContentWithOptionalImage(slide, spec, palette, ratio) {
         return;
     }
 
+    addCardShape(slide, {
+        x: margin - 0.03,
+        y: topY - 0.08,
+        w: slideWidth - margin * 2 + 0.06,
+        h: bodyHeight + 0.12
+    }, palette, 90);
+
     addBulletBlock(slide, spec.bullets, {
         x: margin,
         y: topY,
@@ -374,6 +405,15 @@ function addBulletBlock(slide, bullets, rect, palette) {
 
     bullets.forEach((item) => {
         if (!item || !item.text || y >= maxY - 0.3) return;
+
+        const subCount = Array.isArray(item.subBullets) ? Math.min(item.subBullets.length, MAX_SUB_BULLETS_PER_BULLET) : 0;
+        const cardHeight = 0.46 + subCount * 0.31;
+        addCardShape(slide, {
+            x: rect.x,
+            y: y - 0.03,
+            w: rect.w,
+            h: Math.min(cardHeight, Math.max(0.28, maxY - y))
+        }, palette, 86);
 
         const mainFont = fitFontByLength(17, 12, item.text.length);
         slide.addText(`• ${item.text}`, {
@@ -404,6 +444,79 @@ function addBulletBlock(slide, bullets, rect, palette) {
 
         y += 0.08;
     });
+}
+
+function addDecorativeBackground(slide, palette, ratio, layout) {
+    const { width: slideWidth, height: slideHeight } = getSlideSize(ratio);
+    const rect = getRectShapeType();
+    const ellipse = getEllipseShapeType();
+
+    slide.addShape(rect, {
+        x: 0,
+        y: 0,
+        w: 0.24,
+        h: slideHeight,
+        line: { color: palette.accent, transparency: 100 },
+        fill: { color: palette.accent, transparency: 38 }
+    });
+
+    slide.addShape(rect, {
+        x: slideWidth - 1.8,
+        y: slideHeight - 0.65,
+        w: 1.8,
+        h: 0.65,
+        line: { color: palette.accent, transparency: 100 },
+        fill: { color: palette.accent, transparency: 55 }
+    });
+
+    if (layout === 'cover') {
+        slide.addShape(ellipse, {
+            x: slideWidth - 2.35,
+            y: -0.6,
+            w: 2.6,
+            h: 2.1,
+            line: { color: palette.accent, transparency: 100 },
+            fill: { color: palette.accent, transparency: 72 }
+        });
+    }
+}
+
+function addCardShape(slide, rect, palette, transparency) {
+    const roundRect = getRoundRectShapeType();
+    slide.addShape(roundRect, {
+        x: rect.x,
+        y: rect.y,
+        w: rect.w,
+        h: rect.h,
+        radius: 0.06,
+        line: { color: palette.accent, transparency: 75, pt: 1 },
+        fill: { color: 'FFFFFF', transparency: transparency }
+    });
+}
+
+function addImageFrame(slide, rect, palette) {
+    const roundRect = getRoundRectShapeType();
+    slide.addShape(roundRect, {
+        x: rect.x - 0.04,
+        y: rect.y - 0.04,
+        w: rect.w + 0.08,
+        h: rect.h + 0.08,
+        radius: 0.05,
+        line: { color: palette.accent, pt: 1.2, transparency: 35 },
+        fill: { color: 'FFFFFF', transparency: 100 }
+    });
+}
+
+function getRectShapeType() {
+    return PptxGenJS.ShapeType ? PptxGenJS.ShapeType.rect : 'rect';
+}
+
+function getRoundRectShapeType() {
+    return PptxGenJS.ShapeType ? PptxGenJS.ShapeType.roundRect : 'roundRect';
+}
+
+function getEllipseShapeType() {
+    return PptxGenJS.ShapeType ? PptxGenJS.ShapeType.ellipse : 'ellipse';
 }
 
 function fitFontByLength(base, min, length) {

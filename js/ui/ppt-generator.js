@@ -925,7 +925,7 @@ JSON 结构：
     
     // 在指定位置后插入新页面
     async function insertPageAfter(index) {
-        showCustomPrompt('输入新页面标题：', '', async function(title) {
+        showCustomPrompt('输入新页面内容：', '', async function(title) {
             if (!title) return;
             
             var insertIndex = index + 1;
