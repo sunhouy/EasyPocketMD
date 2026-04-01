@@ -994,6 +994,734 @@
         renderSharePresence(window.sharedDocState.onlineUsers || []);
     }
 
+    function createShareVideoCallId() {
+        return 'call-' + Date.now() + '-' + Math.random().toString(36).slice(2, 9);
+    }
+
+    function sendShareWsPayload(payload) {
+        if (!window.sharedDocState || !window.sharedDocState.ws || !window.sharedDocState.wsConnected) return false;
+        if (window.sharedDocState.ws.readyState !== WebSocket.OPEN) return false;
+        window.sharedDocState.ws.send(JSON.stringify(payload));
+        return true;
+    }
+
+    function removeShareVideoUi() {
+        var panel = document.getElementById('shareVideoUserPanel');
+        if (panel) panel.remove();
+        var modal = document.getElementById('shareVideoCallModal');
+        if (modal) modal.remove();
+        var roomModal = document.getElementById('shareVideoRoomModal');
+        if (roomModal) roomModal.remove();
+    }
+
+    function getShareVideoState() {
+        if (!window.sharedDocState) return null;
+        if (!window.sharedDocState.videoCall) {
+            window.sharedDocState.videoCall = {
+                callId: '',
+                peerViewerId: '',
+                peerViewerName: '',
+                isCaller: false,
+                pc: null,
+                localStream: null,
+                remoteStream: null,
+                pendingCandidates: []
+            };
+        }
+        return window.sharedDocState.videoCall;
+    }
+
+    function getShareVideoUserLabel(user) {
+        if (!user) return '';
+        return (user.viewer_name || 'Guest') + (user.is_editing ? '...' : '');
+    }
+
+    function escapeShareHtml(text) {
+        return String(text || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    function getShareEditableUsers() {
+        if (!window.sharedDocState) return [];
+        var users = Array.isArray(window.sharedDocState.onlineUsers) ? window.sharedDocState.onlineUsers : [];
+        return users.filter(function(u) {
+            if (!u || !u.viewer_id) return false;
+            if (!u.can_edit) return false;
+            return u.viewer_id !== window.sharedDocState.viewerId;
+        });
+    }
+
+    function getShareIceServers() {
+        return [
+            { urls: 'stun:stun.miwifi.com:3478' },
+            { urls: 'stun:stun.l.google.com:19302' }
+        ];
+    }
+
+    function ensureShareVideoCallModal() {
+        var modal = document.getElementById('shareVideoCallModal');
+        if (modal) return modal;
+
+        modal = document.createElement('div');
+        modal.id = 'shareVideoCallModal';
+        modal.style.cssText = 'position:fixed;inset:0;z-index:10005;background:rgba(0,0,0,0.65);display:none;align-items:center;justify-content:center;padding:16px;';
+        modal.innerHTML =
+            '<div style="width:min(920px,96vw);max-height:92vh;overflow:auto;background:#111827;color:#f3f4f6;border-radius:12px;padding:14px;">' +
+            '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">' +
+            '<div id="shareVideoCallTitle" style="font-size:14px;font-weight:600;">视频通话</div>' +
+            '<button id="shareVideoCallHangupBtn" style="border:none;background:#dc2626;color:#fff;padding:8px 12px;border-radius:6px;cursor:pointer;">挂断</button>' +
+            '</div>' +
+            '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;">' +
+            '<div><div style="font-size:12px;opacity:0.8;margin-bottom:6px;">我</div><video id="shareVideoLocal" autoplay muted playsinline style="width:100%;height:220px;object-fit:cover;background:#0b1220;border-radius:8px;"></video></div>' +
+            '<div><div style="font-size:12px;opacity:0.8;margin-bottom:6px;">对方</div><video id="shareVideoRemote" autoplay playsinline style="width:100%;height:220px;object-fit:cover;background:#0b1220;border-radius:8px;"></video></div>' +
+            '</div>' +
+            '</div>';
+        document.body.appendChild(modal);
+
+        var hangupBtn = document.getElementById('shareVideoCallHangupBtn');
+        if (hangupBtn) {
+            hangupBtn.addEventListener('click', function() {
+                cleanupShareVideoCall(true, 'hangup');
+            });
+        }
+        modal.addEventListener('click', function(e) {
+            if (e.target === modal) {
+                cleanupShareVideoCall(true, 'hangup');
+            }
+        });
+        return modal;
+    }
+
+    function openShareVideoCallModal(title) {
+        var modal = ensureShareVideoCallModal();
+        var titleEl = document.getElementById('shareVideoCallTitle');
+        if (titleEl) titleEl.textContent = title || (window.i18n ? window.i18n.t('videoCall') : '视频通话');
+        modal.style.display = 'flex';
+    }
+
+    function closeShareVideoCallModal() {
+        var modal = document.getElementById('shareVideoCallModal');
+        if (modal) modal.style.display = 'none';
+    }
+
+    function stopStreamTracks(stream) {
+        if (!stream) return;
+        stream.getTracks().forEach(function(track) {
+            try { track.stop(); } catch (e) {}
+        });
+    }
+
+    function cleanupShareVideoCall(notifyPeer, reason) {
+        if (!window.sharedDocState) return;
+        var video = getShareVideoState();
+        if (!video) return;
+
+        if (notifyPeer && video.peerViewerId && video.callId) {
+            sendShareWsPayload({
+                type: 'video_call_hangup',
+                target_viewer_id: video.peerViewerId,
+                call_id: video.callId,
+                reason: reason || 'hangup'
+            });
+        }
+
+        if (video.pc) {
+            try { video.pc.onicecandidate = null; } catch (e) {}
+            try { video.pc.ontrack = null; } catch (e) {}
+            try { video.pc.onconnectionstatechange = null; } catch (e) {}
+            try { video.pc.close(); } catch (e) {}
+        }
+        stopStreamTracks(video.localStream);
+        stopStreamTracks(video.remoteStream);
+
+        var localVideo = document.getElementById('shareVideoLocal');
+        if (localVideo) localVideo.srcObject = null;
+        var remoteVideo = document.getElementById('shareVideoRemote');
+        if (remoteVideo) remoteVideo.srcObject = null;
+
+        window.sharedDocState.videoCall = {
+            callId: '',
+            peerViewerId: '',
+            peerViewerName: '',
+            isCaller: false,
+            pc: null,
+            localStream: null,
+            remoteStream: null,
+            pendingCandidates: []
+        };
+        closeShareVideoCallModal();
+    }
+
+    async function ensureShareLocalMedia() {
+        var video = getShareVideoState();
+        if (video.localStream) return video.localStream;
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            throw new Error(window.i18n ? window.i18n.t('videoCallUnsupported') : '当前浏览器不支持视频通话');
+        }
+        video.localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        var localVideo = document.getElementById('shareVideoLocal');
+        if (localVideo) localVideo.srcObject = video.localStream;
+        return video.localStream;
+    }
+
+    async function createSharePeerConnection() {
+        var video = getShareVideoState();
+        if (!video) return null;
+        if (video.pc) return video.pc;
+
+        var pc = new RTCPeerConnection({
+            iceServers: getShareIceServers()
+        });
+
+        var localStream = await ensureShareLocalMedia();
+        localStream.getTracks().forEach(function(track) {
+            pc.addTrack(track, localStream);
+        });
+
+        pc.onicecandidate = function(event) {
+            if (!event.candidate) return;
+            var current = getShareVideoState();
+            if (!current || !current.peerViewerId || !current.callId) return;
+            sendShareWsPayload({
+                type: 'video_signal',
+                target_viewer_id: current.peerViewerId,
+                call_id: current.callId,
+                signal: {
+                    type: 'candidate',
+                    candidate: event.candidate
+                }
+            });
+        };
+
+        pc.ontrack = function(event) {
+            var current = getShareVideoState();
+            if (!current) return;
+            current.remoteStream = event.streams && event.streams[0] ? event.streams[0] : null;
+            var remoteVideo = document.getElementById('shareVideoRemote');
+            if (remoteVideo) remoteVideo.srcObject = current.remoteStream;
+        };
+
+        pc.onconnectionstatechange = function() {
+            var state = pc.connectionState;
+            if (state === 'failed' || state === 'disconnected' || state === 'closed') {
+                cleanupShareVideoCall(false, 'disconnected');
+            }
+        };
+
+        video.pc = pc;
+        return pc;
+    }
+
+    async function applyPendingShareCandidates() {
+        var video = getShareVideoState();
+        if (!video || !video.pc || !video.pc.remoteDescription) return;
+        if (!Array.isArray(video.pendingCandidates) || video.pendingCandidates.length === 0) return;
+
+        var pending = video.pendingCandidates.slice();
+        video.pendingCandidates = [];
+        for (var i = 0; i < pending.length; i++) {
+            try {
+                await video.pc.addIceCandidate(new RTCIceCandidate(pending[i]));
+            } catch (err) {
+                console.warn('应用候选失败:', err);
+            }
+        }
+    }
+
+    async function startShareVideoCallWithUser(user) {
+        if (!window.sharedDocState || !window.sharedDocState.canEdit) {
+            showToast(window.i18n ? window.i18n.t('videoCallEditOnly') : '仅允许编辑用户发起视频通话', 'error');
+            return;
+        }
+        var video = getShareVideoState();
+        if (video.callId) {
+            showToast(window.i18n ? window.i18n.t('videoCallBusy') : '当前已有进行中的视频通话', 'info');
+            return;
+        }
+        video.callId = createShareVideoCallId();
+        video.peerViewerId = user.viewer_id;
+        video.peerViewerName = user.viewer_name || 'Guest';
+        video.isCaller = true;
+        video.pendingCandidates = [];
+
+        openShareVideoCallModal((window.i18n ? window.i18n.t('videoCalling') : '正在呼叫') + ': ' + video.peerViewerName);
+        var inviteSent = sendShareWsPayload({
+            type: 'video_call_invite',
+            target_viewer_id: user.viewer_id,
+            call_id: video.callId
+        });
+        if (!inviteSent) {
+            showToast(window.i18n ? window.i18n.t('websocketError') : 'WebSocket错误', 'error');
+            cleanupShareVideoCall(false, 'socket_error');
+        }
+    }
+
+    async function handleIncomingShareVideoInvite(payload) {
+        if (!window.sharedDocState || !window.sharedDocState.canEdit) {
+            sendShareWsPayload({
+                type: 'video_call_response',
+                target_viewer_id: payload.from_viewer_id,
+                call_id: payload.call_id,
+                accepted: false,
+                reason: 'no_edit_permission'
+            });
+            return;
+        }
+
+        var video = getShareVideoState();
+        if (video.callId) {
+            sendShareWsPayload({
+                type: 'video_call_response',
+                target_viewer_id: payload.from_viewer_id,
+                call_id: payload.call_id,
+                accepted: false,
+                reason: 'busy'
+            });
+            showToast(window.i18n ? window.i18n.t('videoCallBusy') : '当前正在通话中', 'info');
+            return;
+        }
+
+        var callerName = payload.from_viewer_name || 'Guest';
+        showToast((window.i18n ? window.i18n.t('videoCallIncoming') : '收到视频通话邀请') + ': ' + callerName, 'info');
+
+        var accept = false;
+        var askText = (window.i18n ? window.i18n.t('videoCallAcceptPrompt') : '用户发起了视频通话，是否接听？').replace('{name}', callerName);
+        if (window.customConfirm) {
+            accept = await window.customConfirm(askText);
+        } else {
+            accept = window.confirm(askText);
+        }
+
+        sendShareWsPayload({
+            type: 'video_call_response',
+            target_viewer_id: payload.from_viewer_id,
+            call_id: payload.call_id,
+            accepted: !!accept,
+            reason: accept ? '' : 'rejected'
+        });
+
+        if (!accept) return;
+
+        video.callId = payload.call_id;
+        video.peerViewerId = payload.from_viewer_id;
+        video.peerViewerName = callerName;
+        video.isCaller = false;
+        video.pendingCandidates = [];
+        openShareVideoCallModal((window.i18n ? window.i18n.t('videoConnectedWith') : '正在与用户视频') + ': ' + callerName);
+
+        try {
+            await createSharePeerConnection();
+        } catch (err) {
+            showToast((window.i18n ? window.i18n.t('videoCallStartFailed') : '启动视频通话失败') + ': ' + (err.message || ''), 'error');
+            cleanupShareVideoCall(true, 'media_error');
+        }
+    }
+
+    async function handleShareVideoCallResponse(payload) {
+        var video = getShareVideoState();
+        if (!video || !video.callId) return;
+        if (payload.call_id !== video.callId) return;
+        if (payload.from_viewer_id !== video.peerViewerId) return;
+
+        if (!payload.accepted) {
+            showToast(window.i18n ? window.i18n.t('videoCallRejected') : '对方已拒绝视频通话', 'info');
+            cleanupShareVideoCall(false, 'rejected');
+            return;
+        }
+
+        try {
+            var pc = await createSharePeerConnection();
+            var offer = await pc.createOffer();
+            await pc.setLocalDescription(offer);
+            sendShareWsPayload({
+                type: 'video_signal',
+                target_viewer_id: video.peerViewerId,
+                call_id: video.callId,
+                signal: {
+                    type: 'offer',
+                    sdp: offer.sdp
+                }
+            });
+            openShareVideoCallModal((window.i18n ? window.i18n.t('videoConnectedWith') : '正在与用户视频') + ': ' + video.peerViewerName);
+        } catch (err) {
+            showToast((window.i18n ? window.i18n.t('videoCallStartFailed') : '启动视频通话失败') + ': ' + (err.message || ''), 'error');
+            cleanupShareVideoCall(true, 'offer_failed');
+        }
+    }
+
+    async function handleShareVideoSignal(payload) {
+        var video = getShareVideoState();
+        if (!video) return;
+        if (!video.callId || payload.call_id !== video.callId) return;
+        if (!payload.signal || !payload.signal.type) return;
+
+        try {
+            var pc = await createSharePeerConnection();
+            if (payload.signal.type === 'offer') {
+                await pc.setRemoteDescription(new RTCSessionDescription({ type: 'offer', sdp: payload.signal.sdp }));
+                var answer = await pc.createAnswer();
+                await pc.setLocalDescription(answer);
+                sendShareWsPayload({
+                    type: 'video_signal',
+                    target_viewer_id: video.peerViewerId,
+                    call_id: video.callId,
+                    signal: {
+                        type: 'answer',
+                        sdp: answer.sdp
+                    }
+                });
+                await applyPendingShareCandidates();
+                return;
+            }
+
+            if (payload.signal.type === 'answer') {
+                await pc.setRemoteDescription(new RTCSessionDescription({ type: 'answer', sdp: payload.signal.sdp }));
+                await applyPendingShareCandidates();
+                return;
+            }
+
+            if (payload.signal.type === 'candidate' && payload.signal.candidate) {
+                if (!pc.remoteDescription) {
+                    video.pendingCandidates.push(payload.signal.candidate);
+                    return;
+                }
+                await pc.addIceCandidate(new RTCIceCandidate(payload.signal.candidate));
+            }
+        } catch (err) {
+            console.error('处理视频信令失败:', err);
+        }
+    }
+
+    function getShareVideoRoomState() {
+        if (!window.sharedDocState) return null;
+        if (!window.sharedDocState.videoRoom) {
+            window.sharedDocState.videoRoom = {
+                joined: false,
+                localStream: null,
+                peers: {},
+                pendingByPeer: {}
+            };
+        }
+        return window.sharedDocState.videoRoom;
+    }
+
+    function ensureShareVideoRoomModal() {
+        var modal = document.getElementById('shareVideoRoomModal');
+        if (modal) return modal;
+
+        modal = document.createElement('div');
+        modal.id = 'shareVideoRoomModal';
+        modal.style.cssText = 'position:fixed;inset:0;z-index:10006;background:rgba(0,0,0,0.72);display:none;align-items:center;justify-content:center;padding:14px;';
+        modal.innerHTML =
+            '<div style="width:min(1080px,97vw);max-height:94vh;overflow:auto;background:#0f172a;color:#f8fafc;border-radius:12px;padding:12px;">' +
+            '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px;">' +
+            '<div id="shareVideoRoomTitle" style="font-size:14px;font-weight:600;">多人通话房间</div>' +
+            '<button id="shareVideoRoomLeaveBtn" style="border:none;background:#dc2626;color:#fff;padding:8px 12px;border-radius:6px;cursor:pointer;">退出房间</button>' +
+            '</div>' +
+            '<div id="shareVideoRoomGrid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;"></div>' +
+            '</div>';
+        document.body.appendChild(modal);
+
+        var leaveBtn = document.getElementById('shareVideoRoomLeaveBtn');
+        if (leaveBtn) {
+            leaveBtn.addEventListener('click', function() {
+                cleanupShareVideoRoom(true);
+            });
+        }
+        modal.addEventListener('click', function(e) {
+            if (e.target === modal) {
+                cleanupShareVideoRoom(true);
+            }
+        });
+        return modal;
+    }
+
+    function renderShareVideoRoomGrid() {
+        var room = getShareVideoRoomState();
+        if (!room || !room.joined) return;
+        var grid = document.getElementById('shareVideoRoomGrid');
+        if (!grid) return;
+
+        var localName = escapeShareHtml(window.sharedDocState && window.sharedDocState.viewerName ? window.sharedDocState.viewerName : 'Me');
+        var html =
+            '<div style="background:#1e293b;border-radius:8px;padding:8px;">' +
+            '<div style="font-size:12px;opacity:0.9;margin-bottom:6px;">我（' + localName + '）</div>' +
+            '<video id="shareVideoRoomLocal" autoplay muted playsinline style="width:100%;height:190px;object-fit:cover;background:#0b1220;border-radius:6px;"></video>' +
+            '</div>';
+
+        Object.keys(room.peers).forEach(function(peerId) {
+            var peer = room.peers[peerId] || {};
+            var peerName = escapeShareHtml(peer.viewerName || 'Peer');
+            html +=
+                '<div style="background:#1e293b;border-radius:8px;padding:8px;">' +
+                '<div style="font-size:12px;opacity:0.9;margin-bottom:6px;">' + peerName + '</div>' +
+                '<video id="shareVideoRoomPeer-' + peerId + '" autoplay playsinline style="width:100%;height:190px;object-fit:cover;background:#0b1220;border-radius:6px;"></video>' +
+                '</div>';
+        });
+
+        grid.innerHTML = html;
+        var localVideo = document.getElementById('shareVideoRoomLocal');
+        if (localVideo && room.localStream) {
+            localVideo.srcObject = room.localStream;
+        }
+        Object.keys(room.peers).forEach(function(peerId) {
+            var peer = room.peers[peerId] || {};
+            var el = document.getElementById('shareVideoRoomPeer-' + peerId);
+            if (el && peer.remoteStream) {
+                el.srcObject = peer.remoteStream;
+            }
+        });
+    }
+
+    function openShareVideoRoomModal() {
+        ensureShareVideoRoomModal().style.display = 'flex';
+        renderShareVideoRoomGrid();
+    }
+
+    function closeShareVideoRoomModal() {
+        var modal = document.getElementById('shareVideoRoomModal');
+        if (modal) modal.style.display = 'none';
+    }
+
+    async function ensureShareRoomLocalStream() {
+        var room = getShareVideoRoomState();
+        if (!room) return null;
+        if (room.localStream) return room.localStream;
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            throw new Error(window.i18n ? window.i18n.t('videoCallUnsupported') : '当前浏览器不支持视频通话');
+        }
+        room.localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        return room.localStream;
+    }
+
+    async function createShareRoomPeerConnection(peerId, peerName) {
+        var room = getShareVideoRoomState();
+        if (!room || !room.joined) return null;
+        if (room.peers[peerId] && room.peers[peerId].pc) return room.peers[peerId].pc;
+
+        var localStream = await ensureShareRoomLocalStream();
+        var pc = new RTCPeerConnection({ iceServers: getShareIceServers() });
+
+        localStream.getTracks().forEach(function(track) {
+            pc.addTrack(track, localStream);
+        });
+
+        room.peers[peerId] = room.peers[peerId] || { viewerName: peerName || 'Peer', pc: null, remoteStream: null };
+        room.peers[peerId].viewerName = peerName || room.peers[peerId].viewerName || 'Peer';
+        room.peers[peerId].pc = pc;
+
+        pc.onicecandidate = function(event) {
+            if (!event.candidate) return;
+            sendShareWsPayload({
+                type: 'video_room_signal',
+                target_viewer_id: peerId,
+                signal: {
+                    type: 'candidate',
+                    candidate: event.candidate
+                }
+            });
+        };
+
+        pc.ontrack = function(event) {
+            if (!room.peers[peerId]) return;
+            room.peers[peerId].remoteStream = event.streams && event.streams[0] ? event.streams[0] : null;
+            renderShareVideoRoomGrid();
+        };
+
+        pc.onconnectionstatechange = function() {
+            if (pc.connectionState === 'failed' || pc.connectionState === 'closed') {
+                removeShareRoomPeer(peerId);
+            }
+        };
+
+        renderShareVideoRoomGrid();
+        return pc;
+    }
+
+    function removeShareRoomPeer(peerId) {
+        var room = getShareVideoRoomState();
+        if (!room || !room.peers[peerId]) return;
+        var peer = room.peers[peerId];
+        if (peer.pc) {
+            try { peer.pc.onicecandidate = null; } catch (e) {}
+            try { peer.pc.ontrack = null; } catch (e) {}
+            try { peer.pc.onconnectionstatechange = null; } catch (e) {}
+            try { peer.pc.close(); } catch (e) {}
+        }
+        delete room.peers[peerId];
+        if (room.pendingByPeer) delete room.pendingByPeer[peerId];
+        renderShareVideoRoomGrid();
+    }
+
+    async function flushShareRoomPendingCandidates(peerId) {
+        var room = getShareVideoRoomState();
+        if (!room || !room.peers[peerId] || !room.peers[peerId].pc) return;
+        var pc = room.peers[peerId].pc;
+        if (!pc.remoteDescription) return;
+        var pending = (room.pendingByPeer && room.pendingByPeer[peerId]) ? room.pendingByPeer[peerId].slice() : [];
+        room.pendingByPeer[peerId] = [];
+        for (var i = 0; i < pending.length; i++) {
+            try {
+                await pc.addIceCandidate(new RTCIceCandidate(pending[i]));
+            } catch (e) {}
+        }
+    }
+
+    async function createShareRoomOffer(peerId, peerName) {
+        var room = getShareVideoRoomState();
+        if (!room || !room.joined) return;
+        var pc = await createShareRoomPeerConnection(peerId, peerName);
+        if (!pc) return;
+        var offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        sendShareWsPayload({
+            type: 'video_room_signal',
+            target_viewer_id: peerId,
+            signal: {
+                type: 'offer',
+                sdp: offer.sdp
+            }
+        });
+    }
+
+    async function startShareVideoRoom() {
+        if (!window.sharedDocState || !window.sharedDocState.canEdit) {
+            showToast(window.i18n ? window.i18n.t('videoCallEditOnly') : '仅允许编辑用户发起视频通话', 'error');
+            return;
+        }
+        var oneToOne = getShareVideoState();
+        if (oneToOne && oneToOne.callId) {
+            showToast(window.i18n ? window.i18n.t('videoCallBusy') : '当前已有进行中的视频通话', 'info');
+            return;
+        }
+
+        var room = getShareVideoRoomState();
+        if (room.joined) {
+            openShareVideoRoomModal();
+            return;
+        }
+
+        try {
+            room.localStream = await ensureShareRoomLocalStream();
+            room.joined = true;
+            room.peers = {};
+            room.pendingByPeer = {};
+            openShareVideoRoomModal();
+            if (!sendShareWsPayload({ type: 'video_room_join' })) {
+                cleanupShareVideoRoom(false);
+                showToast(window.i18n ? window.i18n.t('websocketError') : 'WebSocket错误', 'error');
+                return;
+            }
+            renderSharePresence(window.sharedDocState.onlineUsers || []);
+            showToast(window.i18n ? window.i18n.t('videoRoomJoined') : '已加入多人通话房间', 'success');
+        } catch (err) {
+            showToast((window.i18n ? window.i18n.t('videoCallStartFailed') : '启动视频通话失败') + ': ' + (err.message || ''), 'error');
+        }
+    }
+
+    function cleanupShareVideoRoom(notifyServer) {
+        var room = getShareVideoRoomState();
+        if (!room) return;
+        if (notifyServer && room.joined) {
+            sendShareWsPayload({ type: 'video_room_leave' });
+        }
+        Object.keys(room.peers || {}).forEach(function(peerId) {
+            removeShareRoomPeer(peerId);
+        });
+        stopStreamTracks(room.localStream);
+        room.localStream = null;
+        room.joined = false;
+        room.peers = {};
+        room.pendingByPeer = {};
+        closeShareVideoRoomModal();
+        if (window.sharedDocState) {
+            renderSharePresence(window.sharedDocState.onlineUsers || []);
+        }
+    }
+
+    async function handleShareRoomParticipants(payload) {
+        var room = getShareVideoRoomState();
+        if (!room || !room.joined) return;
+        var participants = Array.isArray(payload.participants) ? payload.participants : [];
+        for (var i = 0; i < participants.length; i++) {
+            var p = participants[i];
+            if (!p || !p.viewer_id) continue;
+            await createShareRoomOffer(p.viewer_id, p.viewer_name || 'Peer');
+        }
+    }
+
+    function handleShareRoomPeerJoined(payload) {
+        var room = getShareVideoRoomState();
+        if (!room || !room.joined) return;
+        if (!payload || !payload.viewer_id) return;
+        showToast((window.i18n ? window.i18n.t('videoRoomPeerJoined') : '有用户加入多人通话') + ': ' + (payload.viewer_name || payload.viewer_id), 'info');
+    }
+
+    function handleShareRoomPeerLeft(payload) {
+        if (!payload || !payload.viewer_id) return;
+        removeShareRoomPeer(payload.viewer_id);
+        showToast((window.i18n ? window.i18n.t('videoRoomPeerLeft') : '有用户离开多人通话') + ': ' + (payload.viewer_name || payload.viewer_id), 'info');
+    }
+
+    async function handleShareRoomSignal(payload) {
+        var room = getShareVideoRoomState();
+        if (!room || !room.joined) return;
+        if (!payload || !payload.from_viewer_id || !payload.signal || !payload.signal.type) return;
+
+        var peerId = payload.from_viewer_id;
+        var peerName = payload.from_viewer_name || 'Peer';
+        try {
+            var pc = await createShareRoomPeerConnection(peerId, peerName);
+            if (!pc) return;
+
+            if (payload.signal.type === 'offer') {
+                await pc.setRemoteDescription(new RTCSessionDescription({ type: 'offer', sdp: payload.signal.sdp }));
+                var answer = await pc.createAnswer();
+                await pc.setLocalDescription(answer);
+                sendShareWsPayload({
+                    type: 'video_room_signal',
+                    target_viewer_id: peerId,
+                    signal: {
+                        type: 'answer',
+                        sdp: answer.sdp
+                    }
+                });
+                await flushShareRoomPendingCandidates(peerId);
+                return;
+            }
+
+            if (payload.signal.type === 'answer') {
+                await pc.setRemoteDescription(new RTCSessionDescription({ type: 'answer', sdp: payload.signal.sdp }));
+                await flushShareRoomPendingCandidates(peerId);
+                return;
+            }
+
+            if (payload.signal.type === 'candidate' && payload.signal.candidate) {
+                room.pendingByPeer[peerId] = room.pendingByPeer[peerId] || [];
+                if (!pc.remoteDescription) {
+                    room.pendingByPeer[peerId].push(payload.signal.candidate);
+                    return;
+                }
+                await pc.addIceCandidate(new RTCIceCandidate(payload.signal.candidate));
+            }
+        } catch (err) {
+            console.error('处理多人通话信令失败:', err);
+        }
+    }
+
+    function enterShareSfuMode() {
+        var sent = sendShareWsPayload({ type: 'video_sfu_join' });
+        if (!sent) {
+            showToast(window.i18n ? window.i18n.t('websocketError') : 'WebSocket错误', 'error');
+            return;
+        }
+        showToast(window.i18n ? window.i18n.t('videoSfuEntryHint') : '已发送 SFU 入口请求（需后端 SFU 服务支持）', 'info');
+    }
+
     function deactivateSharedDocumentSession() {
         if (!window.sharedDocState) return;
         if (window.sharedDocState.saveTimer) clearTimeout(window.sharedDocState.saveTimer);
@@ -1002,6 +1730,8 @@
         if (window.sharedDocState.localWatchTimer) clearInterval(window.sharedDocState.localWatchTimer);
         if (window.sharedDocState.wsRetryTimer) clearTimeout(window.sharedDocState.wsRetryTimer);
         if (window.sharedDocState.wsGraceTimer) clearTimeout(window.sharedDocState.wsGraceTimer);
+        cleanupShareVideoCall(false, 'leave_session');
+        cleanupShareVideoRoom(false);
         if (window.sharedDocState.ws) {
             try { window.sharedDocState.ws.close(); } catch (e) {}
         }
@@ -1009,6 +1739,7 @@
         setSharedEditorLocked(false);
         var bar = document.getElementById('sharePresenceBar');
         if (bar) bar.remove();
+        removeShareVideoUi();
     }
 
     function activateSharedDocumentSession(shareData, options) {
@@ -1061,7 +1792,23 @@
             wsRetryTimer: null,
             wsGraceTimer: null,
             connectionStatus: 'connecting',
-            onlineUsers: []
+            onlineUsers: [],
+            videoCall: {
+                callId: '',
+                peerViewerId: '',
+                peerViewerName: '',
+                isCaller: false,
+                pc: null,
+                localStream: null,
+                remoteStream: null,
+                pendingCandidates: []
+            },
+            videoRoom: {
+                joined: false,
+                localStream: null,
+                peers: {},
+                pendingByPeer: {}
+            }
         };
         setSharedEditorLocked(!window.sharedDocState.canEdit);
         startSharedDocRealtime();
@@ -1292,6 +2039,58 @@
                 return;
             }
 
+            if (payload.type === 'video_call_invite') {
+                handleIncomingShareVideoInvite(payload);
+                return;
+            }
+
+            if (payload.type === 'video_call_response') {
+                handleShareVideoCallResponse(payload);
+                return;
+            }
+
+            if (payload.type === 'video_signal') {
+                handleShareVideoSignal(payload);
+                return;
+            }
+
+            if (payload.type === 'video_call_hangup') {
+                showToast(window.i18n ? window.i18n.t('videoCallEndedByPeer') : '对方已结束视频通话', 'info');
+                cleanupShareVideoCall(false, 'peer_hangup');
+                return;
+            }
+
+            if (payload.type === 'video_call_unavailable') {
+                showToast(window.i18n ? window.i18n.t('videoUserUnavailable') : '对方当前不可接通', 'error');
+                cleanupShareVideoCall(false, 'unavailable');
+                return;
+            }
+
+            if (payload.type === 'video_room_participants') {
+                handleShareRoomParticipants(payload);
+                return;
+            }
+
+            if (payload.type === 'video_room_peer_joined') {
+                handleShareRoomPeerJoined(payload);
+                return;
+            }
+
+            if (payload.type === 'video_room_peer_left') {
+                handleShareRoomPeerLeft(payload);
+                return;
+            }
+
+            if (payload.type === 'video_room_signal') {
+                handleShareRoomSignal(payload);
+                return;
+            }
+
+            if (payload.type === 'video_sfu_entry') {
+                showToast(window.i18n ? window.i18n.t('videoSfuEntryHint') : 'SFU 入口已返回，请接入专用 SFU 服务', 'info');
+                return;
+            }
+
             if (payload.type === 'ready' || payload.type === 'doc_updated') {
                 if (payload.last_modified) {
                     window.sharedDocState.lastModified = payload.last_modified;
@@ -1328,6 +2127,7 @@
             if (!window.sharedDocState) return;
             window.sharedDocState.wsConnected = false;
             window.sharedDocState.ws = null;
+            cleanupShareVideoRoom(false);
             updateShareConnectionStatus('polling');
             if (!window.sharedDocState.pollTimer) {
                 window.sharedDocState.pollTimer = setInterval(pollSharedDocContent, 2500);
@@ -1350,6 +2150,8 @@
         if (window.sharedDocState && !window.sharedDocState.canEdit) {
             var bar = document.getElementById('sharePresenceBar');
             if (bar) bar.remove();
+            var panel = document.getElementById('shareVideoUserPanel');
+            if (panel) panel.remove();
             return;
         }
 
@@ -1357,19 +2159,90 @@
         if (!bar) {
             bar = document.createElement('div');
             bar.id = 'sharePresenceBar';
-            bar.style.cssText = 'position:fixed;top:64px;left:50%;transform:translateX(-50%);z-index:10002;background:rgba(36,41,46,0.92);color:#fff;padding:6px 12px;border-radius:20px;font-size:12px;max-width:90vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
+            bar.style.cssText = 'position:fixed;top:64px;left:50%;transform:translateX(-50%);z-index:10002;background:rgba(36,41,46,0.92);color:#fff;padding:6px 12px;border-radius:20px;font-size:12px;max-width:94vw;';
             document.body.appendChild(bar);
         }
         var names = (onlineUsers || []).slice(0, 5).map(function(u) {
-            return u.is_editing ? (u.viewer_name + '...') : u.viewer_name;
+            var safeName = escapeShareHtml(u && u.viewer_name ? u.viewer_name : 'Guest');
+            return u && u.is_editing ? (safeName + '...') : safeName;
         });
         var statusInfo = getShareConnectionStatusInfo(window.sharedDocState ? window.sharedDocState.connectionStatus : 'connecting');
+        var editableUsers = getShareEditableUsers();
         bar.innerHTML =
             '<span style="display:inline-flex;align-items:center;gap:6px;margin-right:10px;">' +
             '<span style="width:8px;height:8px;border-radius:50%;background:' + statusInfo.color + ';display:inline-block;"></span>' +
             '<span>' + statusInfo.text + '</span>' +
             '</span>' +
-            '<span>' + (window.i18n ? window.i18n.t('onlineUsers') : '在线用户') + ': ' + (names.length ? names.join(', ') : '-') + '</span>';
+            '<span>' + (window.i18n ? window.i18n.t('onlineUsers') : '在线用户') + ': ' + (names.length ? names.join(', ') : '-') + '</span>' +
+            '<button id="toggleShareVideoUsers" style="margin-left:10px;border:none;background:#2563eb;color:#fff;padding:2px 8px;border-radius:999px;cursor:pointer;font-size:12px;">' +
+            (window.i18n ? window.i18n.t('videoCall') : '视频通话') + ' (' + editableUsers.length + ')' +
+            '</button>' +
+            '<button id="toggleShareVideoRoom" style="margin-left:6px;border:none;background:#7c3aed;color:#fff;padding:2px 8px;border-radius:999px;cursor:pointer;font-size:12px;">' +
+            (window.sharedDocState && window.sharedDocState.videoRoom && window.sharedDocState.videoRoom.joined
+                ? (window.i18n ? window.i18n.t('videoRoomInCall') : '多人通话中')
+                : (window.i18n ? window.i18n.t('videoRoomJoin') : '加入多人通话')) +
+            '</button>' +
+            '<button id="enterShareSfuMode" style="margin-left:6px;border:none;background:#0ea5e9;color:#fff;padding:2px 8px;border-radius:999px;cursor:pointer;font-size:12px;">' +
+            (window.i18n ? window.i18n.t('videoSfuEntry') : 'SFU入口') +
+            '</button>';
+
+        var toggleBtn = document.getElementById('toggleShareVideoUsers');
+        if (toggleBtn) {
+            toggleBtn.onclick = function() {
+                var panel = document.getElementById('shareVideoUserPanel');
+                if (panel && panel.style.display === 'block') {
+                    panel.style.display = 'none';
+                    return;
+                }
+                if (!panel) {
+                    panel = document.createElement('div');
+                    panel.id = 'shareVideoUserPanel';
+                    panel.style.cssText = 'position:fixed;top:98px;left:50%;transform:translateX(-50%);z-index:10003;background:rgba(17,24,39,0.96);color:#fff;border-radius:10px;padding:10px 12px;width:min(360px,92vw);box-shadow:0 10px 22px rgba(0,0,0,0.28);';
+                    document.body.appendChild(panel);
+                }
+                var users = getShareEditableUsers();
+                if (!users.length) {
+                    panel.innerHTML = '<div style="font-size:12px;opacity:0.9;">' + (window.i18n ? window.i18n.t('videoNoEditableUsers') : '暂无可通话用户') + '</div>';
+                } else {
+                    panel.innerHTML = users.map(function(user) {
+                        var label = escapeShareHtml(getShareVideoUserLabel(user));
+                        return '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.08);">' +
+                            '<span style="font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + label + '</span>' +
+                            '<button data-share-call-user="' + user.viewer_id + '" style="border:none;background:#10b981;color:#fff;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:12px;">' +
+                            (window.i18n ? window.i18n.t('videoCall') : '视频通话') +
+                            '</button>' +
+                        '</div>';
+                    }).join('');
+                    panel.querySelectorAll('button[data-share-call-user]').forEach(function(btn) {
+                        btn.addEventListener('click', function() {
+                            var targetId = this.getAttribute('data-share-call-user');
+                            var target = users.find(function(u) { return u.viewer_id === targetId; });
+                            if (target) startShareVideoCallWithUser(target);
+                        });
+                    });
+                }
+                panel.style.display = 'block';
+            };
+        }
+
+        var roomBtn = document.getElementById('toggleShareVideoRoom');
+        if (roomBtn) {
+            roomBtn.onclick = function() {
+                var room = getShareVideoRoomState();
+                if (room && room.joined) {
+                    openShareVideoRoomModal();
+                    return;
+                }
+                startShareVideoRoom();
+            };
+        }
+
+        var sfuBtn = document.getElementById('enterShareSfuMode');
+        if (sfuBtn) {
+            sfuBtn.onclick = function() {
+                enterShareSfuMode();
+            };
+        }
     }
 
     async function heartbeatSharePresence() {
