@@ -698,37 +698,130 @@
         const wasmDiff = gateway.diff(leftText, rightText);
         return Array.isArray(wasmDiff) ? wasmDiff : [];
     }
+
+    function renderSameDiffRowHTML(leftLineNo, rightLineNo, leftText, rightText, extraClass, expandedFromId) {
+        const cls = extraClass ? (' ' + extraClass) : '';
+        const expandedAttr = expandedFromId ? (' data-expanded-from="' + expandedFromId + '"') : '';
+        return '<div class="diff-line diff-same' + cls + '"' + expandedAttr + '>' +
+            '<div class="diff-line-num">' + leftLineNo + '</div>' +
+            '<div class="diff-line-content"><pre>' + escapeHtml(leftText) + '</pre></div>' +
+            '<div class="diff-line-num">' + rightLineNo + '</div>' +
+            '<div class="diff-line-content"><pre>' + escapeHtml(rightText) + '</pre></div>' +
+            '</div>';
+    }
+
+    function bindCollapsedDiffInteractions(diffContainer) {
+        if (!diffContainer) return;
+
+        diffContainer.querySelectorAll('.diff-collapsed[data-collapse-id]').forEach(function(row) {
+            if (row.dataset.boundToggle === '1') return;
+            row.dataset.boundToggle = '1';
+
+            row.addEventListener('click', function() {
+                const collapseId = row.getAttribute('data-collapse-id');
+                if (!collapseId) return;
+
+                if (row.classList.contains('is-expanded')) {
+                    diffContainer.querySelectorAll('.diff-line[data-expanded-from="' + collapseId + '"]').forEach(function(expandedRow) {
+                        expandedRow.remove();
+                    });
+                    row.classList.remove('is-expanded');
+                    return;
+                }
+
+                const encodedSegment = row.getAttribute('data-collapsed-segment') || '';
+                if (!encodedSegment) return;
+
+                let rows = [];
+                try {
+                    rows = JSON.parse(decodeURIComponent(encodedSegment));
+                } catch (e) {
+                    rows = [];
+                }
+                if (!Array.isArray(rows) || rows.length === 0) return;
+
+                const expandedHtml = rows.map(function(item) {
+                    return renderSameDiffRowHTML(item.leftLineNo, item.rightLineNo, item.left || '', item.right || '', 'diff-same-unfolded', collapseId);
+                }).join('');
+
+                row.insertAdjacentHTML('afterend', expandedHtml);
+                row.classList.add('is-expanded');
+            });
+        });
+    }
     
     /**
      * 渲染差异对比视图
      */
-    function renderDiffView(diffResult) {
+    function renderDiffView(diffResult, options) {
+        const opts = options || {};
+        const collapseSame = opts.collapseSame !== false;
         let html = '';
-        diffResult.forEach(function(item, index) {
-            const lineNum = index + 1;
+        let leftLine = 1;
+        let rightLine = 1;
+        let hiddenSameCount = 0;
+        let hiddenSameRows = [];
+        let hasRealDiff = false;
+        let collapseSeq = 0;
+
+        function flushCollapsedSame() {
+            if (!collapseSame || hiddenSameCount <= 0) return;
+            collapseSeq += 1;
+            const collapseId = 'diff-collapse-' + collapseSeq;
+            const payload = encodeURIComponent(JSON.stringify(hiddenSameRows));
+            html += '<div class="diff-line diff-collapsed" data-collapse-id="' + collapseId + '" data-collapsed-segment="' + payload + '">' +
+                '<div class="diff-line-content" style="grid-column:1 / -1;">' +
+                '<pre>' + escapeHtml((isEn() ? '[Folded ' : '[已折叠 ') + hiddenSameCount + (isEn() ? ' identical line(s), click to expand]' : ' 行相同内容，点击展开]')) + '</pre>' +
+                '</div>' +
+                '</div>';
+            hiddenSameCount = 0;
+            hiddenSameRows = [];
+        }
+
+        (diffResult || []).forEach(function(item) {
             if (item.type === 'same') {
-                html += '<div class="diff-line diff-same">' +
-                    '<div class="diff-line-num">' + lineNum + '</div>' +
-                    '<div class="diff-line-content"><pre>' + escapeHtml(item.left) + '</pre></div>' +
-                    '<div class="diff-line-num">' + lineNum + '</div>' +
-                    '<div class="diff-line-content"><pre>' + escapeHtml(item.right) + '</pre></div>' +
-                    '</div>';
-            } else if (item.type === 'removed') {
+                if (collapseSame) {
+                    hiddenSameCount++;
+                    hiddenSameRows.push({ leftLineNo: leftLine, rightLineNo: rightLine, left: item.left || '', right: item.right || '' });
+                } else {
+                    html += renderSameDiffRowHTML(leftLine, rightLine, item.left || '', item.right || '', '', '');
+                }
+                leftLine++;
+                rightLine++;
+                return;
+            }
+
+            hasRealDiff = true;
+            flushCollapsedSame();
+
+            if (item.type === 'removed') {
                 html += '<div class="diff-line diff-removed">' +
-                    '<div class="diff-line-num">' + lineNum + '</div>' +
+                    '<div class="diff-line-num">' + leftLine + '</div>' +
                     '<div class="diff-line-content"><pre>' + escapeHtml(item.left) + '</pre></div>' +
                     '<div class="diff-line-num">-</div>' +
                     '<div class="diff-line-content diff-empty"></div>' +
                     '</div>';
+                leftLine++;
             } else if (item.type === 'added') {
                 html += '<div class="diff-line diff-added">' +
                     '<div class="diff-line-num">-</div>' +
                     '<div class="diff-line-content diff-empty"></div>' +
-                    '<div class="diff-line-num">' + lineNum + '</div>' +
+                    '<div class="diff-line-num">' + rightLine + '</div>' +
                     '<div class="diff-line-content"><pre>' + escapeHtml(item.right) + '</pre></div>' +
                     '</div>';
+                rightLine++;
             }
         });
+
+        flushCollapsedSame();
+
+        if (!hasRealDiff) {
+            return '<div class="diff-line diff-collapsed">' +
+                '<div class="diff-line-content" style="grid-column:1 / -1;">' +
+                '<pre>' + escapeHtml(isEn() ? 'No differences' : '无差异内容') + '</pre>' +
+                '</div>' +
+                '</div>';
+        }
         return html;
     }
     
@@ -757,7 +850,8 @@
         
         // 计算并渲染差异
         const diffResult = computeDiff(conflict.localContent || '', conflict.serverContent || '');
-        diffContent.innerHTML = renderDiffView(diffResult);
+        diffContent.innerHTML = renderDiffView(diffResult, { collapseSame: true });
+        bindCollapsedDiffInteractions(diffContent);
         
         // 显示模态窗口
         diffModal.classList.add('show');
@@ -789,6 +883,64 @@
     }
 
     function showMergePreviewModal(conflict) {
+        function collectConflictTerms(conflicts, key) {
+            const out = [];
+            const seen = Object.create(null);
+            (conflicts || []).forEach(function(item) {
+                const raw = item && item[key] != null ? String(item[key]) : '';
+                const text = raw.trim();
+                if (!text) return;
+                if (seen[text]) return;
+                seen[text] = true;
+                out.push(text);
+            });
+            return out;
+        }
+
+        function shouldHighlightLine(lineText, terms) {
+            if (!lineText || !terms || terms.length === 0) return false;
+            for (let i = 0; i < terms.length; i++) {
+                if (lineText.indexOf(terms[i]) !== -1) return true;
+            }
+            return false;
+        }
+
+        function renderMergePreviewCode(text, localTerms, remoteTerms, mode) {
+            const source = String(text || '');
+            const lines = source.split('\n');
+
+            return lines.map(function(line) {
+                const localHit = shouldHighlightLine(line, localTerms);
+                const remoteHit = shouldHighlightLine(line, remoteTerms);
+                let cls = '';
+
+                if (mode === 'local' && localHit) {
+                    cls = ' merge-preview-line-hl merge-preview-line-hl-local';
+                } else if (mode === 'server' && remoteHit) {
+                    cls = ' merge-preview-line-hl merge-preview-line-hl-remote';
+                } else if (mode === 'merged' && (localHit || remoteHit)) {
+                    cls = localHit && remoteHit
+                        ? ' merge-preview-line-hl merge-preview-line-hl-both'
+                        : (localHit
+                            ? ' merge-preview-line-hl merge-preview-line-hl-local'
+                            : ' merge-preview-line-hl merge-preview-line-hl-remote');
+                }
+
+                const escaped = escapeHtml(line);
+                return cls ? ('<span class="' + cls.trim() + '">' + escaped + '</span>') : escaped;
+            }).join('\n');
+        }
+
+        function scrollCodeToLine(el, lineNo) {
+            if (!el) return;
+            const lines = Math.max(1, String(el.textContent || '').split('\n').length);
+            const lineIndex = Math.max(0, Math.min(lines - 1, (Number(lineNo) || 1) - 1));
+            const ratio = lines <= 1 ? 0 : (lineIndex / (lines - 1));
+            const maxScrollTop = Math.max(0, el.scrollHeight - el.clientHeight);
+            const targetTop = Math.round(maxScrollTop * ratio);
+            el.scrollTo({ top: targetTop, behavior: 'smooth' });
+        }
+
         const gateway = global.wasmTextEngineGateway;
         if (!gateway || typeof gateway.merge3 !== 'function') {
             global.showMessage(isEn() ? 'Smart merge is unavailable' : '智能合并功能不可用', 'error');
@@ -810,10 +962,12 @@
         }
 
         const previewConflicts = Array.isArray(res.data.conflicts) ? res.data.conflicts : [];
+        const localTerms = collectConflictTerms(previewConflicts, 'local');
+        const remoteTerms = collectConflictTerms(previewConflicts, 'remote');
         const conflictListHtml = previewConflicts.length
             ? '<div class="merge-preview-conflicts">' +
-                previewConflicts.map(function(item) {
-                    return '<div class="merge-preview-conflict-item">' +
+                previewConflicts.map(function(item, index) {
+                    return '<div class="merge-preview-conflict-item" data-conflict-index="' + index + '" data-line="' + escapeHtml(String(item.line || 1)) + '">' +
                         '<span class="merge-preview-conflict-line">' + (isEn() ? 'Line ' : '第 ') + escapeHtml(String(item.line || '')) + (isEn() ? '' : ' 行') + '</span>' +
                         '<span class="merge-preview-conflict-values">L: ' + escapeHtml(item.local || '') + ' | R: ' + escapeHtml(item.remote || '') + '</span>' +
                     '</div>';
@@ -839,17 +993,17 @@
                 '<div class="merge-preview-column">' +
                     '<div class="merge-preview-block">' +
                         '<div class="merge-preview-block-title">' + (isEn() ? 'Local Version' : '本地版本') + '</div>' +
-                        '<pre class="merge-preview-code">' + escapeHtml(conflict.localContent || '') + '</pre>' +
+                        '<pre id="mergePreviewLocalCode" class="merge-preview-code merge-preview-code-scroll" tabindex="0">' + renderMergePreviewCode(conflict.localContent || '', localTerms, remoteTerms, 'local') + '</pre>' +
                     '</div>' +
                     '<div class="merge-preview-block">' +
                         '<div class="merge-preview-block-title">' + (isEn() ? 'Server Version' : '服务器版本') + '</div>' +
-                        '<pre class="merge-preview-code">' + escapeHtml(conflict.serverContent || '') + '</pre>' +
+                        '<pre id="mergePreviewServerCode" class="merge-preview-code merge-preview-code-scroll" tabindex="0">' + renderMergePreviewCode(conflict.serverContent || '', localTerms, remoteTerms, 'server') + '</pre>' +
                     '</div>' +
                 '</div>' +
                 '<div class="merge-preview-column">' +
                     '<div class="merge-preview-block merge-preview-result">' +
                         '<div class="merge-preview-block-title">' + (isEn() ? 'Merged Result' : '合并结果') + '</div>' +
-                        '<pre class="merge-preview-code">' + escapeHtml(res.data.mergedText || '') + '</pre>' +
+                        '<pre id="mergePreviewMergedCode" class="merge-preview-code merge-preview-code-scroll" tabindex="0">' + renderMergePreviewCode(res.data.mergedText || '', localTerms, remoteTerms, 'merged') + '</pre>' +
                     '</div>' +
                 '</div>' +
             '</div>';
@@ -863,6 +1017,23 @@
 
         const closeBtn = panel.querySelector('#closeMergePreviewBtn');
         if (closeBtn) closeBtn.onclick = close;
+
+        const localCode = panel.querySelector('#mergePreviewLocalCode');
+        const serverCode = panel.querySelector('#mergePreviewServerCode');
+        const mergedCode = panel.querySelector('#mergePreviewMergedCode');
+        panel.querySelectorAll('.merge-preview-conflict-item').forEach(function(item) {
+            item.addEventListener('click', function() {
+                const line = parseInt(item.getAttribute('data-line') || '1', 10);
+                panel.querySelectorAll('.merge-preview-conflict-item').forEach(function(row) {
+                    row.classList.remove('is-active');
+                });
+                item.classList.add('is-active');
+                scrollCodeToLine(localCode, line);
+                scrollCodeToLine(serverCode, line);
+                scrollCodeToLine(mergedCode, line);
+            });
+        });
+
         modal.onclick = function(e) {
             if (e.target === modal) close();
         };
@@ -2726,11 +2897,12 @@
         // 更新标签文本
         if (localVersionLabel) localVersionLabel.textContent = (isEn() ? 'History Version ' : '历史版本 ') + versionId;
         if (serverVersionLabel) serverVersionLabel.textContent = isEn() ? 'Current Version' : '当前版本';
-        if (diffInfo) diffInfo.textContent = isEn() ? 'Green: Added, Red: Deleted.' : '左侧为历史版本，右侧为当前版本。绿色表示新增，红色表示删除。';
+        if (diffInfo) diffInfo.textContent = isEn() ? 'Showing differences only (unchanged lines are folded).' : '仅显示差异（相同内容已自动折叠）。';
         
         // 计算并渲染差异（历史版本 vs 当前版本）
         const diffResult = computeDiff(content || '', currentContent || '');
-        diffContent.innerHTML = renderDiffView(diffResult);
+        diffContent.innerHTML = renderDiffView(diffResult, { collapseSame: true });
+        bindCollapsedDiffInteractions(diffContent);
         
         // 显示模态窗口
         diffModal.classList.add('show');
@@ -2744,7 +2916,7 @@
             // 恢复原始标签文本
             if (localVersionLabel) localVersionLabel.textContent = isEn() ? 'Local Version' : '本地版本';
             if (serverVersionLabel) serverVersionLabel.textContent = isEn() ? 'Server Version' : '服务器版本';
-            if (diffInfo) diffInfo.textContent = isEn() ? 'Left: Local version, Right: Server version. Green: Added, Red: Deleted.' : '左侧为本地版本，右侧为服务器版本。绿色表示新增，红色表示删除。';
+            if (diffInfo) diffInfo.textContent = isEn() ? 'Showing differences only (unchanged lines are folded).' : '仅显示差异（相同内容已自动折叠）。';
         };
         
         if (closeBtn) closeBtn.onclick = closeModal;
@@ -3157,17 +3329,17 @@
                 '<button id="closeFileDiffResultBtn" style="background:none;border:none;font-size:24px;cursor:pointer;color:' + (nightMode ? '#eee' : '#333') + ';">×</button>' +
             '</div>' +
             '<div style="padding:10px 20px;background:' + (nightMode ? '#3d3d3d' : '#f8f9fa') + ';font-size:13px;color:' + (nightMode ? '#aaa' : '#666') + ';flex-shrink:0;">' +
-                '<i class="fas fa-info-circle"></i> ' + (isEn() ? 'Green = added, Red = removed' : '绿色表示新增，红色表示删除') +
+                '<i class="fas fa-info-circle"></i> ' + (isEn() ? 'Showing differences only (unchanged lines are folded)' : '仅显示差异（相同内容已自动折叠）') +
             '</div>' +
             '<div style="display:flex;padding:10px 20px;background:' + (nightMode ? '#363636' : '#f0f0f0') + ';border-bottom:1px solid ' + (nightMode ? '#444' : '#ddd') + ';flex-shrink:0;">' +
                 '<div style="flex:1;font-weight:500;text-align:center;">' + (isEn() ? 'Current: ' : '当前：') + global.escapeHtml(file1.name) + '</div>' +
                 '<div style="flex:1;font-weight:500;text-align:center;">' + (isEn() ? 'Compare: ' : '对比：') + global.escapeHtml(file2.name) + '</div>' +
             '</div>';
 
-        const diffHtml = renderDiffView(diffResult);
+        const diffHtml = renderDiffView(diffResult, { collapseSame: true });
 
         modalContent.innerHTML = headerHtml +
-            '<div style="flex:1;overflow:auto;padding:0;">' +
+            '<div id="fileDiffResultContent" style="flex:1;overflow:auto;padding:0;">' +
                 '<div style="display:flex;min-width:100%;">' +
                     '<div style="flex:1;">' + diffHtml + '</div>' +
                 '</div>' +
@@ -3175,6 +3347,11 @@
 
         modal.appendChild(modalContent);
         document.body.appendChild(modal);
+
+        const fileDiffScroll = modalContent.querySelector('#fileDiffResultContent');
+        if (fileDiffScroll) {
+            bindCollapsedDiffInteractions(fileDiffScroll);
+        }
 
         // 绑定关闭按钮
         const closeBtn = modalContent.querySelector('#closeFileDiffResultBtn');

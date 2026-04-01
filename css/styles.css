@@ -960,6 +960,7 @@ body.keyboard-open .editor-container {
 
 .merge-preview-column {
     min-width: 0;
+    min-height: 0;
     display: flex;
     flex-direction: column;
     gap: 12px;
@@ -985,6 +986,7 @@ body.keyboard-open .editor-container {
 
 .merge-preview-code {
     flex: 1;
+    min-height: 0;
     margin: 0;
     overflow: auto;
     padding: 10px;
@@ -993,6 +995,37 @@ body.keyboard-open .editor-container {
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
     line-height: 1.45;
     font-size: 12px;
+}
+
+.merge-preview-code-scroll {
+    overflow: auto;
+    overscroll-behavior: contain;
+}
+
+.merge-preview-line-hl {
+    display: inline;
+    border-radius: 3px;
+    padding: 0 2px;
+}
+
+.merge-preview-line-hl-local {
+    background: rgba(255, 193, 7, 0.28);
+}
+
+.merge-preview-line-hl-remote {
+    background: rgba(33, 150, 243, 0.2);
+}
+
+.merge-preview-line-hl-both {
+    background: rgba(156, 39, 176, 0.22);
+}
+
+.merge-preview-conflict-item {
+    cursor: pointer;
+}
+
+.merge-preview-conflict-item.is-active {
+    background: rgba(74, 144, 226, 0.12);
 }
 
 .diff-modal {
@@ -1093,6 +1126,25 @@ body.keyboard-open .editor-container {
     white-space: pre-wrap;
     word-break: break-all;
     font-family: inherit;
+}
+
+.diff-collapsed {
+    background: #f3f6fb !important;
+    cursor: pointer;
+}
+
+.diff-collapsed .diff-line-content {
+    text-align: center;
+    color: #5f6b7a;
+    font-style: italic;
+}
+
+.diff-collapsed.is-expanded {
+    background: #e8eef8 !important;
+}
+
+.diff-same-unfolded {
+    background: rgba(0, 0, 0, 0.015);
 }
 
 .diff-empty {
@@ -2811,9 +2863,41 @@ body.night-mode .merge-preview-code {
     color: #ddd;
 }
 
+body.night-mode .merge-preview-line-hl-local {
+    background: rgba(255, 193, 7, 0.36);
+}
+
+body.night-mode .merge-preview-line-hl-remote {
+    background: rgba(3, 169, 244, 0.34);
+}
+
+body.night-mode .merge-preview-line-hl-both {
+    background: rgba(171, 71, 188, 0.34);
+}
+
+body.night-mode .merge-preview-conflict-item.is-active {
+    background: rgba(90, 159, 210, 0.2);
+}
+
 body.night-mode .diff-info {
     background: #1e3a5f;
     border-left-color: #4a90e2;
+}
+
+body.night-mode .diff-collapsed {
+    background: #2f3845 !important;
+}
+
+body.night-mode .diff-collapsed.is-expanded {
+    background: #394659 !important;
+}
+
+body.night-mode .diff-collapsed .diff-line-content {
+    color: #aab6c4;
+}
+
+body.night-mode .diff-same-unfolded {
+    background: rgba(255, 255, 255, 0.03);
 }
 
 body.night-mode .diff-container {
