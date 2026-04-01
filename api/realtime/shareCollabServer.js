@@ -56,6 +56,29 @@ function initShareCollabServer(httpServer, shareManager) {
         });
     }
 
+    function findClientByViewerId(shareId, viewerId) {
+        const room = roomMap.get(shareId);
+        if (!room) return null;
+        for (const client of room) {
+            if (client && client.ctx && client.ctx.viewerId === viewerId) {
+                return client;
+            }
+        }
+        return null;
+    }
+
+    function getEditableClients(shareId, excludeViewerId) {
+        const room = roomMap.get(shareId);
+        if (!room) return [];
+        const result = [];
+        room.forEach(client => {
+            if (!client || client.readyState !== 1 || !client.ctx || !client.ctx.canEdit) return;
+            if (excludeViewerId && client.ctx.viewerId === excludeViewerId) return;
+            result.push(client);
+        });
+        return result;
+    }
+
     async function broadcastPresence(shareId) {
         const presenceResult = await shareManager.getSharePresence(shareId);
         if (presenceResult.code !== 200) return;
@@ -150,6 +173,170 @@ function initShareCollabServer(httpServer, shareManager) {
                 return;
             }
 
+            if (
+                payload.type === 'video_call_invite' ||
+                payload.type === 'video_call_response' ||
+                payload.type === 'video_signal' ||
+                payload.type === 'video_call_hangup'
+            ) {
+                if (!socket.ctx.canEdit) {
+                    socket.send(JSON.stringify({ type: 'error', code: 403, message: 'no edit permission for video call' }));
+                    return;
+                }
+
+                const targetViewerId = String(payload.target_viewer_id || '').trim();
+                if (!targetViewerId) {
+                    socket.send(JSON.stringify({ type: 'error', code: 400, message: 'missing target_viewer_id' }));
+                    return;
+                }
+
+                const targetClient = findClientByViewerId(socket.ctx.shareId, targetViewerId);
+                if (!targetClient || targetClient.readyState !== 1 || !targetClient.ctx || !targetClient.ctx.canEdit) {
+                    socket.send(JSON.stringify({
+                        type: 'video_call_unavailable',
+                        code: 404,
+                        target_viewer_id: targetViewerId,
+                        message: 'target unavailable'
+                    }));
+                    return;
+                }
+
+                const callId = String(payload.call_id || '').trim();
+
+                if (payload.type === 'video_call_invite') {
+                    targetClient.send(JSON.stringify({
+                        type: 'video_call_invite',
+                        call_id: callId,
+                        share_id: socket.ctx.shareId,
+                        from_viewer_id: socket.ctx.viewerId,
+                        from_viewer_name: socket.ctx.viewerName,
+                        from_can_edit: true
+                    }));
+                    return;
+                }
+
+                if (payload.type === 'video_call_response') {
+                    targetClient.send(JSON.stringify({
+                        type: 'video_call_response',
+                        call_id: callId,
+                        accepted: !!payload.accepted,
+                        reason: payload.reason ? String(payload.reason) : '',
+                        from_viewer_id: socket.ctx.viewerId,
+                        from_viewer_name: socket.ctx.viewerName
+                    }));
+                    return;
+                }
+
+                if (payload.type === 'video_call_hangup') {
+                    targetClient.send(JSON.stringify({
+                        type: 'video_call_hangup',
+                        call_id: callId,
+                        from_viewer_id: socket.ctx.viewerId,
+                        from_viewer_name: socket.ctx.viewerName
+                    }));
+                    return;
+                }
+
+                if (payload.type === 'video_signal') {
+                    targetClient.send(JSON.stringify({
+                        type: 'video_signal',
+                        call_id: callId,
+                        from_viewer_id: socket.ctx.viewerId,
+                        from_viewer_name: socket.ctx.viewerName,
+                        signal: payload.signal || null
+                    }));
+                    return;
+                }
+            }
+
+            if (
+                payload.type === 'video_room_join' ||
+                payload.type === 'video_room_leave' ||
+                payload.type === 'video_room_signal' ||
+                payload.type === 'video_sfu_join'
+            ) {
+                if (!socket.ctx.canEdit) {
+                    socket.send(JSON.stringify({ type: 'error', code: 403, message: 'no edit permission for group video call' }));
+                    return;
+                }
+
+                if (payload.type === 'video_room_join') {
+                    socket.ctx.videoRoomJoined = true;
+                    const participants = getEditableClients(socket.ctx.shareId, socket.ctx.viewerId).map(client => ({
+                        viewer_id: client.ctx.viewerId,
+                        viewer_name: client.ctx.viewerName
+                    }));
+
+                    socket.send(JSON.stringify({
+                        type: 'video_room_participants',
+                        room_id: socket.ctx.shareId,
+                        participants
+                    }));
+
+                    getEditableClients(socket.ctx.shareId, socket.ctx.viewerId).forEach(client => {
+                        client.send(JSON.stringify({
+                            type: 'video_room_peer_joined',
+                            room_id: socket.ctx.shareId,
+                            viewer_id: socket.ctx.viewerId,
+                            viewer_name: socket.ctx.viewerName
+                        }));
+                    });
+                    return;
+                }
+
+                if (payload.type === 'video_room_leave') {
+                    socket.ctx.videoRoomJoined = false;
+                    getEditableClients(socket.ctx.shareId, socket.ctx.viewerId).forEach(client => {
+                        client.send(JSON.stringify({
+                            type: 'video_room_peer_left',
+                            room_id: socket.ctx.shareId,
+                            viewer_id: socket.ctx.viewerId,
+                            viewer_name: socket.ctx.viewerName
+                        }));
+                    });
+                    return;
+                }
+
+                if (payload.type === 'video_sfu_join') {
+                    socket.send(JSON.stringify({
+                        type: 'video_sfu_entry',
+                        code: 200,
+                        room_id: socket.ctx.shareId,
+                        strategy: 'external_sfu',
+                        message: 'sfu entry placeholder'
+                    }));
+                    return;
+                }
+
+                if (payload.type === 'video_room_signal') {
+                    const targetViewerId = String(payload.target_viewer_id || '').trim();
+                    if (!targetViewerId) {
+                        socket.send(JSON.stringify({ type: 'error', code: 400, message: 'missing target_viewer_id' }));
+                        return;
+                    }
+
+                    const targetClient = findClientByViewerId(socket.ctx.shareId, targetViewerId);
+                    if (!targetClient || targetClient.readyState !== 1 || !targetClient.ctx || !targetClient.ctx.canEdit) {
+                        socket.send(JSON.stringify({
+                            type: 'video_call_unavailable',
+                            code: 404,
+                            target_viewer_id: targetViewerId,
+                            message: 'target unavailable'
+                        }));
+                        return;
+                    }
+
+                    targetClient.send(JSON.stringify({
+                        type: 'video_room_signal',
+                        room_id: socket.ctx.shareId,
+                        from_viewer_id: socket.ctx.viewerId,
+                        from_viewer_name: socket.ctx.viewerName,
+                        signal: payload.signal || null
+                    }));
+                    return;
+                }
+            }
+
             if (payload.type === 'sync_request') {
                 const latestResult = await shareManager.getSharedFile(socket.ctx.shareId, socket.ctx.password, {
                     editorUsername: socket.ctx.editorUsername,
@@ -219,6 +406,16 @@ function initShareCollabServer(httpServer, shareManager) {
         });
 
         socket.on('close', async () => {
+            if (socket.ctx && socket.ctx.videoRoomJoined) {
+                getEditableClients(shareId, socket.ctx.viewerId).forEach(client => {
+                    client.send(JSON.stringify({
+                        type: 'video_room_peer_left',
+                        room_id: shareId,
+                        viewer_id: socket.ctx.viewerId,
+                        viewer_name: socket.ctx.viewerName
+                    }));
+                });
+            }
             removeClientFromRoom(shareId, socket);
             await shareManager.updateSharePresence(shareId, viewerId, viewerName, false, socket.ctx ? socket.ctx.canEdit : false);
             await broadcastPresence(shareId);
