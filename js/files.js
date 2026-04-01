@@ -3353,8 +3353,10 @@
         });
         // 查找状态
         let matches = [];
+        let visibleMatches = [];
         let currentMatchIndex = -1;
         let searchText = '';
+        let activeHighlightOverlays = [];
         const findInput = dialog.querySelector('#findInput');
         const replaceInput = dialog.querySelector('#replaceInput');
         const findStatus = dialog.querySelector('#findStatus');
@@ -3539,6 +3541,7 @@
 
             const res = await smartFindInText(getCurrentEditorText(), searchText, { caseSensitive: false });
             matches = (res && res.code === 200 && res.data && Array.isArray(res.data.matches)) ? res.data.matches : [];
+            visibleMatches = findMatchesInVisibleText(searchText);
             if (matches.length === 0) {
                 findStatus.textContent = isEn() ? 'No matches found' : '未找到匹配内容';
                 findStatus.style.color = '#dc3545';
@@ -3581,13 +3584,22 @@
                 el.addEventListener('click', async function() {
                     const fileId = this.getAttribute('data-file-id');
                     const start = parseInt(this.getAttribute('data-start') || '0', 10);
-                    const end = parseInt(this.getAttribute('data-end') || '0', 10);
                     if (fileId && typeof global.openFile === 'function') {
                         await global.openFile(fileId);
-                        clearHighlights();
-                        matches = [{ start: start, end: end, snippet: this.textContent || '' }];
-                        currentMatchIndex = 0;
-                        highlightMatch(currentMatchIndex);
+                        await performFind();
+                        if (matches.length > 0) {
+                            let bestIndex = 0;
+                            let bestDistance = Math.abs((matches[0] && matches[0].start) - start);
+                            for (let i = 1; i < matches.length; i++) {
+                                const distance = Math.abs((matches[i] && matches[i].start) - start);
+                                if (distance < bestDistance) {
+                                    bestDistance = distance;
+                                    bestIndex = i;
+                                }
+                            }
+                            currentMatchIndex = bestIndex;
+                            highlightMatch(currentMatchIndex);
+                        }
                     }
                 });
             });
@@ -3610,31 +3622,82 @@
 
             renderWasmSearchResults(res.data);
         }
-        // 清除所有高亮标记
-        function clearAllHighlightMarks() {
+        function clearVisualHighlights() {
+            activeHighlightOverlays.forEach(function(el) {
+                if (el && el.parentNode) el.parentNode.removeChild(el);
+            });
+            activeHighlightOverlays = [];
+
+            const selection = window.getSelection();
+            if (selection) selection.removeAllRanges();
+        }
+
+        function normalizeSearchText(text) {
+            return String(text || '').toLocaleLowerCase();
+        }
+
+        function findMatchesInVisibleText(keyword) {
             const editorElement = getEditorElement();
-            if (!editorElement) return;
-            // 移除所有之前的高亮标记
-            const marks = editorElement.querySelectorAll('mark.find-highlight');
-            marks.forEach(mark => {
-                const parent = mark.parentNode;
-                if (parent) {
-                    parent.replaceChild(document.createTextNode(mark.textContent), mark);
-                    parent.normalize();
-                }
+            if (!editorElement) return [];
+
+            const originalText = editorElement.textContent || '';
+            const needle = String(keyword || '');
+            if (!needle) return [];
+
+            const source = normalizeSearchText(originalText);
+            const target = normalizeSearchText(needle);
+            const out = [];
+            let cursor = 0;
+
+            while (cursor <= source.length) {
+                const idx = source.indexOf(target, cursor);
+                if (idx === -1) break;
+                out.push({ start: idx, end: idx + needle.length });
+                cursor = idx + Math.max(1, needle.length);
+            }
+            return out;
+        }
+
+        function addRangeHighlightOverlay(range) {
+            const rects = Array.from(range.getClientRects());
+            rects.forEach(function(rect) {
+                if (!rect || rect.width <= 0 || rect.height <= 0) return;
+                const overlay = document.createElement('div');
+                overlay.className = 'find-highlight-overlay';
+                overlay.style.cssText = [
+                    'position:fixed',
+                    'left:' + rect.left + 'px',
+                    'top:' + rect.top + 'px',
+                    'width:' + rect.width + 'px',
+                    'height:' + rect.height + 'px',
+                    'background:rgba(255,235,59,0.55)',
+                    'border-radius:2px',
+                    'pointer-events:none',
+                    'z-index:10002'
+                ].join(';');
+                document.body.appendChild(overlay);
+                activeHighlightOverlays.push(overlay);
             });
         }
+
+        function pickHighlightByIndex(index) {
+            if (visibleMatches.length > index) return visibleMatches[index];
+            if (visibleMatches.length > 0) return visibleMatches[0];
+            return null;
+        }
+
         // 高亮匹配项
         function highlightMatch(index) {
             if (matches.length === 0 || index < 0 || index >= matches.length) return;
-            const match = matches[index];
             // 更新状态
             findStatus.textContent = (isEn() ? 'Match ' : '匹配 ') + (index + 1) + ' / ' + matches.length;
             try {
                 const editorElement = getEditorElement();
                 if (editorElement) {
-                    // 先清除之前的高亮
-                    clearAllHighlightMarks();
+                    const highlight = pickHighlightByIndex(index);
+                    if (!highlight) return;
+
+                    clearVisualHighlights();
                     // 创建范围并选择文本
                     const textNodes = [];
                     const walker = document.createTreeWalker(
@@ -3647,35 +3710,37 @@
                     let currentPos = 0;
                     while (node = walker.nextNode()) {
                         const nodeLength = node.textContent.length;
-                        if (currentPos + nodeLength > match.start && currentPos < match.end) {
+                        if (currentPos + nodeLength > highlight.start && currentPos < highlight.end) {
                             textNodes.push({
                                 node: node,
-                                start: Math.max(0, match.start - currentPos),
-                                end: Math.min(nodeLength, match.end - currentPos)
+                                start: Math.max(0, highlight.start - currentPos),
+                                end: Math.min(nodeLength, highlight.end - currentPos)
                             });
                         }
                         currentPos += nodeLength;
-                        if (currentPos > match.end) break;
+                        if (currentPos > highlight.end) break;
                     }
                     if (textNodes.length > 0) {
                         const range = document.createRange();
                         range.setStart(textNodes[0].node, textNodes[0].start);
                         range.setEnd(textNodes[textNodes.length - 1].node, textNodes[textNodes.length - 1].end);
-                        // 创建高亮标记
-                        const mark = document.createElement('mark');
-                        mark.className = 'find-highlight';
-                        mark.style.cssText = 'background:#ffeb3b;color:#000;padding:2px 0;border-radius:2px;';
                         let rect = null;
                         let targetNode = null;
                         try {
-                            range.surroundContents(mark);
-                            rect = mark.getBoundingClientRect();
-                            targetNode = mark;
-                        } catch (e) {
-                            // 如果 surroundContents 失败，使用选择方式
                             const selection = window.getSelection();
-                            selection.removeAllRanges();
-                            selection.addRange(range);
+                            if (selection) {
+                                selection.removeAllRanges();
+                                selection.addRange(range);
+                            }
+                            addRangeHighlightOverlay(range);
+                            rect = range.getBoundingClientRect();
+                            targetNode = textNodes[0].node.parentElement;
+                        } catch (e) {
+                            const selection = window.getSelection();
+                            if (selection) {
+                                selection.removeAllRanges();
+                                selection.addRange(range);
+                            }
                             rect = range.getBoundingClientRect();
                             targetNode = textNodes[0].node.parentElement;
                         }
@@ -3699,8 +3764,9 @@
         }
         // 清除高亮
         function clearHighlights() {
-            clearAllHighlightMarks();
+            clearVisualHighlights();
             matches = [];
+            visibleMatches = [];
             currentMatchIndex = -1;
         }
         // 查找下一个
@@ -3781,7 +3847,7 @@
         if (wasmSearchBtn) wasmSearchBtn.onclick = runWasmSearch;
         // 关闭对话框并清除高亮
         function closeFindDialog() {
-            clearAllHighlightMarks();
+            clearVisualHighlights();
             dialog.remove();
         }
         closeBtn.onclick = closeFindDialog;
