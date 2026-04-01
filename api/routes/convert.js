@@ -355,6 +355,12 @@ ${html}
 </html>`;
 }
 
+function normalizeDocxMarkdown(markdown) {
+    return String(markdown || '').replace(/```mermaid\n([\s\S]*?)```/g, (match, content) => {
+        return `\n> [Mermaid Diagram]\n>\n> ${String(content || '').trim().split('\n').join('\n> ')}\n`;
+    });
+}
+
 async function runPandocDocx(inputContent, options = {}) {
     const tempDir = await fsp.mkdtemp(path.join(os.tmpdir(), 'easypocketmd-docx-'));
     const inputFormat = options.inputFormat || 'markdown+task_lists+tex_math_dollars+tex_math_single_backslash+fenced_code_blocks+pipe_tables';
@@ -428,11 +434,19 @@ router.post('/docx', async (req, res) => {
             });
         }
 
-        const styledHtml = buildDocxStyledHtml(markdown, settings || {});
-        const docxBuffer = await runPandocDocx(styledHtml, {
-            referenceDocx,
-            inputFormat: 'html'
-        });
+        const docxSettings = settings || {};
+        const docxMathMode = String(docxSettings.docxMathMode || '').toLowerCase();
+        const useNativeMath = docxMathMode !== 'svg' && docxMathMode !== 'html';
+
+        const docxBuffer = useNativeMath
+            ? await runPandocDocx(normalizeDocxMarkdown(markdown), {
+                referenceDocx,
+                inputFormat: 'markdown+task_lists+tex_math_dollars+tex_math_single_backslash+fenced_code_blocks+pipe_tables'
+            })
+            : await runPandocDocx(buildDocxStyledHtml(markdown, docxSettings), {
+                referenceDocx,
+                inputFormat: 'html'
+            });
         const filename = `document_${new Date().toISOString().slice(0, 10)}.docx`;
 
         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
