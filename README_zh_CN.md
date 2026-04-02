@@ -1,120 +1,151 @@
 # EasyPocketMD
+![EasyPocketMD](readme/logo.png)
 
-极速，跨平台，易上手的 Markdown 编辑器，支持Windows/Linux/Android/ios以及网页端。
+**AI 驱动 · 极速 · 跨平台**
+
+<p align="center"><a href="README.md">English</a> &nbsp;|&nbsp; <a href="https://md.yhsun.cn/">DEMO</a></p>
+
+一款几乎零学习成本的 Markdown 编辑器：无需记忆语法，也能轻松插入格式化文本、LaTeX 公式和图表。配合智能搜索与 AI 助手，常用功能都能几步完成。
+
+实时协作、AI 辅助写作与流畅编辑体验，全部整合在美观的 Material Design 界面中。
+
+如果这个项目对你有帮助，欢迎点一个 ⭐ Star，这是对我非常重要的支持。
 
 [![Build and Deploy](https://github.com/sunhouy/EasyPocketMD/actions/workflows/deploy.yml/badge.svg)](https://github.com/sunhouy/EasyPocketMD/actions/workflows/deploy.yml)
 [![Build Android APK](https://github.com/sunhouy/EasyPocketMD/actions/workflows/build-android.yml/badge.svg)](https://github.com/sunhouy/EasyPocketMD/actions/workflows/build-android.yml)
 [![Build Electron App](https://github.com/sunhouy/EasyPocketMD/actions/workflows/build-electron.yml/badge.svg)](https://github.com/sunhouy/EasyPocketMD/actions/workflows/build-electron.yml)
 
-<p align="center"><a href="README.md">English</a> &nbsp;|&nbsp; <a href="https://md.yhsun.cn/">Demo</a></p>
+[![Python 3.6+](https://img.shields.io/badge/python-3.6+-blue.svg)](https://www.python.org/downloads/)
+[![Node.js](https://img.shields.io/badge/node.js-%3E%3D18.0.0-brightgreen.svg)](https://nodejs.org/)
 
-<br />
+## 📖 目录
+- [功能特性](#-功能特性)
+- [快速开始](#-快速开始)
+- [对比说明](#-对比说明)
+- [项目架构](#-项目架构)
+- [部署](#-部署)
+- [演示](#-演示)
+- [许可证](#-许可证)
 
-这个项目是我投入了大量时间和心血的作品，我希望它能真正帮助到大家。如果你觉得它有用，或者认可我的努力，请给一个 ⭐️ Star 支持我！你的每一个 Star 都是我持续改进的动力，也是对我最大的鼓励。
+## ✨ 功能特性
 
-## 优势
+### 🤖 AI 集成
 
-### 在任何地方使用 Markdown
+- AI 写作助手：支持写作、改写、自动排版，甚至可根据文档生成 PPT。
+![AI Writing Assistant](readme/aigenppt.gif)
+- 智能图表与公式：通过 AI 提示词生成 LaTeX 公式和图表，无需手写代码。
+![AI Charts & Formulas](readme/aigenformula.gif)
 
-无论是手机还是电脑，都可以使用 EasyPocketMD 来编辑 Markdown 文档。多平台界面采用统一的设计风格，给您一致的操作体验。
+### 👥 协作与沟通
 
-<div style="display: flex; justify-content: center; gap: 20px;">
-  <img src="readme/1_1.png" height="300px"/>
-  <img src="readme/1_2.png" height="300px"/>
-</div>
+- 实时协作：共享文档并流畅协同编辑。
+![Real-time Collaboration](readme/share.gif)
+- 加密视频通话：内置双人端到端加密视频通话，支持 IPv6 双栈网络。
+![Encrypted Video Call](readme/videocall.gif)
 
-### 零学习成本，直接上手
+### ✍️ 编辑体验
+- 三种预览模式：所见即所得、即时渲染、分屏预览。
+- 高效编辑：快速插入 Markdown、LaTeX 公式和图表；支持全文检索与文件差异对比。
+![Editing Experience](readme/insert.gif)
+- 版本控制：浏览历史记录并比较不同版本差异。
+![Version Control](readme/history.gif)
 
-不需记忆任何 Markdown 语法，底部的工具栏提供了常用的格式插入按钮，如加粗、斜体、标题、列表、引用、代码块、链接、图片等，一键即可插入。支持所见即所得 / 即时渲染 / 分屏预览三种操作模式，总有一个选择适合您。
 
-<div style="display: flex; justify-content: center; gap: 20px;">
-  <img src="readme/2_1.png" height="300px"/>
-  <img src="readme/2_2.png" height="300px"/>
-</div>
+### 🔗 兼容性与设计
+- 跨平台：在多种设备上保持一致且流畅的使用体验。
+![Cross Platform](readme/1_1.png)
+- 文件导入 / 导出：支持导入本地文档，导出为 TXT、DOC、PDF 等格式。
+- 云打印：通过云打印客户端实现远程打印。
+![Cloud Print](readme/cloudprint.gif)
+- 支持 Windows、Linux、Android 与 Web，并在各平台保持一致行为。
+- 现代化界面：简洁的 Material Design，支持日间/夜间模式。
 
-### 丰富的拓展支持
+## 🚀 快速开始
+### 环境要求
+- Node.js ≥ 18.0
+- Python ≥ 3.6
+- MySQL ≥ 5.7
+- Redis ≥ 6.0
+- npm ≥ 9.0
 
-编辑器极速渲染latex公式，mermaid图表，甚至是五线谱和化学方程式。编辑的文档可以直接导出HTML和PDF格式，并极其方便的设置您想要的格式。word能做的，这里都能做，并且更快，更轻量。您本地的txt和markdown文档可以直接导入，在这里继续编辑。
+### 安装
 
-<div style="display: flex; justify-content: center; gap: 20px;">
-  <img src="readme/3_1.png" height="300px"/>
-  <img src="readme/3_2.png" height="300px"/>
-</div>
-
-### 永不会担心文件丢失
-
-所有编辑的文档都将自动保存到本地数据库，如果登陆了账户，会自动与服务器同步，并跨设备同步所有内容。如果不同设备的文件冲突了，我们会提示您决定使用哪个版本。我们会实时保存您做的任何修改，即使突然关闭编辑器或重启电脑，也不会丢失任何数据。我们还会记录历史版本，您可以随时查看和恢复到之前的状态。
-
-<div style="display: flex; justify-content: center; gap: 20px;">
-  <img src="readme/4_1.png" height="300px"/>
-  <img src="readme/4_2.png" height="300px"/>
-</div>
-
-### 领先的云打印功能
-
-在装有打印机的电脑上安装云打印客户端，您可以在任何设备上使用云打印功能将文档打印出来。在手机上，您可以预览文档打印出后的状态，并进行所有配置。强大的AI智能排版功能更可以节省您的时间，让您只须聚焦文档的编写，剩下的交给我们。
-
-<div style="display: flex; justify-content: center; gap: 20px;">
-  <img src="readme/5_1.png" height="300px"/>
-  <img src="readme/5_2.png" height="300px"/>
-</div>
-
-### 强大的隐私保护
-
-您的文件和上传的任何内容都会加密存储在本地和服务器中。您可以分享文档，并进行访问时间和权限的管理。我们使用最新的库，并随时修复安全漏洞，确保您的隐私不被泄露。
-
-<div style="display: flex; justify-content: center; gap: 20px;">
-  <img src="readme/6_1.png" height="300px"/>
-  <img src="readme/6_2.png" height="300px"/>
-</div>
-
-### 高度个性化的体验
-
-底部工具栏的按钮，字体大小，是否显示大纲，日间/夜间模式，语言，都可以根据个人喜好进行设置。我们会保存您的选择，下次打开时自动应用。您可以在设置中随时修改这些选项。
-
-## 项目架构
-
-项目采用JavaScript+Python架构，后端使用nodejs实现，云打印服务端和云打印客户端使用Python实现。前端原生js开发，保障了优秀的性能。
-api/ 后端api接口
-assets/ Capacitor应用资源
-css/ 前端css样式
-js/ 前端js脚本
-print/ 云打印服务端和客户端代码
-scripts/ 部署脚本
-tests/ 测试脚本
-
-## 部署
-
-本网站通过Github Actions自动测试和部署。请在网页目录下添加.env文件存储敏感信息，格式如下。
-
-```
-DB_HOST=数据库地址
-DB_PORT=数据库端口
-DB_USER=数据库用户名
-DB_PASSWORD=数据库密码
-DB_NAME=数据库名
-ADMIN_USER=管理员用户名
-ADMIN_PASSWORD=管理员密码
-BASE_URL=网站域名，例如https://md.yhsun.cn
-
-# Redis 配置（可选，用于文件缓存）
-REDIS_HOST=localhost
-REDIS_PORT=6379
-REDIS_PASSWORD=
-REDIS_DB=0
-```
-
-每次push都会触发自动构建上传代码到服务器，electron应用安卓应用通过打tag触发：
+1. 克隆仓库
 ```bash
-git tag v1.3
-git push origin v1.3
+git clone https://github.com/sunhouy/EasyPocketMD.git
+cd md
 ```
 
-## Demo
+2. 安装 Node.js 依赖
+```bash
+npm install
+```
+
+3. 复制示例配置文件并按需修改：
+```
+cp .env.example .env
+```
+
+4. 初始化数据库
+创建 MySQL 数据库和数据表（结构见 db.sql），并确保 Redis 已运行。
+
+5. 构建前端
+```bash
+npm run build
+```
+
+6. 启动应用
+```bash
+npm start
+```
+生产环境（使用 PM2）：
+```bash
+npm install -g pm2
+pm2 start api/server.js --name "easypocketmd"
+```
+
+
+## 📊 对比说明
+
+| 功能                         | **本项目** | Typora | Obsidian | Notion | VS Code | Joplin                 |
+|-----------------------------|-----------|--------|----------|--------|---------|------------------------|
+| **数据隐私**                 | 🔒 本地 + 云端 | 本地 | 本地 | 仅云端 | 本地 | 本地 + 可选云同步 |
+| **AI 写作助手**              | ✅ 原生支持 | ❌ | ❌（插件） | ❌ | ❌（插件） | ❌                      |
+| **AI 图表与公式**            | ✅ 原生支持 | ❌ | ❌ | ❌ | ❌ | ❌                      |
+| **AI 生成 PPT**             | ✅ 原生支持 | ❌ | ❌ | ❌ | ❌ | ❌                      |
+| **移动端体验**               | 📱 一流体验 | 基础 | 基础 | 良好 | 无 | 基础                  |
+| **实时协作**                 | ✅ E2EE 加密 | ❌ | ❌ | ✅ | ✅（Live Share） | ❌                      |
+| **加密视频通话**             | ✅ 内置 | ❌ | ❌ | ❌ | ❌ | ❌                      |
+| **云打印**                   | ✅ 原生支持 | ❌ | ❌ | ❌ | ❌ | ❌                      |
+| **价格**                     | 免费 / 开源 | 一次性 $15 | 免费 / $50/年同步 | 免费版 | 免费 | 免费                   |
+
+
+## 🏗️ 项目架构
+
+项目采用 JavaScript + Python 架构。后端由 Node.js 实现，云打印服务端与客户端由 Python 实现。前端基于原生 JavaScript 开发，以保证优秀性能。
+```
+api/     后端 API 接口
+assets/  Capacitor 应用资源
+css/     前端 CSS 样式
+js/      前端 JavaScript 脚本
+print/   云打印服务端与客户端代码
+scripts/ 部署脚本
+tests/   测试脚本
+```
+
+## 🎬 演示
 
 <https://md.yhsun.cn/>
-`测试账号test，测试密码123456`
 
-## 联系
-
+## 📧 联系方式
 `18763177732@139.com`
+
+## 📄 许可证
+本项目基于 MIT License 开源。
+
+## 🙌 致谢
+基于现代 Web 技术与开源工具构建，向所有贡献者致敬。
+
+非常感谢所有让 EasyPocketMD 成为可能的开源项目及其贡献者。
+
+完整依赖与许可证清单请见 [DEPENDENCIES.md](./DEPENDENCIES.md)。

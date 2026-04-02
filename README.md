@@ -1,4 +1,5 @@
-# ✍️ EasyPocketMD
+# EasyPocketMD
+![EasyPocketMD](readme/logo.png)
 
 **AI powered · Superfast · Cross Platform**
 
@@ -31,36 +32,31 @@ If you find this useful, please ⭐ star the repo – it means a lot to me.
 ### 🤖 AI Integration
 
 - AI Writing Assistant – Help write, rewrite, auto-format, and even generate PPT slides from your document.
-
+![AI Writing Assistant](readme/aigenppt.gif)
 - Smart Charts & Formulas – Generate LaTeX formulas and diagrams with AI prompts — no manual coding required.
-<div style="display: flex; justify-content: center; gap: 20px;">
-  <img src="readme/1_1.png" height="300px"/>
-  <img src="readme/1_2.png" height="300px"/>
-</div>
+![AI Charts & Formulas](readme/aigenformula.gif)
 
 ### 👥 Collaboration & Communication
 
 - Real-time Collaboration – Share documents and work together seamlessly.
-
+![Real-time Collaboration](readme/share.gif)
 - Encrypted Video Call – Built-in two-person encrypted video call with dual-stack IPv6 support.
-<div style="display: flex; justify-content: center; gap: 20px;">
-  <img src="readme/2_1.png" height="300px"/>
-  <img src="readme/2_2.png" height="300px"/>
-</div>
+![Encrypted Video Call](readme/videocall.gif)
 
 ### ✍️ Editing Experience
 - Three Preview Modes – WYSIWYG, live rendering, and split-screen preview.
 - Efficient Editing – Quick insertion of Markdown, LaTeX formulas, and charts. Full-text search and file diff support.
+![Editing Experience](readme/insert.gif)
 - Version Control – Browse history and compare differences between versions.
-<div style="display: flex; justify-content: center; gap: 20px;">
-  <img src="readme/3_1.png" height="300px"/>
-  <img src="readme/3_2.png" height="300px"/>
-</div>
+![Version Control](readme/history.gif)
+
 
 ### 🔗 Compatibility & Design
 - Cross Platform – Works seamlessly across devices.
+![Cross Platform](readme/1_1.png)
 - File Import / Export – Import local documents; export to TXT, DOC, PDF, and more.
 - Cloud Print – Print remotely via the cloud print client.
+![Cloud Print](readme/cloudprint.gif)
 - Available on Windows, Linux, Android and the web — with consistent behavior across all platforms.
 - Modern UI – Clean Material Design with day/night mode support.
 
@@ -108,7 +104,6 @@ npm install -g pm2
 pm2 start api/server.js --name "easypocketmd"
 ```
 
-7. Cloud Printing Service
 
 ## 📊 How We Compare
 
@@ -137,10 +132,6 @@ print/   Cloud printing server and client code
 scripts/ Deployment scripts
 tests/   Test scripts
 ```
-## 🌐 Deployment
-
-This website is automatically tested and deployed via GitHub Actions. Following Repository secrets are required for deployment:
-
 
 ## 🎬 Demo
 
