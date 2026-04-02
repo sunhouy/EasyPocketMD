@@ -3550,6 +3550,7 @@
         const wasmSearchResults = dialog.querySelector('#wasmSearchResults');
         const toggleCrossSearchBtn = dialog.querySelector('#toggleCrossSearchBtn');
         let isCrossSearchCollapsed = false;
+        const shouldAutoFocusFindInput = !/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
         const gateway = global.wasmTextEngineGateway;
         const smartEngineAvailable = gateway && typeof gateway.ensureReady === 'function';
@@ -3709,8 +3710,10 @@
             if (vditor.vditor.sv) return vditor.vditor.sv.element;
             return null;
         }
-        // 聚焦输入框
-        setTimeout(() => findInput.focus(), 100);
+        // 桌面端保持打开后自动聚焦，移动端由用户手动点输入框唤起键盘
+        if (shouldAutoFocusFindInput) {
+            setTimeout(() => findInput.focus(), 100);
+        }
         // 执行查找
         async function performFind() {
             searchText = findInput.value.trim();
@@ -3925,9 +3928,11 @@
                                 highlightMatch(index, false);
                             }, 90);
                         }
-                        findInput.focus();
-                        if (typeof inputSelStart === 'number' && typeof inputSelEnd === 'number') {
-                            findInput.setSelectionRange(inputSelStart, inputSelEnd);
+                        if (shouldAutoFocusFindInput) {
+                            findInput.focus();
+                            if (typeof inputSelStart === 'number' && typeof inputSelEnd === 'number') {
+                                findInput.setSelectionRange(inputSelStart, inputSelEnd);
+                            }
                         }
                         return;
                     }
@@ -3980,10 +3985,12 @@
                             }
                         }
 
-                        // Keep typing focus in find box; do not move caret into editor content.
-                        findInput.focus();
-                        if (typeof inputSelStart === 'number' && typeof inputSelEnd === 'number') {
-                            findInput.setSelectionRange(inputSelStart, inputSelEnd);
+                        // Keep typing focus in find box on desktop; mobile should not pop the keyboard on button taps.
+                        if (shouldAutoFocusFindInput) {
+                            findInput.focus();
+                            if (typeof inputSelStart === 'number' && typeof inputSelEnd === 'number') {
+                                findInput.setSelectionRange(inputSelStart, inputSelEnd);
+                            }
                         }
                     }
                 }
