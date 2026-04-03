@@ -1,5 +1,5 @@
 # EasyPocketMD
-![EasyPocketMD](readme/logo.png)
+![EasyPocketMD](assets/readme/logo.png)
 
 **AI 驱动 · 极速 · 跨平台**
 

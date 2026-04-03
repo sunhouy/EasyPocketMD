@@ -3624,6 +3624,19 @@
         const secondaryTextColor = nightMode ? '#aaa' : '#666';
         const borderColor = nightMode ? '#444' : '#ddd';
         const inputBg = nightMode ? '#3d3d3d' : '#f5f5f5';
+        const isCompactMobile = window.innerWidth <= 768;
+        const dialogTop = isCompactMobile ? 58 : 72;
+        const dialogRight = isCompactMobile ? 10 : 24;
+        const dialogWidth = isCompactMobile ? 'min(94vw, 320px)' : '336px';
+        const dialogPadding = isCompactMobile ? '12px' : '14px';
+        const titleSize = isCompactMobile ? '14px' : '15px';
+        const baseFontSize = isCompactMobile ? '12px' : '13px';
+        const statusFontSize = isCompactMobile ? '11px' : '12px';
+        const inputPadding = isCompactMobile ? '7px 10px' : '8px 10px';
+        const buttonPadding = isCompactMobile ? '5px 10px' : '6px 10px';
+        const sectionGap = isCompactMobile ? '8px' : '10px';
+        const compactRadius = isCompactMobile ? '5px' : '6px';
+        const wasmResultMaxHeight = isCompactMobile ? '130px' : '160px';
         // 如果已存在查找框，先移除
         const existingModal = document.getElementById('findDialogModal');
         if (existingModal) {
@@ -3632,42 +3645,42 @@
         // 仅窗口本身使用半透明蒙版效果，不遮挡整个页面
         const dialog = document.createElement('div');
         dialog.id = 'findDialogModal';
-        dialog.style.cssText = 'position:fixed;top:80px;right:40px;background:' + (nightMode ? 'rgba(45,45,45,0.92)' : 'rgba(255,255,255,0.9)') + ';color:' + textColor + ';border-radius:12px;padding:20px;width:380px;box-shadow:0 8px 28px rgba(0,0,0,0.28);z-index:10001;border:1px solid ' + borderColor + ';display:flex;flex-direction:column;';
+        dialog.style.cssText = 'position:fixed;top:' + dialogTop + 'px;right:' + dialogRight + 'px;background:' + (nightMode ? 'rgba(45,45,45,0.92)' : 'rgba(255,255,255,0.9)') + ';color:' + textColor + ';border-radius:10px;padding:' + dialogPadding + ';width:' + dialogWidth + ';max-height:78vh;overflow:auto;box-shadow:0 6px 22px rgba(0,0,0,0.24);z-index:10001;border:1px solid ' + borderColor + ';display:flex;flex-direction:column;';
         dialog.innerHTML =
-            '<div id="findDialogHeader" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;cursor:move;user-select:none;touch-action:none;">' +
-                '<h3 style="margin:0;font-size:16px;">' + (isEn() ? 'Find and Replace' : '查找和替换') + '</h3>' +
-                '<button id="closeFindBtn" style="background:none;border:none;font-size:20px;cursor:pointer;color:' + secondaryTextColor + ';padding:0;">&times;</button>' +
+            '<div id="findDialogHeader" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:' + sectionGap + ';cursor:move;user-select:none;touch-action:none;">' +
+                '<h3 style="margin:0;font-size:' + titleSize + ';">' + (isEn() ? 'Find and Replace' : '查找和替换') + '</h3>' +
+                '<button id="closeFindBtn" style="background:none;border:none;font-size:18px;cursor:pointer;color:' + secondaryTextColor + ';padding:0;line-height:1;">&times;</button>' +
             '</div>' +
-            '<div style="margin-bottom:10px;display:flex;align-items:center;gap:8px;">' +
-                '<button id="toggleReplaceBtn" style="background:none;border:none;cursor:pointer;color:' + secondaryTextColor + ';padding:4px;font-size:14px;transition:transform 0.2s;">' +
+            '<div style="margin-bottom:' + sectionGap + ';display:flex;align-items:center;gap:6px;">' +
+                '<button id="toggleReplaceBtn" style="background:none;border:none;cursor:pointer;color:' + secondaryTextColor + ';padding:2px;font-size:13px;transition:transform 0.2s;">' +
                     '<i class="fas fa-chevron-right" id="toggleReplaceIcon"></i>' +
                 '</button>' +
                 '<input type="text" id="findInput" placeholder="' + (isEn() ? 'Enter search text...' : '输入查找内容...') + '" ' +
-                    'style="flex:1;padding:8px 12px;border:1px solid ' + borderColor + ';border-radius:6px;font-size:13px;background:' + inputBg + ';color:' + textColor + ';box-sizing:border-box;outline:none;">' +
+                    'style="flex:1;padding:' + inputPadding + ';border:1px solid ' + borderColor + ';border-radius:' + compactRadius + ';font-size:' + baseFontSize + ';background:' + inputBg + ';color:' + textColor + ';box-sizing:border-box;outline:none;">' +
             '</div>' +
-            '<div id="replaceContainer" style="margin-bottom:15px;display:none;">' +
+            '<div id="replaceContainer" style="margin-bottom:' + sectionGap + ';display:none;">' +
                 '<input type="text" id="replaceInput" placeholder="' + (isEn() ? 'Enter replacement...' : '输入替换内容...') + '" ' +
-                    'style="width:100%;padding:8px 12px;border:1px solid ' + borderColor + ';border-radius:6px;font-size:13px;background:' + inputBg + ';color:' + textColor + ';box-sizing:border-box;outline:none;">' +
+                    'style="width:100%;padding:' + inputPadding + ';border:1px solid ' + borderColor + ';border-radius:' + compactRadius + ';font-size:' + baseFontSize + ';background:' + inputBg + ';color:' + textColor + ';box-sizing:border-box;outline:none;">' +
             '</div>' +
-            '<div id="replaceButtonsContainer" style="display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;margin-bottom:10px;display:none;">' +
-                '<button id="replaceBtn" style="padding:6px 12px;background:' + (nightMode ? '#3d3d3d' : '#f0f0f0') + ';color:' + textColor + ';border:1px solid ' + borderColor + ';border-radius:6px;cursor:pointer;font-size:12px;">' + (isEn() ? 'Replace' : '替换') + '</button>' +
-                '<button id="replaceAllBtn" style="padding:6px 12px;background:' + (nightMode ? '#3d3d3d' : '#f0f0f0') + ';color:' + textColor + ';border:1px solid ' + borderColor + ';border-radius:6px;cursor:pointer;font-size:12px;">' + (isEn() ? 'Replace All' : '全部替换') + '</button>' +
+            '<div id="replaceButtonsContainer" style="display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end;margin-bottom:' + sectionGap + ';display:none;">' +
+                '<button id="replaceBtn" style="padding:' + buttonPadding + ';background:' + (nightMode ? '#3d3d3d' : '#f0f0f0') + ';color:' + textColor + ';border:1px solid ' + borderColor + ';border-radius:' + compactRadius + ';cursor:pointer;font-size:12px;">' + (isEn() ? 'Replace' : '替换') + '</button>' +
+                '<button id="replaceAllBtn" style="padding:' + buttonPadding + ';background:' + (nightMode ? '#3d3d3d' : '#f0f0f0') + ';color:' + textColor + ';border:1px solid ' + borderColor + ';border-radius:' + compactRadius + ';cursor:pointer;font-size:12px;">' + (isEn() ? 'Replace All' : '全部替换') + '</button>' +
             '</div>' +
-            '<div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;margin-bottom:10px;">' +
-                '<button id="findBtn" style="padding:6px 12px;background:' + (nightMode ? '#4a90e2' : '#4a90e2') + ';color:white;border:none;border-radius:6px;cursor:pointer;font-size:12px;">' + (isEn() ? 'Find' : '查找') + '</button>' +
-                '<button id="findPrevBtn" style="padding:6px 12px;background:' + (nightMode ? '#4a90e2' : '#4a90e2') + ';color:white;border:none;border-radius:6px;cursor:pointer;font-size:12px;">' + (isEn() ? 'Prev' : '上一个') + '</button>' +
-                '<button id="findNextBtn" style="padding:6px 12px;background:' + (nightMode ? '#4a90e2' : '#4a90e2') + ';color:white;border:none;border-radius:6px;cursor:pointer;font-size:12px;">' + (isEn() ? 'Next' : '下一个') + '</button>' +
+            '<div style="display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end;margin-bottom:' + sectionGap + ';">' +
+                '<button id="findBtn" style="padding:' + buttonPadding + ';background:' + (nightMode ? '#4a90e2' : '#4a90e2') + ';color:white;border:none;border-radius:' + compactRadius + ';cursor:pointer;font-size:12px;">' + (isEn() ? 'Find' : '查找') + '</button>' +
+                '<button id="findPrevBtn" style="padding:' + buttonPadding + ';background:' + (nightMode ? '#4a90e2' : '#4a90e2') + ';color:white;border:none;border-radius:' + compactRadius + ';cursor:pointer;font-size:12px;">' + (isEn() ? 'Prev' : '上一个') + '</button>' +
+                '<button id="findNextBtn" style="padding:' + buttonPadding + ';background:' + (nightMode ? '#4a90e2' : '#4a90e2') + ';color:white;border:none;border-radius:' + compactRadius + ';cursor:pointer;font-size:12px;">' + (isEn() ? 'Next' : '下一个') + '</button>' +
             '</div>' +
-            '<div id="findStatus" style="font-size:12px;color:' + secondaryTextColor + ';"></div>' +
-            '<div id="wasmSearchPanel" style="margin-top:12px;border-top:1px solid ' + borderColor + ';padding-top:10px;display:none;">' +
+            '<div id="findStatus" style="font-size:' + statusFontSize + ';color:' + secondaryTextColor + ';"></div>' +
+            '<div id="wasmSearchPanel" style="margin-top:' + sectionGap + ';border-top:1px solid ' + borderColor + ';padding-top:' + sectionGap + ';display:none;">' +
                 '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">' +
-                    '<span style="font-size:12px;color:' + secondaryTextColor + ';">' + (isEn() ? 'Cross-file search' : '跨文件搜索') + '</span>' +
+                    '<span style="font-size:' + statusFontSize + ';color:' + secondaryTextColor + ';">' + (isEn() ? 'Cross-file search' : '跨文件搜索') + '</span>' +
                     '<div style="display:flex;align-items:center;gap:6px;">' +
-                        '<button id="toggleCrossSearchBtn" style="padding:4px 8px;background:none;color:' + secondaryTextColor + ';border:1px solid ' + borderColor + ';border-radius:6px;cursor:pointer;font-size:12px;">' + (isEn() ? 'Collapse' : '收起') + '</button>' +
-                        '<button id="wasmSearchBtn" style="padding:4px 10px;background:' + (nightMode ? '#3d3d3d' : '#f0f0f0') + ';color:' + textColor + ';border:1px solid ' + borderColor + ';border-radius:6px;cursor:pointer;font-size:12px;">' + (isEn() ? 'Search Files' : '搜索文件') + '</button>' +
+                        '<button id="toggleCrossSearchBtn" style="padding:4px 8px;background:none;color:' + secondaryTextColor + ';border:1px solid ' + borderColor + ';border-radius:' + compactRadius + ';cursor:pointer;font-size:12px;">' + (isEn() ? 'Collapse' : '收起') + '</button>' +
+                        '<button id="wasmSearchBtn" style="padding:4px 10px;background:' + (nightMode ? '#3d3d3d' : '#f0f0f0') + ';color:' + textColor + ';border:1px solid ' + borderColor + ';border-radius:' + compactRadius + ';cursor:pointer;font-size:12px;">' + (isEn() ? 'Search Files' : '搜索文件') + '</button>' +
                     '</div>' +
                 '</div>' +
-                '<div id="wasmSearchResults" style="max-height:180px;overflow:auto;font-size:12px;"></div>' +
+                '<div id="wasmSearchResults" style="max-height:' + wasmResultMaxHeight + ';overflow:auto;font-size:' + statusFontSize + ';"></div>' +
             '</div>';
         document.body.appendChild(dialog);
         // 拖动逻辑（支持鼠标和触摸）

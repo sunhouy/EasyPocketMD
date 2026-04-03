@@ -3,6 +3,16 @@
     -webkit-tap-highlight-color: transparent;
 }
 
+:root {
+    --top-toolbar-height: 46px;
+    --top-toolbar-padding-x: 10px;
+    --top-toolbar-offset: 0px;
+    --top-toolbar-notice-offset: 40px;
+    --top-toolbar-btn-size: 32px;
+    --top-toolbar-btn-gap: 6px;
+    --top-toolbar-btn-top: calc(var(--top-toolbar-offset) + (var(--top-toolbar-height) - var(--top-toolbar-btn-size)) / 2);
+}
+
 body {
     margin: 0;
     padding: 0;
@@ -93,17 +103,20 @@ body.has-top-notice .editor-container {
     top: calc(50px + 40px);
 }
 
+body.has-top-notice {
+    --top-toolbar-offset: var(--top-toolbar-notice-offset);
+}
+
 body.has-top-notice .mobile-toolbar-container {
-    top: 40px;
+    top: var(--top-toolbar-offset);
 }
 
 body.has-top-notice .sync-status {
-    top: calc(70px + 40px);
+    top: calc(70px + var(--top-toolbar-notice-offset));
 }
 
-body.has-top-notice .editor-mode-toggle,
-body.has-top-notice .editor-save-btn {
-    top: calc(7px + 40px);
+body.has-top-notice .custom-fullscreen-btn {
+    top: var(--top-toolbar-btn-top);
 }
 
 #vditor {
@@ -115,33 +128,42 @@ body.has-top-notice .editor-save-btn {
 
 .mobile-toolbar-container {
     position: fixed;
-    top: 0;
+    top: var(--top-toolbar-offset);
     left: 0;
     right: 0;
     background: white;
     z-index: 1002;
-    padding: 5px 15px;
+    padding: 4px var(--top-toolbar-padding-x);
     border-bottom: 1px solid #eaeaea;
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
     transition: all 0.3s ease;
-    height: 50px;
+    height: var(--top-toolbar-height);
 }
 
 .mobile-toolbar {
+    position: relative;
     display: flex;
-    justify-content: flex-start;
+    justify-content: space-between;
     align-items: center;
     width: 100%;
-    gap: 8px;
+    height: 100%;
 }
 
-.mobile-toolbar .mobile-dropdown {
-    margin-left: auto;
+.toolbar-left-actions,
+.toolbar-right-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--top-toolbar-btn-gap);
+    z-index: 1004;
+}
+
+.toolbar-right-actions .mobile-dropdown {
+    margin-left: 0;
 }
 
 .mobile-action-btn {
-    width: 36px;
-    height: 36px;
+    width: var(--top-toolbar-btn-size);
+    height: var(--top-toolbar-btn-size);
     border-radius: 50%;
     background: rgba(255, 255, 255, 0.9);
     border: none;
@@ -149,8 +171,8 @@ body.has-top-notice .editor-save-btn {
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 16px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    font-size: 14px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
     z-index: 1003 !important;
     transition: all 0.3s ease;
     color: #333;
@@ -219,7 +241,7 @@ body.has-top-notice .editor-save-btn {
 .mobile-dropdown-content {
     display: none;
     position: absolute;
-    top: 50px;
+    top: calc(var(--top-toolbar-btn-size) + 10px);
     right: 0;
     left: auto;
     background: white;
@@ -1299,43 +1321,15 @@ body.night-mode {
 }
 
 .editor-mode-toggle {
-    position: fixed;
-    top: 7px;
-    right: 60px;
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
-    background: rgba(255, 255, 255, 0.9);
-    border: none;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 16px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-    z-index: 1003 !important;
-    transition: all 0.3s ease;
-    color: #333;
+    position: relative;
+    top: auto;
+    right: auto;
 }
 
 .editor-save-btn {
-    position: fixed;
-    top: 7px;
-    right: 103px;
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
-    background: rgba(255, 255, 255, 0.9);
-    border: none;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 16px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-    z-index: 1003 !important;
-    transition: all 0.3s ease;
-    color: #333;
+    position: relative;
+    top: auto;
+    right: auto;
 }
 
 .editor-mode-toggle:hover,
@@ -1471,10 +1465,10 @@ body.night-mode .vditor-toolbar__item:hover {
 
 .custom-fullscreen-btn {
     position: fixed;
-    top: 7px;
-    right: 7px;
-    width: 36px;
-    height: 36px;
+    top: var(--top-toolbar-btn-top);
+    right: var(--top-toolbar-padding-x);
+    width: var(--top-toolbar-btn-size);
+    height: var(--top-toolbar-btn-size);
     border-radius: 50%;
     background: rgba(255, 255, 255, 0.9);
     border: none;
