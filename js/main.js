@@ -19,6 +19,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     var isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
     var isCapacitor = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+    window.isMobileEditorEnvironment = isMobile || isCapacitor;
     if (isCapacitor) {
         document.body.classList.add('is-capacitor');
     }
@@ -296,7 +297,7 @@ document.addEventListener('DOMContentLoaded', function() {
         toolbar: ['emoji', 'br', 'bold', 'italic', 'strike', '|', 'line', 'quote', 'list', 'ordered-list', 'check', 'outdent', 'indent', 'code', 'inline-code', 'insert-after', 'insert-before', 'upload', 'link', 'table', 'record', 'edit-mode', 'both', 'preview', 'fullscreen', 'outline', 'code-theme', 'content-theme', 'export', 'info', 'help', 'br'],
         customWysiwygToolbar: function() {}, // 修复报错
         theme: window.nightMode ? 'dark' : 'classic',
-        mode: localStorage.getItem('vditor_editor_mode') || 'wysiwyg',
+        mode: localStorage.getItem('vditor_editor_mode') || (window.isMobileEditorEnvironment ? 'ir' : 'wysiwyg'),
         cache: { enable: true, id: 'vditor-mobile-optimized' },
         outline: { enable: window.userSettings.showOutline },
         hint: { emoji: {} },
@@ -357,9 +358,12 @@ document.addEventListener('DOMContentLoaded', function() {
                             window.draftRecovery.markDirty();
                         }
                     }
-                    // ECharts 懒加载：只在用户点击图表或滚动到可见区域时渲染
-                    // 不再在每次输入时自动渲染，提升编辑性能
-                    // 处理图片懒加载
+
+                    if (window.isMobileEditorEnvironment) {
+                        return;
+                    }
+
+                    // 桌面端再做图片懒处理，避免移动端输入时额外抢占主线程
                     setTimeout(function() {
                         if (window.LazyImageLoader && window.LazyImageLoader.processVditorImages) {
                             window.LazyImageLoader.processVditorImages();

@@ -2710,14 +2710,15 @@
 
     function startAutoSave() {
         global.clearAutoSave();
-        // 缩短自动保存间隔到 1 秒，更快保存到 localStorage
+        // 移动端适当拉长保存间隔，减少输入过程中对主线程的占用。
+        var delay = global.isMobileEditorEnvironment ? 2500 : 1000;
         global.autoSaveTimer = setTimeout(function() {
             global.saveCurrentFile();
             // 保存后清除草稿（因为已经正式保存了）
             if (global.draftRecovery) {
                 global.draftRecovery.clearDraft();
             }
-        }, 1000);
+        }, delay);
     }
 
     function clearAutoSave() {
