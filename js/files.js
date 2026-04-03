@@ -3812,11 +3812,44 @@
             return { code: 200, message: 'ok', data: { query: keyword, count: out.length, matches: out } };
         }
 
+        function isHiddenCrossSearchFile(filename) {
+            const name = String(filename || '').trim();
+            if (!name) return false;
+            return /(^|[\\/])\.[^\\/]/.test(name);
+        }
+
+        function filterCrossSearchVisibleData(data) {
+            const rows = (data && Array.isArray(data.files)) ? data.files : [];
+            const visibleRows = [];
+            let totalMatches = 0;
+
+            rows.forEach(function(item) {
+                if (!item || isHiddenCrossSearchFile(item.filename)) return;
+                const hits = Array.isArray(item.hits) ? item.hits : [];
+                const matchCount = hits.length;
+                totalMatches += matchCount;
+                visibleRows.push({
+                    docId: item.docId,
+                    filename: item.filename || '',
+                    matchCount: matchCount,
+                    hits: hits
+                });
+            });
+
+            return {
+                query: data && data.query ? data.query : '',
+                files: visibleRows,
+                fileCount: visibleRows.length,
+                totalMatches: totalMatches
+            };
+        }
+
         function jsSearchFilesDetailed(query, options) {
             const rows = [];
             let totalMatches = 0;
             (g('files') || []).forEach(function(file) {
                 if (!file || file.type !== 'file') return;
+                if (isHiddenCrossSearchFile(file.name)) return;
                 const res = jsFindInText(file.content || '', query || '', options || {});
                 const list = res && res.data && Array.isArray(res.data.matches) ? res.data.matches : [];
                 if (list.length === 0) return;
@@ -3969,15 +4002,16 @@
 
         function renderWasmSearchResults(data) {
             if (!wasmSearchResults) return;
-            const rows = (data && Array.isArray(data.files)) ? data.files : [];
-            if (rows.length === 0 || !data.totalMatches) {
+            const visibleData = filterCrossSearchVisibleData(data || {});
+            const rows = visibleData.files;
+            if (rows.length === 0 || !visibleData.totalMatches) {
                 wasmSearchResults.innerHTML = '<div style="color:' + secondaryTextColor + ';">' + (isEn() ? 'No file matches' : '没有匹配文件') + '</div>';
                 return;
             }
 
             let html = '<div style="margin-bottom:8px;color:' + secondaryTextColor + ';">' +
-                (isEn() ? 'Matched files: ' : '匹配文件数：') + data.fileCount + '，' +
-                (isEn() ? 'total matches: ' : '总匹配数：') + data.totalMatches +
+                (isEn() ? 'Matched files: ' : '匹配文件数：') + visibleData.fileCount + '，' +
+                (isEn() ? 'total matches: ' : '总匹配数：') + visibleData.totalMatches +
                 '</div>';
 
             rows.forEach(function(item, rowIndex) {
@@ -4048,7 +4082,7 @@
                 return;
             }
 
-            renderWasmSearchResults(res.data);
+            renderWasmSearchResults(filterCrossSearchVisibleData(res.data));
         }
         function clearVisualHighlights() {
             // Use native selection highlight only; no custom overlay nodes.
