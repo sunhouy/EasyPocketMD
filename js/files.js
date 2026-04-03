@@ -3067,46 +3067,104 @@
     }
 
     /**
-     * 导入本地文件到文件列表
+     * 导入本地文件到文件列表（支持 markdown/ppt/doc/xls）
      */
     global.importFiles = function() {
+        var nightMode = g('nightMode') === true;
+        var bg = nightMode ? '#2d2d2d' : 'white';
+        var textColor = nightMode ? '#eee' : '#333';
+        var subColor = nightMode ? '#aaa' : '#666';
+        var borderColor = nightMode ? '#444' : '#ddd';
+
+        var modal = document.createElement('div');
+        modal.className = 'modal-overlay';
+        modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:10001;';
+
+        var container = document.createElement('div');
+        container.style.cssText = 'background:' + bg + ';color:' + textColor + ';border-radius:12px;padding:20px;width:92%;max-width:460px;';
+
+        var currentFolder = '';
+        if (g('currentFileId')) {
+            var currentNode = g('files').find(function(f) { return f.id === g('currentFileId'); });
+            if (currentNode && currentNode.type === 'file') {
+                currentFolder = getParentPath(currentNode.name);
+            }
+        }
+
+        var folderOptions = getAllFolderPaths().map(function(path) {
+            var label = path || (isEn() ? 'Root' : '根目录');
+            var selected = path === currentFolder ? ' selected' : '';
+            return '<option value="' + global.escapeHtml(path) + '"' + selected + '>' + global.escapeHtml(label) + '</option>';
+        }).join('');
+
+        container.innerHTML =
+            '<h3 style="margin:0 0 10px 0;">' + (isEn() ? 'Import Files' : '导入文件') + '</h3>' +
+            '<div style="font-size:13px;color:' + subColor + ';margin-bottom:14px;">' +
+                (isEn() ? 'Supported: markdown, ppt, doc, xls' : '支持格式：markdown, ppt, doc, xls') +
+                '<br>' +
+                (isEn() ? 'Legacy .doc/.ppt may have limited compatibility.' : '旧版 .doc/.ppt 兼容性可能受限。') +
+            '</div>' +
+            '<label style="display:block;margin-bottom:6px;font-weight:600;">' + (isEn() ? 'Save Path' : '保存路径') + '</label>' +
+            '<select id="importTargetFolder" style="width:100%;padding:10px;border:1px solid ' + borderColor + ';border-radius:8px;background:' + (nightMode ? '#3d3d3d' : '#fff') + ';color:' + textColor + ';margin-bottom:16px;">' +
+                folderOptions +
+            '</select>' +
+            '<div style="display:flex;gap:10px;">' +
+                '<button id="importCancelBtn" style="flex:1;padding:10px;border:1px solid ' + borderColor + ';border-radius:8px;background:transparent;color:' + textColor + ';cursor:pointer;">' + (isEn() ? 'Cancel' : '取消') + '</button>' +
+                '<button id="importChooseBtn" style="flex:1;padding:10px;border:none;border-radius:8px;background:#4a90e2;color:#fff;cursor:pointer;">' + (isEn() ? 'Choose Files' : '选择文件') + '</button>' +
+            '</div>';
+
+        modal.appendChild(container);
+        document.body.appendChild(modal);
+
+        var cancelBtn = container.querySelector('#importCancelBtn');
+        var chooseBtn = container.querySelector('#importChooseBtn');
+        var folderSelect = container.querySelector('#importTargetFolder');
+
+        cancelBtn.onclick = function() {
+            if (modal.parentNode) modal.parentNode.removeChild(modal);
+        };
+
+        modal.addEventListener('click', function(e) {
+            if (e.target === modal && modal.parentNode) {
+                modal.parentNode.removeChild(modal);
+            }
+        });
+
+        chooseBtn.onclick = function() {
+            var targetFolder = normalizePath(folderSelect.value || '');
+            if (modal.parentNode) modal.parentNode.removeChild(modal);
+            pickAndImportFiles(targetFolder);
+        };
+    };
+
+    function pickAndImportFiles(targetFolder) {
         const fileInput = document.createElement('input');
         fileInput.type = 'file';
         fileInput.multiple = true;
-        fileInput.accept = '.md,.txt,.markdown,text/markdown,text/plain';
+        fileInput.accept = '.md,.markdown,.txt,.doc,.docx,.ppt,.pptx,.xls,.xlsx,text/markdown,text/plain,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 
         fileInput.addEventListener('change', async function(e) {
-            const files = Array.from(e.target.files);
-            if (files.length === 0) return;
+            const files = Array.from(e.target.files || []);
+            if (files.length === 0) {
+                fileInput.remove();
+                return;
+            }
 
             global.showMessage((isEn() ? `Importing ${files.length} files...` : `正在导入 ${files.length} 个文件...`), 'info');
 
             let importedCount = 0;
             let skippedCount = 0;
             const newFiles = [];
-
-            const existingNames = new Set(g('files').map(f => f.name));
+            const existingNames = new Set(g('files').map(function(f) { return f.name; }));
 
             for (const file of files) {
                 try {
-                    const content = await readFileAsText(file);
-                    let fileName = file.name;
-                    fileName = normalizePath(fileName);
-
-                    let baseName = fileName;
-                    let counter = 1;
-                    while (existingNames.has(fileName)) {
-                        const parts = fileName.split('/');
-                        const lastPart = parts.pop();
-                        const newLastPart = lastPart.replace(/(\d+)?$/, (m) => m ? parseInt(m)+1 : '1');
-                        parts.push(newLastPart);
-                        fileName = parts.join('/');
-                        counter++;
-                    }
+                    const content = await convertImportedFileToMarkdown(file);
+                    const importName = buildImportedFilePath(file.name, targetFolder, existingNames);
 
                     const newFile = {
                         id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-                        name: fileName,
+                        name: importName,
                         type: 'file',
                         content: content,
                         lastModified: Date.now(),
@@ -3114,39 +3172,39 @@
                     };
 
                     newFiles.push(newFile);
-                    existingNames.add(fileName);
+                    existingNames.add(importName);
                     importedCount++;
                 } catch (error) {
-                    console.error(`读取文件 ${file.name} 失败:`, error);
-                    global.showMessage((isEn() ? `Failed to read file ${file.name}: ` : `读取文件 ${file.name} 失败: `) + error.message, 'error');
+                    console.error('读取文件失败:', file.name, error);
+                    global.showMessage((isEn() ? 'Failed to import file ' : '导入文件失败 ') + file.name + ': ' + error.message, 'error');
                     skippedCount++;
                 }
             }
 
             if (newFiles.length > 0) {
-                newFiles.forEach(f => ensureParentFolders(f.name));
-                g('files').push(...newFiles);
+                newFiles.forEach(function(f) { ensureParentFolders(f.name); });
+                g('files').push.apply(g('files'), newFiles);
                 localStorage.setItem('vditor_files', JSON.stringify(g('files')));
 
-                newFiles.forEach(file => {
+                newFiles.forEach(function(file) {
                     g('lastSyncedContent')[file.id] = file.content;
                     g('unsavedChanges')[file.id] = false;
                 });
 
                 loadFiles();
-                if (newFiles.length > 0) openFile(newFiles[0].id);
+                openFile(newFiles[0].id);
 
                 if (g('currentUser')) {
                     for (const file of newFiles) {
                         try {
                             await global.syncFileToServer(file.id);
                         } catch (syncError) {
-                            console.warn(`同步文件 ${file.name} 失败`, syncError);
+                            console.warn('同步文件失败:', file.name, syncError);
                         }
                     }
                 }
 
-                global.showMessage((isEn() ? `Successfully imported ${importedCount} file${importedCount !== 1 ? 's' : ''}${skippedCount > 0 ? (isEn() ? `, skipped ${skippedCount}` : `，跳过 ${skippedCount} 个`) : ''}` : `成功导入 ${importedCount} 个文件${skippedCount > 0 ? `，跳过 ${skippedCount} 个` : ''}`), 'success');
+                global.showMessage((isEn() ? `Successfully imported ${importedCount} file${importedCount !== 1 ? 's' : ''}${skippedCount > 0 ? `, skipped ${skippedCount}` : ''}` : `成功导入 ${importedCount} 个文件${skippedCount > 0 ? `，跳过 ${skippedCount} 个` : ''}`), 'success');
             } else {
                 global.showMessage(isEn() ? 'No files imported' : '没有导入任何文件', 'warning');
             }
@@ -3155,7 +3213,177 @@
         });
 
         fileInput.click();
-    };
+    }
+
+    function stripKnownExtension(fileName) {
+        return fileName
+            .replace(/\.(md|markdown|txt|doc|docx|ppt|pptx|xls|xlsx)$/i, '')
+            .trim();
+    }
+
+    function buildImportedFilePath(originalFileName, targetFolder, existingNames) {
+        var base = normalizePath(stripKnownExtension(originalFileName));
+        if (!base) {
+            base = isEn() ? 'imported-file' : '导入文件';
+        }
+        var fullPath = targetFolder ? (targetFolder + '/' + base) : base;
+        var candidate = fullPath;
+        var index = 2;
+        while (existingNames.has(candidate)) {
+            candidate = fullPath + '-' + index;
+            index++;
+        }
+        return candidate;
+    }
+
+    async function convertImportedFileToMarkdown(file) {
+        var lowerName = (file.name || '').toLowerCase();
+        if (/\.(md|markdown|txt)$/i.test(lowerName)) {
+            return await readFileAsText(file);
+        }
+
+        if (/\.docx$/i.test(lowerName)) {
+            return await convertDocxToMarkdown(file);
+        }
+        if (/\.doc$/i.test(lowerName)) {
+            throw new Error(isEn() ? 'Legacy .doc is not supported, please convert to .docx first' : '暂不支持旧版 .doc，请先转换为 .docx');
+        }
+
+        if (/\.pptx$/i.test(lowerName)) {
+            return await convertPptxToMarkdown(file);
+        }
+        if (/\.ppt$/i.test(lowerName)) {
+            throw new Error(isEn() ? 'Legacy .ppt is not supported, please convert to .pptx first' : '暂不支持旧版 .ppt，请先转换为 .pptx');
+        }
+
+        if (/\.(xls|xlsx)$/i.test(lowerName)) {
+            return await convertXlsToMarkdown(file);
+        }
+
+        throw new Error(isEn() ? 'Unsupported file type' : '不支持的文件类型');
+    }
+
+    async function convertDocxToMarkdown(file) {
+        const mammothModule = await import('mammoth');
+        const mammoth = mammothModule.default || mammothModule;
+        const arrayBuffer = await file.arrayBuffer();
+        const result = await mammoth.extractRawText({ arrayBuffer: arrayBuffer });
+        const text = (result.value || '').trim();
+        if (!text) {
+            throw new Error(isEn() ? 'The DOCX file appears to be empty' : 'DOCX 文件内容为空');
+        }
+        return text;
+    }
+
+    async function convertPptxToMarkdown(file) {
+        const jszipModule = await import('jszip');
+        const JSZip = jszipModule.default || jszipModule;
+        const zip = await JSZip.loadAsync(await file.arrayBuffer());
+        const slideFiles = Object.keys(zip.files)
+            .filter(function(name) { return /^ppt\/slides\/slide\d+\.xml$/i.test(name); })
+            .sort(function(a, b) {
+                var ai = parseInt((a.match(/slide(\d+)\.xml/i) || [0, 0])[1], 10);
+                var bi = parseInt((b.match(/slide(\d+)\.xml/i) || [0, 0])[1], 10);
+                return ai - bi;
+            });
+
+        if (slideFiles.length === 0) {
+            throw new Error(isEn() ? 'No readable slides found in PPTX' : 'PPTX 中未找到可读取页面');
+        }
+
+        var lines = ['# ' + stripKnownExtension(file.name)];
+        for (var i = 0; i < slideFiles.length; i++) {
+            var xml = await zip.file(slideFiles[i]).async('text');
+            var textList = extractPptxTextNodes(xml);
+            lines.push('');
+            lines.push('## ' + (isEn() ? 'Slide' : '第') + ' ' + (i + 1) + (isEn() ? '' : ' 页'));
+            if (textList.length === 0) {
+                lines.push('- ' + (isEn() ? '(No text content)' : '（无文本内容）'));
+            } else {
+                textList.forEach(function(item) {
+                    lines.push('- ' + item);
+                });
+            }
+        }
+        return lines.join('\n');
+    }
+
+    function extractPptxTextNodes(xml) {
+        var values = [];
+        var reg = /<a:t>([\s\S]*?)<\/a:t>/g;
+        var match;
+        while ((match = reg.exec(xml)) !== null) {
+            var raw = match[1] || '';
+            var text = raw
+                .replace(/&amp;/g, '&')
+                .replace(/&lt;/g, '<')
+                .replace(/&gt;/g, '>')
+                .replace(/&quot;/g, '"')
+                .replace(/&#39;/g, "'")
+                .replace(/\s+/g, ' ')
+                .trim();
+            if (text) values.push(text);
+        }
+        return values;
+    }
+
+    async function convertXlsToMarkdown(file) {
+        const xlsxModule = await import('xlsx');
+        const XLSX = xlsxModule.default || xlsxModule;
+        const workbook = XLSX.read(await file.arrayBuffer(), { type: 'array' });
+        if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
+            throw new Error(isEn() ? 'No readable sheet found' : '未找到可读取工作表');
+        }
+
+        var mdParts = ['# ' + stripKnownExtension(file.name)];
+        workbook.SheetNames.forEach(function(sheetName) {
+            var sheet = workbook.Sheets[sheetName];
+            var rows = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false });
+            mdParts.push('');
+            mdParts.push('## ' + sheetName);
+
+            if (!rows || rows.length === 0) {
+                mdParts.push(isEn() ? '(Empty sheet)' : '（空工作表）');
+                return;
+            }
+
+            var maxCols = rows.reduce(function(max, row) {
+                return Math.max(max, (row || []).length);
+            }, 0);
+            if (maxCols === 0) {
+                mdParts.push(isEn() ? '(Empty sheet)' : '（空工作表）');
+                return;
+            }
+
+            var headerRow = (rows[0] || []).slice();
+            while (headerRow.length < maxCols) headerRow.push('');
+            headerRow = headerRow.map(function(cell, idx) {
+                var text = String(cell == null ? '' : cell).trim();
+                return text || ((isEn() ? 'Column ' : '列') + (idx + 1));
+            });
+
+            mdParts.push('| ' + headerRow.join(' | ') + ' |');
+            mdParts.push('| ' + headerRow.map(function() { return '---'; }).join(' | ') + ' |');
+
+            var dataRows = rows.slice(1);
+            if (dataRows.length === 0) {
+                var emptyRow = new Array(maxCols).fill('');
+                mdParts.push('| ' + emptyRow.join(' | ') + ' |');
+                return;
+            }
+
+            dataRows.forEach(function(row) {
+                var normalized = (row || []).slice();
+                while (normalized.length < maxCols) normalized.push('');
+                var escaped = normalized.map(function(cell) {
+                    return String(cell == null ? '' : cell).replace(/\|/g, '\\|').replace(/\n/g, ' ');
+                });
+                mdParts.push('| ' + escaped.join(' | ') + ' |');
+            });
+        });
+
+        return mdParts.join('\n');
+    }
 
     function readFileAsText(file) {
         return new Promise((resolve, reject) => {
@@ -3533,10 +3761,8 @@
         });
         // 查找状态
         let matches = [];
-        let visibleMatches = [];
         let currentMatchIndex = -1;
         let searchText = '';
-        let activeHighlightOverlays = [];
         const findInput = dialog.querySelector('#findInput');
         const replaceInput = dialog.querySelector('#replaceInput');
         const findStatus = dialog.querySelector('#findStatus');
@@ -3724,9 +3950,8 @@
                 return;
             }
 
-            const res = await smartFindInText(getCurrentEditorText(), searchText, { caseSensitive: false });
-            matches = (res && res.code === 200 && res.data && Array.isArray(res.data.matches)) ? res.data.matches : [];
-            visibleMatches = findMatchesInVisibleText(searchText);
+            // In-file navigation uses editor-visible text so selection/highlight stays accurate in all Vditor modes.
+            matches = findMatchesInVisibleText(searchText);
             if (matches.length === 0) {
                 findStatus.textContent = isEn() ? 'No matches found' : '未找到匹配内容';
                 findStatus.style.color = '#dc3545';
@@ -3824,11 +4049,7 @@
             renderWasmSearchResults(res.data);
         }
         function clearVisualHighlights() {
-            activeHighlightOverlays.forEach(function(el) {
-                if (el && el.parentNode) el.parentNode.removeChild(el);
-            });
-            activeHighlightOverlays = [];
-
+            // Use native selection highlight only; no custom overlay nodes.
             const selection = window.getSelection();
             if (selection) selection.removeAllRanges();
         }
@@ -3859,54 +4080,55 @@
             return out;
         }
 
-        function addRangeHighlightOverlay(range) {
-            const rects = Array.from(range.getClientRects());
-            rects.forEach(function(rect) {
-                if (!rect || rect.width <= 0 || rect.height <= 0) return;
-                const overlay = document.createElement('div');
-                overlay.className = 'find-highlight-overlay';
-                overlay.style.cssText = [
-                    'position:fixed',
-                    'left:' + rect.left + 'px',
-                    'top:' + rect.top + 'px',
-                    'width:' + rect.width + 'px',
-                    'height:' + rect.height + 'px',
-                    'background:rgba(255,235,59,0.55)',
-                    'border-radius:2px',
-                    'pointer-events:none',
-                    'z-index:10002'
-                ].join(';');
-                document.body.appendChild(overlay);
-                activeHighlightOverlays.push(overlay);
-            });
-        }
-
-        function getEditorScrollContainer(editorElement) {
-            if (!editorElement) return null;
-            return editorElement.closest('.vditor-ir') ||
-                editorElement.closest('.vditor-wysiwyg') ||
-                editorElement.closest('.vditor-sv') ||
-                editorElement;
-        }
-
-        function scrollEditorToApproximatePosition(startIndex) {
+        function setSelectionByVisibleRange(start, end) {
             const editorElement = getEditorElement();
-            if (!editorElement) return;
-            const container = getEditorScrollContainer(editorElement);
-            if (!container || typeof container.scrollTo !== 'function') return;
+            if (!editorElement) return null;
 
-            const fullText = getCurrentEditorText();
-            const total = Math.max(1, fullText.length);
-            const ratio = Math.max(0, Math.min(1, (Number(startIndex) || 0) / total));
-            const maxScrollTop = Math.max(0, container.scrollHeight - container.clientHeight);
-            const targetTop = Math.round(maxScrollTop * ratio);
-            container.scrollTo({ top: targetTop, behavior: 'smooth' });
-        }
+            const selection = window.getSelection();
+            if (!selection) return null;
 
-        function pickHighlightByIndex(index) {
-            if (visibleMatches.length > index) return visibleMatches[index];
-            if (visibleMatches.length > 0) return visibleMatches[0];
-            return null;
+            const targetStart = Math.max(0, Number(start) || 0);
+            const targetEnd = Math.max(targetStart, Number(end) || targetStart);
+
+            const walker = document.createTreeWalker(editorElement, NodeFilter.SHOW_TEXT, null, false);
+            let node;
+            let charIndex = 0;
+            let startNode = null;
+            let endNode = null;
+            let startOffset = 0;
+            let endOffset = 0;
+
+            while (node = walker.nextNode()) {
+                const len = node.textContent.length;
+                const next = charIndex + len;
+
+                if (!startNode && targetStart >= charIndex && targetStart <= next) {
+                    startNode = node;
+                    startOffset = targetStart - charIndex;
+                }
+
+                if (startNode && targetEnd >= charIndex && targetEnd <= next) {
+                    endNode = node;
+                    endOffset = targetEnd - charIndex;
+                    break;
+                }
+
+                charIndex = next;
+            }
+
+            if (!startNode) return null;
+            if (!endNode) {
+                endNode = startNode;
+                endOffset = startOffset;
+            }
+
+            const range = document.createRange();
+            range.setStart(startNode, Math.min(startOffset, startNode.textContent.length));
+            range.setEnd(endNode, Math.min(endOffset, endNode.textContent.length));
+
+            selection.removeAllRanges();
+            selection.addRange(range);
+            return range;
         }
 
         // 高亮匹配项
@@ -3915,84 +4137,26 @@
             // 更新状态
             findStatus.textContent = (isEn() ? 'Match ' : '匹配 ') + (index + 1) + ' / ' + matches.length;
             try {
-                scrollEditorToApproximatePosition(matches[index].start);
-                const inputSelStart = findInput.selectionStart;
-                const inputSelEnd = findInput.selectionEnd;
-                const editorElement = getEditorElement();
-                if (editorElement) {
-                    visibleMatches = findMatchesInVisibleText(searchText);
-                    const highlight = pickHighlightByIndex(index);
-                    if (!highlight) {
-                        if (allowRetry !== false) {
-                            setTimeout(function() {
-                                highlightMatch(index, false);
-                            }, 90);
-                        }
-                        if (shouldAutoFocusFindInput) {
-                            findInput.focus();
-                            if (typeof inputSelStart === 'number' && typeof inputSelEnd === 'number') {
-                                findInput.setSelectionRange(inputSelStart, inputSelEnd);
-                            }
-                        }
-                        return;
+                const vditor = g('vditor');
+                if (vditor && typeof vditor.focus === 'function') {
+                    vditor.focus();
+                }
+                const hit = matches[index];
+                const range = setSelectionByVisibleRange(hit.start, hit.end);
+                if (!range) {
+                    if (allowRetry !== false) {
+                        setTimeout(function() {
+                            highlightMatch(index, false);
+                        }, 60);
                     }
+                    return;
+                }
 
-                    clearVisualHighlights();
-                    // 创建范围并选择文本
-                    const textNodes = [];
-                    const walker = document.createTreeWalker(
-                        editorElement,
-                        NodeFilter.SHOW_TEXT,
-                        null,
-                        false
-                    );
-                    let node;
-                    let currentPos = 0;
-                    while (node = walker.nextNode()) {
-                        const nodeLength = node.textContent.length;
-                        if (currentPos + nodeLength > highlight.start && currentPos < highlight.end) {
-                            textNodes.push({
-                                node: node,
-                                start: Math.max(0, highlight.start - currentPos),
-                                end: Math.min(nodeLength, highlight.end - currentPos)
-                            });
-                        }
-                        currentPos += nodeLength;
-                        if (currentPos > highlight.end) break;
-                    }
-                    if (textNodes.length > 0) {
-                        const range = document.createRange();
-                        range.setStart(textNodes[0].node, textNodes[0].start);
-                        range.setEnd(textNodes[textNodes.length - 1].node, textNodes[textNodes.length - 1].end);
-                        let rect = null;
-                        let targetNode = null;
-                        try {
-                            addRangeHighlightOverlay(range);
-                            rect = range.getBoundingClientRect();
-                            targetNode = textNodes[0].node.parentElement;
-                        } catch (e) {
-                            addRangeHighlightOverlay(range);
-                            rect = range.getBoundingClientRect();
-                            targetNode = textNodes[0].node.parentElement;
-                        }
-                        // 滚动到可视区域
-                        if (rect && rect.height > 0) {
-                            const container = getEditorScrollContainer(editorElement);
-                            if (container && targetNode) {
-                                if (targetNode.scrollIntoView) {
-                                    targetNode.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                                }
-                            }
-                        }
-
-                        // Keep typing focus in find box on desktop; mobile should not pop the keyboard on button taps.
-                        if (shouldAutoFocusFindInput) {
-                            findInput.focus();
-                            if (typeof inputSelStart === 'number' && typeof inputSelEnd === 'number') {
-                                findInput.setSelectionRange(inputSelStart, inputSelEnd);
-                            }
-                        }
-                    }
+                const focusTarget = range.startContainer && range.startContainer.nodeType === Node.TEXT_NODE
+                    ? range.startContainer.parentElement
+                    : range.startContainer;
+                if (focusTarget && typeof focusTarget.scrollIntoView === 'function') {
+                    focusTarget.scrollIntoView({ behavior: 'auto', block: 'center', inline: 'nearest' });
                 }
             } catch (e) {
                 console.error('Highlight error:', e);
@@ -4002,7 +4166,6 @@
         function clearHighlights() {
             clearVisualHighlights();
             matches = [];
-            visibleMatches = [];
             currentMatchIndex = -1;
         }
         // 查找下一个
@@ -4032,10 +4195,22 @@
             const replaceText = replaceInput.value;
             const vditor = g('vditor');
             if (!vditor) return;
-            const currentText = vditor.getValue() || '';
+
             const target = matches[currentMatchIndex];
-            const newText = currentText.slice(0, target.start) + replaceText + currentText.slice(target.end);
-            vditor.setValue(newText, true);
+            const selectedRange = setSelectionByVisibleRange(target.start, target.end);
+            if (!selectedRange) return;
+
+            // Use Vditor native edit methods on current selection.
+            vditor.focus();
+            if (typeof vditor.deleteValue === 'function' && typeof vditor.insertValue === 'function') {
+                vditor.deleteValue();
+                vditor.insertValue(replaceText, true);
+            } else {
+                const currentText = vditor.getValue() || '';
+                const newText = currentText.slice(0, target.start) + replaceText + currentText.slice(target.end);
+                vditor.setValue(newText, true);
+            }
+
             await performFind();
             if (matches.length > 0) {
                 currentMatchIndex = Math.min(currentMatchIndex, matches.length - 1);
@@ -4092,7 +4267,7 @@
         }
         // 关闭对话框并清除高亮
         function closeFindDialog() {
-            clearVisualHighlights();
+            clearHighlights();
             dialog.remove();
         }
         closeBtn.onclick = closeFindDialog;

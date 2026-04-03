@@ -1842,6 +1842,7 @@
             wsRetryTimer: null,
             wsGraceTimer: null,
             connectionStatus: 'connecting',
+            connectionHintMinimized: false,
             onlineUsers: [],
             videoCall: {
                 callId: '',
@@ -2219,17 +2220,39 @@
         if (!bar) {
             bar = document.createElement('div');
             bar.id = 'sharePresenceBar';
-            bar.style.cssText = 'position:fixed;top:64px;left:50%;transform:translateX(-50%);z-index:10002;background:rgba(36,41,46,0.92);color:#fff;padding:6px 12px;border-radius:20px;font-size:12px;max-width:94vw;';
+            bar.style.cssText = 'position:fixed;top:12px;right:12px;z-index:10002;';
             document.body.appendChild(bar);
         }
+
+        var isMinimized = !!(window.sharedDocState && window.sharedDocState.connectionHintMinimized);
         var names = (onlineUsers || []).slice(0, 5).map(function(u) {
             var safeName = escapeShareHtml(u && u.viewer_name ? u.viewer_name : 'Guest');
             return u && u.is_editing ? (safeName + '...') : safeName;
         });
         var statusInfo = getShareConnectionStatusInfo(window.sharedDocState ? window.sharedDocState.connectionStatus : 'connecting');
+
+        if (isMinimized) {
+            bar.innerHTML =
+                '<button id="restoreSharePresenceBtn" title="恢复连接状态" style="width:16px;height:16px;padding:0;border:none;border-radius:50%;background:#2da44e;cursor:pointer;box-shadow:0 4px 10px rgba(0,0,0,0.22);"></button>';
+
+            var restoreBtn = document.getElementById('restoreSharePresenceBtn');
+            if (restoreBtn) {
+                restoreBtn.onclick = function() {
+                    if (!window.sharedDocState) return;
+                    window.sharedDocState.connectionHintMinimized = false;
+                    renderSharePresence(window.sharedDocState.onlineUsers || []);
+                };
+            }
+
+            var minimizedPanel = document.getElementById('shareVideoUserPanel');
+            if (minimizedPanel) minimizedPanel.style.display = 'none';
+            return;
+        }
+
         var editableUsers = getShareEditableUsers();
         bar.innerHTML =
-            '<span style="display:inline-flex;align-items:center;gap:6px;margin-right:10px;">' +
+            '<div style="display:flex;align-items:center;gap:8px;background:rgba(36,41,46,0.92);color:#fff;padding:6px 10px;border-radius:20px;font-size:12px;max-width:min(94vw,620px);box-shadow:0 8px 20px rgba(0,0,0,0.2);">' +
+            '<span style="display:inline-flex;align-items:center;gap:6px;">' +
             '<span style="width:8px;height:8px;border-radius:50%;background:' + statusInfo.color + ';display:inline-block;"></span>' +
             '<span>' + statusInfo.text + '</span>' +
             '</span>' +
@@ -2241,7 +2264,18 @@
             (window.sharedDocState && window.sharedDocState.videoRoom && window.sharedDocState.videoRoom.joined
                 ? (window.i18n ? window.i18n.t('videoRoomInCall') : '多人通话中')
                 : (window.i18n ? window.i18n.t('videoRoomJoin') : '加入多人通话')) +
-            '</button>';
+            '</button>' +
+            '<button id="minimizeSharePresenceBtn" title="最小化" style="margin-left:2px;border:none;background:transparent;color:#fff;padding:0 4px;line-height:1;cursor:pointer;font-size:16px;opacity:0.85;">-</button>' +
+            '</div>';
+
+        var minimizeBtn = document.getElementById('minimizeSharePresenceBtn');
+        if (minimizeBtn) {
+            minimizeBtn.onclick = function() {
+                if (!window.sharedDocState) return;
+                window.sharedDocState.connectionHintMinimized = true;
+                renderSharePresence(window.sharedDocState.onlineUsers || []);
+            };
+        }
 
         var toggleBtn = document.getElementById('toggleShareVideoUsers');
         if (toggleBtn) {

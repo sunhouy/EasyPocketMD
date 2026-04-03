@@ -18,6 +18,30 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     var isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    var isCapacitor = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+    if (isCapacitor) {
+        document.body.classList.add('is-capacitor');
+    }
+
+    function shouldAllowNativeTextSelection(target) {
+        if (!target || typeof target.closest !== 'function') return false;
+        if (target.closest('#vditor')) return true;
+        if (target.closest('input, textarea, [contenteditable="true"]')) return true;
+        return false;
+    }
+
+    if (isMobile || isCapacitor) {
+        document.addEventListener('contextmenu', function(e) {
+            if (shouldAllowNativeTextSelection(e.target)) return;
+            e.preventDefault();
+        }, true);
+
+        document.addEventListener('selectstart', function(e) {
+            if (shouldAllowNativeTextSelection(e.target)) return;
+            e.preventDefault();
+        }, true);
+    }
+
     var loading = document.getElementById('loading');
     if (loading) loading.style.display = 'block';
 

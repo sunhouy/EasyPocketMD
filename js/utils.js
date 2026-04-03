@@ -67,6 +67,30 @@
         return div.innerHTML.replace(/'/g, "\\'").replace(/"/g, '&quot;').replace(/\n/g, '\\n');
     }
 
+    function isSpecialResourceUrl(url) {
+        return typeof url === 'string' && /^(blob:|data:|file:|capacitor:|content:)/i.test(url);
+    }
+
+    function isAbsoluteUrl(url) {
+        return typeof url === 'string' && /^[a-zA-Z][a-zA-Z\d+\-.]*:/.test(url);
+    }
+
+    function resolveResourceUrl(url, baseUrl) {
+        if (!url || typeof url !== 'string') {
+            return url;
+        }
+
+        if (isSpecialResourceUrl(url) || isAbsoluteUrl(url)) {
+            return url;
+        }
+
+        try {
+            return new URL(url, baseUrl || window.location.href).href;
+        } catch (error) {
+            return url;
+        }
+    }
+
     function removeModal(modalElement) {
         if (modalElement && modalElement.parentNode) {
             if (modalElement.removeKeydownHandler) modalElement.removeKeydownHandler();
@@ -81,6 +105,11 @@
     /** 获取本地 API 根地址（同源 api/index.php），保证 origin 与 api 之间必有 / */
     function getApiBaseUrl() {
         if (typeof window !== 'undefined') {
+            var configuredApiBase = window.API_BASE_URL || localStorage.getItem('apiBaseUrl');
+            if (configuredApiBase) {
+                return configuredApiBase.replace(/\/$/, '');
+            }
+
             // 在 Electron 应用、Capacitor 应用或本地 file:// 协议下运行，直接请求远程服务器
             if (window.electron || 
                 (window.location && (window.location.protocol === 'file:' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) ||
@@ -99,6 +128,11 @@
     /** 获取应用的基础域名（用于拼接绝对路径） */
     function getAppOrigin() {
         if (typeof window !== 'undefined') {
+            var configuredOrigin = window.APP_ORIGIN || localStorage.getItem('appOrigin');
+            if (configuredOrigin) {
+                return configuredOrigin.replace(/\/$/, '');
+            }
+
             if (window.electron || 
                 (window.location && (window.location.protocol === 'file:' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) ||
                 (window.Capacitor && window.Capacitor.isNativePlatform())) {
@@ -269,6 +303,7 @@
     global.showUploadStatus = showUploadStatus;
     global.formatFileSize = formatFileSize;
     global.escapeHtml = escapeHtml;
+    global.resolveResourceUrl = resolveResourceUrl;
     global.removeModal = removeModal;
     global.getApiBaseUrl = getApiBaseUrl;
     global.getAppOrigin = getAppOrigin;

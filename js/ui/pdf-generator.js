@@ -413,13 +413,18 @@ export async function generatePDF(htmlContent, settings, filename) {
 export async function renderPDF(pdfUrl, container) {
     try {
         // console.log('[PDF Debug] Rendering PDF from URL:', pdfUrl);
+
+        const isNativeLike = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) ||
+            !!window.electron ||
+            (window.location && window.location.protocol === 'file:');
+        const resolveBase = isNativeLike && window.getAppOrigin
+            ? window.getAppOrigin()
+            : window.location.href;
         
-        // Ensure absolute URL
-        if (pdfUrl && !pdfUrl.startsWith('http://') && !pdfUrl.startsWith('https://') && !pdfUrl.startsWith('blob:')) {
-            const origin = window.getAppOrigin ? window.getAppOrigin() : window.location.origin;
-            pdfUrl = origin + (pdfUrl.startsWith('/') ? '' : '/') + pdfUrl;
-            // console.log('[PDF Debug] Converted to absolute URL:', pdfUrl);
-        }
+        // Ensure the URL is resolvable in both web and native containers.
+        pdfUrl = window.resolveResourceUrl
+            ? window.resolveResourceUrl(pdfUrl, resolveBase)
+            : pdfUrl;
 
         const loadingTask = pdfjsLib.getDocument(pdfUrl);
         const pdf = await loadingTask.promise;
@@ -454,6 +459,30 @@ export async function renderPDF(pdfUrl, container) {
         }
     } catch (e) {
         console.error('Render PDF error:', e);
-        container.innerHTML = `<div style="color:red;padding:20px;">预览加载失败: ${e.message}</div>`;
+        container.innerHTML = '';
+
+        const fallbackWrap = document.createElement('div');
+        fallbackWrap.style.cssText = 'width:100%;display:flex;flex-direction:column;gap:12px;padding:16px;box-sizing:border-box;';
+
+        const message = document.createElement('div');
+        message.style.cssText = 'padding:12px 14px;border-radius:8px;background:#fff3cd;color:#856404;border:1px solid #ffe69c;font-size:14px;line-height:1.5;';
+        message.textContent = `预览加载失败，已切换为直接打开 PDF。${e.message ? ' ' + e.message : ''}`;
+
+        const viewer = document.createElement('object');
+        viewer.data = pdfUrl;
+        viewer.type = 'application/pdf';
+        viewer.style.cssText = 'width:100%;min-height:70vh;border:none;border-radius:8px;background:white;';
+
+        const link = document.createElement('a');
+        link.href = pdfUrl;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        link.textContent = '在新标签页打开 PDF';
+        link.style.cssText = 'align-self:flex-start;display:inline-block;padding:10px 14px;border-radius:6px;background:#4a90e2;color:white;text-decoration:none;font-size:14px;';
+
+        fallbackWrap.appendChild(message);
+        fallbackWrap.appendChild(viewer);
+        fallbackWrap.appendChild(link);
+        container.appendChild(fallbackWrap);
     }
 }
