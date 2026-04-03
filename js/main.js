@@ -501,7 +501,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // 便捷函数：显示未登录提示
     function showGuestNoticeBanner() {
-        const text = '未登录用户，上传的图片和文件仅保证保存2小时，<a href="#" id="guestBannerLoginLink" style="color: white; text-decoration: underline; cursor: pointer;">登录</a>后永久保存，且文件自动同步到服务器。';
+        const isEn = window.i18n && window.i18n.getLanguage() === 'en';
+        const loginText = isEn ? 'Log in' : '登录';
+        const dismissText = isEn ? "Don't remind again" : '不再提醒';
+        const text = isEn
+            ? 'As a guest user, uploaded images and files are kept for only 2 hours. <a href="#" id="guestBannerLoginLink" style="color: white; text-decoration: underline; cursor: pointer;">' + loginText + '</a> for permanent storage and automatic server sync. <a href="#" id="guestBannerDismissLink" style="color: white; text-decoration: underline; cursor: pointer; margin-left: 8px;">' + dismissText + '</a>'
+            : '未登录用户，上传的图片和文件仅保证保存2小时，<a href="#" id="guestBannerLoginLink" style="color: white; text-decoration: underline; cursor: pointer;">' + loginText + '</a>后永久保存，且文件自动同步到服务器。<a href="#" id="guestBannerDismissLink" style="color: white; text-decoration: underline; cursor: pointer; margin-left: 8px;">' + dismissText + '</a>';
         showTopNoticeBanner(
             'guest',
             text,
@@ -518,6 +523,15 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (window.showLoginModal) {
                         window.showLoginModal();
                     }
+                });
+            }
+
+            const dismissLink = document.getElementById('guestBannerDismissLink');
+            if (dismissLink) {
+                dismissLink.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    localStorage.setItem('guestNoticeDismissed', 'true');
+                    hideTopNoticeBanner();
                 });
             }
         }, 100);

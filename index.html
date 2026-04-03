@@ -484,9 +484,8 @@
             <p><strong data-i18n="pageTitle">EasyPocketMD</strong></p>
             <p data-i18n="author">作者：孙厚运</p>
             <p data-i18n="description">一款几乎零学习成本的 Markdown 编辑器：无需记忆语法，也能轻松插入格式化文本、LaTeX 公式和图表。配合智能搜索与 AI 助手，常用功能都能几步完成。实时协作、AI 辅助写作与流畅编辑体验，全部整合在美观的界面中。</p>
-            <p><a href="https://www.yhsun.cn/" target="_blank" data-i18n="github">功能介绍</a></p>
-            <p><a href="https://github.com/sunhouy/markdown" target="_blank" data-i18n="github">GitHub地址</a></p>
-            
+            <p><a href="https://yhsun.cn/" target="_blank">功能介绍</a></p>
+            <p><a href="https://github.com/sunhouy/markdown">GitHub地址</a></p>
             <hr>
             <p><a href="https://beian.miit.gov.cn/" target="_blank" data-i18n="icp">京ICP备2025154249号</a></p>
         </div>
@@ -694,42 +693,54 @@
 <!-- 顶部工具栏 -->
 <div class="mobile-toolbar-container">
     <div class="mobile-toolbar">
-        <!-- 文件列表按钮 -->
-        <button class="mobile-action-btn" id="mobileFileBtn" data-i18n-title="fileListTitle" title="文件列表">
-            <i class="fas fa-folder-open"></i>
-        </button>
-        <!-- 登录按钮 -->
-        <button class="mobile-action-btn" id="mobileLoginBtn" data-i18n-title="login" title="登录">
-            <i class="fas fa-user"></i>
-        </button>
-        <!-- 设置按钮 -->
-        <button class="mobile-action-btn" id="mobileSettingsBtn" data-i18n-title="settings" title="设置">
-            <i class="fas fa-cog"></i>
-        </button>
-        <h1 class="mobile-title" data-i18n="mobileTitle">EasyPocketMD</h1>
-        <div class="mobile-dropdown">
-            <button class="mobile-action-btn" id="mobileMenuBtn" data-i18n-title="settings" title="菜单">
-                <i class="fas fa-ellipsis-v"></i>
+        <div class="toolbar-left-actions">
+            <!-- 文件列表按钮 -->
+            <button class="mobile-action-btn" id="mobileFileBtn" data-i18n-title="fileListTitle" title="文件列表">
+                <i class="fas fa-folder-open"></i>
             </button>
-            <div class="mobile-dropdown-content" id="mobileDropdown">
+            <!-- 登录按钮 -->
+            <button class="mobile-action-btn" id="mobileLoginBtn" data-i18n-title="login" title="登录">
+                <i class="fas fa-user"></i>
+            </button>
+            <!-- 设置按钮 -->
+            <button class="mobile-action-btn" id="mobileSettingsBtn" data-i18n-title="settings" title="设置">
+                <i class="fas fa-cog"></i>
+            </button>
+        </div>
+        <h1 class="mobile-title" data-i18n="mobileTitle">EasyPocketMD</h1>
+        <div class="toolbar-right-actions">
+            <!-- 保存按钮 -->
+            <button class="mobile-action-btn editor-save-btn" id="saveFileBtn" title="保存文件">
+                <i class="fas fa-save"></i>
+            </button>
+            <!-- 夜间模式切换按钮 -->
+            <button class="mobile-action-btn editor-mode-toggle" id="modeToggle" title="切换夜间模式">
+                <i class="fas fa-moon"></i>
+            </button>
+            <div class="mobile-dropdown">
+                <button class="mobile-action-btn" id="mobileMenuBtn" data-i18n-title="settings" title="菜单">
+                    <i class="fas fa-ellipsis-v"></i>
+                </button>
+                <div class="mobile-dropdown-content" id="mobileDropdown">
 
-                <button class="dropdown-item" id="mobileShareBtn"><i class="fas fa-share-alt"></i>  <span data-i18n="share">分享</span></button>
-                <button class="dropdown-item" id="mobileFileManagerBtn"><i class="fas fa-folder"></i>  <span data-i18n="myFiles">我的文件</span></button>
-                <button class="dropdown-item" id="mobileFileDiffBtn"><i class="fas fa-code-branch"></i>  <span data-i18n="fileDiff">文件对比</span></button>
-                <button class="dropdown-item" id="mobileFindBtn"><i class="fas fa-search"></i>  <span data-i18n="findInFile">查找和替换</span></button>
-                <button class="dropdown-item" id="mobilePrintBtn"><i class="fas fa-print"></i>  <span data-i18n="cloudPrint">云打印</span></button>
-                <button class="dropdown-item" id="mobilePresentationBtn"><i class="fas fa-chalkboard-teacher"></i>  <span data-i18n="presentationMode">演示模式</span></button>
-                <button class="dropdown-item" id="mobileModeBtn"><i class="fas fa-exchange-alt"></i>  <span data-i18n="switchMode">切换编辑器模式</span></button>
-                <button class="dropdown-item" id="mobileImportBtn"><i class="fas fa-file-import"></i>  <span data-i18n="import">导入</span></button>
-                <button class="dropdown-item" id="mobileExportBtn"><i class="fas fa-file-export"></i>  <span data-i18n="export">导出</span></button>
-                <!--
-                <button class="dropdown-item" id="mobileVideoCallBtn"><i class="fas fa-video"></i>  <span data-i18n="videoCall">视频通话</span></button>
-            -->
-                <button class="dropdown-item" id="mobileClearBtn"><i class="fas fa-trash-alt"></i>  <span data-i18n="clear">清空</span></button>
-                <!--
-                <button class="dropdown-item" id="serviceStatusBtn"><i class="fas fa-heartbeat"></i>  <span data-i18n="serviceStatus">服务状态</span></button>
+                    <button class="dropdown-item" id="mobileShareBtn"><i class="fas fa-share-alt"></i>  <span data-i18n="share">分享</span></button>
+                    <button class="dropdown-item" id="mobileFileManagerBtn"><i class="fas fa-folder"></i>  <span data-i18n="myFiles">我的文件</span></button>
+                    <button class="dropdown-item" id="mobileFileDiffBtn"><i class="fas fa-code-branch"></i>  <span data-i18n="fileDiff">文件对比</span></button>
+                    <button class="dropdown-item" id="mobileFindBtn"><i class="fas fa-search"></i>  <span data-i18n="findInFile">查找和替换</span></button>
+                    <button class="dropdown-item" id="mobilePrintBtn"><i class="fas fa-print"></i>  <span data-i18n="cloudPrint">云打印</span></button>
+                    <button class="dropdown-item" id="mobilePresentationBtn"><i class="fas fa-chalkboard-teacher"></i>  <span data-i18n="presentationMode">演示模式</span></button>
+                    <button class="dropdown-item" id="mobileModeBtn"><i class="fas fa-exchange-alt"></i>  <span data-i18n="switchMode">切换编辑器模式</span></button>
+                    <button class="dropdown-item" id="mobileImportBtn"><i class="fas fa-file-import"></i>  <span data-i18n="import">导入</span></button>
+                    <button class="dropdown-item" id="mobileExportBtn"><i class="fas fa-file-export"></i>  <span data-i18n="export">导出</span></button>
+                    <!--
+                    <button class="dropdown-item" id="mobileVideoCallBtn"><i class="fas fa-video"></i>  <span data-i18n="videoCall">视频通话</span></button>
                 -->
-                <button class="dropdown-item" id="aboutBtn"><i class="fas fa-info-circle"></i>  <span data-i18n="about">关于</span></button>
+                    <button class="dropdown-item" id="mobileClearBtn"><i class="fas fa-trash-alt"></i>  <span data-i18n="clear">清空</span></button>
+                    <!--
+                    <button class="dropdown-item" id="serviceStatusBtn"><i class="fas fa-heartbeat"></i>  <span data-i18n="serviceStatus">服务状态</span></button>
+                    -->
+                    <button class="dropdown-item" id="aboutBtn"><i class="fas fa-info-circle"></i>  <span data-i18n="about">关于</span></button>
+                </div>
             </div>
         </div>
     </div>
@@ -741,15 +752,6 @@
         <!-- 按钮将由 JS 动态生成 -->
     </div>
 </div>
-
-<!-- 保存按钮 -->
-<button class="editor-save-btn" id="saveFileBtn" title="保存文件">
-    <i class="fas fa-save"></i>
-</button>
-<!-- 夜间模式切换按钮 -->
-<button class="editor-mode-toggle" id="modeToggle" title="切换夜间模式">
-    <i class="fas fa-moon"></i>
-</button>
 
 <!-- 操作面板容器 -->
 <div class="mobile-action-sheet" id="mobileActionSheet"></div>

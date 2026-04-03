@@ -1,5 +1,5 @@
 # EasyPocketMD
-![EasyPocketMD](readme/logo.png)
+![EasyPocketMD](assets/readme/logo.png)
 
 **AI powered · Superfast · Cross Platform**
 
