@@ -32,31 +32,31 @@ If you find this useful, please ⭐ star the repo – it means a lot to me.
 ### 🤖 AI Integration
 
 - AI Writing Assistant – Help write, rewrite, auto-format, and even generate PPT slides from your document.
-![AI Writing Assistant](readme/aigenppt.gif)
+![AI Writing Assistant](assets/readme/aigenppt.gif)
 - Smart Charts & Formulas – Generate LaTeX formulas and diagrams with AI prompts — no manual coding required.
-![AI Charts & Formulas](readme/aigenformula.gif)
+![AI Charts & Formulas](assets/readme/aigenformula.gif)
 
 ### 👥 Collaboration & Communication
 
 - Real-time Collaboration – Share documents and work together seamlessly.
-![Real-time Collaboration](readme/share.gif)
+![Real-time Collaboration](assets/readme/share.gif)
 - Encrypted Video Call – Built-in two-person encrypted video call with dual-stack IPv6 support.
-![Encrypted Video Call](readme/videocall.gif)
+![Encrypted Video Call](assets/readme/videocall.gif)
 
 ### ✍️ Editing Experience
 - Three Preview Modes – WYSIWYG, live rendering, and split-screen preview.
 - Efficient Editing – Quick insertion of Markdown, LaTeX formulas, and charts. Full-text search and file diff support.
-![Editing Experience](readme/insert.gif)
+![Editing Experience](assets/readme/insert.gif)
 - Version Control – Browse history and compare differences between versions.
-![Version Control](readme/history.gif)
+![Version Control](assets/readme/history.gif)
 
 
 ### 🔗 Compatibility & Design
 - Cross Platform – Works seamlessly across devices.
-![Cross Platform](readme/1_1.png)
+![Cross Platform](assets/readme/1_1.png)
 - File Import / Export – Import local documents; export to TXT, DOC, PDF, and more.
 - Cloud Print – Print remotely via the cloud print client.
-![Cloud Print](readme/cloudprint.gif)
+![Cloud Print](assets/readme/cloudprint.gif)
 - Available on Windows, Linux, Android and the web — with consistent behavior across all platforms.
 - Modern UI – Clean Material Design with day/night mode support.
 
