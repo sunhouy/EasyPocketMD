@@ -187,14 +187,6 @@ export default defineConfig({
           dest: '.'
         },
         {
-          src: 'icon-512.png',
-          dest: '.'
-        },
-        {
-          src: 'icon-192.png',
-          dest: '.'
-        },
-        {
           src: 'node_modules/pdfjs-dist/build/pdf.worker.mjs',
           dest: 'assets'
         },
