@@ -2,134 +2,118 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="EasyPocketMD 介绍页，展示在线使用地址、跨平台下载、功能 GIF 和与其他编辑器的对比。">
-  <title>EasyPocketMD - Markdown 编辑器介绍</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="description" content="一款几乎零学习成本的 Markdown 编辑器：无需记忆语法，也能轻松插入格式化文本、LaTeX 公式和图表。配合智能搜索与 AI 助手，常用功能都能几步完成。实时协作、AI 辅助写作与流畅编辑体验，全部整合在美观的界面中。">
+  <link rel="icon" type="image/x-icon" href="https://static.yhsun.cn/assets/icon.png">
+  <title>EasyPocketMD | 零门槛AI协作Markdown编辑器</title>
   <style>
-    :root {
-      color-scheme: dark;
-      --bg: #0b1020;
-      --bg-elevated: #111a2d;
-      --panel: rgba(17, 26, 45, 0.82);
-      --panel-strong: #16233d;
-      --border: rgba(255, 255, 255, 0.09);
-      --text: #eaf0ff;
-      --muted: #a9b5d1;
-      --accent: #4fb3ff;
-      --accent-strong: #2b8cff;
-      --accent-soft: rgba(79, 179, 255, 0.14);
-      --success: #4fd1a5;
-      --warning: #ffcc66;
-      --shadow: 0 22px 70px rgba(0, 0, 0, 0.42);
-      --radius-xl: 28px;
-      --radius-lg: 22px;
-      --radius-md: 16px;
-      --max-width: 1240px;
-    }
-
+    /* 基础重置 + 主题变量定义 (通过 data-theme 动态控制) */
     * {
+      margin: 0;
+      padding: 0;
       box-sizing: border-box;
     }
 
-    html {
-      scroll-behavior: smooth;
+    /* 默认 light 主题变量 (与 data-theme="light" 一致) */
+    :root {
+      --bg-body: #ffffff;
+      --bg-elevated: #f8fafc;
+      --bg-surface: #ffffff;
+      --bg-panel: rgba(248, 250, 252, 0.92);
+      --border-light: rgba(0, 0, 0, 0.08);
+      --border-strong: rgba(0, 0, 0, 0.12);
+      --text-primary: #0a0c12;
+      --text-secondary: #2d3a4b;
+      --text-muted: #4b5e77;
+      --accent: #2b6ef0;
+      --accent-soft: rgba(43, 110, 240, 0.08);
+      --accent-glow: rgba(43, 110, 240, 0.2);
+      --success: #1f8a4c;
+      --shadow-sm: 0 8px 20px rgba(0, 0, 0, 0.03), 0 2px 6px rgba(0, 0, 0, 0.05);
+      --shadow-md: 0 16px 32px rgba(0, 0, 0, 0.06);
+      --radius-xl: 28px;
+      --radius-lg: 20px;
+      --radius-md: 14px;
+      --transition-default: all 0.2s ease;
     }
 
+    /* 深色主题变量 */
+    [data-theme="dark"] {
+      --bg-body: #000000;
+      --bg-elevated: #0c0f15;
+      --bg-surface: #0a0c10;
+      --bg-panel: rgba(12, 15, 21, 0.92);
+      --border-light: rgba(255, 255, 255, 0.08);
+      --border-strong: rgba(255, 255, 255, 0.14);
+      --text-primary: #eff3fc;
+      --text-secondary: #cbd5e6;
+      --text-muted: #8e9db2;
+      --accent: #5c9eff;
+      --accent-soft: rgba(92, 158, 255, 0.12);
+      --accent-glow: rgba(92, 158, 255, 0.2);
+      --success: #4bc28c;
+      --shadow-sm: 0 8px 20px rgba(0, 0, 0, 0.5);
+      --shadow-md: 0 16px 32px rgba(0, 0, 0, 0.6);
+    }
+
+    /* 主题切换平滑过渡 */
     body {
-      margin: 0;
-      font-family: "Segoe UI Variable", "Segoe UI", "Noto Sans SC", "Microsoft YaHei UI", sans-serif;
-      background:
-        radial-gradient(circle at top left, rgba(79, 179, 255, 0.18), transparent 30%),
-        radial-gradient(circle at 85% 10%, rgba(79, 209, 165, 0.14), transparent 25%),
-        linear-gradient(180deg, #0a0f1e 0%, #0b1020 46%, #090d18 100%);
-      color: var(--text);
-      line-height: 1.6;
-      overflow-x: hidden;
-    }
-
-    a {
-      color: inherit;
-      text-decoration: none;
-    }
-
-    img {
-      display: block;
-      max-width: 100%;
+      background: var(--bg-body);
+      color: var(--text-primary);
+      font-family: "Segoe UI Variable", "Segoe UI", "Noto Sans SC", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      line-height: 1.5;
+      transition: background 0.2s ease, color 0.2s ease;
     }
 
     .shell {
       position: relative;
-      isolation: isolate;
     }
 
-    .shell::before,
-    .shell::after {
-      content: "";
-      position: fixed;
-      inset: auto;
-      width: 34rem;
-      height: 34rem;
-      border-radius: 50%;
-      filter: blur(80px);
-      opacity: 0.12;
-      pointer-events: none;
-      z-index: -1;
-    }
-
-    .shell::before {
-      top: -8rem;
-      left: -8rem;
-      background: #4fb3ff;
-    }
-
-    .shell::after {
-      right: -10rem;
-      top: 18rem;
-      background: #4fd1a5;
-    }
-
+    /* 顶部栏 ———— 极简：只有图标/标题/夜间按钮/github按钮，单行保证 */
     .topbar {
       position: sticky;
       top: 0;
-      z-index: 20;
-      backdrop-filter: blur(18px);
-      background: rgba(10, 15, 30, 0.7);
-      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-    }
-
-    .topbar-inner,
-    .section,
-    .footer-inner {
-      width: min(var(--max-width), calc(100% - 40px));
-      margin: 0 auto;
+      z-index: 30;
+      backdrop-filter: blur(20px);
+      background: var(--bg-panel);
+      border-bottom: 1px solid var(--border-light);
+      transition: background 0.2s;
     }
 
     .topbar-inner {
-      min-height: 76px;
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 0 20px;
+      min-height: 64px;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 20px;
+      gap: 12px;
+      /* 确保单行不换行 */
+      flex-wrap: nowrap;
     }
 
+    /* 品牌区：图标+标题，单行 */
     .brand {
       display: inline-flex;
       align-items: center;
-      gap: 14px;
-      font-weight: 700;
-      letter-spacing: 0.02em;
-      white-space: nowrap;
+      gap: 10px;
+      text-decoration: none;
+      color: var(--text-primary);
+      flex-shrink: 1;
+      min-width: 0;
     }
 
     .brand-mark {
-      width: 40px;
-      height: 40px;
-      border-radius: 12px;
-      background: linear-gradient(145deg, rgba(79, 179, 255, 0.95), rgba(79, 209, 165, 0.86));
+      width: 34px;
+      height: 34px;
+      border-radius: 10px;
+      background: var(--accent);
       display: grid;
       place-items: center;
-      box-shadow: 0 10px 26px rgba(79, 179, 255, 0.28);
       overflow: hidden;
+      flex-shrink: 0;
+      box-shadow: 0 2px 8px var(--accent-glow);
     }
 
     .brand-mark img {
@@ -138,1101 +122,731 @@
       object-fit: cover;
     }
 
-    .brand-meta {
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
+    .brand-name {
+      font-size: 1.25rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
-    .brand-subtitle {
-      font-size: 12px;
-      color: var(--muted);
-      font-weight: 500;
-    }
-
-    .nav {
-      display: flex;
-      align-items: center;
-      gap: 22px;
-      color: var(--muted);
-      font-size: 14px;
-    }
-
-    .nav a:hover {
-      color: var(--text);
-    }
-
-    .nav-cta {
+    /* 右侧按钮组：夜间模式切换 + github图标，单行 */
+    .right-actions {
       display: flex;
       align-items: center;
       gap: 12px;
+      flex-shrink: 0;
     }
 
-    .btn {
-      display: inline-flex;
+    /* 通用图标按钮样式 */
+    .icon-btn {
+      width: 40px;
+      height: 40px;
+      display: flex;
       align-items: center;
       justify-content: center;
-      gap: 10px;
-      padding: 13px 18px;
-      border-radius: 999px;
-      border: 1px solid transparent;
-      font-weight: 700;
-      font-size: 14px;
-      transition: transform 180ms ease, border-color 180ms ease, background 180ms ease, color 180ms ease, box-shadow 180ms ease;
+      border-radius: 40px;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border-light);
       cursor: pointer;
-      white-space: nowrap;
+      transition: var(--transition-default);
+      font-size: 1.5rem;
+      line-height: 1;
+      text-decoration: none;
+      color: var(--text-primary);
     }
 
-    .btn:hover {
-      transform: translateY(-1px);
+    .icon-btn:hover {
+      background: var(--accent-soft);
+      transform: scale(0.96);
     }
 
-    .btn-primary {
-      color: #06101f;
-      background: linear-gradient(180deg, #71c4ff, #4fb3ff 55%, #399dff);
-      box-shadow: 0 14px 32px rgba(79, 179, 255, 0.24);
+    .theme-icon {
+      width: 22px;
+      height: 22px;
+      display: block;
+      pointer-events: none;
     }
 
-    .btn-secondary {
-      color: var(--text);
-      background: rgba(255, 255, 255, 0.04);
-      border-color: var(--border);
+    /* github 图标 svg 定制 */
+    .github-icon-svg {
+      width: 22px;
+      height: 22px;
+      fill: var(--text-primary);
+      transition: fill 0.2s;
     }
 
-    .hero {
-      padding: 84px 0 42px;
+    .icon-btn:hover .github-icon-svg {
+      fill: var(--accent);
+    }
+
+    /* 其余页面样式复用原有设计，但微调部分间距 */
+    .section-container,
+    .footer-inner {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+
+    .section {
+      padding: 56px 0 48px;
     }
 
     .hero-grid {
       display: grid;
-      grid-template-columns: minmax(0, 1.1fr) minmax(340px, 0.9fr);
-      gap: 36px;
+      grid-template-columns: 1fr 1fr;
+      gap: 48px;
       align-items: center;
     }
 
     .eyebrow {
       display: inline-flex;
       align-items: center;
-      gap: 10px;
-      padding: 8px 14px;
-      border: 1px solid rgba(79, 179, 255, 0.25);
-      border-radius: 999px;
-      background: rgba(79, 179, 255, 0.08);
-      color: #cfe8ff;
-      font-size: 13px;
-      font-weight: 700;
-      letter-spacing: 0.02em;
-    }
-
-    .eyebrow-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: var(--success);
-      box-shadow: 0 0 0 6px rgba(79, 209, 165, 0.18);
+      gap: 8px;
+      background: var(--accent-soft);
+      padding: 6px 16px;
+      border-radius: 40px;
+      font-size: 0.8rem;
+      font-weight: 500;
+      color: var(--accent);
     }
 
     h1 {
-      margin: 22px 0 18px;
-      font-size: clamp(2.8rem, 5vw, 5.4rem);
-      line-height: 0.96;
-      letter-spacing: -0.04em;
-      max-width: 10ch;
+      font-size: clamp(2.5rem, 5vw, 4.8rem);
+      line-height: 1.1;
+      letter-spacing: -0.03em;
+      margin: 20px 0 16px;
     }
 
     .lead {
-      max-width: 62ch;
-      font-size: clamp(1.05rem, 1.6vw, 1.18rem);
-      color: var(--muted);
-      margin: 0 0 28px;
+      font-size: 1.1rem;
+      color: var(--text-secondary);
+      max-width: 90%;
+      margin-bottom: 28px;
     }
 
     .hero-actions {
       display: flex;
       flex-wrap: wrap;
       gap: 14px;
-      margin-bottom: 22px;
+      margin-bottom: 24px;
     }
 
-    .hero-meta {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 12px;
-      color: var(--muted);
-      font-size: 14px;
-    }
-
-    .meta-pill {
+    .btn {
       display: inline-flex;
       align-items: center;
+      justify-content: center;
       gap: 8px;
-      padding: 10px 14px;
-      background: rgba(255, 255, 255, 0.04);
-      border: 1px solid var(--border);
-      border-radius: 999px;
+      padding: 10px 20px;
+      border-radius: 60px;
+      font-weight: 600;
+      font-size: 0.9rem;
+      transition: all 0.2s;
+      text-decoration: none;
+      cursor: pointer;
+      border: 1px solid transparent;
     }
 
-    .meta-pill strong {
-      color: var(--text);
+    .btn-primary {
+      background: var(--accent);
+      color: #ffffff;
+      box-shadow: 0 4px 12px var(--accent-glow);
     }
 
-    .hero-visual {
-      position: relative;
-      min-height: 620px;
-      display: grid;
-      align-items: center;
-      justify-items: center;
+    .btn-primary:hover {
+      filter: brightness(1.05);
+      transform: translateY(-1px);
     }
 
+    .btn-secondary {
+      background: var(--bg-elevated);
+      border-color: var(--border-light);
+      color: var(--text-primary);
+    }
+
+    .btn-secondary:hover {
+      background: var(--accent-soft);
+      border-color: var(--accent);
+    }
+
+    /* 编辑器窗口等复用 */
     .editor-window {
-      width: min(100%, 620px);
-      border-radius: 28px;
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      background: linear-gradient(180deg, rgba(23, 34, 58, 0.96), rgba(14, 20, 35, 0.96));
-      box-shadow: var(--shadow);
+      background: var(--bg-surface);
+      border: 1px solid var(--border-light);
+      border-radius: var(--radius-lg);
       overflow: hidden;
-      position: relative;
+      box-shadow: var(--shadow-md);
     }
 
     .window-bar {
-      height: 42px;
+      background: var(--bg-elevated);
+      padding: 12px 16px;
       display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 0 16px;
-      background: rgba(255, 255, 255, 0.04);
-      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      gap: 8px;
+      border-bottom: 1px solid var(--border-light);
     }
 
     .window-dot {
-      width: 10px;
-      height: 10px;
+      width: 12px;
+      height: 12px;
       border-radius: 50%;
-      background: rgba(255, 255, 255, 0.2);
+      background: var(--text-muted);
+      opacity: 0.6;
     }
 
     .window-body {
       display: grid;
-      grid-template-columns: 1.1fr 0.9fr;
-      min-height: 520px;
+      grid-template-columns: 1fr 1fr;
     }
 
     .code-pane {
-      padding: 28px;
-      background:
-        linear-gradient(180deg, rgba(79, 179, 255, 0.08), transparent 18%),
-        radial-gradient(circle at top right, rgba(79, 209, 165, 0.14), transparent 28%),
-        #11192b;
-      border-right: 1px solid rgba(255, 255, 255, 0.06);
-    }
-
-    .code-glyphs {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin-bottom: 18px;
-      color: var(--muted);
-      font-size: 12px;
-      font-weight: 700;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-    }
-
-    .code-chip {
-      padding: 6px 10px;
-      border-radius: 999px;
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid rgba(255, 255, 255, 0.06);
+      padding: 24px;
+      border-right: 1px solid var(--border-light);
     }
 
     .feature-lines {
-      margin: 0;
-      padding: 0;
       list-style: none;
       display: grid;
-      gap: 14px;
-      font-size: 15px;
-      color: #dbe7ff;
+      gap: 16px;
     }
 
     .feature-lines li {
       display: flex;
-      align-items: center;
       gap: 12px;
+      align-items: flex-start;
     }
 
     .line-marker {
-      width: 12px;
-      height: 12px;
+      width: 8px;
+      height: 8px;
+      background: var(--accent);
       border-radius: 50%;
-      background: linear-gradient(180deg, #71c4ff, #4fd1a5);
-      box-shadow: 0 0 0 4px rgba(79, 179, 255, 0.08);
-      flex: 0 0 auto;
+      margin-top: 6px;
+      flex-shrink: 0;
     }
 
     .device-stack {
       padding: 24px;
-      display: grid;
-      gap: 16px;
-      align-content: center;
-      justify-items: center;
-      background: linear-gradient(180deg, rgba(10, 14, 26, 0.78), rgba(17, 27, 48, 0.96));
+      display: flex;
+      justify-content: center;
+      align-items: center;
     }
 
     .gif-frame {
-      width: min(100%, 254px);
+      max-width: 260px;
       border-radius: 24px;
-      padding: 10px;
-      background: linear-gradient(180deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.03));
-      border: 1px solid rgba(255, 255, 255, 0.09);
-      box-shadow: 0 18px 34px rgba(0, 0, 0, 0.34);
-      overflow: hidden;
-    }
-
-    .gif-frame.tall {
-      width: min(100%, 276px);
+      background: var(--bg-elevated);
+      padding: 8px;
+      border: 1px solid var(--border-light);
     }
 
     .gif-frame img {
       width: 100%;
-      height: 100%;
-      max-height: 430px;
-      object-fit: contain;
       border-radius: 18px;
-      background: #0b1020;
+      display: block;
     }
 
-    .gif-caption {
-      color: var(--muted);
-      font-size: 13px;
-      text-align: center;
-      max-width: 24ch;
-    }
-
-    .section {
-      padding: 38px 0;
-    }
-
-    .section-head {
-      display: flex;
-      align-items: end;
-      justify-content: space-between;
-      gap: 18px;
-      margin-bottom: 20px;
-    }
-
-    .section-title {
-      margin: 0;
-      font-size: clamp(1.6rem, 2.5vw, 2.4rem);
-      line-height: 1.1;
-      letter-spacing: -0.03em;
-    }
-
-    .section-subtitle {
-      margin: 0;
-      max-width: 62ch;
-      color: var(--muted);
-      font-size: 15px;
-    }
-
+    /* 数据卡片 */
     .stats-grid {
       display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 16px;
-    }
-
-    .stat-card,
-    .feature-card,
-    .download-card,
-    .compare-card {
-      background: var(--panel);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-lg);
-      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.2);
-      backdrop-filter: blur(16px);
+      grid-template-columns: repeat(4, 1fr);
+      gap: 20px;
+      margin-top: 24px;
     }
 
     .stat-card {
-      padding: 18px;
+      background: var(--bg-panel);
+      border: 1px solid var(--border-light);
+      border-radius: var(--radius-md);
+      padding: 20px;
     }
 
     .stat-value {
-      display: block;
-      font-size: 1.5rem;
+      font-size: 1.8rem;
       font-weight: 800;
-      margin-bottom: 4px;
+      display: block;
+      margin-bottom: 8px;
     }
 
-    .stat-label {
-      color: var(--muted);
-      font-size: 13px;
-    }
-
-    .pill-row {
+    /* 下载区域 —— 动态展示单平台卡片 + 全部平台卡片 */
+    .platform-grid {
       display: flex;
       flex-wrap: wrap;
-      gap: 10px;
-      margin-top: 20px;
-    }
-
-    .pill {
-      padding: 9px 12px;
-      border-radius: 999px;
-      background: rgba(255, 255, 255, 0.04);
-      border: 1px solid rgba(255, 255, 255, 0.07);
-      color: #d7e4ff;
-      font-size: 13px;
-    }
-
-    .platform-grid {
-      display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 16px;
+      gap: 24px;
+      align-items: stretch;
     }
 
     .download-card {
-      padding: 20px;
-      position: relative;
-      overflow: hidden;
+      background: var(--bg-panel);
+      border: 1px solid var(--border-light);
+      border-radius: var(--radius-md);
+      padding: 24px;
+      flex: 1 1 240px;
+      transition: all 0.2s;
     }
 
     .download-card.recommended {
-      border-color: rgba(79, 179, 255, 0.42);
-      box-shadow: 0 18px 40px rgba(79, 179, 255, 0.12);
-    }
-
-    .download-card.recommended::after {
-      content: "推荐";
-      position: absolute;
-      top: 16px;
-      right: 16px;
-      padding: 6px 10px;
-      border-radius: 999px;
-      background: rgba(79, 179, 255, 0.18);
-      color: #dff1ff;
-      font-size: 12px;
-      font-weight: 800;
-      border: 1px solid rgba(79, 179, 255, 0.28);
-    }
-
-    .download-title {
-      margin: 0 0 6px;
-      font-size: 1.1rem;
-    }
-
-    .download-desc {
-      color: var(--muted);
-      font-size: 14px;
-      margin: 0 0 16px;
-      min-height: 44px;
-    }
-
-    .download-action {
-      width: 100%;
-      margin-bottom: 10px;
-    }
-
-    .download-alt {
-      color: var(--muted);
-      font-size: 13px;
-    }
-
-    .download-alt a {
-      color: #cfe8ff;
-      text-decoration: underline;
-      text-underline-offset: 3px;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 1px var(--accent), var(--shadow-sm);
     }
 
     .feature-grid {
       display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 16px;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 24px;
     }
 
     .feature-card {
+      background: var(--bg-panel);
+      border: 1px solid var(--border-light);
+      border-radius: var(--radius-lg);
       display: grid;
-      grid-template-columns: minmax(220px, 0.85fr) minmax(0, 1.15fr);
-      gap: 18px;
-      padding: 18px;
+      grid-template-columns: 1fr 0.9fr;
+      gap: 20px;
+      padding: 24px;
       align-items: center;
-    }
-
-    .feature-card:nth-child(even) {
-      grid-template-columns: minmax(0, 1.15fr) minmax(220px, 0.85fr);
-    }
-
-    .feature-copy h3 {
-      margin: 0 0 8px;
-      font-size: 1.2rem;
-    }
-
-    .feature-copy p {
-      margin: 0;
-      color: var(--muted);
-      font-size: 14px;
     }
 
     .feature-tag {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      padding: 8px 12px;
-      margin-bottom: 12px;
-      border-radius: 999px;
-      background: rgba(79, 179, 255, 0.1);
-      color: #cfe8ff;
-      font-size: 12px;
-      font-weight: 700;
-      letter-spacing: 0.02em;
-    }
-
-    .feature-tag .line-marker {
-      width: 10px;
-      height: 10px;
-    }
-
-    .media-card {
-      display: grid;
-      justify-items: center;
-      gap: 10px;
-    }
-
-    .media-card .gif-frame {
-      width: min(100%, 300px);
-    }
-
-    .media-card .gif-frame img {
-      max-height: 520px;
+      display: inline-block;
+      background: var(--accent-soft);
+      color: var(--accent);
+      padding: 4px 12px;
+      border-radius: 40px;
+      font-size: 0.75rem;
+      font-weight: 600;
     }
 
     .compare-card {
-      padding: 22px;
+      background: var(--bg-panel);
+      border: 1px solid var(--border-light);
+      border-radius: var(--radius-lg);
+      padding: 4px 0;
+      overflow-x: auto;
     }
 
-    table {
+    .compare-card table {
       width: 100%;
+      min-width: 680px;
       border-collapse: collapse;
-      overflow: hidden;
-      border-radius: 18px;
+      font-size: 0.85rem;
     }
 
-    th,
-    td {
+    th, td {
       text-align: left;
       padding: 14px 12px;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-      vertical-align: top;
-      font-size: 14px;
+      border-bottom: 1px solid var(--border-light);
+      color: var(--text-secondary);
     }
 
     th {
-      color: #dfe9ff;
-      font-size: 13px;
-      letter-spacing: 0.02em;
-      background: rgba(255, 255, 255, 0.03);
-    }
-
-    td {
-      color: var(--muted);
-    }
-
-    td strong {
-      color: var(--text);
+      font-weight: 700;
+      color: var(--text-primary);
+      background: var(--bg-elevated);
     }
 
     .positive {
-      color: #a8f0d6;
-      font-weight: 700;
-    }
-
-    .negative {
-      color: #ffb5b5;
-      font-weight: 700;
+      color: var(--success);
+      font-weight: 600;
     }
 
     .cta-band {
-      margin: 28px 0 70px;
-      border-radius: 32px;
-      padding: 28px;
-      background:
-        linear-gradient(135deg, rgba(79, 179, 255, 0.18), rgba(79, 209, 165, 0.12)),
-        linear-gradient(180deg, rgba(17, 26, 45, 0.96), rgba(13, 20, 35, 0.96));
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      box-shadow: var(--shadow);
+      background: var(--bg-elevated);
+      border-radius: var(--radius-xl);
+      padding: 40px 32px;
       display: flex;
-      align-items: center;
       justify-content: space-between;
-      gap: 20px;
-    }
-
-    .cta-band h2 {
-      margin: 0 0 8px;
-      font-size: clamp(1.6rem, 3vw, 2.2rem);
-    }
-
-    .cta-band p {
-      margin: 0;
-      color: var(--muted);
-      max-width: 58ch;
-    }
-
-    .cta-actions {
-      display: flex;
+      align-items: center;
       flex-wrap: wrap;
-      gap: 12px;
-      justify-content: flex-end;
+      gap: 24px;
+      margin: 32px 0 20px;
+      border: 1px solid var(--border-light);
     }
 
     .footer {
-      padding: 0 0 38px;
-      color: var(--muted);
-      font-size: 13px;
+      border-top: 1px solid var(--border-light);
+      padding: 32px 0 40px;
+      margin-top: 32px;
     }
 
     .footer-inner {
-      padding-top: 18px;
-      border-top: 1px solid rgba(255, 255, 255, 0.08);
       display: flex;
       justify-content: space-between;
-      gap: 18px;
       flex-wrap: wrap;
+      gap: 16px;
+      color: var(--text-muted);
+      font-size: 0.85rem;
     }
 
-    @media (max-width: 1120px) {
-      .hero-grid,
-      .feature-grid,
-      .platform-grid,
+    /* 模态框样式 */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(6px);
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      visibility: hidden;
+      opacity: 0;
+      transition: visibility 0.2s, opacity 0.2s;
+    }
+
+    .modal-overlay.active {
+      visibility: visible;
+      opacity: 1;
+    }
+
+    .modal-container {
+      background: var(--bg-body);
+      border-radius: 32px;
+      max-width: 900px;
+      width: 90%;
+      max-height: 85vh;
+      overflow-y: auto;
+      border: 1px solid var(--border-light);
+      box-shadow: var(--shadow-md);
+      padding: 28px 24px 32px;
+      position: relative;
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border-light);
+    }
+
+    .modal-header h3 {
+      font-size: 1.6rem;
+    }
+
+    .close-modal {
+      background: none;
+      border: none;
+      font-size: 28px;
+      cursor: pointer;
+      color: var(--text-muted);
+      transition: color 0.2s;
+    }
+
+    .downloads-full-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .downloads-full-table th,
+    .downloads-full-table td {
+      padding: 12px 8px;
+      border-bottom: 1px solid var(--border-light);
+    }
+
+    .downloads-full-table a {
+      color: var(--accent);
+      text-decoration: none;
+      word-break: break-all;
+    }
+
+    @media (max-width: 1024px) {
+      .hero-grid, .stats-grid, .feature-grid {
+        grid-template-columns: 1fr;
+      }
+      .window-body {
+        grid-template-columns: 1fr;
+      }
+      .feature-card {
+        grid-template-columns: 1fr;
+      }
       .stats-grid {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px;
       }
-
-      .window-body,
-      .feature-card,
-      .feature-card:nth-child(even) {
-        grid-template-columns: 1fr;
-      }
-
-      .hero-visual {
-        min-height: auto;
-      }
-
-      .editor-window {
-        width: 100%;
+      .platform-grid {
+        gap: 16px;
       }
     }
 
-    @media (max-width: 820px) {
-      .topbar-inner {
-        flex-wrap: wrap;
-        padding: 14px 0;
+    @media (max-width: 640px) {
+      .section-container, .topbar-inner, .footer-inner {
+        padding: 0 18px;
       }
-
-      .nav {
-        order: 3;
-        width: 100%;
-        overflow-x: auto;
-        padding-bottom: 4px;
+      .brand-name {
+        font-size: 1rem;
       }
-
-      .hero {
-        padding-top: 54px;
+      .brand-mark {
+        width: 28px;
+        height: 28px;
       }
-
-      .hero-grid,
-      .stats-grid,
-      .platform-grid,
-      .feature-grid {
-        grid-template-columns: 1fr;
+      .icon-btn {
+        width: 36px;
+        height: 36px;
+        font-size: 1.2rem;
       }
-
-      .section-head,
-      .cta-band,
-      .footer-inner {
-        flex-direction: column;
-        align-items: flex-start;
+      .github-icon-svg {
+        width: 18px;
+        height: 18px;
       }
-
-      h1 {
-        max-width: none;
+      .theme-icon {
+        width: 18px;
+        height: 18px;
       }
-
-      .cta-actions {
-        width: 100%;
-        justify-content: flex-start;
+      .right-actions {
+        gap: 8px;
       }
-
-      .gif-frame,
-      .gif-frame.tall {
-        width: min(100%, 320px);
-      }
-    }
-
-    @media (prefers-reduced-motion: reduce) {
-      html {
-        scroll-behavior: auto;
-      }
-
-      * {
-        transition-duration: 0ms !important;
-        animation-duration: 0ms !important;
+      .btn {
+        padding: 8px 16px;
+        font-size: 0.8rem;
       }
     }
   </style>
 </head>
 <body>
-  <div class="shell">
-    <header class="topbar">
-      <div class="topbar-inner">
-        <a class="brand" href="#top">
-          <span class="brand-mark"><img src="assets/readme/logo.png" alt="EasyPocketMD"></span>
-          <span class="brand-meta">
-            <span>EasyPocketMD</span>
-            <span class="brand-subtitle">Markdown 编辑器 · Web / Android / Desktop</span>
-          </span>
+<div class="shell">
+  <!-- 极简顶部栏：只包含图标/标题/夜间模式切换/github跳转按钮 -->
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="#top">
+        <span class="brand-mark"><img src="https://static.yhsun.cn/assets/icon.png" alt="EasyPocketMD"></span>
+        <span class="brand-name">EasyPocketMD</span>
+      </a>
+      <div class="right-actions">
+        <!-- 夜间模式切换按钮 -->
+        <button class="icon-btn" id="themeToggleBtn" aria-label="切换日夜模式">
+          <img id="themeToggleIcon" class="theme-icon" src="https://static.yhsun.cn/assets/theme-dark.svg" alt="主题切换图标">
+        </button>
+        <!-- GitHub 图标按钮，跳转指定仓库 -->
+        <a class="icon-btn" href="https://github.com/sunhouy/EasyPocketMD" target="_blank" rel="noopener noreferrer" aria-label="GitHub仓库">
+          <svg class="github-icon-svg" viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+            <path d="M12 0C5.37 0 0 5.37 0 12c0 5.3 3.438 9.8 8.205 11.387.6.113.82-.26.82-.58 0-.287-.01-1.05-.015-2.06-3.338.726-4.042-1.416-4.042-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.09-.745.082-.73.082-.73 1.205.085 1.84 1.237 1.84 1.237 1.07 1.834 2.807 1.304 3.492.997.108-.775.418-1.305.762-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.468-2.38 1.235-3.22-.123-.3-.535-1.52.117-3.16 0 0 1.008-.322 3.3 1.23.96-.267 1.98-.4 3-.405 1.02.005 2.04.138 3 .405 2.29-1.552 3.297-1.23 3.297-1.23.653 1.64.24 2.86.118 3.16.768.84 1.233 1.91 1.233 3.22 0 4.61-2.804 5.62-5.476 5.92.43.37.824 1.102.824 2.22 0 1.602-.015 2.894-.015 3.287 0 .322.216.698.83.578C20.565 21.795 24 17.295 24 12c0-6.63-5.37-12-12-12z"/>
+          </svg>
         </a>
-        <nav class="nav" aria-label="页面导航">
-          <a href="#features">功能</a>
-          <a href="#downloads">下载</a>
-          <a href="#compare">对比</a>
-          <a href="https://md.yhsun.cn/" target="_blank" rel="noreferrer">在线使用</a>
-        </nav>
-        <div class="nav-cta">
-          <a class="btn btn-secondary" href="#downloads">查看下载</a>
-          <a class="btn btn-primary" href="https://md.yhsun.cn/" target="_blank" rel="noreferrer">立即在线使用</a>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <!-- Hero 区域保持原有风格，但去除顶部栏重复链接 -->
+    <section class="section">
+      <div class="section-container hero-grid">
+        <div>
+          <div class="eyebrow">✨ 开源免费的在线Markdown编辑器</div>
+          <h1>AI 驱动 · 极速 · 跨平台</h1>
+          <p class="lead">无需记忆语法，也能轻松插入格式化文本、LaTeX 公式和图表。配合智能搜索与 AI 助手，常用功能都能几步完成。实时协作、AI 辅助写作与流畅编辑体验，全部整合在美观的界面中。</p>
+          <div class="hero-actions" id="dynamicHeroActions">
+          </div>
+        </div>
+        <div class="hero-visual">
+          <div class="editor-window">
+            <div class="window-bar"><span class="window-dot"></span><span class="window-dot"></span><span class="window-dot"></span></div>
+            <div class="window-body">
+              <div class="code-pane">
+                <ul class="feature-lines">
+                  <li><span class="line-marker"></span>便捷操作，无需记忆语法</li>
+                  <li><span class="line-marker"></span>桌面/移动端/Web完全一致的体验</li>
+                  <li><span class="line-marker"></span>全局查找/全文检索/差异对比</li>
+                  <li><span class="line-marker"></span>与doc/ppt/xlsx无缝衔接</li>
+                  <li><span class="line-marker"></span>现代化界面/极致性能</li>
+                  <li><span class="line-marker"></span>在线协作/加密音视频通话</li>
+                  <li><span class="line-marker"></span>AI生成PPT/公式/图表</li>
+                  <li><span class="line-marker"></span>跨平台同步/云打印</li>
+                </ul>
+              </div>
+              <div class="device-stack">
+                <div class="gif-frame"><img src="https://static.yhsun.cn/assets/main.png" alt="主界面展示" loading="lazy"></div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
-    </header>
+    </section>
 
-    <main id="top">
-      <section class="hero section">
-        <div class="section hero-grid">
-          <div>
-            <div class="eyebrow"><span class="eyebrow-dot"></span><span>零学习成本的 Markdown 编辑器，支持 AI、协作、云打印与多端同步</span></div>
-            <h1>像 VS Code 一样清晰，像笔记工具一样顺手。</h1>
-            <p class="lead">EasyPocketMD 把 Markdown 编辑、AI 辅助、实时协作、文件导入导出和云打印整合到一个统一体验里。桌面、网页、Android 都能使用，并且为不同系统提供直接可用的下载包。</p>
-            <div class="hero-actions">
-              <a class="btn btn-primary" href="https://md.yhsun.cn/" target="_blank" rel="noreferrer">在线使用</a>
-              <a class="btn btn-secondary" id="recommendedDownloadBtn" href="#downloads">下载推荐版</a>
-              <a class="btn btn-secondary" href="#features">看功能演示</a>
-            </div>
-            <div class="hero-meta">
-              <span class="meta-pill"><strong>推荐平台：</strong><span id="platformLabel">自动识别中</span></span>
-              <span class="meta-pill"><strong>在线地址：</strong><a href="https://md.yhsun.cn/" target="_blank" rel="noreferrer">md.yhsun.cn</a></span>
-              <span class="meta-pill"><strong>桌面体验：</strong>适配竖版 GIF 与大屏浏览</span>
-            </div>
-            <div class="pill-row" aria-label="核心能力">
-              <span class="pill">AI 写作与 PPT 生成</span>
-              <span class="pill">实时协作</span>
-              <span class="pill">加密视频通话</span>
-              <span class="pill">历史版本</span>
-              <span class="pill">云打印</span>
-              <span class="pill">跨平台同步</span>
-            </div>
-          </div>
-
-          <div class="hero-visual" aria-label="产品视觉展示">
-            <div class="editor-window">
-              <div class="window-bar">
-                <span class="window-dot"></span>
-                <span class="window-dot"></span>
-                <span class="window-dot"></span>
-              </div>
-              <div class="window-body">
-                <div class="code-pane">
-                  <div class="code-glyphs">
-                    <span class="code-chip">Markdown</span>
-                    <span class="code-chip">AI</span>
-                    <span class="code-chip">Share</span>
-                  </div>
-                  <ul class="feature-lines">
-                    <li><span class="line-marker"></span><span>插入格式化文本、公式、图表和文件，不必记忆复杂语法。</span></li>
-                    <li><span class="line-marker"></span><span>直接在线使用，也可下载到 Windows / macOS / Linux / Android。</span></li>
-                    <li><span class="line-marker"></span><span>支持多端同步、历史版本、全文搜索与文件差异对比。</span></li>
-                    <li><span class="line-marker"></span><span>云打印、共享协作和视频通话都在同一个工作区内完成。</span></li>
-                  </ul>
-                </div>
-                <div class="device-stack">
-                  <div class="gif-frame tall">
-                    <img src="assets/readme/aigenppt.gif" alt="AI 生成 PPT 演示 GIF" loading="lazy">
-                  </div>
-                  <div class="gif-caption">竖版 GIF 通过卡片式留白展示，在桌面端也不会显得拥挤。</div>
-                </div>
-              </div>
-            </div>
-          </div>
+    <!-- 数据速览等保持原样 -->
+    <section class="section">
+      <div class="section-container">
+        <div class="stats-grid">
+          <div class="stat-card"><span class="stat-value">AI 原生</span><span class="stat-label">写作/排版/图表/PPT</span></div>
+          <div class="stat-card"><span class="stat-value">实时协作</span><span class="stat-label">共享文档/多人编辑</span></div>
+          <div class="stat-card"><span class="stat-value">多端一致</span><span class="stat-label">Web/Android/桌面端</span></div>
+          <div class="stat-card"><span class="stat-value">开源免费</span><span class="stat-label">安全稳定可信赖</span></div>
         </div>
-      </section>
+      </div>
+    </section>
 
-      <section class="section">
-        <div class="section-head section">
-          <div>
-            <h2 class="section-title">一个页面看清优势</h2>
-            <p class="section-subtitle">从内容生产、协作到导出打印，EasyPocketMD 重点解决的是“写完之后怎么顺手落地”。</p>
-          </div>
-        </div>
-        <div class="section stats-grid">
-          <div class="stat-card"><span class="stat-value">AI 原生</span><span class="stat-label">写作、改写、排版、图表、公式、PPT 一体化</span></div>
-          <div class="stat-card"><span class="stat-value">实时协作</span><span class="stat-label">共享文档、多人编辑、远程沟通都能直接用</span></div>
-          <div class="stat-card"><span class="stat-value">多端一致</span><span class="stat-label">Web、Android、Windows、macOS、Linux 保持同一体验</span></div>
-          <div class="stat-card"><span class="stat-value">可直接下载</span><span class="stat-label">在线地址和全部安装包都在这个页面里</span></div>
-        </div>
-      </section>
-
-      <section class="section" id="downloads">
-        <div class="section-head section">
+    <!-- 下载区域：仅展示当前系统推荐卡片 + 全部平台按钮 -->
+    <section class="section" id="downloads">
+      <div class="section-container">
+        <div class="section-head">
           <div>
             <h2 class="section-title">下载与在线使用</h2>
-            <p class="section-subtitle">页面会根据你的系统自动推荐一个最合适的下载入口，同时保留全部安装包，方便你按场景选择。</p>
+            <p class="stat-label" id="dynamicDownloadHint">根据您的系统智能推荐版本</p>
           </div>
-          <div class="hero-actions" style="margin:0;">
-            <a class="btn btn-secondary" href="https://md.yhsun.cn/" target="_blank" rel="noreferrer">直接在线使用</a>
-          </div>
+          <a class="btn btn-secondary" href="https://md.yhsun.cn/" target="_blank" rel="noreferrer">在线使用 Web 版</a>
         </div>
-
-        <div class="platform-grid">
-          <article class="download-card" id="card-web">
-            <h3 class="download-title">Web 在线版</h3>
-            <p class="download-desc">无需安装，打开即可使用，适合快速编辑与跨设备访问。</p>
-            <a class="btn btn-primary download-action" href="https://md.yhsun.cn/" target="_blank" rel="noreferrer">打开在线地址</a>
-            <div class="download-alt">地址：<a href="https://md.yhsun.cn/" target="_blank" rel="noreferrer">https://md.yhsun.cn/</a></div>
-          </article>
-
-          <article class="download-card" id="card-android">
-            <h3 class="download-title">Android</h3>
-            <p class="download-desc">移动端随时编辑、同步与查看文档，适合外出场景。</p>
-            <a class="btn btn-primary download-action" href="https://static.yhsun.cn/android/app-release.apk" target="_blank" rel="noreferrer">下载 APK</a>
-            <div class="download-alt">安装包：app-release.apk</div>
-          </article>
-
-          <article class="download-card" id="card-desktop">
-            <h3 class="download-title">桌面端</h3>
-            <p class="download-desc">Windows、macOS、Linux 都提供独立安装包，适合重度编辑与日常使用。</p>
-            <a class="btn btn-primary download-action" id="recommendedDownloadLink" href="#">下载推荐版</a>
-            <div class="download-alt" id="recommendedDownloadNote">正在识别系统...</div>
-          </article>
-
-          <article class="download-card">
-            <h3 class="download-title">全部下载</h3>
-            <p class="download-desc">如果你更想自己选择安装包，这里提供完整列表。</p>
-            <a class="btn btn-secondary download-action" href="#all-downloads">查看全部下载</a>
-            <div class="download-alt">包含 Windows / macOS / Linux / Android / Web</div>
-          </article>
+        <div class="platform-grid" id="dynamicDownloadCards">
+          <!-- 动态生成：Android卡片 或 桌面端卡片，以及“全部平台”卡片 -->
         </div>
-
-        <div class="compare-card" id="all-downloads" style="margin-top:16px;">
-          <table>
-            <thead>
-              <tr>
-                <th>平台</th>
-                <th>推荐链接</th>
-                <th>全部下载</th>
-              </tr>
-            </thead>
-            <tbody id="downloadTableBody">
-              <tr>
-                <td>Web</td>
-                <td><span class="positive">在线即用</span></td>
-                <td><a href="https://md.yhsun.cn/" target="_blank" rel="noreferrer">https://md.yhsun.cn/</a></td>
-              </tr>
-              <tr>
-                <td>Android</td>
-                <td><span class="positive">APK</span></td>
-                <td><a href="https://static.yhsun.cn/android/app-release.apk" target="_blank" rel="noreferrer">app-release.apk</a></td>
-              </tr>
-              <tr>
-                <td>Windows</td>
-                <td><span class="positive">.exe</span></td>
-                <td><a href="https://static.yhsun.cn/electron/win/easypocketmd_windows.exe" target="_blank" rel="noreferrer">easypocketmd_windows.exe</a></td>
-              </tr>
-              <tr>
-                <td>macOS</td>
-                <td><span class="positive">.dmg</span></td>
-                <td><a href="https://static.yhsun.cn/electron/macos/easypocketmd_mac.dmg" target="_blank" rel="noreferrer">easypocketmd_mac.dmg</a></td>
-              </tr>
-              <tr>
-                <td>Linux</td>
-                <td><span class="positive">.AppImage</span></td>
-                <td>
-                  <div><a href="https://static.yhsun.cn/electron/linux/easypocketmd_linux.appimage" target="_blank" rel="noreferrer">easypocketmd_linux.appimage</a></div>
-                  <div><a href="https://static.yhsun.cn/electron/linux/easypocketmd_linux.deb" target="_blank" rel="noreferrer">easypocketmd_linux.deb</a></div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <section class="section" id="features">
-        <div class="section-head section">
-          <div>
-            <h2 class="section-title">功能特性展示</h2>
-            <p class="section-subtitle">把最重要的演示内容直接摆出来，GIF 采用更宽的卡片和留白，竖版内容在桌面上也能轻松看清。</p>
-          </div>
-        </div>
-
-        <div class="feature-grid">
-          <article class="feature-card">
-            <div class="feature-copy">
-              <div class="feature-tag"><span class="line-marker"></span>AI 写作与 PPT 生成</div>
-              <h3>从文档到演示稿，几步完成</h3>
-              <p>适合把 Markdown 内容快速整理成可展示的结构，减少重复手工排版。</p>
-            </div>
-            <div class="media-card">
-              <div class="gif-frame tall">
-                <img src="assets/readme/aigenppt.gif" alt="AI 写作助手生成 PPT 的演示" loading="lazy">
-              </div>
-            </div>
-          </article>
-
-          <article class="feature-card">
-            <div class="feature-copy">
-              <div class="feature-tag"><span class="line-marker"></span>AI 图表与公式</div>
-              <h3>提示词生成公式、图表和结构化内容</h3>
-              <p>把复杂表达变成可视化结果，适合文档、课程资料和方案说明。</p>
-            </div>
-            <div class="media-card">
-              <div class="gif-frame tall">
-                <img src="assets/readme/aigenformula.gif" alt="AI 图表与公式生成演示" loading="lazy">
-              </div>
-            </div>
-          </article>
-
-          <article class="feature-card">
-            <div class="feature-copy">
-              <div class="feature-tag"><span class="line-marker"></span>实时协作</div>
-              <h3>共享文档，协作写作更直接</h3>
-              <p>适合多人审阅、联合撰写和远程配合，工作流尽量保持在一个页面内。</p>
-            </div>
-            <div class="media-card">
-              <div class="gif-frame tall">
-                <img src="assets/readme/share.gif" alt="实时协作共享文档演示" loading="lazy">
-              </div>
-            </div>
-          </article>
-
-          <article class="feature-card">
-            <div class="feature-copy">
-              <div class="feature-tag"><span class="line-marker"></span>加密视频通话</div>
-              <h3>在编辑器里直接完成沟通</h3>
-              <p>适合协作时边看文档边确认细节，减少在多个工具之间切换。</p>
-            </div>
-            <div class="media-card">
-              <div class="gif-frame tall">
-                <img src="assets/readme/videocall.gif" alt="加密视频通话演示" loading="lazy">
-              </div>
-            </div>
-          </article>
-
-          <article class="feature-card">
-            <div class="feature-copy">
-              <div class="feature-tag"><span class="line-marker"></span>高效编辑</div>
-              <h3>插入、预览、搜索和对比都很顺手</h3>
-              <p>编辑器更强调“立即可用”的动作入口，让用户少记快捷键也能保持效率。</p>
-            </div>
-            <div class="media-card">
-              <div class="gif-frame tall">
-                <img src="assets/readme/insert.gif" alt="插入功能与编辑体验演示" loading="lazy">
-              </div>
-            </div>
-          </article>
-
-          <article class="feature-card">
-            <div class="feature-copy">
-              <div class="feature-tag"><span class="line-marker"></span>历史版本</div>
-              <h3>随时回看版本，减少误改风险</h3>
-              <p>适合长文写作和多人协作的场景，改动轨迹更容易追溯。</p>
-            </div>
-            <div class="media-card">
-              <div class="gif-frame tall">
-                <img src="assets/readme/history.gif" alt="历史版本对比演示" loading="lazy">
-              </div>
-            </div>
-          </article>
-
-          <article class="feature-card">
-            <div class="feature-copy">
-              <div class="feature-tag"><span class="line-marker"></span>云打印</div>
-              <h3>需要纸质输出时也能直接处理</h3>
-              <p>把打印和预览流程收束到同一套产品体验里，减少额外折腾。</p>
-            </div>
-            <div class="media-card">
-              <div class="gif-frame tall">
-                <img src="assets/readme/cloudprint.gif" alt="云打印功能演示" loading="lazy">
-              </div>
-            </div>
-          </article>
-        </div>
-      </section>
-
-      <section class="section" id="compare">
-        <div class="section-head section">
-          <div>
-            <h2 class="section-title">和其他编辑器的对比</h2>
-            <p class="section-subtitle">重点看 AI、协作、导出和跨平台体验。EasyPocketMD 的目标不是“功能堆叠”，而是把这些能力放进一个更顺手的工作流里。</p>
-          </div>
-        </div>
-
-        <div class="compare-card">
-          <table>
-            <thead>
-              <tr>
-                <th>能力</th>
-                <th>EasyPocketMD</th>
-                <th>Typora</th>
-                <th>Obsidian</th>
-                <th>Notion</th>
-                <th>VS Code</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td><strong>AI 写作 / PPT / 图表</strong></td>
-                <td class="positive">原生支持</td>
-                <td class="negative">无</td>
-                <td class="negative">依赖插件</td>
-                <td class="negative">无</td>
-                <td class="negative">依赖扩展</td>
-              </tr>
-              <tr>
-                <td><strong>实时协作</strong></td>
-                <td class="positive">内置</td>
-                <td class="negative">无</td>
-                <td class="negative">无</td>
-                <td class="positive">支持</td>
-                <td class="positive">Live Share</td>
-              </tr>
-              <tr>
-                <td><strong>云打印</strong></td>
-                <td class="positive">原生支持</td>
-                <td class="negative">无</td>
-                <td class="negative">无</td>
-                <td class="negative">无</td>
-                <td class="negative">无</td>
-              </tr>
-              <tr>
-                <td><strong>多端体验</strong></td>
-                <td class="positive">Web / Android / 桌面统一</td>
-                <td>以桌面为主</td>
-                <td>以本地笔记为主</td>
-                <td>以云端协作为主</td>
-                <td>偏开发者工作流</td>
-              </tr>
-              <tr>
-                <td><strong>上手难度</strong></td>
-                <td class="positive">低</td>
-                <td>低</td>
-                <td>中等</td>
-                <td>低</td>
-                <td>中等</td>
-              </tr>
-              <tr>
-                <td><strong>适合场景</strong></td>
-                <td class="positive">写作、协作、演示、打印</td>
-                <td>纯写作</td>
-                <td>知识库</td>
-                <td>文档协作</td>
-                <td>开发者工具扩展</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <section class="section">
-        <div class="cta-band">
-          <div>
-            <h2>现在就用你当前系统最合适的版本开始。</h2>
-            <p>如果你只是想立刻写内容，直接打开在线版即可；如果更偏好安装到本地，可以从推荐入口或完整下载列表中选一个最合适的包。</p>
-          </div>
-          <div class="cta-actions">
-            <a class="btn btn-secondary" href="#all-downloads">全部下载</a>
-            <a class="btn btn-primary" href="https://md.yhsun.cn/" target="_blank" rel="noreferrer">在线使用</a>
-          </div>
-        </div>
-      </section>
-    </main>
-
-    <footer class="footer">
-      <div class="footer-inner">
-        <span>EasyPocketMD - Markdown 编辑器介绍页</span>
-        <span>在线地址：<a href="https://md.yhsun.cn/" target="_blank" rel="noreferrer">https://md.yhsun.cn/</a></span>
       </div>
-    </footer>
-  </div>
+    </section>
 
-  <script>
-    const downloadTargets = {
-      web: {
-        label: 'Web 在线版',
-        note: '当前环境更适合直接在线使用。',
-        buttonText: '打开在线地址',
-        url: 'https://md.yhsun.cn/',
-        card: 'card-web'
-      },
-      android: {
-        label: 'Android',
-        note: '检测到 Android 设备，推荐直接下载 APK。',
-        buttonText: '下载 APK',
-        url: 'https://static.yhsun.cn/android/app-release.apk',
-        card: 'card-android'
-      },
-      windows: {
-        label: 'Windows',
-        note: '检测到 Windows，推荐下载 .exe 安装包。',
-        buttonText: '下载 Windows 安装包',
-        url: 'https://static.yhsun.cn/electron/win/easypocketmd_windows.exe',
-        card: 'card-desktop'
-      },
-      macos: {
-        label: 'macOS',
-        note: '检测到 macOS，推荐下载 .dmg 安装包。',
-        buttonText: '下载 macOS 安装包',
-        url: 'https://static.yhsun.cn/electron/macos/easypocketmd_mac.dmg',
-        card: 'card-desktop'
-      },
-      linux: {
-        label: 'Linux',
-        note: '检测到 Linux，推荐下载通用的 AppImage。',
-        buttonText: '下载 Linux AppImage',
-        url: 'https://static.yhsun.cn/electron/linux/easypocketmd_linux.appimage',
-        card: 'card-desktop'
-      }
-    };
+    <!-- 以下功能、对比、CTA区域保留 -->
+    <section class="section" id="features"><div class="section-container"><div class="section-head"><h2 class="section-title">功能展示</h2></div><div class="feature-grid"><div class="feature-card"><div><div class="feature-tag">AI 写作与PPT</div><h3>从文档到演示稿</h3><p>AI 一键生成 PPT、图表和结构化内容</p></div><div class="gif-frame"><img src="https://static.yhsun.cn/assets/aigenppt.gif" alt="AI PPT"></div></div><div class="feature-card"><div><div class="feature-tag">AI 图表与公式</div><h3>提示词生成公式图表</h3><p>复杂表达可直接转为可视化结果</p></div><div class="gif-frame"><img src="https://static.yhsun.cn/assets/aigenformula.gif" alt="AI图表公式"></div></div><div class="feature-card"><div><div class="feature-tag">实时协作</div><h3>共享文档多人编辑</h3><p>远程配合，编辑内容实时同步</p></div><div class="gif-frame"><img src="https://static.yhsun.cn/assets/share.gif" alt="协作"></div></div><div class="feature-card"><div><div class="feature-tag">加密视频通话</div><h3>编辑器内直接沟通</h3><p>边看文档边确认细节，提升协作效率</p></div><div class="gif-frame"><img src="https://static.yhsun.cn/assets/videocall.gif" alt="视频通话"></div></div><div class="feature-card"><div><div class="feature-tag">高效编辑</div><h3>所见即所得 + 分屏预览</h3><p>快速插入 Markdown、公式和图表，支持全文检索</p></div><div class="gif-frame"><img src="https://static.yhsun.cn/assets/insert.gif" alt="编辑体验"></div></div><div class="feature-card"><div><div class="feature-tag">版本控制</div><h3>历史版本可追溯</h3><p>浏览历史记录并对比不同版本差异</p></div><div class="gif-frame"><img src="https://static.yhsun.cn/assets/history.gif" alt="版本控制"></div></div><div class="feature-card"><div><div class="feature-tag">云打印</div><h3>跨设备远程打印</h3><p>通过云打印客户端提交任务，随时输出文档</p></div><div class="gif-frame"><img src="https://static.yhsun.cn/assets/cloudprint.gif" alt="云打印"></div></div><div class="feature-card"><div><div class="feature-tag">跨平台体验</div><h3>Web / Android / 桌面端一致</h3><p>同一套操作逻辑，学习一次即可全端使用</p></div><div class="gif-frame"><img src="https://static.yhsun.cn/assets/1_1.png" alt="跨平台"></div></div></div></div></section>
 
+    <section class="section" id="compare"><div class="section-container"><div class="section-head"><h2 class="section-title">和其他编辑器对比</h2></div><div class="compare-card"><table><thead><tr><th>能力</th><th>EasyPocketMD</th><th>Typora</th><th>Obsidian</th><th>Notion</th><th>VS Code</th></tr></thead><tbody><tr><td><strong>AI写作/PPT/图表</strong></td><td class="positive">原生支持</td><td class="negative">无</td><td class="negative">依赖插件</td><td class="negative">无</td><td class="negative">依赖扩展</td></tr><tr><td><strong>实时协作</strong></td><td class="positive">内置</td><td class="negative">无</td><td class="negative">无</td><td class="positive">支持</td><td class="positive">Live Share</td></tr><tr><td><strong>云打印</strong></td><td class="positive">原生支持</td><td class="negative">无</td><td class="negative">无</td><td class="negative">无</td><td class="negative">无</td></tr><tr><td><strong>多端体验</strong></td><td class="positive">Web/Android/桌面统一</td><td>桌面为主</td><td>本地笔记</td><td>云端协作</td><td>开发者工具</td></tr><tr><td><strong>上手难度</strong></td><td class="positive">低</td><td>低</td><td>中等</td><td>低</td><td>中等</td></tr></tbody></table></div></div></section>
+
+    <section class="section"><div class="section-container"><div class="cta-band"><div><h2>现在就用适合你的版本开始写作</h2><p>在线使用或下载客户端，全平台支持。</p></div><div class="hero-actions"><button id="ctaShowAllBtn" class="btn btn-secondary">📥 全部下载</button><a class="btn btn-primary" href="https://md.yhsun.cn/" target="_blank">在线使用</a></div></div></div></section>
+  </main>
+
+  <footer class="footer"><div class="footer-inner"><span><a href="https://beian.miit.gov.cn/" target="_blank" rel="noreferrer" style="color: inherit; text-decoration: none;">京ICP备2025154249号</a></span><span>在线地址：<a href="https://md.yhsun.cn/" target="_blank" rel="noreferrer">https://md.yhsun.cn/</a></span></div></footer>
+</div>
+
+<!-- 模态框 -->
+<div id="downloadModal" class="modal-overlay"><div class="modal-container"><div class="modal-header"><h3>📥 全平台下载</h3><button class="close-modal" id="closeModalBtn">&times;</button></div><table class="downloads-full-table"><thead><tr><th>平台</th><th>推荐版本</th><th>下载链接</th></tr></thead><tbody><tr><td>Android</td><td>APK</td><td><a href="https://static.yhsun.cn/android/app-release.apk" target="_blank" rel="noreferrer">app-release.apk</a></td></tr><tr><td>Windows</td><td>.exe</td><td><a href="https://static.yhsun.cn/electron/win/easypocketmd_windows.exe" target="_blank" rel="noreferrer">easypocketmd_windows.exe</a></td></tr><tr><td>macOS</td><td>.dmg</td><td><a href="https://static.yhsun.cn/electron/macos/easypocketmd_mac.dmg" target="_blank" rel="noreferrer">easypocketmd_mac.dmg</a></td></tr><tr><td>Linux</td><td>AppImage / deb</td><td><a href="https://static.yhsun.cn/electron/linux/easypocketmd_linux.appimage" target="_blank" rel="noreferrer">.AppImage</a> &nbsp;|&nbsp; <a href="https://static.yhsun.cn/electron/linux/easypocketmd_linux.deb" target="_blank" rel="noreferrer">.deb</a></td></tr><tr><td>Web在线</td><td>浏览器</td><td><a href="https://md.yhsun.cn/" target="_blank" rel="noreferrer">md.yhsun.cn</a></td></tr></tbody></table><div style="margin-top: 20px; text-align: right;"><button class="btn btn-secondary" id="modalCloseFooter">关闭</button></div></div></div>
+
+<script>
+  (function() {
+    // 1. 平台检测
     function detectPlatform() {
       const ua = navigator.userAgent.toLowerCase();
-      const platform = navigator.platform ? navigator.platform.toLowerCase() : '';
-
+      if (ua.includes('iphone') || ua.includes('ipad') || ua.includes('ipod')) return 'ios';
       if (ua.includes('android')) return 'android';
-      if (ua.includes('iphone') || ua.includes('ipad') || ua.includes('ipod')) return 'web';
-      if (platform.includes('mac') || ua.includes('mac os x')) return 'macos';
-      if (platform.includes('win') || ua.includes('windows')) return 'windows';
-      if (platform.includes('linux') || ua.includes('linux')) return 'linux';
-      return 'web';
+      // 桌面端检测 windows/mac/linux
+      if (ua.includes('win')) return 'windows';
+      if (ua.includes('mac')) return 'macos';
+      if (ua.includes('linux')) return 'linux';
+      return 'desktop_other';
+    }
+    const platform = detectPlatform();
+
+    // 2. 下载链接映射
+    const recommendByPlatform = {
+      android: {
+        title: '📱 Android 客户端',
+        desc: '专为移动端优化，随时编辑同步',
+        url: 'https://static.yhsun.cn/android/app-release.apk',
+        text: '下载 Android APK',
+        note: '当前系统推荐 Android 版本'
+      },
+      windows: {
+        title: '🪟 Windows 客户端',
+        desc: '适用于 Windows，推荐 .exe 安装包',
+        url: 'https://static.yhsun.cn/electron/win/easypocketmd_windows.exe',
+        text: '下载 Windows .exe',
+        note: '当前系统推荐 Windows 安装包'
+      },
+      macos: {
+        title: '🍎 macOS 客户端',
+        desc: '适用于 macOS，推荐 .dmg 安装包',
+        url: 'https://static.yhsun.cn/electron/macos/easypocketmd_mac.dmg',
+        text: '下载 macOS .dmg',
+        note: '当前系统推荐 macOS 安装包'
+      },
+      linux: {
+        title: '🐧 Linux 客户端',
+        desc: '适用于 Linux，推荐 AppImage 便携版本',
+        url: 'https://static.yhsun.cn/electron/linux/easypocketmd_linux.appimage',
+        text: '下载 Linux AppImage',
+        note: '当前系统推荐 Linux 安装包'
+      },
+      ios: {
+        title: '📱 iOS Web 版',
+        desc: 'iOS 设备推荐直接使用在线版本',
+        url: 'https://md.yhsun.cn/',
+        text: '打开 iOS Web 版',
+        note: '当前系统推荐 iOS 在线版本'
+      },
+      desktop_other: {
+        title: '💻 桌面客户端',
+        desc: '根据系统选择对应安装包，支持多平台',
+        url: 'https://static.yhsun.cn/electron/win/easypocketmd_windows.exe',
+        text: '下载桌面安装包',
+        note: '根据系统选择对应安装包'
+      }
+    };
+    const activeRecommend = recommendByPlatform[platform] || recommendByPlatform.desktop_other;
+
+    // 动态渲染下载区域 (仅展示 推荐卡片 + 全部平台卡片)
+    const downloadContainer = document.getElementById('dynamicDownloadCards');
+    if (downloadContainer) {
+      const recCardHtml = `<article class="download-card recommended" id="card-platform-rec">
+          <h3>${activeRecommend.title}</h3>
+          <p class="stat-label" style="margin:8px 0 12px;">${activeRecommend.desc}</p>
+          <a class="btn btn-primary download-action" href="${activeRecommend.url}" target="_blank" rel="noreferrer">${activeRecommend.text}</a>
+        </article>`;
+      const allCardHtml = `<article class="download-card"><h3>📦 全部平台</h3><p class="stat-label" style="margin:8px 0 12px;">获取其他系统安装包及历史版本</p><button class="btn btn-secondary showAllDownloadsBtn" style="cursor:pointer;">查看全部下载</button></article>`;
+      downloadContainer.innerHTML = recCardHtml + allCardHtml;
     }
 
-    const platformKey = detectPlatform();
-    const target = downloadTargets[platformKey];
-    const recommendedButton = document.getElementById('recommendedDownloadBtn');
-    const recommendedDownloadLink = document.getElementById('recommendedDownloadLink');
-    const recommendedDownloadNote = document.getElementById('recommendedDownloadNote');
-    const platformLabel = document.getElementById('platformLabel');
-
-    if (target) {
-      platformLabel.textContent = target.label;
-      recommendedButton.textContent = target.buttonText;
-      recommendedButton.href = target.url;
-      recommendedButton.target = '_blank';
-      recommendedButton.rel = 'noreferrer';
-      recommendedDownloadLink.textContent = target.buttonText;
-      recommendedDownloadLink.href = target.url;
-      recommendedDownloadLink.target = '_blank';
-      recommendedDownloadLink.rel = 'noreferrer';
-      recommendedDownloadNote.textContent = target.note;
-
-      const card = document.getElementById(target.card);
-      if (card) card.classList.add('recommended');
+    // 动态更新hero区域的推荐按钮，使其与推荐卡片一致
+    const heroActions = document.getElementById('dynamicHeroActions');
+    if (heroActions) {
+      heroActions.innerHTML = `<a class="btn btn-primary" href="${activeRecommend.url}" target="_blank" rel="noreferrer">${activeRecommend.text}</a>
+                               <a class="btn btn-secondary" href="https://md.yhsun.cn/" target="_blank">在线使用</a>`;
     }
-  </script>
+    const hintSpan = document.getElementById('dynamicDownloadHint');
+    if (hintSpan) hintSpan.innerText = activeRecommend.note;
+
+    // 3. 主题切换逻辑 (夜间模式按钮可点击切换)
+    const themeToggleBtn = document.getElementById('themeToggleBtn');
+    const themeToggleIcon = document.getElementById('themeToggleIcon');
+    const setTheme = (theme) => {
+      document.documentElement.setAttribute('data-theme', theme);
+      localStorage.setItem('easypocket_theme', theme);
+      // 更新按钮图标
+      if (themeToggleBtn) {
+        themeToggleBtn.setAttribute('aria-label', theme === 'dark' ? '切换至浅色模式' : '切换至深色模式');
+      }
+      if (themeToggleIcon) {
+        themeToggleIcon.src = theme === 'dark'
+          ? 'https://static.yhsun.cn/assets/theme-light.svg'
+          : 'https://static.yhsun.cn/assets/theme-dark.svg';
+      }
+    };
+    const getInitialTheme = () => {
+      const saved = localStorage.getItem('easypocket_theme');
+      if (saved === 'light' || saved === 'dark') return saved;
+      // 跟随系统
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      return prefersDark ? 'dark' : 'light';
+    };
+    const currentTheme = getInitialTheme();
+    setTheme(currentTheme);
+    if (themeToggleBtn) {
+      themeToggleBtn.addEventListener('click', () => {
+        const now = document.documentElement.getAttribute('data-theme');
+        const newTheme = now === 'dark' ? 'light' : 'dark';
+        setTheme(newTheme);
+      });
+    }
+
+    // 4. 模态框全部下载逻辑
+    const modal = document.getElementById('downloadModal');
+    const openModal = () => modal?.classList.add('active');
+    const closeModal = () => modal?.classList.remove('active');
+    // 监听所有 .showAllDownloadsBtn (动态生成) 和已有按钮
+    const bindModalButtons = () => {
+      document.querySelectorAll('.showAllDownloadsBtn, #ctaShowAllBtn').forEach(btn => {
+        btn.removeEventListener('click', openModal);
+        btn.addEventListener('click', openModal);
+      });
+    };
+    bindModalButtons();
+    const closeBtns = document.querySelectorAll('#closeModalBtn, #modalCloseFooter');
+    closeBtns.forEach(btn => btn.addEventListener('click', closeModal));
+    modal?.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+    // 观察动态卡片按钮
+    const observer = new MutationObserver(() => bindModalButtons());
+    if (downloadContainer) observer.observe(downloadContainer, { childList: true, subtree: true });
+    bindModalButtons();
+
+    // 额外为全部平台卡片按钮绑定（初始）
+    setTimeout(bindModalButtons, 50);
+  })();
+</script>
 </body>
 </html>
