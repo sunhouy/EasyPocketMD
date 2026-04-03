@@ -4133,6 +4133,69 @@
             return range;
         }
 
+        function getCursorTopRelativeToEditor(vditor, editorElement) {
+            if (vditor && typeof vditor.getCursorPosition === 'function') {
+                const pos = vditor.getCursorPosition();
+                if (pos && Number.isFinite(pos.top)) return pos.top;
+            }
+
+            const selection = window.getSelection();
+            if (!selection || selection.rangeCount === 0) return 0;
+            const range = selection.getRangeAt(0);
+            if (!editorElement.contains(range.startContainer)) return 0;
+
+            let cursorRect = range.getClientRects().length ? range.getClientRects()[0] : null;
+            if (!cursorRect) {
+                const node = range.startContainer.nodeType === Node.TEXT_NODE
+                    ? range.startContainer.parentElement
+                    : range.startContainer;
+                if (node && typeof node.getBoundingClientRect === 'function') {
+                    cursorRect = node.getBoundingClientRect();
+                }
+            }
+            if (!cursorRect) return 0;
+
+            const parentRect = editorElement.parentElement
+                ? editorElement.parentElement.getBoundingClientRect()
+                : editorElement.getBoundingClientRect();
+            return cursorRect.top - parentRect.top;
+        }
+
+        function centerCurrentSelectionViaVditor() {
+            const vditor = g('vditor');
+            if (!vditor || !vditor.vditor) return false;
+
+            const internal = vditor.vditor;
+            const mode = (typeof vditor.getCurrentMode === 'function' ? vditor.getCurrentMode() : internal.currentMode) || internal.currentMode;
+            const editorElement = internal[mode] && internal[mode].element;
+            if (!editorElement) return false;
+
+            const cursorTop = getCursorTopRelativeToEditor(vditor, editorElement);
+            const isFullscreen = !!(internal.element && internal.element.classList && internal.element.classList.contains('vditor--fullscreen'));
+            const heightMode = internal.options ? internal.options.height : null;
+
+            if (heightMode === 'auto' && !isFullscreen) {
+                const editorTop = internal.element ? internal.element.offsetTop : editorElement.offsetTop;
+                const toolbarHeight = internal.toolbar && internal.toolbar.element ? internal.toolbar.element.offsetHeight : 0;
+                const targetY = cursorTop + editorTop + toolbarHeight - window.innerHeight / 2 + 10;
+                window.scrollTo(window.scrollX, Math.max(0, targetY));
+            } else {
+                editorElement.scrollTop = cursorTop + editorElement.scrollTop - editorElement.clientHeight / 2 + 10;
+            }
+
+            return true;
+        }
+
+        function centerSelectionFallback(range) {
+            if (!range) return;
+            const target = range.startContainer && range.startContainer.nodeType === Node.TEXT_NODE
+                ? range.startContainer.parentElement
+                : range.startContainer;
+            if (target && typeof target.scrollIntoView === 'function') {
+                target.scrollIntoView({ behavior: 'auto', block: 'center', inline: 'nearest' });
+            }
+        }
+
         // 高亮匹配项
         function highlightMatch(index, allowRetry) {
             if (matches.length === 0 || index < 0 || index >= matches.length) return;
@@ -4154,11 +4217,8 @@
                     return;
                 }
 
-                const focusTarget = range.startContainer && range.startContainer.nodeType === Node.TEXT_NODE
-                    ? range.startContainer.parentElement
-                    : range.startContainer;
-                if (focusTarget && typeof focusTarget.scrollIntoView === 'function') {
-                    focusTarget.scrollIntoView({ behavior: 'auto', block: 'center', inline: 'nearest' });
+                if (!centerCurrentSelectionViaVditor()) {
+                    centerSelectionFallback(range);
                 }
             } catch (e) {
                 console.error('Highlight error:', e);
