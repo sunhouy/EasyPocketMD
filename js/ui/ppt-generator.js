@@ -376,10 +376,10 @@ ${topic ? 'PPT主题：' + topic : ''}
 
 要求：
 1. 必须包含：封面页、目录页、正文页、致谢页。
-2. ${isAcademic ? '这是学术/研究类主题，必须增加参考资料页（放在致谢前）。' : '若判断为学术内容（论文/实验/研究报告），需要增加参考资料页。'}
-3. 页数不要凑数，按信息量决定，最少5页，最多30页。
+2. ${isAcademic ? '如果是正式的学术/研究类主题，增加参考资料页（放在致谢前）' : '请根据是否是正式的学术或研究内容选择是否添加参考资料页'}
+3. 页数按信息量决定，最少5页，最多30页。
 4. 每页标题必须具体，不能使用“标题”“内容页”等空泛词。
-5. 正文页每页2-5个要点，且尽量避免重复。
+5. 正文页每页2-5个要点，至少2个，避免重复。
 6. 目录页的要点应列出主要章节，不要写空话。
 
 输出格式：
@@ -402,7 +402,7 @@ ${topic ? 'PPT主题：' + topic : ''}
 
 ${isAcademic ? '倒数第2页：参考资料\n要点1：文献1\n要点2：文献2\n' : ''}
 
-请只输出大纲正文，不要解释。`;
+参考资料必须是正确的参考资料格式，给出准确的来源。请只输出大纲正文，不要解释。`;
         } else {
             prompt = `请为主题"${topic}"生成一个详细的PPT大纲，页数由内容复杂度自动决定（5-30页）。
 
@@ -410,10 +410,10 @@ ${userOutline ? '用户提供的参考大纲：\n' + userOutline + '\n\n' : ''}
 
 要求：
 1. 必须包含：封面页、目录页、正文页、致谢页。
-2. ${isAcademic ? '这是学术/研究类主题，必须增加参考资料页（放在致谢前）。' : '若判断为学术内容（论文/实验/研究报告），需要增加参考资料页。'}
+2. ${isAcademic ? '如果是正式的学术/研究类主题，增加参考资料页（放在致谢前）' : '请根据是否是正式的学术或研究内容选择是否添加参考资料页'}
 3. 页数不要凑数，按信息量决定，最少5页，最多30页。
 4. 每页标题必须具体，不能使用“标题”“内容页”等空泛词。
-5. 正文页每页2-5个要点，且尽量避免重复。
+5. 正文页每页2-5个要点，至少2个，避免重复。
 6. 目录页的要点应列出主要章节，不要写空话。
 
 输出格式：
@@ -432,7 +432,7 @@ ${userOutline ? '用户提供的参考大纲：\n' + userOutline + '\n\n' : ''}
 ...（按需扩展）
 
 最后1页：致谢
-要点1：感谢语/问答引导
+要点：感谢语
 
 ${isAcademic ? '倒数第2页：参考资料\n要点1：文献1\n要点2：文献2\n' : ''}
 
@@ -1575,16 +1575,50 @@ JSON 结构：
             showCustomConfirm(
                 '第' + ungeneratedPages.join(', ') + '页尚未生成，是否继续？',
                 function() {
-                    doDownloadPPT();
+                    promptFilenameAndDownloadPPT();
                 }
             );
         } else {
-            doDownloadPPT();
+            promptFilenameAndDownloadPPT();
         }
     }
 
+    function getDefaultPPTFileName() {
+        var defaultName = isEn() ? 'presentation' : '演示文稿';
+        var currentFileId = g('currentFileId');
+        if (!currentFileId || typeof g('fileTree') === 'undefined') {
+            return pptState.topic || defaultName;
+        }
+        try {
+            var currentNode = g('fileTree').jstree(true).get_node(currentFileId);
+            if (currentNode && currentNode.text) {
+                return currentNode.text.replace(/\.md$/i, '');
+            }
+        } catch (e) {
+            console.error('获取PPT文件名失败:', e);
+        }
+        return pptState.topic || defaultName;
+    }
+
+    function promptFilenameAndDownloadPPT() {
+        var defaultFileName = getDefaultPPTFileName();
+
+        if (typeof global.showFilenameDialog === 'function') {
+            global.showFilenameDialog(defaultFileName, 'pptx', function(filename) {
+                doDownloadPPT(filename);
+            });
+            return;
+        }
+
+        showCustomPrompt(isEn() ? 'Enter file name:' : '输入文件名：', defaultFileName, function(filename) {
+            if (filename === null) return;
+            var finalName = (filename || defaultFileName).trim();
+            doDownloadPPT(finalName || defaultFileName);
+        });
+    }
+
     // 实际下载 - 调用后端 API 生成 PPT
-    async function doDownloadPPT() {
+    async function doDownloadPPT(customFilename) {
         var btn = document.getElementById('pptEditorDownload');
         if (!btn) return;
 
@@ -1662,8 +1696,8 @@ JSON 结构：
 
             // 获取文件名
             var contentDisposition = response.headers.get('Content-Disposition');
-            var fileName = pptState.topic || 'PPT';
-            if (contentDisposition) {
+            var fileName = (customFilename || '').trim() || pptState.topic || 'PPT';
+            if (!customFilename && contentDisposition) {
                 var filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
                 if (filenameMatch) {
                     fileName = decodeURIComponent(filenameMatch[1].replace(/['"]/g, ''));
@@ -1673,14 +1707,50 @@ JSON 结构：
 
             // 下载文件
             var blob = await response.blob();
-            var url = window.URL.createObjectURL(blob);
-            var a = document.createElement('a');
-            a.href = url;
-            a.download = fileName;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            window.URL.revokeObjectURL(url);
+
+            if (window.Capacitor && window.Capacitor.isNativePlatform()) {
+                // Capacitor 环境：将 Blob 写入临时文件后调用系统分享/保存
+                var base64Data = await new Promise(function(resolve, reject) {
+                    var reader = new FileReader();
+                    reader.onloadend = function() {
+                        try {
+                            var result = reader.result || '';
+                            var base64 = String(result).split(',')[1] || '';
+                            resolve(base64);
+                        } catch (err) {
+                            reject(err);
+                        }
+                    };
+                    reader.onerror = function() {
+                        reject(new Error('读取文件失败'));
+                    };
+                    reader.readAsDataURL(blob);
+                });
+
+                var fsModule = await import('@capacitor/filesystem');
+                var shareModule = await import('@capacitor/share');
+                var writeResult = await fsModule.Filesystem.writeFile({
+                    path: fileName,
+                    data: base64Data,
+                    directory: fsModule.Directory.Cache
+                });
+
+                await shareModule.Share.share({
+                    title: fileName,
+                    text: fileName,
+                    url: writeResult.uri,
+                    dialogTitle: isEn() ? 'Save or Share File' : '保存或分享文件'
+                });
+            } else {
+                var url = window.URL.createObjectURL(blob);
+                var a = document.createElement('a');
+                a.href = url;
+                a.download = fileName;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+            }
 
             if (global.showMessage) {
                 global.showMessage('PPT下载成功', 'success');

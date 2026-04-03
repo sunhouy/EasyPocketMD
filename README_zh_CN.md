@@ -32,31 +32,31 @@
 ### 🤖 AI 集成
 
 - AI 写作助手：支持写作、改写、自动排版，甚至可根据文档生成 PPT。
-![AI Writing Assistant](readme/aigenppt.gif)
+![AI Writing Assistant](assets/readme/aigenppt.gif)
 - 智能图表与公式：通过 AI 提示词生成 LaTeX 公式和图表，无需手写代码。
-![AI Charts & Formulas](readme/aigenformula.gif)
+![AI Charts & Formulas](assets/readme/aigenformula.gif)
 
 ### 👥 协作与沟通
 
 - 实时协作：共享文档并流畅协同编辑。
-![Real-time Collaboration](readme/share.gif)
+![Real-time Collaboration](assets/readme/share.gif)
 - 加密视频通话：内置双人端到端加密视频通话，支持 IPv6 双栈网络。
-![Encrypted Video Call](readme/videocall.gif)
+![Encrypted Video Call](assets/readme/videocall.gif)
 
 ### ✍️ 编辑体验
 - 三种预览模式：所见即所得、即时渲染、分屏预览。
 - 高效编辑：快速插入 Markdown、LaTeX 公式和图表；支持全文检索与文件差异对比。
-![Editing Experience](readme/insert.gif)
+![Editing Experience](assets/readme/insert.gif)
 - 版本控制：浏览历史记录并比较不同版本差异。
-![Version Control](readme/history.gif)
+![Version Control](assets/readme/history.gif)
 
 
 ### 🔗 兼容性与设计
 - 跨平台：在多种设备上保持一致且流畅的使用体验。
-![Cross Platform](readme/1_1.png)
+![Cross Platform](assets/readme/1_1.png)
 - 文件导入 / 导出：支持导入本地文档，导出为 TXT、DOC、PDF 等格式。
 - 云打印：通过云打印客户端实现远程打印。
-![Cloud Print](readme/cloudprint.gif)
+![Cloud Print](assets/readme/cloudprint.gif)
 - 支持 Windows、Linux、Android 与 Web，并在各平台保持一致行为。
 - 现代化界面：简洁的 Material Design，支持日间/夜间模式。
 

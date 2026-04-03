@@ -294,17 +294,10 @@ async function exportFile(content, ext) {
                         return;
                     }
 
-                    // 确保pdfUrl是完整的URL
-                    var fullPdfUrl = pdfUrl;
-                    if (!pdfUrl.startsWith('http://') && !pdfUrl.startsWith('https://') && !pdfUrl.startsWith('blob:')) {
-                        // 构建完整的URL
-                        var origin = window.getAppOrigin ? window.getAppOrigin() : window.location.origin;
-                        var baseUrl = origin;
-                        if (!pdfUrl.startsWith('/')) {
-                            baseUrl += '/' + window.location.pathname.split('/').slice(0, -1).join('/') + '/';
-                        }
-                        fullPdfUrl = baseUrl + pdfUrl;
-                    }
+                    // 确保pdfUrl是完整且可下载的URL
+                    var fullPdfUrl = global.resolveResourceUrl
+                        ? global.resolveResourceUrl(pdfUrl, window.getAppOrigin ? window.getAppOrigin() : window.location.href)
+                        : pdfUrl;
 
                     // 创建下载链接
                     var a = document.createElement('a');
@@ -456,7 +449,13 @@ async function downloadInCapacitor(data, filename, mimeType, isRawData = false) 
             base64Data = btoa(unescape(encodeURIComponent(data)));
         } else {
             // 如果是 URL，尝试获取并转为 base64
-            const response = await fetch(data);
+            const resourceUrl = global.resolveResourceUrl
+                ? global.resolveResourceUrl(data, global.getAppOrigin ? global.getAppOrigin() : window.location.href)
+                : data;
+            const response = await fetch(resourceUrl, { cache: 'no-store' });
+            if (!response.ok) {
+                throw new Error('HTTP ' + response.status);
+            }
             const blob = await response.blob();
             base64Data = await new Promise((resolve) => {
                 const reader = new FileReader();
@@ -492,3 +491,4 @@ async function downloadInCapacitor(data, filename, mimeType, isRawData = false) 
 
 global.exportContent = exportContent;
 global.exportFile = exportFile;
+global.showFilenameDialog = showFilenameDialog;

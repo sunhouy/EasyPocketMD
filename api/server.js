@@ -73,13 +73,9 @@ app.get('/manifest.webmanifest', (req, res) => {
     res.setHeader('Content-Type', 'application/manifest+json; charset=utf-8');
     res.sendFile(path.join(rootPath, 'manifest.webmanifest'));
 });
-app.get('/icon-192.png', (req, res) => {
+app.get('/icon.png', (req, res) => {
     res.type('image/png');
-    res.sendFile(path.join(rootPath, 'icon-192.png'));
-});
-app.get('/icon-512.png', (req, res) => {
-    res.type('image/png');
-    res.sendFile(path.join(rootPath, 'icon-512.png'));
+    res.sendFile(path.join(rootPath, 'icon.png'));
 });
 
 // Import routes first

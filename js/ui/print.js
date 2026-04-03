@@ -16,6 +16,27 @@ async function getPDFGenerator() {
     return { generatePDF: global.generatePDF, renderPDF: global.renderPDF };
 }
 
+function shouldUseLocalPdfFallback(error) {
+    if (!(window.Capacitor && window.Capacitor.isNativePlatform())) {
+        return false;
+    }
+
+    var message = (error && error.message ? String(error.message) : '').toLowerCase();
+    return message.indexOf('failed to fetch') !== -1 ||
+        message.indexOf('network') !== -1 ||
+        message.indexOf('load failed') !== -1;
+}
+
+function getResourceResolveBase() {
+    var isNativeLike = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) ||
+        !!window.electron ||
+        (window.location && window.location.protocol === 'file:');
+    if (isNativeLike && window.getAppOrigin) {
+        return window.getAppOrigin();
+    }
+    return window.location.href;
+}
+
 /**
  * 在 Capacitor 中处理文件下载/分享
  * @param {string} data 数据内容（可以是 URL 也可以是纯文本/HTML）
@@ -28,36 +49,73 @@ async function downloadInCapacitor(data, filename, mimeType, isRawData = false) 
         const { Filesystem, Directory } = await import('@capacitor/filesystem');
         const { Share } = await import('@capacitor/share');
 
-        let base64Data = '';
+        const resourceUrl = isRawData
+            ? ''
+            : (global.resolveResourceUrl
+                ? global.resolveResourceUrl(data, getResourceResolveBase())
+                : data);
+        const isBlobUrl = !isRawData && typeof resourceUrl === 'string' && resourceUrl.startsWith('blob:');
+
+        let fileUri = '';
+
         if (isRawData) {
             // 原始文本数据转 base64
-            base64Data = btoa(unescape(encodeURIComponent(data)));
-        } else {
-            // 如果是 URL，尝试获取并转为 base64
-            const response = await fetch(data);
-            const blob = await response.blob();
-            base64Data = await new Promise((resolve) => {
-                const reader = new FileReader();
-                reader.onloadend = () => {
-                    const base64 = reader.result.split(',')[1];
-                    resolve(base64);
-                };
-                reader.readAsDataURL(blob);
+            const base64Data = btoa(unescape(encodeURIComponent(data)));
+            const writeResult = await Filesystem.writeFile({
+                path: filename,
+                data: base64Data,
+                directory: Directory.Cache
             });
-        }
+            fileUri = writeResult.uri;
+        } else {
+            // 原生下载优先，规避 WebView 的 fetch/CORS 限制
+            if (!isBlobUrl && window.Capacitor && window.Capacitor.isNativePlatform() && typeof Filesystem.downloadFile === 'function') {
+                try {
+                    const downloadResult = await Filesystem.downloadFile({
+                        url: resourceUrl,
+                        path: filename,
+                        directory: Directory.Cache,
+                        recursive: true
+                    });
+                    const uriResult = await Filesystem.getUri({
+                        path: downloadResult.path || filename,
+                        directory: Directory.Cache
+                    });
+                    fileUri = uriResult.uri;
+                } catch (downloadError) {
+                    console.warn('Native downloadFile failed, fallback to fetch:', downloadError);
+                }
+            }
 
-        // 写入临时文件
-        const writeResult = await Filesystem.writeFile({
-            path: filename,
-            data: base64Data,
-            directory: Directory.Cache
-        });
+            if (!fileUri) {
+                const response = await fetch(resourceUrl, { cache: 'no-store' });
+                if (!response.ok) {
+                    throw new Error('HTTP ' + response.status);
+                }
+                const blob = await response.blob();
+                const base64Data = await new Promise((resolve) => {
+                    const reader = new FileReader();
+                    reader.onloadend = () => {
+                        const base64 = reader.result.split(',')[1];
+                        resolve(base64);
+                    };
+                    reader.readAsDataURL(blob);
+                });
+
+                const writeResult = await Filesystem.writeFile({
+                    path: filename,
+                    data: base64Data,
+                    directory: Directory.Cache
+                });
+                fileUri = writeResult.uri;
+            }
+        }
 
         // 分享文件（这在移动端通常是保存到文件的最佳方式）
         await Share.share({
             title: filename,
             text: filename,
-            url: writeResult.uri,
+            url: fileUri,
             dialogTitle: isEn() ? 'Save or Share File' : '保存或分享文件'
         });
 
@@ -1501,21 +1559,26 @@ async function downloadInCapacitor(data, filename, mimeType, isRawData = false) 
             var htmlContent = await preparePrintContent(content, settings);
             // 懒加载 PDF 生成器并生成PDF
             const { generatePDF } = await getPDFGenerator();
-            var pdfUrl = await generatePDF(htmlContent, settings, 'document.pdf');
+            var pdfUrl;
+            try {
+                pdfUrl = await generatePDF(htmlContent, settings, 'document.pdf');
+            } catch (serverError) {
+                if (!shouldUseLocalPdfFallback(serverError)) {
+                    throw serverError;
+                }
+
+                console.warn('Server PDF generation failed, fallback to local conversion:', serverError);
+                var fallbackSettings = Object.assign({}, settings, { conversionMethod: 'local' });
+                pdfUrl = await generatePDF(htmlContent, fallbackSettings, 'document.pdf');
+                global.showMessage(isEn() ? 'Server conversion unavailable, switched to local conversion' : '后端转换不可用，已切换本地转换');
+            }
             
             loadingModal.remove();
 
             // 确保pdfUrl是完整的URL
-            var fullPdfUrl = pdfUrl;
-            if (!pdfUrl.startsWith('http://') && !pdfUrl.startsWith('https://')) {
-                // 构建完整的URL
-                var origin = window.getAppOrigin ? window.getAppOrigin() : window.location.origin;
-                var baseUrl = origin;
-                if (!pdfUrl.startsWith('/')) {
-                    baseUrl += '/' + window.location.pathname.split('/').slice(0, -1).join('/') + '/';
-                }
-                fullPdfUrl = baseUrl + pdfUrl;
-            }
+            var fullPdfUrl = global.resolveResourceUrl
+                ? global.resolveResourceUrl(pdfUrl, getResourceResolveBase())
+                : pdfUrl;
 
             // 如果是 Capacitor 环境，使用特殊的下载逻辑
             if (window.Capacitor && window.Capacitor.isNativePlatform()) {
@@ -1648,13 +1711,9 @@ async function downloadInCapacitor(data, filename, mimeType, isRawData = false) 
             pdfBtn.onclick = async function() {
                 try {
                     // 确保pdfUrl是完整的URL
-                    var fullPdfUrl = pdfUrl;
-                    if (!pdfUrl.startsWith('http://') && !pdfUrl.startsWith('https://')) {
-                        // 构建完整的URL
-                        var origin = window.getAppOrigin ? window.getAppOrigin() : window.location.origin;
-                        var baseUrl = origin;
-                        fullPdfUrl = new URL(pdfUrl, baseUrl).href;
-                    }
+                    var fullPdfUrl = global.resolveResourceUrl
+                        ? global.resolveResourceUrl(pdfUrl, getResourceResolveBase())
+                        : pdfUrl;
                     
                     // 如果是 Capacitor 环境，使用特殊的下载逻辑
                     if (window.Capacitor && window.Capacitor.isNativePlatform()) {
@@ -1703,7 +1762,18 @@ async function downloadInCapacitor(data, filename, mimeType, isRawData = false) 
             var htmlContent = await preparePrintContent(content, settings);
             // 懒加载 PDF 生成器并生成PDF
             const { generatePDF } = await getPDFGenerator();
-            pdfUrl = await generatePDF(htmlContent, settings);
+            try {
+                pdfUrl = await generatePDF(htmlContent, settings);
+            } catch (serverError) {
+                if (!shouldUseLocalPdfFallback(serverError)) {
+                    throw serverError;
+                }
+
+                console.warn('Server PDF generation failed, fallback to local preview conversion:', serverError);
+                var fallbackSettings = Object.assign({}, settings, { conversionMethod: 'local' });
+                pdfUrl = await generatePDF(htmlContent, fallbackSettings);
+                global.showMessage(isEn() ? 'Server conversion unavailable, switched to local preview' : '后端转换不可用，已切换本地预览');
+            }
 
             // PDF生成完成，直接显示预览
             showPreview();

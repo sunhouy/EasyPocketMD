@@ -14,6 +14,69 @@ body {
     position: relative;
 }
 
+/* 移动端与 Capacitor 默认禁止界面文本被选中，减少误触带来的体验干扰。 */
+@media (hover: none), (pointer: coarse) {
+    body {
+        -webkit-user-select: none;
+        user-select: none;
+        -webkit-touch-callout: none;
+    }
+
+    button,
+    .mobile-action-btn,
+    .bottom-btn,
+    .dropdown-item,
+    .mobile-toolbar-container,
+    .mobile-bottom-bar,
+    .file-list-sidebar,
+    .modal-overlay,
+    .sync-status {
+        -webkit-touch-callout: none;
+        -webkit-user-select: none;
+        user-select: none;
+    }
+
+    #vditor,
+    #vditor *,
+    input,
+    textarea,
+    [contenteditable="true"] {
+        -webkit-user-select: text;
+        user-select: text;
+        -webkit-touch-callout: default;
+    }
+}
+
+body.is-capacitor {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+}
+
+body.is-capacitor button,
+body.is-capacitor .mobile-action-btn,
+body.is-capacitor .bottom-btn,
+body.is-capacitor .dropdown-item,
+body.is-capacitor .mobile-toolbar-container,
+body.is-capacitor .mobile-bottom-bar,
+body.is-capacitor .file-list-sidebar,
+body.is-capacitor .modal-overlay,
+body.is-capacitor .sync-status {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+body.is-capacitor #vditor,
+body.is-capacitor #vditor *,
+body.is-capacitor input,
+body.is-capacitor textarea,
+body.is-capacitor [contenteditable="true"] {
+    -webkit-user-select: text;
+    user-select: text;
+    -webkit-touch-callout: default;
+}
+
 .editor-container {
     position: absolute;
     top: 50px;

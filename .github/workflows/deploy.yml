@@ -130,7 +130,7 @@ jobs:
     - name: Create deployment tarball
       run: |
         mkdir -p deploy_tmp
-        cp -r dist api print package.json package-lock.json nginx.conf sw.js manifest.webmanifest icon-192.png icon-512.png .env ssl deploy_tmp/
+        cp -r dist api print package.json package-lock.json nginx.conf sw.js manifest.webmanifest icon.png .env ssl deploy_tmp/
         tar -czf deploy.tar.gz -C deploy_tmp .
 
     - name: Prepare and execute zero-downtime deployment
