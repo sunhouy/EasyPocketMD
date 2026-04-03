@@ -420,7 +420,21 @@ jobs:
             "$PM2_BIN" delete "$CURRENT_NAME" 2>/dev/null || true
           fi
 
-          "$PM2_BIN" save
+          # 配置 PM2 开机自启（systemd）
+          echo "配置 PM2 开机自启..."
+          if command -v systemctl > /dev/null 2>&1; then
+            if [ "$(id -u)" -eq 0 ]; then
+              "$PM2_BIN" startup systemd -u "$USER" --hp "$HOME" || true
+            elif command -v sudo > /dev/null 2>&1; then
+              sudo env PATH="$PATH:${{ env.REMOTE_NODE_BIN }}" "$PM2_BIN" startup systemd -u "$USER" --hp "$HOME" || true
+            else
+              echo "⚠️ 非 root 且无 sudo，跳过 PM2 开机自启配置"
+            fi
+            "$PM2_BIN" save
+            echo "✓ PM2 进程列表已保存"
+          else
+            echo "⚠️ 未检测到 systemd，跳过 PM2 开机自启配置"
+          fi
 
           echo "✓ 零停机部署完成！"
           "$PM2_BIN" list
