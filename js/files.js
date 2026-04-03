@@ -4238,7 +4238,9 @@
         // 绑定事件
         findInput.addEventListener('input', function() {
             // Keep state clean when keyword changes; search only on explicit action.
-            clearHighlights();
+            // Avoid clearing document selection here, it can steal focus from the input on some platforms.
+            matches = [];
+            currentMatchIndex = -1;
             searchText = '';
             findStatus.textContent = '';
             findStatus.style.color = secondaryTextColor;
