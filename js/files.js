@@ -3653,6 +3653,7 @@
                 '<button id="replaceAllBtn" style="padding:6px 12px;background:' + (nightMode ? '#3d3d3d' : '#f0f0f0') + ';color:' + textColor + ';border:1px solid ' + borderColor + ';border-radius:6px;cursor:pointer;font-size:12px;">' + (isEn() ? 'Replace All' : '全部替换') + '</button>' +
             '</div>' +
             '<div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;margin-bottom:10px;">' +
+                '<button id="findBtn" style="padding:6px 12px;background:' + (nightMode ? '#4a90e2' : '#4a90e2') + ';color:white;border:none;border-radius:6px;cursor:pointer;font-size:12px;">' + (isEn() ? 'Find' : '查找') + '</button>' +
                 '<button id="findPrevBtn" style="padding:6px 12px;background:' + (nightMode ? '#4a90e2' : '#4a90e2') + ';color:white;border:none;border-radius:6px;cursor:pointer;font-size:12px;">' + (isEn() ? 'Prev' : '上一个') + '</button>' +
                 '<button id="findNextBtn" style="padding:6px 12px;background:' + (nightMode ? '#4a90e2' : '#4a90e2') + ';color:white;border:none;border-radius:6px;cursor:pointer;font-size:12px;">' + (isEn() ? 'Next' : '下一个') + '</button>' +
             '</div>' +
@@ -3766,6 +3767,7 @@
         const findInput = dialog.querySelector('#findInput');
         const replaceInput = dialog.querySelector('#replaceInput');
         const findStatus = dialog.querySelector('#findStatus');
+        const findBtn = dialog.querySelector('#findBtn');
         const findNextBtn = dialog.querySelector('#findNextBtn');
         const findPrevBtn = dialog.querySelector('#findPrevBtn');
         const replaceBtn = dialog.querySelector('#replaceBtn');
@@ -4234,15 +4236,18 @@
             currentMatchIndex = -1;
         }
         // 绑定事件
-        let findTimeout;
         findInput.addEventListener('input', function() {
-            clearTimeout(findTimeout);
-            findTimeout = setTimeout(function() { performFind(); }, 200);
+            // Keep state clean when keyword changes; search only on explicit action.
+            clearHighlights();
+            searchText = '';
+            findStatus.textContent = '';
+            findStatus.style.color = secondaryTextColor;
+            if (wasmSearchResults) wasmSearchResults.innerHTML = '';
         });
         findInput.addEventListener('keydown', function(e) {
             if (e.key === 'Enter') {
                 e.preventDefault();
-                findNext();
+                performFind();
             }
         });
         replaceInput.addEventListener('keydown', function(e) {
@@ -4251,6 +4256,7 @@
                 doReplace();
             }
         });
+        findBtn.onclick = performFind;
         findNextBtn.onclick = findNext;
         findPrevBtn.onclick = findPrev;
         replaceBtn.onclick = doReplace;
