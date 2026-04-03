@@ -24,21 +24,30 @@ document.addEventListener('DOMContentLoaded', function() {
         document.body.classList.add('is-capacitor');
     }
 
+    function getTargetElement(target) {
+        if (!target) return null;
+        if (target.nodeType === 3 && target.parentElement) return target.parentElement;
+        return (target.nodeType === 1 && typeof target.closest === 'function') ? target : null;
+    }
+
     function shouldAllowNativeTextSelection(target) {
-        if (!target || typeof target.closest !== 'function') return false;
-        if (target.closest('#vditor')) return true;
-        if (target.closest('input, textarea, [contenteditable="true"]')) return true;
+        var el = getTargetElement(target);
+        if (!el) return false;
+        if (el.closest('#vditor, .vditor, .vditor-content')) return true;
+        if (el.closest('input, textarea, [contenteditable="true"]')) return true;
         return false;
+    }
+
+    function shouldBlockContextMenu(target) {
+        var el = getTargetElement(target);
+        if (!el) return false;
+        if (shouldAllowNativeTextSelection(el)) return false;
+        return !!el.closest('button, .mobile-action-btn, .bottom-btn, .dropdown-item, .mobile-toolbar-container, .mobile-bottom-bar, .file-list-sidebar, .modal-overlay, .sync-status, .jstree-anchor, .file-menu-btn');
     }
 
     if (isMobile || isCapacitor) {
         document.addEventListener('contextmenu', function(e) {
-            if (shouldAllowNativeTextSelection(e.target)) return;
-            e.preventDefault();
-        }, true);
-
-        document.addEventListener('selectstart', function(e) {
-            if (shouldAllowNativeTextSelection(e.target)) return;
+            if (!shouldBlockContextMenu(e.target)) return;
             e.preventDefault();
         }, true);
     }
@@ -297,7 +306,7 @@ document.addEventListener('DOMContentLoaded', function() {
         toolbar: ['emoji', 'br', 'bold', 'italic', 'strike', '|', 'line', 'quote', 'list', 'ordered-list', 'check', 'outdent', 'indent', 'code', 'inline-code', 'insert-after', 'insert-before', 'upload', 'link', 'table', 'record', 'edit-mode', 'both', 'preview', 'fullscreen', 'outline', 'code-theme', 'content-theme', 'export', 'info', 'help', 'br'],
         customWysiwygToolbar: function() {}, // 修复报错
         theme: window.nightMode ? 'dark' : 'classic',
-        mode: localStorage.getItem('vditor_editor_mode') || (window.isMobileEditorEnvironment ? 'ir' : 'wysiwyg'),
+        mode: localStorage.getItem('vditor_editor_mode') || 'wysiwyg',
         cache: { enable: true, id: 'vditor-mobile-optimized' },
         outline: { enable: window.userSettings.showOutline },
         hint: { emoji: {} },
@@ -898,7 +907,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!modal) return;
 
         // 设置当前编辑器模式
-        var currentEditorMode = localStorage.getItem('vditor_editor_mode') || 'ir';
+        var currentEditorMode = localStorage.getItem('vditor_editor_mode') || 'wysiwyg';
         var modeRadios = document.getElementsByName('editorMode');
         for (var i = 0; i < modeRadios.length; i++) {
             if (modeRadios[i].value === currentEditorMode) {
