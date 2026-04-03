@@ -16,7 +16,6 @@ document.addEventListener('DOMContentLoaded', function() {
         window.i18n.init();
         applyTranslations();
     }
-g
     var isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
     var isCapacitor = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
     window.isMobileEditorEnvironment = isMobile || isCapacitor;
