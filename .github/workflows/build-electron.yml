@@ -234,6 +234,13 @@ jobs:
           name: md-electron-linux
           path: downloads/electron/linux
 
+      # 下载 macOS 产物
+      - name: Download macOS Electron artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: md-electron-mac
+          path: downloads/electron/mac
+
       # 在服务器上创建对应目录
       - name: Create electron directories on server
         uses: appleboy/ssh-action@master
@@ -244,27 +251,56 @@ jobs:
           script: |
             mkdir -p /www/wwwroot/static/electron/win
             mkdir -p /www/wwwroot/static/electron/linux
+            mkdir -p /www/wwwroot/static/electron/macos
 
-      # 准备 Windows 产物（排除 elevate.exe，只保留安装文件）
-      - name: Prepare Windows deployment files
+      # 准备部署产物（仅安装包，且使用固定文件名）
+      - name: Prepare deployment installer files
         run: |
-          # Create deployment directory
-          mkdir -p deploy/win
+          mkdir -p deploy/win deploy/linux deploy/macos
           
-          # Find and copy only the setup file, excluding elevate.exe
+          # Windows: 仅保留安装包，重命名为 easypocketmd_windows.exe
           setup_file=$(find downloads/electron/win -name "*.exe" -not -name "elevate.exe" | grep -i setup | head -1)
           if [ -n "$setup_file" ]; then
-            cp "$setup_file" "deploy/win/$(basename "$setup_file")"
-            echo "Copied setup file: $(basename "$setup_file")"
+            cp "$setup_file" "deploy/win/easypocketmd_windows.exe"
+            echo "Prepared Windows installer: easypocketmd_windows.exe"
           else
-            # If no setup file found, try to find any exe file
             exe_file=$(find downloads/electron/win -name "*.exe" -not -name "elevate.exe" | head -1)
             if [ -n "$exe_file" ]; then
-              cp "$exe_file" "deploy/win/$(basename "$exe_file")"
-              echo "Copied exe file: $(basename "$exe_file")"
+              cp "$exe_file" "deploy/win/easypocketmd_windows.exe"
+              echo "Prepared Windows installer from fallback exe: easypocketmd_windows.exe"
             else
-              echo "No exe files found"
+              echo "No Windows installer (.exe) found"
+              exit 1
             fi
+          fi
+
+          # Linux: 仅保留 .deb 和 .AppImage，统一重命名
+          linux_deb=$(find downloads/electron/linux -name "*.deb" | head -1)
+          if [ -n "$linux_deb" ]; then
+            cp "$linux_deb" "deploy/linux/easypocketmd_linux.deb"
+            echo "Prepared Linux installer: easypocketmd_linux.deb"
+          else
+            echo "No Linux installer (.deb) found"
+            exit 1
+          fi
+
+          linux_appimage=$(find downloads/electron/linux -name "*.AppImage" | head -1)
+          if [ -n "$linux_appimage" ]; then
+            cp "$linux_appimage" "deploy/linux/easypocketmd_linux.appimage"
+            echo "Prepared Linux installer: easypocketmd_linux.appimage"
+          else
+            echo "No Linux installer (.AppImage) found"
+            exit 1
+          fi
+
+          # macOS: 仅保留 .dmg，重命名为 easypocketmd_macos.dmg
+          mac_dmg=$(find downloads/electron/mac -name "*.dmg" | head -1)
+          if [ -n "$mac_dmg" ]; then
+            cp "$mac_dmg" "deploy/macos/easypocketmd_macos.dmg"
+            echo "Prepared macOS installer: easypocketmd_macos.dmg"
+          else
+            echo "No macOS installer (.dmg) found"
+            exit 1
           fi
 
       # 上传 Windows 产物
@@ -274,7 +310,7 @@ jobs:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           password: ${{ secrets.SERVER_PASSWORD }}
-          source: "deploy/win/*"
+          source: "deploy/win/easypocketmd_windows.exe"
           target: "/www/wwwroot/static/electron/win"
           strip_components: 2   # 去除 deploy/win/ 前缀
 
@@ -285,6 +321,17 @@ jobs:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           password: ${{ secrets.SERVER_PASSWORD }}
-          source: "downloads/electron/linux/*"
+          source: "deploy/linux/*"
           target: "/www/wwwroot/static/electron/linux"
-          strip_components: 3   # 去除 downloads/electron/linux/ 前缀
+          strip_components: 2   # 去除 deploy/linux/ 前缀
+
+      # 上传 macOS 产物
+      - name: Upload macOS Electron artifacts
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          password: ${{ secrets.SERVER_PASSWORD }}
+          source: "deploy/macos/easypocketmd_macos.dmg"
+          target: "/www/wwwroot/static/electron/macos"
+          strip_components: 2   # 去除 deploy/macos/ 前缀

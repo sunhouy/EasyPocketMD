@@ -39,3 +39,4 @@ tests/               linguist-vendored
 webrtc/**            linguist-documentation
 
 .github/workflows/*.yml linguist-detectable=true
+dev/** linguist-generated=true
