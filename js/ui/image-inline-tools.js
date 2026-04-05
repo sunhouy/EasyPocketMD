@@ -57,18 +57,31 @@
 
     function applyImageStyle(img, width, rotate) {
         if (!img) return;
-        if (width && width > 0) {
-            img.style.width = width + 'px';
-            img.style.maxWidth = '100%';
-            img.setAttribute('width', String(width));
-        }
-        img.dataset.epmdRotate = String(rotate || 0);
+        
+        rotate = rotate || 0;
+        img.dataset.epmdRotate = String(rotate);
+        
         if (rotate) {
             img.style.transform = 'rotate(' + rotate + 'deg)';
             img.style.transformOrigin = 'center center';
         } else {
             img.style.removeProperty('transform');
             img.style.removeProperty('transform-origin');
+        }
+        
+        if (width && width > 0) {
+            img.style.width = width + 'px';
+            img.style.maxWidth = '100%';
+            img.setAttribute('width', String(width));
+        } else if (!width && (rotate === 90 || rotate === 270)) {
+            var container = img.parentElement;
+            var maxWidth = container ? container.getBoundingClientRect().width : window.innerWidth;
+            if (maxWidth > 0) {
+                maxWidth = Math.min(maxWidth, 800);
+                img.style.width = maxWidth + 'px';
+                img.style.maxWidth = '100%';
+                img.setAttribute('width', String(maxWidth));
+            }
         }
     }
 
@@ -201,10 +214,10 @@
         modal.id = MODAL_ID;
         modal.setAttribute('contenteditable', 'false');
         
-        var bg = nightMode ? '#2d2d2d' : '#fff';
-        var textColor = nightMode ? '#eee' : '#333';
-        var btnBg = nightMode ? '#3d3d3d' : '#f0f0f0';
-        var borderColor = nightMode ? '#555' : '#ddd';
+        var bg = nightMode ? '#1a1a1a' : '#fff';
+        var textColor = nightMode ? '#ffffff' : '#333';
+        var btnBg = nightMode ? '#2d2d2d' : '#f0f0f0';
+        var borderColor = nightMode ? '#444444' : '#ddd';
 
         modal.style.cssText = `
             position: fixed;
@@ -254,8 +267,11 @@
                 <div style="margin-bottom: 20px;">
                     <label style="display: block; margin-bottom: 8px; font-size: 14px;">裁剪</label>
                     <button class="epmd-modal-btn epmd-crop-open" style="padding: 8px 12px; background: ${btnBg}; border: 1px solid ${borderColor}; border-radius: 6px; cursor: pointer; width: 100%;">打开裁剪工具</button>
-                    <div class="epmd-crop-canvas-container" style="display: none; margin-top: 12px; background: ${nightMode ? '#1a1a1a' : '#fafafa'}; padding: 10px; border-radius: 6px;">
-                        <canvas class="epmd-crop-canvas" style="max-width: 100%; border: 2px solid ${borderColor}; border-radius: 4px; display: block; margin: 0 auto;"></canvas>
+                    <div class="epmd-crop-canvas-container" style="display: none; margin-top: 12px; background: ${nightMode ? '#0d0d0d' : '#fafafa'}; padding: 10px; border-radius: 6px;">
+                        <div style="font-size: 12px; margin-bottom: 8px; color: ${nightMode ? '#cccccc' : '#666'};">
+                            提示：在图片上拖拽边缘线来调整裁剪区域
+                        </div>
+                        <canvas class="epmd-crop-canvas" style="max-width: 100%; border: 2px solid ${borderColor}; border-radius: 4px; display: block; margin: 0 auto; cursor: default;"></canvas>
                         <div style="margin-top: 10px; display: flex; gap: 8px;">
                             <button class="epmd-crop-confirm" style="flex: 1; padding: 6px; background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer;">确认裁剪</button>
                             <button class="epmd-crop-cancel" style="flex: 1; padding: 6px; background: #f44336; color: white; border: none; border-radius: 4px; cursor: pointer;">取消</button>
@@ -273,7 +289,11 @@
                         <option value="chi_tra">繁体</option>
                     </select>
                     <button class="epmd-modal-btn epmd-ocr-run" style="padding: 8px 12px; background: ${btnBg}; border: 1px solid ${borderColor}; border-radius: 6px; cursor: pointer; width: 100%;">运行 OCR</button>
-                    <div class="epmd-ocr-status" style="margin-top: 10px; font-size: 12px; color: ${nightMode ? '#aaa' : '#666'};"></div>
+                    <div class="epmd-ocr-status" style="margin-top: 10px; font-size: 12px; color: ${nightMode ? '#cccccc' : '#666'};"></div>
+                </div>
+
+                <div style="margin-bottom: 0; padding-top: 20px; border-top: 1px solid ${borderColor};">
+                    <button class="epmd-modal-btn epmd-delete-image" style="padding: 8px 12px; background: #f44336; color: white; border: 1px solid #d32f2f; border-radius: 6px; cursor: pointer; width: 100%; font-weight: bold;">删除图片</button>
                 </div>
             </div>
         `;
@@ -337,16 +357,16 @@
             if (!currentEditingImage) return;
             var meta = getImageMeta(currentEditingImage);
             var rotate = (meta.rotate - 90) % 360;
-            applyImageStyle(currentEditingImage, meta.width || 320, rotate);
-            persistImageChange(currentEditingImage, meta.width || 320, rotate);
+            applyImageStyle(currentEditingImage, 0, rotate);
+            persistImageChange(currentEditingImage, 0, rotate);
         };
 
         modal.querySelector('.epmd-rotate-right').onclick = function() {
             if (!currentEditingImage) return;
             var meta = getImageMeta(currentEditingImage);
             var rotate = (meta.rotate + 90) % 360;
-            applyImageStyle(currentEditingImage, meta.width || 320, rotate);
-            persistImageChange(currentEditingImage, meta.width || 320, rotate);
+            applyImageStyle(currentEditingImage, 0, rotate);
+            persistImageChange(currentEditingImage, 0, rotate);
         };
 
         modal.querySelector('.epmd-crop-open').onclick = function() {
@@ -357,6 +377,19 @@
         modal.querySelector('.epmd-ocr-run').onclick = function() {
             if (!currentEditingImage) return;
             runOCR(currentEditingImage, modal);
+        };
+
+        modal.querySelector('.epmd-delete-image').onclick = function() {
+            if (!currentEditingImage) return;
+            if (typeof global.customConfirm === 'function') {
+                global.customConfirm('确定要删除这张图片吗？此操作无法撤销。').then(function(confirmed) {
+                    if (confirmed) {
+                        deleteImage(currentEditingImage, modal);
+                    }
+                });
+            } else if (global.confirm('确定要删除这张图片吗？')) {
+                deleteImage(currentEditingImage, modal);
+            }
         };
     }
 
@@ -386,48 +419,100 @@
     }
 
     function setupCropHandlers(canvas, origImage, imgElement, modal) {
+        var EDGE_THRESHOLD = 8;
         var cropState = {
-            startX: 0,
-            startY: 0,
-            isDrawing: false,
-            rect: { x: 20, y: 20, w: canvas.width - 40, h: canvas.height - 40 }
+            rect: { x: 20, y: 20, w: canvas.width - 40, h: canvas.height - 40 },
+            draggingEdge: null,
+            isDrawing: false
         };
 
         function drawCropBox() {
             var ctx = canvas.getContext('2d');
             ctx.drawImage(origImage, 0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.clearRect(cropState.rect.x, cropState.rect.y, cropState.rect.w, cropState.rect.h);
             ctx.strokeStyle = '#FF6B6B';
-            ctx.lineWidth = 2;
+            ctx.lineWidth = 3;
             ctx.strokeRect(cropState.rect.x, cropState.rect.y, cropState.rect.w, cropState.rect.h);
-            ctx.fillStyle = 'rgba(255, 107, 107, 0.1)';
-            ctx.fillRect(cropState.rect.x, cropState.rect.y, cropState.rect.w, cropState.rect.h);
+            
+            // 绘制四个角与中点标记
+            var corners = [
+                {x: cropState.rect.x, y: cropState.rect.y},
+                {x: cropState.rect.x + cropState.rect.w, y: cropState.rect.y},
+                {x: cropState.rect.x, y: cropState.rect.y + cropState.rect.h},
+                {x: cropState.rect.x + cropState.rect.w, y: cropState.rect.y + cropState.rect.h},
+                {x: cropState.rect.x + cropState.rect.w / 2, y: cropState.rect.y},
+                {x: cropState.rect.x + cropState.rect.w / 2, y: cropState.rect.y + cropState.rect.h},
+                {x: cropState.rect.x, y: cropState.rect.y + cropState.rect.h / 2},
+                {x: cropState.rect.x + cropState.rect.w, y: cropState.rect.y + cropState.rect.h / 2}
+            ];
+            ctx.fillStyle = '#FF6B6B';
+            corners.forEach(function(c) {
+                ctx.fillRect(c.x - 4, c.y - 4, 8, 8);
+            });
+        }
+
+        function getEdgeAtPoint(x, y) {
+            var rect = cropState.rect;
+            var onTop = Math.abs(y - rect.y) < EDGE_THRESHOLD && x >= rect.x - 5 && x <= rect.x + rect.w + 5;
+            var onBottom = Math.abs(y - (rect.y + rect.h)) < EDGE_THRESHOLD && x >= rect.x - 5 && x <= rect.x + rect.w + 5;
+            var onLeft = Math.abs(x - rect.x) < EDGE_THRESHOLD && y >= rect.y - 5 && y <= rect.y + rect.h + 5;
+            var onRight = Math.abs(x - (rect.x + rect.w)) < EDGE_THRESHOLD && y >= rect.y - 5 && y <= rect.y + rect.h + 5;
+            
+            if (onTop) return 'top';
+            if (onBottom) return 'bottom';
+            if (onLeft) return 'left';
+            if (onRight) return 'right';
+            return null;
         }
 
         drawCropBox();
 
         canvas.onmousedown = function(e) {
-            cropState.isDrawing = true;
-            cropState.startX = e.offsetX;
-            cropState.startY = e.offsetY;
+            var edge = getEdgeAtPoint(e.offsetX, e.offsetY);
+            if (edge) {
+                cropState.isDrawing = true;
+                cropState.draggingEdge = edge;
+            }
         };
 
         canvas.onmousemove = function(e) {
+            var edge = getEdgeAtPoint(e.offsetX, e.offsetY);
+            canvas.style.cursor = (edge === 'top' || edge === 'bottom') ? 'ns-resize' : 
+                                   (edge === 'left' || edge === 'right') ? 'ew-resize' : 'default';
+            
             if (!cropState.isDrawing) return;
-            var x = e.offsetX;
-            var y = e.offsetY;
-            cropState.rect.x = Math.max(0, Math.min(x, cropState.startX));
-            cropState.rect.y = Math.max(0, Math.min(y, cropState.startY));
-            cropState.rect.w = Math.abs(x - cropState.startX);
-            cropState.rect.h = Math.abs(y - cropState.startY);
+            
+            var minSize = 20;
+            switch(cropState.draggingEdge) {
+                case 'top':
+                    cropState.rect.y = Math.max(0, Math.min(e.offsetY, cropState.rect.y + cropState.rect.h - minSize));
+                    cropState.rect.h = cropState.rect.y + cropState.rect.h - cropState.rect.y;
+                    break;
+                case 'bottom':
+                    cropState.rect.h = Math.max(minSize, Math.min(e.offsetY, canvas.height) - cropState.rect.y);
+                    break;
+                case 'left':
+                    cropState.rect.x = Math.max(0, Math.min(e.offsetX, cropState.rect.x + cropState.rect.w - minSize));
+                    cropState.rect.w = cropState.rect.x + cropState.rect.w - cropState.rect.x;
+                    break;
+                case 'right':
+                    cropState.rect.w = Math.max(minSize, Math.min(e.offsetX, canvas.width) - cropState.rect.x);
+                    break;
+            }
             drawCropBox();
         };
 
         canvas.onmouseup = function() {
             cropState.isDrawing = false;
+            cropState.draggingEdge = null;
         };
 
         canvas.onmouseleave = function() {
             cropState.isDrawing = false;
+            cropState.draggingEdge = null;
+            canvas.style.cursor = 'default';
         };
 
         var confirmBtn = modal.querySelector('.epmd-crop-confirm');
@@ -460,6 +545,64 @@
             modal.querySelector('.epmd-crop-canvas-container').style.display = 'none';
             drawCropBox();
         };
+    }
+
+    function deleteImage(img, modal) {
+        if (!global.vditor || typeof global.vditor.getValue !== 'function' || typeof global.vditor.setValue !== 'function') {
+            global.showMessage ? global.showMessage('删除失败', 'error') : alert('删除失败');
+            return;
+        }
+
+        var src = img.getAttribute('src') || '';
+        if (!src) return;
+
+        var raw = global.vditor.getValue() || '';
+        var srcNorm = normalizeUrl(src);
+        var updated = null;
+
+        // Remove Markdown image syntax: ![alt](url)
+        var mdRegex = /!\[[^\]]*\]\([^)\s]+(?:\s+"[^"]*")?\)\s*/g;
+        updated = replaceFirstMatch(raw, mdRegex, function(match) {
+            var matchUrl = match.match(/\(([^)]+)\)/);
+            if (!matchUrl) return null;
+            var url = normalizeUrl(matchUrl[1].split(/\s+/)[0]);
+            if (url !== srcNorm) return null;
+            return '';
+        });
+
+        // Remove HTML image syntax: <img ... src="...">
+        if (!updated) {
+            var htmlRegex = /<img\b[^>]*src=(['"])(.*?)\1[^>]*>\s*/gi;
+            updated = replaceFirstMatch(raw, htmlRegex, function(match) {
+                var matchUrl = normalizeUrl(match[2]);
+                if (matchUrl !== srcNorm) return null;
+                return '';
+            });
+        }
+
+        if (!updated || updated === raw) {
+            global.showMessage ? global.showMessage('未找到该图片', 'error') : alert('未找到该图片');
+            return;
+        }
+
+        suspendObserver = true;
+        try {
+            global.vditor.setValue(updated);
+            if (global.currentFileId) {
+                global.unsavedChanges = global.unsavedChanges || {};
+                global.unsavedChanges[global.currentFileId] = true;
+                if (typeof global.startAutoSave === 'function') {
+                    global.startAutoSave();
+                }
+            }
+            closeModal();
+            global.showMessage ? global.showMessage('图片已删除', 'success') : alert('图片已删除');
+        } finally {
+            setTimeout(function() {
+                suspendObserver = false;
+                scheduleImageBindings();
+            }, 80);
+        }
     }
 
     async function runOCR(img, modal) {
