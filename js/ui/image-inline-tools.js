@@ -6,6 +6,8 @@
     var updateTimer = null;
     var suspendObserver = false;
     var currentEditingImage = null;
+    var cropperLoadPromise = null;
+    var activeCropper = null;
 
     function escapeRegExp(str) {
         return String(str || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -132,11 +134,158 @@
         var match;
         while ((match = regex.exec(content)) !== null) {
             var replacement = mapper(match);
-            if (replacement) {
+            if (replacement !== null && replacement !== undefined) {
                 return content.slice(0, match.index) + replacement + content.slice(match.index + match[0].length);
             }
         }
         return null;
+    }
+
+    function applyEditorValue(updated) {
+        suspendObserver = true;
+        try {
+            global.vditor.setValue(updated);
+            if (global.currentFileId) {
+                global.unsavedChanges = global.unsavedChanges || {};
+                global.unsavedChanges[global.currentFileId] = true;
+                if (typeof global.startAutoSave === 'function') {
+                    global.startAutoSave();
+                }
+            }
+            return true;
+        } finally {
+            setTimeout(function() {
+                suspendObserver = false;
+                scheduleImageBindings();
+            }, 80);
+        }
+    }
+
+    function replaceImageSourceInEditor(oldSrc, newSrc, width, rotate, imgAlt) {
+        if (!global.vditor || typeof global.vditor.getValue !== 'function' || typeof global.vditor.setValue !== 'function') {
+            return false;
+        }
+
+        var raw = global.vditor.getValue() || '';
+        var updated = null;
+        var hasStyle = (width && width > 0) || !!rotate;
+
+        var mdRegex = /!\[([^\]]*)\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g;
+        updated = replaceFirstMatch(raw, mdRegex, function(match) {
+            var matchUrl = normalizeUrl(match[2]);
+            if (!urlsMatch(matchUrl, oldSrc)) return null;
+            var alt = match[1] || imgAlt || '';
+            if (hasStyle) {
+                return buildImageHtml(newSrc, alt, width, rotate);
+            }
+            return '![' + alt + '](' + newSrc + ')';
+        });
+
+        if (updated === null) {
+            var htmlRegex = /<img\b[^>]*src=(['"])(.*?)\1[^>]*>/gi;
+            updated = replaceFirstMatch(raw, htmlRegex, function(match) {
+                var matchUrl = normalizeUrl(match[2]);
+                if (!urlsMatch(matchUrl, oldSrc)) return null;
+                var altMatch = match[0].match(/\balt=(['"])(.*?)\1/i);
+                var alt = altMatch ? altMatch[2] : (imgAlt || '');
+                return buildImageHtml(newSrc, alt, width, rotate);
+            });
+        }
+
+        if (updated === null || updated === raw) {
+            return false;
+        }
+
+        return applyEditorValue(updated);
+    }
+
+    function extractUploadedUrl(uploadResult) {
+        var text = String(uploadResult || '').trim();
+        if (!text) return '';
+
+        var imageMd = text.match(/!\[[^\]]*\]\(([^)\s]+)(?:\s+"[^"]*")?\)/);
+        if (imageMd && imageMd[1]) return imageMd[1];
+
+        var linkMd = text.match(/\[[^\]]*\]\(([^)\s]+)(?:\s+"[^"]*")?\)/);
+        if (linkMd && linkMd[1]) return linkMd[1];
+
+        if (/^(https?:)?\/\//i.test(text) || text.charAt(0) === '/') {
+            return text;
+        }
+
+        return '';
+    }
+
+    async function uploadCroppedImage(blob, originalSrc) {
+        if (!blob) {
+            throw new Error('裁剪结果为空');
+        }
+        if (typeof global.uploadFiles !== 'function') {
+            throw new Error('上传功能不可用');
+        }
+
+        var srcInfo = toComparableUrl(originalSrc);
+        var baseName = (srcInfo.file || 'image').replace(/\.[^.]+$/, '');
+        var ext = (blob.type || 'image/png').split('/').pop() || 'png';
+        ext = ext.replace(/[^a-zA-Z0-9]/g, '') || 'png';
+        var fileName = baseName + '_crop_' + Date.now() + '.' + ext;
+        var file = fileFromBlob(blob, fileName);
+
+        var uploadResult = await global.uploadFiles([file], false);
+        var uploadedUrl = extractUploadedUrl(uploadResult);
+        if (!uploadedUrl) {
+            throw new Error('上传成功但未返回图片地址');
+        }
+        return uploadedUrl;
+    }
+
+    function loadCropperLibrary() {
+        if (!cropperLoadPromise) {
+            cropperLoadPromise = import('cropperjs').then(function(mod) {
+                return mod.default || mod;
+            });
+        }
+        return cropperLoadPromise;
+    }
+
+    function destroyActiveCropper(modal) {
+        if (activeCropper && typeof activeCropper.destroy === 'function') {
+            activeCropper.destroy();
+        }
+        activeCropper = null;
+
+        if (modal && modal.dataset.epmdCropObjectUrl) {
+            URL.revokeObjectURL(modal.dataset.epmdCropObjectUrl);
+            delete modal.dataset.epmdCropObjectUrl;
+        }
+
+        if (modal) {
+            var target = modal.querySelector('.epmd-crop-target');
+            if (target) {
+                target.removeAttribute('src');
+            }
+        }
+    }
+
+    function setCropBusy(modal, busy, text) {
+        var status = modal.querySelector('.epmd-crop-status');
+        if (status) {
+            status.textContent = text || '';
+        }
+
+        var buttons = modal.querySelectorAll('.epmd-crop-confirm, .epmd-crop-cancel, .epmd-crop-open, .epmd-modal-btn');
+        buttons.forEach(function(btn) {
+            if (btn.classList.contains('epmd-modal-close')) return;
+            btn.disabled = !!busy;
+        });
+    }
+
+    function blobFromCanvas(canvas, type, quality) {
+        return new Promise(function(resolve) {
+            canvas.toBlob(function(blob) {
+                resolve(blob);
+            }, type || 'image/png', quality || 0.92);
+        });
     }
 
     function persistImageChange(img, width, rotate) {
@@ -160,7 +309,7 @@
         });
 
         // HTML image syntax: <img ... src="...">
-        if (!updated) {
+        if (updated === null) {
             var htmlRegex = /<img\b[^>]*src=(['"])(.*?)\1[^>]*>/gi;
             updated = replaceFirstMatch(raw, htmlRegex, function(match) {
                 var matchUrl = normalizeUrl(match[2]);
@@ -171,27 +320,11 @@
             });
         }
 
-        if (!updated || updated === raw) {
+        if (updated === null || updated === raw) {
             return false;
         }
 
-        suspendObserver = true;
-        try {
-            global.vditor.setValue(updated);
-            if (global.currentFileId) {
-                global.unsavedChanges = global.unsavedChanges || {};
-                global.unsavedChanges[global.currentFileId] = true;
-                if (typeof global.startAutoSave === 'function') {
-                    global.startAutoSave();
-                }
-            }
-            return true;
-        } finally {
-            setTimeout(function() {
-                suspendObserver = false;
-                scheduleImageBindings();
-            }, 80);
-        }
+        return applyEditorValue(updated);
     }
 
     function createToolButton(label, title, action) {
@@ -300,9 +433,12 @@
                     <button class="epmd-modal-btn epmd-crop-open" style="padding: 8px 12px; background: ${btnBg}; color: ${btnTextColor}; border: 1px solid ${borderColor}; border-radius: 6px; cursor: pointer; width: 100%;">打开裁剪工具</button>
                     <div class="epmd-crop-canvas-container" style="display: none; margin-top: 12px; background: ${nightMode ? '#0d0d0d' : '#fafafa'}; padding: 10px; border-radius: 6px;">
                         <div style="font-size: 12px; margin-bottom: 8px; color: ${nightMode ? '#cccccc' : '#666'};">
-                            提示：在图片上拖拽边缘线来调整裁剪区域
+                            提示：可双指缩放和拖动图片，拖拽四角/四边调整裁剪区域
                         </div>
-                        <canvas class="epmd-crop-canvas" style="max-width: 100%; border: 2px solid ${borderColor}; border-radius: 4px; display: block; margin: 0 auto; cursor: default;"></canvas>
+                        <div class="epmd-cropper-stage" style="max-height: 52vh; border: 1px solid ${borderColor}; border-radius: 4px; overflow: hidden; background: ${nightMode ? '#000' : '#fff'};">
+                            <img class="epmd-crop-target" alt="crop-target" style="display: block; max-width: 100%;">
+                        </div>
+                        <div class="epmd-crop-status" style="margin-top: 8px; font-size: 12px; color: ${nightMode ? '#cccccc' : '#666'};"></div>
                         <div style="margin-top: 10px; display: flex; gap: 8px;">
                             <button class="epmd-crop-confirm" style="flex: 1; padding: 6px; background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer;">确认裁剪</button>
                             <button class="epmd-crop-cancel" style="flex: 1; padding: 6px; background: #f44336; color: white; border: none; border-radius: 4px; cursor: pointer;">取消</button>
@@ -347,6 +483,7 @@
     function closeModal() {
         var modal = document.getElementById(MODAL_ID);
         if (modal) {
+            destroyActiveCropper(modal);
             modal.style.display = 'none';
             var container = modal.querySelector('.epmd-crop-canvas-container');
             if (container) {
@@ -424,243 +561,116 @@
         };
     }
 
-    function openCropTool(img, modal) {
+    async function openCropTool(img, modal) {
         var container = modal.querySelector('.epmd-crop-canvas-container');
-        var canvas = modal.querySelector('.epmd-crop-canvas');
+        var cropTarget = modal.querySelector('.epmd-crop-target');
+        var cropStatus = modal.querySelector('.epmd-crop-status');
+        var confirmBtn = modal.querySelector('.epmd-crop-confirm');
+        var cancelBtn = modal.querySelector('.epmd-crop-cancel');
         
-        if (!canvas || !img.src) {
+        if (!cropTarget || !img.src) {
             global.showMessage ? global.showMessage('无效的图片', 'error') : alert('无效的图片');
             return;
         }
 
-        var image = new Image();
-        image.crossOrigin = 'anonymous';
-        image.onload = function() {
-            canvas.width = Math.min(image.width, 500);
-            canvas.height = (canvas.width / image.width) * image.height;
-            var ctx = canvas.getContext('2d');
-            ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
-            container.style.display = 'block';
-            setupCropHandlers(canvas, image, img, modal);
-        };
-        image.onerror = function() {
-            global.showMessage ? global.showMessage('图片加载失败', 'error') : alert('图片加载失败');
-        };
-        image.src = img.src;
-    }
+        container.style.display = 'block';
+        setCropBusy(modal, true, '正在加载裁剪工具...');
 
-    function setupCropHandlers(canvas, origImage, imgElement, modal) {
-        var EDGE_THRESHOLD = 8;
-        var MIN_SIZE = 20;
-        var cropState = {
-            rect: { x: 20, y: 20, w: canvas.width - 40, h: canvas.height - 40 },
-            draggingEdge: null,
-            isDrawing: false,
-            startX: 0,
-            startY: 0,
-            startRect: null
-        };
+        try {
+            var Cropper = await loadCropperLibrary();
+            destroyActiveCropper(modal);
 
-        function clamp(value, min, max) {
-            return Math.max(min, Math.min(max, value));
-        }
+            var imageResponse = await fetch(img.src, { mode: 'cors' });
+            if (!imageResponse.ok) {
+                throw new Error('图片加载失败: ' + imageResponse.status);
+            }
 
-        function drawCropBox() {
-            var ctx = canvas.getContext('2d');
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.drawImage(origImage, 0, 0, canvas.width, canvas.height);
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-            // Show selected crop area by drawing the image again through a clip.
-            ctx.save();
-            ctx.beginPath();
-            ctx.rect(cropState.rect.x, cropState.rect.y, cropState.rect.w, cropState.rect.h);
-            ctx.clip();
-            ctx.drawImage(origImage, 0, 0, canvas.width, canvas.height);
-            ctx.restore();
-
-            ctx.strokeStyle = '#FF6B6B';
-            ctx.lineWidth = 3;
-            ctx.strokeRect(cropState.rect.x, cropState.rect.y, cropState.rect.w, cropState.rect.h);
-            
-            // 绘制四个角与中点标记
-            var corners = [
-                {x: cropState.rect.x, y: cropState.rect.y},
-                {x: cropState.rect.x + cropState.rect.w, y: cropState.rect.y},
-                {x: cropState.rect.x, y: cropState.rect.y + cropState.rect.h},
-                {x: cropState.rect.x + cropState.rect.w, y: cropState.rect.y + cropState.rect.h},
-                {x: cropState.rect.x + cropState.rect.w / 2, y: cropState.rect.y},
-                {x: cropState.rect.x + cropState.rect.w / 2, y: cropState.rect.y + cropState.rect.h},
-                {x: cropState.rect.x, y: cropState.rect.y + cropState.rect.h / 2},
-                {x: cropState.rect.x + cropState.rect.w, y: cropState.rect.y + cropState.rect.h / 2}
-            ];
-            ctx.fillStyle = '#FF6B6B';
-            corners.forEach(function(c) {
-                ctx.fillRect(c.x - 4, c.y - 4, 8, 8);
+            var imageBlob = await imageResponse.blob();
+            var objectUrl = URL.createObjectURL(imageBlob);
+            modal.dataset.epmdCropObjectUrl = objectUrl;
+            await new Promise(function(resolve, reject) {
+                cropTarget.onload = function() { resolve(); };
+                cropTarget.onerror = function() { reject(new Error('图片解析失败')); };
+                cropTarget.src = objectUrl;
             });
+
+            activeCropper = new Cropper(cropTarget, {
+                viewMode: 1,
+                dragMode: 'move',
+                autoCropArea: 1,
+                responsive: true,
+                background: false,
+                checkCrossOrigin: false,
+                checkOrientation: false,
+                movable: true,
+                zoomable: true,
+                scalable: false,
+                rotatable: false,
+                guides: true,
+                center: true,
+                highlight: true,
+                cropBoxMovable: true,
+                cropBoxResizable: true,
+                touchDragZoom: true,
+                toggleDragModeOnDblclick: false
+            });
+
+            cropStatus.textContent = '拖动裁剪框后点击确认裁剪';
+            setCropBusy(modal, false, cropStatus.textContent);
+        } catch (error) {
+            console.error('裁剪工具加载失败', error);
+            destroyActiveCropper(modal);
+            container.style.display = 'none';
+            setCropBusy(modal, false, '');
+            global.showMessage ? global.showMessage('裁剪工具加载失败: ' + error.message, 'error') : alert('裁剪工具加载失败: ' + error.message);
+            return;
         }
 
-        function getEdgeAtPoint(x, y) {
-            var rect = cropState.rect;
-            var nearTop = Math.abs(y - rect.y) <= EDGE_THRESHOLD;
-            var nearBottom = Math.abs(y - (rect.y + rect.h)) <= EDGE_THRESHOLD;
-            var nearLeft = Math.abs(x - rect.x) <= EDGE_THRESHOLD;
-            var nearRight = Math.abs(x - (rect.x + rect.w)) <= EDGE_THRESHOLD;
-            var insideX = x >= rect.x - EDGE_THRESHOLD && x <= rect.x + rect.w + EDGE_THRESHOLD;
-            var insideY = y >= rect.y - EDGE_THRESHOLD && y <= rect.y + rect.h + EDGE_THRESHOLD;
+        confirmBtn.onclick = async function() {
+            if (!currentEditingImage || !activeCropper) return;
+            setCropBusy(modal, true, '正在裁剪并上传...');
 
-            if (nearTop && nearLeft) return 'top-left';
-            if (nearTop && nearRight) return 'top-right';
-            if (nearBottom && nearLeft) return 'bottom-left';
-            if (nearBottom && nearRight) return 'bottom-right';
-            if (nearTop && insideX) return 'top';
-            if (nearBottom && insideX) return 'bottom';
-            if (nearLeft && insideY) return 'left';
-            if (nearRight && insideY) return 'right';
-            return null;
-        }
+            try {
+                var oldSrc = currentEditingImage.getAttribute('src') || '';
+                var oldMeta = getImageMeta(currentEditingImage);
+                var canvas = activeCropper.getCroppedCanvas({
+                    imageSmoothingEnabled: true,
+                    imageSmoothingQuality: 'high',
+                    fillColor: '#ffffff'
+                });
 
-        function getCursorForEdge(edge) {
-            if (!edge) return 'default';
-            if (edge === 'top' || edge === 'bottom') return 'ns-resize';
-            if (edge === 'left' || edge === 'right') return 'ew-resize';
-            if (edge === 'top-left' || edge === 'bottom-right') return 'nwse-resize';
-            return 'nesw-resize';
-        }
+                if (!canvas) {
+                    throw new Error('生成裁剪结果失败');
+                }
 
-        drawCropBox();
+                var blob = await blobFromCanvas(canvas, 'image/png', 0.95);
+                var uploadedUrl = await uploadCroppedImage(blob, oldSrc);
 
-        canvas.onmousedown = function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            var edge = getEdgeAtPoint(e.offsetX, e.offsetY);
-            if (edge) {
-                cropState.isDrawing = true;
-                cropState.draggingEdge = edge;
-                cropState.startX = e.offsetX;
-                cropState.startY = e.offsetY;
-                cropState.startRect = {
-                    x: cropState.rect.x,
-                    y: cropState.rect.y,
-                    w: cropState.rect.w,
-                    h: cropState.rect.h
-                };
+                currentEditingImage.src = uploadedUrl;
+                currentEditingImage.removeAttribute('srcset');
+                currentEditingImage.dataset.epmdCropped = '1';
+                applyImageStyle(currentEditingImage, oldMeta.width || 0, oldMeta.rotate || 0);
+
+                var replaced = replaceImageSourceInEditor(oldSrc, uploadedUrl, oldMeta.width || 0, oldMeta.rotate || 0, currentEditingImage.getAttribute('alt') || '');
+                if (!replaced) {
+                    throw new Error('裁剪后链接替换失败');
+                }
+
+                destroyActiveCropper(modal);
+                container.style.display = 'none';
+                global.showMessage ? global.showMessage('裁剪完成，已替换为云端新图片', 'success') : alert('裁剪完成，已替换为云端新图片');
+            } catch (error) {
+                console.error('裁剪上传失败', error);
+                global.showMessage ? global.showMessage('裁剪失败: ' + error.message, 'error') : alert('裁剪失败: ' + error.message);
+            } finally {
+                setCropBusy(modal, false, '');
             }
-        };
-
-        canvas.onmousemove = function(e) {
-            var edge = getEdgeAtPoint(e.offsetX, e.offsetY);
-            canvas.style.cursor = cropState.isDrawing ? getCursorForEdge(cropState.draggingEdge) : getCursorForEdge(edge);
-            
-            if (!cropState.isDrawing || !cropState.startRect) return;
-            e.preventDefault();
-            
-            var dx = e.offsetX - cropState.startX;
-            var dy = e.offsetY - cropState.startY;
-            var start = cropState.startRect;
-            var next = {
-                x: start.x,
-                y: start.y,
-                w: start.w,
-                h: start.h
-            };
-            var right = start.x + start.w;
-            var bottom = start.y + start.h;
-
-            switch (cropState.draggingEdge) {
-                case 'top':
-                    next.y = clamp(start.y + dy, 0, bottom - MIN_SIZE);
-                    next.h = bottom - next.y;
-                    break;
-                case 'bottom':
-                    var newBottom = clamp(bottom + dy, start.y + MIN_SIZE, canvas.height);
-                    next.h = newBottom - start.y;
-                    break;
-                case 'left':
-                    next.x = clamp(start.x + dx, 0, right - MIN_SIZE);
-                    next.w = right - next.x;
-                    break;
-                case 'right':
-                    var newRight = clamp(right + dx, start.x + MIN_SIZE, canvas.width);
-                    next.w = newRight - start.x;
-                    break;
-                case 'top-left':
-                    next.y = clamp(start.y + dy, 0, bottom - MIN_SIZE);
-                    next.h = bottom - next.y;
-                    next.x = clamp(start.x + dx, 0, right - MIN_SIZE);
-                    next.w = right - next.x;
-                    break;
-                case 'top-right':
-                    next.y = clamp(start.y + dy, 0, bottom - MIN_SIZE);
-                    next.h = bottom - next.y;
-                    var trRight = clamp(right + dx, start.x + MIN_SIZE, canvas.width);
-                    next.w = trRight - start.x;
-                    break;
-                case 'bottom-left':
-                    var blBottom = clamp(bottom + dy, start.y + MIN_SIZE, canvas.height);
-                    next.h = blBottom - start.y;
-                    next.x = clamp(start.x + dx, 0, right - MIN_SIZE);
-                    next.w = right - next.x;
-                    break;
-                case 'bottom-right':
-                    var brBottom = clamp(bottom + dy, start.y + MIN_SIZE, canvas.height);
-                    next.h = brBottom - start.y;
-                    var brRight = clamp(right + dx, start.x + MIN_SIZE, canvas.width);
-                    next.w = brRight - start.x;
-                    break;
-            }
-
-            cropState.rect = next;
-            drawCropBox();
-        };
-
-        canvas.onmouseup = function() {
-            cropState.isDrawing = false;
-            cropState.draggingEdge = null;
-            cropState.startRect = null;
-        };
-
-        canvas.onmouseleave = function() {
-            cropState.isDrawing = false;
-            cropState.draggingEdge = null;
-            cropState.startRect = null;
-            canvas.style.cursor = 'default';
-        };
-
-        canvas.ondragstart = function(e) {
-            e.preventDefault();
-        };
-
-        var confirmBtn = modal.querySelector('.epmd-crop-confirm');
-        var cancelBtn = modal.querySelector('.epmd-crop-cancel');
-
-        confirmBtn.onclick = function() {
-            var ratio = origImage.width / canvas.width;
-            var cropCanvas = document.createElement('canvas');
-            cropCanvas.width = Math.round(cropState.rect.w * ratio);
-            cropCanvas.height = Math.round(cropState.rect.h * ratio);
-            var ctx = cropCanvas.getContext('2d');
-            ctx.drawImage(origImage, 
-                Math.round(cropState.rect.x * ratio), 
-                Math.round(cropState.rect.y * ratio),
-                cropCanvas.width, 
-                cropCanvas.height,
-                0, 0, cropCanvas.width, cropCanvas.height);
-            
-            cropCanvas.toBlob(function(blob) {
-                var url = URL.createObjectURL(blob);
-                imgElement.src = url;
-                imgElement.dataset.epmdCropped = '1';
-                persistImageChange(imgElement, cropCanvas.width, 0);
-                modal.querySelector('.epmd-crop-canvas-container').style.display = 'none';
-                global.showMessage ? global.showMessage('裁剪完成', 'success') : alert('裁剪完成');
-            }, 'image/png');
         };
 
         cancelBtn.onclick = function() {
-            modal.querySelector('.epmd-crop-canvas-container').style.display = 'none';
-            drawCropBox();
+            destroyActiveCropper(modal);
+            container.style.display = 'none';
+            setCropBusy(modal, false, '');
         };
     }
 
@@ -680,7 +690,8 @@
         // Remove Markdown image syntax: ![alt](url)
         var mdRegex = /!\[[^\]]*\]\([^)\s]+(?:\s+"[^"]*")?\)\s*/g;
         updated = replaceFirstMatch(raw, mdRegex, function(match) {
-            var matchUrl = match.match(/\(([^)]+)\)/);
+            var matchedText = match[0] || '';
+            var matchUrl = matchedText.match(/\(([^)]+)\)/);
             if (!matchUrl) return null;
             var url = normalizeUrl(matchUrl[1].split(/\s+/)[0]);
             if (!urlsMatch(url, srcNorm)) return null;
@@ -688,7 +699,7 @@
         });
 
         // Remove HTML image syntax: <img ... src="...">
-        if (!updated) {
+        if (updated === null) {
             var htmlRegex = /<img\b[^>]*src=(['"])(.*?)\1[^>]*>\s*/gi;
             updated = replaceFirstMatch(raw, htmlRegex, function(match) {
                 var matchUrl = normalizeUrl(match[2]);
@@ -697,29 +708,25 @@
             });
         }
 
-        if (!updated || updated === raw) {
+        if (updated === null || updated === raw) {
+            // Fallback: remove the clicked image element directly in editor DOM if available.
+            if (img && img.parentNode) {
+                img.parentNode.removeChild(img);
+                var latest = global.vditor.getValue() || '';
+                if (latest !== raw) {
+                    applyEditorValue(latest);
+                    closeModal();
+                    global.showMessage ? global.showMessage('图片已删除', 'success') : alert('图片已删除');
+                    return;
+                }
+            }
             global.showMessage ? global.showMessage('未找到该图片', 'error') : alert('未找到该图片');
             return;
         }
 
-        suspendObserver = true;
-        try {
-            global.vditor.setValue(updated);
-            if (global.currentFileId) {
-                global.unsavedChanges = global.unsavedChanges || {};
-                global.unsavedChanges[global.currentFileId] = true;
-                if (typeof global.startAutoSave === 'function') {
-                    global.startAutoSave();
-                }
-            }
-            closeModal();
-            global.showMessage ? global.showMessage('图片已删除', 'success') : alert('图片已删除');
-        } finally {
-            setTimeout(function() {
-                suspendObserver = false;
-                scheduleImageBindings();
-            }, 80);
-        }
+        applyEditorValue(updated);
+        closeModal();
+        global.showMessage ? global.showMessage('图片已删除', 'success') : alert('图片已删除');
     }
 
     async function runOCR(img, modal) {
