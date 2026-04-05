@@ -1669,7 +1669,6 @@ async function downloadInCapacitor(data, filename, mimeType, isRawData = false) 
         var showPreview = async function() {
             if (!pdfUrl) return;
             
-            console.log('[PDF Debug] Showing preview for URL:', pdfUrl);
             loadingModal.remove();
             
             previewModal = document.createElement('div');
@@ -1960,27 +1959,20 @@ async function downloadInCapacitor(data, filename, mimeType, isRawData = false) 
     }
 
     async function preparePrintContent(content, settings) {
-        console.log('[Print Debug] preparePrintContent start. Content length:', content ? content.length : 0);
         
         // 生成缓存键
         var cacheKey = generateCacheKey(content, settings);
 
         // 检查缓存是否存在
         if (printContentCache[cacheKey]) {
-            console.log('[Print Debug] Using cached content');
             return printContentCache[cacheKey];
         }
 
-        // 使用服务端 API 进行 Markdown 转换
         var htmlContent = '';
         try {
             var api = global.getApiBaseUrl ? global.getApiBaseUrl() : 'api';
-            // 兼容 api 路径可能不包含 /api 的情况 (取决于 getApiBaseUrl 实现)
-            // 如果 getApiBaseUrl 返回 'api' (相对路径), 则 fetch('api/convert/markdown')
-            // 如果返回完整 URL, 需要拼接
             var apiUrl = api.startsWith('http') ? api + '/convert/markdown' : 'api/convert/markdown';
             
-            console.log('[Print Debug] Fetching markdown conversion from:', apiUrl);
             var response = await fetch(apiUrl, {
                 method: 'POST',
                 headers: {
@@ -1992,27 +1984,20 @@ async function downloadInCapacitor(data, filename, mimeType, isRawData = false) 
             var result = await response.json();
             if (result.code === 200) {
                 htmlContent = result.data;
-                console.log('[Print Debug] Server conversion success. HTML length:', htmlContent.length);
             } else {
                 console.error('[Print Debug] Markdown conversion failed:', result.message);
-                // Fallback to local formatting if server fails
                 htmlContent = formatForPrint(content, settings);
-                console.log('[Print Debug] Fallback to local formatting. HTML length:', htmlContent.length);
             }
         } catch (e) {
             console.error('[Print Debug] Markdown conversion error:', e);
             // Fallback to local formatting
             htmlContent = formatForPrint(content, settings);
-            console.log('[Print Debug] Fallback to local formatting (error). HTML length:', htmlContent.length);
         }
 
-        // Post-process HTML to match expected structure for Mermaid and others
         var tempDiv = document.createElement('div');
         tempDiv.innerHTML = htmlContent;
 
-        // Transform mermaid code blocks: <pre><code class="language-mermaid">...</code></pre> -> <div class="mermaid">...</div>
         var mermaidCodes = tempDiv.querySelectorAll('code.language-mermaid');
-        console.log('[Print Debug] Found mermaid blocks:', mermaidCodes.length);
         mermaidCodes.forEach(function(code) {
             var pre = code.parentNode;
             if (pre.tagName === 'PRE') {
@@ -2026,27 +2011,18 @@ async function downloadInCapacitor(data, filename, mimeType, isRawData = false) 
             }
         });
 
-        // Update htmlContent
         htmlContent = tempDiv.innerHTML;
 
-        // Convert formulas and charts to images and upload
         if (!global.convertFormulasAndChartsToImages) {
              console.error('[Print Debug] Render module not loaded');
              throw new Error('Render module not loaded');
         }
         
-        console.log('[Print Debug] Starting convertFormulasAndChartsToImages...');
-        // 在打印 / 导出 PDF 场景下，mermaid 图表应上传到临时目录（PDF 所在的 uploads 目录），
-        // 而不是用户自己的 user_files 目录，因此传入 useTempDir 标志。
         var processedHtml = await global.convertFormulasAndChartsToImages(htmlContent, { useTempDir: true });
-        console.log('[Print Debug] convertFormulasAndChartsToImages done. HTML length:', processedHtml.length);
 
-        // For print, we need to ensure formulas, charts, and images are properly rendered
-        // Create a temporary container to process the content
         var tempContainer = document.createElement('div');
         tempContainer.innerHTML = processedHtml;
 
-        // Process images - convert to data URLs to avoid network errors
         processImages(tempContainer);
 
         var finalHtml = tempContainer.innerHTML;
@@ -2055,9 +2031,6 @@ async function downloadInCapacitor(data, filename, mimeType, isRawData = false) 
         const printStyle = getPrintStyles(settings);
         finalHtml = `<style>${printStyle}</style><div class="print-content">${finalHtml}</div>`;
         
-        console.log('[Print Debug] Final HTML prepared. Length:', finalHtml.length);
-
-        // 将处理后的内容存入缓存
         printContentCache[cacheKey] = finalHtml;
 
         return finalHtml;
@@ -2083,7 +2056,6 @@ async function downloadInCapacitor(data, filename, mimeType, isRawData = false) 
     }
 
     function processFormulasAndCharts(container) {
-        // Process KaTeX formulas - preserve original elements for client-side rendering
         var mathElements = container.querySelectorAll('.katex, .katex-display, [data-katex]');
         mathElements.forEach(function(el) {
             var latex = el.getAttribute('data-katex') || el.textContent;

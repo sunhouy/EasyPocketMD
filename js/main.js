@@ -6,10 +6,7 @@ import startupAsciiArt from '../ascii.md?raw';
 document.addEventListener('DOMContentLoaded', function() {
     'use strict';
 
-    console.log(startupAsciiArt);
 
-    // 记录页面加载开始时间
-    // const pageLoadStartTime = performance.now();
 
     // 初始化翻译系统
     if (window.i18n) {
@@ -328,12 +325,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 window.initInlineImageTools();
             }
 
-            // 计算加载时间
-            // const loadTime = Math.round(performance.now() - pageLoadStartTime);
 
-            // 打印EasyPocketMD
             console.log('%c%s', 'font-size: 48px; font-weight: bold; color: #4a90e2; text-shadow: 2px 2px 4px rgba(0,0,0,0.2);', 'EasyPocketMD');
-            // console.log('%cLoad time: %dms', 'font-size: 16px; font-weight: bold; color: #27ae60;', loadTime);
 
             // 应用字体大小设置
             applyFontSize(window.userSettings.fontSize);
@@ -442,7 +435,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // 监听网络恢复事件
         window.addEventListener('online', function() {
-            console.log('Network connected');
             // 如果当前显示的是网络错误提示，则自动关闭
             if (currentNoticeType === 'network-error') {
                 hideTopNoticeBanner();
@@ -451,7 +443,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // 监听网络断开事件，主动显示网络错误提示
         window.addEventListener('offline', function() {
-            console.log('Network disconnected');
             // 网络断开时，显示网络错误提示
             showNetworkErrorBanner();
         });

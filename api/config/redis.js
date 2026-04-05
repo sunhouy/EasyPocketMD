@@ -7,11 +7,9 @@ const redisConfig = {
     db: parseInt(process.env.REDIS_DB) || 0,
     retryStrategy: (times) => {
         if (times > 5) {
-            console.log('Redis: max retries reached, stop reconnecting');
             return null;
         }
         const delay = Math.min(times * 500, 2000);
-        console.log(`Redis: reconnect attempt ${times}, next in ${delay}ms`);
         return delay;
     },
     maxRetriesPerRequest: 3,
@@ -21,12 +19,7 @@ const redisConfig = {
     commandTimeout: 5000
 };
 
-console.log('Redis configuration loaded:', {
-    host: redisConfig.host,
-    port: redisConfig.port,
-    hasPassword: !!redisConfig.password,
-    db: redisConfig.db
-});
+
 
 let redis = null;
 let redisAvailable = false;
@@ -35,12 +28,10 @@ try {
     redis = new Redis(redisConfig);
 
     redis.on('connect', () => {
-        console.log('Redis: connected successfully');
         redisAvailable = true;
     });
 
     redis.on('ready', () => {
-        console.log('Redis: ready for commands');
         redisAvailable = true;
     });
 
@@ -50,12 +41,10 @@ try {
     });
 
     redis.on('close', () => {
-        console.log('Redis: connection closed');
         redisAvailable = false;
     });
 
     redis.on('reconnecting', () => {
-        console.log('Redis: attempting to reconnect...');
     });
 
 } catch (err) {

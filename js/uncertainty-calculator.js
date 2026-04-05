@@ -469,7 +469,6 @@ function showUncertaintyCalculator() {
         if (window.vditor) {
             window.vditor.setValue(resultMarkdown);
         } else {
-            console.log(resultMarkdown);
             g('customAlert')('结果已生成，但未找到编辑器，请检查Vditor是否已加载。');
         }
         closeUncertaintyCalculator();

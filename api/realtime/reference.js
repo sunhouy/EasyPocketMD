@@ -15,13 +15,11 @@ const clients = new Map(); // ws -> { userId, roomId, passwordVerified }
 const rooms = new Map();    // roomId -> { password: string|null, clients: Set of ws }
 
 wss.on('connection', (ws, req) => {
-    console.log('新客户端连接');
     clients.set(ws, { userId: null, roomId: null, passwordVerified: false, pendingPassword: null });
 
     ws.on('message', (message) => {
         try {
             const data = JSON.parse(message);
-            console.log('收到消息:', data.type);
 
             switch (data.type) {
                 case 'join':
@@ -40,7 +38,6 @@ wss.on('connection', (ws, req) => {
                     handleLeave(ws);
                     break;
                 default:
-                    console.log('未知消息类型:', data.type);
             }
         } catch (error) {
             console.error('解析消息失败:', error);
@@ -48,7 +45,6 @@ wss.on('connection', (ws, req) => {
     });
 
     ws.on('close', () => {
-        console.log('客户端断开');
         handleLeave(ws);
     });
 });
@@ -67,7 +63,6 @@ function handleJoin(ws, data) {
             clients: new Set()
         });
         client.passwordVerified = true;
-        console.log(`创建新房间 ${roomId}${password ? ' (有密码)' : ''}`);
     } else {
         const room = rooms.get(roomId);
         // 检查房间是否需要密码
@@ -118,7 +113,6 @@ function handleJoin(ws, data) {
         }
     });
 
-    console.log(`${userId} 加入了房间 ${roomId}`);
 }
 
 function handleVerifyPassword(ws, data) {
@@ -158,7 +152,6 @@ function handleVerifyPassword(ws, data) {
             }
         });
 
-        console.log(`${client.userId} 验证密码后加入房间 ${client.roomId}`);
     } else {
         // 密码错误
         ws.send(JSON.stringify({

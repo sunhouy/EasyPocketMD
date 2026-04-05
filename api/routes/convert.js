@@ -38,21 +38,13 @@ function cleanMathJaxContent(html) {
     try {
         let cleaned = html;
         
-        // 1. Remove all MathJax scripts
-        // Remove script tags with src containing mathjax or MathJax in id
         cleaned = cleaned.replace(/<script[^>]*src[^>]*mathjax[^>]*>[\s\S]*?<\/script>/gi, '');
         cleaned = cleaned.replace(/<script[^>]*id[^>]*MathJax[^>]*>[\s\S]*?<\/script>/gi, '');
         
-        // Remove script tags containing mathjax in their content
-        // This is more complex with regex, so we'll do our best
         cleaned = cleaned.replace(/<script[^>]*>[\s\S]*?mathjax[\s\S]*?<\/script>/gi, '');
         
-        // 2. Remove <mjx-assistive-mml> nodes (including all content inside)
         cleaned = cleaned.replace(/<mjx-assistive-mml[^>]*>[\s\S]*?<\/mjx-assistive-mml>/gi, '');
         
-        // 3. Process <mjx-container> elements
-        // We need to find all mjx-container elements and extract the SVG
-        // This is a bit complex with regex, but we'll use a function to replace
         cleaned = cleaned.replace(/<mjx-container([^>]*)>([\s\S]*?)<\/mjx-container>/gi, (match, attrs, content) => {
             // Extract SVG from the content
             const svgMatch = content.match(/<svg[\s\S]*?<\/svg>/i);
@@ -68,19 +60,16 @@ function cleanMathJaxContent(html) {
 
                 return `<span class="docx-math-svg docx-math-inline">${svg}</span>`;
             }
-            // If no SVG found, remove the container
             return '';
         });
         
         return cleaned;
     } catch (error) {
         console.error('[PDF Debug] Error cleaning MathJax content:', error);
-        // If cleaning fails, return original HTML
         return html;
     }
 }
 
-// Conversion endpoint
 router.post('/markdown', (req, res) => {
     try {
         const { content } = req.body;
@@ -92,7 +81,6 @@ router.post('/markdown', (req, res) => {
             });
         }
 
-        // Render markdown to HTML
         const html = md.render(content);
         
         return res.json({
@@ -109,7 +97,6 @@ router.post('/markdown', (req, res) => {
     }
 });
 
-// PDF Conversion endpoint
 router.post('/pdf', (req, res) => {
     try {
         let { html, settings } = req.body;
@@ -121,18 +108,11 @@ router.post('/pdf', (req, res) => {
             });
         }
         
-        // Clean up MathJax-related content before conversion
-        // console.log('[PDF Debug] Cleaning MathJax content on backend...');
         html = cleanMathJaxContent(html);
-        // console.log('[PDF Debug] MathJax content cleaned on backend');
 
         const filename = `${uuidv4()}.pdf`;
-        // uploads folder is one level up from api/routes/ (api/routes/../uploads -> api/uploads -> no, server.js says ../uploads from api/)
-        // server.js is in api/. routes/convert.js is in api/routes/.
-        // so uploads is at ../../uploads relative to this file.
         const uploadDir = path.join(__dirname, '../../uploads');
         
-        // Ensure uploads directory exists
         if (!fs.existsSync(uploadDir)) {
             fs.mkdirSync(uploadDir, { recursive: true });
         }
@@ -140,7 +120,6 @@ router.post('/pdf', (req, res) => {
         const filePath = path.join(uploadDir, filename);
         const fileUrl = `/uploads/${filename}`;
 
-        // Configure wkhtmltopdf options
         const options = {
             pageSize: 'A4',
             marginTop: settings?.pageMargin ? `${settings.pageMargin}mm` : '15mm',
@@ -155,7 +134,6 @@ router.post('/pdf', (req, res) => {
         
         const writeStream = fs.createWriteStream(filePath);
         
-        // console.log('[PDF Debug] Starting wkhtmltopdf for filename:', filename);
         
         const pdfStream = wkhtmltopdf(html, options);
         
@@ -172,11 +150,9 @@ router.post('/pdf', (req, res) => {
 
         pdfStream.pipe(writeStream)
             .on('finish', () => {
-                // Check if file exists and has content
                 if (fs.existsSync(filePath)) {
                     const stats = fs.statSync(filePath);
                     if (stats.size > 0) {
-                        // console.log('[PDF Debug] PDF generation successful, size:', stats.size);
                         if (!res.headersSent) {
                             res.json({
                                 code: 200,
@@ -362,13 +338,10 @@ function normalizeDocxMarkdown(markdown) {
         return `\n> [Mermaid Diagram]\n>\n> ${String(content || '').trim().split('\n').join('\n> ')}\n`;
     });
 
-    // Support formulas exported as escaped delimiters: \\(...\\), \\[...\\]
     normalized = normalized
         .replace(/\\\\\[([\s\S]*?)\\\\\]/g, (_, expr) => `$$\n${String(expr || '').trim()}\n$$`)
         .replace(/\\\\\(([\s\S]*?)\\\\\)/g, (_, expr) => `$${String(expr || '').trim()}$`);
 
-    // Some editor pipelines may escape dollar delimiters, causing pandoc to treat
-    // formulas as plain text. Normalize common escaped forms back to math delimiters.
     normalized = normalized
         .replace(/\\\$\\\$([\s\S]*?)\\\$\\\$/g, (_, expr) => `$$\n${String(expr || '').trim()}\n$$`)
         .replace(/\\\$([^\n$]+?)\\\$/g, (_, expr) => `$${String(expr || '').trim()}$`);

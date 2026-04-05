@@ -476,7 +476,6 @@
     // 设置状态
     function setStatus(msg) {
         statusDiv.textContent = msg;
-        console.log('[状态]', msg);
     }
 
     // 获取 URL 参数
@@ -686,7 +685,6 @@
 
     // 处理信令消息
     async function handleSignaling(data) {
-        console.log('[信令]', data.type, data);
 
         switch (data.type) {
             case 'joined':
@@ -731,7 +729,6 @@
                 break;
 
             default:
-                console.log('未知信令类型:', data.type);
         }
     }
 
@@ -749,7 +746,6 @@
 
         // 监听远程流
         peerConnection.ontrack = (event) => {
-            console.log('收到远程流');
             remoteVideo.srcObject = event.streams[0];
         };
 
@@ -765,7 +761,6 @@
 
         // 监听连接状态
         peerConnection.onconnectionstatechange = () => {
-            console.log('连接状态:', peerConnection.connectionState);
             if (peerConnection.connectionState === 'connected') {
                 setStatus('通话已建立');
                 isInCall = true;
@@ -803,7 +798,6 @@
 
         // 监听远程流
         peerConnection.ontrack = (event) => {
-            console.log('收到远程流');
             remoteVideo.srcObject = event.streams[0];
         };
 

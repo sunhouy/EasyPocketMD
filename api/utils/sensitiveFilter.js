@@ -45,7 +45,6 @@ function loadSensitiveWords() {
     // 构建字典树
     sensitiveWordMap = buildSensitiveWordMap(sensitiveWordsList);
     isLoaded = true;
-    console.log(`✅ 敏感词库加载完成，共 ${sensitiveWordsList.length} 个词`);
   } catch (error) {
     console.error('❌ 加载敏感词库失败:', error.message);
   }

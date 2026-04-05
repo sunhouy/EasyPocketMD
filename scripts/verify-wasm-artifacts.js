@@ -23,6 +23,3 @@ if (missing.length > 0) {
     missing.forEach((filePath) => console.error(' - ' + filePath));
     process.exit(1);
 }
-
-console.log('[verify-wasm-artifacts] OK (' + mode + ')');
-
