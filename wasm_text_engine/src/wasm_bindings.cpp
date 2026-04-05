@@ -17,6 +17,7 @@ EMSCRIPTEN_BINDINGS(text_engine_module) {
         .function("search", &WasmTextEngine::search)
         .function("analyze", &WasmTextEngine::analyze)
         .function("similarity", &WasmTextEngine::similarity)
+        .function("extractTags", &WasmTextEngine::extractTags)
         .function("findInText", &WasmTextEngine::findInText)
         .function("replaceAllText", &WasmTextEngine::replaceAllText);
 }

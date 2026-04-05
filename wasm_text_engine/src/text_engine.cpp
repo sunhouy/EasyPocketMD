@@ -67,6 +67,126 @@ std::string toAsciiLower(const std::string& input) {
     return out;
 }
 
+std::string trimAscii(const std::string& input) {
+    size_t start = 0;
+    while (start < input.size() && std::isspace(static_cast<unsigned char>(input[start]))) {
+        ++start;
+    }
+
+    if (start >= input.size()) return "";
+
+    size_t end = input.size();
+    while (end > start && std::isspace(static_cast<unsigned char>(input[end - 1]))) {
+        --end;
+    }
+
+    return input.substr(start, end - start);
+}
+
+bool isTagBoundary(unsigned char ch) {
+    return !(std::isalnum(ch) || ch == '_' || ch == '-' || ch >= 0x80);
+}
+
+std::string normalizeTagToken(const std::string& raw) {
+    std::string token = trimAscii(raw);
+    if (token.empty()) return "";
+
+    while (!token.empty() && (token[0] == '#' || token[0] == '-' || token[0] == '"' || token[0] == '\'')) {
+        token.erase(token.begin());
+    }
+    while (!token.empty() && (token[token.size() - 1] == ',' || token[token.size() - 1] == '.' || token[token.size() - 1] == ';' || token[token.size() - 1] == '"' || token[token.size() - 1] == '\'' || token[token.size() - 1] == ']')) {
+        token.erase(token.end() - 1);
+    }
+
+    token = trimAscii(token);
+    if (token.empty()) return "";
+    return toAsciiLower(token);
+}
+
+void collectFrontmatterTags(const std::string& text, std::set<std::string>& outTags) {
+    if (!(text.rfind("---\n", 0) == 0 || text.rfind("---\r\n", 0) == 0)) return;
+
+    size_t metaStart = text.find('\n');
+    if (metaStart == std::string::npos) return;
+    ++metaStart;
+
+    size_t metaEnd = text.find("\n---", metaStart);
+    if (metaEnd == std::string::npos) return;
+
+    const std::string meta = text.substr(metaStart, metaEnd - metaStart);
+    std::istringstream stream(meta);
+    std::string line;
+    bool inTagList = false;
+
+    while (std::getline(stream, line)) {
+        const std::string lower = toAsciiLower(trimAscii(line));
+        if (lower.empty()) {
+            inTagList = false;
+            continue;
+        }
+
+        if (lower.rfind("tags:", 0) == 0) {
+            inTagList = true;
+            std::string remain = trimAscii(line.substr(line.find(':') + 1));
+            if (!remain.empty()) {
+                if (!remain.empty() && remain[0] == '[') {
+                    if (!remain.empty() && remain[remain.size() - 1] == ']') {
+                        remain = remain.substr(1, remain.size() - 2);
+                    }
+                    std::stringstream ss(remain);
+                    std::string token;
+                    while (std::getline(ss, token, ',')) {
+                        const std::string normalized = normalizeTagToken(token);
+                        if (!normalized.empty()) outTags.insert(normalized);
+                    }
+                } else {
+                    const std::string normalized = normalizeTagToken(remain);
+                    if (!normalized.empty()) outTags.insert(normalized);
+                }
+                inTagList = false;
+            }
+            continue;
+        }
+
+        if (!inTagList) continue;
+
+        std::string trimmed = trimAscii(line);
+        if (!trimmed.empty() && trimmed[0] == '-') {
+            const std::string normalized = normalizeTagToken(trimmed.substr(1));
+            if (!normalized.empty()) outTags.insert(normalized);
+        } else {
+            inTagList = false;
+        }
+    }
+}
+
+void collectHashtagTags(const std::string& text, std::set<std::string>& outTags) {
+    for (size_t i = 0; i < text.size(); ++i) {
+        if (text[i] != '#') continue;
+
+        if (i > 0 && !isTagBoundary(static_cast<unsigned char>(text[i - 1]))) {
+            continue;
+        }
+
+        size_t j = i + 1;
+        while (j < text.size()) {
+            const unsigned char ch = static_cast<unsigned char>(text[j]);
+            if (isTagBoundary(ch)) break;
+            ++j;
+        }
+
+        if (j <= i + 1) continue;
+
+        const std::string raw = text.substr(i + 1, j - i - 1);
+        const std::string normalized = normalizeTagToken(raw);
+        if (normalized.size() >= 2) {
+            outTags.insert(normalized);
+        }
+
+        i = j;
+    }
+}
+
 bool isUtf8Continuation(unsigned char ch) {
     return (ch & 0xC0) == 0x80;
 }
@@ -509,6 +629,29 @@ std::string WasmTextEngine::similarity(const std::string& leftText, const std::s
         << "\"distance\":" << dist
         << "}";
 
+    return out.str();
+}
+
+std::string WasmTextEngine::extractTags(const std::string& text) const {
+    std::set<std::string> tags;
+    collectFrontmatterTags(text, tags);
+    collectHashtagTags(text, tags);
+
+    std::ostringstream tagsJson;
+    tagsJson << "[";
+    size_t index = 0;
+    for (std::set<std::string>::const_iterator it = tags.begin(); it != tags.end(); ++it) {
+        if (index > 0) tagsJson << ",";
+        tagsJson << "\"" << jsonEscape(*it) << "\"";
+        ++index;
+    }
+    tagsJson << "]";
+
+    std::ostringstream out;
+    out << "{"
+        << "\"tags\":" << tagsJson.str() << ","
+        << "\"count\":" << tags.size()
+        << "}";
     return out.str();
 }
 

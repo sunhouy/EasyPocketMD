@@ -2001,6 +2001,598 @@
         if (wasVisible && fileListSidebar) {
             fileListSidebar.classList.add('show');
         }
+
+        if (isKnowledgeGraphPanelVisible()) {
+            setTimeout(function() {
+                refreshKnowledgeGraph();
+            }, 0);
+        }
+    }
+
+    // ---------- 知识图谱功能（WASM-only） ----------
+    var knowledgeGraphChart = null;
+    var knowledgeGraphBuildToken = 0;
+    var knowledgeGraphPanelBound = false;
+    var knowledgeGraphRawData = null;
+    var knowledgeGraphSearchTimer = null;
+    var knowledgeGraphView = {
+        groupBy: 'folder',
+        relationFilter: 'all',
+        searchQuery: ''
+    };
+
+    function isHiddenCrossSearchFile(filename) {
+        const name = String(filename || '').trim();
+        if (!name) return false;
+        return /(^|[\\/])\.[^\\/]/.test(name);
+    }
+
+    function getKnowledgeGraphGateway() {
+        const gateway = global.wasmTextEngineGateway;
+        if (!gateway) return null;
+        if (typeof gateway.ensureReady !== 'function') return null;
+        if (typeof gateway.findInText !== 'function') return null;
+        if (typeof gateway.similarity !== 'function') return null;
+        if (typeof gateway.extractTags !== 'function') return null;
+        return gateway;
+    }
+
+    function isKnowledgeGraphPanelVisible() {
+        const panel = document.getElementById('knowledgeGraphPanel');
+        return !!(panel && panel.style.display !== 'none');
+    }
+
+    function disposeKnowledgeGraphChart() {
+        if (knowledgeGraphChart && typeof knowledgeGraphChart.dispose === 'function') {
+            knowledgeGraphChart.dispose();
+        }
+        knowledgeGraphChart = null;
+    }
+
+    function setKnowledgeGraphStatus(message, isError) {
+        const statusEl = document.getElementById('knowledgeGraphStatus');
+        if (!statusEl) return;
+        statusEl.textContent = message || '';
+        statusEl.style.color = isError ? '#dc3545' : '';
+    }
+
+    function getKnowledgeGraphFileContent(file) {
+        if (!file) return '';
+        if (String(file.id) === String(g('currentFileId')) && g('vditor') && typeof g('vditor').getValue === 'function') {
+            try {
+                return g('vditor').getValue() || '';
+            } catch (error) {
+                console.warn('读取当前编辑器内容失败:', error);
+            }
+        }
+        return file.content || '';
+    }
+
+    function getKnowledgeGraphNodeName(file) {
+        const name = String(file && file.name ? file.name : '').trim();
+        return name || 'Untitled';
+    }
+
+    function getKnowledgeGraphSummaryText(file) {
+        return (getKnowledgeGraphNodeName(file) + ' ' + String(getKnowledgeGraphFileContent(file) || ''))
+            .replace(/\s+/g, ' ')
+            .slice(0, 1200);
+    }
+
+    function getKnowledgeGraphFolder(file) {
+        const name = getKnowledgeGraphNodeName(file);
+        const idx = name.lastIndexOf('/');
+        return idx > 0 ? name.slice(0, idx) : '/';
+    }
+
+    async function hasWasmMatch(gateway, text, query) {
+        if (!query) return false;
+        const res = gateway.findInText(String(text || ''), String(query || ''), { caseSensitive: false });
+        return !!(res && res.code === 200 && res.data && Number(res.data.count || 0) > 0);
+    }
+
+    async function collectWasmTags(gateway, text) {
+        const res = gateway.extractTags(String(text || ''));
+        if (!res || res.code !== 200 || !res.data || !Array.isArray(res.data.tags)) {
+            return [];
+        }
+        return res.data.tags.map(function(tag) { return String(tag || '').trim(); }).filter(Boolean);
+    }
+
+    function getFileAliases(file) {
+        const aliases = new Set();
+        const fullName = getKnowledgeGraphNodeName(file).toLowerCase();
+        const fileName = fullName.split('/').pop() || fullName;
+        aliases.add(fullName);
+        aliases.add(fileName);
+        aliases.add(fileName.replace(/\.[^.]+$/, ''));
+        return Array.from(aliases).filter(function(alias) { return alias && alias.length >= 3; });
+    }
+
+    async function buildKnowledgeGraphData() {
+        const gateway = getKnowledgeGraphGateway();
+        if (!gateway) {
+            throw new Error(window.i18n ? window.i18n.t('knowledgeGraphWasmRequired') : '知识图谱需要 WASM 引擎');
+        }
+
+        const readyRes = await gateway.ensureReady();
+        if (!readyRes || readyRes.code !== 200) {
+            throw new Error(window.i18n ? window.i18n.t('knowledgeGraphWasmRequired') : '知识图谱需要 WASM 引擎');
+        }
+
+        const files = (g('files') || [])
+            .filter(function(file) {
+                return file && file.type === 'file' && !isHiddenCrossSearchFile(file.name);
+            })
+            .slice()
+            .sort(function(a, b) {
+                return (b.lastModified || 0) - (a.lastModified || 0);
+            })
+            .slice(0, 60);
+
+        const nodes = [];
+        const fileMeta = [];
+
+        for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            const content = String(getKnowledgeGraphFileContent(file) || '');
+            const tags = await collectWasmTags(gateway, content);
+            const node = {
+                id: String(file.id),
+                fileId: String(file.id),
+                name: getKnowledgeGraphNodeName(file),
+                filename: file.name || '',
+                folder: getKnowledgeGraphFolder(file),
+                tags: tags,
+                contentLength: content.length,
+                symbolSize: Math.max(14, Math.min(40, 12 + Math.log(Math.max(1, content.length)) * 2.1))
+            };
+            nodes.push(node);
+            fileMeta.push({
+                file: file,
+                content: content,
+                summary: getKnowledgeGraphSummaryText(file),
+                aliases: getFileAliases(file),
+                node: node
+            });
+        }
+
+        const links = [];
+        const similarityCandidates = [];
+
+        for (let i = 0; i < fileMeta.length; i++) {
+            for (let j = i + 1; j < fileMeta.length; j++) {
+                const left = fileMeta[i];
+                const right = fileMeta[j];
+
+                let hasReference = false;
+                for (let k = 0; k < right.aliases.length && !hasReference; k++) {
+                    hasReference = await hasWasmMatch(gateway, left.content, right.aliases[k]);
+                }
+                for (let k = 0; k < left.aliases.length && !hasReference; k++) {
+                    hasReference = await hasWasmMatch(gateway, right.content, left.aliases[k]);
+                }
+
+                if (hasReference) {
+                    links.push({
+                        id: 'ref:' + left.node.id + '->' + right.node.id,
+                        source: left.node.id,
+                        target: right.node.id,
+                        relation: 'reference',
+                        value: 1,
+                        lineStyle: { color: '#4a90e2', width: 1.9 },
+                        label: { show: true, formatter: function() { return isEn() ? 'Ref' : '引用'; } }
+                    });
+                    continue;
+                }
+
+                const simRes = gateway.similarity(left.summary, right.summary);
+                const simScore = simRes && simRes.code === 200 && simRes.data ? Number(simRes.data.score || 0) : 0;
+                if (simScore >= 0.32) {
+                    similarityCandidates.push({
+                        id: 'sim:' + left.node.id + '->' + right.node.id,
+                        source: left.node.id,
+                        target: right.node.id,
+                        relation: 'similarity',
+                        value: simScore,
+                        score: simScore,
+                        lineStyle: { color: '#9aa4b2', width: 1.2, type: 'dashed', opacity: 0.78 },
+                        label: { show: true, formatter: function() { return isEn() ? 'Sim' : '相似'; } }
+                    });
+                }
+            }
+        }
+
+        similarityCandidates.sort(function(a, b) {
+            return (b.score || 0) - (a.score || 0);
+        });
+        similarityCandidates.slice(0, 100).forEach(function(edge) {
+            links.push(edge);
+        });
+
+        nodes.forEach(function(node) {
+            const degree = links.filter(function(link) {
+                return link.source === node.id || link.target === node.id;
+            }).length;
+            node.value = Math.max(1, degree + Math.ceil((node.contentLength || 0) / 3000));
+            node.itemStyle = {
+                color: degree > 4 ? '#ff8a65' : (degree > 1 ? '#4a90e2' : '#9ccc65')
+            };
+        });
+
+        return {
+            nodes: nodes,
+            links: links,
+            wasmOnly: true
+        };
+    }
+
+    function withGrouping(rawData) {
+        const groupBy = knowledgeGraphView.groupBy || 'none';
+        if (!rawData || !Array.isArray(rawData.nodes) || groupBy === 'none') {
+            return {
+                nodes: (rawData && rawData.nodes) ? rawData.nodes.slice() : [],
+                links: (rawData && rawData.links) ? rawData.links.slice() : []
+            };
+        }
+
+        const groupMap = new Map();
+        const outNodes = rawData.nodes.map(function(node) {
+            const copy = Object.assign({}, node);
+            const key = groupBy === 'folder'
+                ? (copy.folder || '/')
+                : ((copy.tags && copy.tags.length > 0) ? copy.tags[0] : (isEn() ? 'untagged' : '未标记'));
+            copy.groupKey = key;
+            return copy;
+        });
+        const outLinks = rawData.links.slice();
+
+        outNodes.forEach(function(node) {
+            const groupNodeId = 'group:' + groupBy + ':' + node.groupKey;
+            if (!groupMap.has(groupNodeId)) {
+                const groupNode = {
+                    id: groupNodeId,
+                    name: node.groupKey,
+                    isGroup: true,
+                    symbolSize: 30,
+                    value: 1,
+                    itemStyle: {
+                        color: groupBy === 'folder' ? '#7e57c2' : '#26a69a'
+                    }
+                };
+                groupMap.set(groupNodeId, groupNode);
+            }
+            node.groupId = groupNodeId;
+            outLinks.push({
+                id: 'group:' + groupNodeId + '->' + node.id,
+                source: groupNodeId,
+                target: node.id,
+                relation: 'group',
+                value: 1,
+                lineStyle: { color: '#c0c7d1', width: 1, opacity: 0.5 },
+                label: { show: false }
+            });
+        });
+
+        groupMap.forEach(function(groupNode) {
+            outNodes.push(groupNode);
+        });
+
+        return {
+            nodes: outNodes,
+            links: outLinks
+        };
+    }
+
+    async function applyWasmViewFilters(graphData) {
+        if (!graphData) return { nodes: [], links: [] };
+
+        const gateway = getKnowledgeGraphGateway();
+        if (!gateway) throw new Error(window.i18n ? window.i18n.t('knowledgeGraphWasmRequired') : '知识图谱需要 WASM 引擎');
+
+        const grouped = withGrouping(graphData);
+        const relationFilter = knowledgeGraphView.relationFilter || 'all';
+        const query = String(knowledgeGraphView.searchQuery || '').trim();
+
+        let links = grouped.links.filter(function(link) {
+            if (relationFilter === 'all') return true;
+            return link.relation === relationFilter;
+        });
+
+        let nodes = grouped.nodes.slice();
+        if (query) {
+            const matchedIds = new Set();
+
+            for (let i = 0; i < nodes.length; i++) {
+                const node = nodes[i];
+                const targetText = node.isGroup ? node.name : (node.name + ' ' + (node.filename || ''));
+                const hitRes = gateway.findInText(String(targetText || ''), query, { caseSensitive: false });
+                if (hitRes && hitRes.code === 200 && hitRes.data && Number(hitRes.data.count || 0) > 0) {
+                    matchedIds.add(node.id);
+                }
+            }
+
+            nodes.forEach(function(node) {
+                if (!node.isGroup && matchedIds.has(node.id) && node.groupId) {
+                    matchedIds.add(node.groupId);
+                }
+                if (node.isGroup && matchedIds.has(node.id)) {
+                    nodes.forEach(function(fileNode) {
+                        if (!fileNode.isGroup && fileNode.groupId === node.id) {
+                            matchedIds.add(fileNode.id);
+                        }
+                    });
+                }
+            });
+
+            nodes = nodes.filter(function(node) {
+                return matchedIds.has(node.id);
+            });
+            links = links.filter(function(link) {
+                return matchedIds.has(link.source) && matchedIds.has(link.target);
+            });
+        }
+
+        if (knowledgeGraphView.groupBy !== 'none' && relationFilter !== 'group') {
+            const usedIds = new Set();
+            links.forEach(function(link) {
+                usedIds.add(link.source);
+                usedIds.add(link.target);
+            });
+            nodes = nodes.filter(function(node) {
+                return !node.isGroup || usedIds.has(node.id);
+            });
+        }
+
+        return { nodes: nodes, links: links };
+    }
+
+    function getRelationLabel(relation) {
+        if (relation === 'reference') return isEn() ? 'Reference' : '引用';
+        if (relation === 'similarity') return isEn() ? 'Similarity' : '相似';
+        if (relation === 'group') return isEn() ? 'Group' : '分组';
+        return relation;
+    }
+
+    async function renderKnowledgeGraph() {
+        const panel = document.getElementById('knowledgeGraphPanel');
+        const chartEl = document.getElementById('knowledgeGraphChart');
+        if (!panel || !chartEl || panel.style.display === 'none') return;
+
+        const token = ++knowledgeGraphBuildToken;
+        setKnowledgeGraphStatus(window.i18n ? window.i18n.t('knowledgeGraphLoading') : '正在分析文件关系...', false);
+
+        try {
+            const gateway = getKnowledgeGraphGateway();
+            if (!gateway) {
+                throw new Error(window.i18n ? window.i18n.t('knowledgeGraphWasmRequired') : '知识图谱需要 WASM 引擎');
+            }
+
+            if (!knowledgeGraphRawData) {
+                knowledgeGraphRawData = await buildKnowledgeGraphData();
+            }
+
+            const filtered = await applyWasmViewFilters(knowledgeGraphRawData);
+            if (token !== knowledgeGraphBuildToken) return;
+
+            if (!filtered.nodes.length) {
+                disposeKnowledgeGraphChart();
+                chartEl.innerHTML = '';
+                setKnowledgeGraphStatus(window.i18n ? window.i18n.t('knowledgeGraphEmpty') : '暂无可视化关系，请先创建或打开文件', false);
+                return;
+            }
+
+            if (!(window.EChartsLoader && typeof window.EChartsLoader.load === 'function')) {
+                throw new Error(window.i18n ? window.i18n.t('knowledgeGraphWasmRequired') : '知识图谱需要 WASM 引擎');
+            }
+
+            await new Promise(function(resolve) {
+                window.EChartsLoader.load(function() { resolve(); });
+            });
+            if (token !== knowledgeGraphBuildToken) return;
+            if (typeof echarts === 'undefined') throw new Error('echarts unavailable');
+
+            disposeKnowledgeGraphChart();
+            knowledgeGraphChart = echarts.init(chartEl, g('nightMode') ? 'dark' : null);
+
+            const option = {
+                animationDurationUpdate: 200,
+                animationEasingUpdate: 'quinticInOut',
+                tooltip: {
+                    formatter: function(params) {
+                        if (params.dataType === 'node') {
+                            const title = params.data && (params.data.filename || params.data.name) ? (params.data.filename || params.data.name) : '';
+                            return '<div style="max-width:220px;white-space:normal;"><strong>' + escapeHtml(title) + '</strong></div>';
+                        }
+                        if (params.dataType === 'edge') {
+                            return getRelationLabel(params.data && params.data.relation ? params.data.relation : '');
+                        }
+                        return '';
+                    }
+                },
+                series: [{
+                    type: 'graph',
+                    layout: 'force',
+                    roam: true,
+                    draggable: true,
+                    data: filtered.nodes,
+                    links: filtered.links,
+                    label: {
+                        show: true,
+                        position: 'right',
+                        formatter: function(params) {
+                            const name = params && params.data && params.data.name ? String(params.data.name) : '';
+                            return name.length > 18 ? (name.slice(0, 18) + '...') : name;
+                        }
+                    },
+                    edgeLabel: {
+                        show: true,
+                        fontSize: 10,
+                        formatter: function(params) {
+                            return getRelationLabel(params.data && params.data.relation ? params.data.relation : '');
+                        }
+                    },
+                    lineStyle: {
+                        curveness: 0.15
+                    },
+                    emphasis: {
+                        focus: 'adjacency',
+                        lineStyle: {
+                            width: 2.2
+                        }
+                    },
+                    force: {
+                        repulsion: 200,
+                        edgeLength: [50, 140],
+                        gravity: 0.08
+                    }
+                }]
+            };
+
+            knowledgeGraphChart.setOption(option, true);
+            knowledgeGraphChart.on('click', function(params) {
+                if (!params || params.dataType !== 'node' || !params.data || !params.data.fileId) return;
+                if (typeof global.openFile === 'function') {
+                    global.openFile(params.data.fileId);
+                }
+            });
+
+            const statusText = (window.i18n ? window.i18n.t('knowledgeGraphReady') : '已生成知识图谱，共 {nodeCount} 个文件节点、{edgeCount} 条关系')
+                .replace('{nodeCount}', String(filtered.nodes.length))
+                .replace('{edgeCount}', String(filtered.links.length));
+            setKnowledgeGraphStatus(statusText, false);
+        } catch (error) {
+            console.error('[KnowledgeGraph] render failed:', error);
+            setKnowledgeGraphStatus((error && error.message) || (window.i18n ? window.i18n.t('knowledgeGraphWasmRequired') : '知识图谱需要 WASM 引擎'), true);
+        }
+    }
+
+    function refreshKnowledgeGraph(forceRebuild) {
+        if (!isKnowledgeGraphPanelVisible()) return;
+        if (forceRebuild) knowledgeGraphRawData = null;
+        renderKnowledgeGraph();
+    }
+
+    function toggleKnowledgeGraphPanel(forceVisible) {
+        const panel = document.getElementById('knowledgeGraphPanel');
+        if (!panel) return;
+
+        const shouldShow = typeof forceVisible === 'boolean' ? forceVisible : panel.style.display === 'none';
+        panel.style.display = shouldShow ? 'flex' : 'none';
+
+        if (shouldShow) {
+            refreshKnowledgeGraph(true);
+        } else {
+            disposeKnowledgeGraphChart();
+        }
+    }
+
+    function exportKnowledgeGraphImage() {
+        if (!knowledgeGraphChart || typeof knowledgeGraphChart.getDataURL !== 'function') {
+            global.showMessage(window.i18n ? window.i18n.t('exportGraphFailed') : '导出图谱失败', 'error');
+            return;
+        }
+
+        try {
+            const dataUrl = knowledgeGraphChart.getDataURL({
+                pixelRatio: 2,
+                backgroundColor: g('nightMode') ? '#1f1f1f' : '#ffffff'
+            });
+            const link = document.createElement('a');
+            link.href = dataUrl;
+            link.download = 'knowledge-graph.png';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            global.showMessage(window.i18n ? window.i18n.t('exportGraphSuccess') : '图谱图片已导出', 'success');
+        } catch (error) {
+            console.error('[KnowledgeGraph] export failed:', error);
+            global.showMessage(window.i18n ? window.i18n.t('exportGraphFailed') : '导出图谱失败', 'error');
+        }
+    }
+
+    function bindKnowledgeGraphControls() {
+        const groupSelect = document.getElementById('knowledgeGraphGroupBy');
+        const relationSelect = document.getElementById('knowledgeGraphRelationFilter');
+        const searchInput = document.getElementById('knowledgeGraphSearchInput');
+        const exportBtn = document.getElementById('knowledgeGraphExportBtn');
+
+        if (groupSelect) {
+            groupSelect.addEventListener('change', function() {
+                knowledgeGraphView.groupBy = groupSelect.value || 'folder';
+                renderKnowledgeGraph();
+            });
+        }
+
+        if (relationSelect) {
+            relationSelect.addEventListener('change', function() {
+                knowledgeGraphView.relationFilter = relationSelect.value || 'all';
+                renderKnowledgeGraph();
+            });
+        }
+
+        if (searchInput) {
+            searchInput.addEventListener('input', function() {
+                const value = searchInput.value || '';
+                clearTimeout(knowledgeGraphSearchTimer);
+                knowledgeGraphSearchTimer = setTimeout(function() {
+                    knowledgeGraphView.searchQuery = value;
+                    renderKnowledgeGraph();
+                }, 180);
+            });
+        }
+
+        if (exportBtn) {
+            exportBtn.addEventListener('click', exportKnowledgeGraphImage);
+        }
+    }
+
+    function initKnowledgeGraphPanel() {
+        if (knowledgeGraphPanelBound) return;
+        const panel = document.getElementById('knowledgeGraphPanel');
+        const toggleBtn = document.getElementById('knowledgeGraphBtn');
+        const collapseBtn = document.getElementById('knowledgeGraphCollapseBtn');
+        const refreshBtn = document.getElementById('knowledgeGraphRefreshBtn');
+        const buildBtn = document.getElementById('knowledgeGraphBuildBtn');
+
+        if (!panel || !toggleBtn) return;
+        knowledgeGraphPanelBound = true;
+
+        toggleBtn.addEventListener('click', function() {
+            toggleKnowledgeGraphPanel(panel.style.display === 'none');
+        });
+
+        if (collapseBtn) {
+            collapseBtn.addEventListener('click', function() {
+                toggleKnowledgeGraphPanel(false);
+            });
+        }
+
+        if (refreshBtn) {
+            refreshBtn.addEventListener('click', function() {
+                refreshKnowledgeGraph(true);
+            });
+        }
+
+        if (buildBtn) {
+            buildBtn.addEventListener('click', function() {
+                toggleKnowledgeGraphPanel(true);
+            });
+        }
+
+        bindKnowledgeGraphControls();
+
+        window.addEventListener('resize', function() {
+            if (knowledgeGraphChart && typeof knowledgeGraphChart.resize === 'function' && isKnowledgeGraphPanelVisible()) {
+                knowledgeGraphChart.resize();
+            }
+        });
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initKnowledgeGraphPanel);
+    } else {
+        initKnowledgeGraphPanel();
     }
 
     // ---------- 文件操作函数 ----------
@@ -3990,7 +4582,7 @@
             setTimeout(() => findInput.focus(), 100);
         }
         // 执行查找
-        async function performFind() {
+        async function performFind(options) {
             searchText = findInput.value.trim();
             if (!searchText) {
                 findStatus.textContent = '';
@@ -4010,7 +4602,7 @@
                 if (currentMatchIndex < 0 || currentMatchIndex >= matches.length) {
                     currentMatchIndex = 0;
                 }
-                highlightMatch(currentMatchIndex);
+                highlightMatch(currentMatchIndex, true, options);
             }
         }
 
@@ -4062,7 +4654,7 @@
                     const start = parseInt(this.getAttribute('data-start') || '0', 10);
                     if (fileId && typeof global.openFile === 'function') {
                         await global.openFile(fileId);
-                        await performFind();
+                        await performFind({ focusEditor: false });
                         if (matches.length > 0) {
                             let bestIndex = 0;
                             let bestDistance = Math.abs((matches[0] && matches[0].start) - start);
@@ -4074,7 +4666,7 @@
                                 }
                             }
                             currentMatchIndex = bestIndex;
-                            highlightMatch(currentMatchIndex);
+                            highlightMatch(currentMatchIndex, true, { focusEditor: false });
                         }
                     }
                 });
@@ -4245,13 +4837,14 @@
         }
 
         // 高亮匹配项
-        function highlightMatch(index, allowRetry) {
+        function highlightMatch(index, allowRetry, options) {
             if (matches.length === 0 || index < 0 || index >= matches.length) return;
             // 更新状态
             findStatus.textContent = (isEn() ? 'Match ' : '匹配 ') + (index + 1) + ' / ' + matches.length;
             try {
                 const vditor = g('vditor');
-                if (vditor && typeof vditor.focus === 'function') {
+                const shouldFocusEditor = !options || options.focusEditor !== false;
+                if (shouldFocusEditor && vditor && typeof vditor.focus === 'function') {
                     vditor.focus();
                 }
                 const hit = matches[index];

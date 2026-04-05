@@ -171,6 +171,9 @@
             <div class="file-list-help" id="fileListHelp" data-i18n-title="fileListHelp" title="右键或长按显示更多功能">
                 <i class="fas fa-question-circle"></i>
             </div>
+            <button class="file-list-graph-btn" id="knowledgeGraphBtn" data-i18n-title="knowledgeGraph" title="知识图谱">
+                <i class="fas fa-project-diagram"></i>
+            </button>
             <button class="file-list-close" id="fileListClose">
                 <i class="fas fa-times"></i>
             </button>
@@ -178,6 +181,49 @@
     </div>
     <div id="fileList">
         <!-- 文件列表将在这里动态生成 -->
+    </div>
+    <div class="knowledge-graph-panel" id="knowledgeGraphPanel" style="display:none;">
+        <div class="knowledge-graph-header">
+            <div class="knowledge-graph-title">
+                <i class="fas fa-project-diagram"></i>
+                <span data-i18n="knowledgeGraph">知识图谱</span>
+            </div>
+            <div class="knowledge-graph-actions">
+                <button class="knowledge-graph-action-btn" id="knowledgeGraphRefreshBtn" data-i18n-title="refreshKnowledgeGraph" title="刷新图谱">
+                    <i class="fas fa-sync-alt"></i>
+                </button>
+                <button class="knowledge-graph-action-btn" id="knowledgeGraphCollapseBtn" data-i18n-title="collapse" title="收起">
+                    <i class="fas fa-chevron-up"></i>
+                </button>
+            </div>
+        </div>
+        <div class="knowledge-graph-toolbar">
+            <button class="knowledge-graph-build-btn" id="knowledgeGraphBuildBtn">
+                <i class="fas fa-wand-magic-sparkles"></i> <span data-i18n="buildKnowledgeGraph">生成图谱</span>
+            </button>
+            <span class="knowledge-graph-tip" data-i18n="knowledgeGraphTip">使用 WASM 计算跨文件关系</span>
+        </div>
+        <div class="knowledge-graph-controls">
+            <select id="knowledgeGraphGroupBy" class="knowledge-graph-select" data-i18n-title="groupBy" title="分组方式">
+                <option value="none" data-i18n="groupNone">不分组</option>
+                <option value="folder" selected data-i18n="groupFolder">按文件夹</option>
+                <option value="tag" data-i18n="groupTag">按标签</option>
+            </select>
+            <select id="knowledgeGraphRelationFilter" class="knowledge-graph-select" data-i18n-title="relationFilter" title="关系筛选">
+                <option value="all" data-i18n="relationAll">全部关系</option>
+                <option value="reference" data-i18n="relationReference">仅引用</option>
+                <option value="similarity" data-i18n="relationSimilarity">仅相似</option>
+                <option value="group" data-i18n="relationGroup">仅分组</option>
+            </select>
+        </div>
+        <div class="knowledge-graph-controls">
+            <input id="knowledgeGraphSearchInput" class="knowledge-graph-input" data-i18n-placeholder="nodeSearchPlaceholder" placeholder="搜索节点..." />
+            <button class="knowledge-graph-action-btn" id="knowledgeGraphExportBtn" data-i18n-title="exportGraphImage" title="导出图片">
+                <i class="fas fa-image"></i>
+            </button>
+        </div>
+        <div class="knowledge-graph-status" id="knowledgeGraphStatus"></div>
+        <div class="knowledge-graph-chart" id="knowledgeGraphChart"></div>
     </div>
     <div class="file-list-actions">
         <button class="add-file-btn" id="addFileBtn">
