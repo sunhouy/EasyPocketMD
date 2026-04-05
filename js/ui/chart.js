@@ -653,7 +653,7 @@
         buttonBar.style.cssText = 'display: flex; gap: 10px; justify-content: flex-end;';
 
         var insertBtn = document.createElement('button');
-        insertBtn.innerHTML = '<i class="fas fa-plus"></i> ' + (isEn() ? 'Insert' : '插入');
+        insertBtn.innerHTML = '<i class="fas fa-plus"></i> ' + t('insertChart');
         insertBtn.style.cssText = 'padding: 10px 20px; background: #4a90e2; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px;';
         insertBtn.onclick = function() {
             var data = {};
@@ -880,7 +880,7 @@
         generateBtn.style.cssText = 'padding: 10px 20px; background: #4a90e2; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px;';
 
         var insertBtn = document.createElement('button');
-        insertBtn.innerHTML = '<i class="fas fa-plus"></i> ' + (isEn() ? 'Insert' : '插入');
+        insertBtn.innerHTML = '<i class="fas fa-plus"></i> ' + t('insertChart');
         insertBtn.style.cssText = 'padding: 10px 20px; background: #28a745; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; display: none;';
 
         var generatedCode = '';
