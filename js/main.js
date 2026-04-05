@@ -324,6 +324,10 @@ document.addEventListener('DOMContentLoaded', function() {
             window.vditorReady = true;
             if (loading) loading.style.display = 'none';
 
+            if (typeof window.initInlineImageTools === 'function') {
+                window.initInlineImageTools();
+            }
+
             // 计算加载时间
             // const loadTime = Math.round(performance.now() - pageLoadStartTime);
 
@@ -758,6 +762,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     reinitEditorEvents();
                     reinitMenuEvents();
                     reinitMobileFeatures();
+                    if (typeof window.initInlineImageTools === 'function') {
+                        window.initInlineImageTools();
+                    }
                     // 应用字体大小设置
                     applyFontSize(window.userSettings.fontSize);
                     // 应用大纲视图设置
@@ -1717,6 +1724,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     reinitEditorEvents();
                     reinitMenuEvents();
                     reinitMobileFeatures();
+                    if (typeof window.initInlineImageTools === 'function') {
+                        window.initInlineImageTools();
+                    }
                     applyFontSize(window.userSettings.fontSize);
                 }
             };

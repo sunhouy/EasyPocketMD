@@ -33,6 +33,7 @@ import './js/ui/echarts-loader.js';
 // 导出模块改为懒加载，不在首屏加载
 // import './js/ui/export.js';
 import './js/ui/upload.js';
+import './js/ui/image-inline-tools.js';
 // 分享模块改为懒加载，不在首屏加载
 // import './js/ui/share.js';
 // 云打印模块改为懒加载，不在首屏加载
