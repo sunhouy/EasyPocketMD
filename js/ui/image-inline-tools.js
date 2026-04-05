@@ -243,8 +243,11 @@
 
     function loadCropperLibrary() {
         if (!cropperLoadPromise) {
-            cropperLoadPromise = import('cropperjs').then(function(mod) {
-                return mod.default || mod;
+            cropperLoadPromise = Promise.all([
+                import('cropperjs'),
+                import('cropperjs/dist/cropper.css')
+            ]).then(function(modules) {
+                return modules[0].default || modules[0];
             });
         }
         return cropperLoadPromise;
@@ -305,11 +308,14 @@
         modal.style.cssText = [
             'position: fixed',
             'inset: 0',
+            'width: 100vw',
+            'height: 100vh',
             'z-index: 12000',
             'display: none',
             'background: ' + bg,
             'color: ' + textColor,
-            'flex-direction: column'
+            'flex-direction: column',
+            'overflow: hidden'
         ].join(';');
 
         modal.innerHTML = `
@@ -317,9 +323,9 @@
                 <div style="font-size:16px;font-weight:600;">全屏裁剪</div>
                 <button class="epmd-fs-crop-close" style="padding:6px 10px;background:${nightMode ? '#2d2d2d' : '#efefef'};color:${textColor};border:1px solid ${border};border-radius:6px;cursor:pointer;">关闭</button>
             </div>
-            <div style="flex:1;min-height:0;display:flex;align-items:center;justify-content:center;padding:12px;overflow:hidden;">
-                <div class="epmd-fs-crop-stage" style="width:100%;height:100%;max-width:1600px;border:1px solid ${border};border-radius:8px;background:${nightMode ? '#0a0a0a' : '#fff'};overflow:hidden;">
-                    <img class="epmd-fs-crop-target" alt="crop-target" style="display:block;max-width:100%;">
+            <div style="flex:1;min-height:0;height:calc(100vh - 126px);display:flex;align-items:stretch;justify-content:center;padding:12px;overflow:hidden;">
+                <div class="epmd-fs-crop-stage" style="width:100%;height:100%;max-width:1800px;border:1px solid ${border};border-radius:8px;background:${nightMode ? '#0a0a0a' : '#fff'};overflow:hidden;position:relative;">
+                    <img class="epmd-fs-crop-target" alt="crop-target" style="display:block;width:100%;height:100%;object-fit:contain;">
                 </div>
             </div>
             <div style="padding:12px 16px;border-top:1px solid ${border};background:${panel};">
@@ -656,6 +662,23 @@
             });
 
             activeCropper = new Cropper(cropTarget, {
+                viewMode: 1,
+                dragMode: 'move',
+                autoCropArea: 1,
+                responsive: true,
+                background: false,
+                checkCrossOrigin: false,
+                checkOrientation: false,
+                movable: true,
+                zoomable: true,
+                scalable: false,
+                rotatable: false,
+                guides: true,
+                center: true,
+                highlight: true,
+                cropBoxMovable: true,
+                cropBoxResizable: true,
+                toggleDragModeOnDblclick: false,
                 container: cropStage
             });
             activeCropperHost = cropModal;
@@ -675,15 +698,15 @@
             try {
                 var oldSrc = targetImage.getAttribute('src') || '';
                 var oldMeta = getImageMeta(targetImage);
-                var selection = typeof activeCropper.getCropperSelection === 'function'
-                    ? activeCropper.getCropperSelection()
-                    : null;
-
-                if (!selection || typeof selection.$toCanvas !== 'function') {
+                if (typeof activeCropper.getCroppedCanvas !== 'function') {
                     throw new Error('当前裁剪器不支持导出，请刷新后重试');
                 }
 
-                var canvas = await selection.$toCanvas();
+                var canvas = activeCropper.getCroppedCanvas({
+                    imageSmoothingEnabled: true,
+                    imageSmoothingQuality: 'high',
+                    fillColor: '#ffffff'
+                });
 
                 if (!canvas) {
                     throw new Error('生成裁剪结果失败');

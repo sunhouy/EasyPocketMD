@@ -45,7 +45,7 @@
     "@fortawesome/fontawesome-free": "^7.2.0",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
-    "cropperjs": "^2.1.0",
+    "cropperjs": "^1.6.2",
     "dom-to-image": "^2.6.0",
     "dotenv": "^16.3.1",
     "echarts": "^6.0.0",
