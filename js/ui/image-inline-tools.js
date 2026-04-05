@@ -3,11 +3,13 @@
 
     var OCR_API = 'https://ocr.yhsun.cn/';
     var MODAL_ID = 'epmd-image-tools-modal';
+    var FULLSCREEN_CROP_ID = 'epmd-image-crop-fullscreen';
     var updateTimer = null;
     var suspendObserver = false;
     var currentEditingImage = null;
     var cropperLoadPromise = null;
     var activeCropper = null;
+    var activeCropperHost = null;
 
     function escapeRegExp(str) {
         return String(str || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -249,35 +251,98 @@
     }
 
     function destroyActiveCropper(modal) {
+        var host = modal || activeCropperHost;
         if (activeCropper && typeof activeCropper.destroy === 'function') {
             activeCropper.destroy();
         }
         activeCropper = null;
+        activeCropperHost = null;
 
-        if (modal && modal.dataset.epmdCropObjectUrl) {
-            URL.revokeObjectURL(modal.dataset.epmdCropObjectUrl);
-            delete modal.dataset.epmdCropObjectUrl;
+        if (host && host.dataset.epmdCropObjectUrl) {
+            URL.revokeObjectURL(host.dataset.epmdCropObjectUrl);
+            delete host.dataset.epmdCropObjectUrl;
         }
 
-        if (modal) {
-            var target = modal.querySelector('.epmd-crop-target');
+        if (host) {
+            var target = host.querySelector('.epmd-crop-target, .epmd-fs-crop-target');
             if (target) {
                 target.removeAttribute('src');
             }
         }
     }
 
-    function setCropBusy(modal, busy, text) {
-        var status = modal.querySelector('.epmd-crop-status');
+    function setFullscreenCropBusy(modal, busy, text) {
+        if (!modal) return;
+
+        var status = modal.querySelector('.epmd-fs-crop-status');
         if (status) {
             status.textContent = text || '';
         }
 
-        var buttons = modal.querySelectorAll('.epmd-crop-confirm, .epmd-crop-cancel, .epmd-crop-open, .epmd-modal-btn');
+        var buttons = modal.querySelectorAll('.epmd-fs-crop-confirm, .epmd-fs-crop-cancel');
         buttons.forEach(function(btn) {
-            if (btn.classList.contains('epmd-modal-close')) return;
             btn.disabled = !!busy;
         });
+
+        var closeBtn = modal.querySelector('.epmd-fs-crop-close');
+        if (closeBtn) {
+            closeBtn.disabled = !!busy;
+        }
+    }
+
+    function createFullscreenCropModal() {
+        var existing = document.getElementById(FULLSCREEN_CROP_ID);
+        if (existing) return existing;
+
+        var nightMode = global.nightMode;
+        var bg = nightMode ? '#000000' : '#ffffff';
+        var textColor = nightMode ? '#ffffff' : '#222';
+        var panel = nightMode ? '#111111' : '#f7f7f7';
+        var border = nightMode ? '#333333' : '#dddddd';
+
+        var modal = document.createElement('div');
+        modal.id = FULLSCREEN_CROP_ID;
+        modal.style.cssText = [
+            'position: fixed',
+            'inset: 0',
+            'z-index: 12000',
+            'display: none',
+            'background: ' + bg,
+            'color: ' + textColor,
+            'flex-direction: column'
+        ].join(';');
+
+        modal.innerHTML = `
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid ${border};background:${panel};">
+                <div style="font-size:16px;font-weight:600;">全屏裁剪</div>
+                <button class="epmd-fs-crop-close" style="padding:6px 10px;background:${nightMode ? '#2d2d2d' : '#efefef'};color:${textColor};border:1px solid ${border};border-radius:6px;cursor:pointer;">关闭</button>
+            </div>
+            <div style="flex:1;min-height:0;display:flex;align-items:center;justify-content:center;padding:12px;overflow:hidden;">
+                <div class="epmd-fs-crop-stage" style="width:100%;height:100%;max-width:1600px;border:1px solid ${border};border-radius:8px;background:${nightMode ? '#0a0a0a' : '#fff'};overflow:hidden;">
+                    <img class="epmd-fs-crop-target" alt="crop-target" style="display:block;max-width:100%;">
+                </div>
+            </div>
+            <div style="padding:12px 16px;border-top:1px solid ${border};background:${panel};">
+                <div class="epmd-fs-crop-status" style="font-size:12px;min-height:18px;color:${nightMode ? '#cccccc' : '#555'};margin-bottom:10px;"></div>
+                <div style="display:flex;gap:10px;">
+                    <button class="epmd-fs-crop-cancel" style="flex:1;padding:10px;background:${nightMode ? '#3a3a3a' : '#e9e9e9'};color:${textColor};border:1px solid ${border};border-radius:6px;cursor:pointer;">取消</button>
+                    <button class="epmd-fs-crop-confirm" style="flex:1;padding:10px;background:#4CAF50;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600;">确认裁剪并上传</button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+        return modal;
+    }
+
+    function hideFullscreenCropModal() {
+        var modal = document.getElementById(FULLSCREEN_CROP_ID);
+        if (!modal) return;
+        destroyActiveCropper(modal);
+        modal.style.display = 'none';
+
+        var status = modal.querySelector('.epmd-fs-crop-status');
+        if (status) status.textContent = '';
     }
 
     function blobFromCanvas(canvas, type, quality) {
@@ -431,19 +496,7 @@
                 <div style="margin-bottom: 20px;">
                     <label style="display: block; margin-bottom: 8px; font-size: 14px;">裁剪</label>
                     <button class="epmd-modal-btn epmd-crop-open" style="padding: 8px 12px; background: ${btnBg}; color: ${btnTextColor}; border: 1px solid ${borderColor}; border-radius: 6px; cursor: pointer; width: 100%;">打开裁剪工具</button>
-                    <div class="epmd-crop-canvas-container" style="display: none; margin-top: 12px; background: ${nightMode ? '#0d0d0d' : '#fafafa'}; padding: 10px; border-radius: 6px;">
-                        <div style="font-size: 12px; margin-bottom: 8px; color: ${nightMode ? '#cccccc' : '#666'};">
-                            提示：可双指缩放和拖动图片，拖拽四角/四边调整裁剪区域
-                        </div>
-                        <div class="epmd-cropper-stage" style="max-height: 52vh; border: 1px solid ${borderColor}; border-radius: 4px; overflow: hidden; background: ${nightMode ? '#000' : '#fff'};">
-                            <img class="epmd-crop-target" alt="crop-target" style="display: block; max-width: 100%;">
-                        </div>
-                        <div class="epmd-crop-status" style="margin-top: 8px; font-size: 12px; color: ${nightMode ? '#cccccc' : '#666'};"></div>
-                        <div style="margin-top: 10px; display: flex; gap: 8px;">
-                            <button class="epmd-crop-confirm" style="flex: 1; padding: 6px; background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer;">确认裁剪</button>
-                            <button class="epmd-crop-cancel" style="flex: 1; padding: 6px; background: #f44336; color: white; border: none; border-radius: 4px; cursor: pointer;">取消</button>
-                        </div>
-                    </div>
+                    <div style="font-size: 12px; margin-top: 8px; color: ${nightMode ? '#cccccc' : '#666'};">将打开全屏裁剪窗口，支持手机触控拖拽与缩放。</div>
                 </div>
 
                 <div style="margin-bottom: 20px;">
@@ -483,12 +536,8 @@
     function closeModal() {
         var modal = document.getElementById(MODAL_ID);
         if (modal) {
-            destroyActiveCropper(modal);
+            hideFullscreenCropModal();
             modal.style.display = 'none';
-            var container = modal.querySelector('.epmd-crop-canvas-container');
-            if (container) {
-                container.style.display = 'none';
-            }
             currentEditingImage = null;
         }
     }
@@ -497,11 +546,6 @@
         currentEditingImage = img;
         var modal = createModal();
         modal.style.display = 'flex';
-
-        var container = modal.querySelector('.epmd-crop-canvas-container');
-        if (container) {
-            container.style.display = 'none';
-        }
 
         // 绑定按钮事件
         modal.querySelector('.epmd-size-minus').onclick = function() {
@@ -562,32 +606,49 @@
     }
 
     async function openCropTool(img, modal) {
-        var container = modal.querySelector('.epmd-crop-canvas-container');
-        var cropTarget = modal.querySelector('.epmd-crop-target');
-        var cropStatus = modal.querySelector('.epmd-crop-status');
-        var confirmBtn = modal.querySelector('.epmd-crop-confirm');
-        var cancelBtn = modal.querySelector('.epmd-crop-cancel');
-        
-        if (!cropTarget || !img.src) {
+        if (!img || !img.src) {
             global.showMessage ? global.showMessage('无效的图片', 'error') : alert('无效的图片');
             return;
         }
 
-        container.style.display = 'block';
-        setCropBusy(modal, true, '正在加载裁剪工具...');
+        var cropModal = createFullscreenCropModal();
+        var cropTarget = cropModal.querySelector('.epmd-fs-crop-target');
+        var cropStage = cropModal.querySelector('.epmd-fs-crop-stage');
+        var cropCloseBtn = cropModal.querySelector('.epmd-fs-crop-close');
+        var cropConfirmBtn = cropModal.querySelector('.epmd-fs-crop-confirm');
+        var cropCancelBtn = cropModal.querySelector('.epmd-fs-crop-cancel');
+
+        if (!cropTarget || !cropStage || !cropCloseBtn || !cropConfirmBtn || !cropCancelBtn) {
+            global.showMessage ? global.showMessage('裁剪界面初始化失败', 'error') : alert('裁剪界面初始化失败');
+            return;
+        }
+
+        cropModal.style.display = 'flex';
+        setFullscreenCropBusy(cropModal, true, '正在加载全屏裁剪工具...');
+
+        var targetImage = img;
+        var toolModal = modal;
+
+        cropCloseBtn.onclick = function() {
+            hideFullscreenCropModal();
+        };
+
+        cropCancelBtn.onclick = function() {
+            hideFullscreenCropModal();
+        };
 
         try {
             var Cropper = await loadCropperLibrary();
-            destroyActiveCropper(modal);
+            destroyActiveCropper(cropModal);
 
-            var imageResponse = await fetch(img.src, { mode: 'cors' });
+            var imageResponse = await fetch(targetImage.src, { mode: 'cors' });
             if (!imageResponse.ok) {
                 throw new Error('图片加载失败: ' + imageResponse.status);
             }
 
             var imageBlob = await imageResponse.blob();
             var objectUrl = URL.createObjectURL(imageBlob);
-            modal.dataset.epmdCropObjectUrl = objectUrl;
+            cropModal.dataset.epmdCropObjectUrl = objectUrl;
             await new Promise(function(resolve, reject) {
                 cropTarget.onload = function() { resolve(); };
                 cropTarget.onerror = function() { reject(new Error('图片解析失败')); };
@@ -595,49 +656,34 @@
             });
 
             activeCropper = new Cropper(cropTarget, {
-                viewMode: 1,
-                dragMode: 'move',
-                autoCropArea: 1,
-                responsive: true,
-                background: false,
-                checkCrossOrigin: false,
-                checkOrientation: false,
-                movable: true,
-                zoomable: true,
-                scalable: false,
-                rotatable: false,
-                guides: true,
-                center: true,
-                highlight: true,
-                cropBoxMovable: true,
-                cropBoxResizable: true,
-                touchDragZoom: true,
-                toggleDragModeOnDblclick: false
+                container: cropStage
             });
+            activeCropperHost = cropModal;
 
-            cropStatus.textContent = '拖动裁剪框后点击确认裁剪';
-            setCropBusy(modal, false, cropStatus.textContent);
+            setFullscreenCropBusy(cropModal, false, '拖动裁剪框后点击确认裁剪');
         } catch (error) {
             console.error('裁剪工具加载失败', error);
-            destroyActiveCropper(modal);
-            container.style.display = 'none';
-            setCropBusy(modal, false, '');
+            hideFullscreenCropModal();
             global.showMessage ? global.showMessage('裁剪工具加载失败: ' + error.message, 'error') : alert('裁剪工具加载失败: ' + error.message);
             return;
         }
 
-        confirmBtn.onclick = async function() {
-            if (!currentEditingImage || !activeCropper) return;
-            setCropBusy(modal, true, '正在裁剪并上传...');
+        cropConfirmBtn.onclick = async function() {
+            if (!targetImage || !activeCropper) return;
+            setFullscreenCropBusy(cropModal, true, '正在裁剪并上传...');
 
             try {
-                var oldSrc = currentEditingImage.getAttribute('src') || '';
-                var oldMeta = getImageMeta(currentEditingImage);
-                var canvas = activeCropper.getCroppedCanvas({
-                    imageSmoothingEnabled: true,
-                    imageSmoothingQuality: 'high',
-                    fillColor: '#ffffff'
-                });
+                var oldSrc = targetImage.getAttribute('src') || '';
+                var oldMeta = getImageMeta(targetImage);
+                var selection = typeof activeCropper.getCropperSelection === 'function'
+                    ? activeCropper.getCropperSelection()
+                    : null;
+
+                if (!selection || typeof selection.$toCanvas !== 'function') {
+                    throw new Error('当前裁剪器不支持导出，请刷新后重试');
+                }
+
+                var canvas = await selection.$toCanvas();
 
                 if (!canvas) {
                     throw new Error('生成裁剪结果失败');
@@ -646,31 +692,29 @@
                 var blob = await blobFromCanvas(canvas, 'image/png', 0.95);
                 var uploadedUrl = await uploadCroppedImage(blob, oldSrc);
 
-                currentEditingImage.src = uploadedUrl;
-                currentEditingImage.removeAttribute('srcset');
-                currentEditingImage.dataset.epmdCropped = '1';
-                applyImageStyle(currentEditingImage, oldMeta.width || 0, oldMeta.rotate || 0);
+                targetImage.src = uploadedUrl;
+                targetImage.removeAttribute('srcset');
+                targetImage.dataset.epmdCropped = '1';
+                applyImageStyle(targetImage, oldMeta.width || 0, oldMeta.rotate || 0);
 
-                var replaced = replaceImageSourceInEditor(oldSrc, uploadedUrl, oldMeta.width || 0, oldMeta.rotate || 0, currentEditingImage.getAttribute('alt') || '');
+                var replaced = replaceImageSourceInEditor(oldSrc, uploadedUrl, oldMeta.width || 0, oldMeta.rotate || 0, targetImage.getAttribute('alt') || '');
                 if (!replaced) {
                     throw new Error('裁剪后链接替换失败');
                 }
 
-                destroyActiveCropper(modal);
-                container.style.display = 'none';
+                hideFullscreenCropModal();
+                if (toolModal) {
+                    toolModal.style.display = 'none';
+                }
                 global.showMessage ? global.showMessage('裁剪完成，已替换为云端新图片', 'success') : alert('裁剪完成，已替换为云端新图片');
             } catch (error) {
                 console.error('裁剪上传失败', error);
                 global.showMessage ? global.showMessage('裁剪失败: ' + error.message, 'error') : alert('裁剪失败: ' + error.message);
             } finally {
-                setCropBusy(modal, false, '');
+                if (cropModal.style.display !== 'none') {
+                    setFullscreenCropBusy(cropModal, false, '拖动裁剪框后点击确认裁剪');
+                }
             }
-        };
-
-        cancelBtn.onclick = function() {
-            destroyActiveCropper(modal);
-            container.style.display = 'none';
-            setCropBusy(modal, false, '');
         };
     }
 
