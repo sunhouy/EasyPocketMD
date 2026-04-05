@@ -45,6 +45,7 @@
     "@fortawesome/fontawesome-free": "^7.2.0",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
+    "cropperjs": "^2.1.0",
     "dom-to-image": "^2.6.0",
     "dotenv": "^16.3.1",
     "echarts": "^6.0.0",
@@ -57,9 +58,9 @@
     "ioredis": "^5.10.1",
     "jquery": "^3.7.1",
     "jsonwebtoken": "^9.0.3",
-    "jszip": "^3.10.1",
     "jspdf": "^4.2.1",
     "jstree": "^3.3.17",
+    "jszip": "^3.10.1",
     "mammoth": "^1.11.0",
     "markdown-it": "^14.1.1",
     "markdown-it-footnote": "^4.0.0",
@@ -75,9 +76,9 @@
     "sharp": "^0.34.5",
     "uuid": "^9.0.1",
     "vditor": "^3.11.2",
-    "xlsx": "^0.18.5",
     "wkhtmltopdf": "^0.4.0",
-    "ws": "^8.18.0"
+    "ws": "^8.18.0",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@capacitor/android": "^6.1.2",
