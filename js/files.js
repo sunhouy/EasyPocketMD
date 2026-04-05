@@ -2021,6 +2021,16 @@
         searchQuery: ''
     };
 
+    function kgText(key, fallback) {
+        if (window.i18n && typeof window.i18n.tOr === 'function') {
+            return window.i18n.tOr(key, fallback || key);
+        }
+        if (window.i18n && typeof window.i18n.has === 'function' && window.i18n.has(key) && typeof window.i18n.t === 'function') {
+            return window.i18n.t(key);
+        }
+        return fallback || key;
+    }
+
     function isHiddenCrossSearchFile(filename) {
         const name = String(filename || '').trim();
         if (!name) return false;
@@ -2112,12 +2122,12 @@
     async function buildKnowledgeGraphData() {
         const gateway = getKnowledgeGraphGateway();
         if (!gateway) {
-            throw new Error(window.i18n ? window.i18n.t('knowledgeGraphWasmRequired') : '知识图谱需要 WASM 引擎');
+            throw new Error(kgText('knowledgeGraphWasmRequired', '知识图谱需要 WASM 引擎，请先构建并启用 WASM'));
         }
 
         const readyRes = await gateway.ensureReady();
         if (!readyRes || readyRes.code !== 200) {
-            throw new Error(window.i18n ? window.i18n.t('knowledgeGraphWasmRequired') : '知识图谱需要 WASM 引擎');
+            throw new Error(kgText('knowledgeGraphWasmRequired', '知识图谱需要 WASM 引擎，请先构建并启用 WASM'));
         }
 
         const files = (g('files') || [])
@@ -2288,7 +2298,7 @@
         if (!graphData) return { nodes: [], links: [] };
 
         const gateway = getKnowledgeGraphGateway();
-        if (!gateway) throw new Error(window.i18n ? window.i18n.t('knowledgeGraphWasmRequired') : '知识图谱需要 WASM 引擎');
+        if (!gateway) throw new Error(kgText('knowledgeGraphWasmRequired', '知识图谱需要 WASM 引擎，请先构建并启用 WASM'));
 
         const grouped = withGrouping(graphData);
         const relationFilter = knowledgeGraphView.relationFilter || 'all';
@@ -2360,12 +2370,12 @@
         if (!panel || !chartEl || panel.style.display === 'none') return;
 
         const token = ++knowledgeGraphBuildToken;
-        setKnowledgeGraphStatus(window.i18n ? window.i18n.t('knowledgeGraphLoading') : '正在分析文件关系...', false);
+        setKnowledgeGraphStatus(kgText('knowledgeGraphLoading', '正在分析文件关系...'), false);
 
         try {
             const gateway = getKnowledgeGraphGateway();
             if (!gateway) {
-                throw new Error(window.i18n ? window.i18n.t('knowledgeGraphWasmRequired') : '知识图谱需要 WASM 引擎');
+                throw new Error(kgText('knowledgeGraphWasmRequired', '知识图谱需要 WASM 引擎，请先构建并启用 WASM'));
             }
 
             if (!knowledgeGraphRawData) {
@@ -2378,12 +2388,12 @@
             if (!filtered.nodes.length) {
                 disposeKnowledgeGraphChart();
                 chartEl.innerHTML = '';
-                setKnowledgeGraphStatus(window.i18n ? window.i18n.t('knowledgeGraphEmpty') : '暂无可视化关系，请先创建或打开文件', false);
+                setKnowledgeGraphStatus(kgText('knowledgeGraphEmpty', '暂无可视化关系，请先创建或打开文件'), false);
                 return;
             }
 
             if (!(window.EChartsLoader && typeof window.EChartsLoader.load === 'function')) {
-                throw new Error(window.i18n ? window.i18n.t('knowledgeGraphWasmRequired') : '知识图谱需要 WASM 引擎');
+                throw new Error(kgText('knowledgeGraphWasmRequired', '知识图谱需要 WASM 引擎，请先构建并启用 WASM'));
             }
 
             await new Promise(function(resolve) {
@@ -2457,13 +2467,13 @@
                 }
             });
 
-            const statusText = (window.i18n ? window.i18n.t('knowledgeGraphReady') : '已生成知识图谱，共 {nodeCount} 个文件节点、{edgeCount} 条关系')
+            const statusText = kgText('knowledgeGraphReady', '已生成知识图谱，共 {nodeCount} 个文件节点、{edgeCount} 条关系')
                 .replace('{nodeCount}', String(filtered.nodes.length))
                 .replace('{edgeCount}', String(filtered.links.length));
             setKnowledgeGraphStatus(statusText, false);
         } catch (error) {
             console.error('[KnowledgeGraph] render failed:', error);
-            setKnowledgeGraphStatus((error && error.message) || (window.i18n ? window.i18n.t('knowledgeGraphWasmRequired') : '知识图谱需要 WASM 引擎'), true);
+            setKnowledgeGraphStatus((error && error.message) || kgText('knowledgeGraphWasmRequired', '知识图谱需要 WASM 引擎，请先构建并启用 WASM'), true);
         }
     }
 
@@ -2479,6 +2489,7 @@
 
         const shouldShow = typeof forceVisible === 'boolean' ? forceVisible : panel.style.display === 'none';
         panel.style.display = shouldShow ? 'flex' : 'none';
+        panel.classList.toggle('knowledge-graph-fullscreen', shouldShow);
 
         if (shouldShow) {
             refreshKnowledgeGraph(true);
@@ -2489,7 +2500,7 @@
 
     function exportKnowledgeGraphImage() {
         if (!knowledgeGraphChart || typeof knowledgeGraphChart.getDataURL !== 'function') {
-            global.showMessage(window.i18n ? window.i18n.t('exportGraphFailed') : '导出图谱失败', 'error');
+            global.showMessage(kgText('exportGraphFailed', '导出图谱失败'), 'error');
             return;
         }
 
@@ -2504,10 +2515,10 @@
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
-            global.showMessage(window.i18n ? window.i18n.t('exportGraphSuccess') : '图谱图片已导出', 'success');
+            global.showMessage(kgText('exportGraphSuccess', '图谱图片已导出'), 'success');
         } catch (error) {
             console.error('[KnowledgeGraph] export failed:', error);
-            global.showMessage(window.i18n ? window.i18n.t('exportGraphFailed') : '导出图谱失败', 'error');
+            global.showMessage(kgText('exportGraphFailed', '导出图谱失败'), 'error');
         }
     }
 
@@ -2567,6 +2578,12 @@
                 toggleKnowledgeGraphPanel(false);
             });
         }
+
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape' && isKnowledgeGraphPanelVisible()) {
+                toggleKnowledgeGraphPanel(false);
+            }
+        });
 
         if (refreshBtn) {
             refreshBtn.addEventListener('click', function() {

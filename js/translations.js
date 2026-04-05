@@ -1305,6 +1305,19 @@
             return key;
         },
 
+        has: function (key) {
+            const langTranslations = translations[currentLanguage];
+            return !!(langTranslations && Object.prototype.hasOwnProperty.call(langTranslations, key));
+        },
+
+        tOr: function (key, fallback) {
+            const langTranslations = translations[currentLanguage];
+            if (langTranslations && Object.prototype.hasOwnProperty.call(langTranslations, key)) {
+                return langTranslations[key];
+            }
+            return fallback || key;
+        },
+
     };
 
 })(window);
