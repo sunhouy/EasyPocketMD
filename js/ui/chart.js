@@ -4,13 +4,14 @@
 
     function g(name) { return global[name]; }
     function isEn() { return window.i18n && window.i18n.getLanguage() === 'en'; }
+    function t(key) { return window.i18n ? window.i18n.t(key) : key; }
 
     // 图表类型分类
     var chartCategories = {
         mermaid: {
-            name: isEn() ? 'Mermaid Charts' : 'Mermaid 图表',
+            name: t('mermaidCharts'),
             icon: '<i class="fas fa-project-diagram"></i>',
-            description: isEn() ? 'Flowcharts, diagrams and more' : '流程图、图表等'
+            description: t('mermaidChartsDescription')
         },
         echarts: {
             name: isEn() ? 'ECharts' : 'ECharts 图表',
@@ -23,12 +24,12 @@
     var mermaidTemplates = [
         {
             icon: '<i class="fas fa-project-diagram"></i>',
-            name: '流程图 (Flowchart)',
+            name: t('flowchart'),
             keywords: ['flowchart', '流程图', 'flow'],
-            description: isEn() ? 'Create a flowchart with custom steps' : '创建带自定义步骤的流程图',
+            description: t('flowchartDescription'),
             hasDataInput: true,
             generateTemplate: function(data) {
-                var steps = data.steps || ['开始', '处理', '决策', '结束'];
+                var steps = data.steps || [isEn() ? 'Start' : '开始', isEn() ? 'Process' : '处理', isEn() ? 'Decision?' : '决策?', isEn() ? 'End' : '结束'];
                 var directions = data.directions || ['TD'];
                 var code = 'graph ' + directions[0] + '\n';
                 for (var i = 0; i < steps.length; i++) {
@@ -47,21 +48,21 @@
             },
             dataConfig: {
                 fields: [
-                    { name: 'steps', label: isEn() ? 'Flow Steps (one per line)' : '流程步骤（每行一个）', type: 'textarea', placeholder: isEn() ? 'Start\nProcess\nDecision?\nEnd' : '开始\n处理\n决策?\n结束', defaultValue: isEn() ? 'Start\nProcess\nDecision?\nEnd' : '开始\n处理\n决策?\n结束' },
-                    { name: 'direction', label: isEn() ? 'Direction' : '方向', type: 'select', options: [
-                        { value: 'TD', label: isEn() ? 'Top to Bottom' : '从上到下' },
-                        { value: 'LR', label: isEn() ? 'Left to Right' : '从左到右' },
-                        { value: 'BT', label: isEn() ? 'Bottom to Top' : '从下到上' },
-                        { value: 'RL', label: isEn() ? 'Right to Left' : '从右到左' }
+                    { name: 'steps', label: t('flowSteps'), type: 'textarea', placeholder: isEn() ? 'Start\nProcess\nDecision?\nEnd' : '开始\n处理\n决策?\n结束', defaultValue: isEn() ? 'Start\nProcess\nDecision?\nEnd' : '开始\n处理\n决策?\n结束' },
+                    { name: 'direction', label: t('direction'), type: 'select', options: [
+                        { value: 'TD', label: t('topToBottom') },
+                        { value: 'LR', label: t('leftToRight') },
+                        { value: 'BT', label: t('bottomToTop') },
+                        { value: 'RL', label: t('rightToLeft') }
                     ], defaultValue: 'TD' }
                 ]
             }
         },
         {
             icon: '<i class="fas fa-exchange-alt"></i>',
-            name: '序列图 (Sequence Diagram)',
+            name: t('sequenceDiagram'),
             keywords: ['sequence', '序列图', '时序图'],
-            description: isEn() ? 'Create a sequence diagram with participants' : '创建带参与者的序列图',
+            description: t('sequenceDiagramDescription'),
             hasDataInput: true,
             generateTemplate: function(data) {
                 var participants = data.participants || ['用户', '系统', '数据库'];
@@ -77,19 +78,19 @@
             },
             dataConfig: {
                 fields: [
-                    { name: 'participants', label: isEn() ? 'Participants (one per line)' : '参与者（每行一个）', type: 'textarea', placeholder: isEn() ? 'User\nFrontend\nAPI\nDatabase' : '用户\n前端\nAPI\n数据库', defaultValue: isEn() ? 'User\nSystem\nDatabase' : '用户\n系统\n数据库' },
-                    { name: 'messages', label: isEn() ? 'Messages (one per line)' : '消息（每行一个）', type: 'textarea', placeholder: isEn() ? 'Request data\nQuery\nReturn result' : '请求数据\n查询\n返回结果', defaultValue: isEn() ? 'Request data\nQuery\nReturn result' : '请求数据\n查询\n返回结果' }
+                    { name: 'participants', label: t('participants'), type: 'textarea', placeholder: isEn() ? 'User\nFrontend\nAPI\nDatabase' : '用户\n前端\nAPI\n数据库', defaultValue: isEn() ? 'User\nSystem\nDatabase' : '用户\n系统\n数据库' },
+                    { name: 'messages', label: t('messages'), type: 'textarea', placeholder: isEn() ? 'Request data\nQuery\nReturn result' : '请求数据\n查询\n返回结果', defaultValue: isEn() ? 'Request data\nQuery\nReturn result' : '请求数据\n查询\n返回结果' }
                 ]
             }
         },
         {
             icon: '<i class="fas fa-sitemap"></i>',
-            name: '类图 (Class Diagram)',
+            name: t('classDiagram'),
             keywords: ['class', '类图', 'classDiagram'],
-            description: isEn() ? 'Create a class diagram' : '创建类图',
+            description: t('classDiagramDescription'),
             hasDataInput: true,
             generateTemplate: function(data) {
-                var classes = data.classes || ['Animal', 'Dog', 'Cat'];
+                var classes = data.classes || [isEn() ? 'Animal' : '动物', isEn() ? 'Dog' : '狗', isEn() ? 'Cat' : '猫'];
                 var code = 'classDiagram\n';
                 for (var i = 1; i < classes.length; i++) {
                     code += '    ' + classes[0] + ' <|-- ' + classes[i] + ' : ' + (isEn() ? 'extends' : '继承') + '\n';
@@ -99,18 +100,18 @@
             },
             dataConfig: {
                 fields: [
-                    { name: 'classes', label: isEn() ? 'Class Names (one per line, first is parent)' : '类名（每行一个，第一个是父类）', type: 'textarea', placeholder: isEn() ? 'Animal\nDog\nCat\nBird' : '动物\n狗\n猫\n鸟', defaultValue: isEn() ? 'Animal\nDog\nCat' : '动物\n狗\n猫' }
+                    { name: 'classes', label: t('classNames'), type: 'textarea', placeholder: isEn() ? 'Animal\nDog\nCat\nBird' : '动物\n狗\n猫\n鸟', defaultValue: isEn() ? 'Animal\nDog\nCat' : '动物\n狗\n猫' }
                 ]
             }
         },
         {
             icon: '<i class="fas fa-sync-alt"></i>',
-            name: '状态图 (State Diagram)',
+            name: t('stateDiagram'),
             keywords: ['state', '状态图', 'stateDiagram'],
-            description: isEn() ? 'Create a state diagram' : '创建状态图',
+            description: t('stateDiagramDescription'),
             hasDataInput: true,
             generateTemplate: function(data) {
-                var states = data.states || ['待付款', '已付款', '已发货', '已收货'];
+                var states = data.states || [isEn() ? 'Pending' : '待付款', isEn() ? 'Paid' : '已付款', isEn() ? 'Shipped' : '已发货', isEn() ? 'Received' : '已收货'];
                 var code = 'stateDiagram-v2\n    [*] --> ' + states[0] + '\n';
                 for (var i = 0; i < states.length - 1; i++) {
                     code += '    ' + states[i] + ' --> ' + states[i+1] + ' : ' + (isEn() ? 'event' : '事件') + (i+1) + '\n';
@@ -120,18 +121,18 @@
             },
             dataConfig: {
                 fields: [
-                    { name: 'states', label: isEn() ? 'State Names (one per line)' : '状态名（每行一个）', type: 'textarea', placeholder: isEn() ? 'Pending\nPaid\nShipped\nReceived' : '待付款\n已付款\n已发货\n已收货', defaultValue: isEn() ? 'Pending\nPaid\nShipped\nReceived' : '待付款\n已付款\n已发货\n已收货' }
+                    { name: 'states', label: t('stateNames'), type: 'textarea', placeholder: isEn() ? 'Pending\nPaid\nShipped\nReceived' : '待付款\n已付款\n已发货\n已收货', defaultValue: isEn() ? 'Pending\nPaid\nShipped\nReceived' : '待付款\n已付款\n已发货\n已收货' }
                 ]
             }
         },
         {
             icon: '<i class="fas fa-chart-gantt"></i>',
-            name: '甘特图 (Gantt Chart)',
+            name: t('ganttChart'),
             keywords: ['gantt', '甘特图', 'project'],
-            description: isEn() ? 'Create a Gantt chart' : '创建甘特图',
+            description: t('ganttChartDescription'),
             hasDataInput: true,
             generateTemplate: function(data) {
-                var tasks = data.tasks || ['需求分析', '设计', '开发', '测试'];
+                var tasks = data.tasks || [isEn() ? 'Analysis' : '需求分析', isEn() ? 'Design' : '设计', isEn() ? 'Development' : '开发', isEn() ? 'Testing' : '测试'];
                 var durations = data.durations || ['7d', '5d', '10d', '5d'];
                 var code = 'gantt\n    title ' + (isEn() ? 'Project Plan' : '项目计划') + '\n    dateFormat YYYY-MM-DD\n';
                 for (var i = 0; i < tasks.length; i++) {
@@ -143,19 +144,19 @@
             },
             dataConfig: {
                 fields: [
-                    { name: 'tasks', label: isEn() ? 'Task Names (one per line)' : '任务名（每行一个）', type: 'textarea', placeholder: isEn() ? 'Analysis\nDesign\nDevelopment\nTesting' : '需求分析\n设计\n开发\n测试', defaultValue: isEn() ? 'Analysis\nDesign\nDevelopment\nTesting' : '需求分析\n设计\n开发\n测试' },
-                    { name: 'durations', label: isEn() ? 'Durations (one per line, e.g., 7d, 2w)' : '持续时间（每行一个，如7d, 2w）', type: 'textarea', placeholder: '7d\n5d\n10d\n5d', defaultValue: '7d\n5d\n10d\n5d' }
+                    { name: 'tasks', label: t('taskNames'), type: 'textarea', placeholder: isEn() ? 'Analysis\nDesign\nDevelopment\nTesting' : '需求分析\n设计\n开发\n测试', defaultValue: isEn() ? 'Analysis\nDesign\nDevelopment\nTesting' : '需求分析\n设计\n开发\n测试' },
+                    { name: 'durations', label: t('durations'), type: 'textarea', placeholder: '7d\n5d\n10d\n5d', defaultValue: '7d\n5d\n10d\n5d' }
                 ]
             }
         },
         {
             icon: '<i class="fas fa-chart-pie"></i>',
-            name: '饼图 (Pie Chart)',
+            name: t('pieChart'),
             keywords: ['pie', '饼图', '比例'],
-            description: isEn() ? 'Create a pie chart' : '创建饼图',
+            description: t('pieChartDescription'),
             hasDataInput: true,
             generateTemplate: function(data) {
-                var items = data.items || ['产品A', '产品B', '产品C'];
+                var items = data.items || [isEn() ? 'Product A' : '产品A', isEn() ? 'Product B' : '产品B', isEn() ? 'Product C' : '产品C'];
                 var values = data.values || [35, 25, 40];
                 var code = 'pie title ' + (data.title || (isEn() ? 'Distribution' : '分布')) + '\n';
                 for (var i = 0; i < items.length && i < values.length; i++) {
@@ -165,23 +166,23 @@
             },
             dataConfig: {
                 fields: [
-                    { name: 'title', label: isEn() ? 'Chart Title' : '图表标题', type: 'text', placeholder: isEn() ? 'Distribution' : '分布', defaultValue: isEn() ? 'Market Share' : '市场份额' },
-                    { name: 'items', label: isEn() ? 'Item Names (one per line)' : '项目名（每行一个）', type: 'textarea', placeholder: isEn() ? 'Product A\nProduct B\nProduct C' : '产品A\n产品B\n产品C', defaultValue: isEn() ? 'Product A\nProduct B\nProduct C' : '产品A\n产品B\n产品C' },
-                    { name: 'values', label: isEn() ? 'Values (one per line)' : '数值（每行一个）', type: 'textarea', placeholder: '35\n25\n40', defaultValue: '35\n25\n40' }
+                    { name: 'title', label: t('chartTitle'), type: 'text', placeholder: isEn() ? 'Distribution' : '分布', defaultValue: isEn() ? 'Market Share' : '市场份额' },
+                    { name: 'items', label: t('itemNames'), type: 'textarea', placeholder: isEn() ? 'Product A\nProduct B\nProduct C' : '产品A\n产品B\n产品C', defaultValue: isEn() ? 'Product A\nProduct B\nProduct C' : '产品A\n产品B\n产品C' },
+                    { name: 'values', label: t('values'), type: 'textarea', placeholder: '35\n25\n40', defaultValue: '35\n25\n40' }
                 ]
             }
         },
         {
             icon: '<i class="fas fa-chart-line"></i>',
-            name: '折线图 (Line Chart)',
+            name: t('lineChart'),
             keywords: ['line', '折线图', '趋势'],
-            description: isEn() ? 'Create a line chart with multiple lines' : '创建支持多条线的折线图',
+            description: t('lineChartDescription'),
             hasDataInput: true,
             generateTemplate: function(data) {
-                var xLabels = data.xLabels || ['Jan', 'Feb', 'Mar', 'Apr'];
+                var xLabels = data.xLabels || [isEn() ? 'Jan' : '1月', isEn() ? 'Feb' : '2月', isEn() ? 'Mar' : '3月', isEn() ? 'Apr' : '4月'];
                 var yLabel = data.yLabel || (isEn() ? 'Value' : '数值');
                 var lineCount = parseInt(data.lineCount) || 1;
-                
+
                 var allValues = [];
                 var lines = [];
                 for (var i = 0; i < lineCount; i++) {
@@ -195,52 +196,52 @@
                     allValues = allValues.concat(lineValues);
                     lines.push({ name: lineName, values: lineValues });
                 }
-                
+
                 var maxVal = Math.max.apply(null, allValues) * 1.2;
                 var code = '---\ntitle: ' + (data.title || (isEn() ? 'Line Chart' : '折线图')) + '\n---\nxychart-beta\n    title "' + (data.title || (isEn() ? 'Trend' : '趋势')) + '"\n    x-axis [' + xLabels.join(', ') + ']\n    y-axis "' + yLabel + '" 0 --> ' + maxVal + '\n';
-                
+
                 lines.forEach(function(line) {
                     code += '    line [' + line.values.join(', ') + ']\n';
                 });
-                
+
                 return '```mermaid\n' + code + '```';
             },
             dataConfig: {
                 fields: [
-                    { name: 'title', label: isEn() ? 'Chart Title' : '图表标题', type: 'text', defaultValue: isEn() ? 'Sales Trend' : '销售趋势' },
-                    { name: 'xLabels', label: isEn() ? 'X-Axis Labels (comma separated)' : 'X轴标签（逗号分隔）', type: 'text', placeholder: 'Jan, Feb, Mar, Apr', defaultValue: 'Q1, Q2, Q3, Q4' },
-                    { name: 'yLabel', label: isEn() ? 'Y-Axis Label' : 'Y轴标签', type: 'text', defaultValue: isEn() ? 'Sales' : '销售额' },
-                    { name: 'lineCount', label: isEn() ? 'Number of Lines' : '线条数量', type: 'select', options: [
+                    { name: 'title', label: t('chartTitle'), type: 'text', defaultValue: isEn() ? 'Sales Trend' : '销售趋势' },
+                    { name: 'xLabels', label: t('xLabels'), type: 'text', placeholder: 'Jan, Feb, Mar, Apr', defaultValue: 'Q1, Q2, Q3, Q4' },
+                    { name: 'yLabel', label: t('yLabel'), type: 'text', defaultValue: isEn() ? 'Sales' : '销售额' },
+                    { name: 'lineCount', label: t('numberOfLines'), type: 'select', options: [
                         { value: '1', label: '1' },
                         { value: '2', label: '2' },
                         { value: '3', label: '3' },
                         { value: '4', label: '4' },
                         { value: '5', label: '5' }
                     ], defaultValue: '2' },
-                    { name: 'line1Name', label: isEn() ? 'Line 1 Name' : '线条1名称', type: 'text', defaultValue: isEn() ? 'Product A' : '产品A' },
-                    { name: 'line1Values', label: isEn() ? 'Line 1 Values (comma separated)' : '线条1数值（逗号分隔）', type: 'text', placeholder: '10, 20, 30, 40', defaultValue: '100, 150, 120, 180' },
-                    { name: 'line2Name', label: isEn() ? 'Line 2 Name' : '线条2名称', type: 'text', defaultValue: isEn() ? 'Product B' : '产品B' },
-                    { name: 'line2Values', label: isEn() ? 'Line 2 Values (comma separated)' : '线条2数值（逗号分隔）', type: 'text', placeholder: '15, 25, 35, 45', defaultValue: '80, 120, 160, 140' },
-                    { name: 'line3Name', label: isEn() ? 'Line 3 Name' : '线条3名称', type: 'text', defaultValue: isEn() ? 'Product C' : '产品C' },
-                    { name: 'line3Values', label: isEn() ? 'Line 3 Values (comma separated)' : '线条3数值（逗号分隔）', type: 'text', placeholder: '20, 30, 25, 35', defaultValue: '60, 90, 110, 130' },
-                    { name: 'line4Name', label: isEn() ? 'Line 4 Name' : '线条4名称', type: 'text', defaultValue: isEn() ? 'Product D' : '产品D' },
-                    { name: 'line4Values', label: isEn() ? 'Line 4 Values (comma separated)' : '线条4数值（逗号分隔）', type: 'text', placeholder: '25, 35, 45, 55', defaultValue: '120, 100, 140, 160' },
-                    { name: 'line5Name', label: isEn() ? 'Line 5 Name' : '线条5名称', type: 'text', defaultValue: isEn() ? 'Product E' : '产品E' },
-                    { name: 'line5Values', label: isEn() ? 'Line 5 Values (comma separated)' : '线条5数值（逗号分隔）', type: 'text', placeholder: '30, 40, 50, 60', defaultValue: '90, 110, 100, 120' }
+                    { name: 'line1Name', label: t('lineName').replace('{name}', '1'), type: 'text', defaultValue: isEn() ? 'Product A' : '产品A' },
+                    { name: 'line1Values', label: t('lineValues').replace('{name}', '1'), type: 'text', placeholder: '10, 20, 30, 40', defaultValue: '100, 150, 120, 180' },
+                    { name: 'line2Name', label: t('lineName').replace('{name}', '2'), type: 'text', defaultValue: isEn() ? 'Product B' : '产品B' },
+                    { name: 'line2Values', label: t('lineValues').replace('{name}', '2'), type: 'text', placeholder: '15, 25, 35, 45', defaultValue: '80, 120, 160, 140' },
+                    { name: 'line3Name', label: t('lineName').replace('{name}', '3'), type: 'text', defaultValue: isEn() ? 'Product C' : '产品C' },
+                    { name: 'line3Values', label: t('lineValues').replace('{name}', '3'), type: 'text', placeholder: '20, 30, 25, 35', defaultValue: '60, 90, 110, 130' },
+                    { name: 'line4Name', label: t('lineName').replace('{name}', '4'), type: 'text', defaultValue: isEn() ? 'Product D' : '产品D' },
+                    { name: 'line4Values', label: t('lineValues').replace('{name}', '4'), type: 'text', placeholder: '25, 35, 45, 55', defaultValue: '120, 100, 140, 160' },
+                    { name: 'line5Name', label: t('lineName').replace('{name}', '5'), type: 'text', defaultValue: isEn() ? 'Product E' : '产品E' },
+                    { name: 'line5Values', label: t('lineValues').replace('{name}', '5'), type: 'text', placeholder: '30, 40, 50, 60', defaultValue: '90, 110, 100, 120' }
                 ]
             }
         },
         {
             icon: '<i class="fas fa-chart-bar"></i>',
-            name: '柱状图 (Bar Chart)',
+            name: t('barChart'),
             keywords: ['bar', '柱状图', '条形图'],
-            description: isEn() ? 'Create a bar chart with multiple series' : '创建支持多组数据的柱状图',
+            description: t('barChartDescription'),
             hasDataInput: true,
             generateTemplate: function(data) {
                 var xLabels = data.xLabels || ['A', 'B', 'C'];
                 var yLabel = data.yLabel || (isEn() ? 'Value' : '数值');
                 var barCount = parseInt(data.barCount) || 1;
-                
+
                 var allValues = [];
                 var bars = [];
                 for (var i = 0; i < barCount; i++) {
@@ -254,49 +255,49 @@
                     allValues = allValues.concat(barValues);
                     bars.push({ name: barName, values: barValues });
                 }
-                
+
                 var maxVal = Math.max.apply(null, allValues) * 1.2;
                 var code = '---\ntitle: ' + (data.title || (isEn() ? 'Bar Chart' : '柱状图')) + '\n---\nxychart-beta\n    title "' + (data.title || (isEn() ? 'Comparison' : '对比')) + '"\n    x-axis ["' + xLabels.join('", "') + '"]\n    y-axis "' + yLabel + '" 0 --> ' + maxVal + '\n';
-                
+
                 bars.forEach(function(bar) {
                     code += '    bar [' + bar.values.join(', ') + ']\n';
                 });
-                
+
                 return '```mermaid\n' + code + '```';
             },
             dataConfig: {
                 fields: [
-                    { name: 'title', label: isEn() ? 'Chart Title' : '图表标题', type: 'text', defaultValue: isEn() ? 'Quarterly Sales' : '季度销售' },
-                    { name: 'xLabels', label: isEn() ? 'X-Axis Labels (comma separated)' : 'X轴标签（逗号分隔）', type: 'text', placeholder: 'A, B, C', defaultValue: 'Q1, Q2, Q3, Q4' },
-                    { name: 'yLabel', label: isEn() ? 'Y-Axis Label' : 'Y轴标签', type: 'text', defaultValue: isEn() ? 'Sales' : '销售额' },
-                    { name: 'barCount', label: isEn() ? 'Number of Series' : '数据系列数量', type: 'select', options: [
+                    { name: 'title', label: t('chartTitle'), type: 'text', defaultValue: isEn() ? 'Quarterly Sales' : '季度销售' },
+                    { name: 'xLabels', label: t('xLabels'), type: 'text', placeholder: 'A, B, C', defaultValue: 'Q1, Q2, Q3, Q4' },
+                    { name: 'yLabel', label: t('yLabel'), type: 'text', defaultValue: isEn() ? 'Sales' : '销售额' },
+                    { name: 'barCount', label: t('numberOfSeries'), type: 'select', options: [
                         { value: '1', label: '1' },
                         { value: '2', label: '2' },
                         { value: '3', label: '3' },
                         { value: '4', label: '4' },
                         { value: '5', label: '5' }
                     ], defaultValue: '2' },
-                    { name: 'bar1Name', label: isEn() ? 'Series 1 Name' : '系列1名称', type: 'text', defaultValue: isEn() ? '2023' : '2023年' },
-                    { name: 'bar1Values', label: isEn() ? 'Series 1 Values (comma separated)' : '系列1数值（逗号分隔）', type: 'text', placeholder: '10, 20, 15', defaultValue: '150, 180, 120, 190' },
-                    { name: 'bar2Name', label: isEn() ? 'Series 2 Name' : '系列2名称', type: 'text', defaultValue: isEn() ? '2024' : '2024年' },
-                    { name: 'bar2Values', label: isEn() ? 'Series 2 Values (comma separated)' : '系列2数值（逗号分隔）', type: 'text', placeholder: '15, 25, 20', defaultValue: '170, 200, 140, 210' },
-                    { name: 'bar3Name', label: isEn() ? 'Series 3 Name' : '系列3名称', type: 'text', defaultValue: isEn() ? '2025' : '2025年' },
-                    { name: 'bar3Values', label: isEn() ? 'Series 3 Values (comma separated)' : '系列3数值（逗号分隔）', type: 'text', placeholder: '20, 30, 25', defaultValue: '180, 220, 160, 230' },
-                    { name: 'bar4Name', label: isEn() ? 'Series 4 Name' : '系列4名称', type: 'text', defaultValue: isEn() ? 'Target' : '目标' },
-                    { name: 'bar4Values', label: isEn() ? 'Series 4 Values (comma separated)' : '系列4数值（逗号分隔）', type: 'text', placeholder: '25, 35, 30', defaultValue: '200, 240, 180, 250' },
-                    { name: 'bar5Name', label: isEn() ? 'Series 5 Name' : '系列5名称', type: 'text', defaultValue: isEn() ? 'Forecast' : '预测' },
-                    { name: 'bar5Values', label: isEn() ? 'Series 5 Values (comma separated)' : '系列5数值（逗号分隔）', type: 'text', placeholder: '30, 40, 35', defaultValue: '210, 250, 190, 260' }
+                    { name: 'bar1Name', label: t('seriesName').replace('{name}', '1'), type: 'text', defaultValue: isEn() ? '2023' : '2023年' },
+                    { name: 'bar1Values', label: t('seriesValues').replace('{name}', '1'), type: 'text', placeholder: '10, 20, 15', defaultValue: '150, 180, 120, 190' },
+                    { name: 'bar2Name', label: t('seriesName').replace('{name}', '2'), type: 'text', defaultValue: isEn() ? '2024' : '2024年' },
+                    { name: 'bar2Values', label: t('seriesValues').replace('{name}', '2'), type: 'text', placeholder: '15, 25, 20', defaultValue: '170, 200, 140, 210' },
+                    { name: 'bar3Name', label: t('seriesName').replace('{name}', '3'), type: 'text', defaultValue: isEn() ? '2025' : '2025年' },
+                    { name: 'bar3Values', label: t('seriesValues').replace('{name}', '3'), type: 'text', placeholder: '20, 30, 25', defaultValue: '180, 220, 160, 230' },
+                    { name: 'bar4Name', label: t('seriesName').replace('{name}', '4'), type: 'text', defaultValue: isEn() ? 'Target' : '目标' },
+                    { name: 'bar4Values', label: t('seriesValues').replace('{name}', '4'), type: 'text', placeholder: '25, 35, 30', defaultValue: '200, 240, 180, 250' },
+                    { name: 'bar5Name', label: t('seriesName').replace('{name}', '5'), type: 'text', defaultValue: isEn() ? 'Forecast' : '预测' },
+                    { name: 'bar5Values', label: t('seriesValues').replace('{name}', '5'), type: 'text', placeholder: '30, 40, 35', defaultValue: '210, 250, 190, 260' }
                 ]
             }
         },
         {
             icon: '<i class="fas fa-database"></i>',
-            name: 'ER图 (Entity Relationship)',
+            name: t('erDiagram'),
             keywords: ['er', 'er图', 'entity'],
-            description: isEn() ? 'Create an ER diagram' : '创建ER图',
+            description: t('erDiagramDescription'),
             hasDataInput: true,
             generateTemplate: function(data) {
-                var entities = data.entities || ['USER', 'ORDER', 'PRODUCT'];
+                var entities = data.entities || [isEn() ? 'USER' : '用户', isEn() ? 'ORDER' : '订单', isEn() ? 'PRODUCT' : '产品'];
                 var code = 'erDiagram\n';
                 for (var i = 0; i < entities.length - 1; i++) {
                     code += '    ' + entities[i] + ' ||--o{ ' + entities[i+1] + ' : ' + (isEn() ? 'has' : '拥有') + '\n';
@@ -308,19 +309,19 @@
             },
             dataConfig: {
                 fields: [
-                    { name: 'entities', label: isEn() ? 'Entity Names (one per line)' : '实体名（每行一个）', type: 'textarea', placeholder: isEn() ? 'USER\nORDER\nPRODUCT' : '用户\n订单\n产品', defaultValue: isEn() ? 'USER\nORDER\nPRODUCT' : '用户\n订单\n产品' }
+                    { name: 'entities', label: t('entityNames'), type: 'textarea', placeholder: isEn() ? 'USER\nORDER\nPRODUCT' : '用户\n订单\n产品', defaultValue: isEn() ? 'USER\nORDER\nPRODUCT' : '用户\n订单\n产品' }
                 ]
             }
         },
         {
             icon: '<i class="fas fa-walking"></i>',
-            name: '用户旅程图 (User Journey)',
+            name: t('userJourney'),
             keywords: ['journey', '用户旅程'],
-            description: isEn() ? 'Create a user journey map' : '创建用户旅程图',
+            description: t('userJourneyDescription'),
             hasDataInput: true,
             generateTemplate: function(data) {
-                var sections = data.sections || ['浏览', '购买', '售后'];
-                var tasks = data.tasks || ['查看商品', '下单支付', '收货评价'];
+                var sections = data.sections || [isEn() ? 'Browse' : '浏览', isEn() ? 'Purchase' : '购买', isEn() ? 'After-sales' : '售后'];
+                var tasks = data.tasks || [isEn() ? 'View products' : '查看商品', isEn() ? 'Place order' : '下单支付', isEn() ? 'Leave review' : '收货评价'];
                 var code = 'journey\n    title ' + (data.title || (isEn() ? 'User Journey' : '用户旅程')) + '\n';
                 for (var i = 0; i < sections.length && i < tasks.length; i++) {
                     code += '    section ' + sections[i] + '\n      ' + tasks[i] + ': 5: ' + (isEn() ? 'User' : '用户') + '\n';
@@ -329,17 +330,17 @@
             },
             dataConfig: {
                 fields: [
-                    { name: 'title', label: isEn() ? 'Journey Title' : '旅程标题', type: 'text', defaultValue: isEn() ? 'Shopping Experience' : '购物体验' },
-                    { name: 'sections', label: isEn() ? 'Sections (one per line)' : '阶段（每行一个）', type: 'textarea', placeholder: isEn() ? 'Browse\nPurchase\nAfter-sales' : '浏览\n购买\n售后', defaultValue: isEn() ? 'Browse\nPurchase\nAfter-sales' : '浏览\n购买\n售后' },
-                    { name: 'tasks', label: isEn() ? 'Tasks (one per line)' : '任务（每行一个）', type: 'textarea', placeholder: isEn() ? 'View products\nPlace order\nLeave review' : '查看商品\n下单支付\n收货评价', defaultValue: isEn() ? 'View products\nPlace order\nLeave review' : '查看商品\n下单支付\n收货评价' }
+                    { name: 'title', label: t('journeyTitle'), type: 'text', defaultValue: isEn() ? 'Shopping Experience' : '购物体验' },
+                    { name: 'sections', label: t('sections'), type: 'textarea', placeholder: isEn() ? 'Browse\nPurchase\nAfter-sales' : '浏览\n购买\n售后', defaultValue: isEn() ? 'Browse\nPurchase\nAfter-sales' : '浏览\n购买\n售后' },
+                    { name: 'tasks', label: t('tasks'), type: 'textarea', placeholder: isEn() ? 'View products\nPlace order\nLeave review' : '查看商品\n下单支付\n收货评价', defaultValue: isEn() ? 'View products\nPlace order\nLeave review' : '查看商品\n下单支付\n收货评价' }
                 ]
             }
         },
         {
             icon: '<i class="fab fa-git-alt"></i>',
-            name: 'Git分支图 (Git Graph)',
+            name: t('gitGraph'),
             keywords: ['git', 'git graph', '分支'],
-            description: isEn() ? 'Create a Git branch graph' : '创建Git分支图',
+            description: t('gitGraphDescription'),
             hasDataInput: true,
             generateTemplate: function(data) {
                 var branches = data.branches || ['main', 'develop', 'feature'];
@@ -354,19 +355,19 @@
             },
             dataConfig: {
                 fields: [
-                    { name: 'branches', label: isEn() ? 'Branch Names (one per line, first is main)' : '分支名（每行一个，第一个是主干）', type: 'textarea', placeholder: 'main\ndevelop\nfeature/login', defaultValue: 'main\ndevelop\nfeature' }
+                    { name: 'branches', label: t('branchNames'), type: 'textarea', placeholder: 'main\ndevelop\nfeature/login', defaultValue: 'main\ndevelop\nfeature' }
                 ]
             }
         },
         {
             icon: '<i class="fas fa-brain"></i>',
-            name: '思维导图 (Mindmap)',
+            name: t('mindmap'),
             keywords: ['mindmap', '思维导图', 'mind'],
-            description: isEn() ? 'Create a mind map' : '创建思维导图',
+            description: t('mindmapDescription'),
             hasDataInput: true,
             generateTemplate: function(data) {
                 var center = data.center || (isEn() ? 'Topic' : '主题');
-                var branches = data.branches || ['分支1', '分支2', '分支3'];
+                var branches = data.branches || [isEn() ? 'Branch 1' : '分支1', isEn() ? 'Branch 2' : '分支2', isEn() ? 'Branch 3' : '分支3'];
                 var code = 'mindmap\n  root((' + center + '))\n';
                 branches.forEach(function(b) {
                     code += '    ' + b + '\n';
@@ -375,21 +376,21 @@
             },
             dataConfig: {
                 fields: [
-                    { name: 'center', label: isEn() ? 'Center Topic' : '中心主题', type: 'text', defaultValue: isEn() ? 'Project' : '项目' },
-                    { name: 'branches', label: isEn() ? 'Branches (one per line)' : '分支（每行一个）', type: 'textarea', placeholder: isEn() ? 'Planning\nDesign\nDevelopment\nTesting' : '规划\n设计\n开发\n测试', defaultValue: isEn() ? 'Planning\nDesign\nDevelopment' : '规划\n设计\n开发' }
+                    { name: 'center', label: t('centerTopic'), type: 'text', defaultValue: isEn() ? 'Project' : '项目' },
+                    { name: 'branches', label: t('branches'), type: 'textarea', placeholder: isEn() ? 'Planning\nDesign\nDevelopment\nTesting' : '规划\n设计\n开发\n测试', defaultValue: isEn() ? 'Planning\nDesign\nDevelopment' : '规划\n设计\n开发' }
                 ]
             }
         },
         {
             icon: '<i class="fas fa-clock"></i>',
-            name: '时间线图 (Timeline)',
+            name: t('timeline'),
             keywords: ['timeline', '时间线', '历史'],
-            description: isEn() ? 'Create a timeline' : '创建时间线',
+            description: t('timelineDescription'),
             hasDataInput: true,
             generateTemplate: function(data) {
                 var title = data.title || (isEn() ? 'Project Timeline' : '项目时间线');
-                var sections = data.sections || ['Phase 1', 'Phase 2', 'Phase 3'];
-                var events = data.events || ['Start', 'Milestone', 'Complete'];
+                var sections = data.sections || [isEn() ? 'Phase 1' : '第一阶段', isEn() ? 'Phase 2' : '第二阶段', isEn() ? 'Phase 3' : '第三阶段'];
+                var events = data.events || [isEn() ? 'Start' : '启动', isEn() ? 'Review' : '评审', isEn() ? 'Complete' : '上线'];
                 var code = 'timeline\n    title ' + title + '\n';
                 for (var i = 0; i < sections.length && i < events.length; i++) {
                     code += '    section ' + sections[i] + '\n        ' + events[i] + '\n';
@@ -398,17 +399,17 @@
             },
             dataConfig: {
                 fields: [
-                    { name: 'title', label: isEn() ? 'Timeline Title' : '时间线标题', type: 'text', defaultValue: isEn() ? 'Project Milestones' : '项目里程碑' },
-                    { name: 'sections', label: isEn() ? 'Sections (one per line)' : '阶段（每行一个）', type: 'textarea', placeholder: isEn() ? 'Phase 1\nPhase 2\nPhase 3' : '第一阶段\n第二阶段\n第三阶段', defaultValue: isEn() ? 'Phase 1\nPhase 2\nPhase 3' : '第一阶段\n第二阶段\n第三阶段' },
-                    { name: 'events', label: isEn() ? 'Events (one per line)' : '事件（每行一个）', type: 'textarea', placeholder: isEn() ? 'Kickoff\nReview\nLaunch' : '启动\n评审\n上线', defaultValue: isEn() ? 'Kickoff\nReview\nLaunch' : '启动\n评审\n上线' }
+                    { name: 'title', label: t('timelineTitle'), type: 'text', defaultValue: isEn() ? 'Project Milestones' : '项目里程碑' },
+                    { name: 'sections', label: t('sections'), type: 'textarea', placeholder: isEn() ? 'Phase 1\nPhase 2\nPhase 3' : '第一阶段\n第二阶段\n第三阶段', defaultValue: isEn() ? 'Phase 1\nPhase 2\nPhase 3' : '第一阶段\n第二阶段\n第三阶段' },
+                    { name: 'events', label: t('events'), type: 'textarea', placeholder: isEn() ? 'Kickoff\nReview\nLaunch' : '启动\n评审\n上线', defaultValue: isEn() ? 'Kickoff\nReview\nLaunch' : '启动\n评审\n上线' }
                 ]
             }
         },
         {
             icon: '<i class="fas fa-cubes"></i>',
-            name: 'C4架构图 (C4 Diagram)',
+            name: t('c4Diagram'),
             keywords: ['c4', '架构图', 'architecture'],
-            description: isEn() ? 'Create a C4 architecture diagram' : '创建C4架构图',
+            description: t('c4DiagramDescription'),
             hasDataInput: true,
             generateTemplate: function(data) {
                 var type = data.type || 'Context';
@@ -421,19 +422,19 @@
             },
             dataConfig: {
                 fields: [
-                    { name: 'type', label: isEn() ? 'Diagram Type' : '图表类型', type: 'select', options: [
+                    { name: 'type', label: t('diagramType'), type: 'select', options: [
                         { value: 'Context', label: 'Context ' + (isEn() ? 'Diagram' : '图') },
                         { value: 'Container', label: 'Container ' + (isEn() ? 'Diagram' : '图') }
                     ], defaultValue: 'Context' },
-                    { name: 'systemName', label: isEn() ? 'System Name' : '系统名称', type: 'text', defaultValue: isEn() ? 'Web Application' : 'Web应用' }
+                    { name: 'systemName', label: t('systemName'), type: 'text', defaultValue: isEn() ? 'Web Application' : 'Web应用' }
                 ]
             }
         },
         {
             icon: '<i class="fas fa-network-wired"></i>',
-            name: '网络拓扑图 (Network)',
+            name: t('networkDiagram'),
             keywords: ['network', '网络图', '拓扑'],
-            description: isEn() ? 'Create a network topology diagram' : '创建网络拓扑图',
+            description: t('networkDiagramDescription'),
             hasDataInput: true,
             generateTemplate: function(data) {
                 var layers = data.layers || [isEn() ? 'Internet' : '互联网', isEn() ? 'DMZ' : 'DMZ区', isEn() ? 'App' : '应用层', isEn() ? 'Data' : '数据层'];
@@ -448,7 +449,7 @@
             },
             dataConfig: {
                 fields: [
-                    { name: 'layers', label: isEn() ? 'Network Layers (one per line)' : '网络层（每行一个）', type: 'textarea', placeholder: isEn() ? 'Internet\nDMZ\nApplication\nDatabase' : '互联网\nDMZ区\n应用层\n数据层', defaultValue: isEn() ? 'Internet\nDMZ\nApplication\nDatabase' : '互联网\nDMZ区\n应用层\n数据层' }
+                    { name: 'layers', label: t('networkLayers'), type: 'textarea', placeholder: isEn() ? 'Internet\nDMZ\nApplication\nDatabase' : '互联网\nDMZ区\n应用层\n数据层', defaultValue: isEn() ? 'Internet\nDMZ\nApplication\nDatabase' : '互联网\nDMZ区\n应用层\n数据层' }
                 ]
             }
         }
@@ -595,7 +596,7 @@
         previewContainer.style.cssText = 'margin-bottom: 20px; padding: 15px; background: ' + (nightMode ? '#1a1a1a' : '#f5f5f5') + '; border-radius: 8px;';
 
         var previewLabel = document.createElement('div');
-        previewLabel.textContent = isEn() ? 'Preview:' : '预览：';
+        previewLabel.textContent = t('preview');
         previewLabel.style.cssText = 'font-size: 12px; color: ' + (nightMode ? '#888' : '#666') + '; margin-bottom: 8px;';
         previewContainer.appendChild(previewLabel);
 
@@ -804,7 +805,7 @@
 
         // 标题
         var title = document.createElement('div');
-        title.innerHTML = '<i class="fas fa-magic" style="color: #4a90e2;"></i> ' + (isEn() ? 'AI Chart Generator' : 'AI图表生成器');
+        title.innerHTML = '<i class="fas fa-magic" style="color: #4a90e2;"></i> ' + t('aiChartGenerator');
         title.style.cssText = 'font-size: 18px; font-weight: 600; margin-bottom: 5px; color: ' + (nightMode ? '#eee' : '#333') + ';';
         container.appendChild(title);
 
@@ -823,27 +824,27 @@
         // 示例提示
         var examples = document.createElement('div');
         examples.style.cssText = 'margin-bottom: 15px; padding: 10px; background: ' + (nightMode ? '#1a1a1a' : '#f0f0f0') + '; border-radius: 6px; font-size: 12px; color: ' + (nightMode ? '#888' : '#666') + ';';
-        examples.innerHTML = '<strong>' + (isEn() ? 'Examples:' : '示例：') + '</strong><br>' +
+        examples.innerHTML = '<strong>' + t('chartExamples') + '</strong><br>' +
             (isEn() ?
-                '• Show me a login flowchart with email verification<br>' +
-                '• Create a sequence diagram for online payment<br>' +
-                '• Draw a class diagram for an e-commerce system<br>' +
-                '• Make a Gantt chart for a 3-month project' :
-                '• 显示一个带邮箱验证的登录流程图<br>' +
-                '• 创建一个在线支付的序列图<br>' +
-                '• 绘制一个电商系统的类图<br>' +
-                '• 制作一个3个月项目的甘特图');
+                '• ' + t('chartExample1') + '<br>' +
+                '• ' + t('chartExample2') + '<br>' +
+                '• ' + t('chartExample3') + '<br>' +
+                '• ' + t('chartExample4') :
+                '• ' + t('chartExample1') + '<br>' +
+                '• ' + t('chartExample2') + '<br>' +
+                '• ' + t('chartExample3') + '<br>' +
+                '• ' + t('chartExample4'));
         container.appendChild(examples);
 
         // 输入框
         var inputLabel = document.createElement('label');
-        inputLabel.textContent = isEn() ? 'Describe your chart:' : '描述你的图表：';
+        inputLabel.textContent = t('describeChart');
         inputLabel.style.cssText = 'display: block; margin-bottom: 8px; font-size: 14px; color: ' + (nightMode ? '#ddd' : '#333') + ';';
         container.appendChild(inputLabel);
 
         var input = document.createElement('textarea');
         input.rows = 4;
-        input.placeholder = isEn() ? 'e.g., A flowchart showing user registration process' : '例如：一个显示用户注册流程的流程图';
+        input.placeholder = t('describeChartPlaceholder');
         input.style.cssText = 'width: 100%; padding: 12px; border: 1px solid ' + (nightMode ? '#444' : '#ccc') + '; border-radius: 6px; font-size: 14px; background: ' + (nightMode ? '#222' : '#fafafa') + '; color: ' + (nightMode ? '#eee' : '#333') + '; box-sizing: border-box; resize: vertical;';
         container.appendChild(input);
 
@@ -852,7 +853,7 @@
         resultContainer.style.cssText = 'margin-top: 20px; display: none;';
 
         var resultLabel = document.createElement('div');
-        resultLabel.textContent = isEn() ? 'Generated Chart:' : '生成的图表：';
+        resultLabel.textContent = t('generatedChart');
         resultLabel.style.cssText = 'font-size: 13px; color: ' + (nightMode ? '#888' : '#666') + '; margin-bottom: 8px;';
         resultContainer.appendChild(resultLabel);
 
@@ -875,7 +876,7 @@
         buttonBar.style.cssText = 'display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;';
 
         var generateBtn = document.createElement('button');
-        generateBtn.innerHTML = '<i class="fas fa-magic"></i> ' + (isEn() ? 'Generate' : '生成');
+        generateBtn.innerHTML = '<i class="fas fa-magic"></i> ' + t('aiGenerate');
         generateBtn.style.cssText = 'padding: 10px 20px; background: #4a90e2; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px;';
 
         var insertBtn = document.createElement('button');
@@ -893,7 +894,7 @@
             }
 
             generateBtn.disabled = true;
-            generateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ' + (isEn() ? 'Generating...' : '生成中...');
+            generateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ' + t('generatingChart');
 
             try {
                 var apiUrl = (window.getApiBaseUrl ? window.getApiBaseUrl() : 'api') + '/ai/chart';
@@ -986,7 +987,7 @@
 
         // 标题
         var title = document.createElement('div');
-        title.textContent = isEn() ? 'Insert Chart' : '插入图表';
+        title.textContent = t('insertChart');
         title.style.cssText = 'font-size: 18px; font-weight: 600; margin-bottom: 12px; text-align: center; color: ' + (nightMode ? '#eee' : '#333') + ';';
         container.appendChild(title);
 
@@ -1008,7 +1009,7 @@
 
         // AI生成按钮
         var aiBtn = document.createElement('button');
-        aiBtn.innerHTML = '<i class="fas fa-magic"></i> ' + (isEn() ? 'AI Generate' : 'AI生成');
+        aiBtn.innerHTML = '<i class="fas fa-magic"></i> ' + t('aiGenerate');
         aiBtn.style.cssText = 'width: 100%; padding: 8px; margin-bottom: 12px; background: linear-gradient(135deg, #4a90e2 0%, #357abd 100%); color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 500;';
         aiBtn.onclick = showAIGenerateDialog;
         container.appendChild(aiBtn);
@@ -1016,7 +1017,7 @@
         // 搜索框
         var searchBox = document.createElement('input');
         searchBox.type = 'text';
-        searchBox.placeholder = isEn() ? 'Search chart templates...' : '搜索图表模板...';
+        searchBox.placeholder = t('searchChartTemplates');
         searchBox.style.cssText = 'width: 100%; padding: 10px 12px; margin-bottom: 15px; border: 1px solid ' + (nightMode ? '#444' : '#ccc') + '; border-radius: 6px; font-size: 14px; background: ' + (nightMode ? '#222' : '#fafafa') + '; color: ' + (nightMode ? '#eee' : '#333') + '; outline: none; box-sizing: border-box;';
         container.appendChild(searchBox);
 
@@ -1032,7 +1033,7 @@
             if (!items || items.length === 0) {
                 var emptyMsg = document.createElement('div');
                 emptyMsg.style.cssText = 'text-align: center; color: #888; padding: 30px; grid-column: 1/-1;';
-                emptyMsg.textContent = isEn() ? 'No matching charts' : '无匹配图表';
+                emptyMsg.textContent = t('noMatchingCharts');
                 chartGrid.appendChild(emptyMsg);
                 return;
             }
@@ -1083,7 +1084,7 @@
             // 如果 echartsTemplates 还没加载，尝试预加载
             chartGrid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 30px; color: ' + (nightMode ? '#aaa' : '#666') + ';">' +
                 '<i class="fas fa-spinner fa-spin" style="font-size: 32px; margin-bottom: 15px; color: #4a90e2;"></i>' +
-                '<div style="font-size: 14px;">' + (isEn() ? 'Loading ECharts templates...' : '加载 ECharts 模板中...') + '</div>' +
+                '<div style="font-size: 14px;">' + t('loadingEchartsTemplates') + '</div>' +
                 '</div>';
 
             // 尝试延迟加载
@@ -1117,7 +1118,7 @@
                 // 如果 echartsTemplates 还没加载，显示加载提示
                 chartGrid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 30px; color: ' + (nightMode ? '#aaa' : '#666') + ';">' +
                     '<i class="fas fa-spinner fa-spin" style="font-size: 32px; margin-bottom: 15px; color: #4a90e2;"></i>' +
-                    '<div style="font-size: 14px;">' + (isEn() ? 'Loading ECharts templates...' : '加载 ECharts 模板中...') + '</div>' +
+                    '<div style="font-size: 14px;">' + t('loadingEchartsTemplates') + '</div>' +
                     '</div>';
 
                 // 尝试延迟加载
@@ -1127,7 +1128,7 @@
                     } else {
                         chartGrid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 30px; color: ' + (nightMode ? '#aaa' : '#666') + ';">' +
                             '<i class="fas fa-exclamation-triangle" style="font-size: 32px; margin-bottom: 15px; color: #f0ad4e;"></i>' +
-                            '<div style="font-size: 14px;">' + (isEn() ? 'Failed to load ECharts templates. Please refresh and try again.' : '加载 ECharts 模板失败，请刷新重试。') + '</div>' +
+                            '<div style="font-size: 14px;">' + t('failedToLoadEchartsTemplates') + '</div>' +
                             '</div>';
                     }
                 }, 1000);
@@ -1150,7 +1151,7 @@
             if (!templates || templates.length === 0) {
                 var emptyMsg = document.createElement('div');
                 emptyMsg.style.cssText = 'text-align: center; color: #888; padding: 30px; grid-column: 1/-1;';
-                emptyMsg.textContent = isEn() ? 'No ECharts templates available' : '暂无 ECharts 模板';
+                emptyMsg.textContent = t('noEchartsTemplates');
                 chartGrid.appendChild(emptyMsg);
                 return;
             }

@@ -244,6 +244,21 @@
         return state.client.replaceAllText(text || '', query || '', replacement || '', options || {});
     }
 
+    function analyze(text) {
+        if (!isUsable()) return { code: 500, message: 'smart analyze unavailable' };
+        return state.client.analyze(text || '');
+    }
+
+    function similarity(leftText, rightText) {
+        if (!isUsable()) return { code: 500, message: 'smart similarity unavailable' };
+        return state.client.similarity(leftText || '', rightText || '');
+    }
+
+    function extractTags(text) {
+        if (!isUsable()) return { code: 500, message: 'smart extractTags unavailable' };
+        return state.client.extractTags(text || '');
+    }
+
     function searchFilesDetailed(query, options) {
         if (!isUsable()) return { code: 500, message: 'smart search unavailable' };
 
@@ -304,6 +319,9 @@
         searchFilesDetailed: searchFilesDetailed,
         findInText: findInText,
         replaceAllText: replaceAllText,
+        analyze: analyze,
+        similarity: similarity,
+        extractTags: extractTags,
         getStatus: function() {
             return {
                 enabled: getEnabledFlag(),

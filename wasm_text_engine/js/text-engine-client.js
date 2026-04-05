@@ -138,6 +138,17 @@ export class WasmTextEngineClient {
             return err('similarity failed: ' + e.message);
         }
     }
+
+    extractTags(text) {
+        try {
+            if (!hasMethod(this.engine, 'extractTags')) {
+                return err('extractTags failed: wasm method extractTags is unavailable');
+            }
+            return ok(JSON.parse(this.engine.extractTags(text || '')));
+        } catch (e) {
+            return err('extractTags failed: ' + e.message);
+        }
+    }
 }
 
 
