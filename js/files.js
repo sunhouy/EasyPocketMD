@@ -2492,7 +2492,14 @@
         panel.classList.toggle('knowledge-graph-fullscreen', shouldShow);
 
         if (shouldShow) {
-            refreshKnowledgeGraph(true);
+            const loadingText = kgText('knowledgeGraphLoading', '正在分析文件关系...');
+            setKnowledgeGraphStatus(loadingText, false);
+            if (typeof global.showMessage === 'function') {
+                global.showMessage(loadingText, 'info');
+            }
+            setTimeout(function() {
+                refreshKnowledgeGraph(true);
+            }, 16);
         } else {
             disposeKnowledgeGraphChart();
         }
