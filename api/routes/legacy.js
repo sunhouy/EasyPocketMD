@@ -12,7 +12,6 @@ const apiManager = require('../models/ApiManager');
 const { verifyTokenOrPassword } = require('../utils/auth');
 const { generatePasswordForm, generateShareViewPage } = require('../utils/htmlGenerator');
 
-// Multer setup for handling all uploads
 const upload = multer({
     dest: path.join(__dirname, '../../temp_uploads'), // Temporary directory
     limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
@@ -31,10 +30,8 @@ router.all('/index.php', upload.any(), async (req, res) => {
     const method = req.method;
     const action = req.query.action || '';
     
-    // Merge query and body for easier access (PHP style $_REQUEST kind of)
     const data = { ...req.query, ...req.body };
     
-    // console.log(`Processing request: ${action}, Method: ${method}`);
 
     try {
         switch (action) {
@@ -195,34 +192,8 @@ router.all('/index.php', upload.any(), async (req, res) => {
                 if (result.code === 401) {
                     res.send(generatePasswordForm(data.share_id));
                 } else if (result.code === 200) {
-                    // Redirect to index.html with params, OR render view page directly
-                    // PHP code redirects to index.html?share_id=...
-                    // But wait, PHP code says:
-                    // if ($result['code'] === 200) { header('Location: ...'); exit; }
-                    // So it redirects to the frontend app which handles the view?
-                    // Let's check PHP again.
-                    // Yes: header('Location: ' . $redirectUrl);
-                    // But wait, there is ALSO `generateShareViewPage` function in PHP file.
-                    // Is it used?
-                    // Ah, `generateShareViewPage` is DEFINED but NOT USED in `view_share` case in the PHP file I read!
-                    // Line 567: header('Location: ' . $redirectUrl);
-                    // So it redirects to index.html.
-                    // BUT, `generateShareViewPage` exists. Maybe it was an old implementation or for a different purpose?
-                    // Wait, let's look at `index.html`. It probably reads `share_id` and calls `get_share`.
-                    // So I should redirect too.
                     
                     const baseUrl = userModel.baseUrl || 'http://localhost:3000';
-                    // We need to construct the URL to the frontend index.html
-                    // Assuming frontend is served at root /
-                    // If this API is running on port 3000 and frontend on port 80/443 (via Nginx), then baseUrl should point to frontend.
-                    // Or if served statically by Express.
-                    
-                    // PHP: $baseUrl = $config['base_url'] ?? getBaseUrl();
-                    // $baseUrl = preg_replace('#/api$#', '', $baseUrl);
-                    // $redirectUrl = rtrim($baseUrl, '/') . '/index.html?share_id=' ...
-                    
-                    // I'll assume relative path redirect works if on same domain.
-                    // Or construct absolute URL.
                     
                     let redirectUrl = `../../index.html?share_id=${encodeURIComponent(data.share_id)}`;
                     if (data.password) {
@@ -474,14 +445,6 @@ router.all('/index.php', upload.any(), async (req, res) => {
                     res.json({ code: 401, message: '用户身份验证失败' });
                     break;
                 }
-
-                // File validation logic is in User model or here?
-                // User model expects file object.
-                // But multer already saved to temp.
-                // We should rename it to final destination here or in model.
-                // The User.js implementation expects `file.filename` to be set if handled by multer diskStorage with destination.
-                // But here we used `dest: temp`.
-                // So we need to move it manually.
                 
                 const avatarExt = path.extname(file.originalname);
                 const avatarFilename = `${data.username}_${Date.now()}${avatarExt}`;
@@ -523,7 +486,6 @@ router.all('/index.php', upload.any(), async (req, res) => {
             timestamp: new Date().toISOString()
         });
         
-        // Clean up any uploaded files in case of error
         if (req.files) {
             req.files.forEach(f => {
                 if (fs.existsSync(f.path)) fs.unlinkSync(f.path);

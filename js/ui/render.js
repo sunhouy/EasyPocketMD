@@ -38,9 +38,7 @@
      * options.useTempDir 为 true 时，会提示 uploadImage 使用临时目录（不携带用户信息）。
      */
     async function convertFormulasAndChartsToImages(html, options) {
-        // console.log('[Render Debug] convertFormulasAndChartsToImages start');
         if (!html) {
-            // console.log('[Render Debug] HTML is empty, skipping');
             return html;
         }
 
@@ -48,7 +46,6 @@
         var html2canvas;
         try {
             html2canvas = (await import('html2canvas')).default;
-            // console.log('[Render Debug] html2canvas loaded');
         } catch (e) {
             console.error('[Render Debug] Failed to load html2canvas', e);
             return html;
@@ -56,11 +53,9 @@
 
         var container = document.createElement('div');
         container.innerHTML = html;
-        // console.log('[Render Debug] Container created, processing elements...');
 
         // 处理原始的Markdown公式格式
         var allElements = container.querySelectorAll('div, p, span');
-        // console.log('[Render Debug] Found elements:', allElements.length);
 
         // 收集所有需要处理的元素
         var elementsToProcess = [];
@@ -116,22 +111,15 @@
             }
         }
         
-        // console.log('[Render Debug] Formulas to process:', elementsToProcess.length);
-
-        // 处理公式元素
-        // 由于 markdown-it-mathjax3 已经处理了公式，这里不需要再手动处理。
         elementsToProcess = [];
 
-        // Convert Mermaid charts to images and upload
         var mermaidElements = container.querySelectorAll('.mermaid, [data-mermaid]');
-        // console.log('[Render Debug] Mermaid elements to process:', mermaidElements.length);
 
         for (var i = 0; i < mermaidElements.length; i++) {
             var el = mermaidElements[i];
             var mermaidCode = el.textContent || el.getAttribute('data-mermaid');
             if (!mermaidCode) continue;
             
-            // console.log('[Render Debug] Processing mermaid:', i);
 
             try {
                 // Create a temporary div for rendering
@@ -228,7 +216,6 @@
                         </svg>
                     `;
                     tempDiv.innerHTML = svgCode;
-                    // console.log('[Render Debug] 使用占位符替代');
                 }
 
                 // Wait a bit for rendering to complete
@@ -237,7 +224,6 @@
                 // Convert to image using html2canvas
                 if (html2canvas) {
                     try {
-                        // console.log('[Render Debug] 开始转换图表为图片');
                         const canvas = await html2canvas(tempDiv, {
                             backgroundColor: '#ffffff',
                             scale: 2
@@ -256,9 +242,7 @@
                 }
 
                 // Upload image to server
-                // 当 options.useTempDir 为 true 时，上传到临时目录（如 PDF 导出目录），而不是用户目录
                 var imgUrl = await global.uploadImage(dataUrl, options && options.useTempDir);
-                // console.log('[Render Debug] Chart uploaded:', imgUrl);
 
                 if (imgUrl && el.parentNode) {
                     // Create image container with proper styling
@@ -278,8 +262,6 @@
                     console.error('[Render Debug] Mermaid渲染错误:', e);
             }
         }
-        
-        // console.log('[Render Debug] convertFormulasAndChartsToImages finished. HTML length:', container.innerHTML.length);
         return container.innerHTML;
     }
 

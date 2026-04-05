@@ -38,11 +38,6 @@ const screenshotsPath = path.join(__dirname, '../screenshots');
 const userFilesPath = path.join(__dirname, '../user_files');
 
 if (!isTest) {
-    console.log('Serving static files from:');
-    console.log('- Uploads:', uploadsPath);
-    console.log('- Avatars:', avatarsPath);
-    console.log('- Screenshots:', screenshotsPath);
-    console.log('- User Files:', userFilesPath);
 }
 
 app.use('/uploads', express.static(uploadsPath));
@@ -56,9 +51,6 @@ app.use('/vditor', express.static(path.join(__dirname, '../node_modules/vditor/d
 app.use('/fa', express.static(path.join(__dirname, '../node_modules/@fortawesome/fontawesome-free')));
 
 if (!isTest) {
-    console.log('Server starting...');
-    console.log('Current directory (__dirname):', __dirname);
-    console.log('Current working directory (process.cwd()):', process.cwd());
 }
 
 // PWA assets (must NOT fall back to index.html)
@@ -167,8 +159,6 @@ if (distPath) {
         res.sendFile(path.join(distPath, 'index.html'));
     });
 } else {
-    // Fallback to serving root for development (though Vite is recommended)
-    // Note: Root index.html now uses modules, so it won't work directly without Vite
     if (!isTest) console.log('Frontend build (dist) not found. Serving from root directory.');
     app.use(express.static(rootPath, {
         setHeaders: (res, path) => {

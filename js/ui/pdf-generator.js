@@ -2,10 +2,8 @@ import * as pdfjsLib from 'pdfjs-dist';
 import htmlToPdfmake from 'html-to-pdfmake';
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 
-// Use Vite-resolved URL so worker path works with non-root deployments.
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
-// 保存 pdfmake 实例，用于按需初始化
 let pdfMake = null;
 let pdfMakeInitialized = false;
 
@@ -17,7 +15,6 @@ function loadScript(url) {
         const script = document.createElement('script');
         script.src = url;
         script.onload = () => {
-            // console.log('[PDF Debug] Script loaded:', url);
             resolve();
         };
         script.onerror = (error) => {
@@ -35,27 +32,25 @@ async function initPdfMakeWithChineseFonts() {
     if (pdfMakeInitialized) {
         return pdfMake;
     }
-    
-    // console.log('[PDF Debug] Initializing pdfmake with Chinese fonts...');
-    
+
+
     try {
         // 先设置全局的 pdfMake 对象
         window.pdfMake = {};
-        
+
         // 加载 pdfmake 和 vfs_fonts 作为普通脚本，而不是模块
         await loadScript('./pdfmake.min.js');
         await loadScript('./vfs_fonts.js');
-        
+
         // 此时 window.pdfMake 应该已经有完整的 vfs 了
         pdfMake = window.pdfMake;
-        
-        // console.log('[PDF Debug] vfs keys:', Object.keys(pdfMake.vfs || {}));
-        
+
+
     } catch (e) {
         console.error('[PDF Debug] Initialization failed:', e);
         throw e;
     }
-    
+
     // 设置字体，注意是大写的 TTF，和 vfs 中的键名一致
     pdfMake.fonts = {
         Roboto: {
@@ -71,10 +66,9 @@ async function initPdfMakeWithChineseFonts() {
             bolditalics: 'fzhei-jt.TTF'
         }
     };
-    
+
     pdfMakeInitialized = true;
-    // console.log('[PDF Debug] pdfmake with Chinese fonts initialized');
-    
+
     return pdfMake;
 }
 
@@ -85,15 +79,10 @@ async function initPdfMakeWithChineseFonts() {
  * @returns {Promise<string>} - Returns blob URL for the generated PDF
  */
 async function generatePDFLocal(htmlContent, settings) {
-    // console.log('[PDF Debug] Starting local PDF generation...');
-    
-    // console.log('[PDF Debug] Original htmlContent preview (first 500 chars):', htmlContent.substring(0, 500));
-    
-    // 按需初始化 pdfmake 并加载中文字体
     const currentPdfMake = await initPdfMakeWithChineseFonts();
-    
+
     let processedContent = htmlContent;
-    
+
     // 提取真正的内容，移除开头的 <style> 标签
     // 查找 <body> 标签或直接的内容
     const bodyMatch = processedContent.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
@@ -103,17 +92,15 @@ async function generatePDFLocal(htmlContent, settings) {
         // 如果没有 <body> 标签，尝试移除开头的 <style> 标签
         processedContent = processedContent.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
     }
-    
-    // console.log('[PDF Debug] Processed content preview (first 500 chars):', processedContent.substring(0, 500));
-    
+
+
     // 首先创建临时 DOM 来处理图片和公式
     const tempDiv = document.createElement('div');
     tempDiv.innerHTML = processedContent;
-    
+
     // 处理图片：转换为 data URLs
     const images = tempDiv.querySelectorAll('img');
-    // console.log('[PDF Debug] Found', images.length, 'images');
-    
+
     // 将所有图片转换为 data URLs
     const imagePromises = [];
     images.forEach((img, index) => {
@@ -124,14 +111,14 @@ async function generatePDFLocal(htmlContent, settings) {
                     resolve();
                     return;
                 }
-                
+
                 // 尝试转换为 data URL
                 const canvas = document.createElement('canvas');
                 const ctx = canvas.getContext('2d');
                 const tempImg = new Image();
-                
+
                 tempImg.crossOrigin = 'anonymous';
-                
+
                 tempImg.onload = () => {
                     canvas.width = tempImg.naturalWidth || tempImg.width;
                     canvas.height = tempImg.naturalHeight || tempImg.height;
@@ -139,32 +126,30 @@ async function generatePDFLocal(htmlContent, settings) {
                     try {
                         const dataUrl = canvas.toDataURL('image/png');
                         img.src = dataUrl;
-                        // console.log('[PDF Debug] Image', index, 'converted to data URL');
                     } catch (e) {
                         console.warn('[PDF Debug] Failed to convert image', index, ':', e);
                         img.remove();
                     }
                     resolve();
                 };
-                
+
                 tempImg.onerror = () => {
                     console.warn('[PDF Debug] Failed to load image', index);
                     img.remove();
                     resolve();
                 };
-                
+
                 tempImg.src = img.src;
             })
         );
     });
-    
+
     // 等待所有图片处理完成
     await Promise.all(imagePromises);
-    
+
     // 处理 LaTeX 公式：移除 SVG 元素
     const svgElements = tempDiv.querySelectorAll('svg');
-    // console.log('[PDF Debug] Found', svgElements.length, 'SVG elements');
-    
+
     // 移除所有 SVG 元素
     svgElements.forEach(svg => {
         const parent = svg.parentNode;
@@ -177,7 +162,7 @@ async function generatePDFLocal(htmlContent, settings) {
             }
         }
     });
-    
+
     // 清理字体样式
     let html = tempDiv.innerHTML;
     html = html
@@ -191,8 +176,6 @@ async function generatePDFLocal(htmlContent, settings) {
         </div>
     `;
 
-    // console.log('[PDF Debug] Converting HTML to pdfmake content...');
-    
     const pdfMakeContent = htmlToPdfmake(fullHtml, {
         defaultStyles: {
             p: { fontSize: 12, lineHeight: 1.2, font: 'fangzhen' },
@@ -204,8 +187,7 @@ async function generatePDFLocal(htmlContent, settings) {
         }
     });
 
-    // console.log('[PDF Debug] htmlToPdfmake conversion done');
-    
+
     // 后处理：确保所有图片宽度不超过页面宽度
     function limitImageWidth(content) {
         if (Array.isArray(content)) {
@@ -214,7 +196,7 @@ async function generatePDFLocal(htmlContent, settings) {
             // 检查是否是图片
             if (content.image) {
                 // A4 页面宽度：595pt，减去边距（每个边 15mm ≈ 42pt），所以 595 - 42*2 = 511pt
-                // 我们设置最大 500pt 留一点余地
+                // 设置最大 500pt 留一点余地
                 const maxWidth = 500;
                 if (!content.width || content.width > maxWidth) {
                     content.width = maxWidth;
@@ -232,9 +214,8 @@ async function generatePDFLocal(htmlContent, settings) {
             }
         }
     }
-    
+
     limitImageWidth(pdfMakeContent);
-    // console.log('[PDF Debug] Image width limiting done');
 
     const docDefinition = {
         content: pdfMakeContent,
@@ -250,13 +231,9 @@ async function generatePDFLocal(htmlContent, settings) {
         ]
     };
 
-    // console.log('[PDF Debug] Creating pdfmake document...');
 
     try {
         const pdfDoc = currentPdfMake.createPdf(docDefinition);
-        // console.log('[PDF Debug] pdfmake document created');
-        
-        // console.log('[PDF Debug] Getting buffer...');
         const buffer = await new Promise((resolve, reject) => {
             pdfDoc.getBuffer((buffer) => {
                 resolve(buffer);
@@ -264,11 +241,9 @@ async function generatePDFLocal(htmlContent, settings) {
                 reject(error);
             });
         });
-        // console.log('[PDF Debug] Buffer created, length:', buffer.length, 'bytes');
-        
+
         const blob = new Blob([buffer], { type: 'application/pdf' });
         const url = URL.createObjectURL(blob);
-        // console.log('[PDF Debug] Blob URL created:', url);
         return url;
     } catch (error) {
         console.error('[PDF Debug] Local PDF generation error:', error);
@@ -288,11 +263,11 @@ function cleanMathJaxContent(html) {
     // Create a temporary DOM element to parse HTML
     const tempDiv = document.createElement('div');
     tempDiv.innerHTML = html;
-    
+
     // 1. Remove all MathJax scripts
     const scripts = tempDiv.querySelectorAll('script[src*="mathjax"], script[id*="MathJax"]');
     scripts.forEach(script => script.remove());
-    
+
     // Remove any other MathJax-related scripts
     const allScripts = tempDiv.querySelectorAll('script');
     allScripts.forEach(script => {
@@ -300,11 +275,11 @@ function cleanMathJaxContent(html) {
             script.remove();
         }
     });
-    
+
     // 2. Remove <mjx-assistive-mml> nodes
     const assistiveMml = tempDiv.querySelectorAll('mjx-assistive-mml');
     assistiveMml.forEach(el => el.remove());
-    
+
     // 3. Process <mjx-container> elements
     const mjxContainers = tempDiv.querySelectorAll('mjx-container');
     mjxContainers.forEach(container => {
@@ -314,11 +289,11 @@ function cleanMathJaxContent(html) {
             // Create a div to wrap the SVG
             const wrapper = document.createElement('div');
             wrapper.style.cssText = 'text-align: center; margin: 1em 0;';
-            
+
             // Clone the SVG to avoid reference issues
             const svgClone = svg.cloneNode(true);
             wrapper.appendChild(svgClone);
-            
+
             // Replace the mjx-container with our wrapper div
             container.parentNode.replaceChild(wrapper, container);
         } else {
@@ -326,7 +301,7 @@ function cleanMathJaxContent(html) {
             container.remove();
         }
     });
-    
+
     return tempDiv.innerHTML;
 }
 
@@ -341,18 +316,14 @@ export async function generatePDF(htmlContent, settings, filename) {
     if (settings && settings.conversionMethod === 'local') {
         return await generatePDFLocal(htmlContent, settings);
     }
-    
+
     // Debug: Check if content is empty
     if (!htmlContent || htmlContent.trim() === '') {
         console.warn('[PDF Debug] generatePDF received empty content');
         htmlContent = '<div style="padding: 20px; font-size: 16px; color: #666; text-align: center;">(文档内容为空)</div>';
-    } 
-    
-    // Clean up MathJax-related content before sending to backend
-    // console.log('[PDF Debug] Cleaning MathJax content...');
+    }
+
     const cleanedHtmlContent = cleanMathJaxContent(htmlContent);
-    // console.log('[PDF Debug] MathJax content cleaned');
-    
     const fullHtml = `
         <!DOCTYPE html>
         <html>
@@ -392,7 +363,7 @@ export async function generatePDF(htmlContent, settings, filename) {
         });
 
         const result = await response.json();
-        
+
         if (result.code === 200 && result.url) {
             return result.url;
         } else {
@@ -412,7 +383,6 @@ export async function generatePDF(htmlContent, settings, filename) {
  */
 export async function renderPDF(pdfUrl, container) {
     try {
-        // console.log('[PDF Debug] Rendering PDF from URL:', pdfUrl);
 
         const isNativeLike = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) ||
             !!window.electron ||
@@ -420,7 +390,7 @@ export async function renderPDF(pdfUrl, container) {
         const resolveBase = isNativeLike && window.getAppOrigin
             ? window.getAppOrigin()
             : window.location.href;
-        
+
         // Ensure the URL is resolvable in both web and native containers.
         pdfUrl = window.resolveResourceUrl
             ? window.resolveResourceUrl(pdfUrl, resolveBase)
@@ -428,33 +398,33 @@ export async function renderPDF(pdfUrl, container) {
 
         const loadingTask = pdfjsLib.getDocument(pdfUrl);
         const pdf = await loadingTask.promise;
-        
+
         container.innerHTML = ''; // Clear container
 
         for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
             const page = await pdf.getPage(pageNum);
-            
+
             const scale = 1.5;
             const viewport = page.getViewport({ scale: scale });
-            
+
             const canvas = document.createElement('canvas');
             const context = canvas.getContext('2d');
             canvas.height = viewport.height;
             canvas.width = viewport.width;
-            
+
             // Style the canvas
             canvas.style.width = '100%';
             canvas.style.height = 'auto';
             canvas.style.marginBottom = '20px';
             canvas.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
-            
+
             container.appendChild(canvas);
-            
+
             const renderContext = {
                 canvasContext: context,
                 viewport: viewport
             };
-            
+
             await page.render(renderContext).promise;
         }
     } catch (e) {

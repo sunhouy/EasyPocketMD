@@ -1537,7 +1537,6 @@
         }
 
         const treeData = getJsTreeData();
-        // console.log('Initializing file tree with data:', treeData);
 
         if (treeData.length === 0) {
             console.warn('File tree data is empty');

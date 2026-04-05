@@ -19,8 +19,3 @@ if (initRes.code !== 200) {
     console.error(initRes.message);
     process.exit(1);
 }
-
-console.log(client.diff('a\nb', 'a\nc'));
-console.log(client.merge3('x\nbase', 'x\nlocal', 'x\nremote', 'manual'));
-console.log(client.analyze('hello\nwasm'));
-

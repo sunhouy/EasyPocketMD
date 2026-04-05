@@ -202,8 +202,33 @@
     }
 
     function extractUploadedUrl(uploadResult) {
+        if (uploadResult && typeof uploadResult === 'object') {
+            if (Array.isArray(uploadResult.urls) && uploadResult.urls[0]) {
+                return String(uploadResult.urls[0]);
+            }
+            if (uploadResult.data && Array.isArray(uploadResult.data.urls) && uploadResult.data.urls[0]) {
+                return String(uploadResult.data.urls[0]);
+            }
+        }
+
         var text = String(uploadResult || '').trim();
         if (!text) return '';
+
+        var lines = text.split(/\r?\n/).map(function(line) { return line.trim(); }).filter(Boolean);
+        if (lines.length > 0) {
+            text = lines[0];
+        }
+
+        // Prefer slicing between "](" and last ")" to tolerate ")" in URLs.
+        var openIdx = text.indexOf('](');
+        var closeIdx = text.lastIndexOf(')');
+        if (openIdx > -1 && closeIdx > openIdx + 2) {
+            var sliced = text.slice(openIdx + 2, closeIdx).trim();
+            if (sliced.charAt(0) === '<' && sliced.charAt(sliced.length - 1) === '>') {
+                sliced = sliced.slice(1, -1);
+            }
+            if (sliced) return sliced;
+        }
 
         var imageMd = text.match(/!\[[^\]]*\]\(([^)\s]+)(?:\s+"[^"]*")?\)/);
         if (imageMd && imageMd[1]) return imageMd[1];
@@ -222,9 +247,6 @@
         if (!blob) {
             throw new Error('裁剪结果为空');
         }
-        if (typeof global.uploadFiles !== 'function') {
-            throw new Error('上传功能不可用');
-        }
 
         var srcInfo = toComparableUrl(originalSrc);
         var baseName = (srcInfo.file || 'image').replace(/\.[^.]+$/, '');
@@ -233,12 +255,59 @@
         var fileName = baseName + '_crop_' + Date.now() + '.' + ext;
         var file = fileFromBlob(blob, fileName);
 
-        var uploadResult = await global.uploadFiles([file], false);
+        var formData = new FormData();
+        formData.append('files[]', file);
+        if (global.currentUser) {
+            formData.append('username', global.currentUser.username);
+            formData.append('password', global.currentUser.password);
+        }
+        formData.append('uploadDir', 'uploads');
+
+        var apiUrl = (global.getApiBaseUrl ? global.getApiBaseUrl() : 'api') + '/external/upload';
+        var response = await fetch(apiUrl, { method: 'POST', body: formData });
+        var uploadResult;
+        try {
+            uploadResult = await response.json();
+        } catch (e) {
+            throw new Error('上传返回解析失败');
+        }
+
+        if (!response.ok || !uploadResult || uploadResult.success !== true) {
+            throw new Error((uploadResult && uploadResult.message) ? uploadResult.message : '上传失败');
+        }
+
         var uploadedUrl = extractUploadedUrl(uploadResult);
         if (!uploadedUrl) {
             throw new Error('上传成功但未返回图片地址');
         }
+        if (uploadedUrl.indexOf(' ') > -1) {
+            uploadedUrl = encodeURI(uploadedUrl);
+        }
         return uploadedUrl;
+    }
+
+    function editorContainsImageUrl(url) {
+        if (!url || !global.vditor || typeof global.vditor.getValue !== 'function') {
+            return false;
+        }
+
+        var raw = global.vditor.getValue() || '';
+
+        var mdRegex = /!\[[^\]]*\]\(([^)\n]+)\)/g;
+        var mdMatch;
+        while ((mdMatch = mdRegex.exec(raw)) !== null) {
+            var mdUrl = normalizeUrl(String(mdMatch[1] || '').trim().split(/\s+/)[0]);
+            if (urlsMatch(mdUrl, url)) return true;
+        }
+
+        var htmlRegex = /<img\b[^>]*src=(['"])(.*?)\1[^>]*>/gi;
+        var htmlMatch;
+        while ((htmlMatch = htmlRegex.exec(raw)) !== null) {
+            var htmlUrl = normalizeUrl(htmlMatch[2]);
+            if (urlsMatch(htmlUrl, url)) return true;
+        }
+
+        return false;
     }
 
     function loadCropperLibrary() {
@@ -721,7 +790,7 @@
                 applyImageStyle(targetImage, oldMeta.width || 0, oldMeta.rotate || 0);
 
                 var replaced = replaceImageSourceInEditor(oldSrc, uploadedUrl, oldMeta.width || 0, oldMeta.rotate || 0, targetImage.getAttribute('alt') || '');
-                if (!replaced) {
+                if (!replaced && !editorContainsImageUrl(uploadedUrl)) {
                     throw new Error('裁剪后链接替换失败');
                 }
 
