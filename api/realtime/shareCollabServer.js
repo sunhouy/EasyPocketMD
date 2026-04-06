@@ -28,6 +28,31 @@ function initShareCollabServer(httpServer, shareManager) {
 
     const wss = new WebSocketServer({ server: httpServer, path: '/api/share/ws' });
     const roomMap = new Map();
+    const connectionTimeout = new Map();
+    const HEARTBEAT_INTERVAL = 30000;
+    const CONNECTION_TIMEOUT = 60000;
+
+    function cleanupConnection(socket, shareId) {
+        if (connectionTimeout.has(socket)) {
+            clearTimeout(connectionTimeout.get(socket));
+            connectionTimeout.delete(socket);
+        }
+        removeClientFromRoom(shareId, socket);
+        if (socket.ctx) {
+            socket.ctx = null;
+        }
+    }
+
+    function resetConnectionTimeout(socket, shareId) {
+        if (connectionTimeout.has(socket)) {
+            clearTimeout(connectionTimeout.get(socket));
+        }
+        const timeout = setTimeout(() => {
+            console.log(`[WebSocket] Connection timeout, closing: ${shareId}`);
+            socket.terminate();
+        }, CONNECTION_TIMEOUT);
+        connectionTimeout.set(socket, timeout);
+    }
 
     function addClientToRoom(shareId, client) {
         if (!roomMap.has(shareId)) {
@@ -135,10 +160,12 @@ function initShareCollabServer(httpServer, shareManager) {
             viewerId,
             viewerName,
             canEdit: !!shareResult.data.can_edit,
-            contentVersion: shareResult.data.content_version || 1
+            contentVersion: shareResult.data.content_version || 1,
+            lastHeartbeat: Date.now()
         };
 
         addClientToRoom(shareId, socket);
+        resetConnectionTimeout(socket, shareId);
 
         await shareManager.updateSharePresence(shareId, viewerId, viewerName, false, socket.ctx.canEdit);
 
@@ -155,6 +182,7 @@ function initShareCollabServer(httpServer, shareManager) {
         await broadcastPresence(shareId);
 
         socket.on('message', async (rawMessage) => {
+            resetConnectionTimeout(socket, shareId);
             const payload = safeJsonParse(String(rawMessage || ''));
             if (!payload || !payload.type) {
                 socket.send(JSON.stringify({ type: 'error', code: 400, message: 'invalid message' }));
@@ -429,22 +457,38 @@ function initShareCollabServer(httpServer, shareManager) {
             }
         });
 
-        socket.on('close', async () => {
+        socket.on('error', (err) => {
+            console.error('[WebSocket] Connection error:', err);
+            cleanupConnection(socket, shareId);
+        });
+
+        socket.on('close', async (code, reason) => {
+            console.log(`[WebSocket] Connection closed: code=${code}, reason=${reason}`);
             if (socket.ctx && socket.ctx.videoRoomJoined) {
                 getEditableClients(shareId, socket.ctx.viewerId).forEach(client => {
-                    client.send(JSON.stringify({
-                        type: 'video_room_peer_left',
-                        room_id: shareId,
-                        viewer_id: socket.ctx.viewerId,
-                        viewer_name: socket.ctx.viewerName
-                    }));
+                    if (client.readyState === 1) {
+                        client.send(JSON.stringify({
+                            type: 'video_room_peer_left',
+                            room_id: shareId,
+                            viewer_id: socket.ctx.viewerId,
+                            viewer_name: socket.ctx.viewerName
+                        }));
+                    }
                 });
             }
-            removeClientFromRoom(shareId, socket);
             await shareManager.updateSharePresence(shareId, viewerId, viewerName, false, socket.ctx ? socket.ctx.canEdit : false);
             await broadcastPresence(shareId);
+            cleanupConnection(socket, shareId);
         });
     });
+
+    setInterval(() => {
+        for (const [shareId, room] of roomMap.entries()) {
+            if (room.size === 0) {
+                roomMap.delete(shareId);
+            }
+        }
+    }, 60000);
 
     return wss;
 }
