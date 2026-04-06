@@ -2,6 +2,62 @@ const express = require('express');
 const router = express.Router();
 const https = require('https');
 
+function makeAiRequest(requestBody) {
+    return new Promise((resolve, reject) => {
+        const apiKey = process.env.DASHSCOPE_API_KEY;
+        if (!apiKey) {
+            return reject(new Error('AI API Key is not configured'));
+        }
+
+        const options = {
+            hostname: 'dashscope.aliyuncs.com',
+            path: '/api/v1/services/aigc/text-generation/generation',
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`,
+                'Content-Length': Buffer.byteLength(requestBody)
+            },
+            timeout: 30000
+        };
+
+        const chunks = [];
+        let totalSize = 0;
+        const MAX_RESPONSE_SIZE = 10 * 1024 * 1024;
+
+        const apiRequest = https.request(options, (apiRes) => {
+            apiRes.on('data', (chunk) => {
+                totalSize += chunk.length;
+                if (totalSize > MAX_RESPONSE_SIZE) {
+                    apiRequest.destroy(new Error('Response too large'));
+                    return;
+                }
+                chunks.push(chunk);
+            });
+
+            apiRes.on('end', () => {
+                try {
+                    const data = Buffer.concat(chunks).toString('utf8');
+                    const response = JSON.parse(data);
+                    resolve(response);
+                } catch (e) {
+                    reject(new Error('Failed to parse AI response'));
+                }
+            });
+
+            apiRes.on('error', reject);
+        });
+
+        apiRequest.on('error', reject);
+        apiRequest.on('timeout', () => {
+            apiRequest.destroy(new Error('Request timeout'));
+        });
+
+        apiRequest.write(requestBody);
+        apiRequest.end();
+    });
+}
+
 // AI Layout endpoint
 router.post('/layout', async (req, res) => {
     try {
@@ -22,7 +78,6 @@ router.post('/layout', async (req, res) => {
             });
         }
 
-        // Construct system prompt based on style
         const stylePrompts = {
             academic: '请将以下Markdown内容重新排版为学术论文风格。要求：标题清晰分级，段落结构严谨，适当使用加粗强调关键概念。',
             business: '请将以下Markdown内容重新排版为商务公文风格。要求：格式规范，条理清晰，语气正式，重点突出。',
@@ -35,7 +90,6 @@ router.post('/layout', async (req, res) => {
             systemPrompt += '\n额外要求：' + requirements;
         }
 
-        // Call DashScope API
         const requestBody = JSON.stringify({
             model: "qwen-turbo",
             input: {
@@ -55,78 +109,27 @@ router.post('/layout', async (req, res) => {
             }
         });
 
-        const options = {
-            hostname: 'dashscope.aliyuncs.com',
-            path: '/api/v1/services/aigc/text-generation/generation',
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${apiKey}`,
-                'Content-Length': Buffer.byteLength(requestBody)
-            }
-        };
-
-        const apiRequest = https.request(options, (apiRes) => {
-            let data = '';
-            
-            apiRes.on('data', (chunk) => {
-                data += chunk;
+        const response = await makeAiRequest(requestBody);
+        
+        if (response.output && response.output.choices && response.output.choices.length > 0) {
+            const aiContent = response.output.choices[0].message.content;
+            res.json({
+                code: 200,
+                data: aiContent
             });
-            
-            apiRes.on('end', () => {
-                if (apiRes.statusCode >= 200 && apiRes.statusCode < 300) {
-                    try {
-                        const response = JSON.parse(data);
-                        if (response.output && response.output.choices && response.output.choices.length > 0) {
-                            const aiContent = response.output.choices[0].message.content;
-                            res.json({
-                                code: 200,
-                                data: aiContent
-                            });
-                        } else {
-                            console.error('DashScope API unexpected response:', response);
-                            res.status(500).json({
-                                code: 500,
-                                message: 'AI processing failed',
-                                error: response.message || 'Unknown error'
-                            });
-                        }
-                    } catch (e) {
-                        console.error('Failed to parse DashScope response:', e);
-                        res.status(500).json({
-                            code: 500,
-                            message: 'Failed to parse AI response'
-                        });
-                    }
-                } else {
-                    console.error(`DashScope API Error: ${apiRes.statusCode}`, data);
-                    res.status(apiRes.statusCode).json({
-                        code: apiRes.statusCode,
-                        message: 'AI API request failed',
-                        error: data
-                    });
-                }
-            });
-        });
-
-        apiRequest.on('error', (e) => {
-            console.error('DashScope Request Error:', e);
+        } else {
+            console.error('DashScope API unexpected response:', response);
             res.status(500).json({
                 code: 500,
-                message: 'Network error calling AI service',
-                error: e.message
+                message: 'AI processing failed',
+                error: response.message || 'Unknown error'
             });
-        });
-
-        apiRequest.write(requestBody);
-        apiRequest.end();
-
+        }
     } catch (error) {
         console.error('AI Layout error:', error);
         return res.status(500).json({
             code: 500,
-            message: 'Internal server error',
-            error: error.message
+            message: error.message || 'Internal server error'
         });
     }
 });
@@ -151,7 +154,6 @@ router.post('/formula', async (req, res) => {
             });
         }
 
-        // Construct system prompt based on language
         const isEnglish = language === 'en';
         const systemPrompt = isEnglish 
             ? `You are a LaTeX formula expert. Given a user's search keyword, provide relevant LaTeX formulas.
@@ -179,7 +181,6 @@ Provide 5-10 most relevant formulas. Only return the formula list, no explanatio
             ? `Search for LaTeX formulas related to: "${keyword}"`
             : `搜索与"${keyword}"相关的LaTeX公式`;
 
-        // Call DashScope API
         const requestBody = JSON.stringify({
             model: "qwen-turbo",
             input: {
@@ -199,78 +200,27 @@ Provide 5-10 most relevant formulas. Only return the formula list, no explanatio
             }
         });
 
-        const options = {
-            hostname: 'dashscope.aliyuncs.com',
-            path: '/api/v1/services/aigc/text-generation/generation',
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${apiKey}`,
-                'Content-Length': Buffer.byteLength(requestBody)
-            }
-        };
-
-        const apiRequest = https.request(options, (apiRes) => {
-            let data = '';
-            
-            apiRes.on('data', (chunk) => {
-                data += chunk;
+        const response = await makeAiRequest(requestBody);
+        
+        if (response.output && response.output.choices && response.output.choices.length > 0) {
+            const aiContent = response.output.choices[0].message.content;
+            res.json({
+                code: 200,
+                data: aiContent
             });
-            
-            apiRes.on('end', () => {
-                if (apiRes.statusCode >= 200 && apiRes.statusCode < 300) {
-                    try {
-                        const response = JSON.parse(data);
-                        if (response.output && response.output.choices && response.output.choices.length > 0) {
-                            const aiContent = response.output.choices[0].message.content;
-                            res.json({
-                                code: 200,
-                                data: aiContent
-                            });
-                        } else {
-                            console.error('DashScope API unexpected response:', response);
-                            res.status(500).json({
-                                code: 500,
-                                message: 'AI processing failed',
-                                error: response.message || 'Unknown error'
-                            });
-                        }
-                    } catch (e) {
-                        console.error('Failed to parse DashScope response:', e);
-                        res.status(500).json({
-                            code: 500,
-                            message: 'Failed to parse AI response'
-                        });
-                    }
-                } else {
-                    console.error(`DashScope API Error: ${apiRes.statusCode}`, data);
-                    res.status(apiRes.statusCode).json({
-                        code: apiRes.statusCode,
-                        message: 'AI API request failed',
-                        error: data
-                    });
-                }
-            });
-        });
-
-        apiRequest.on('error', (e) => {
-            console.error('DashScope Request Error:', e);
+        } else {
+            console.error('DashScope API unexpected response:', response);
             res.status(500).json({
                 code: 500,
-                message: 'Network error calling AI service',
-                error: e.message
+                message: 'AI processing failed',
+                error: response.message || 'Unknown error'
             });
-        });
-
-        apiRequest.write(requestBody);
-        apiRequest.end();
-
+        }
     } catch (error) {
         console.error('AI Formula Search error:', error);
         return res.status(500).json({
             code: 500,
-            message: 'Internal server error',
-            error: error.message
+            message: error.message || 'Internal server error'
         });
     }
 });
@@ -295,7 +245,6 @@ router.post('/chart', async (req, res) => {
             });
         }
 
-        // Construct system prompt based on language
         const isEnglish = language === 'en';
         const systemPrompt = isEnglish 
             ? `You are a Mermaid chart expert. Given a user's search keyword, generate relevant Mermaid diagram templates.
@@ -339,7 +288,6 @@ sequenceDiagram
             ? `Generate Mermaid chart templates for: "${keyword}"`
             : `生成与"${keyword}"相关的Mermaid图表模板`;
 
-        // Call DashScope API
         const requestBody = JSON.stringify({
             model: "qwen-turbo",
             input: {
@@ -359,78 +307,27 @@ sequenceDiagram
             }
         });
 
-        const options = {
-            hostname: 'dashscope.aliyuncs.com',
-            path: '/api/v1/services/aigc/text-generation/generation',
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${apiKey}`,
-                'Content-Length': Buffer.byteLength(requestBody)
-            }
-        };
-
-        const apiRequest = https.request(options, (apiRes) => {
-            let data = '';
-            
-            apiRes.on('data', (chunk) => {
-                data += chunk;
+        const response = await makeAiRequest(requestBody);
+        
+        if (response.output && response.output.choices && response.output.choices.length > 0) {
+            const aiContent = response.output.choices[0].message.content;
+            res.json({
+                code: 200,
+                data: aiContent
             });
-            
-            apiRes.on('end', () => {
-                if (apiRes.statusCode >= 200 && apiRes.statusCode < 300) {
-                    try {
-                        const response = JSON.parse(data);
-                        if (response.output && response.output.choices && response.output.choices.length > 0) {
-                            const aiContent = response.output.choices[0].message.content;
-                            res.json({
-                                code: 200,
-                                data: aiContent
-                            });
-                        } else {
-                            console.error('DashScope API unexpected response:', response);
-                            res.status(500).json({
-                                code: 500,
-                                message: 'AI processing failed',
-                                error: response.message || 'Unknown error'
-                            });
-                        }
-                    } catch (e) {
-                        console.error('Failed to parse DashScope response:', e);
-                        res.status(500).json({
-                            code: 500,
-                            message: 'Failed to parse AI response'
-                        });
-                    }
-                } else {
-                    console.error(`DashScope API Error: ${apiRes.statusCode}`, data);
-                    res.status(apiRes.statusCode).json({
-                        code: apiRes.statusCode,
-                        message: 'AI API request failed',
-                        error: data
-                    });
-                }
-            });
-        });
-
-        apiRequest.on('error', (e) => {
-            console.error('DashScope Request Error:', e);
+        } else {
+            console.error('DashScope API unexpected response:', response);
             res.status(500).json({
                 code: 500,
-                message: 'Network error calling AI service',
-                error: e.message
+                message: 'AI processing failed',
+                error: response.message || 'Unknown error'
             });
-        });
-
-        apiRequest.write(requestBody);
-        apiRequest.end();
-
+        }
     } catch (error) {
         console.error('AI Chart Search error:', error);
         return res.status(500).json({
             code: 500,
-            message: 'Internal server error',
-            error: error.message
+            message: error.message || 'Internal server error'
         });
     }
 });
@@ -455,7 +352,6 @@ router.post('/generate', async (req, res) => {
             });
         }
 
-        // Call DashScope API
         const requestBody = JSON.stringify({
             model: "qwen-turbo",
             input: {
@@ -475,78 +371,27 @@ router.post('/generate', async (req, res) => {
             }
         });
 
-        const options = {
-            hostname: 'dashscope.aliyuncs.com',
-            path: '/api/v1/services/aigc/text-generation/generation',
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${apiKey}`,
-                'Content-Length': Buffer.byteLength(requestBody)
-            }
-        };
-
-        const apiRequest = https.request(options, (apiRes) => {
-            let data = '';
-
-            apiRes.on('data', (chunk) => {
-                data += chunk;
+        const response = await makeAiRequest(requestBody);
+        
+        if (response.output && response.output.choices && response.output.choices.length > 0) {
+            const aiContent = response.output.choices[0].message.content;
+            res.json({
+                code: 200,
+                data: aiContent
             });
-
-            apiRes.on('end', () => {
-                if (apiRes.statusCode >= 200 && apiRes.statusCode < 300) {
-                    try {
-                        const response = JSON.parse(data);
-                        if (response.output && response.output.choices && response.output.choices.length > 0) {
-                            const aiContent = response.output.choices[0].message.content;
-                            res.json({
-                                code: 200,
-                                data: aiContent
-                            });
-                        } else {
-                            console.error('DashScope API unexpected response:', response);
-                            res.status(500).json({
-                                code: 500,
-                                message: 'AI processing failed',
-                                error: response.message || 'Unknown error'
-                            });
-                        }
-                    } catch (e) {
-                        console.error('Failed to parse DashScope response:', e);
-                        res.status(500).json({
-                            code: 500,
-                            message: 'Failed to parse AI response'
-                        });
-                    }
-                } else {
-                    console.error(`DashScope API Error: ${apiRes.statusCode}`, data);
-                    res.status(apiRes.statusCode).json({
-                        code: apiRes.statusCode,
-                        message: 'AI API request failed',
-                        error: data
-                    });
-                }
-            });
-        });
-
-        apiRequest.on('error', (e) => {
-            console.error('DashScope Request Error:', e);
+        } else {
+            console.error('DashScope API unexpected response:', response);
             res.status(500).json({
                 code: 500,
-                message: 'Network error calling AI service',
-                error: e.message
+                message: 'AI processing failed',
+                error: response.message || 'Unknown error'
             });
-        });
-
-        apiRequest.write(requestBody);
-        apiRequest.end();
-
+        }
     } catch (error) {
         console.error('AI Generate error:', error);
         return res.status(500).json({
             code: 500,
-            message: 'Internal server error',
-            error: error.message
+            message: error.message || 'Internal server error'
         });
     }
 });
@@ -563,7 +408,6 @@ router.post('/markdown', async (req, res) => {
             });
         }
 
-        // 检查关键词长度（最多10个字）
         if (keyword.length > 10) {
             return res.status(400).json({
                 code: 400,
@@ -579,7 +423,6 @@ router.post('/markdown', async (req, res) => {
             });
         }
 
-        // Construct system prompt based on language
         const isEnglish = language === 'en';
         const systemPrompt = isEnglish
             ? `You are a Markdown expert. Given a user's search keyword, provide relevant Markdown code examples.
@@ -611,7 +454,6 @@ Provide 5-10 most relevant Markdown examples. Only return the list, no explanati
             ? `Search for Markdown code examples related to: "${keyword}"`
             : `搜索与"${keyword}"相关的Markdown代码示例`;
 
-        // Call DashScope API
         const requestBody = JSON.stringify({
             model: "qwen-turbo",
             input: {
@@ -631,78 +473,27 @@ Provide 5-10 most relevant Markdown examples. Only return the list, no explanati
             }
         });
 
-        const options = {
-            hostname: 'dashscope.aliyuncs.com',
-            path: '/api/v1/services/aigc/text-generation/generation',
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${apiKey}`,
-                'Content-Length': Buffer.byteLength(requestBody)
-            }
-        };
-
-        const apiRequest = https.request(options, (apiRes) => {
-            let data = '';
-
-            apiRes.on('data', (chunk) => {
-                data += chunk;
+        const response = await makeAiRequest(requestBody);
+        
+        if (response.output && response.output.choices && response.output.choices.length > 0) {
+            const aiContent = response.output.choices[0].message.content;
+            res.json({
+                code: 200,
+                data: aiContent
             });
-
-            apiRes.on('end', () => {
-                if (apiRes.statusCode >= 200 && apiRes.statusCode < 300) {
-                    try {
-                        const response = JSON.parse(data);
-                        if (response.output && response.output.choices && response.output.choices.length > 0) {
-                            const aiContent = response.output.choices[0].message.content;
-                            res.json({
-                                code: 200,
-                                data: aiContent
-                            });
-                        } else {
-                            console.error('DashScope API unexpected response:', response);
-                            res.status(500).json({
-                                code: 500,
-                                message: 'AI processing failed',
-                                error: response.message || 'Unknown error'
-                            });
-                        }
-                    } catch (e) {
-                        console.error('Failed to parse DashScope response:', e);
-                        res.status(500).json({
-                            code: 500,
-                            message: 'Failed to parse AI response'
-                        });
-                    }
-                } else {
-                    console.error(`DashScope API Error: ${apiRes.statusCode}`, data);
-                    res.status(apiRes.statusCode).json({
-                        code: apiRes.statusCode,
-                        message: 'AI API request failed',
-                        error: data
-                    });
-                }
-            });
-        });
-
-        apiRequest.on('error', (e) => {
-            console.error('DashScope Request Error:', e);
+        } else {
+            console.error('DashScope API unexpected response:', response);
             res.status(500).json({
                 code: 500,
-                message: 'Network error calling AI service',
-                error: e.message
+                message: 'AI processing failed',
+                error: response.message || 'Unknown error'
             });
-        });
-
-        apiRequest.write(requestBody);
-        apiRequest.end();
-
+        }
     } catch (error) {
         console.error('AI Markdown Search error:', error);
         return res.status(500).json({
             code: 500,
-            message: 'Internal server error',
-            error: error.message
+            message: error.message || 'Internal server error'
         });
     }
 });

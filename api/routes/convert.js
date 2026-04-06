@@ -98,6 +98,9 @@ router.post('/markdown', (req, res) => {
 });
 
 router.post('/pdf', (req, res) => {
+    let writeStream = null;
+    let pdfStream = null;
+    
     try {
         let { html, settings } = req.body;
         
@@ -127,22 +130,46 @@ router.post('/pdf', (req, res) => {
             marginLeft: settings?.pageMargin ? `${settings.pageMargin}mm` : '15mm',
             marginRight: settings?.pageMargin ? `${settings.pageMargin}mm` : '15mm',
             printMediaType: true,
-            enableLocalFileAccess: true, // Needed for local images if any
+            enableLocalFileAccess: true,
             encoding: 'UTF-8'
         };
 
+        writeStream = fs.createWriteStream(filePath);
+        pdfStream = wkhtmltopdf(html, options);
         
-        const writeStream = fs.createWriteStream(filePath);
-        
-        
-        const pdfStream = wkhtmltopdf(html, options);
-        
+        const cleanup = () => {
+            if (pdfStream) {
+                pdfStream.destroy();
+                pdfStream = null;
+            }
+            if (writeStream) {
+                writeStream.destroy();
+                writeStream = null;
+            }
+        };
+
         pdfStream.on('error', (err) => {
             console.error('[PDF Debug] wkhtmltopdf command error:', err);
+            cleanup();
             if (!res.headersSent) {
                 res.status(500).json({
                     code: 500,
                     message: 'PDF generation failed (command error)',
+                    error: err.message
+                });
+            }
+            if (fs.existsSync(filePath)) {
+                fs.unlink(filePath, () => {});
+            }
+        });
+
+        writeStream.on('error', (err) => {
+            console.error('[PDF Debug] writeStream error:', err);
+            cleanup();
+            if (!res.headersSent) {
+                res.status(500).json({
+                    code: 500,
+                    message: 'PDF generation failed (stream error)',
                     error: err.message
                 });
             }
@@ -162,6 +189,8 @@ router.post('/pdf', (req, res) => {
                         }
                     } else {
                         console.error('[PDF Debug] PDF generation failed: file is empty');
+                        cleanup();
+                        fs.unlink(filePath, () => {});
                         if (!res.headersSent) {
                             res.status(500).json({
                                 code: 500,
@@ -171,6 +200,7 @@ router.post('/pdf', (req, res) => {
                     }
                 } else {
                     console.error('[PDF Debug] PDF generation failed: file not found');
+                    cleanup();
                     if (!res.headersSent) {
                         res.status(500).json({
                             code: 500,
@@ -178,20 +208,29 @@ router.post('/pdf', (req, res) => {
                         });
                     }
                 }
-            })
-            .on('error', (err) => {
-                console.error('[PDF Debug] writeStream error:', err);
-                if (!res.headersSent) {
-                    res.status(500).json({
-                        code: 500,
-                        message: 'PDF generation failed (stream error)',
-                        error: err.message
-                    });
-                }
             });
+
+        const timeout = setTimeout(() => {
+            if (!res.headersSent) {
+                cleanup();
+                if (fs.existsSync(filePath)) {
+                    fs.unlink(filePath, () => {});
+                }
+                res.status(504).json({
+                    code: 504,
+                    message: 'PDF generation timeout'
+                });
+            }
+        }, 120000);
+
+        res.on('finish', () => {
+            clearTimeout(timeout);
+        });
 
     } catch (error) {
         console.error('PDF conversion endpoint error:', error);
+        if (writeStream) writeStream.destroy();
+        if (pdfStream) pdfStream.destroy();
         return res.status(500).json({
             code: 500,
             message: 'Server error during PDF conversion',
