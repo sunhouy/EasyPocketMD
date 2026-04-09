@@ -554,7 +554,9 @@
         } else {
             showLoginModal();
         }
-        e.stopPropagation();
+        if (e && typeof e.stopPropagation === 'function') {
+            e.stopPropagation();
+        }
     }
 
     global.showUserInfo = showUserInfo;
