@@ -12,6 +12,8 @@
     let tokenRecoveryInProgress = false;
     let lastTokenRecoveryAt = 0;
     const browserFileHandleMap = new Map();
+    const localExternalSnapshotMap = new Map();
+    const localExternalConflictPrompting = new Set();
 
     function isTokenErrorMessage(message) {
         if (!message) return false;
@@ -85,6 +87,7 @@
     if (!global.pendingServerSync) {
         global.pendingServerSync = loadPendingServerSync();
     }
+    startExternalLocalConflictMonitor();
 
     // ---------- 共享在线文档（所有者视角） ----------
     let ownerShareCache = { updatedAt: 0, byFilename: {} };
@@ -175,32 +178,15 @@
 
     // ---------- 辅助函数：路径处理 ----------
     function normalizePath(input) {
-        let path = input.trim();
-        if (path.startsWith('/')) {
-            path = path.substring(1);
-        }
-        if (path.endsWith('.md')) {
-            path = path.substring(0, path.length - 3);
-        } else if (path.endsWith('.txt')) {
-            path = path.substring(0, path.length - 4);
-        } else if (path.endsWith('.markdown')) {
-            path = path.substring(0, path.length - 9);
-        }
-        return path;
+        return global.wasmTextEngineGateway.normalizePath(input || '');
     }
 
     function getParentPath(path) {
-        if (!path) return '';
-        const lastSlash = path.lastIndexOf('/');
-        if (lastSlash === -1) return '';
-        return path.substring(0, lastSlash);
+        return global.wasmTextEngineGateway.parentPath(path || '');
     }
 
     function getBasename(path) {
-        if (!path) return '';
-        const lastSlash = path.lastIndexOf('/');
-        if (lastSlash === -1) return path;
-        return path.substring(lastSlash + 1);
+        return global.wasmTextEngineGateway.basenamePath(path || '');
     }
 
     function ensureParentFolders(path) {
@@ -267,9 +253,7 @@
     }
 
     function getPathBasename(filePath) {
-        if (!filePath) return '';
-        const parts = String(filePath).split(/[/\\]/);
-        return parts[parts.length - 1] || filePath;
+        return global.wasmTextEngineGateway.pathBasename(filePath || '');
     }
 
     function createBrowserLocalPath(fileName) {
@@ -336,6 +320,165 @@
             URL.revokeObjectURL(url);
             if (link.parentNode) link.parentNode.removeChild(link);
         }, 0);
+    }
+
+    function isLikelyBrowserWritePermissionError(error) {
+        if (!error) return false;
+        const name = String(error.name || '');
+        const message = String(error.message || '');
+        return name === 'NotAllowedError' ||
+            name === 'SecurityError' ||
+            name === 'NoModificationAllowedError' ||
+            message.includes('permission') ||
+            message.includes('denied');
+    }
+
+    async function requestBrowserWriteHandle() {
+        if (typeof global.showOpenFilePicker !== 'function') return null;
+        try {
+            const handles = await global.showOpenFilePicker({
+                multiple: false,
+                types: [{
+                    description: 'Markdown',
+                    accept: {
+                        'text/markdown': ['.md', '.markdown'],
+                        'text/plain': ['.txt']
+                    }
+                }]
+            });
+            return handles && handles[0] ? handles[0] : null;
+        } catch (error) {
+            if (error && error.name === 'AbortError') return null;
+            throw error;
+        }
+    }
+
+    async function writeBrowserLocalFileWithRetry(fileId, content) {
+        let handle = browserFileHandleMap.get(fileId);
+        if (!handle) {
+            handle = await requestBrowserWriteHandle();
+            if (!handle) return { success: false, canceled: true };
+            browserFileHandleMap.set(fileId, handle);
+        }
+
+        try {
+            const writable = await handle.createWritable();
+            await writable.write(content);
+            await writable.close();
+            localExternalSnapshotMap.set(fileId, content);
+            return { success: true };
+        } catch (error) {
+            if (!isLikelyBrowserWritePermissionError(error)) {
+                return { success: false, error: error };
+            }
+
+            global.showMessage(t('localFileNeedReauthorize'), 'warning');
+            const reauthorizedHandle = await requestBrowserWriteHandle();
+            if (!reauthorizedHandle) return { success: false, canceled: true };
+            browserFileHandleMap.set(fileId, reauthorizedHandle);
+
+            try {
+                const writable = await reauthorizedHandle.createWritable();
+                await writable.write(content);
+                await writable.close();
+                localExternalSnapshotMap.set(fileId, content);
+                return { success: true, reauthorized: true };
+            } catch (retryError) {
+                return { success: false, error: retryError };
+            }
+        }
+    }
+
+    async function syncFileAfterSaveIfNeeded(currentFileId, file, content, isManual, contentChanged) {
+        if (!g('currentUser')) {
+            g('lastSyncedContent')[currentFileId] = content;
+            return;
+        }
+        markPendingServerSync(currentFileId, true);
+        try {
+            const saveResult = await global.syncFileToServer(currentFileId);
+            if (isManual && contentChanged && saveResult) {
+                try { await global.createHistoryVersion(file.name, content); } catch (e) { console.warn('创建历史版本失败', e); }
+            }
+            if (saveResult) markPendingServerSync(currentFileId, false);
+        } catch (e) {
+            // 保持 pending
+        }
+    }
+
+    async function readExternalSourceContent(file, fileId) {
+        if (!file || !file.isExternalLocal) return null;
+
+        if (global.electron && file.localFilePath && typeof global.electron.readLocalFile === 'function') {
+            const result = await global.electron.readLocalFile(file.localFilePath);
+            if (!result || !result.success) return null;
+            return result.content || '';
+        }
+
+        if (file.localFileMode === 'browser-fsa') {
+            const handle = browserFileHandleMap.get(fileId);
+            if (!handle || typeof handle.getFile !== 'function') return null;
+            const browserFile = await handle.getFile();
+            return await readTextFromBrowserFile(browserFile);
+        }
+
+        return null;
+    }
+
+    async function checkExternalLocalConflictForCurrentFile() {
+        const currentFileId = g('currentFileId');
+        if (!currentFileId) return;
+        if (localExternalConflictPrompting.has(currentFileId)) return;
+
+        const files = g('files');
+        const file = files.find(function(f) { return f.id === currentFileId && f.type === 'file'; });
+        if (!file || !file.isExternalLocal) return;
+        if (g('unsavedChanges')[currentFileId]) return;
+
+        if (!localExternalSnapshotMap.has(currentFileId)) {
+            localExternalSnapshotMap.set(currentFileId, file.content || '');
+            return;
+        }
+
+        let latestExternalContent;
+        try {
+            latestExternalContent = await readExternalSourceContent(file, currentFileId);
+        } catch (error) {
+            return;
+        }
+        if (latestExternalContent == null) return;
+
+        const baselineContent = localExternalSnapshotMap.get(currentFileId);
+        if (latestExternalContent === baselineContent) return;
+
+        localExternalConflictPrompting.add(currentFileId);
+        try {
+            const useExternal = await g('customConfirm')(t('externalFileModifiedConfirm'));
+            if (useExternal) {
+                file.content = latestExternalContent;
+                file.lastModified = Date.now();
+                localStorage.setItem('vditor_files', JSON.stringify(files));
+                if (g('vditor')) g('vditor').setValue(latestExternalContent);
+                g('unsavedChanges')[currentFileId] = false;
+                localExternalSnapshotMap.set(currentFileId, latestExternalContent);
+                loadFiles();
+                global.showMessage(t('externalFileReloaded'), 'warning');
+                await syncFileAfterSaveIfNeeded(currentFileId, file, latestExternalContent, false, true);
+            } else {
+                // 用户拒绝覆盖时更新快照，避免重复弹窗。
+                localExternalSnapshotMap.set(currentFileId, latestExternalContent);
+                global.showMessage(t('externalFileModified'), 'warning');
+            }
+        } finally {
+            localExternalConflictPrompting.delete(currentFileId);
+        }
+    }
+
+    function startExternalLocalConflictMonitor() {
+        if (global.externalLocalConflictInterval) return;
+        global.externalLocalConflictInterval = setInterval(function() {
+            checkExternalLocalConflictForCurrentFile().catch(function() {});
+        }, 4000);
     }
 
     async function openExternalLocalFileInBrowser() {
@@ -435,6 +578,7 @@
         if (fileData.browserFileHandle) {
             browserFileHandleMap.set(target.id, fileData.browserFileHandle);
         }
+        localExternalSnapshotMap.set(target.id, target.content || '');
 
         localStorage.setItem('vditor_files', JSON.stringify(files));
         g('lastSyncedContent')[target.id] = target.content;
@@ -455,24 +599,13 @@
 
     // 获取所有可用目标文件夹（包含虚拟中间文件夹）
     function getAllFolderPaths() {
-        const folderSet = new Set(['']); // 根目录
-        const files = g('files');
-        files.forEach(f => {
-            if (f.type === 'folder') {
-                folderSet.add(f.name);
-            }
-            // 对于象文件，提取其所有的父路径作为文件夹
-            if (f.type === 'file') {
-                let path = f.name;
-                while (path.includes('/')) {
-                    const parent = getParentPath(path);
-                    if (!parent) break;
-                    folderSet.add(parent);
-                    path = parent;
-                }
-            }
-        });
-        return Array.from(folderSet).sort((a, b) => a.localeCompare(b));
+        const files = g('files') || [];
+        const payload = files.map(function(file) {
+            const type = file && file.type ? String(file.type) : '';
+            const name = file && file.name ? String(file.name).replace(/[\n\t]/g, ' ') : '';
+            return type + '\t' + name;
+        }).join('\n');
+        return global.wasmTextEngineGateway.collectFolderPaths(payload);
     }
 
     // ---------- 服务器同步相关 ----------
@@ -922,12 +1055,11 @@
      * 返回格式：[{type: 'same'|'added'|'removed', left: string, right: string}]
      */
     function computeDiff(leftText, rightText) {
-        const gateway = global.wasmTextEngineGateway;
-        if (!gateway || typeof gateway.diff !== 'function') {
-            return [];
+        const wasmDiff = global.wasmTextEngineGateway.diff(leftText, rightText);
+        if (!Array.isArray(wasmDiff)) {
+            throw new Error('WASM diff returned invalid data');
         }
-        const wasmDiff = gateway.diff(leftText, rightText);
-        return Array.isArray(wasmDiff) ? wasmDiff : [];
+        return wasmDiff;
     }
 
     function renderSameDiffRowHTML(leftLineNo, rightLineNo, leftText, rightText, extraClass, expandedFromId) {
@@ -1173,10 +1305,6 @@
         }
 
         const gateway = global.wasmTextEngineGateway;
-        if (!gateway || typeof gateway.merge3 !== 'function') {
-            global.showMessage(isEn() ? 'Smart merge is unavailable' : '智能合并功能不可用', 'error');
-            return;
-        }
 
         const files = g('files') || [];
         const matched = files.find(function(f) {
@@ -1406,11 +1534,8 @@
                 } else if (selection.value === 'merge') {
                     const localFile = localFiles.find(function(f) { return f.name === conflict.filename; });
                     const baseText = localFile && localFile.id ? (g('lastSyncedContent')[localFile.id] || '') : '';
-                    const gateway = global.wasmTextEngineGateway;
-                    const mergeRes = gateway && typeof gateway.merge3 === 'function'
-                        ? gateway.merge3(baseText, conflict.localContent || '', conflict.serverContent || '', 'manual')
-                        : null;
-                    const mergedText = mergeRes && mergeRes.code === 200 && mergeRes.data ? (mergeRes.data.mergedText || '') : (conflict.localContent || '');
+                    const mergeRes = global.wasmTextEngineGateway.merge3(baseText, conflict.localContent || '', conflict.serverContent || '', 'manual');
+                    const mergedText = mergeRes.data.mergedText || '';
 
                     const serverFileIndex = serverFiles.findIndex(function(f) { return f.name === conflict.filename; });
                     if (serverFileIndex !== -1) {
@@ -2262,19 +2387,11 @@
     }
 
     function isHiddenCrossSearchFile(filename) {
-        const name = String(filename || '').trim();
-        if (!name) return false;
-        return /(^|[\\/])\.[^\\/]/.test(name);
+        return global.wasmTextEngineGateway.isHiddenCrossSearchFile(filename || '');
     }
 
     function getKnowledgeGraphGateway() {
-        const gateway = global.wasmTextEngineGateway;
-        if (!gateway) return null;
-        if (typeof gateway.ensureReady !== 'function') return null;
-        if (typeof gateway.findInText !== 'function') return null;
-        if (typeof gateway.similarity !== 'function') return null;
-        if (typeof gateway.extractTags !== 'function') return null;
-        return gateway;
+        return global.wasmTextEngineGateway;
     }
 
     function isKnowledgeGraphPanelVisible() {
@@ -3106,6 +3223,7 @@
         if (g('vditor')) g('vditor').setValue(content);
 
         await activateOwnerSharedSession(file, content);
+        await checkExternalLocalConflictForCurrentFile();
 
         expandActiveFile();
         global.startAutoSave();
@@ -3214,44 +3332,42 @@
             global.draftRecovery.clearDraft();
         }
 
-        // Electron 本地文件：直接回写原始文件路径，不走服务器同步
+        // Electron 本地文件：优先回写原始文件路径，再同步云端
         if (file.isExternalLocal && file.localFilePath && global.electron && typeof global.electron.writeLocalFile === 'function') {
             const writeResult = await global.electron.writeLocalFile(file.localFilePath, content);
             if (!writeResult || !writeResult.success) {
                 global.showMessage((isEn() ? 'Failed to save local file: ' : '保存本地文件失败：') + ((writeResult && writeResult.error) || ''), 'error');
                 return;
             }
-            g('lastSyncedContent')[currentFileId] = content;
+            localExternalSnapshotMap.set(currentFileId, content);
             g('unsavedChanges')[currentFileId] = false;
             if (isManual) {
                 global.showMessage(t('localFileSaved'), 'success');
             }
+            await syncFileAfterSaveIfNeeded(currentFileId, file, content, isManual, contentChanged);
             return;
         }
 
         // 浏览器本地文件（File System Access API）：有写权限时直接回写
         if (file.isExternalLocal && file.localFileMode === 'browser-fsa') {
-            const handle = browserFileHandleMap.get(currentFileId);
-            if (handle && typeof handle.createWritable === 'function') {
-                try {
-                    const writable = await handle.createWritable();
-                    await writable.write(content);
-                    await writable.close();
-                    g('lastSyncedContent')[currentFileId] = content;
-                    g('unsavedChanges')[currentFileId] = false;
-                    if (isManual) {
-                        global.showMessage(t('localFileSaved'), 'success');
-                    }
-                } catch (error) {
-                    global.showMessage((isEn() ? 'Failed to save local file: ' : '保存本地文件失败：') + (error && error.message ? error.message : ''), 'error');
+            const writeResult = await writeBrowserLocalFileWithRetry(currentFileId, content);
+            if (writeResult && writeResult.success) {
+                g('unsavedChanges')[currentFileId] = false;
+                if (isManual) {
+                    global.showMessage(t('localFileSaved'), 'success');
                 }
+                await syncFileAfterSaveIfNeeded(currentFileId, file, content, isManual, contentChanged);
             } else {
+                if (writeResult && writeResult.error && !writeResult.canceled) {
+                    global.showMessage((isEn() ? 'Failed to save local file: ' : '保存本地文件失败：') + (writeResult.error.message || ''), 'error');
+                }
                 downloadLocalContent(file.name, content);
-                g('lastSyncedContent')[currentFileId] = content;
+                localExternalSnapshotMap.set(currentFileId, content);
                 g('unsavedChanges')[currentFileId] = false;
                 if (isManual) {
                     global.showMessage(t('localFileSavedAsDownload'), 'warning');
                 }
+                await syncFileAfterSaveIfNeeded(currentFileId, file, content, isManual, contentChanged);
             }
             return;
         }
@@ -3259,27 +3375,16 @@
         // 浏览器 input 打开的文件无法直接写回，回退为下载
         if (file.isExternalLocal && file.localFileMode === 'browser-file') {
             downloadLocalContent(file.name, content);
-            g('lastSyncedContent')[currentFileId] = content;
+            localExternalSnapshotMap.set(currentFileId, content);
             g('unsavedChanges')[currentFileId] = false;
             if (isManual) {
                 global.showMessage(t('localFileSavedAsDownload'), 'warning');
             }
+            await syncFileAfterSaveIfNeeded(currentFileId, file, content, isManual, contentChanged);
             return;
         }
 
-        if (g('currentUser')) {
-            // 保存即触发服务器同步；失败则保留 pending 标记，稍后会自动补齐同步
-            markPendingServerSync(currentFileId, true);
-            try {
-                const saveResult = await global.syncFileToServer(currentFileId);
-                if (isManual && contentChanged && saveResult) {
-                    try { await global.createHistoryVersion(file.name, content); } catch (e) { console.warn('创建历史版本失败', e); }
-                }
-                if (saveResult) markPendingServerSync(currentFileId, false);
-            } catch (e) {
-                // 保持 pending
-            }
-        }
+        await syncFileAfterSaveIfNeeded(currentFileId, file, content, isManual, contentChanged);
     }
 
     async function createHistoryVersion(filename, content) {
@@ -3769,20 +3874,6 @@
         }
     }
 
-    function highlightMarkdown(content) {
-        var html = content.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
-        html = html.replace(/^(#{1,6})\s+(.+)$/gm, function(match, hashes, text) {
-            var level = hashes.length;
-            var color = ['#e74c3c', '#e67e22', '#f1c40f', '#2ecc71', '#3498db', '#9b59b6'][level - 1];
-            return '<span style="color: ' + color + '; font-weight: bold;">' + hashes + ' ' + text + '</span>';
-        });
-        html = html.replace(/\*\*(.+?)\*\*/g, '<strong style="color: #e74c3c;">$1</strong>');
-        html = html.replace(/\*(.+?)\*/g, '<em style="color: #e67e22;">$1</em>');
-        html = html.replace(/`([^`]+)`/g, '<code style="background: #f0f0f0; padding: 2px 4px; border-radius: 3px; color: #c7254e;">$1</code>');
-        html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" style="color: #4a90e2;">$1</a>');
-        return html.replace(/\n/g, '<br>');
-    }
-
     function previewHistoryVersion(filename, versionId, content, timestamp) {
         const diffModal = document.getElementById('diffModalOverlay');
         const diffContent = document.getElementById('diffContent');
@@ -3863,17 +3954,20 @@
     }
 
     function compareVersions(originalContent, newContent) {
-        if (originalContent === newContent) return { hasChanges: false, message: isEn() ? 'Content is identical' : '内容完全相同' };
-        var originalLines = originalContent.split('\n');
-        var newLines = newContent.split('\n');
-        var maxLines = Math.max(originalLines.length, newLines.length);
-        var added = 0, removed = 0, changed = 0;
-        for (var i = 0; i < maxLines; i++) {
-            if (i >= originalLines.length) added++;
-            else if (i >= newLines.length) removed++;
-            else if (originalLines[i] !== newLines[i]) changed++;
+        var stats = global.wasmTextEngineGateway.compareVersions(originalContent || '', newContent || '');
+        if (!stats || !stats.hasChanges) {
+            return { hasChanges: false, message: isEn() ? 'Content is identical' : '内容完全相同', added: 0, removed: 0, changed: 0 };
         }
-        return { hasChanges: true, message: (isEn() ? 'Line changes: added ' : '行数变化: 新增 ') + added + (isEn() ? ' lines, removed ' : ' 行，删除 ') + removed + (isEn() ? ' lines, modified ' : ' 行，修改 ') + changed + (isEn() ? ' lines' : ' 行'), added: added, removed: removed, changed: changed };
+        var added = Number(stats.added || 0);
+        var removed = Number(stats.removed || 0);
+        var changed = Number(stats.changed || 0);
+        return {
+            hasChanges: true,
+            message: (isEn() ? 'Line changes: added ' : '行数变化: 新增 ') + added + (isEn() ? ' lines, removed ' : ' 行，删除 ') + removed + (isEn() ? ' lines, modified ' : ' 行，修改 ') + changed + (isEn() ? ' lines' : ' 行'),
+            added: added,
+            removed: removed,
+            changed: changed
+        };
     }
 
     async function restoreFromHistory(filename, versionId, content, fileId) {
@@ -4705,178 +4799,7 @@
         const shouldAutoFocusFindInput = !/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
         const gateway = global.wasmTextEngineGateway;
-        const smartEngineAvailable = gateway && typeof gateway.ensureReady === 'function';
         if (wasmSearchPanel) wasmSearchPanel.style.display = 'block';
-
-        function normalizeForSearch(text, caseSensitive) {
-            const source = String(text || '');
-            return caseSensitive ? source : source.toLocaleLowerCase();
-        }
-
-        function jsFindInText(text, query, options) {
-            const sourceText = String(text || '');
-            const keyword = String(query || '');
-            if (!keyword) return { code: 200, message: 'ok', data: { query: '', count: 0, matches: [] } };
-            const opts = options || {};
-            const source = normalizeForSearch(sourceText, !!opts.caseSensitive);
-            const needle = normalizeForSearch(keyword, !!opts.caseSensitive);
-            const out = [];
-            let startAt = 0;
-            while (startAt <= source.length) {
-                const idx = source.indexOf(needle, startAt);
-                if (idx === -1) break;
-                const end = idx + keyword.length;
-                out.push({
-                    start: idx,
-                    end: end,
-                    snippet: sourceText.slice(Math.max(0, idx - 30), Math.min(sourceText.length, end + 30))
-                });
-                startAt = idx + Math.max(1, keyword.length);
-            }
-            return { code: 200, message: 'ok', data: { query: keyword, count: out.length, matches: out } };
-        }
-
-        function isHiddenCrossSearchFile(filename) {
-            const name = String(filename || '').trim();
-            if (!name) return false;
-            return /(^|[\\/])\.[^\\/]/.test(name);
-        }
-
-        function filterCrossSearchVisibleData(data) {
-            const rows = (data && Array.isArray(data.files)) ? data.files : [];
-            const visibleRows = [];
-            let totalMatches = 0;
-
-            rows.forEach(function(item) {
-                if (!item || isHiddenCrossSearchFile(item.filename)) return;
-                const hits = Array.isArray(item.hits) ? item.hits : [];
-                const matchCount = hits.length;
-                totalMatches += matchCount;
-                visibleRows.push({
-                    docId: item.docId,
-                    filename: item.filename || '',
-                    matchCount: matchCount,
-                    hits: hits
-                });
-            });
-
-            return {
-                query: data && data.query ? data.query : '',
-                files: visibleRows,
-                fileCount: visibleRows.length,
-                totalMatches: totalMatches
-            };
-        }
-
-        function jsSearchFilesDetailed(query, options) {
-            const rows = [];
-            let totalMatches = 0;
-            (g('files') || []).forEach(function(file) {
-                if (!file || file.type !== 'file') return;
-                if (isHiddenCrossSearchFile(file.name)) return;
-                const res = jsFindInText(file.content || '', query || '', options || {});
-                const list = res && res.data && Array.isArray(res.data.matches) ? res.data.matches : [];
-                if (list.length === 0) return;
-                const hits = list.map(function(hit, index) {
-                    return { index: index, start: hit.start, end: hit.end, snippet: hit.snippet || '' };
-                });
-                totalMatches += hits.length;
-                rows.push({ docId: String(file.id), filename: file.name || '', matchCount: hits.length, hits: hits });
-            });
-            return { code: 200, message: 'ok', data: { query: query || '', files: rows, fileCount: rows.length, totalMatches: totalMatches } };
-        }
-
-        async function smartFindInText(text, query, options) {
-            if (smartEngineAvailable) {
-                const readyRes = await gateway.ensureReady();
-                if (readyRes && readyRes.code === 200) {
-                    const engineRes = gateway.findInText(text || '', query || '', options || {});
-                    if (engineRes && engineRes.code === 200 && engineRes.data && Array.isArray(engineRes.data.matches)) {
-                        console.info('[cross-search] findInText handled by wasm', {
-                            query: query || '',
-                            count: engineRes.data.matches.length
-                        });
-                        return engineRes;
-                    }
-                    console.warn('[cross-search] findInText wasm returned invalid result, fallback to js', {
-                        query: query || '',
-                        code: engineRes && engineRes.code,
-                        message: engineRes && engineRes.message
-                    });
-                } else {
-                    console.warn('[cross-search] findInText wasm not ready, fallback to js', {
-                        query: query || '',
-                        code: readyRes && readyRes.code,
-                        message: readyRes && readyRes.message
-                    });
-                }
-            } else {
-                console.info('[cross-search] findInText wasm unavailable, using js fallback', { query: query || '' });
-            }
-            const fallbackRes = jsFindInText(text || '', query || '', options || {});
-            console.info('[cross-search] findInText handled by js fallback', {
-                query: query || '',
-                count: fallbackRes && fallbackRes.data ? (fallbackRes.data.count || 0) : 0
-            });
-            return fallbackRes;
-        }
-
-        async function smartSearchFilesDetailed(query, options) {
-            if (smartEngineAvailable) {
-                const readyRes = await gateway.ensureReady();
-                if (readyRes && readyRes.code === 200) {
-                    const engineRes = gateway.searchFilesDetailed(query || '', options || {});
-                    if (engineRes && engineRes.code === 200 && engineRes.data) {
-                        console.info('[cross-search] searchFilesDetailed handled by wasm', {
-                            query: query || '',
-                            fileCount: engineRes.data.fileCount || 0,
-                            totalMatches: engineRes.data.totalMatches || 0
-                        });
-                        return engineRes;
-                    }
-                    console.warn('[cross-search] searchFilesDetailed wasm returned invalid result, fallback to js', {
-                        query: query || '',
-                        code: engineRes && engineRes.code,
-                        message: engineRes && engineRes.message
-                    });
-                } else {
-                    console.warn('[cross-search] searchFilesDetailed wasm not ready, fallback to js', {
-                        query: query || '',
-                        code: readyRes && readyRes.code,
-                        message: readyRes && readyRes.message
-                    });
-                }
-            } else {
-                console.info('[cross-search] searchFilesDetailed wasm unavailable, using js fallback', { query: query || '' });
-            }
-            const fallbackRes = jsSearchFilesDetailed(query || '', options || {});
-            console.info('[cross-search] searchFilesDetailed handled by js fallback', {
-                query: query || '',
-                fileCount: fallbackRes.data ? (fallbackRes.data.fileCount || 0) : 0,
-                totalMatches: fallbackRes.data ? (fallbackRes.data.totalMatches || 0) : 0
-            });
-            return fallbackRes;
-        }
-
-        async function smartReplaceAll(text, query, replacement, options) {
-            if (smartEngineAvailable) {
-                const readyRes = await gateway.ensureReady();
-                if (readyRes && readyRes.code === 200) {
-                    const engineRes = gateway.replaceAllText(text || '', query || '', replacement || '', options || {});
-                    if (engineRes && engineRes.code === 200 && engineRes.data) return engineRes;
-                }
-            }
-            const sourceText = String(text || '');
-            const keyword = String(query || '');
-            if (!keyword) return { code: 200, message: 'ok', data: { text: sourceText, replaced: 0 } };
-            const findRes = jsFindInText(sourceText, keyword, options || {});
-            const count = findRes && findRes.data ? (findRes.data.count || 0) : 0;
-            if (count === 0) return { code: 200, message: 'ok', data: { text: sourceText, replaced: 0 } };
-            const caseSensitive = !!(options && options.caseSensitive);
-            const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-            const flags = caseSensitive ? 'g' : 'gi';
-            return { code: 200, message: 'ok', data: { text: sourceText.replace(new RegExp(escaped, flags), replacement || ''), replaced: count } };
-        }
 
         function getCurrentEditorText() {
             const vditor = g('vditor');
@@ -4909,8 +4832,12 @@
                 return;
             }
 
-            // In-file navigation uses editor-visible text so selection/highlight stays accurate in all Vditor modes.
-            matches = findMatchesInVisibleText(searchText);
+            const readyRes = await gateway.ensureReady();
+            if (!readyRes || readyRes.code !== 200) {
+                throw new Error((readyRes && readyRes.message) || (isEn() ? 'WASM search unavailable' : 'WASM 搜索不可用'));
+            }
+            const res = gateway.findInText(getCurrentEditorText(), searchText, { caseSensitive: false });
+            matches = (res && res.code === 200 && res.data && Array.isArray(res.data.matches)) ? res.data.matches : [];
             if (matches.length === 0) {
                 findStatus.textContent = isEn() ? 'No matches found' : '未找到匹配内容';
                 findStatus.style.color = '#dc3545';
@@ -4926,16 +4853,16 @@
 
         function renderWasmSearchResults(data) {
             if (!wasmSearchResults) return;
-            const visibleData = filterCrossSearchVisibleData(data || {});
-            const rows = visibleData.files;
-            if (rows.length === 0 || !visibleData.totalMatches) {
+            const rows = (data && Array.isArray(data.files)) ? data.files : [];
+            const totalMatches = (data && typeof data.totalMatches === 'number') ? data.totalMatches : 0;
+            if (rows.length === 0 || !totalMatches) {
                 wasmSearchResults.innerHTML = '<div style="color:' + secondaryTextColor + ';">' + (isEn() ? 'No file matches' : '没有匹配文件') + '</div>';
                 return;
             }
 
             let html = '<div style="margin-bottom:8px;color:' + secondaryTextColor + ';">' +
-                (isEn() ? 'Matched files: ' : '匹配文件数：') + visibleData.fileCount + '，' +
-                (isEn() ? 'total matches: ' : '总匹配数：') + visibleData.totalMatches +
+                (isEn() ? 'Matched files: ' : '匹配文件数：') + rows.length + '，' +
+                (isEn() ? 'total matches: ' : '总匹配数：') + totalMatches +
                 '</div>';
 
             rows.forEach(function(item, rowIndex) {
@@ -4998,7 +4925,15 @@
                 return;
             }
 
-            const res = await smartSearchFilesDetailed(keyword, { caseSensitive: false });
+            const readyRes = await gateway.ensureReady();
+            if (!readyRes || readyRes.code !== 200) {
+                if (wasmSearchResults) {
+                    wasmSearchResults.innerHTML = '<div style="color:#dc3545;">' + escapeHtml((readyRes && readyRes.message) || (isEn() ? 'Search failed' : '搜索失败')) + '</div>';
+                }
+                return;
+            }
+
+            const res = gateway.searchFilesDetailed(keyword, { caseSensitive: false });
             if (!res || res.code !== 200) {
                 if (wasmSearchResults) {
                     wasmSearchResults.innerHTML = '<div style="color:#dc3545;">' + escapeHtml((res && res.message) || (isEn() ? 'Search failed' : '搜索失败')) + '</div>';
@@ -5006,38 +4941,12 @@
                 return;
             }
 
-            renderWasmSearchResults(filterCrossSearchVisibleData(res.data));
+            renderWasmSearchResults(res.data);
         }
         function clearVisualHighlights() {
             // Use native selection highlight only; no custom overlay nodes.
             const selection = window.getSelection();
             if (selection) selection.removeAllRanges();
-        }
-
-        function normalizeSearchText(text) {
-            return String(text || '').toLocaleLowerCase();
-        }
-
-        function findMatchesInVisibleText(keyword) {
-            const editorElement = getEditorElement();
-            if (!editorElement) return [];
-
-            const originalText = editorElement.textContent || '';
-            const needle = String(keyword || '');
-            if (!needle) return [];
-
-            const source = normalizeSearchText(originalText);
-            const target = normalizeSearchText(needle);
-            const out = [];
-            let cursor = 0;
-
-            while (cursor <= source.length) {
-                const idx = source.indexOf(target, cursor);
-                if (idx === -1) break;
-                out.push({ start: idx, end: idx + needle.length });
-                cursor = idx + Math.max(1, needle.length);
-            }
-            return out;
         }
 
         function setSelectionByVisibleRange(start, end) {
@@ -5245,7 +5154,9 @@
             const replaceText = replaceInput.value;
             const vditor = g('vditor');
             if (!vditor) return;
-            const replaceRes = await smartReplaceAll(vditor.getValue() || '', searchText, replaceText, { caseSensitive: false });
+            const readyRes = await gateway.ensureReady();
+            if (!readyRes || readyRes.code !== 200) return;
+            const replaceRes = gateway.replaceAllText(vditor.getValue() || '', searchText, replaceText, { caseSensitive: false });
             if (!replaceRes || replaceRes.code !== 200 || !replaceRes.data) return;
             vditor.setValue(replaceRes.data.text || '', true);
             findStatus.textContent = (isEn() ? 'Replaced ' : '已替换 ') + (replaceRes.data.replaced || 0) + (isEn() ? ' occurrences' : ' 处');

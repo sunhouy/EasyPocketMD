@@ -2,6 +2,7 @@
  * Vditor 初始化、界面与功能绑定
  */
 import startupAsciiArt from '../ascii.md?raw';
+import { initSlashCommandRuntime } from './ui/slash-command.js';
 
 document.addEventListener('DOMContentLoaded', function() {
     'use strict';
@@ -74,6 +75,517 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function getVisibleToolbarButtons() {
         return window.allToolbarButtons.filter(isToolbarButtonVisible);
+    }
+
+    var keyboardShortcutActionDefinitions = [
+        { id: 'openFileMenu', textKey: 'keyboardShortcutFileMenu', defaultValue: 'F', allowInEditor: false, toolbarButtonId: 'desktopFileBtn', toolbarTextKey: 'fileMenu' },
+        { id: 'openLoginMenu', textKey: 'keyboardShortcutLoginMenu', defaultValue: 'U', allowInEditor: false, toolbarButtonId: 'desktopLoginBtn', toolbarTextKey: 'login' },
+        { id: 'openInsertMenu', textKey: 'keyboardShortcutInsertMenu', defaultValue: 'I', allowInEditor: false, toolbarButtonId: 'desktopInsertBtn', toolbarTextKey: 'insert' },
+        { id: 'openEditMenu', textKey: 'keyboardShortcutEditMenu', defaultValue: 'E', allowInEditor: false, toolbarButtonId: 'desktopEditBtn', toolbarTextKey: 'edit' },
+        { id: 'openSettingsMenu', textKey: 'keyboardShortcutSettingsMenu', defaultValue: 'S', allowInEditor: false, toolbarButtonId: 'desktopSettingsBtn', toolbarTextKey: 'settings' },
+        { id: 'openMoreMenu', textKey: 'keyboardShortcutMoreMenu', defaultValue: 'M', allowInEditor: false, toolbarButtonId: 'desktopMoreBtn', toolbarTextKey: 'more' },
+        { id: 'saveFile', textKey: 'keyboardShortcutSaveFile', defaultValue: 'Ctrl+S', allowInEditor: true },
+        { id: 'newFile', textKey: 'keyboardShortcutNewFile', defaultValue: 'Ctrl+N', allowInEditor: true },
+        { id: 'findInFile', textKey: 'keyboardShortcutFindInFile', defaultValue: 'Ctrl+F', allowInEditor: true },
+        { id: 'undo', textKey: 'keyboardShortcutUndo', defaultValue: 'Ctrl+Z', allowInEditor: true },
+        { id: 'redo', textKey: 'keyboardShortcutRedo', defaultValue: 'Ctrl+Shift+Z', allowInEditor: true },
+        { id: 'openLocalFile', textKey: 'keyboardShortcutOpenLocalFile', defaultValue: 'Ctrl+O', allowInEditor: true },
+        { id: 'toggleTheme', textKey: 'keyboardShortcutToggleTheme', defaultValue: 'Ctrl+Shift+L', allowInEditor: true }
+    ];
+    var keyboardShortcutActionsById = {};
+    var defaultKeyboardShortcuts = {};
+    var keyboardShortcutListenerInitialized = false;
+    var settingsDialogInitialSnapshot = null;
+    var settingsDialogCloseInProgress = false;
+
+    keyboardShortcutActionDefinitions.forEach(function(definition) {
+        keyboardShortcutActionsById[definition.id] = definition;
+        defaultKeyboardShortcuts[definition.id] = definition.defaultValue;
+    });
+
+    window.defaultKeyboardShortcuts = Object.assign({}, defaultKeyboardShortcuts);
+
+    function normalizeShortcutKeyToken(token) {
+        var rawToken = String(token || '').trim();
+        if (!rawToken) return '';
+
+        var lowerToken = rawToken.toLowerCase();
+        var aliasMap = {
+            space: 'Space',
+            spacebar: 'Space',
+            tab: 'Tab',
+            enter: 'Enter',
+            return: 'Enter',
+            esc: 'Escape',
+            escape: 'Escape',
+            up: 'ArrowUp',
+            down: 'ArrowDown',
+            left: 'ArrowLeft',
+            right: 'ArrowRight',
+            arrowup: 'ArrowUp',
+            arrowdown: 'ArrowDown',
+            arrowleft: 'ArrowLeft',
+            arrowright: 'ArrowRight',
+            delete: 'Delete',
+            del: 'Delete',
+            backspace: 'Backspace',
+            comma: ',',
+            period: '.',
+            dot: '.',
+            '/': '/',
+            '\\': '\\',
+            '-': '-',
+            '_': '_',
+            ',': ',',
+            '.': '.'
+        };
+
+        if (aliasMap[lowerToken]) return aliasMap[lowerToken];
+        if (/^f\d{1,2}$/i.test(rawToken)) return rawToken.toUpperCase();
+        if (rawToken.length === 1) return rawToken.toUpperCase();
+        if (lowerToken === ' ') return 'Space';
+
+        return rawToken.charAt(0).toUpperCase() + rawToken.slice(1).toLowerCase();
+    }
+
+    function normalizeShortcut(rawShortcut) {
+        if (typeof rawShortcut !== 'string') return '';
+
+        var shortcutText = rawShortcut.trim();
+        if (!shortcutText) return '';
+
+        var tokens = shortcutText.split('+').map(function(item) {
+            return item.trim();
+        }).filter(Boolean);
+        if (!tokens.length) return '';
+
+        var hasCtrl = false;
+        var hasAlt = false;
+        var hasShift = false;
+        var keyToken = '';
+
+        for (var i = 0; i < tokens.length; i++) {
+            var lower = tokens[i].toLowerCase();
+            if (lower === 'ctrl' || lower === 'control' || lower === 'cmdorctrl' || lower === 'cmd' || lower === 'command' || lower === 'meta' || lower === 'super' || lower === 'win' || lower === 'windows') {
+                hasCtrl = true;
+                continue;
+            }
+            if (lower === 'alt' || lower === 'option') {
+                hasAlt = true;
+                continue;
+            }
+            if (lower === 'shift') {
+                hasShift = true;
+                continue;
+            }
+            if (keyToken) {
+                return '';
+            }
+            keyToken = normalizeShortcutKeyToken(tokens[i]);
+        }
+
+        if (!keyToken) return '';
+
+        var normalizedParts = [];
+        if (hasCtrl) normalizedParts.push('Ctrl');
+        if (hasAlt) normalizedParts.push('Alt');
+        if (hasShift) normalizedParts.push('Shift');
+        normalizedParts.push(keyToken);
+        return normalizedParts.join('+');
+    }
+
+    function buildShortcutFromKeyboardEvent(event) {
+        var rawKey = String(event.key || '').trim();
+        if (!rawKey) return '';
+
+        var lowerKey = rawKey.toLowerCase();
+        if (lowerKey === 'dead' || lowerKey === 'process' || lowerKey === 'unidentified') return '';
+        if (lowerKey === 'control' || lowerKey === 'shift' || lowerKey === 'alt' || lowerKey === 'meta') return '';
+
+        var keyToken = normalizeShortcutKeyToken(rawKey);
+        if (!keyToken) return '';
+
+        var shortcutParts = [];
+        if (event.ctrlKey || event.metaKey) shortcutParts.push('Ctrl');
+        if (event.altKey) shortcutParts.push('Alt');
+        if (event.shiftKey) shortcutParts.push('Shift');
+        shortcutParts.push(keyToken);
+
+        return shortcutParts.join('+');
+    }
+
+    function getEffectiveKeyboardShortcuts(settings) {
+        var shortcuts = {};
+        var customShortcuts = settings && settings.keyboardShortcuts ? settings.keyboardShortcuts : null;
+
+        keyboardShortcutActionDefinitions.forEach(function(definition) {
+            var hasCustomValue = customShortcuts && Object.prototype.hasOwnProperty.call(customShortcuts, definition.id);
+            if (!hasCustomValue) {
+                shortcuts[definition.id] = definition.defaultValue;
+                return;
+            }
+
+            var customValue = customShortcuts[definition.id];
+            if (typeof customValue === 'string' && customValue.trim() === '') {
+                shortcuts[definition.id] = '';
+                return;
+            }
+
+            var normalized = normalizeShortcut(String(customValue || ''));
+            shortcuts[definition.id] = normalized || definition.defaultValue;
+        });
+
+        return shortcuts;
+    }
+
+    function isEditorTarget(target) {
+        var el = getTargetElement(target);
+        if (!el) return false;
+        return !!el.closest('#vditor, .vditor, .vditor-content');
+    }
+
+    function isFormInputTarget(target) {
+        var el = getTargetElement(target);
+        if (!el) return false;
+        if (!el.closest('input, textarea, select, [contenteditable="true"]')) return false;
+        return !isEditorTarget(el);
+    }
+
+    function findShortcutActionId(shortcutValue) {
+        var effectiveShortcuts = getEffectiveKeyboardShortcuts(window.userSettings);
+        for (var i = 0; i < keyboardShortcutActionDefinitions.length; i++) {
+            var definition = keyboardShortcutActionDefinitions[i];
+            if (effectiveShortcuts[definition.id] === shortcutValue) {
+                return definition.id;
+            }
+        }
+        return '';
+    }
+
+    function clickElementById(elementId) {
+        var element = document.getElementById(elementId);
+        if (!element) return false;
+        element.click();
+        return true;
+    }
+
+    function executeKeyboardShortcutAction(actionId) {
+        switch (actionId) {
+        case 'openFileMenu':
+            if (clickElementById('desktopFileBtn')) return;
+            var sidebar = document.getElementById('fileListSidebar');
+            if (sidebar) sidebar.classList.toggle('show');
+            return;
+        case 'openLoginMenu':
+            if (clickElementById('desktopLoginBtn')) return;
+            if (typeof window.handleLoginButtonClick === 'function') window.handleLoginButtonClick();
+            return;
+        case 'openInsertMenu':
+            if (clickElementById('desktopInsertBtn')) return;
+            if (typeof window.showInsertPicker === 'function') {
+                window.showInsertPicker();
+            } else if (typeof window.showInsertMenu === 'function') {
+                window.showInsertMenu();
+            }
+            return;
+        case 'openEditMenu':
+            clickElementById('desktopEditBtn');
+            return;
+        case 'openSettingsMenu':
+            if (clickElementById('desktopSettingsBtn')) return;
+            if (typeof window.showSettingsDialog === 'function') window.showSettingsDialog();
+            return;
+        case 'openMoreMenu':
+            clickElementById('desktopMoreBtn');
+            return;
+        case 'saveFile':
+            if (typeof window.saveCurrentFile === 'function') window.saveCurrentFile(true);
+            return;
+        case 'newFile':
+            if (typeof window.createNewFile === 'function') window.createNewFile();
+            return;
+        case 'findInFile':
+            if (typeof window.showFindDialog === 'function') window.showFindDialog();
+            return;
+        case 'undo':
+            if (window.vditor && window.vditor.vditor && window.vditor.vditor.undo) {
+                window.vditor.vditor.undo.undo(window.vditor.vditor);
+            }
+            return;
+        case 'redo':
+            if (window.vditor && window.vditor.vditor && window.vditor.vditor.undo) {
+                window.vditor.vditor.undo.redo(window.vditor.vditor);
+            }
+            return;
+        case 'openLocalFile':
+            if (typeof window.openExternalLocalFileByDialog === 'function') {
+                return window.openExternalLocalFileByDialog();
+            }
+            window.showMessage(window.i18n ? window.i18n.t('localFileOpenFailed') : '打开本地文件失败', 'error');
+            return;
+        case 'toggleTheme':
+            if (typeof window.toggleNightMode === 'function') window.toggleNightMode();
+            return;
+        default:
+            return;
+        }
+    }
+
+    function handleGlobalKeyboardShortcuts(event) {
+        if (event.defaultPrevented || event.isComposing) return;
+        if (isFormInputTarget(event.target)) return;
+
+        var shortcutValue = buildShortcutFromKeyboardEvent(event);
+        if (!shortcutValue) return;
+
+        var actionId = findShortcutActionId(shortcutValue);
+        if (!actionId) return;
+
+        var actionDefinition = keyboardShortcutActionsById[actionId];
+        if (!actionDefinition) return;
+        if (isEditorTarget(event.target) && actionDefinition.allowInEditor === false) return;
+
+        event.preventDefault();
+        event.stopPropagation();
+
+        try {
+            var result = executeKeyboardShortcutAction(actionId);
+            if (result && typeof result.catch === 'function') {
+                result.catch(function(error) {
+                    console.error('[KeyboardShortcut] action failed:', actionId, error);
+                });
+            }
+        } catch (error) {
+            console.error('[KeyboardShortcut] action failed:', actionId, error);
+        }
+    }
+
+    function renderDesktopToolbarShortcutLabels() {
+        var effectiveShortcuts = getEffectiveKeyboardShortcuts(window.userSettings);
+
+        keyboardShortcutActionDefinitions.forEach(function(definition) {
+            if (!definition.toolbarButtonId || !definition.toolbarTextKey) return;
+
+            var button = document.getElementById(definition.toolbarButtonId);
+            if (!button) return;
+
+            var baseText = window.i18n ? window.i18n.t(definition.toolbarTextKey) : button.textContent;
+            var shortcut = effectiveShortcuts[definition.id];
+            var displayText = shortcut ? baseText + '(' + shortcut + ')' : baseText;
+
+            button.textContent = displayText;
+            if (shortcut) {
+                button.setAttribute('title', baseText + ' [' + shortcut + ']');
+            } else {
+                button.removeAttribute('title');
+            }
+        });
+    }
+
+    function renderKeyboardShortcutSettings() {
+        var container = document.getElementById('keyboardShortcutsSettings');
+        if (!container) return;
+
+        container.innerHTML = '';
+        var effectiveShortcuts = getEffectiveKeyboardShortcuts(window.userSettings);
+
+        keyboardShortcutActionDefinitions.forEach(function(definition) {
+            var row = document.createElement('div');
+            row.className = 'shortcut-setting-row';
+            row.style.display = 'flex';
+            row.style.alignItems = 'center';
+            row.style.justifyContent = 'space-between';
+            row.style.gap = '10px';
+            row.style.marginBottom = '8px';
+
+            var label = document.createElement('label');
+            label.setAttribute('for', 'keyboardShortcutInput_' + definition.id);
+            label.style.flex = '1';
+            label.style.fontSize = '14px';
+            label.style.color = 'inherit';
+            label.textContent = window.i18n ? window.i18n.t(definition.textKey) : definition.id;
+
+            var input = document.createElement('input');
+            input.id = 'keyboardShortcutInput_' + definition.id;
+            input.type = 'text';
+            input.className = 'form-control';
+            input.style.maxWidth = '180px';
+            input.style.textAlign = 'right';
+            input.value = effectiveShortcuts[definition.id] || '';
+            input.placeholder = definition.defaultValue;
+            input.setAttribute('data-shortcut-action-id', definition.id);
+
+            row.appendChild(label);
+            row.appendChild(input);
+            container.appendChild(row);
+        });
+    }
+
+    function collectKeyboardShortcutsFromSettings() {
+        var shortcutInputs = document.querySelectorAll('#keyboardShortcutsSettings input[data-shortcut-action-id]');
+        if (!shortcutInputs.length) {
+            return getEffectiveKeyboardShortcuts(window.userSettings);
+        }
+
+        var savedShortcuts = {};
+        var usedShortcuts = {};
+
+        for (var i = 0; i < shortcutInputs.length; i++) {
+            var input = shortcutInputs[i];
+            var actionId = input.getAttribute('data-shortcut-action-id');
+            var rawValue = String(input.value || '').trim();
+            if (!actionId || !keyboardShortcutActionsById[actionId]) continue;
+
+            if (!rawValue) {
+                savedShortcuts[actionId] = '';
+                continue;
+            }
+
+            var normalized = normalizeShortcut(rawValue);
+            if (!normalized) {
+                var invalidTemplate = window.i18n ? window.i18n.t('keyboardShortcutInvalid') : '快捷键格式无效：{value}';
+                window.customAlert(invalidTemplate.replace('{value}', rawValue));
+                input.focus();
+                input.select();
+                return null;
+            }
+
+            if (usedShortcuts[normalized]) {
+                var conflictTemplate = window.i18n ? window.i18n.t('keyboardShortcutConflict') : '快捷键冲突：{shortcut} 已用于多个操作';
+                window.customAlert(conflictTemplate.replace('{shortcut}', normalized));
+                input.focus();
+                input.select();
+                return null;
+            }
+
+            usedShortcuts[normalized] = actionId;
+            savedShortcuts[actionId] = normalized;
+        }
+
+        keyboardShortcutActionDefinitions.forEach(function(definition) {
+            if (!Object.prototype.hasOwnProperty.call(savedShortcuts, definition.id)) {
+                savedShortcuts[definition.id] = definition.defaultValue;
+            }
+        });
+
+        return savedShortcuts;
+    }
+
+    function normalizeShortcutForDirtyCheck(value) {
+        var rawValue = String(value || '').trim();
+        if (!rawValue) return '';
+        var normalized = normalizeShortcut(rawValue);
+        return normalized || rawValue.toUpperCase();
+    }
+
+    function getCheckedRadioValue(name, fallbackValue) {
+        var radios = document.getElementsByName(name);
+        for (var i = 0; i < radios.length; i++) {
+            if (radios[i].checked) {
+                return radios[i].value;
+            }
+        }
+        return fallbackValue;
+    }
+
+    function buildSettingsDialogSnapshot() {
+        var toolbarButtons = [];
+        var toolbarCheckboxes = document.querySelectorAll('#toolbarButtonsSettings input[type="checkbox"]');
+        toolbarCheckboxes.forEach(function(cb) {
+            if (cb.checked) {
+                toolbarButtons.push(cb.value);
+            }
+        });
+
+        var draftShortcuts = {};
+        var shortcutInputs = document.querySelectorAll('#keyboardShortcutsSettings input[data-shortcut-action-id]');
+        if (shortcutInputs.length) {
+            for (var i = 0; i < shortcutInputs.length; i++) {
+                var input = shortcutInputs[i];
+                var actionId = input.getAttribute('data-shortcut-action-id');
+                if (!actionId || !keyboardShortcutActionsById[actionId]) continue;
+                draftShortcuts[actionId] = normalizeShortcutForDirtyCheck(input.value);
+            }
+        }
+
+        var effectiveShortcuts = getEffectiveKeyboardShortcuts(window.userSettings);
+        keyboardShortcutActionDefinitions.forEach(function(definition) {
+            if (!Object.prototype.hasOwnProperty.call(draftShortcuts, definition.id)) {
+                draftShortcuts[definition.id] = normalizeShortcutForDirtyCheck(effectiveShortcuts[definition.id]);
+            }
+        });
+
+        var fontSizeSelect = document.getElementById('fontSizeSelect');
+        var showOutlineCheckbox = document.getElementById('showOutlineCheckbox');
+        var slashCommandEnabledCheckbox = document.getElementById('slashCommandEnabledCheckbox');
+        var slashCommandActivationKeySelect = document.getElementById('slashCommandActivationKeySelect');
+        var mdAssociationCheckbox = document.getElementById('mdAssociationCheckbox');
+
+        return {
+            editorMode: getCheckedRadioValue('editorMode', 'wysiwyg'),
+            themeMode: getCheckedRadioValue('themeMode', 'system'),
+            uiMode: getCheckedRadioValue('uiMode', 'auto'),
+            language: getCheckedRadioValue('language', window.i18n ? window.i18n.getLanguage() : 'zh'),
+            fontSize: fontSizeSelect ? fontSizeSelect.value : '16px',
+            showOutline: !!(showOutlineCheckbox && showOutlineCheckbox.checked),
+            enableSlashCommand: slashCommandEnabledCheckbox ? slashCommandEnabledCheckbox.checked : true,
+            slashCommandActivationKey: slashCommandActivationKeySelect ? (slashCommandActivationKeySelect.value || 'Tab') : 'Tab',
+            storageLocation: getCheckedRadioValue('storageLocation', 'cloud'),
+            defaultFileOpening: getCheckedRadioValue('defaultFileOpening', 'lastEdited'),
+            defaultSorting: getCheckedRadioValue('defaultSorting', 'modifiedTime'),
+            mdFileAssociationEnabled: !!(mdAssociationCheckbox && mdAssociationCheckbox.checked),
+            toolbarButtons: toolbarButtons,
+            keyboardShortcuts: draftShortcuts
+        };
+    }
+
+    function hasSettingsDialogUnsavedChanges() {
+        if (!settingsDialogInitialSnapshot) return false;
+        var currentSnapshot = buildSettingsDialogSnapshot();
+        return JSON.stringify(currentSnapshot) !== JSON.stringify(settingsDialogInitialSnapshot);
+    }
+
+    async function requestCloseSettingsDialog() {
+        var modal = document.getElementById('settingsModalOverlay');
+        if (!modal || !modal.classList.contains('show')) return;
+        if (settingsDialogCloseInProgress) return;
+
+        if (!hasSettingsDialogUnsavedChanges()) {
+            modal.classList.remove('show');
+            settingsDialogInitialSnapshot = null;
+            return;
+        }
+
+        settingsDialogCloseInProgress = true;
+        try {
+            var confirmMessage = window.i18n ? window.i18n.t('settingsUnsavedSaveConfirm') : '设置已修改，是否保存后关闭？';
+            var shouldSave = await window.customConfirm(confirmMessage, {
+                cancelText: window.i18n ? window.i18n.t('settingsDontSave') : '不保存',
+                confirmText: window.i18n ? window.i18n.t('save') : '保存',
+                dismissible: false,
+                closeOnOverlay: false,
+                closeOnEsc: false
+            });
+
+            if (!shouldSave) {
+                modal.classList.remove('show');
+                settingsDialogInitialSnapshot = null;
+                return;
+            }
+
+            var saveButton = document.getElementById('saveSettingsBtn');
+            if (saveButton) {
+                saveButton.click();
+            }
+        } finally {
+            settingsDialogCloseInProgress = false;
+        }
+    }
+
+    function initGlobalKeyboardShortcuts() {
+        if (keyboardShortcutListenerInitialized) return;
+        keyboardShortcutListenerInitialized = true;
+        document.addEventListener('keydown', handleGlobalKeyboardShortcuts, true);
     }
 
     async function handleBottomSave() {
@@ -203,6 +715,12 @@ document.addEventListener('DOMContentLoaded', function() {
     if (typeof window.userSettings.showOutline !== 'boolean') {
         window.userSettings.showOutline = false; // 默认不显示大纲
     }
+    if (typeof window.userSettings.enableSlashCommand !== 'boolean') {
+        window.userSettings.enableSlashCommand = true;
+    }
+    if (!window.userSettings.slashCommandActivationKey) {
+        window.userSettings.slashCommandActivationKey = 'Tab';
+    }
     if (typeof window.userSettings.enableWasmTextEngine !== 'boolean') {
         window.userSettings.enableWasmTextEngine = true;
     }
@@ -212,6 +730,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (!window.userSettings.uiMode) {
         window.userSettings.uiMode = 'auto'; // auto, mobile, desktop
     }
+    window.userSettings.keyboardShortcuts = getEffectiveKeyboardShortcuts(window.userSettings);
 
     let electronOpenFileBridgeInitialized = false;
 
@@ -324,6 +843,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 el.setAttribute('placeholder', window.i18n.t(key));
             }
         });
+
+        if (Array.isArray(keyboardShortcutActionDefinitions)) {
+            renderDesktopToolbarShortcutLabels();
+        }
     }
 
     // 获取模式名称的翻译
@@ -392,13 +915,19 @@ document.addEventListener('DOMContentLoaded', function() {
             applyOutline(window.userSettings.showOutline);
 
             // 初始化用户界面和移动特性
-            initUserInterface();
-            initMobileFeatures();
-            initElectronOpenFileBridge();
-            document.addEventListener('keydown', function(e) {
-                if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); window.saveCurrentFile(true); }
-                if (e.ctrlKey && e.shiftKey && e.key === 'L') { e.preventDefault(); window.toggleNightMode(); }
-            });
+            var continueAfterEngineReady = function() {
+                initUserInterface();
+                initMobileFeatures();
+                initSlashCommandRuntime();
+                initElectronOpenFileBridge();
+                initGlobalKeyboardShortcuts();
+            };
+
+            if (window.wasmTextEngineGateway && typeof window.wasmTextEngineGateway.ensureReady === 'function') {
+                window.wasmTextEngineGateway.ensureReady().finally(continueAfterEngineReady);
+            } else {
+                continueAfterEngineReady();
+            }
             document.addEventListener('click', function(e) {
                 var dropdown = document.getElementById('mobileDropdown');
                 var menuBtn = document.getElementById('mobileMenuBtn');
@@ -901,6 +1430,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // 渲染底部工具栏
         window.renderBottomToolbar();
+        renderDesktopToolbarShortcutLabels();
     }
 
     function showModeSelection() {
@@ -975,6 +1505,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
         }
+
+        initSlashCommandRuntime();
     }
 
     function reinitMenuEvents() {
@@ -1079,6 +1611,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // 重新渲染底部工具栏
         window.renderBottomToolbar();
+        renderDesktopToolbarShortcutLabels();
     }
 
     var closeHistoryBtn = document.getElementById('closeHistoryBtn');
@@ -1166,6 +1699,16 @@ document.addEventListener('DOMContentLoaded', function() {
             showOutlineCheckbox.checked = window.userSettings.showOutline || false;
         }
 
+        var slashCommandEnabledCheckbox = document.getElementById('slashCommandEnabledCheckbox');
+        if (slashCommandEnabledCheckbox) {
+            slashCommandEnabledCheckbox.checked = window.userSettings.enableSlashCommand !== false;
+        }
+
+        var slashCommandActivationKeySelect = document.getElementById('slashCommandActivationKeySelect');
+        if (slashCommandActivationKeySelect) {
+            slashCommandActivationKeySelect.value = window.userSettings.slashCommandActivationKey || 'Tab';
+        }
+
         // 设置存储位置
         var currentStorageLoc = window.userSettings.storageLocation || 'cloud';
         var storageRadios = document.getElementsByName('storageLocation');
@@ -1206,6 +1749,21 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // 生成工具栏按钮选择
         renderToolbarButtonSettings();
+        renderKeyboardShortcutSettings();
+
+        // 每次打开设置都默认折叠空间管理详情
+        var slashCommandDetails = document.getElementById('slashCommandDetails');
+        if (slashCommandDetails) {
+            slashCommandDetails.open = false;
+        }
+        var keyboardShortcutsDetails = document.getElementById('keyboardShortcutsDetails');
+        if (keyboardShortcutsDetails) {
+            keyboardShortcutsDetails.open = false;
+        }
+        var toolbarButtonsDetails = document.getElementById('toolbarButtonsDetails');
+        if (toolbarButtonsDetails) {
+            toolbarButtonsDetails.open = false;
+        }
 
         // 每次打开设置都默认折叠空间管理详情
         var storageManagementDetails = document.getElementById('storageManagementDetails');
@@ -1216,6 +1774,8 @@ document.addEventListener('DOMContentLoaded', function() {
         if (storageUsagePanel) {
             storageUsagePanel.style.display = 'none';
         }
+
+        settingsDialogInitialSnapshot = buildSettingsDialogSnapshot();
 
         modal.classList.add('show');
     };
@@ -1510,6 +2070,9 @@ document.addEventListener('DOMContentLoaded', function() {
             uiMode: 'auto',
             fontSize: '16px',
             showOutline: false,
+            enableSlashCommand: window.userSettings.enableSlashCommand !== false,
+            slashCommandActivationKey: window.userSettings.slashCommandActivationKey || 'Tab',
+            keyboardShortcuts: getEffectiveKeyboardShortcuts(window.userSettings),
             mdFileAssociationEnabled: window.userSettings.mdFileAssociationEnabled,
             storageLocation: 'cloud'
         };
@@ -1580,6 +2143,16 @@ document.addEventListener('DOMContentLoaded', function() {
             newSettings.showOutline = showOutlineCheckbox.checked;
         }
 
+        var slashCommandEnabledCheckbox = document.getElementById('slashCommandEnabledCheckbox');
+        if (slashCommandEnabledCheckbox) {
+            newSettings.enableSlashCommand = slashCommandEnabledCheckbox.checked;
+        }
+
+        var slashCommandActivationKeySelect = document.getElementById('slashCommandActivationKeySelect');
+        if (slashCommandActivationKeySelect) {
+            newSettings.slashCommandActivationKey = slashCommandActivationKeySelect.value || 'Tab';
+        }
+
         var mdAssociationCheckbox = document.getElementById('mdAssociationCheckbox');
         if (mdAssociationCheckbox) {
             newSettings.mdFileAssociationEnabled = mdAssociationCheckbox.checked;
@@ -1611,6 +2184,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 break;
             }
         }
+
+        var keyboardShortcuts = collectKeyboardShortcutsFromSettings();
+        if (!keyboardShortcuts) {
+            return;
+        }
+        newSettings.keyboardShortcuts = keyboardShortcuts;
 
         // 验证按钮数量
         if (newSettings.toolbarButtons.length < 5 || newSettings.toolbarButtons.length > 7) {
@@ -1660,14 +2239,17 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         if (oldNightMode !== window.nightMode || languageChanged || needReinitForOutline) {
+            settingsDialogInitialSnapshot = null;
             window.location.reload(); // 重新加载以应用主题、语言或大纲视图更改
         } else {
             applyTranslations();
             applyInterfaceMode(window.userSettings);
             window.renderBottomToolbar();
             initMobileFeatures();
+            initSlashCommandRuntime();
             // 重新加载文件列表以应用新的排序设置
             if (window.loadFiles) window.loadFiles();
+            settingsDialogInitialSnapshot = null;
             document.getElementById('settingsModalOverlay').classList.remove('show');
             window.showMessage(window.i18n ? window.i18n.t('settingsSaved') : '设置已保存', 'success');
         }
@@ -1675,7 +2257,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     var cancelSettingsBtn = document.getElementById('cancelSettingsBtn');
     if(cancelSettingsBtn) cancelSettingsBtn.addEventListener('click', function() {
-        document.getElementById('settingsModalOverlay').classList.remove('show');
+        requestCloseSettingsDialog();
     });
 
     // 关于对话框
@@ -1876,7 +2458,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // 点击遮罩层关闭模态框
     var settingsModalOverlay = document.getElementById('settingsModalOverlay');
     if (settingsModalOverlay) settingsModalOverlay.addEventListener('click', function(e) {
-        if (e.target === this) this.classList.remove('show');
+        if (e.target === this) requestCloseSettingsDialog();
     });
 
     var aboutModalOverlay = document.getElementById('aboutModalOverlay');

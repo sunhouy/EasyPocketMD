@@ -19,3 +19,17 @@ if (initRes.code !== 200) {
     console.error(initRes.message);
     process.exit(1);
 }
+
+const paletteRes = client.slashPalette('图片', { language: 'zh', limit: 8 });
+if (paletteRes.code !== 200 || !paletteRes.data || !Array.isArray(paletteRes.data.items)) {
+    console.error('slashPalette failed');
+    process.exit(1);
+}
+
+const settingsRes = client.slashPaletteSettings('zh');
+if (settingsRes.code !== 200 || !settingsRes.data || !settingsRes.data.defaultActivationKey) {
+    console.error('slashPaletteSettings failed');
+    process.exit(1);
+}
+
+console.log('slash palette smoke ok');

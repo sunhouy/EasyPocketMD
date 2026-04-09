@@ -27,12 +27,26 @@ public:
     std::string similarity(const std::string& leftText, const std::string& rightText) const;
     std::string extractTags(const std::string& text) const;
     std::string findInText(const std::string& text, const std::string& query, bool caseSensitive) const;
+    std::string normalizePath(const std::string& input) const;
+    std::string parentPath(const std::string& path) const;
+    std::string basenamePath(const std::string& path) const;
+    std::string pathBasename(const std::string& path) const;
+    std::string compareVersions(const std::string& originalContent, const std::string& newContent) const;
+    std::string isHiddenCrossSearchFile(const std::string& filename) const;
+    std::string collectFolderPaths(const std::string& entriesPayload) const;
     std::string replaceAllText(
         const std::string& text,
         const std::string& query,
         const std::string& replacement,
         bool caseSensitive
     ) const;
+    std::string slashPalette(
+        const std::string& query,
+        const std::string& language,
+        int limit = 24,
+        bool includeHidden = false
+    ) const;
+    std::string slashPaletteSettings(const std::string& language) const;
 
 private:
     struct Impl;

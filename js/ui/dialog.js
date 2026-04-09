@@ -52,13 +52,29 @@
         let confirmText = options.confirmText || (isEn ? 'OK' : '确定');
         let cancelText = options.cancelText || (isEn ? 'Cancel' : '取消');
         let placeholder = options.placeholder || '';
+        let dismissible = options.dismissible !== false;
+        let closeOnOverlay = dismissible && options.closeOnOverlay !== false;
+        let closeOnEsc = dismissible && options.closeOnEsc !== false;
+        let showCancelButton = options.showCancelButton !== false;
+        let showCloseButton = options.showCloseButton === true;
+
+        function buildCloseButton() {
+            if (!showCloseButton) return '';
+            return '<button class="custom-dialog-btn close custom-dialog-close" aria-label="close" style="position:absolute;top:10px;right:10px;width:28px;height:28px;border:none;border-radius:6px;background:' + (nightMode ? '#4a4a4a' : '#f0f0f0') + ';color:' + textColor + ';cursor:pointer;font-size:16px;line-height:1;">&times;</button>';
+        }
+
+        function buildCancelButton() {
+            if (!showCancelButton) return '';
+            return '<button class="custom-dialog-btn cancel" style="flex:1;padding:12px;background:' + (nightMode ? '#555' : '#6c757d') + ';color:white;border:none;border-radius:6px;cursor:pointer;font-size:14px;">' + cancelText + '</button>';
+        }
 
         let content = '';
 
         if (type === 'alert') {
             content = `
                 <div class="custom-dialog-overlay" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;">
-                    <div class="custom-dialog-content" style="background:${bgColor};color:${textColor};border-radius:12px;padding:25px;width:90%;max-width:400px;box-shadow:0 4px 20px rgba(0,0,0,0.3);">
+                    <div class="custom-dialog-content" style="position:relative;background:${bgColor};color:${textColor};border-radius:12px;padding:25px;width:90%;max-width:400px;box-shadow:0 4px 20px rgba(0,0,0,0.3);">
+                        ${buildCloseButton()}
                         <h2 style="text-align:center;margin:0 0 15px 0;font-size:18px;">${title}</h2>
                         <p style="text-align:center;margin:0 0 20px 0;font-size:14px;line-height:1.5;">${message}</p>
                         <div style="display:flex;gap:10px;">
@@ -70,11 +86,12 @@
         } else if (type === 'confirm') {
             content = `
                 <div class="custom-dialog-overlay" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;">
-                    <div class="custom-dialog-content" style="background:${bgColor};color:${textColor};border-radius:12px;padding:25px;width:90%;max-width:400px;box-shadow:0 4px 20px rgba(0,0,0,0.3);">
+                    <div class="custom-dialog-content" style="position:relative;background:${bgColor};color:${textColor};border-radius:12px;padding:25px;width:90%;max-width:400px;box-shadow:0 4px 20px rgba(0,0,0,0.3);">
+                        ${buildCloseButton()}
                         <h2 style="text-align:center;margin:0 0 15px 0;font-size:18px;">${title}</h2>
                         <p style="text-align:center;margin:0 0 20px 0;font-size:14px;line-height:1.5;">${message}</p>
                         <div style="display:flex;gap:10px;">
-                            <button class="custom-dialog-btn cancel" style="flex:1;padding:12px;background:${nightMode ? '#555' : '#6c757d'};color:white;border:none;border-radius:6px;cursor:pointer;font-size:14px;">${cancelText}</button>
+                            ${buildCancelButton()}
                             <button class="custom-dialog-btn confirm" style="flex:1;padding:12px;background:#4a90e2;color:white;border:none;border-radius:6px;cursor:pointer;font-size:14px;">${confirmText}</button>
                         </div>
                     </div>
@@ -83,12 +100,13 @@
         } else if (type === 'prompt') {
             content = `
                 <div class="custom-dialog-overlay" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;">
-                    <div class="custom-dialog-content" style="background:${bgColor};color:${textColor};border-radius:12px;padding:25px;width:90%;max-width:400px;box-shadow:0 4px 20px rgba(0,0,0,0.3);">
+                    <div class="custom-dialog-content" style="position:relative;background:${bgColor};color:${textColor};border-radius:12px;padding:25px;width:90%;max-width:400px;box-shadow:0 4px 20px rgba(0,0,0,0.3);">
+                        ${buildCloseButton()}
                         <h2 style="text-align:center;margin:0 0 15px 0;font-size:18px;">${title}</h2>
                         <p style="text-align:center;margin:0 0 15px 0;font-size:14px;line-height:1.5;">${message}</p>
                         <input type="text" class="custom-dialog-input" style="width:100%;padding:10px;margin-bottom:20px;border:1px solid ${nightMode ? '#555' : '#ddd'};border-radius:6px;background:${inputBgColor};color:${textColor};font-size:14px;box-sizing:border-box;" placeholder="${placeholder}" value="${defaultValue}">
                         <div style="display:flex;gap:10px;">
-                            <button class="custom-dialog-btn cancel" style="flex:1;padding:12px;background:${nightMode ? '#555' : '#6c757d'};color:white;border:none;border-radius:6px;cursor:pointer;font-size:14px;">${cancelText}</button>
+                            ${buildCancelButton()}
                             <button class="custom-dialog-btn confirm" style="flex:1;padding:12px;background:#4a90e2;color:white;border:none;border-radius:6px;cursor:pointer;font-size:14px;">${confirmText}</button>
                         </div>
                     </div>
@@ -101,9 +119,17 @@
 
         const confirmBtn = container.querySelector('.custom-dialog-btn.confirm');
         const cancelBtn = container.querySelector('.custom-dialog-btn.cancel');
+        const closeBtn = container.querySelector('.custom-dialog-btn.close, .custom-dialog-close, [data-dialog-close]');
         const input = container.querySelector('.custom-dialog-input');
+        let closed = false;
+        let onKeydown = null;
 
         const closeDialog = (result) => {
+            if (closed) return;
+            closed = true;
+            if (onKeydown) {
+                document.removeEventListener('keydown', onKeydown, true);
+            }
             container.style.display = 'none';
             container.innerHTML = '';
             callback(result);
@@ -125,6 +151,12 @@
             });
         }
 
+        if (closeBtn) {
+            closeBtn.addEventListener('click', () => {
+                closeDialog(type === 'prompt' ? null : false);
+            });
+        }
+
         if (input) {
             input.addEventListener('keypress', (e) => {
                 if (e.key === 'Enter') {
@@ -134,8 +166,18 @@
             setTimeout(() => input.focus(), 100);
         }
 
+        if (closeOnEsc) {
+            onKeydown = (e) => {
+                if (e.key === 'Escape') {
+                    e.preventDefault();
+                    closeDialog(type === 'prompt' ? null : false);
+                }
+            };
+            document.addEventListener('keydown', onKeydown, true);
+        }
+
         container.addEventListener('click', (e) => {
-            if (e.target === container.querySelector('.custom-dialog-overlay')) {
+            if (closeOnOverlay && e.target === container.querySelector('.custom-dialog-overlay')) {
                 closeDialog(type === 'prompt' ? null : false);
             }
         });

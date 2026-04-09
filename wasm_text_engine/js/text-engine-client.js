@@ -24,7 +24,22 @@ export class WasmTextEngineClient {
             var factory = mod.default;
             this.module = await factory(opts.moduleOptions || {});
             this.engine = new this.module.WasmTextEngine();
-            if (!hasMethod(this.engine, 'diff') || !hasMethod(this.engine, 'merge3') || !hasMethod(this.engine, 'findInText')) {
+            var requiredMethods = [
+                'diff',
+                'merge3',
+                'findInText',
+                'normalizePath',
+                'parentPath',
+                'basenamePath',
+                'pathBasename',
+                'compareVersions',
+                'isHiddenCrossSearchFile',
+                'collectFolderPaths'
+            ];
+            var missing = requiredMethods.filter(function(name) {
+                return !hasMethod(this.engine, name);
+            }, this);
+            if (missing.length > 0) {
                 return err('init failed: wasm engine methods are incomplete (possibly stale artifact)');
             }
             return ok({ ready: true }, 'initialized');
@@ -114,6 +129,62 @@ export class WasmTextEngineClient {
         }
     }
 
+    normalizePath(input) {
+        try {
+            return this.engine.normalizePath(input || '');
+        } catch (e) {
+            throw new Error('normalizePath failed: ' + e.message);
+        }
+    }
+
+    parentPath(path) {
+        try {
+            return this.engine.parentPath(path || '');
+        } catch (e) {
+            throw new Error('parentPath failed: ' + e.message);
+        }
+    }
+
+    basenamePath(path) {
+        try {
+            return this.engine.basenamePath(path || '');
+        } catch (e) {
+            throw new Error('basenamePath failed: ' + e.message);
+        }
+    }
+
+    pathBasename(path) {
+        try {
+            return this.engine.pathBasename(path || '');
+        } catch (e) {
+            throw new Error('pathBasename failed: ' + e.message);
+        }
+    }
+
+    compareVersions(originalContent, newContent) {
+        try {
+            return ok(JSON.parse(this.engine.compareVersions(originalContent || '', newContent || '')));
+        } catch (e) {
+            return err('compareVersions failed: ' + e.message);
+        }
+    }
+
+    isHiddenCrossSearchFile(filename) {
+        try {
+            return ok(JSON.parse(this.engine.isHiddenCrossSearchFile(filename || '')));
+        } catch (e) {
+            return err('isHiddenCrossSearchFile failed: ' + e.message);
+        }
+    }
+
+    collectFolderPaths(entriesPayload) {
+        try {
+            return ok(JSON.parse(this.engine.collectFolderPaths(entriesPayload || '')));
+        } catch (e) {
+            return err('collectFolderPaths failed: ' + e.message);
+        }
+    }
+
     replaceAllText(text, query, replacement, options) {
         var opts = options || {};
         try {
@@ -147,6 +218,34 @@ export class WasmTextEngineClient {
             return ok(JSON.parse(this.engine.extractTags(text || '')));
         } catch (e) {
             return err('extractTags failed: ' + e.message);
+        }
+    }
+
+    slashPalette(query, options) {
+        var opts = options || {};
+        try {
+            if (!hasMethod(this.engine, 'slashPalette')) {
+                return err('slashPalette failed: wasm method slashPalette is unavailable');
+            }
+            return ok(JSON.parse(this.engine.slashPalette(
+                query || '',
+                opts.language || '',
+                opts.limit || 24,
+                !!opts.includeHidden
+            )));
+        } catch (e) {
+            return err('slashPalette failed: ' + e.message);
+        }
+    }
+
+    slashPaletteSettings(language) {
+        try {
+            if (!hasMethod(this.engine, 'slashPaletteSettings')) {
+                return err('slashPaletteSettings failed: wasm method slashPaletteSettings is unavailable');
+            }
+            return ok(JSON.parse(this.engine.slashPaletteSettings(language || '')));
+        } catch (e) {
+            return err('slashPaletteSettings failed: ' + e.message);
         }
     }
 }

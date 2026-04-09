@@ -6,6 +6,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 add_library(text_engine_core STATIC
     src/text_engine.cpp
+    src/slash_command_index.cpp
 )
 
 target_include_directories(text_engine_core PUBLIC src)
@@ -19,6 +20,7 @@ target_link_libraries(smoke_test PRIVATE text_engine_core)
 if(EMSCRIPTEN)
     add_executable(text_engine_wasm
         src/text_engine.cpp
+        src/slash_command_index.cpp
         src/wasm_bindings.cpp
     )
 

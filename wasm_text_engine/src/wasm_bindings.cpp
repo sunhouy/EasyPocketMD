@@ -19,7 +19,16 @@ EMSCRIPTEN_BINDINGS(text_engine_module) {
         .function("similarity", &WasmTextEngine::similarity)
         .function("extractTags", &WasmTextEngine::extractTags)
         .function("findInText", &WasmTextEngine::findInText)
-        .function("replaceAllText", &WasmTextEngine::replaceAllText);
+        .function("normalizePath", &WasmTextEngine::normalizePath)
+        .function("parentPath", &WasmTextEngine::parentPath)
+        .function("basenamePath", &WasmTextEngine::basenamePath)
+        .function("pathBasename", &WasmTextEngine::pathBasename)
+        .function("compareVersions", &WasmTextEngine::compareVersions)
+        .function("isHiddenCrossSearchFile", &WasmTextEngine::isHiddenCrossSearchFile)
+        .function("collectFolderPaths", &WasmTextEngine::collectFolderPaths)
+        .function("replaceAllText", &WasmTextEngine::replaceAllText)
+        .function("slashPalette", &WasmTextEngine::slashPalette)
+        .function("slashPaletteSettings", &WasmTextEngine::slashPaletteSettings);
 }
 
 #endif
