@@ -493,8 +493,7 @@
         }
         document.addEventListener('keydown', handleKeydown);
 
-        // 聚焦搜索框
-        searchBox.focus();
+        // 不默认聚焦搜索框
     }
 
     // 脚注选择器
