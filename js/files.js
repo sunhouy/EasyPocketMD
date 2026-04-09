@@ -4796,6 +4796,10 @@
         const wasmSearchResults = dialog.querySelector('#wasmSearchResults');
         const toggleCrossSearchBtn = dialog.querySelector('#toggleCrossSearchBtn');
         let isCrossSearchCollapsed = false;
+        let visibleMatches = [];
+        let crossSearchLazyState = null;
+        const CROSS_SEARCH_BATCH_SIZE = 50;
+        const CROSS_SEARCH_PREFETCH_OFFSET = 180;
         const shouldAutoFocusFindInput = !/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
         const gateway = global.wasmTextEngineGateway;
@@ -4828,6 +4832,8 @@
             if (!searchText) {
                 findStatus.textContent = '';
                 clearHighlights();
+                visibleMatches = [];
+                crossSearchLazyState = null;
                 if (wasmSearchResults) wasmSearchResults.innerHTML = '';
                 return;
             }
@@ -4847,86 +4853,253 @@
                 if (currentMatchIndex < 0 || currentMatchIndex >= matches.length) {
                     currentMatchIndex = 0;
                 }
+                visibleMatches = [];
                 highlightMatch(currentMatchIndex, true, options);
             }
+        }
+
+        function normalizeSearchText(text) {
+            return String(text || '').toLocaleLowerCase();
+        }
+
+        function findMatchesInVisibleText(keyword) {
+            const editorElement = getEditorElement();
+            if (!editorElement) return [];
+
+            const originalText = editorElement.textContent || '';
+            const needle = String(keyword || '');
+            if (!needle) return [];
+
+            const source = normalizeSearchText(originalText);
+            const target = normalizeSearchText(needle);
+            const out = [];
+            let cursor = 0;
+
+            while (cursor <= source.length) {
+                const idx = source.indexOf(target, cursor);
+                if (idx === -1) break;
+                out.push({ start: idx, end: idx + needle.length });
+                cursor = idx + Math.max(1, needle.length);
+            }
+            return out;
+        }
+
+        function pickVisibleMatch(index, candidateMatches) {
+            if (!Array.isArray(candidateMatches) || candidateMatches.length === 0) return null;
+            if (candidateMatches.length === matches.length && index >= 0 && index < candidateMatches.length) {
+                return candidateMatches[index];
+            }
+
+            const sourceHit = matches[index];
+            const sourceTextLength = Math.max(1, getCurrentEditorText().length);
+            const editorElement = getEditorElement();
+            const visibleTextLength = Math.max(1, editorElement && editorElement.textContent ? editorElement.textContent.length : sourceTextLength);
+            const sourceStart = sourceHit ? Math.max(0, Number(sourceHit.start) || 0) : 0;
+            const expectedPos = Math.round((sourceStart / sourceTextLength) * visibleTextLength);
+            const estimatedIndex = Math.max(0, Math.min(
+                candidateMatches.length - 1,
+                Math.round((Math.max(0, index) / Math.max(1, matches.length - 1)) * Math.max(0, candidateMatches.length - 1))
+            ));
+
+            let bestMatch = candidateMatches[estimatedIndex];
+            let bestDistance = Math.abs((bestMatch && bestMatch.start) - expectedPos);
+            const from = Math.max(0, estimatedIndex - 8);
+            const to = Math.min(candidateMatches.length - 1, estimatedIndex + 8);
+            for (let i = from; i <= to; i++) {
+                const distance = Math.abs((candidateMatches[i] && candidateMatches[i].start) - expectedPos);
+                if (distance < bestDistance) {
+                    bestDistance = distance;
+                    bestMatch = candidateMatches[i];
+                }
+            }
+
+            return bestMatch || candidateMatches[0];
+        }
+
+        function setSelectionForMatch(index) {
+            const candidateMatches = findMatchesInVisibleText(searchText);
+            visibleMatches = candidateMatches;
+
+            const visibleHit = pickVisibleMatch(index, candidateMatches);
+            if (visibleHit) {
+                const mappedRange = setSelectionByVisibleRange(visibleHit.start, visibleHit.end);
+                if (mappedRange) return mappedRange;
+            }
+
+            const sourceHit = matches[index];
+            if (!sourceHit) return null;
+            return setSelectionByVisibleRange(sourceHit.start, sourceHit.end);
+        }
+
+        function computeCrossSearchTotalMatches(rows) {
+            return rows.reduce(function(sum, item) {
+                const hits = Array.isArray(item && item.hits) ? item.hits.length : 0;
+                const count = hits || (Number(item && item.matchCount) || 0);
+                return sum + count;
+            }, 0);
+        }
+
+        function flattenCrossSearchHits(rows) {
+            const flattened = [];
+            rows.forEach(function(item) {
+                const fileHits = Array.isArray(item && item.hits) ? item.hits : [];
+                const fileMatchCount = fileHits.length || (Number(item && item.matchCount) || 0);
+                fileHits.forEach(function(hit) {
+                    flattened.push({
+                        docId: String(item && item.docId || ''),
+                        filename: item && item.filename ? item.filename : '',
+                        fileMatchCount: fileMatchCount,
+                        start: Number(hit && hit.start) || 0,
+                        end: Number(hit && hit.end) || 0,
+                        snippet: hit && hit.snippet ? hit.snippet : ''
+                    });
+                });
+            });
+            return flattened;
+        }
+
+        function updateCrossSearchLoadStatus() {
+            if (!crossSearchLazyState || !crossSearchLazyState.statusEl) return;
+
+            const loaded = crossSearchLazyState.renderedCount || 0;
+            const total = Array.isArray(crossSearchLazyState.flatHits) ? crossSearchLazyState.flatHits.length : 0;
+
+            if (loaded >= total) {
+                crossSearchLazyState.statusEl.textContent = isEn() ? 'All results loaded' : '已加载全部结果';
+                return;
+            }
+
+            crossSearchLazyState.statusEl.textContent = (isEn() ? 'Loaded ' : '已加载 ') +
+                loaded + ' / ' + total +
+                (isEn() ? ' results, scroll down to load more' : ' 条结果，向下滚动继续加载');
+        }
+
+        function appendCrossSearchBatch(batchSize) {
+            if (!crossSearchLazyState || !crossSearchLazyState.listEl || crossSearchLazyState.loading) return;
+
+            const state = crossSearchLazyState;
+            const flatHits = Array.isArray(state.flatHits) ? state.flatHits : [];
+            if (state.renderedCount >= flatHits.length) {
+                updateCrossSearchLoadStatus();
+                return;
+            }
+
+            state.loading = true;
+            const from = state.renderedCount;
+            const to = Math.min(flatHits.length, from + Math.max(1, Number(batchSize) || CROSS_SEARCH_BATCH_SIZE));
+            const fragment = document.createDocumentFragment();
+
+            for (let i = from; i < to; i++) {
+                const item = flatHits[i];
+                const wrapper = document.createElement('div');
+                wrapper.style.cssText = 'padding:6px 8px;border:1px solid ' + borderColor + ';border-radius:6px;margin-bottom:8px;';
+                wrapper.innerHTML =
+                    '<div style="font-weight:600;margin-bottom:4px;">' +
+                        escapeHtml(item.filename || '') + ' (' + (item.fileMatchCount || 0) + ')' +
+                    '</div>' +
+                    '<div class="cross-search-hit" data-file-id="' + item.docId + '" data-start="' + item.start + '" data-end="' + item.end + '" style="margin-top:5px;padding:5px 6px;border-radius:5px;background:' + (nightMode ? '#3a3a3a' : '#f6f6f6') + ';cursor:pointer;white-space:pre-wrap;word-break:break-word;">' +
+                        escapeHtml(item.snippet || '') +
+                    '</div>';
+                fragment.appendChild(wrapper);
+            }
+
+            state.listEl.appendChild(fragment);
+            state.renderedCount = to;
+            state.loading = false;
+            updateCrossSearchLoadStatus();
+        }
+
+        async function jumpToCrossSearchHit(fileId, start) {
+            if (!fileId || typeof global.openFile !== 'function') return;
+
+            await global.openFile(fileId);
+            await performFind({ focusEditor: false });
+            if (matches.length === 0) return;
+
+            let bestIndex = 0;
+            let bestDistance = Math.abs((matches[0] && matches[0].start) - start);
+            for (let i = 1; i < matches.length; i++) {
+                const distance = Math.abs((matches[i] && matches[i].start) - start);
+                if (distance < bestDistance) {
+                    bestDistance = distance;
+                    bestIndex = i;
+                }
+            }
+
+            currentMatchIndex = bestIndex;
+            highlightMatch(currentMatchIndex, true, { focusEditor: false });
         }
 
         function renderWasmSearchResults(data) {
             if (!wasmSearchResults) return;
             const rows = (data && Array.isArray(data.files)) ? data.files : [];
-            const totalMatches = (data && typeof data.totalMatches === 'number') ? data.totalMatches : 0;
+            const totalMatches = computeCrossSearchTotalMatches(rows);
             if (rows.length === 0 || !totalMatches) {
+                crossSearchLazyState = null;
                 wasmSearchResults.innerHTML = '<div style="color:' + secondaryTextColor + ';">' + (isEn() ? 'No file matches' : '没有匹配文件') + '</div>';
                 return;
             }
 
-            let html = '<div style="margin-bottom:8px;color:' + secondaryTextColor + ';">' +
-                (isEn() ? 'Matched files: ' : '匹配文件数：') + rows.length + '，' +
-                (isEn() ? 'total matches: ' : '总匹配数：') + totalMatches +
-                '</div>';
+            const flatHits = flattenCrossSearchHits(rows);
+            wasmSearchResults.innerHTML =
+                '<div style="margin-bottom:8px;color:' + secondaryTextColor + ';">' +
+                    (isEn() ? 'Matched files: ' : '匹配文件数：') + rows.length + '，' +
+                    (isEn() ? 'total matches: ' : '总匹配数：') + totalMatches +
+                '</div>' +
+                '<div id="crossSearchLazyList" style="max-height:260px;overflow:auto;padding-right:2px;"></div>' +
+                '<div id="crossSearchLazyStatus" style="margin-top:6px;color:' + secondaryTextColor + ';font-size:12px;"></div>';
 
-            rows.forEach(function(item, rowIndex) {
-                html += '<div style="padding:6px 8px;border:1px solid ' + borderColor + ';border-radius:6px;margin-bottom:8px;">' +
-                    '<div class="cross-search-file-header" data-file-block-id="crossFileBlock_' + rowIndex + '" style="font-weight:600;display:flex;align-items:center;justify-content:space-between;cursor:pointer;">' +
-                        '<span>' + escapeHtml(item.filename || '') + ' (' + item.matchCount + ')</span>' +
-                        '<span class="cross-search-file-chevron" style="color:' + secondaryTextColor + ';">▾</span>' +
-                    '</div>' +
-                    '<div id="crossFileBlock_' + rowIndex + '" style="margin-top:4px;">';
-                (item.hits || []).forEach(function(hit) {
-                    html += '<div class="cross-search-hit" data-file-id="' + String(item.docId) + '" data-start="' + hit.start + '" data-end="' + hit.end + '" style="margin-top:5px;padding:5px 6px;border-radius:5px;background:' + (nightMode ? '#3a3a3a' : '#f6f6f6') + ';cursor:pointer;white-space:pre-wrap;word-break:break-word;">' +
-                        escapeHtml(hit.snippet || '') +
-                    '</div>';
+            const listEl = wasmSearchResults.querySelector('#crossSearchLazyList');
+            const statusEl = wasmSearchResults.querySelector('#crossSearchLazyStatus');
+            crossSearchLazyState = {
+                flatHits: flatHits,
+                renderedCount: 0,
+                listEl: listEl,
+                statusEl: statusEl,
+                loading: false,
+                lastScrollTop: 0
+            };
+
+            if (listEl) {
+                listEl.addEventListener('click', function(event) {
+                    const hitEl = event.target && event.target.closest ? event.target.closest('.cross-search-hit') : null;
+                    if (!hitEl) return;
+                    const fileId = hitEl.getAttribute('data-file-id');
+                    const start = parseInt(hitEl.getAttribute('data-start') || '0', 10);
+                    jumpToCrossSearchHit(fileId, start).catch(function(error) {
+                        console.error('Cross-file jump failed:', error);
+                    });
                 });
-                html += '</div></div>';
-            });
-            wasmSearchResults.innerHTML = html;
 
-            wasmSearchResults.querySelectorAll('.cross-search-file-header').forEach(function(el) {
-                el.addEventListener('click', function() {
-                    const blockId = this.getAttribute('data-file-block-id');
-                    const body = blockId ? wasmSearchResults.querySelector('#' + blockId) : null;
-                    const chevron = this.querySelector('.cross-search-file-chevron');
-                    if (!body) return;
-                    const hidden = body.style.display === 'none';
-                    body.style.display = hidden ? 'block' : 'none';
-                    if (chevron) chevron.textContent = hidden ? '▾' : '▸';
-                });
-            });
+                listEl.addEventListener('scroll', function() {
+                    if (!crossSearchLazyState || crossSearchLazyState.loading) return;
 
-            wasmSearchResults.querySelectorAll('.cross-search-hit').forEach(function(el) {
-                el.addEventListener('click', async function() {
-                    const fileId = this.getAttribute('data-file-id');
-                    const start = parseInt(this.getAttribute('data-start') || '0', 10);
-                    if (fileId && typeof global.openFile === 'function') {
-                        await global.openFile(fileId);
-                        await performFind({ focusEditor: false });
-                        if (matches.length > 0) {
-                            let bestIndex = 0;
-                            let bestDistance = Math.abs((matches[0] && matches[0].start) - start);
-                            for (let i = 1; i < matches.length; i++) {
-                                const distance = Math.abs((matches[i] && matches[i].start) - start);
-                                if (distance < bestDistance) {
-                                    bestDistance = distance;
-                                    bestIndex = i;
-                                }
-                            }
-                            currentMatchIndex = bestIndex;
-                            highlightMatch(currentMatchIndex, true, { focusEditor: false });
-                        }
+                    const currentTop = listEl.scrollTop;
+                    const scrollingDown = currentTop > (crossSearchLazyState.lastScrollTop || 0);
+                    crossSearchLazyState.lastScrollTop = currentTop;
+                    if (!scrollingDown) return;
+
+                    const nearBottom = currentTop + listEl.clientHeight >= listEl.scrollHeight - CROSS_SEARCH_PREFETCH_OFFSET;
+                    if (nearBottom) {
+                        appendCrossSearchBatch(CROSS_SEARCH_BATCH_SIZE);
                     }
                 });
-            });
+            }
+
+            appendCrossSearchBatch(CROSS_SEARCH_BATCH_SIZE);
         }
 
         async function runWasmSearch() {
             const keyword = findInput.value.trim();
             if (!keyword) {
+                crossSearchLazyState = null;
                 if (wasmSearchResults) wasmSearchResults.innerHTML = '';
                 return;
             }
 
             const readyRes = await gateway.ensureReady();
             if (!readyRes || readyRes.code !== 200) {
+                crossSearchLazyState = null;
                 if (wasmSearchResults) {
                     wasmSearchResults.innerHTML = '<div style="color:#dc3545;">' + escapeHtml((readyRes && readyRes.message) || (isEn() ? 'Search failed' : '搜索失败')) + '</div>';
                 }
@@ -4935,6 +5108,7 @@
 
             const res = gateway.searchFilesDetailed(keyword, { caseSensitive: false });
             if (!res || res.code !== 200) {
+                crossSearchLazyState = null;
                 if (wasmSearchResults) {
                     wasmSearchResults.innerHTML = '<div style="color:#dc3545;">' + escapeHtml((res && res.message) || (isEn() ? 'Search failed' : '搜索失败')) + '</div>';
                 }
@@ -5074,8 +5248,7 @@
                 if (shouldFocusEditor && vditor && typeof vditor.focus === 'function') {
                     vditor.focus();
                 }
-                const hit = matches[index];
-                const range = setSelectionByVisibleRange(hit.start, hit.end);
+                const range = setSelectionForMatch(index);
                 if (!range) {
                     if (allowRetry !== false) {
                         setTimeout(function() {
@@ -5096,6 +5269,7 @@
         function clearHighlights() {
             clearVisualHighlights();
             matches = [];
+            visibleMatches = [];
             currentMatchIndex = -1;
         }
         // 查找下一个
@@ -5127,7 +5301,7 @@
             if (!vditor) return;
 
             const target = matches[currentMatchIndex];
-            const selectedRange = setSelectionByVisibleRange(target.start, target.end);
+            const selectedRange = setSelectionForMatch(currentMatchIndex);
             if (!selectedRange) return;
 
             // Use Vditor native edit methods on current selection.
@@ -5172,6 +5346,8 @@
             matches = [];
             currentMatchIndex = -1;
             searchText = '';
+            visibleMatches = [];
+            crossSearchLazyState = null;
             findStatus.textContent = '';
             findStatus.style.color = secondaryTextColor;
             if (wasmSearchResults) wasmSearchResults.innerHTML = '';
@@ -5206,6 +5382,7 @@
         // 关闭对话框并清除高亮
         function closeFindDialog() {
             clearHighlights();
+            crossSearchLazyState = null;
             dialog.remove();
         }
         closeBtn.onclick = closeFindDialog;

@@ -127,6 +127,12 @@ jobs:
     - name: Verify WASM packaged in dist
       run: npm run wasm:text:verify:dist
 
+    - name: Capture WASM checksums
+      id: wasm_checksums
+      run: |
+        echo "js_sha256=$(sha256sum dist/wasm_text_engine/text_engine.js | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+        echo "wasm_sha256=$(sha256sum dist/wasm_text_engine/text_engine.wasm | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+
     - name: Create deployment tarball
       run: |
         mkdir -p deploy_tmp
@@ -367,6 +373,53 @@ jobs:
             echo "等待服务就绪... ($i/10)"
             sleep 2
           done
+
+          # 校验 WASM 产物是否为本次构建版本，避免旧产物被错误复用
+          echo "校验 WASM 产物版本与完整性..."
+          EXPECTED_JS_SHA="${{ steps.wasm_checksums.outputs.js_sha256 }}"
+          EXPECTED_WASM_SHA="${{ steps.wasm_checksums.outputs.wasm_sha256 }}"
+          ACTIVE_JS="$NEXT_DIR/dist/wasm_text_engine/text_engine.js"
+          ACTIVE_WASM="$NEXT_DIR/dist/wasm_text_engine/text_engine.wasm"
+
+          if [ ! -f "$ACTIVE_JS" ] || [ ! -f "$ACTIVE_WASM" ]; then
+            echo "错误: 部署目录中缺少 WASM 产物"
+            ls -la "$NEXT_DIR/dist/wasm_text_engine" || true
+            exit 1
+          fi
+
+          ACTUAL_JS_SHA=$(sha256sum "$ACTIVE_JS" | awk '{print $1}')
+          ACTUAL_WASM_SHA=$(sha256sum "$ACTIVE_WASM" | awk '{print $1}')
+          if [ "$ACTUAL_JS_SHA" != "$EXPECTED_JS_SHA" ] || [ "$ACTUAL_WASM_SHA" != "$EXPECTED_WASM_SHA" ]; then
+            echo "错误: 部署目录 WASM 校验失败"
+            echo "expected js:   $EXPECTED_JS_SHA"
+            echo "actual js:     $ACTUAL_JS_SHA"
+            echo "expected wasm: $EXPECTED_WASM_SHA"
+            echo "actual wasm:   $ACTUAL_WASM_SHA"
+            exit 1
+          fi
+          echo "✓ 部署目录 WASM 校验通过"
+
+          TMP_WASM_DIR="/tmp/md_wasm_probe"
+          rm -rf "$TMP_WASM_DIR"
+          mkdir -p "$TMP_WASM_DIR"
+          curl -fsS "http://127.0.0.1:$NEXT_PORT/wasm_text_engine/text_engine.js" -o "$TMP_WASM_DIR/text_engine.js"
+          curl -fsS "http://127.0.0.1:$NEXT_PORT/wasm_text_engine/text_engine.wasm" -o "$TMP_WASM_DIR/text_engine.wasm"
+
+          SERVED_JS_SHA=$(sha256sum "$TMP_WASM_DIR/text_engine.js" | awk '{print $1}')
+          SERVED_WASM_SHA=$(sha256sum "$TMP_WASM_DIR/text_engine.wasm" | awk '{print $1}')
+          if [ "$SERVED_JS_SHA" != "$EXPECTED_JS_SHA" ] || [ "$SERVED_WASM_SHA" != "$EXPECTED_WASM_SHA" ]; then
+            echo "错误: HTTP 实际返回的 WASM 产物与构建版本不一致"
+            echo "served js:     $SERVED_JS_SHA"
+            echo "served wasm:   $SERVED_WASM_SHA"
+            echo "expected js:   $EXPECTED_JS_SHA"
+            echo "expected wasm: $EXPECTED_WASM_SHA"
+            exit 1
+          fi
+
+          # 二次确认方法完整性，避免出现“methods are incomplete”线上回退
+          export TMP_WASM_JS="$TMP_WASM_DIR/text_engine.js"
+          node --input-type=module -e "import { pathToFileURL } from 'node:url'; const mod = await import(pathToFileURL(process.env.TMP_WASM_JS).href); const inst = await mod.default({}); const engine = new inst.WasmTextEngine(); const required=['diff','merge3','findInText','normalizePath','parentPath','basenamePath','pathBasename','compareVersions','isHiddenCrossSearchFile','collectFolderPaths']; const missing=required.filter((m)=>typeof engine[m] !== 'function'); if (missing.length) { console.error('WASM 方法缺失:', missing.join(',')); process.exit(1); }"
+          echo "✓ HTTP WASM 完整性校验通过"
 
           # 原子切换符号链接
           echo "执行原子切换..."
