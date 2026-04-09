@@ -38,6 +38,7 @@ intro.html           linguist-vendored
 
 tests/               linguist-vendored
 webrtc/**            linguist-documentation
-*.yml linguist-detectable=true
+
+.github/workflows/*.yml linguist-detectable=true linguist-type=programming
 
 dev/** linguist-generated=true

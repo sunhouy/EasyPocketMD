@@ -1,6 +1,6 @@
 {
-  "name": "EasyPocketMD",
-  "version": "1.0.0",
+  "name": "easypocketmd",
+  "version": "2.4.0",
   "description": "基于Vditor的移动端轻量化在线markdown编辑器，可进行多文件管理。支持可视化插入格式、公式、图表，上传文件和图片，降低学习和操作门槛；支持多端文件同步，历史版本，文件分享，日间、夜间模式切换，导入本地文件，导出文档，云打印功能",
   "main": "electron-main.js",
   "scripts": {
@@ -67,6 +67,7 @@
     "markdown-it-footnote": "^4.0.0",
     "markdown-it-mathjax3": "^5.2.0",
     "markdown-it-task-lists": "^2.1.1",
+    "marked": "^12.0.2",
     "multer": "^2.1.1",
     "mysql2": "^3.6.5",
     "pdfjs-dist": "^4.4.168",
