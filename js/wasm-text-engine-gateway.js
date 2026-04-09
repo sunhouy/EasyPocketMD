@@ -400,12 +400,17 @@
             const rows = Array.isArray(searchRes.data.results) ? searchRes.data.results : [];
             const results = rows.map(function(row) {
                 const file = fileMap[String(row.docId)] || {};
+                const fileContent = String(file.content || '');
                 const hits = Array.isArray(row.hits) ? row.hits.map(function(hit, idx) {
+                    const startByte = Number(hit.start || 0);
+                    const endByte = Number(hit.end || startByte);
+                    const startChar = byteToCharIndex(fileContent, startByte);
+                    const endChar = byteToCharIndex(fileContent, endByte);
                     return {
                         index: idx,
-                        start: hit.start,
-                        end: hit.end,
-                        snippet: hit.snippet || ''
+                        start: startChar,
+                        end: Math.max(startChar, endChar),
+                        snippet: hit.snippet || buildSnippetByCharIndex(fileContent, startChar, endChar, 30)
                     };
                 }) : [];
                 return {
