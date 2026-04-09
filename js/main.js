@@ -13,9 +13,10 @@ document.addEventListener('DOMContentLoaded', function() {
         window.i18n.init();
         applyTranslations();
     }
-    var isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    var isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
     var isCapacitor = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
-    window.isMobileEditorEnvironment = isMobile || isCapacitor;
+    window.isMobileEditorEnvironment = isMobileDevice || isCapacitor;
+    window.editorInterfaceMode = window.isMobileEditorEnvironment ? 'mobile' : 'desktop';
     if (isCapacitor) {
         document.body.classList.add('is-capacitor');
     }
@@ -41,7 +42,7 @@ document.addEventListener('DOMContentLoaded', function() {
         return !!el.closest('button, .mobile-action-btn, .bottom-btn, .dropdown-item, .mobile-toolbar-container, .mobile-bottom-bar, .file-list-sidebar, .modal-overlay, .sync-status, .jstree-anchor, .file-menu-btn');
     }
 
-    if (isMobile || isCapacitor) {
+    if (isMobileDevice || isCapacitor) {
         document.addEventListener('contextmenu', function(e) {
             if (!shouldBlockContextMenu(e.target)) return;
             e.preventDefault();
@@ -205,6 +206,29 @@ document.addEventListener('DOMContentLoaded', function() {
     if (typeof window.userSettings.enableWasmTextEngine !== 'boolean') {
         window.userSettings.enableWasmTextEngine = true;
     }
+    if (!window.userSettings.uiMode) {
+        window.userSettings.uiMode = 'auto'; // auto, mobile, desktop
+    }
+
+    function getEffectiveInterfaceMode(settings) {
+        var targetSettings = settings || window.userSettings || {};
+        var configuredMode = targetSettings.uiMode || 'auto';
+        if (configuredMode === 'mobile' || configuredMode === 'desktop') {
+            return configuredMode;
+        }
+        return (isMobileDevice || isCapacitor) ? 'mobile' : 'desktop';
+    }
+
+    function applyInterfaceMode(settings) {
+        var mode = getEffectiveInterfaceMode(settings);
+        window.editorInterfaceMode = mode;
+        window.isMobileEditorEnvironment = mode === 'mobile';
+
+        document.body.classList.remove('ui-mode-mobile', 'ui-mode-desktop');
+        document.body.classList.add(mode === 'mobile' ? 'ui-mode-mobile' : 'ui-mode-desktop');
+    }
+
+    applyInterfaceMode(window.userSettings);
 
     bindToolbarEasterEggTrigger();
 
@@ -349,9 +373,16 @@ document.addEventListener('DOMContentLoaded', function() {
                 var fileListSidebar = document.getElementById('fileListSidebar');
                 var mobileFileBtn = document.getElementById('mobileFileBtn');
 
+                var desktopDropdown = document.getElementById('desktopMoreDropdown');
+                var desktopMoreBtn = document.getElementById('desktopMoreBtn');
+
                 if (menuBtn && dropdown && !menuBtn.contains(e.target) && !dropdown.contains(e.target)) dropdown.classList.remove('show');
+                if (desktopDropdown && desktopMoreBtn && !desktopMoreBtn.contains(e.target) && !desktopDropdown.contains(e.target)) desktopDropdown.classList.remove('show');
                 if (overlay && e.target === overlay) window.hideMobileActionSheet();
-                if (userMenu && !document.getElementById('mobileLoginBtn').contains(e.target) && !userMenu.contains(e.target)) userMenu.classList.remove('show');
+                var mobileLoginBtn = document.getElementById('mobileLoginBtn');
+                var desktopLoginBtn = document.getElementById('desktopLoginBtn');
+                var loginTriggerClicked = (mobileLoginBtn && mobileLoginBtn.contains(e.target)) || (desktopLoginBtn && desktopLoginBtn.contains(e.target));
+                if (userMenu && !loginTriggerClicked && !userMenu.contains(e.target)) userMenu.classList.remove('show');
             });
             if (window.vditor && window.vditor.vditor && window.vditor.vditor.ir) {
                 window.vditor.vditor.ir.element.addEventListener('input', function() {
@@ -588,7 +619,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // 演示模式按钮仅在桌面端显示
         var mobilePresentationBtn = document.getElementById('mobilePresentationBtn');
         if (mobilePresentationBtn) {
-            if (isMobile) {
+            if (window.editorInterfaceMode === 'mobile') {
                 mobilePresentationBtn.style.display = 'none';
             } else {
                 mobilePresentationBtn.style.display = '';
@@ -599,6 +630,16 @@ document.addEventListener('DOMContentLoaded', function() {
     function initMobileFeatures() {
         var dropdown = document.getElementById('mobileDropdown');
         function closeDrop() { if (dropdown) dropdown.classList.remove('show'); }
+        var desktopDropdown = document.getElementById('desktopMoreDropdown');
+        function closeDesktopDrop() { if (desktopDropdown) desktopDropdown.classList.remove('show'); }
+
+        function bindDesktopButton(id, fn) {
+            var el = document.getElementById(id);
+            if (!el || !el.parentNode) return;
+            var neu = el.cloneNode(true);
+            el.parentNode.replaceChild(neu, el);
+            neu.addEventListener('click', fn);
+        }
 
         var mobileShareBtn = document.getElementById('mobileShareBtn');
         if (mobileShareBtn) mobileShareBtn.addEventListener('click', async function() {
@@ -705,6 +746,92 @@ document.addEventListener('DOMContentLoaded', function() {
         if (mobileLoginBtn) mobileLoginBtn.addEventListener('click', window.handleLoginButtonClick);
         var modeToggle = document.getElementById('modeToggle');
         if (modeToggle) modeToggle.addEventListener('click', window.toggleNightMode);
+
+        bindDesktopButton('desktopFileBtn', function() {
+            var sidebar = document.getElementById('fileListSidebar');
+            if (sidebar) sidebar.classList.toggle('show');
+        });
+        bindDesktopButton('desktopLoginBtn', function() { window.handleLoginButtonClick(); });
+        bindDesktopButton('desktopInsertBtn', function() {
+            if (typeof window.showInsertPicker === 'function') window.showInsertPicker();
+            else window.showInsertMenu();
+        });
+        bindDesktopButton('desktopFormulaBtn', async function() {
+            if (typeof window.showFormulaPicker !== 'function') {
+                await import('./formula-picker.js');
+            }
+            if (typeof window.showFormulaPicker === 'function') window.showFormulaPicker();
+        });
+        bindDesktopButton('desktopChartBtn', async function() {
+            if (typeof window.showChartPicker !== 'function') {
+                await import('./ui/chart.js');
+            }
+            if (typeof window.showChartPicker === 'function') window.showChartPicker();
+        });
+        bindDesktopButton('desktopUndoBtn', function() {
+            if (window.vditor && window.vditor.vditor && window.vditor.vditor.undo) {
+                window.vditor.vditor.undo.undo(window.vditor.vditor);
+            }
+        });
+        bindDesktopButton('desktopRedoBtn', function() {
+            if (window.vditor && window.vditor.vditor && window.vditor.vditor.undo) {
+                window.vditor.vditor.undo.redo(window.vditor.vditor);
+            }
+        });
+        bindDesktopButton('desktopSaveBtn', handleBottomSave);
+        bindDesktopButton('desktopSettingsBtn', function() { window.showSettingsDialog(); });
+        bindDesktopButton('desktopAboutBtn', function() { window.showAboutDialog(); });
+        bindDesktopButton('desktopMoreBtn', function(e) {
+            e.stopPropagation();
+            if (desktopDropdown) desktopDropdown.classList.toggle('show');
+        });
+
+        bindDesktopButton('desktopShareBtn', async function() {
+            if (typeof window.showShareDialog !== 'function') {
+                await import('./ui/share.js');
+            }
+            window.showShareDialog();
+            closeDesktopDrop();
+        });
+        bindDesktopButton('desktopFileManagerBtn', function() { window.showFileManager(); closeDesktopDrop(); });
+        bindDesktopButton('desktopFileDiffBtn', function() {
+            if (typeof window.showFileDiffDialog === 'function') {
+                window.showFileDiffDialog();
+            }
+            closeDesktopDrop();
+        });
+        bindDesktopButton('desktopFindBtn', function() {
+            if (typeof window.showFindDialog === 'function') {
+                window.showFindDialog();
+            }
+            closeDesktopDrop();
+        });
+        bindDesktopButton('desktopPrintBtn', async function() {
+            if (typeof window.showPrintDialog !== 'function') {
+                await import('./ui/print.js');
+            }
+            window.showPrintDialog();
+            closeDesktopDrop();
+        });
+        bindDesktopButton('desktopPresentationBtn', function() { enterPresentationMode(); closeDesktopDrop(); });
+        bindDesktopButton('desktopModeBtn', function() { showModeSelection(); closeDesktopDrop(); });
+        bindDesktopButton('desktopImportBtn', function() { window.importFiles(); closeDesktopDrop(); });
+        bindDesktopButton('desktopExportBtn', async function() {
+            if (typeof window.exportContent !== 'function') {
+                await import('./ui/export.js');
+            }
+            window.exportContent();
+            closeDesktopDrop();
+        });
+        bindDesktopButton('desktopClearBtn', async function() {
+            const confirmed = await window.customConfirm(window.i18n ? window.i18n.t('clearConfirm') : '确定要清空当前文件的内容吗？');
+            if (confirmed) {
+                if (window.vditor) window.vditor.setValue('');
+                window.showMessage(window.i18n ? window.i18n.t('contentCleared') : '内容已清空');
+            }
+            closeDesktopDrop();
+        });
+        bindDesktopButton('desktopServiceStatusBtn', function() { window.showServiceStatusDialog(); closeDesktopDrop(); });
 
         // 渲染底部工具栏
         window.renderBottomToolbar();
@@ -853,7 +980,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // 演示模式按钮仅在桌面端显示
         var mobilePresentationBtn = document.getElementById('mobilePresentationBtn');
         if (mobilePresentationBtn) {
-            if (isMobile) {
+            if (window.editorInterfaceMode === 'mobile') {
                 mobilePresentationBtn.style.display = 'none';
             } else {
                 mobilePresentationBtn.style.display = '';
@@ -932,6 +1059,15 @@ document.addEventListener('DOMContentLoaded', function() {
         for (var i = 0; i < themeRadios.length; i++) {
             if (themeRadios[i].value === currentThemeMode) {
                 themeRadios[i].checked = true;
+            }
+        }
+
+        // 设置界面样式模式
+        var currentUiMode = window.userSettings.uiMode || 'auto';
+        var uiModeRadios = document.getElementsByName('uiMode');
+        for (var i = 0; i < uiModeRadios.length; i++) {
+            if (uiModeRadios[i].value === currentUiMode) {
+                uiModeRadios[i].checked = true;
             }
         }
 
@@ -1288,6 +1424,7 @@ document.addEventListener('DOMContentLoaded', function() {
         var newSettings = {
             toolbarButtons: [],
             themeMode: 'system',
+            uiMode: 'auto',
             fontSize: '16px',
             showOutline: false,
             storageLocation: 'cloud'
@@ -1310,6 +1447,15 @@ document.addEventListener('DOMContentLoaded', function() {
         for (var i = 0; i < themeRadios.length; i++) {
             if (themeRadios[i].checked) {
                 newSettings.themeMode = themeRadios[i].value;
+                break;
+            }
+        }
+
+        // 获取界面样式模式
+        var uiModeRadios = document.getElementsByName('uiMode');
+        for (var i = 0; i < uiModeRadios.length; i++) {
+            if (uiModeRadios[i].checked) {
+                newSettings.uiMode = uiModeRadios[i].value;
                 break;
             }
         }
@@ -1422,7 +1568,9 @@ document.addEventListener('DOMContentLoaded', function() {
             window.location.reload(); // 重新加载以应用主题、语言或大纲视图更改
         } else {
             applyTranslations();
+            applyInterfaceMode(window.userSettings);
             window.renderBottomToolbar();
+            initMobileFeatures();
             // 重新加载文件列表以应用新的排序设置
             if (window.loadFiles) window.loadFiles();
             document.getElementById('settingsModalOverlay').classList.remove('show');
