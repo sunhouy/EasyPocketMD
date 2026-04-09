@@ -97,6 +97,9 @@ document.addEventListener('DOMContentLoaded', function() {
     var keyboardShortcutListenerInitialized = false;
     var settingsDialogInitialSnapshot = null;
     var settingsDialogCloseInProgress = false;
+    var erudaModulePromise = null;
+    var erudaInstance = null;
+    var erudaEnabled = false;
 
     keyboardShortcutActionDefinitions.forEach(function(definition) {
         keyboardShortcutActionsById[definition.id] = definition;
@@ -517,6 +520,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         var fontSizeSelect = document.getElementById('fontSizeSelect');
         var showOutlineCheckbox = document.getElementById('showOutlineCheckbox');
+        var debugModeCheckbox = document.getElementById('debugModeCheckbox');
         var slashCommandEnabledCheckbox = document.getElementById('slashCommandEnabledCheckbox');
         var slashCommandActivationKeySelect = document.getElementById('slashCommandActivationKeySelect');
         var mdAssociationCheckbox = document.getElementById('mdAssociationCheckbox');
@@ -528,6 +532,7 @@ document.addEventListener('DOMContentLoaded', function() {
             language: getCheckedRadioValue('language', window.i18n ? window.i18n.getLanguage() : 'zh'),
             fontSize: fontSizeSelect ? fontSizeSelect.value : '16px',
             showOutline: !!(showOutlineCheckbox && showOutlineCheckbox.checked),
+            enableDebugMode: !!(debugModeCheckbox && debugModeCheckbox.checked),
             enableSlashCommand: slashCommandEnabledCheckbox ? slashCommandEnabledCheckbox.checked : true,
             slashCommandActivationKey: slashCommandActivationKeySelect ? (slashCommandActivationKeySelect.value || 'Tab') : 'Tab',
             storageLocation: getCheckedRadioValue('storageLocation', 'cloud'),
@@ -580,6 +585,52 @@ document.addEventListener('DOMContentLoaded', function() {
         } finally {
             settingsDialogCloseInProgress = false;
         }
+    }
+
+    async function loadErudaModule() {
+        if (erudaInstance) return erudaInstance;
+        if (!erudaModulePromise) {
+            erudaModulePromise = import('eruda').then(function(module) {
+                return module && module.default ? module.default : module;
+            }).catch(function(error) {
+                erudaModulePromise = null;
+                throw error;
+            });
+        }
+
+        erudaInstance = await erudaModulePromise;
+        return erudaInstance;
+    }
+
+    async function applyDebugModeSetting(enableDebugMode, notifyOnError) {
+        var shouldEnable = !!enableDebugMode;
+
+        if (shouldEnable === erudaEnabled) {
+            return true;
+        }
+
+        if (shouldEnable) {
+            try {
+                var eruda = await loadErudaModule();
+                if (eruda && typeof eruda.init === 'function') {
+                    eruda.init();
+                }
+                erudaEnabled = true;
+                return true;
+            } catch (error) {
+                console.error('Failed to enable Eruda debug mode:', error);
+                if (notifyOnError && typeof window.showMessage === 'function') {
+                    window.showMessage(window.i18n ? window.i18n.t('debugModeLoadFailed') : '调试模式加载失败', 'error');
+                }
+                return false;
+            }
+        }
+
+        if (erudaInstance && typeof erudaInstance.destroy === 'function') {
+            erudaInstance.destroy();
+        }
+        erudaEnabled = false;
+        return true;
     }
 
     function initGlobalKeyboardShortcuts() {
@@ -715,6 +766,9 @@ document.addEventListener('DOMContentLoaded', function() {
     if (typeof window.userSettings.showOutline !== 'boolean') {
         window.userSettings.showOutline = false; // 默认不显示大纲
     }
+    if (typeof window.userSettings.enableDebugMode !== 'boolean') {
+        window.userSettings.enableDebugMode = false;
+    }
     if (typeof window.userSettings.enableSlashCommand !== 'boolean') {
         window.userSettings.enableSlashCommand = true;
     }
@@ -731,6 +785,7 @@ document.addEventListener('DOMContentLoaded', function() {
         window.userSettings.uiMode = 'auto'; // auto, mobile, desktop
     }
     window.userSettings.keyboardShortcuts = getEffectiveKeyboardShortcuts(window.userSettings);
+    applyDebugModeSetting(window.userSettings.enableDebugMode, false);
 
     let electronOpenFileBridgeInitialized = false;
 
@@ -1699,6 +1754,11 @@ document.addEventListener('DOMContentLoaded', function() {
             showOutlineCheckbox.checked = window.userSettings.showOutline || false;
         }
 
+        var debugModeCheckbox = document.getElementById('debugModeCheckbox');
+        if (debugModeCheckbox) {
+            debugModeCheckbox.checked = window.userSettings.enableDebugMode === true;
+        }
+
         var slashCommandEnabledCheckbox = document.getElementById('slashCommandEnabledCheckbox');
         if (slashCommandEnabledCheckbox) {
             slashCommandEnabledCheckbox.checked = window.userSettings.enableSlashCommand !== false;
@@ -2070,6 +2130,7 @@ document.addEventListener('DOMContentLoaded', function() {
             uiMode: 'auto',
             fontSize: '16px',
             showOutline: false,
+            enableDebugMode: false,
             enableSlashCommand: window.userSettings.enableSlashCommand !== false,
             slashCommandActivationKey: window.userSettings.slashCommandActivationKey || 'Tab',
             keyboardShortcuts: getEffectiveKeyboardShortcuts(window.userSettings),
@@ -2141,6 +2202,11 @@ document.addEventListener('DOMContentLoaded', function() {
         var showOutlineCheckbox = document.getElementById('showOutlineCheckbox');
         if (showOutlineCheckbox) {
             newSettings.showOutline = showOutlineCheckbox.checked;
+        }
+
+        var debugModeCheckbox = document.getElementById('debugModeCheckbox');
+        if (debugModeCheckbox) {
+            newSettings.enableDebugMode = debugModeCheckbox.checked;
         }
 
         var slashCommandEnabledCheckbox = document.getElementById('slashCommandEnabledCheckbox');
@@ -2247,6 +2313,7 @@ document.addEventListener('DOMContentLoaded', function() {
             window.renderBottomToolbar();
             initMobileFeatures();
             initSlashCommandRuntime();
+            applyDebugModeSetting(window.userSettings.enableDebugMode, true);
             // 重新加载文件列表以应用新的排序设置
             if (window.loadFiles) window.loadFiles();
             settingsDialogInitialSnapshot = null;
