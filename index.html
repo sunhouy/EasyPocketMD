@@ -480,6 +480,12 @@
                     <label><input type="radio" name="defaultSorting" value="fileSize"> <span data-i18n="sortByFileSize">文件大小</span></label>
                 </div>
             </div>
+            <div class="form-group" id="mdAssociationSetting" style="display:none;">
+                <label data-i18n="mdFileAssociation">.md 文件关联</label>
+                <div class="checkbox-group">
+                    <label><input type="checkbox" id="mdAssociationCheckbox"> <span data-i18n="mdFileAssociationDesc">允许通过系统打开 .md 文件时自动在应用中打开</span></label>
+                </div>
+            </div>
             <div class="form-group">
                 <label data-i18n="bottomToolbarButtons">底部工具栏按钮 (5-7个)</label>
                 <div class="checkbox-group" id="toolbarButtonsSettings">
@@ -776,6 +782,7 @@
                     <button class="dropdown-item" id="desktopPrintBtn"><i class="fas fa-print"></i><span data-i18n="cloudPrint">云打印</span></button>
                     <button class="dropdown-item" id="desktopPresentationBtn"><i class="fas fa-chalkboard-teacher"></i><span data-i18n="presentationMode">演示模式</span></button>
                     <button class="dropdown-item" id="desktopModeBtn"><i class="fas fa-exchange-alt"></i><span data-i18n="switchMode">切换编辑器模式</span></button>
+                    <button class="dropdown-item" id="desktopOpenLocalFileBtn"><i class="fas fa-folder-open"></i><span data-i18n="openLocalFile">打开本地文件</span></button>
                     <button class="dropdown-item" id="desktopImportBtn"><i class="fas fa-file-import"></i><span data-i18n="import">导入</span></button>
                     <button class="dropdown-item" id="desktopExportBtn"><i class="fas fa-file-export"></i><span data-i18n="export">导出</span></button>
                     <button class="dropdown-item" id="desktopClearBtn"><i class="fas fa-trash-alt"></i><span data-i18n="clear">清空</span></button>
@@ -821,6 +828,7 @@
                     <button class="dropdown-item" id="mobilePrintBtn"><i class="fas fa-print"></i>  <span data-i18n="cloudPrint">云打印</span></button>
                     <button class="dropdown-item" id="mobilePresentationBtn"><i class="fas fa-chalkboard-teacher"></i>  <span data-i18n="presentationMode">演示模式</span></button>
                     <button class="dropdown-item" id="mobileModeBtn"><i class="fas fa-exchange-alt"></i>  <span data-i18n="switchMode">切换编辑器模式</span></button>
+                    <button class="dropdown-item" id="mobileOpenLocalFileBtn"><i class="fas fa-folder-open"></i>  <span data-i18n="openLocalFile">打开本地文件</span></button>
                     <button class="dropdown-item" id="mobileImportBtn"><i class="fas fa-file-import"></i>  <span data-i18n="import">导入</span></button>
                     <button class="dropdown-item" id="mobileExportBtn"><i class="fas fa-file-export"></i>  <span data-i18n="export">导出</span></button>
                     <!--

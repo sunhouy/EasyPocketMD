@@ -265,6 +265,71 @@
         }
     }
 
+    function getPathBasename(filePath) {
+        if (!filePath) return '';
+        const parts = String(filePath).split(/[/\\]/);
+        return parts[parts.length - 1] || filePath;
+    }
+
+    async function openExternalLocalFileByPath(filePath, presetData) {
+        if (!filePath) return false;
+        if (!global.electron || typeof global.electron.readLocalFile !== 'function') {
+            global.showMessage(isEn() ? 'This feature is only available in Electron' : '该功能仅在 Electron 桌面端可用', 'warning');
+            return false;
+        }
+
+        let fileData = presetData;
+        if (!fileData) {
+            fileData = await global.electron.readLocalFile(filePath);
+        }
+
+        if (!fileData || !fileData.success) {
+            global.showMessage((isEn() ? 'Failed to open local file: ' : '打开本地文件失败：') + ((fileData && fileData.error) || ''), 'error');
+            return false;
+        }
+
+        const files = g('files');
+        let target = files.find(function(f) { return f.type === 'file' && f.isExternalLocal && f.localFilePath === fileData.path; });
+        const now = Date.now();
+
+        if (!target) {
+            const baseName = fileData.name || getPathBasename(fileData.path) || (isEn() ? 'Local file' : '本地文件');
+            const safeName = getNextAvailableName(baseName, '');
+            target = {
+                id: 'local-' + now + '-' + Math.random().toString(36).slice(2, 8),
+                name: safeName,
+                type: 'file',
+                content: fileData.content || '',
+                lastModified: now,
+                isSynced: true,
+                isExternalLocal: true,
+                localFilePath: fileData.path
+            };
+            files.push(target);
+        } else {
+            target.content = fileData.content || '';
+            target.lastModified = now;
+        }
+
+        localStorage.setItem('vditor_files', JSON.stringify(files));
+        g('lastSyncedContent')[target.id] = target.content;
+        g('unsavedChanges')[target.id] = false;
+        loadFiles();
+        openFile(target.id);
+        return true;
+    }
+
+    async function openExternalLocalFileByDialog() {
+        if (!global.electron || typeof global.electron.openLocalFileDialog !== 'function') {
+            global.showMessage(isEn() ? 'This feature is only available in Electron' : '该功能仅在 Electron 桌面端可用', 'warning');
+            return false;
+        }
+
+        const result = await global.electron.openLocalFileDialog();
+        if (!result || result.canceled) return false;
+        return openExternalLocalFileByPath(result.path, result);
+    }
+
     // 获取所有可用目标文件夹（包含虚拟中间文件夹）
     function getAllFolderPaths() {
         const folderSet = new Set(['']); // 根目录
@@ -3026,6 +3091,21 @@
             global.draftRecovery.clearDraft();
         }
 
+        // Electron 本地文件：直接回写原始文件路径，不走服务器同步
+        if (file.isExternalLocal && file.localFilePath && global.electron && typeof global.electron.writeLocalFile === 'function') {
+            const writeResult = await global.electron.writeLocalFile(file.localFilePath, content);
+            if (!writeResult || !writeResult.success) {
+                global.showMessage((isEn() ? 'Failed to save local file: ' : '保存本地文件失败：') + ((writeResult && writeResult.error) || ''), 'error');
+                return;
+            }
+            g('lastSyncedContent')[currentFileId] = content;
+            g('unsavedChanges')[currentFileId] = false;
+            if (isManual) {
+                global.showMessage(t('localFileSaved'), 'success');
+            }
+            return;
+        }
+
         if (g('currentUser')) {
             // 保存即触发服务器同步；失败则保留 pending 标记，稍后会自动补齐同步
             markPendingServerSync(currentFileId, true);
@@ -5100,6 +5180,8 @@
     // 导出文件对比和全文查找功能
     global.showFileDiffDialog = showFileDiffDialog;
     global.showFindDialog = showFindDialog;
+    global.openExternalLocalFileByDialog = openExternalLocalFileByDialog;
+    global.openExternalLocalFileByPath = openExternalLocalFileByPath;
 
 })(typeof window !== 'undefined' ? window : this);
 

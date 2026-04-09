@@ -162,6 +162,11 @@
             clear: '清空',
             clearConfirm: '确定要清空当前文件的内容吗？',
             contentCleared: '内容已清空',
+            openLocalFile: '打开本地文件',
+            localFileSaved: '本地文件已保存',
+            localFileOpenFailed: '打开本地文件失败',
+            mdFileAssociation: '.md 文件关联',
+            mdFileAssociationDesc: '允许通过系统打开 .md 文件时自动在应用中打开',
             videoCall: '视频通话',
 
             // 服务状态
@@ -792,6 +797,11 @@
             clear: 'Clear',
             clearConfirm: 'Are you sure you want to clear the current file content?',
             contentCleared: 'Content cleared',
+            openLocalFile: 'Open Local File',
+            localFileSaved: 'Local file saved',
+            localFileOpenFailed: 'Failed to open local file',
+            mdFileAssociation: '.md File Association',
+            mdFileAssociationDesc: 'Allow opening .md files in app when launched from the operating system',
             videoCall: 'Video Call',
 
             // Service Status
