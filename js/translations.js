@@ -104,7 +104,7 @@
             fontSize: '字体大小',
             showOutline: '显示大纲视图（需刷新页面）',
             debugMode: '调试模式',
-            debugModeEnable: '开启 Eruda 调试面板（懒加载）',
+            debugModeEnable: '开启调试模式',
             debugModeLoadFailed: '调试模式加载失败',
             slashCommand: '斜杠快捷命令',
             slashCommandEnable: '在编辑器输入 / 时显示快捷操作列表',

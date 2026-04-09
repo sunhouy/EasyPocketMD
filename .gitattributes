@@ -38,5 +38,6 @@ intro.html           linguist-vendored
 
 tests/               linguist-vendored
 webrtc/**            linguist-documentation
+*.yml linguist-detectable=true
 
 dev/** linguist-generated=true

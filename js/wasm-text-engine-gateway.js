@@ -367,6 +367,9 @@
                     hits: hits
                 };
             });
+            const totalMatches = results.reduce(function(sum, item) {
+                return sum + (item.matchCount || 0);
+            }, 0);
 
             return {
                 code: 200,
@@ -375,9 +378,7 @@
                     query: query || '',
                     files: results,
                     fileCount: results.length,
-                    totalMatches: typeof searchRes.data.total === 'number'
-                        ? searchRes.data.total
-                        : results.reduce(function(sum, item) { return sum + (item.matchCount || 0); }, 0)
+                    totalMatches: totalMatches
                 }
             };
         } catch (e) {
