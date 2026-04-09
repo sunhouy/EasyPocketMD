@@ -126,6 +126,93 @@ body.has-top-notice .custom-fullscreen-btn {
     outline: none;
 }
 
+.long-file-editor-host {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    background: #ffffff;
+}
+
+.long-file-toolbar {
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 6px 10px;
+    border-bottom: 1px solid #e7ebf1;
+    background: #f8fafc;
+}
+
+.long-file-mode-hint {
+    min-width: 0;
+    color: #4b5a6a;
+    font-size: 12px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.long-file-preview-toggle {
+    flex-shrink: 0;
+    border: 1px solid #d5dce6;
+    background: #ffffff;
+    color: #2d3b4d;
+    border-radius: 6px;
+    padding: 5px 10px;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.long-file-preview-toggle:hover {
+    background: #eef3f9;
+}
+
+.long-file-editor-body {
+    flex: 1;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+
+.long-file-editor-body.preview-disabled {
+    grid-template-columns: minmax(0, 1fr);
+}
+
+.long-file-editor-body.preview-disabled .long-file-preview {
+    display: none;
+}
+
+.long-file-textarea {
+    width: 100%;
+    height: 100%;
+    resize: none;
+    border: none;
+    border-right: 1px solid #e7ebf1;
+    outline: none;
+    padding: 14px;
+    font-size: 16px;
+    line-height: 1.6;
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    color: #1f2937;
+    background: #ffffff;
+}
+
+.long-file-preview {
+    height: 100%;
+    overflow: auto;
+    padding: 14px;
+    line-height: 1.6;
+    color: #233142;
+    background: #fbfdff;
+    word-break: break-word;
+}
+
+.long-file-preview pre {
+    white-space: pre-wrap;
+}
+
 .mobile-toolbar-container {
     position: fixed;
     top: var(--top-toolbar-offset);
@@ -1772,6 +1859,56 @@ body.night-mode .vditor-toolbar__item {
 
 body.night-mode .vditor-toolbar__item:hover {
     background-color: #444444 !important;
+}
+
+body.night-mode .long-file-editor-host {
+    background: #1a1a1a;
+}
+
+body.night-mode .long-file-toolbar {
+    background: #20242a;
+    border-bottom-color: #2f3845;
+}
+
+body.night-mode .long-file-mode-hint {
+    color: #b5c0cf;
+}
+
+body.night-mode .long-file-preview-toggle {
+    background: #2a313d;
+    border-color: #445063;
+    color: #d8e0ea;
+}
+
+body.night-mode .long-file-preview-toggle:hover {
+    background: #343e4c;
+}
+
+body.night-mode .long-file-textarea {
+    background: #15191f;
+    color: #dde5f0;
+    border-right-color: #2f3845;
+}
+
+body.night-mode .long-file-preview {
+    background: #1d232c;
+    color: #d8e0ea;
+}
+
+@media (max-width: 960px) {
+    .long-file-editor-body {
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: minmax(0, 1fr) minmax(140px, 38%);
+    }
+
+    .long-file-textarea {
+        border-right: none;
+        border-bottom: 1px solid #e7ebf1;
+    }
+
+    body.night-mode .long-file-textarea {
+        border-bottom-color: #2f3845;
+    }
 }
 
 .upload-status {

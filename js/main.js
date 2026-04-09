@@ -1508,6 +1508,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function setEditorMode(mode) {
         if (!window.vditor || !modeMap[mode]) return;
+        if (window.isLongFileMode) {
+            window.showMessage(window.i18n ? window.i18n.t('longFileModeSwitchBlocked') : '当前文件处于超长模式，暂不支持切换 Vditor 编辑模式', 'warning');
+            return;
+        }
         try {
             var currentContent = window.vditor.getValue();
             localStorage.setItem('vditor_editor_mode', mode);
@@ -2535,6 +2539,18 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // 应用字体大小设置
     function applyFontSize(fontSize) {
+        var longFileTextarea = document.getElementById('longFileTextarea');
+        if (longFileTextarea) {
+            longFileTextarea.style.fontSize = fontSize;
+            longFileTextarea.style.lineHeight = '1.6';
+        }
+
+        var longFilePreview = document.getElementById('longFilePreview');
+        if (longFilePreview) {
+            longFilePreview.style.fontSize = fontSize;
+            longFilePreview.style.lineHeight = '1.6';
+        }
+
         if (!window.vditor) return;
 
         var vditorElement = document.getElementById('vditor');
@@ -2576,6 +2592,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // 应用大纲视图设置
     function applyOutline(show) {
+        if (window.isLongFileMode) return;
         if (!window.vditor) return;
 
         // 如果需要，重新初始化编辑器以应用大纲视图设置

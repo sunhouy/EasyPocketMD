@@ -14,6 +14,300 @@
     const browserFileHandleMap = new Map();
     const localExternalSnapshotMap = new Map();
     const localExternalConflictPrompting = new Set();
+    const LONG_FILE_MODE_CHAR_THRESHOLD = 220000;
+    const LONG_FILE_MODE_LINE_THRESHOLD = 6000;
+    const LONG_FILE_MODE_PREVIEW_DEBOUNCE = 180;
+
+    let markedParserPromise = null;
+    let longFilePreviewTimer = null;
+
+    function getLongFileEditorState() {
+        if (!global.longFileEditorState) {
+            global.longFileEditorState = {
+                active: false,
+                fileId: null,
+                previewEnabled: true,
+                renderToken: 0
+            };
+        }
+        return global.longFileEditorState;
+    }
+
+    function syncLongFileModeFlag() {
+        const state = getLongFileEditorState();
+        global.isLongFileMode = !!state.active;
+        if (typeof document !== 'undefined' && document.body) {
+            document.body.classList.toggle('long-file-mode-active', !!state.active);
+        }
+    }
+
+    function isLongFileEditorActiveFor(fileId) {
+        const state = getLongFileEditorState();
+        if (!state.active) return false;
+        return String(state.fileId || '') === String(fileId || g('currentFileId') || '');
+    }
+
+    function countTextLinesFast(text) {
+        if (!text) return 1;
+        let lines = 1;
+        for (let i = 0; i < text.length; i++) {
+            if (text.charCodeAt(i) === 10) lines += 1;
+        }
+        return lines;
+    }
+
+    function shouldUseLongFileMode(content) {
+        const text = String(content || '');
+        if (text.length >= LONG_FILE_MODE_CHAR_THRESHOLD) return true;
+        return countTextLinesFast(text) >= LONG_FILE_MODE_LINE_THRESHOLD;
+    }
+
+    function ensureLongFileEditorElements() {
+        let host = document.getElementById('longFileEditorHost');
+        if (host) return host;
+
+        const editorContainer = document.querySelector('.editor-container');
+        if (!editorContainer) return null;
+
+        host = document.createElement('div');
+        host.id = 'longFileEditorHost';
+        host.className = 'long-file-editor-host';
+        host.style.display = 'none';
+        host.innerHTML =
+            '<div class="long-file-toolbar">' +
+                '<div id="longFileModeHint" class="long-file-mode-hint"></div>' +
+                '<button id="longFilePreviewToggle" type="button" class="long-file-preview-toggle"></button>' +
+            '</div>' +
+            '<div id="longFileEditorBody" class="long-file-editor-body">' +
+                '<textarea id="longFileTextarea" class="long-file-textarea" spellcheck="false"></textarea>' +
+                '<div id="longFilePreview" class="long-file-preview"></div>' +
+            '</div>';
+        editorContainer.appendChild(host);
+
+        const textarea = document.getElementById('longFileTextarea');
+        const previewToggle = document.getElementById('longFilePreviewToggle');
+
+        if (textarea) {
+            textarea.addEventListener('input', function() {
+                const state = getLongFileEditorState();
+                if (!state.active) return;
+
+                const currentFileId = g('currentFileId');
+                if (currentFileId) {
+                    g('unsavedChanges')[currentFileId] = true;
+                    if (typeof global.startAutoSave === 'function') {
+                        global.startAutoSave();
+                    }
+                    if (global.draftRecovery && typeof global.draftRecovery.markDirty === 'function') {
+                        global.draftRecovery.markDirty();
+                    }
+                }
+
+                scheduleLongFilePreviewRender();
+            });
+        }
+
+        if (previewToggle) {
+            previewToggle.addEventListener('click', function() {
+                const state = getLongFileEditorState();
+                state.previewEnabled = !state.previewEnabled;
+                applyLongFilePreviewVisibility();
+                updateLongFileEditorLabels();
+                if (state.previewEnabled) {
+                    scheduleLongFilePreviewRender();
+                }
+            });
+        }
+
+        return host;
+    }
+
+    function applyLongFilePreviewVisibility() {
+        const body = document.getElementById('longFileEditorBody');
+        const state = getLongFileEditorState();
+        if (!body) return;
+        body.classList.toggle('preview-disabled', !state.previewEnabled);
+    }
+
+    function updateLongFileEditorLabels() {
+        const hint = document.getElementById('longFileModeHint');
+        const toggle = document.getElementById('longFilePreviewToggle');
+        const state = getLongFileEditorState();
+        const bannerText = window.i18n ? t('longFileModeBanner') : '超长文件模式：高性能文本编辑 + 快速预览';
+        const toggleShowText = window.i18n ? t('longFilePreviewShow') : '显示预览';
+        const toggleHideText = window.i18n ? t('longFilePreviewHide') : '隐藏预览';
+        if (hint) {
+            hint.textContent = bannerText;
+        }
+        if (toggle) {
+            toggle.textContent = state.previewEnabled ? toggleHideText : toggleShowText;
+        }
+    }
+
+    function getLongFileTextarea() {
+        return document.getElementById('longFileTextarea');
+    }
+
+    function getLongFilePreview() {
+        return document.getElementById('longFilePreview');
+    }
+
+    async function loadMarkedParser() {
+        if (!markedParserPromise) {
+            markedParserPromise = import('marked').then(function(mod) {
+                const marked = mod && (mod.marked || mod.default || mod);
+                if (!marked) {
+                    throw new Error('marked module unavailable');
+                }
+
+                if (typeof marked.setOptions === 'function') {
+                    marked.setOptions({ gfm: true, breaks: true });
+                }
+
+                if (typeof marked.parse === 'function') {
+                    return function(source) {
+                        return marked.parse(source || '');
+                    };
+                }
+
+                if (typeof marked === 'function') {
+                    return function(source) {
+                        return marked(source || '');
+                    };
+                }
+
+                throw new Error('marked parser not found');
+            }).catch(function(error) {
+                markedParserPromise = null;
+                throw error;
+            });
+        }
+
+        return markedParserPromise;
+    }
+
+    async function renderLongFilePreviewNow() {
+        const state = getLongFileEditorState();
+        if (!state.active || !state.previewEnabled) return;
+
+        const preview = getLongFilePreview();
+        const textarea = getLongFileTextarea();
+        if (!preview || !textarea) return;
+
+        const markdownText = String(textarea.value || '');
+        state.renderToken += 1;
+        const token = state.renderToken;
+
+        try {
+            const parse = await loadMarkedParser();
+            if (token !== getLongFileEditorState().renderToken) return;
+            const html = parse(markdownText);
+            preview.innerHTML = html;
+        } catch (error) {
+            if (token !== getLongFileEditorState().renderToken) return;
+            preview.innerHTML = '<pre>' + escapeHtml(markdownText) + '</pre>';
+        }
+    }
+
+    function scheduleLongFilePreviewRender() {
+        const state = getLongFileEditorState();
+        if (!state.active || !state.previewEnabled) return;
+        if (longFilePreviewTimer) clearTimeout(longFilePreviewTimer);
+        longFilePreviewTimer = setTimeout(function() {
+            longFilePreviewTimer = null;
+            renderLongFilePreviewNow();
+        }, LONG_FILE_MODE_PREVIEW_DEBOUNCE);
+    }
+
+    function activateLongFileEditor(fileId, content) {
+        const host = ensureLongFileEditorElements();
+        if (!host) return false;
+
+        const vditorEl = document.getElementById('vditor');
+        const textarea = getLongFileTextarea();
+        const state = getLongFileEditorState();
+
+        state.active = true;
+        state.fileId = fileId;
+
+        if (vditorEl) vditorEl.style.display = 'none';
+        host.style.display = 'flex';
+
+        if (textarea) {
+            textarea.value = String(content || '');
+            textarea.scrollTop = 0;
+            textarea.scrollLeft = 0;
+        }
+
+        applyLongFilePreviewVisibility();
+        updateLongFileEditorLabels();
+        syncLongFileModeFlag();
+        scheduleLongFilePreviewRender();
+        return true;
+    }
+
+    function deactivateLongFileEditor() {
+        const host = document.getElementById('longFileEditorHost');
+        const vditorEl = document.getElementById('vditor');
+        const state = getLongFileEditorState();
+
+        state.active = false;
+        state.fileId = null;
+        state.renderToken += 1;
+
+        if (longFilePreviewTimer) {
+            clearTimeout(longFilePreviewTimer);
+            longFilePreviewTimer = null;
+        }
+
+        if (host) host.style.display = 'none';
+        if (vditorEl) vditorEl.style.display = '';
+
+        syncLongFileModeFlag();
+    }
+
+    function setEditorContentForFile(fileId, content) {
+        const normalizedContent = String(content || '');
+        const currentFileId = g('currentFileId');
+        const isCurrentFile = String(fileId || '') === String(currentFileId || '');
+
+        if (isCurrentFile) {
+            if (shouldUseLongFileMode(normalizedContent)) {
+                activateLongFileEditor(fileId, normalizedContent);
+                return;
+            }
+
+            if (isLongFileEditorActiveFor(fileId)) {
+                deactivateLongFileEditor();
+            }
+        }
+
+        if (isLongFileEditorActiveFor(fileId)) {
+            const textarea = getLongFileTextarea();
+            if (textarea) {
+                textarea.value = normalizedContent;
+                scheduleLongFilePreviewRender();
+            }
+            return;
+        }
+
+        if (g('vditor') && typeof g('vditor').setValue === 'function') {
+            g('vditor').setValue(normalizedContent);
+        }
+    }
+
+    function getCurrentEditorContent(fileId, fallbackContent) {
+        if (isLongFileEditorActiveFor(fileId)) {
+            const textarea = getLongFileTextarea();
+            return textarea ? String(textarea.value || '') : String(fallbackContent || '');
+        }
+
+        if (g('vditor') && typeof g('vditor').getValue === 'function') {
+            return g('vditor').getValue();
+        }
+
+        return String(fallbackContent || '');
+    }
 
     function isTokenErrorMessage(message) {
         if (!message) return false;
@@ -154,9 +448,7 @@
             file.content = sharedContent;
             file.lastModified = Date.now();
             localStorage.setItem('vditor_files', JSON.stringify(g('files')));
-            if (g('vditor')) {
-                g('vditor').setValue(sharedContent);
-            }
+            setEditorContentForFile(file.id, sharedContent);
 
             if (typeof global.activateSharedDocumentSession === 'function') {
                 global.activateSharedDocumentSession(result.data, {
@@ -249,6 +541,19 @@
             }
             candidateName = baseName + counter;
             counter++;
+        }
+    }
+
+    function isExternalLocalFile(file) {
+        return !!(file && file.type === 'file' && file.isExternalLocal);
+    }
+
+    function normalizeExternalLocalFileRecord(file) {
+        if (!isExternalLocalFile(file)) return;
+        // 外部本地文件不参与“云端已同步”语义，避免刷新时被误判为“服务器已删除”。
+        file.isSynced = false;
+        if (!file.localFileMode) {
+            file.localFileMode = global.electron ? 'electron' : 'browser-file';
         }
     }
 
@@ -390,6 +695,12 @@
     }
 
     async function syncFileAfterSaveIfNeeded(currentFileId, file, content, isManual, contentChanged) {
+        if (isExternalLocalFile(file)) {
+            g('lastSyncedContent')[currentFileId] = content;
+            markPendingServerSync(currentFileId, false);
+            return;
+        }
+
         if (!g('currentUser')) {
             g('lastSyncedContent')[currentFileId] = content;
             return;
@@ -458,7 +769,7 @@
                 file.content = latestExternalContent;
                 file.lastModified = Date.now();
                 localStorage.setItem('vditor_files', JSON.stringify(files));
-                if (g('vditor')) g('vditor').setValue(latestExternalContent);
+                setEditorContentForFile(currentFileId, latestExternalContent);
                 g('unsavedChanges')[currentFileId] = false;
                 localExternalSnapshotMap.set(currentFileId, latestExternalContent);
                 loadFiles();
@@ -562,7 +873,7 @@
                 type: 'file',
                 content: fileData.content || '',
                 lastModified: now,
-                isSynced: true,
+                isSynced: false,
                 isExternalLocal: true,
                 localFilePath: resolvedPath,
                 localFileMode: localFileMode
@@ -571,6 +882,7 @@
         } else {
             target.content = fileData.content || '';
             target.lastModified = now;
+            target.isSynced = false;
             target.localFileMode = localFileMode;
             if (!target.localFilePath) target.localFilePath = resolvedPath;
         }
@@ -669,7 +981,10 @@
 
                 const localFiles = JSON.parse(localStorage.getItem('vditor_files') || '[]');
                 // 迁移：给本地文件增加type字段，默认为file
-                localFiles.forEach(f => { if (!f.type) f.type = 'file'; });
+                localFiles.forEach(f => {
+                    if (!f.type) f.type = 'file';
+                    normalizeExternalLocalFileRecord(f);
+                });
 
                 // 当用户从未登录 -> 登录时，本地可能存在服务器从未见过的文件。
                 // 这些文件不应弹冲突窗口，应直接上传并保存到用户服务器上。
@@ -800,7 +1115,6 @@
 
         const files = g('files') || [];
         const currentFileId = g('currentFileId');
-        const vditor = g('vditor');
         const lastSyncedContent = g('lastSyncedContent') || {};
         const unsavedChanges = g('unsavedChanges') || {};
         const pendingServerSync = g('pendingServerSync') || {};
@@ -821,12 +1135,15 @@
         let hasLocalUpdate = false;
         files.forEach(function(file) {
             if (!file || file.type !== 'file') return;
+            if (isExternalLocalFile(file)) return;
             if (pendingServerSync[file.id]) return;
 
             const serverFile = serverMap[file.name];
             if (!serverFile || serverFile.type !== 'file') return;
 
-            const editorContent = (vditor && file.id === currentFileId) ? vditor.getValue() : file.content;
+            const editorContent = file.id === currentFileId
+                ? getCurrentEditorContent(currentFileId, file.content)
+                : file.content;
             const baseContent = lastSyncedContent[file.id];
             const hasLocalChanges = !file.isSynced || unsavedChanges[file.id] || editorContent !== baseContent;
             if (hasLocalChanges) return;
@@ -837,8 +1154,8 @@
                 file.isSynced = true;
                 lastSyncedContent[file.id] = serverFile.content;
                 unsavedChanges[file.id] = false;
-                if (vditor && file.id === currentFileId) {
-                    vditor.setValue(serverFile.content);
+                if (file.id === currentFileId) {
+                    setEditorContentForFile(currentFileId, serverFile.content);
                 }
                 hasLocalUpdate = true;
             }
@@ -858,6 +1175,11 @@
         serverFiles.forEach(function(f) { serverFileMap[f.name] = f; });
 
         localFiles.forEach(function(localFile) {
+            // 外部本地文件不参与云端冲突检测，避免刷新时误删本地文件映射。
+            if (isExternalLocalFile(localFile)) {
+                return;
+            }
+
             // 如果文件在待同步列表中（用户强制退出时未同步），跳过冲突检测，直接使用本地版本
             // 这些文件会在后续自动同步，无需用户手动解决冲突
             if (localFile.id && pendingServerSync[localFile.id]) {
@@ -908,6 +1230,7 @@
         const toUpload = localFiles.filter(function(f) {
             if (!f || !f.name) return false;
             if (f.type !== 'file' && f.type !== 'folder') return false;
+            if (isExternalLocalFile(f)) return false;
             if (serverFileMap[f.name]) return false;
             // 只上传“从未同步过”的本地文件/文件夹
             return !f.isSynced;
@@ -927,7 +1250,7 @@
                 const content =
                     f.type === 'folder'
                         ? ''
-                        : (g('vditor') && f.id === g('currentFileId') ? g('vditor').getValue() : f.content);
+                        : (f.id === g('currentFileId') ? getCurrentEditorContent(f.id, f.content) : f.content);
 
                 // 使用现有的保存接口（verifyUser 支持 body.token），避免依赖自定义 Header（sendBeacon 也可用）
                 const filenameToSend = f.type === 'folder' ? (f.name.endsWith('/') ? f.name : (f.name + '/')) : f.name;
@@ -998,13 +1321,12 @@
 
     function syncCurrentFileWithBeacon() {
         const currentFileId = g('currentFileId');
-        const vditor = g('vditor');
-        if (!currentFileId || !vditor) return false;
+        if (!currentFileId) return false;
         const files = g('files') || [];
         const file = files.find(f => f.id === currentFileId);
         if (!file || file.type !== 'file') return false;
 
-        const content = vditor.getValue();
+        const content = getCurrentEditorContent(currentFileId, file.content);
 
         // 关闭页面，保持“保存即同步保存（本地 + 服务器）”的一致性
         try {
@@ -1014,6 +1336,7 @@
             g('unsavedChanges')[currentFileId] = false;
         } catch (e) {}
 
+        if (isExternalLocalFile(file)) return true;
         if (!g('currentUser')) return true;
 
         // sendBeacon 无法等待响应，因此统一标记为 pending，后续会自动补齐同步
@@ -1529,7 +1852,9 @@
                     if (localFileIndex !== -1) {
                         localFiles[localFileIndex].content = conflict.serverContent;
                         localFiles[localFileIndex].lastModified = conflict.serverModified;
-                        if (currentFileId === localFiles[localFileIndex].id && vditor) vditor.setValue(conflict.serverContent);
+                        if (currentFileId === localFiles[localFileIndex].id) {
+                            setEditorContentForFile(currentFileId, conflict.serverContent);
+                        }
                     }
                 } else if (selection.value === 'merge') {
                     const localFile = localFiles.find(function(f) { return f.name === conflict.filename; });
@@ -1546,7 +1871,9 @@
                     if (localFileIndex !== -1) {
                         localFiles[localFileIndex].content = mergedText;
                         localFiles[localFileIndex].lastModified = Date.now();
-                        if (currentFileId === localFiles[localFileIndex].id && vditor) vditor.setValue(mergedText);
+                        if (currentFileId === localFiles[localFileIndex].id) {
+                            setEditorContentForFile(currentFileId, mergedText);
+                        }
                     }
                 }
             }
@@ -1593,6 +1920,11 @@
             fileMap[serverFile.name] = file;
         });
         localFiles.forEach(function(localFile) {
+            if (isExternalLocalFile(localFile)) {
+                normalizeExternalLocalFileRecord(localFile);
+                mergedFiles.push(Object.assign({}, localFile));
+                return;
+            }
             if (!fileMap[localFile.name]) mergedFiles.push(Object.assign({}, localFile, { isSynced: false }));
         });
         global.files = mergedFiles;
@@ -1607,7 +1939,10 @@
 
     function loadLocalFiles() {
         const localFiles = JSON.parse(localStorage.getItem('vditor_files') || '[]');
-        localFiles.forEach(f => { if (!f.type) f.type = 'file'; });
+        localFiles.forEach(f => {
+            if (!f.type) f.type = 'file';
+            normalizeExternalLocalFileRecord(f);
+        });
         if (localFiles.length === 0) createDefaultFile();
         else {
             global.files = localFiles;
@@ -2415,9 +2750,9 @@
 
     function getKnowledgeGraphFileContent(file) {
         if (!file) return '';
-        if (String(file.id) === String(g('currentFileId')) && g('vditor') && typeof g('vditor').getValue === 'function') {
+        if (String(file.id) === String(g('currentFileId'))) {
             try {
-                return g('vditor').getValue() || '';
+                return getCurrentEditorContent(file.id, file.content) || '';
             } catch (error) {
                 console.warn('读取当前编辑器内容失败:', error);
             }
@@ -3092,7 +3427,14 @@
         global.files.push(defaultFile);
         localStorage.setItem('vditor_files', JSON.stringify(global.files));
         global.currentFileId = defaultFile.id;
-        if (g('vditor')) g('vditor').setValue(defaultFile.content);
+
+        if (shouldUseLongFileMode(defaultFile.content)) {
+            activateLongFileEditor(defaultFile.id, defaultFile.content);
+        } else {
+            deactivateLongFileEditor();
+            setEditorContentForFile(defaultFile.id, defaultFile.content);
+        }
+
         loadFiles();
         g('lastSyncedContent')[defaultFile.id] = defaultFile.content;
         g('unsavedChanges')[defaultFile.id] = false;
@@ -3220,7 +3562,20 @@
             }
         }
         
-        if (g('vditor')) g('vditor').setValue(content);
+        const useLongFileMode = shouldUseLongFileMode(content);
+        if (useLongFileMode) {
+            const wasAlreadyLongForSameFile = isLongFileEditorActiveFor(fileId);
+            activateLongFileEditor(fileId, content);
+            if (!wasAlreadyLongForSameFile) {
+                const longModeNotice = window.i18n
+                    ? t('longFileModeNotice')
+                    : '检测到超长文件，已切换为高性能文本模式（禁用 Vditor 以避免卡顿）';
+                global.showMessage(longModeNotice, 'warning');
+            }
+        } else {
+            deactivateLongFileEditor();
+            setEditorContentForFile(fileId, content);
+        }
 
         await activateOwnerSharedSession(file, content);
         await checkExternalLocalConflictForCurrentFile();
@@ -3295,11 +3650,15 @@
         isManual = isManual !== false;
         const currentFileId = g('currentFileId');
         const vditor = g('vditor');
-        if (!currentFileId || !vditor) return;
+        if (!currentFileId) return;
+
+        const isLongMode = isLongFileEditorActiveFor(currentFileId);
+        if (!isLongMode && !vditor) return;
+
         const files = g('files');
         const fileIndex = files.findIndex(function(f) { return f.id === currentFileId && f.type === 'file'; });
         if (fileIndex === -1) return;
-        let content = vditor.getValue();
+        let content = getCurrentEditorContent(currentFileId, files[fileIndex].content);
 
         if (global.LocalImageManager && global.LocalImageManager.convertBlobToLocal) {
             try {
@@ -3748,12 +4107,14 @@
 
         const files = g('files');
         const currentFileId = g('currentFileId');
-        const vditor = g('vditor');
         const lastSyncedContent = g('lastSyncedContent');
         const pendingServerSync = g('pendingServerSync') || {};
         const filesToSync = files.filter(function(file) {
             if (file.type !== 'file') return false;
-            const currentContent = vditor && file.id === currentFileId ? vditor.getValue() : file.content;
+            if (isExternalLocalFile(file)) return false;
+            const currentContent = file.id === currentFileId
+                ? getCurrentEditorContent(currentFileId, file.content)
+                : file.content;
             return pendingServerSync[file.id] || !file.isSynced || currentContent !== lastSyncedContent[file.id];
         });
         if (filesToSync.length === 0) return;
@@ -3770,6 +4131,15 @@
         const files = g('files');
         const file = files.find(function(f) { return f.id === fileId; });
         if (!file) return;
+
+        if (isExternalLocalFile(file)) {
+            const content = file.id === g('currentFileId')
+                ? getCurrentEditorContent(file.id, file.content)
+                : file.content;
+            g('lastSyncedContent')[fileId] = content;
+            markPendingServerSync(fileId, false);
+            return true;
+        }
         
         let content = '';
         let filenameToSend = file.name;
@@ -3780,7 +4150,9 @@
                 filenameToSend += '/';
             }
         } else {
-            content = (g('vditor') && file.id === g('currentFileId') ? g('vditor').getValue() : file.content);
+            content = file.id === g('currentFileId')
+                ? getCurrentEditorContent(file.id, file.content)
+                : file.content;
 
             // 先检查服务器是否已被其他端更新，避免本地静默覆盖远程新内容
             const baseContent = (g('lastSyncedContent') || {})[fileId];
@@ -3798,8 +4170,8 @@
                     file.content = serverSnapshot.content;
                     file.lastModified = serverSnapshot.lastModified || Date.now();
                     file.isSynced = true;
-                    if (g('vditor') && file.id === g('currentFileId')) {
-                        g('vditor').setValue(serverSnapshot.content);
+                    if (file.id === g('currentFileId')) {
+                        setEditorContentForFile(file.id, serverSnapshot.content);
                     }
                     localStorage.setItem('vditor_files', JSON.stringify(files));
                     g('lastSyncedContent')[fileId] = serverSnapshot.content;
@@ -3975,8 +4347,7 @@
         if (!confirmed1) return;
         try {
             global.showMessage(isEn() ? 'Restoring history version...' : '正在恢复历史版本...', 'info');
-            var vditor = g('vditor');
-            var currentContent = vditor ? vditor.getValue() : '';
+            var currentContent = getCurrentEditorContent(fileId, '');
             var diff = compareVersions(currentContent, content);
             if (!diff.hasChanges) { global.showMessage(isEn() ? 'Current content is the same as the selected version, no need to restore' : '当前内容与所选版本相同，无需恢复', 'info'); return; }
             const confirmed2 = await g('customConfirm')(isEn() ? 'About to restore history version, here is the change summary:\n' + diff.message + '\n\nAre you sure you want to restore?' : '即将恢复历史版本，以下是变化摘要：\n' + diff.message + '\n\n确定要恢复吗？');
@@ -3992,8 +4363,8 @@
             files[fileIndex].lastModified = Date.now();
             files[fileIndex].isSynced = g('currentUser') ? false : true;
             localStorage.setItem('vditor_files', JSON.stringify(files));
-            if (vditor && g('currentFileId') === fileId) {
-                vditor.setValue(content);
+            if (g('currentFileId') === fileId) {
+                setEditorContentForFile(fileId, content);
                 global.showMessage((isEn() ? 'Restored to this version (Version ID: ' : '已恢复到此版本（版本ID: ') + versionId + '）', 'success');
                 g('unsavedChanges')[fileId] = true;
                 setTimeout(function() { global.saveCurrentFile(true); }, 1000);
@@ -4806,11 +5177,18 @@
         if (wasmSearchPanel) wasmSearchPanel.style.display = 'block';
 
         function getCurrentEditorText() {
-            const vditor = g('vditor');
-            return vditor ? (vditor.getValue() || '') : '';
+            const currentFileId = g('currentFileId');
+            const currentFile = (g('files') || []).find(function(file) {
+                return file && file.id === currentFileId;
+            });
+            return getCurrentEditorContent(currentFileId, currentFile ? currentFile.content : '');
         }
         // 获取编辑器可搜索的DOM节点
         function getEditorElement() {
+            if (isLongFileEditorActiveFor(g('currentFileId'))) {
+                return document.getElementById('longFileTextarea');
+            }
+
             const vditor = g('vditor');
             if (!vditor || !vditor.vditor) return null;
             const mode = vditor.vditor.currentMode || vditor.vditor.mode || vditor.vditor.currentOptions.mode;
@@ -4866,7 +5244,9 @@
             const editorElement = getEditorElement();
             if (!editorElement) return [];
 
-            const originalText = editorElement.textContent || '';
+            const originalText = editorElement.tagName === 'TEXTAREA'
+                ? (editorElement.value || '')
+                : (editorElement.textContent || '');
             const needle = String(keyword || '');
             if (!needle) return [];
 
@@ -5127,6 +5507,22 @@
             const editorElement = getEditorElement();
             if (!editorElement) return null;
 
+            if (editorElement.tagName === 'TEXTAREA') {
+                const totalLength = (editorElement.value || '').length;
+                const targetStart = Math.max(0, Math.min(totalLength, Number(start) || 0));
+                const targetEnd = Math.max(targetStart, Math.min(totalLength, Number(end) || targetStart));
+                editorElement.focus();
+                if (typeof editorElement.setSelectionRange === 'function') {
+                    editorElement.setSelectionRange(targetStart, targetEnd);
+                }
+                return {
+                    startContainer: editorElement,
+                    endContainer: editorElement,
+                    startOffset: targetStart,
+                    endOffset: targetEnd
+                };
+            }
+
             const selection = window.getSelection();
             if (!selection) return null;
 
@@ -5203,6 +5599,19 @@
         }
 
         function centerCurrentSelectionViaVditor() {
+            if (isLongFileEditorActiveFor(g('currentFileId'))) {
+                const textarea = document.getElementById('longFileTextarea');
+                if (!textarea) return false;
+
+                const before = textarea.value.slice(0, textarea.selectionStart || 0);
+                const lineIndex = before.split('\n').length - 1;
+                const totalLines = Math.max(1, textarea.value.split('\n').length);
+                const ratio = totalLines <= 1 ? 0 : (lineIndex / (totalLines - 1));
+                const maxTop = Math.max(0, textarea.scrollHeight - textarea.clientHeight);
+                textarea.scrollTop = Math.round(maxTop * ratio);
+                return true;
+            }
+
             const vditor = g('vditor');
             if (!vditor || !vditor.vditor) return false;
 
@@ -5298,11 +5707,30 @@
             }
             const replaceText = replaceInput.value;
             const vditor = g('vditor');
-            if (!vditor) return;
+            const currentFileId = g('currentFileId');
+            const currentFile = (g('files') || []).find(function(file) { return file && file.id === currentFileId; });
+            if (!vditor && !isLongFileEditorActiveFor(currentFileId)) return;
 
             const target = matches[currentMatchIndex];
             const selectedRange = setSelectionForMatch(currentMatchIndex);
             if (!selectedRange) return;
+
+            if (isLongFileEditorActiveFor(currentFileId)) {
+                const currentText = getCurrentEditorText();
+                const newText = currentText.slice(0, target.start) + replaceText + currentText.slice(target.end);
+                setEditorContentForFile(currentFileId, newText);
+                if (currentFile) {
+                    currentFile.content = newText;
+                    currentFile.lastModified = Date.now();
+                }
+                g('unsavedChanges')[currentFileId] = true;
+                await performFind();
+                if (matches.length > 0) {
+                    currentMatchIndex = Math.min(currentMatchIndex, matches.length - 1);
+                    highlightMatch(currentMatchIndex);
+                }
+                return;
+            }
 
             // Use Vditor native edit methods on current selection.
             vditor.focus();
@@ -5327,12 +5755,23 @@
             if (matches.length === 0) return;
             const replaceText = replaceInput.value;
             const vditor = g('vditor');
-            if (!vditor) return;
+            const currentFileId = g('currentFileId');
+            const currentFile = (g('files') || []).find(function(file) { return file && file.id === currentFileId; });
+            if (!vditor && !isLongFileEditorActiveFor(currentFileId)) return;
             const readyRes = await gateway.ensureReady();
             if (!readyRes || readyRes.code !== 200) return;
-            const replaceRes = gateway.replaceAllText(vditor.getValue() || '', searchText, replaceText, { caseSensitive: false });
+            const replaceRes = gateway.replaceAllText(getCurrentEditorText(), searchText, replaceText, { caseSensitive: false });
             if (!replaceRes || replaceRes.code !== 200 || !replaceRes.data) return;
-            vditor.setValue(replaceRes.data.text || '', true);
+            if (isLongFileEditorActiveFor(currentFileId)) {
+                setEditorContentForFile(currentFileId, replaceRes.data.text || '');
+            } else {
+                vditor.setValue(replaceRes.data.text || '', true);
+            }
+            if (currentFile) {
+                currentFile.content = replaceRes.data.text || '';
+                currentFile.lastModified = Date.now();
+            }
+            g('unsavedChanges')[currentFileId] = true;
             findStatus.textContent = (isEn() ? 'Replaced ' : '已替换 ') + (replaceRes.data.replaced || 0) + (isEn() ? ' occurrences' : ' 处');
             findStatus.style.color = '#28a745';
             clearHighlights();

@@ -1,19 +1,5 @@
 # wasm_text_engine
 
-独立实验目录（不替换现有逻辑），用于验证 C++ + WebAssembly 的文本能力。
-
-## 能力
-
-- 文件差异分析（行级 diff）
-- 三方合并与冲突标记（`manual/local/remote`）
-- 全文索引与搜索（可增删文档）
-- 附加能力：文本分析（行数/词数/指纹）和相似度计算
-
-返回结构建议与主项目保持一致：
-
-```json
-{ "code": 200, "message": "ok", "data": { } }
-```
 
 ## 目录结构
 
@@ -62,13 +48,13 @@ client.indexDocument('f1', 'hello markdown');
 const search = client.search('markdown', { limit: 10, caseSensitive: false, wholeWord: false });
 ```
 
-## 与现有项目对接建议（灰度）
+## 对接
 
 1. 在 `js/files.js` 增加能力探测开关（例如 `window.useWasmTextEngine`）。
 2. 仅替换差异计算、冲突合并、全文搜索路径；失败时回退原逻辑。
 3. 稳定后再将本目录产物并入主构建流程。
 
-当前已接入（灰度，不替换原逻辑）：
+当前已接入（灰度）：
 
 - `js/wasm-text-engine-gateway.js`：网关与回退
 - `js/files.js`：`computeDiff`、冲突合并预览、查找对话框中的跨文件搜索
