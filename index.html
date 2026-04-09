@@ -426,6 +426,14 @@
                 </div>
             </div>
             <div class="form-group">
+                <label data-i18n="interfaceStyleMode">界面样式模式</label>
+                <div class="radio-group" id="interfaceStyleModeSetting">
+                    <label><input type="radio" name="uiMode" value="auto"> <span data-i18n="interfaceStyleAuto">自动（根据设备）</span></label>
+                    <label><input type="radio" name="uiMode" value="mobile"> <span data-i18n="interfaceStyleMobile">手机样式</span></label>
+                    <label><input type="radio" name="uiMode" value="desktop"> <span data-i18n="interfaceStyleDesktop">电脑样式</span></label>
+                </div>
+            </div>
+            <div class="form-group">
                 <label data-i18n="language">语言</label>
                 <div class="radio-group" id="languageMode">
                     <label><input type="radio" name="language" value="zh"> <span data-i18n="chinese">中文</span></label>
@@ -740,6 +748,42 @@
 <!-- 顶部工具栏 -->
 <div class="mobile-toolbar-container">
     <div class="mobile-toolbar">
+        <div class="desktop-toolbar" id="desktopToolbar">
+            <button class="desktop-toolbar-btn" id="desktopFileBtn" data-i18n="fileMenu">文件</button>
+            <button class="desktop-toolbar-btn" id="desktopLoginBtn" data-i18n="login">登录</button>
+            <button class="desktop-toolbar-btn" id="desktopInsertBtn" data-i18n="insert">插入</button>
+            <button class="desktop-toolbar-btn" id="desktopFormulaBtn" data-i18n="formula">公式</button>
+            <button class="desktop-toolbar-btn" id="desktopChartBtn" data-i18n="chart">图表</button>
+
+            <div class="desktop-edit-group">
+                <span class="desktop-edit-label" data-i18n="edit">编辑</span>
+                <button class="desktop-toolbar-btn mini" id="desktopUndoBtn" data-i18n="undo">撤销</button>
+                <button class="desktop-toolbar-btn mini" id="desktopRedoBtn" data-i18n="redo">重做</button>
+                <button class="desktop-toolbar-btn mini" id="desktopSaveBtn" data-i18n="save">保存</button>
+            </div>
+
+            <button class="desktop-toolbar-btn" id="desktopSettingsBtn" data-i18n="settings">设置</button>
+
+            <div class="desktop-dropdown">
+                <button class="desktop-toolbar-btn" id="desktopMoreBtn" data-i18n="more">更多</button>
+                <div class="desktop-dropdown-content" id="desktopMoreDropdown">
+                    <button class="dropdown-item" id="desktopShareBtn"><i class="fas fa-share-alt"></i><span data-i18n="share">分享</span></button>
+                    <button class="dropdown-item" id="desktopFileManagerBtn"><i class="fas fa-folder"></i><span data-i18n="myFiles">我的文件</span></button>
+                    <button class="dropdown-item" id="desktopFileDiffBtn"><i class="fas fa-code-branch"></i><span data-i18n="fileDiff">文件对比</span></button>
+                    <button class="dropdown-item" id="desktopFindBtn"><i class="fas fa-search"></i><span data-i18n="findInFile">查找和替换</span></button>
+                    <button class="dropdown-item" id="desktopPrintBtn"><i class="fas fa-print"></i><span data-i18n="cloudPrint">云打印</span></button>
+                    <button class="dropdown-item" id="desktopPresentationBtn"><i class="fas fa-chalkboard-teacher"></i><span data-i18n="presentationMode">演示模式</span></button>
+                    <button class="dropdown-item" id="desktopModeBtn"><i class="fas fa-exchange-alt"></i><span data-i18n="switchMode">切换编辑器模式</span></button>
+                    <button class="dropdown-item" id="desktopImportBtn"><i class="fas fa-file-import"></i><span data-i18n="import">导入</span></button>
+                    <button class="dropdown-item" id="desktopExportBtn"><i class="fas fa-file-export"></i><span data-i18n="export">导出</span></button>
+                    <button class="dropdown-item" id="desktopClearBtn"><i class="fas fa-trash-alt"></i><span data-i18n="clear">清空</span></button>
+                    <button class="dropdown-item" id="desktopServiceStatusBtn"><i class="fas fa-heartbeat"></i><span data-i18n="serviceStatus">服务状态</span></button>
+                </div>
+            </div>
+
+            <button class="desktop-toolbar-btn" id="desktopAboutBtn" data-i18n="about">关于</button>
+        </div>
+
         <div class="toolbar-left-actions">
             <!-- 文件列表按钮 -->
             <button class="mobile-action-btn" id="mobileFileBtn" data-i18n-title="fileListTitle" title="文件列表">

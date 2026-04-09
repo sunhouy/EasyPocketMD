@@ -88,6 +88,10 @@
             lightMode: '日间模式',
             darkMode: '夜间模式',
             followSystem: '跟随系统',
+            interfaceStyleMode: '界面样式模式',
+            interfaceStyleAuto: '自动（根据设备）',
+            interfaceStyleMobile: '手机样式',
+            interfaceStyleDesktop: '电脑样式',
             bottomToolbarButtons: '底部工具栏按钮 (5-7个)',
             save: '保存',
             buttonCountError: '底部工具栏按钮数量必须在 5 到 7 个之间',
@@ -142,6 +146,7 @@
             icp: '京ICP备2025154249号',
 
             // 菜单
+            fileMenu: '文件',
             share: '分享',
             myFiles: '我的文件',
             fileDiff: '文件对比',
@@ -151,6 +156,7 @@
             presentationModeStarted: '已进入演示模式，按 ESC 键退出',
             presentationModeEnded: '已退出演示模式',
             switchMode: '切换模式',
+            more: '更多',
             import: '导入',
             export: '导出',
             clear: '清空',
@@ -712,6 +718,10 @@
             lightMode: 'Light Mode',
             darkMode: 'Dark Mode',
             followSystem: 'Follow System',
+            interfaceStyleMode: 'Interface Style Mode',
+            interfaceStyleAuto: 'Auto (based on device)',
+            interfaceStyleMobile: 'Mobile Style',
+            interfaceStyleDesktop: 'Desktop Style',
             bottomToolbarButtons: 'Bottom Toolbar Buttons (5-7)',
             save: 'Save',
             buttonCountError: 'Bottom toolbar buttons must be between 5 and 7',
@@ -766,6 +776,7 @@
             icp: '京ICP备2025154249号',
 
             // Menu
+            fileMenu: 'File',
             share: 'Share',
             myFiles: 'My Files',
             fileDiff: 'File Diff',
@@ -775,6 +786,7 @@
             presentationModeStarted: 'Entered presentation mode, press ESC to exit',
             presentationModeEnded: 'Exited presentation mode',
             switchMode: 'Switch Mode',
+            more: 'More',
             import: 'Import',
             export: 'Export',
             clear: 'Clear',

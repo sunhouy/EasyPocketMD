@@ -9,6 +9,48 @@
     function isEn() { return window.i18n && window.i18n.getLanguage() === 'en'; }
     function t(key) { return window.i18n ? window.i18n.t(key) : key; }
 
+    let tokenRecoveryInProgress = false;
+    let lastTokenRecoveryAt = 0;
+
+    function isTokenErrorMessage(message) {
+        if (!message) return false;
+        const msg = String(message);
+        return msg.includes('Token验证失败') || msg.includes('token') || msg.includes('Token') || msg.includes('过期') || msg.includes('expired') || msg.includes('sessionExpired');
+    }
+
+    async function tryHandleTokenExpired(source) {
+        const resultLike = source && typeof source === 'object' && Object.prototype.hasOwnProperty.call(source, 'code')
+            ? source
+            : null;
+
+        const matchedByResult = !!(global.isTokenError && global.isTokenError(resultLike || source));
+        const matchedByMessage = isTokenErrorMessage(source && source.message ? source.message : source);
+        if ((!matchedByResult && !matchedByMessage) || !g('currentUser')) return false;
+
+        const now = Date.now();
+        if (tokenRecoveryInProgress || (now - lastTokenRecoveryAt < 5000)) {
+            return true;
+        }
+
+        tokenRecoveryInProgress = true;
+        lastTokenRecoveryAt = now;
+        try {
+            if (global.handleTokenExpired) {
+                await global.handleTokenExpired();
+            } else {
+                global.currentUser = null;
+                localStorage.removeItem('vditor_user');
+                global.showMessage(isEn() ? 'Session expired, please login again' : '登录会话已过期，请重新登录', 'warning');
+                if (typeof global.handleLoginButtonClick === 'function') {
+                    global.handleLoginButtonClick();
+                }
+            }
+        } finally {
+            tokenRecoveryInProgress = false;
+        }
+        return true;
+    }
+
     // ---------- 服务器同步一致性：待同步标记 ----------
     // 记录“本地已保存但服务器尚未确认保存”的文件，避免本地/服务器长期不一致
     function loadPendingServerSync() {
@@ -386,6 +428,7 @@
             }
         } catch (error) {
             console.error('从服务器加载文件失败:', error);
+            await tryHandleTokenExpired(error);
             global.showSyncStatus(isEn() ? 'Sync failed, using local files' : '同步失败，使用本地文件', 'error');
             loadLocalFiles();
         }
@@ -3371,6 +3414,7 @@
         try {
             for (var i = 0; i < filesToSync.length; i++) await global.syncFileToServer(filesToSync[i].id);
         } catch (error) {
+            await tryHandleTokenExpired(error);
             console.error('同步失败', error);
         }
     }
@@ -3440,9 +3484,19 @@
                 }
                 return true;
             }
+
+            if (await tryHandleTokenExpired(result)) {
+                return false;
+            }
+
             throw new Error(result.message || (isEn() ? 'Save failed' : '保存失败'));
         } catch (error) {
             console.error('同步文件失败:', error);
+
+            if (await tryHandleTokenExpired(error)) {
+                return false;
+            }
+
             if (error.message === 'Failed to fetch' || error.message.includes('NetworkError')) {
                 if (global.showNetworkErrorBanner) {
                     global.showNetworkErrorBanner();
