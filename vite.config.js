@@ -123,7 +123,8 @@ self.addEventListener('fetch', event => {
 export default defineConfig({
   base: './',
   define: {
-    __WASM_TEXT_ENGINE_PRESENT__: JSON.stringify(hasWasmTextEngineDist)
+    __WASM_TEXT_ENGINE_PRESENT__: JSON.stringify(hasWasmTextEngineDist),
+    __APP_BUILD_TAG__: JSON.stringify(cacheVersion)
   },
   server: {
     port: 8080,

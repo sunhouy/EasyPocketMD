@@ -29,13 +29,54 @@
         return true;
     }
 
-    async function pickAvailableModulePath(explicitPath) {
-        const candidates = explicitPath
+    function getBuildTag() {
+        if (typeof __APP_BUILD_TAG__ === 'string' && __APP_BUILD_TAG__) {
+            return __APP_BUILD_TAG__;
+        }
+        return '';
+    }
+
+    function withCacheTag(url, cacheTag) {
+        if (!cacheTag) return url;
+        try {
+            const target = new URL(url, window.location.href);
+            if (!target.searchParams.has('v')) {
+                target.searchParams.set('v', cacheTag);
+            }
+            return target.href;
+        } catch (e) {
+            return url;
+        }
+    }
+
+    function buildModuleOptions(cacheTag) {
+        if (!cacheTag) return {};
+        return {
+            locateFile: function(path, scriptDirectory) {
+                try {
+                    const located = new URL(path, scriptDirectory || window.location.href);
+                    // Avoid query suffix for local file:// runtime (e.g., Electron offline bundle).
+                    if (located.protocol !== 'file:' && !located.searchParams.has('v')) {
+                        located.searchParams.set('v', cacheTag);
+                    }
+                    return located.href;
+                } catch (e) {
+                    return (scriptDirectory || '') + path;
+                }
+            }
+        };
+    }
+
+    async function pickAvailableModulePath(explicitPath, cacheTag) {
+        const rawCandidates = explicitPath
             ? [explicitPath]
             : [
                 new URL('./wasm_text_engine/text_engine.js', window.location.href).href,
                 new URL('./wasm_text_engine/dist/text_engine.js', window.location.href).href
             ];
+        const candidates = rawCandidates.map(function(url) {
+            return withCacheTag(url, cacheTag);
+        });
 
         for (let i = 0; i < candidates.length; i++) {
             const url = candidates[i];
@@ -87,8 +128,9 @@
                 const mod = await import('../wasm_text_engine/js/text-engine-client.js');
                 const Client = mod.WasmTextEngineClient;
                 state.client = new Client();
+                const cacheTag = getBuildTag();
 
-                const modulePath = await pickAvailableModulePath(options && options.modulePath);
+                const modulePath = await pickAvailableModulePath(options && options.modulePath, cacheTag);
                 if (!modulePath) {
                     return {
                         code: 500,
@@ -96,7 +138,13 @@
                     };
                 }
 
-                const res = await state.client.init({ modulePath: modulePath });
+                const moduleOptions = Object.assign(
+                    {},
+                    buildModuleOptions(cacheTag),
+                    options && options.moduleOptions ? options.moduleOptions : {}
+                );
+
+                const res = await state.client.init({ modulePath: modulePath, moduleOptions: moduleOptions });
                 if (!res || res.code !== 200) {
                     throw new Error((res && res.message) || 'init failed');
                 }
