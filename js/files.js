@@ -11,6 +11,7 @@
 
     let tokenRecoveryInProgress = false;
     let lastTokenRecoveryAt = 0;
+    const browserFileHandleMap = new Map();
 
     function isTokenErrorMessage(message) {
         if (!message) return false;
@@ -271,15 +272,129 @@
         return parts[parts.length - 1] || filePath;
     }
 
-    async function openExternalLocalFileByPath(filePath, presetData) {
-        if (!filePath) return false;
-        if (!global.electron || typeof global.electron.readLocalFile !== 'function') {
-            global.showMessage(isEn() ? 'This feature is only available in Electron' : '该功能仅在 Electron 桌面端可用', 'warning');
+    function createBrowserLocalPath(fileName) {
+        return 'browser://' + encodeURIComponent(fileName || ('local-' + Date.now()));
+    }
+
+    async function readTextFromBrowserFile(fileObject) {
+        if (!fileObject) return '';
+        if (typeof fileObject.text === 'function') {
+            return await fileObject.text();
+        }
+        return new Promise(function(resolve, reject) {
+            const reader = new FileReader();
+            reader.onload = function() { resolve(String(reader.result || '')); };
+            reader.onerror = function() { reject(reader.error || new Error('read failed')); };
+            reader.readAsText(fileObject);
+        });
+    }
+
+    async function pickLocalFileByInput() {
+        return new Promise(function(resolve) {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.md,.markdown,.txt,text/markdown,text/plain';
+            input.style.display = 'none';
+            document.body.appendChild(input);
+
+            let settled = false;
+            function finish(file) {
+                if (settled) return;
+                settled = true;
+                window.removeEventListener('focus', onFocusBack);
+                setTimeout(function() {
+                    if (input.parentNode) input.parentNode.removeChild(input);
+                }, 0);
+                resolve(file || null);
+            }
+
+            function onFocusBack() {
+                setTimeout(function() {
+                    if (!settled) finish(null);
+                }, 500);
+            }
+
+            input.addEventListener('change', function() {
+                const file = input.files && input.files[0] ? input.files[0] : null;
+                finish(file);
+            }, { once: true });
+
+            window.addEventListener('focus', onFocusBack, { once: true });
+            input.click();
+        });
+    }
+
+    function downloadLocalContent(fileName, content) {
+        const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = fileName || (isEn() ? 'document.md' : '文档.md');
+        document.body.appendChild(link);
+        link.click();
+        setTimeout(function() {
+            URL.revokeObjectURL(url);
+            if (link.parentNode) link.parentNode.removeChild(link);
+        }, 0);
+    }
+
+    async function openExternalLocalFileInBrowser() {
+        try {
+            if (typeof global.showOpenFilePicker === 'function') {
+                const handles = await global.showOpenFilePicker({
+                    multiple: false,
+                    types: [{
+                        description: 'Markdown',
+                        accept: {
+                            'text/markdown': ['.md', '.markdown'],
+                            'text/plain': ['.txt']
+                        }
+                    }]
+                });
+                const handle = handles && handles[0];
+                if (!handle) return false;
+                const browserFile = await handle.getFile();
+                const content = await readTextFromBrowserFile(browserFile);
+                const localPath = createBrowserLocalPath(browserFile.name);
+                return openExternalLocalFileByPath(localPath, {
+                    success: true,
+                    path: localPath,
+                    name: browserFile.name,
+                    content: content,
+                    localFileMode: 'browser-fsa',
+                    browserFileHandle: handle
+                });
+            }
+
+            const fallbackFile = await pickLocalFileByInput();
+            if (!fallbackFile) return false;
+            const fallbackContent = await readTextFromBrowserFile(fallbackFile);
+            const fallbackPath = createBrowserLocalPath(fallbackFile.name);
+            return openExternalLocalFileByPath(fallbackPath, {
+                success: true,
+                path: fallbackPath,
+                name: fallbackFile.name,
+                content: fallbackContent,
+                localFileMode: 'browser-file'
+            });
+        } catch (error) {
+            if (error && error.name === 'AbortError') {
+                return false;
+            }
+            global.showMessage((isEn() ? 'Failed to open local file: ' : '打开本地文件失败：') + (error && error.message ? error.message : ''), 'error');
             return false;
         }
+    }
+
+    async function openExternalLocalFileByPath(filePath, presetData) {
+        if (!filePath) return false;
 
         let fileData = presetData;
         if (!fileData) {
+            if (!global.electron || typeof global.electron.readLocalFile !== 'function') {
+                global.showMessage((isEn() ? 'Failed to open local file' : '打开本地文件失败') + ': ' + (isEn() ? 'Unsupported environment' : '当前环境不支持'), 'warning');
+                return false;
+            }
             fileData = await global.electron.readLocalFile(filePath);
         }
 
@@ -288,12 +403,15 @@
             return false;
         }
 
+        const resolvedPath = fileData.path || filePath || createBrowserLocalPath(fileData.name);
+        const localFileMode = fileData.localFileMode || (global.electron ? 'electron' : 'browser-file');
+
         const files = g('files');
-        let target = files.find(function(f) { return f.type === 'file' && f.isExternalLocal && f.localFilePath === fileData.path; });
+        let target = files.find(function(f) { return f.type === 'file' && f.isExternalLocal && f.localFilePath === resolvedPath; });
         const now = Date.now();
 
         if (!target) {
-            const baseName = fileData.name || getPathBasename(fileData.path) || (isEn() ? 'Local file' : '本地文件');
+            const baseName = fileData.name || getPathBasename(resolvedPath) || (isEn() ? 'Local file' : '本地文件');
             const safeName = getNextAvailableName(baseName, '');
             target = {
                 id: 'local-' + now + '-' + Math.random().toString(36).slice(2, 8),
@@ -303,12 +421,19 @@
                 lastModified: now,
                 isSynced: true,
                 isExternalLocal: true,
-                localFilePath: fileData.path
+                localFilePath: resolvedPath,
+                localFileMode: localFileMode
             };
             files.push(target);
         } else {
             target.content = fileData.content || '';
             target.lastModified = now;
+            target.localFileMode = localFileMode;
+            if (!target.localFilePath) target.localFilePath = resolvedPath;
+        }
+
+        if (fileData.browserFileHandle) {
+            browserFileHandleMap.set(target.id, fileData.browserFileHandle);
         }
 
         localStorage.setItem('vditor_files', JSON.stringify(files));
@@ -320,14 +445,12 @@
     }
 
     async function openExternalLocalFileByDialog() {
-        if (!global.electron || typeof global.electron.openLocalFileDialog !== 'function') {
-            global.showMessage(isEn() ? 'This feature is only available in Electron' : '该功能仅在 Electron 桌面端可用', 'warning');
-            return false;
+        if (global.electron && typeof global.electron.openLocalFileDialog === 'function') {
+            const result = await global.electron.openLocalFileDialog();
+            if (!result || result.canceled) return false;
+            return openExternalLocalFileByPath(result.path, result);
         }
-
-        const result = await global.electron.openLocalFileDialog();
-        if (!result || result.canceled) return false;
-        return openExternalLocalFileByPath(result.path, result);
+        return openExternalLocalFileInBrowser();
     }
 
     // 获取所有可用目标文件夹（包含虚拟中间文件夹）
@@ -3102,6 +3225,44 @@
             g('unsavedChanges')[currentFileId] = false;
             if (isManual) {
                 global.showMessage(t('localFileSaved'), 'success');
+            }
+            return;
+        }
+
+        // 浏览器本地文件（File System Access API）：有写权限时直接回写
+        if (file.isExternalLocal && file.localFileMode === 'browser-fsa') {
+            const handle = browserFileHandleMap.get(currentFileId);
+            if (handle && typeof handle.createWritable === 'function') {
+                try {
+                    const writable = await handle.createWritable();
+                    await writable.write(content);
+                    await writable.close();
+                    g('lastSyncedContent')[currentFileId] = content;
+                    g('unsavedChanges')[currentFileId] = false;
+                    if (isManual) {
+                        global.showMessage(t('localFileSaved'), 'success');
+                    }
+                } catch (error) {
+                    global.showMessage((isEn() ? 'Failed to save local file: ' : '保存本地文件失败：') + (error && error.message ? error.message : ''), 'error');
+                }
+            } else {
+                downloadLocalContent(file.name, content);
+                g('lastSyncedContent')[currentFileId] = content;
+                g('unsavedChanges')[currentFileId] = false;
+                if (isManual) {
+                    global.showMessage(t('localFileSavedAsDownload'), 'warning');
+                }
+            }
+            return;
+        }
+
+        // 浏览器 input 打开的文件无法直接写回，回退为下载
+        if (file.isExternalLocal && file.localFileMode === 'browser-file') {
+            downloadLocalContent(file.name, content);
+            g('lastSyncedContent')[currentFileId] = content;
+            g('unsavedChanges')[currentFileId] = false;
+            if (isManual) {
+                global.showMessage(t('localFileSavedAsDownload'), 'warning');
             }
             return;
         }
