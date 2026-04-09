@@ -206,9 +206,42 @@ document.addEventListener('DOMContentLoaded', function() {
     if (typeof window.userSettings.enableWasmTextEngine !== 'boolean') {
         window.userSettings.enableWasmTextEngine = true;
     }
+    if (typeof window.userSettings.mdFileAssociationEnabled !== 'boolean') {
+        window.userSettings.mdFileAssociationEnabled = true;
+    }
     if (!window.userSettings.uiMode) {
         window.userSettings.uiMode = 'auto'; // auto, mobile, desktop
     }
+
+    let electronOpenFileBridgeInitialized = false;
+
+    async function syncMdAssociationSettingFromElectron() {
+        if (!window.electron || typeof window.electron.getMdAssociationEnabled !== 'function') return;
+        try {
+            const enabled = await window.electron.getMdAssociationEnabled();
+            window.userSettings.mdFileAssociationEnabled = !!enabled;
+            localStorage.setItem('vditor_settings', JSON.stringify(window.userSettings));
+        } catch (error) {
+            console.warn('Failed to load md association setting from Electron:', error);
+        }
+    }
+
+    function initElectronOpenFileBridge() {
+        if (!window.electron || typeof window.electron.onOpenLocalFileRequest !== 'function' || electronOpenFileBridgeInitialized) return;
+        electronOpenFileBridgeInitialized = true;
+
+        window.electron.onOpenLocalFileRequest(async function(filePath) {
+            if (!filePath || typeof window.openExternalLocalFileByPath !== 'function') return;
+            try {
+                await window.openExternalLocalFileByPath(filePath);
+            } catch (error) {
+                console.error('Failed to open local file from system event:', error);
+                window.showMessage((window.i18n ? window.i18n.t('localFileOpenFailed') : '打开本地文件失败') + ': ' + error.message, 'error');
+            }
+        });
+    }
+
+    syncMdAssociationSettingFromElectron();
 
     function getEffectiveInterfaceMode(settings) {
         var targetSettings = settings || window.userSettings || {};
@@ -361,6 +394,7 @@ document.addEventListener('DOMContentLoaded', function() {
             // 初始化用户界面和移动特性
             initUserInterface();
             initMobileFeatures();
+            initElectronOpenFileBridge();
             document.addEventListener('keydown', function(e) {
                 if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); window.saveCurrentFile(true); }
                 if (e.ctrlKey && e.shiftKey && e.key === 'L') { e.preventDefault(); window.toggleNightMode(); }
@@ -691,6 +725,15 @@ document.addEventListener('DOMContentLoaded', function() {
         if (mobileMenuBtn) mobileMenuBtn.addEventListener('click', function(e) { e.stopPropagation(); if (dropdown) dropdown.classList.toggle('show'); });
         var mobileModeBtn = document.getElementById('mobileModeBtn');
         if (mobileModeBtn) mobileModeBtn.addEventListener('click', function() { showModeSelection(); closeDrop(); });
+        var mobileOpenLocalFileBtn = document.getElementById('mobileOpenLocalFileBtn');
+        if (mobileOpenLocalFileBtn) mobileOpenLocalFileBtn.addEventListener('click', async function() {
+            if (typeof window.openExternalLocalFileByDialog === 'function') {
+                await window.openExternalLocalFileByDialog();
+            } else {
+                window.showMessage(window.i18n ? window.i18n.t('localFileOpenFailed') : '打开本地文件失败', 'error');
+            }
+            closeDrop();
+        });
         var mobileExportBtn = document.getElementById('mobileExportBtn');
         if (mobileExportBtn) mobileExportBtn.addEventListener('click', async function() {
             if (typeof window.exportContent !== 'function') {
@@ -830,6 +873,14 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         bindDesktopButton('desktopPresentationBtn', function() { enterPresentationMode(); closeDesktopDrop(); });
         bindDesktopButton('desktopModeBtn', function() { showModeSelection(); closeDesktopDrop(); });
+        bindDesktopButton('desktopOpenLocalFileBtn', async function() {
+            if (typeof window.openExternalLocalFileByDialog === 'function') {
+                await window.openExternalLocalFileByDialog();
+            } else {
+                window.showMessage(window.i18n ? window.i18n.t('localFileOpenFailed') : '打开本地文件失败', 'error');
+            }
+            closeDesktopDrop();
+        });
         bindDesktopButton('desktopImportBtn', function() { window.importFiles(); closeDesktopDrop(); });
         bindDesktopButton('desktopExportBtn', async function() {
             if (typeof window.exportContent !== 'function') {
@@ -952,6 +1003,12 @@ document.addEventListener('DOMContentLoaded', function() {
             { id: 'mobilePresentationBtn', fn: function() { enterPresentationMode(); closeDrop(); } },
             { id: 'mobileMenuBtn', fn: function(e) { e.stopPropagation(); if (dropdown) dropdown.classList.toggle('show'); } },
             { id: 'mobileModeBtn', fn: function() { showModeSelection(); closeDrop(); } },
+            { id: 'mobileOpenLocalFileBtn', fn: async function() {
+                if (typeof window.openExternalLocalFileByDialog === 'function') {
+                    await window.openExternalLocalFileByDialog();
+                }
+                closeDrop();
+            } },
             { id: 'mobileExportBtn', fn: async function() {
                 if (typeof window.exportContent !== 'function') {
                     await import('./ui/export.js');
@@ -1133,6 +1190,17 @@ document.addEventListener('DOMContentLoaded', function() {
         for (var i = 0; i < defaultSortingRadios.length; i++) {
             if (defaultSortingRadios[i].value === currentDefaultSorting) {
                 defaultSortingRadios[i].checked = true;
+            }
+        }
+
+        var mdAssociationSetting = document.getElementById('mdAssociationSetting');
+        var mdAssociationCheckbox = document.getElementById('mdAssociationCheckbox');
+        if (mdAssociationSetting && mdAssociationCheckbox) {
+            if (window.electron) {
+                mdAssociationSetting.style.display = '';
+                mdAssociationCheckbox.checked = !!window.userSettings.mdFileAssociationEnabled;
+            } else {
+                mdAssociationSetting.style.display = 'none';
             }
         }
 
@@ -1442,6 +1510,7 @@ document.addEventListener('DOMContentLoaded', function() {
             uiMode: 'auto',
             fontSize: '16px',
             showOutline: false,
+            mdFileAssociationEnabled: window.userSettings.mdFileAssociationEnabled,
             storageLocation: 'cloud'
         };
 
@@ -1511,6 +1580,11 @@ document.addEventListener('DOMContentLoaded', function() {
             newSettings.showOutline = showOutlineCheckbox.checked;
         }
 
+        var mdAssociationCheckbox = document.getElementById('mdAssociationCheckbox');
+        if (mdAssociationCheckbox) {
+            newSettings.mdFileAssociationEnabled = mdAssociationCheckbox.checked;
+        }
+
         // 获取选中的存储位置
         var storageRadios = document.getElementsByName('storageLocation');
         for (var i = 0; i < storageRadios.length; i++) {
@@ -1550,6 +1624,12 @@ document.addEventListener('DOMContentLoaded', function() {
         // 保存设置
         window.userSettings = newSettings;
         localStorage.setItem('vditor_settings', JSON.stringify(window.userSettings));
+
+        if (window.electron && typeof window.electron.setMdAssociationEnabled === 'function') {
+            window.electron.setMdAssociationEnabled(!!newSettings.mdFileAssociationEnabled).catch(function(error) {
+                console.warn('Failed to persist md association setting:', error);
+            });
+        }
 
         // 应用字体大小设置
         applyFontSize(newSettings.fontSize);

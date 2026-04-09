@@ -109,6 +109,17 @@
       "icon.png",
       "package.json"
     ],
+    "fileAssociations": [
+      {
+        "ext": [
+          "md",
+          "markdown"
+        ],
+        "name": "Markdown Document",
+        "description": "Markdown file",
+        "role": "Editor"
+      }
+    ],
     "linux": {
       "target": [
         "AppImage",
