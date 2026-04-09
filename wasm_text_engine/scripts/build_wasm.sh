@@ -8,6 +8,7 @@ mkdir -p "$OUT_DIR"
 
 em++ \
   "$ROOT_DIR/src/text_engine.cpp" \
+  "$ROOT_DIR/src/slash_command_index.cpp" \
   "$ROOT_DIR/src/wasm_bindings.cpp" \
   -O3 \
   --bind \

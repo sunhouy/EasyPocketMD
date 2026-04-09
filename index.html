@@ -458,6 +458,42 @@
                     <label><input type="checkbox" id="showOutlineCheckbox"> <span></span></label>
                 </div>
             </div>
+            <div class="form-group settings-collapsible-group">
+                <details id="slashCommandDetails" class="settings-collapsible">
+                    <summary class="settings-collapsible-summary">
+                        <span data-i18n="slashCommand">斜杠快捷命令</span>
+                    </summary>
+                    <div class="settings-collapsible-body">
+                        <div class="checkbox-group">
+                            <label><input type="checkbox" id="slashCommandEnabledCheckbox"> <span data-i18n="slashCommandEnable">在编辑器输入 / 时显示快捷操作列表</span></label>
+                        </div>
+                        <label class="settings-sub-label" for="slashCommandActivationKeySelect" data-i18n="slashCommandActivationKey">执行快捷键</label>
+                        <div class="select-group">
+                            <select id="slashCommandActivationKeySelect" class="form-control">
+                                <option value="Tab" data-i18n="slashActivationTab">Tab</option>
+                                <option value="Enter" data-i18n="slashActivationEnter">Enter</option>
+                                <option value="Space" data-i18n="slashActivationSpace">Space</option>
+                                <option value="Ctrl+K" data-i18n="slashActivationCtrlK">Ctrl+K</option>
+                                <option value="Ctrl+J" data-i18n="slashActivationCtrlJ">Ctrl+J</option>
+                                <option value="Alt+Space" data-i18n="slashActivationAltSpace">Alt+Space</option>
+                            </select>
+                        </div>
+                    </div>
+                </details>
+            </div>
+            <div class="form-group settings-collapsible-group">
+                <details id="keyboardShortcutsDetails" class="settings-collapsible">
+                    <summary class="settings-collapsible-summary">
+                        <span data-i18n="keyboardShortcuts">快捷键</span>
+                    </summary>
+                    <div class="settings-collapsible-body">
+                        <div id="keyboardShortcutsSettings" class="keyboard-shortcuts-settings">
+                            <!-- 动态生成 -->
+                        </div>
+                        <div class="settings-hint" data-i18n="keyboardShortcutsHint">支持单字母或组合键（如 F、Ctrl+S、Alt+M），留空表示禁用该快捷键</div>
+                    </div>
+                </details>
+            </div>
             <div class="form-group">
                 <label data-i18n="defaultStorageLocation">默认存储位置</label>
                 <div class="radio-group" id="storageLocationSetting">
@@ -486,27 +522,34 @@
                     <label><input type="checkbox" id="mdAssociationCheckbox"> <span data-i18n="mdFileAssociationDesc">允许通过系统打开 .md 文件时自动在应用中打开</span></label>
                 </div>
             </div>
-            <div class="form-group">
-                <label data-i18n="bottomToolbarButtons">底部工具栏按钮 (5-7个)</label>
-                <div class="checkbox-group" id="toolbarButtonsSettings">
-                    <!-- 动态生成 -->
-                </div>
-            </div>
-            <div class="form-group">
-                <label data-i18n="storageManagement">空间管理</label>
-                <details id="storageManagementDetails" style="margin-top:8px;">
-                    <summary id="storageManagementSummary" style="cursor:pointer;user-select:none;font-size:13px;color:#666;">
-                        <span data-i18n="expandStorageManagement">展开空间管理详情</span>
+            <div class="form-group settings-collapsible-group">
+                <details id="toolbarButtonsDetails" class="settings-collapsible">
+                    <summary class="settings-collapsible-summary">
+                        <span data-i18n="bottomToolbarButtons">底部工具栏按钮 (5-7个)</span>
                     </summary>
-                    <div id="storageUsagePanel" style="display:none;margin-top:10px;padding:10px;border:1px solid #e6e6e6;border-radius:8px;background:#fafafa;">
-                        <div id="storageUsageLoading" data-i18n="storageUsageCalculating" style="font-size:12px;color:#777;">正在计算存储占用...</div>
-                        <div id="storageUsageList" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 10px;font-size:13px;line-height:1.5;"></div>
+                    <div class="settings-collapsible-body">
+                        <div class="checkbox-group" id="toolbarButtonsSettings">
+                            <!-- 动态生成 -->
+                        </div>
                     </div>
-                    <div class="space-management-actions" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:10px;">
-                        <button type="button" class="modal-btn secondary" id="clearCacheStorageBtn" data-i18n="clearCacheStorage">清空 Cache Storage</button>
-                        <button type="button" class="modal-btn secondary" id="clearIndexedDBBtn" data-i18n="clearIndexedDB">清空 IndexedDB</button>
-                        <button type="button" class="modal-btn secondary" id="clearServiceWorkerBtn" data-i18n="clearServiceWorker">清空 Service Worker</button>
-                        <button type="button" class="modal-btn secondary" id="clearCookiesBtn" data-i18n="clearCookies">清空 Cookies</button>
+                </details>
+            </div>
+            <div class="form-group settings-collapsible-group">
+                <details id="storageManagementDetails" class="settings-collapsible">
+                    <summary id="storageManagementSummary" class="settings-collapsible-summary">
+                        <span data-i18n="storageManagement">空间管理</span>
+                    </summary>
+                    <div class="settings-collapsible-body">
+                        <div id="storageUsagePanel" class="storage-usage-panel">
+                            <div id="storageUsageLoading" data-i18n="storageUsageCalculating" class="storage-usage-loading">正在计算存储占用...</div>
+                            <div id="storageUsageList" class="storage-usage-list"></div>
+                        </div>
+                        <div class="space-management-actions">
+                            <button type="button" class="modal-btn secondary" id="clearCacheStorageBtn" data-i18n="clearCacheStorage">清空 Cache Storage</button>
+                            <button type="button" class="modal-btn secondary" id="clearIndexedDBBtn" data-i18n="clearIndexedDB">清空 IndexedDB</button>
+                            <button type="button" class="modal-btn secondary" id="clearServiceWorkerBtn" data-i18n="clearServiceWorker">清空 Service Worker</button>
+                            <button type="button" class="modal-btn secondary" id="clearCookiesBtn" data-i18n="clearCookies">清空 Cookies</button>
+                        </div>
                     </div>
                 </details>
             </div>

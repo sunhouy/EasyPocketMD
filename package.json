@@ -5,7 +5,7 @@
   "main": "electron-main.js",
   "scripts": {
     "dev": "vite",
-    "build": "node version.js && vite build",
+    "build": "npm run wasm:text:build && node version.js && vite build && npm run wasm:text:verify:dist",
     "test": "NODE_ENV=test jest --runInBand --forceExit",
     "check-deploy": "node scripts/check-deploy.js",
     "start": "node api/server.js",

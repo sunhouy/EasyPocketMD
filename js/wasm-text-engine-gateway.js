@@ -12,7 +12,7 @@
     };
 
     function getEnabledFlag() {
-        // 对所有用户默认启用智能文本引擎；失败时自动降级到 JS 兜底。
+        // 对所有用户默认启用智能文本引擎。
         return true;
     }
 
@@ -161,6 +161,12 @@
         return source.slice(left, right);
     }
 
+    function isHiddenCrossSearchFile(filename) {
+        const name = String(filename || '').trim();
+        if (!name) return false;
+        return /(^|[\/])\.[^\/]/.test(name);
+    }
+
     function diff(leftText, rightText) {
         if (!isUsable()) return null;
 
@@ -194,7 +200,7 @@
 
         state.client.clearIndex();
         docs.forEach(function(file) {
-            if (!file || file.type !== 'file' || !file.id) return;
+            if (!file || file.type !== 'file' || !file.id || isHiddenCrossSearchFile(file.name)) return;
             state.client.indexDocument(String(file.id), file.content || '');
         });
 
@@ -239,6 +245,53 @@
         return { code: 200, message: 'ok', data: normalized };
     }
 
+    function normalizePath(input) {
+        if (!isUsable()) throw new Error('smart normalizePath unavailable');
+        return state.client.normalizePath(input || '');
+    }
+
+    function parentPath(path) {
+        if (!isUsable()) throw new Error('smart parentPath unavailable');
+        return state.client.parentPath(path || '');
+    }
+
+    function basenamePath(path) {
+        if (!isUsable()) throw new Error('smart basenamePath unavailable');
+        return state.client.basenamePath(path || '');
+    }
+
+    function pathBasename(path) {
+        if (!isUsable()) throw new Error('smart pathBasename unavailable');
+        return state.client.pathBasename(path || '');
+    }
+
+    function compareVersions(originalContent, newContent) {
+        if (!isUsable()) throw new Error('smart compareVersions unavailable');
+        const res = state.client.compareVersions(originalContent || '', newContent || '');
+        if (!res || res.code !== 200 || !res.data) {
+            throw new Error((res && res.message) || 'compareVersions failed');
+        }
+        return res.data;
+    }
+
+    function isHiddenCrossSearchFile(filename) {
+        if (!isUsable()) throw new Error('smart isHiddenCrossSearchFile unavailable');
+        const res = state.client.isHiddenCrossSearchFile(filename || '');
+        if (!res || res.code !== 200 || !res.data) {
+            throw new Error((res && res.message) || 'isHiddenCrossSearchFile failed');
+        }
+        return !!res.data.hidden;
+    }
+
+    function collectFolderPaths(entriesPayload) {
+        if (!isUsable()) throw new Error('smart collectFolderPaths unavailable');
+        const res = state.client.collectFolderPaths(entriesPayload || '');
+        if (!res || res.code !== 200 || !res.data || !Array.isArray(res.data.folders)) {
+            throw new Error((res && res.message) || 'collectFolderPaths failed');
+        }
+        return res.data.folders;
+    }
+
     function replaceAllText(text, query, replacement, options) {
         if (!isUsable()) return { code: 500, message: 'smart replace unavailable' };
         return state.client.replaceAllText(text || '', query || '', replacement || '', options || {});
@@ -259,40 +312,60 @@
         return state.client.extractTags(text || '');
     }
 
+    function slashPalette(query, options) {
+        if (!isUsable()) return { code: 500, message: 'slash palette unavailable' };
+        if (!state.client || typeof state.client.slashPalette !== 'function') {
+            return { code: 500, message: 'slash palette unavailable' };
+        }
+        return state.client.slashPalette(query || '', options || {});
+    }
+
+    function slashPaletteSettings(language) {
+        if (!isUsable()) return { code: 500, message: 'slash palette settings unavailable' };
+        if (!state.client || typeof state.client.slashPaletteSettings !== 'function') {
+            return { code: 500, message: 'slash palette settings unavailable' };
+        }
+        return state.client.slashPaletteSettings(language || '');
+    }
+
     function searchFilesDetailed(query, options) {
         if (!isUsable()) return { code: 500, message: 'smart search unavailable' };
 
         try {
+            const rebuildRes = rebuildIndex(global.files || []);
+            if (!rebuildRes || rebuildRes.code !== 200) {
+                return rebuildRes;
+            }
+
+            const searchRes = state.client.search(query || '', options || {});
+            if (!searchRes || searchRes.code !== 200 || !searchRes.data) {
+                throw new Error((searchRes && searchRes.message) || 'search failed');
+            }
+
             const files = Array.isArray(global.files) ? global.files : [];
-            const results = [];
-            let totalMatches = 0;
-
+            const fileMap = {};
             files.forEach(function(file) {
-                if (!file || file.type !== 'file') return;
-                const res = findInText(file.content || '', query || '', options || {});
-                if (!res || res.code !== 200) {
-                    throw new Error((res && res.message) || 'findInText failed in searchFilesDetailed');
-                }
-                if (!res.data || !Array.isArray(res.data.matches) || res.data.matches.length === 0) {
-                    return;
-                }
+                if (!file || !file.id || isHiddenCrossSearchFile(file.name)) return;
+                fileMap[String(file.id)] = file;
+            });
 
-                const hits = res.data.matches.map(function(hit, idx) {
+            const rows = Array.isArray(searchRes.data.results) ? searchRes.data.results : [];
+            const results = rows.map(function(row) {
+                const file = fileMap[String(row.docId)] || {};
+                const hits = Array.isArray(row.hits) ? row.hits.map(function(hit, idx) {
                     return {
                         index: idx,
                         start: hit.start,
                         end: hit.end,
                         snippet: hit.snippet || ''
                     };
-                });
-
-                totalMatches += hits.length;
-                results.push({
-                    docId: String(file.id),
-                    filename: file.name || '',
+                }) : [];
+                return {
+                    docId: String(row.docId || ''),
+                    filename: file.name || row.filename || '',
                     matchCount: hits.length,
                     hits: hits
-                });
+                };
             });
 
             return {
@@ -302,7 +375,9 @@
                     query: query || '',
                     files: results,
                     fileCount: results.length,
-                    totalMatches: totalMatches
+                    totalMatches: typeof searchRes.data.total === 'number'
+                        ? searchRes.data.total
+                        : results.reduce(function(sum, item) { return sum + (item.matchCount || 0); }, 0)
                 }
             };
         } catch (e) {
@@ -318,10 +393,19 @@
         searchFiles: searchFiles,
         searchFilesDetailed: searchFilesDetailed,
         findInText: findInText,
+        normalizePath: normalizePath,
+        parentPath: parentPath,
+        basenamePath: basenamePath,
+        pathBasename: pathBasename,
+        compareVersions: compareVersions,
+        isHiddenCrossSearchFile: isHiddenCrossSearchFile,
+        collectFolderPaths: collectFolderPaths,
         replaceAllText: replaceAllText,
         analyze: analyze,
         similarity: similarity,
         extractTags: extractTags,
+        slashPalette: slashPalette,
+        slashPaletteSettings: slashPaletteSettings,
         getStatus: function() {
             return {
                 enabled: getEnabledFlag(),

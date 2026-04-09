@@ -4,6 +4,7 @@
 #include <cmath>
 #include <cctype>
 #include <cstdint>
+#include <cstring>
 #include <map>
 #include <set>
 #include <sstream>
@@ -65,6 +66,17 @@ std::string toAsciiLower(const std::string& input) {
         out[i] = static_cast<char>(std::tolower(static_cast<unsigned char>(out[i])));
     }
     return out;
+}
+
+bool hasSuffix(const std::string& input, const char* suffix) {
+    if (!suffix) return false;
+    const size_t suffixLen = std::strlen(suffix);
+    if (input.size() < suffixLen) return false;
+    return input.compare(input.size() - suffixLen, suffixLen, suffix) == 0;
+}
+
+bool isPathSeparator(char ch) {
+    return ch == '/' || ch == '\\';
 }
 
 std::string trimAscii(const std::string& input) {
@@ -683,6 +695,144 @@ std::string WasmTextEngine::findInText(const std::string& text, const std::strin
         << "\"matches\":" << matches.str()
         << "}";
     return out.str();
+}
+
+std::string WasmTextEngine::normalizePath(const std::string& input) const {
+    std::string path = trimAscii(input);
+    if (!path.empty() && path[0] == '/') {
+        path.erase(path.begin());
+    }
+
+    if (hasSuffix(path, ".md")) {
+        path.erase(path.size() - 3);
+    } else if (hasSuffix(path, ".txt")) {
+        path.erase(path.size() - 4);
+    } else if (hasSuffix(path, ".markdown")) {
+        path.erase(path.size() - 9);
+    }
+
+    return path;
+}
+
+std::string WasmTextEngine::parentPath(const std::string& path) const {
+    if (path.empty()) return "";
+    const size_t lastSlash = path.rfind('/');
+    if (lastSlash == std::string::npos) return "";
+    return path.substr(0, lastSlash);
+}
+
+std::string WasmTextEngine::basenamePath(const std::string& path) const {
+    if (path.empty()) return "";
+    const size_t lastSlash = path.rfind('/');
+    if (lastSlash == std::string::npos) return path;
+    return path.substr(lastSlash + 1);
+}
+
+std::string WasmTextEngine::pathBasename(const std::string& path) const {
+    if (path.empty()) return "";
+    const size_t lastSep = path.find_last_of("/\\");
+    if (lastSep == std::string::npos) return path;
+    if (lastSep + 1 >= path.size()) return path;
+    return path.substr(lastSep + 1);
+}
+
+std::string WasmTextEngine::compareVersions(const std::string& originalContent, const std::string& newContent) const {
+    if (originalContent == newContent) {
+        return "{\"hasChanges\":false,\"added\":0,\"removed\":0,\"changed\":0}";
+    }
+
+    const std::vector<std::string> originalLines = splitLines(originalContent);
+    const std::vector<std::string> newLines = splitLines(newContent);
+    const size_t maxLines = std::max(originalLines.size(), newLines.size());
+
+    size_t added = 0;
+    size_t removed = 0;
+    size_t changed = 0;
+
+    for (size_t i = 0; i < maxLines; ++i) {
+        if (i >= originalLines.size()) {
+            ++added;
+        } else if (i >= newLines.size()) {
+            ++removed;
+        } else if (originalLines[i] != newLines[i]) {
+            ++changed;
+        }
+    }
+
+    std::ostringstream out;
+    out << "{"
+        << "\"hasChanges\":true,"
+        << "\"added\":" << added << ","
+        << "\"removed\":" << removed << ","
+        << "\"changed\":" << changed
+        << "}";
+    return out.str();
+}
+
+std::string WasmTextEngine::isHiddenCrossSearchFile(const std::string& filename) const {
+    const std::string name = trimAscii(filename);
+    bool hidden = false;
+
+    if (!name.empty() && name.size() >= 2) {
+        for (size_t i = 0; i + 1 < name.size(); ++i) {
+            const bool segmentStart = (i == 0) || isPathSeparator(name[i - 1]);
+            if (segmentStart && name[i] == '.' && !isPathSeparator(name[i + 1])) {
+                hidden = true;
+                break;
+            }
+        }
+    }
+
+    return std::string("{\"hidden\":") + (hidden ? "true" : "false") + "}";
+}
+
+std::string WasmTextEngine::collectFolderPaths(const std::string& entriesPayload) const {
+    std::set<std::string> folderSet;
+    folderSet.insert("");
+
+    std::istringstream stream(entriesPayload);
+    std::string row;
+    while (std::getline(stream, row)) {
+        if (row.empty()) continue;
+
+        const size_t sep = row.find('\t');
+        if (sep == std::string::npos) continue;
+
+        const std::string type = row.substr(0, sep);
+        const std::string name = row.substr(sep + 1);
+        if (name.empty()) continue;
+
+        if (type == "folder") {
+            folderSet.insert(name);
+            continue;
+        }
+
+        if (type != "file") {
+            continue;
+        }
+
+        std::string parent = name;
+        while (true) {
+            const size_t slash = parent.rfind('/');
+            if (slash == std::string::npos) break;
+            parent = parent.substr(0, slash);
+            if (!parent.empty()) {
+                folderSet.insert(parent);
+            }
+        }
+    }
+
+    std::ostringstream folders;
+    folders << "[";
+    size_t index = 0;
+    for (std::set<std::string>::const_iterator it = folderSet.begin(); it != folderSet.end(); ++it) {
+        if (index > 0) folders << ",";
+        folders << "\"" << jsonEscape(*it) << "\"";
+        ++index;
+    }
+    folders << "]";
+
+    return std::string("{\"folders\":") + folders.str() + "}";
 }
 
 std::string WasmTextEngine::replaceAllText(
