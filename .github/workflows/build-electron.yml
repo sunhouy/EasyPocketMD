@@ -129,7 +129,7 @@ jobs:
           '
 
       - name: Build web app (Vite)
-        run: npm run build
+        run: npm run build:web
 
       - name: Verify WASM packaged in dist
         run: npm run wasm:text:verify:dist
