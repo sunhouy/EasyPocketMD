@@ -104,10 +104,18 @@
 
     /** 获取本地 API 根地址（同源 api/index.php），保证 origin 与 api 之间必有 / */
     function getApiBaseUrl() {
+        function normalizeApiBase(url) {
+            if (!url) return 'api';
+            var normalized = String(url).replace(/\/$/, '');
+            // 防止 /api/api 重复拼接（可能来自用户配置或部署路径）
+            normalized = normalized.replace(/\/api\/api(\/|$)/g, '/api$1');
+            return normalized;
+        }
+
         if (typeof window !== 'undefined') {
             var configuredApiBase = window.API_BASE_URL || localStorage.getItem('apiBaseUrl');
             if (configuredApiBase) {
-                return configuredApiBase.replace(/\/$/, '');
+                return normalizeApiBase(configuredApiBase);
             }
 
             // 在 Electron 应用、Capacitor 应用或本地 file:// 协议下运行，直接请求远程服务器
@@ -119,7 +127,11 @@
             if (window.location && window.location.origin) {
                 var path = (window.location.pathname || '').replace(/\/[^/]*$/, '');
                 var base = window.location.origin + path;
-                return base.replace(/\/?$/, '/') + 'api';
+                // 当部署路径本身就是 /api 时，避免再追加一层 /api
+                if (/\/api\/?$/.test(base)) {
+                    return normalizeApiBase(base);
+                }
+                return normalizeApiBase(base.replace(/\/?$/, '/') + 'api');
             }
         }
         return 'api';

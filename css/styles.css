@@ -1610,6 +1610,12 @@ body.ui-mode-desktop .desktop-toolbar {
     display: flex;
 }
 
+body.ui-mode-desktop .mobile-toolbar-container,
+body.ui-mode-desktop .mobile-toolbar,
+body.ui-mode-desktop .desktop-toolbar {
+    overflow: visible;
+}
+
 body.ui-mode-desktop .toolbar-left-actions,
 body.ui-mode-desktop .toolbar-right-actions,
 body.ui-mode-desktop .mobile-title {

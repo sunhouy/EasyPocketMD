@@ -755,11 +755,13 @@
             <button class="desktop-toolbar-btn" id="desktopFormulaBtn" data-i18n="formula">公式</button>
             <button class="desktop-toolbar-btn" id="desktopChartBtn" data-i18n="chart">图表</button>
 
-            <div class="desktop-edit-group">
-                <span class="desktop-edit-label" data-i18n="edit">编辑</span>
-                <button class="desktop-toolbar-btn mini" id="desktopUndoBtn" data-i18n="undo">撤销</button>
-                <button class="desktop-toolbar-btn mini" id="desktopRedoBtn" data-i18n="redo">重做</button>
-                <button class="desktop-toolbar-btn mini" id="desktopSaveBtn" data-i18n="save">保存</button>
+            <div class="desktop-dropdown">
+                <button class="desktop-toolbar-btn" id="desktopEditBtn" data-i18n="edit">编辑</button>
+                <div class="desktop-dropdown-content" id="desktopEditDropdown">
+                    <button class="dropdown-item" id="desktopEditSaveBtn"><span data-i18n="save">保存</span></button>
+                    <button class="dropdown-item" id="desktopEditUndoBtn"><span data-i18n="undo">撤销</span></button>
+                    <button class="dropdown-item" id="desktopEditRedoBtn"><span data-i18n="redo">重做</span></button>
+                </div>
             </div>
 
             <button class="desktop-toolbar-btn" id="desktopSettingsBtn" data-i18n="settings">设置</button>
@@ -777,11 +779,9 @@
                     <button class="dropdown-item" id="desktopImportBtn"><i class="fas fa-file-import"></i><span data-i18n="import">导入</span></button>
                     <button class="dropdown-item" id="desktopExportBtn"><i class="fas fa-file-export"></i><span data-i18n="export">导出</span></button>
                     <button class="dropdown-item" id="desktopClearBtn"><i class="fas fa-trash-alt"></i><span data-i18n="clear">清空</span></button>
-                    <button class="dropdown-item" id="desktopServiceStatusBtn"><i class="fas fa-heartbeat"></i><span data-i18n="serviceStatus">服务状态</span></button>
+                    <button class="dropdown-item" id="desktopAboutBtn"><i class="fas fa-info-circle"></i><span data-i18n="about">关于</span></button>
                 </div>
             </div>
-
-            <button class="desktop-toolbar-btn" id="desktopAboutBtn" data-i18n="about">关于</button>
         </div>
 
         <div class="toolbar-left-actions">

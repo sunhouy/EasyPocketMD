@@ -375,9 +375,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 var desktopDropdown = document.getElementById('desktopMoreDropdown');
                 var desktopMoreBtn = document.getElementById('desktopMoreBtn');
+                var desktopEditDropdown = document.getElementById('desktopEditDropdown');
+                var desktopEditBtn = document.getElementById('desktopEditBtn');
 
                 if (menuBtn && dropdown && !menuBtn.contains(e.target) && !dropdown.contains(e.target)) dropdown.classList.remove('show');
                 if (desktopDropdown && desktopMoreBtn && !desktopMoreBtn.contains(e.target) && !desktopDropdown.contains(e.target)) desktopDropdown.classList.remove('show');
+                if (desktopEditDropdown && desktopEditBtn && !desktopEditBtn.contains(e.target) && !desktopEditDropdown.contains(e.target)) desktopEditDropdown.classList.remove('show');
                 if (overlay && e.target === overlay) window.hideMobileActionSheet();
                 var mobileLoginBtn = document.getElementById('mobileLoginBtn');
                 var desktopLoginBtn = document.getElementById('desktopLoginBtn');
@@ -632,6 +635,8 @@ document.addEventListener('DOMContentLoaded', function() {
         function closeDrop() { if (dropdown) dropdown.classList.remove('show'); }
         var desktopDropdown = document.getElementById('desktopMoreDropdown');
         function closeDesktopDrop() { if (desktopDropdown) desktopDropdown.classList.remove('show'); }
+        var desktopEditDropdown = document.getElementById('desktopEditDropdown');
+        function closeDesktopEditDrop() { if (desktopEditDropdown) desktopEditDropdown.classList.remove('show'); }
 
         function bindDesktopButton(id, fn) {
             var el = document.getElementById(id);
@@ -768,22 +773,32 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             if (typeof window.showChartPicker === 'function') window.showChartPicker();
         });
-        bindDesktopButton('desktopUndoBtn', function() {
+        bindDesktopButton('desktopEditUndoBtn', function() {
             if (window.vditor && window.vditor.vditor && window.vditor.vditor.undo) {
                 window.vditor.vditor.undo.undo(window.vditor.vditor);
             }
+            closeDesktopEditDrop();
         });
-        bindDesktopButton('desktopRedoBtn', function() {
+        bindDesktopButton('desktopEditRedoBtn', function() {
             if (window.vditor && window.vditor.vditor && window.vditor.vditor.undo) {
                 window.vditor.vditor.undo.redo(window.vditor.vditor);
             }
+            closeDesktopEditDrop();
         });
-        bindDesktopButton('desktopSaveBtn', handleBottomSave);
+        bindDesktopButton('desktopEditSaveBtn', async function() {
+            await handleBottomSave();
+            closeDesktopEditDrop();
+        });
         bindDesktopButton('desktopSettingsBtn', function() { window.showSettingsDialog(); });
-        bindDesktopButton('desktopAboutBtn', function() { window.showAboutDialog(); });
+        bindDesktopButton('desktopEditBtn', function(e) {
+            e.stopPropagation();
+            if (desktopEditDropdown) desktopEditDropdown.classList.toggle('show');
+            closeDesktopDrop();
+        });
         bindDesktopButton('desktopMoreBtn', function(e) {
             e.stopPropagation();
             if (desktopDropdown) desktopDropdown.classList.toggle('show');
+            closeDesktopEditDrop();
         });
 
         bindDesktopButton('desktopShareBtn', async function() {
@@ -831,7 +846,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             closeDesktopDrop();
         });
-        bindDesktopButton('desktopServiceStatusBtn', function() { window.showServiceStatusDialog(); closeDesktopDrop(); });
+        bindDesktopButton('desktopAboutBtn', function() { window.showAboutDialog(); closeDesktopDrop(); });
 
         // 渲染底部工具栏
         window.renderBottomToolbar();
