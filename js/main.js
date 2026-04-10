@@ -58,6 +58,7 @@ document.addEventListener('DOMContentLoaded', function() {
     window.currentUser = JSON.parse(localStorage.getItem('vditor_user') || 'null');
     window.currentFileId = null;
     window.files = JSON.parse(localStorage.getItem('vditor_files') || '[]');
+    window.appSessionId = 'session_' + Date.now() + '_' + Math.random().toString(36).slice(2, 10);
     window.autoSaveTimer = null;
     window.syncInterval = null;
     window.lastSyncedContent = {};
@@ -138,6 +139,22 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
     }
+
+    window.ensureWasmTextEngineReady = function() {
+        if (!window.wasmTextEngineReadyPromise) {
+            if (!window.wasmTextEngineGateway || typeof window.wasmTextEngineGateway.ensureReady !== 'function') {
+                window.wasmTextEngineReadyPromise = Promise.reject(new Error('wasm text engine gateway unavailable'));
+            } else {
+                window.wasmTextEngineReadyPromise = window.wasmTextEngineGateway.ensureReady().then(function(res) {
+                    if (!res || res.code !== 200) {
+                        throw new Error((res && res.message) || 'wasm text engine initialization failed');
+                    }
+                    return res;
+                });
+            }
+        }
+        return window.wasmTextEngineReadyPromise;
+    };
 
     window.ensureVditorInitialized = function() {
         if (window.vditor && window.vditorReady) {
@@ -1300,21 +1317,39 @@ document.addEventListener('DOMContentLoaded', function() {
         // 初始化顶部提示横幅
         initTopNoticeBanner();
 
-        if (window.currentUser) {
-            window.showUserInfo();
-            window.startAutoSync();
-            window.loadFilesFromServer();
-            hideTopNoticeBanner();
-        } else {
-            // 检查是否是分享链接
-            const urlParams = new URLSearchParams(window.location.search);
-            const shareId = urlParams.get('share_id');
+        var bootFileWorkspace = function() {
+            if (window.currentUser) {
+                window.showUserInfo();
+                window.startAutoSync();
+                window.loadFilesFromServer();
+                hideTopNoticeBanner();
+            } else {
+                const urlParams = new URLSearchParams(window.location.search);
+                const shareId = urlParams.get('share_id');
 
-            if (!shareId) {
-                // 不是分享链接，显示未登录提示横幅
-                showGuestNoticeBanner();
+                if (!shareId) {
+                    showGuestNoticeBanner();
+                }
+                window.loadLocalFiles();
             }
-            window.loadLocalFiles();
+        };
+
+        var handleWasmStartupFailure = function(error) {
+            const message = (window.i18n ? window.i18n.t('syncFailed') : '初始化失败') +
+                ': ' + ((error && error.message) || 'wasm text engine unavailable');
+            console.error('[startup] wasm text engine failed before file workspace boot', error);
+            showTopNoticeBanner('network-error', message, 'fas fa-exclamation-triangle');
+            if (window.showMessage) {
+                window.showMessage(message, 'error');
+            }
+            var loadingEl = document.getElementById('loading');
+            if (loadingEl) loadingEl.style.display = 'none';
+        };
+
+        if (typeof window.ensureWasmTextEngineReady === 'function') {
+            window.ensureWasmTextEngineReady().then(bootFileWorkspace).catch(handleWasmStartupFailure);
+        } else {
+            bootFileWorkspace();
         }
         var fileListClose = document.getElementById('fileListClose');
         if (fileListClose) fileListClose.addEventListener('click', function() { document.getElementById('fileListSidebar').classList.remove('show'); });

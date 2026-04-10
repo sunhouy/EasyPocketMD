@@ -296,6 +296,24 @@
         }
     }
 
+    function syncCurrentEditorSnapshotIntoFiles(targetFiles, options) {
+        const files = Array.isArray(targetFiles) ? targetFiles : [];
+        const currentFileId = options && options.fileId ? options.fileId : g('currentFileId');
+        if (!currentFileId) return;
+
+        const fileIndex = files.findIndex(function(file) {
+            return file && file.type === 'file' && String(file.id) === String(currentFileId);
+        });
+        if (fileIndex === -1) return;
+
+        const currentFile = files[fileIndex];
+        const editorContent = getCurrentEditorContent(currentFileId, currentFile.content);
+        if (editorContent === currentFile.content) return;
+
+        currentFile.content = editorContent;
+        currentFile.lastModified = Date.now();
+    }
+
     function getCurrentEditorContent(fileId, fallbackContent) {
         if (isLongFileEditorActiveFor(fileId)) {
             const textarea = getLongFileTextarea();
@@ -6019,4 +6037,3 @@
     global.openExternalLocalFileByPath = openExternalLocalFileByPath;
 
 })(typeof window !== 'undefined' ? window : this);
-
