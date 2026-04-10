@@ -91,7 +91,7 @@ async function exportContent() {
     // 创建模态框
     var modal = document.createElement('div');
     modal.className = 'modal-overlay';
-    modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:10000;';
+    modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:100100;';
 
     // 创建内容容器
     var container = document.createElement('div');

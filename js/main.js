@@ -2505,8 +2505,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (ua.indexOf('win') !== -1) return 'windows';
         if (ua.indexOf('mac') !== -1) return 'macos';
         if (ua.indexOf('linux') !== -1) {
-            if (/ubuntu|debian|mint|kali|pop|deepin|uos/.test(ua)) return 'linuxDeb';
-            return 'linuxAppImage';
+            return 'linuxDeb';
         }
         return 'windows';
     }

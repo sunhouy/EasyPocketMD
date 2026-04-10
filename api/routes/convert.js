@@ -239,6 +239,88 @@ router.post('/pdf', (req, res) => {
     }
 });
 
+router.post('/ocr', async (req, res) => {
+    try {
+        const imageUrl = String(req.body && req.body.imageUrl ? req.body.imageUrl : '').trim();
+        const lang = String(req.body && req.body.lang ? req.body.lang : 'chi_tra+chi_sim+eng').trim();
+        const fallbackOcrApi = String(req.body && req.body.fallbackOcrApi ? req.body.fallbackOcrApi : '').trim();
+        const ocrApi = process.env.OCR_API_URL || fallbackOcrApi || 'https://ocr.yhsun.cn/';
+
+        if (!imageUrl) {
+            return res.status(400).json({
+                code: 400,
+                message: 'imageUrl is required'
+            });
+        }
+
+        let imageResponse;
+        try {
+            imageResponse = await fetch(imageUrl);
+        } catch (fetchErr) {
+            return res.status(502).json({
+                code: 502,
+                message: 'Failed to fetch image from source',
+                error: fetchErr.message
+            });
+        }
+
+        if (!imageResponse.ok) {
+            return res.status(502).json({
+                code: 502,
+                message: 'Failed to fetch image from source',
+                error: 'HTTP ' + imageResponse.status
+            });
+        }
+
+        const imageType = imageResponse.headers.get('content-type') || 'image/png';
+        const imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
+
+        const formData = new FormData();
+        formData.append('file', new Blob([imageBuffer], { type: imageType }), 'ocr-image.png');
+        formData.append('lang', lang);
+
+        const ocrResponse = await fetch(ocrApi, {
+            method: 'POST',
+            body: formData
+        });
+
+        if (!ocrResponse.ok) {
+            const fallbackText = await ocrResponse.text().catch(() => '');
+            return res.status(502).json({
+                code: 502,
+                message: 'OCR upstream request failed',
+                error: 'HTTP ' + ocrResponse.status + (fallbackText ? (': ' + fallbackText.slice(0, 200)) : '')
+            });
+        }
+
+        let ocrData;
+        try {
+            ocrData = await ocrResponse.json();
+        } catch (parseErr) {
+            const rawText = await ocrResponse.text().catch(() => '');
+            return res.status(502).json({
+                code: 502,
+                message: 'OCR upstream response parse failed',
+                error: parseErr.message,
+                raw: rawText.slice(0, 300)
+            });
+        }
+
+        return res.json({
+            code: 200,
+            message: 'OCR success',
+            data: ocrData
+        });
+    } catch (error) {
+        console.error('OCR conversion endpoint error:', error);
+        return res.status(500).json({
+            code: 500,
+            message: 'Server error during OCR conversion',
+            error: error.message
+        });
+    }
+});
+
 function toFiniteNumber(value, fallback) {
     const parsed = Number(value);
     return Number.isFinite(parsed) ? parsed : fallback;

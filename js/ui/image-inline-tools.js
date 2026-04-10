@@ -2,6 +2,18 @@
     'use strict';
 
     var OCR_API = 'https://ocr.yhsun.cn/';
+
+    function getNativeAwareResolveBase() {
+        var isNativeLike = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) ||
+            !!window.electron ||
+            (window.location && window.location.protocol === 'file:');
+
+        if (isNativeLike && typeof global.getAppOrigin === 'function') {
+            return global.getAppOrigin();
+        }
+
+        return window.location.href;
+    }
     var MODAL_ID = 'epmd-image-tools-modal';
     var FULLSCREEN_CROP_ID = 'epmd-image-crop-fullscreen';
     var updateTimer = null;
@@ -10,6 +22,7 @@
     var cropperLoadPromise = null;
     var activeCropper = null;
     var activeCropperHost = null;
+    var lastImageToolOpenAt = 0;
 
     function escapeRegExp(str) {
         return String(str || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -66,6 +79,48 @@
         if (!img) return false;
         if (img.closest('.vditor-wysiwyg, .vditor-ir__preview, .vditor-sv')) return true;
         return false;
+    }
+
+    function blurActiveTextInput() {
+        var active = document.activeElement;
+        if (!active || typeof active.blur !== 'function') return;
+
+        var tagName = String(active.tagName || '').toUpperCase();
+        var isTextInput = tagName === 'INPUT' || tagName === 'TEXTAREA';
+        var isEditable = !!active.isContentEditable;
+        if (isTextInput || isEditable) {
+            active.blur();
+        }
+    }
+
+    function getViewportHeight() {
+        if (window.visualViewport && window.visualViewport.height) {
+            return Math.max(0, Math.round(window.visualViewport.height));
+        }
+        return Math.max(0, Math.round(window.innerHeight || document.documentElement.clientHeight || 0));
+    }
+
+    function syncFullscreenCropViewport(modal) {
+        if (!modal) return;
+        var viewportHeight = getViewportHeight();
+        if (viewportHeight > 0) {
+            modal.style.height = viewportHeight + 'px';
+            modal.style.minHeight = viewportHeight + 'px';
+        }
+    }
+
+    function openImageToolsFromInteraction(event, img) {
+        if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+            if (typeof event.stopImmediatePropagation === 'function') {
+                event.stopImmediatePropagation();
+            }
+        }
+
+        blurActiveTextInput();
+        lastImageToolOpenAt = Date.now();
+        showImageToolsModal(img);
     }
 
     function getTargetImages() {
@@ -466,6 +521,18 @@
             'overflow: hidden'
         ].join(';');
 
+        var onViewportResize = function() {
+            if (modal.style.display !== 'none') {
+                syncFullscreenCropViewport(modal);
+            }
+        };
+
+        window.addEventListener('resize', onViewportResize);
+        window.addEventListener('orientationchange', onViewportResize);
+        if (window.visualViewport) {
+            window.visualViewport.addEventListener('resize', onViewportResize);
+        }
+
         modal.innerHTML = `
             <div style="display:flex;align-items:center;justify-content:space-between;padding:calc(10px + env(safe-area-inset-top, 0px)) 16px 10px;border-bottom:1px solid ${border};background:${panel};flex:none;">
                 <div style="font-size:16px;font-weight:600;">全屏裁剪</div>
@@ -766,6 +833,8 @@
             return;
         }
 
+        blurActiveTextInput();
+
         var cropModal = createFullscreenCropModal();
         var cropTarget = cropModal.querySelector('.epmd-fs-crop-target');
         var cropStage = cropModal.querySelector('.epmd-fs-crop-stage');
@@ -779,6 +848,12 @@
         }
 
         cropModal.style.display = 'flex';
+        syncFullscreenCropViewport(cropModal);
+        setTimeout(function() {
+            if (cropModal.style.display !== 'none') {
+                syncFullscreenCropViewport(cropModal);
+            }
+        }, 120);
         cropModal.epmdCropState = {
             busy: false,
             dirty: false,
@@ -989,33 +1064,35 @@
             return;
         }
 
+        var resolvedSrc = (typeof global.resolveResourceUrl === 'function')
+            ? global.resolveResourceUrl(src, getNativeAwareResolveBase())
+            : src;
+
         var statusDiv = modal.querySelector('.epmd-ocr-status');
         var btn = modal.querySelector('.epmd-ocr-run');
         statusDiv.textContent = 'OCR 识别中...';
         btn.disabled = true;
 
         try {
-            var response = await fetch(src, { mode: 'cors' });
-            if (!response.ok) {
-                throw new Error('图片读取失败: ' + response.status);
-            }
-            var blob = await response.blob();
-
-            var formData = new FormData();
-            formData.append('file', fileFromBlob(blob, 'ocr-image.png'));
             var langSelect = modal.querySelector('.epmd-ocr-lang');
-            formData.append('lang', langSelect.value);
-
-            var ocrRes = await fetch(OCR_API, {
+            var apiUrl = (global.getApiBaseUrl ? global.getApiBaseUrl() : 'api') + '/convert/ocr';
+            var ocrRes = await fetch(apiUrl, {
                 method: 'POST',
-                body: formData
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    imageUrl: resolvedSrc,
+                    fallbackOcrApi: OCR_API,
+                    lang: langSelect ? langSelect.value : 'chi_tra+chi_sim+eng'
+                })
             });
             if (!ocrRes.ok) {
                 throw new Error('OCR 请求失败: ' + ocrRes.status);
             }
 
             var data = await ocrRes.json();
-            var text = (data && data.text ? String(data.text) : '').trim();
+            var text = (data && data.data && data.data.text ? String(data.data.text) : '').trim();
             if (!text) {
                 text = '无识别结果';
             }
@@ -1085,9 +1162,24 @@
             if (img.dataset.epmdToolsBound === '1') return;
             img.dataset.epmdToolsBound = '1';
             img.style.cursor = 'pointer';
+
+            img.addEventListener('touchstart', function(e) {
+                openImageToolsFromInteraction(e, img);
+            }, { passive: false });
+
+            img.addEventListener('mousedown', function(e) {
+                if (typeof e.button === 'number' && e.button !== 0) return;
+                openImageToolsFromInteraction(e, img);
+            });
+
             img.addEventListener('click', function(e) {
-                e.stopPropagation();
-                showImageToolsModal(img);
+                // touchstart/mousedown already handled opening; swallow delayed click.
+                if (Date.now() - lastImageToolOpenAt < 450) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    return;
+                }
+                openImageToolsFromInteraction(e, img);
             });
         });
     }
