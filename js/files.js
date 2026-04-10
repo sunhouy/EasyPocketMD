@@ -1991,6 +1991,17 @@
     }
 
     let hasNotifiedInitialFileListRendered = false;
+    let hasBoundFabRingDismiss = false;
+    const FILE_LIST_SEARCH_DEBOUNCE = 180;
+    const fileListSearchState = {
+        query: '',
+        scope: 'title',
+        timer: null,
+        token: 0,
+        matchedNodeIds: new Set(),
+        totalMatches: 0,
+        applyingVisibility: false
+    };
 
     function shouldAutoOpenInitialFile() {
         return !global.deferInitialFileOpen;
@@ -2010,35 +2021,339 @@
         }
     }
 
+    function closeFileManagementFabRing() {
+        const fab = document.getElementById('fileManagementFab');
+        const ring = document.getElementById('fileManagementFabRing');
+        if (fab) fab.classList.remove('open');
+        if (ring) {
+            ring.classList.remove('open');
+            ring.setAttribute('aria-hidden', 'true');
+        }
+    }
+
+    function toggleFileManagementFabRing() {
+        const fab = document.getElementById('fileManagementFab');
+        const ring = document.getElementById('fileManagementFabRing');
+        if (!fab || !ring) return;
+
+        const willOpen = !ring.classList.contains('open');
+        if (!willOpen) {
+            closeFileManagementFabRing();
+            return;
+        }
+
+        fab.classList.add('open');
+        ring.classList.add('open');
+        ring.setAttribute('aria-hidden', 'false');
+    }
+
     function bindFileManagementFabIfNeeded() {
         const fab = document.getElementById('fileManagementFab');
+        const ring = document.getElementById('fileManagementFabRing');
+        const newFileBtn = document.getElementById('fileManagementFabNewFile');
+        const newFolderBtn = document.getElementById('fileManagementFabNewFolder');
         if (!fab || fab.dataset.bound === '1') return;
 
         fab.dataset.bound = '1';
         fab.addEventListener('click', function(e) {
             e.preventDefault();
             e.stopPropagation();
+            if (ring) {
+                toggleFileManagementFabRing();
+                return;
+            }
+            global.createNewFile();
+        });
 
-            if (typeof global.showMobileActionSheet === 'function') {
-                global.showMobileActionSheet(
-                    isEn() ? 'Create' : '新建',
-                    [
-                        {
-                            icon: '<i class="fas fa-file"></i>',
-                            text: isEn() ? 'New File' : '新建文件',
-                            action: function() { global.createNewFile(); }
-                        },
-                        {
-                            icon: '<i class="fas fa-folder-plus"></i>',
-                            text: isEn() ? 'New Folder' : '新建文件夹',
-                            action: function() { global.createNewFolder(); }
-                        }
-                    ]
-                );
+        if (newFileBtn) {
+            newFileBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                closeFileManagementFabRing();
+                global.createNewFile();
+            });
+        }
+
+        if (newFolderBtn) {
+            newFolderBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                closeFileManagementFabRing();
+                global.createNewFolder();
+            });
+        }
+
+        if (!hasBoundFabRingDismiss) {
+            hasBoundFabRingDismiss = true;
+            document.addEventListener('click', function(e) {
+                const fabEl = document.getElementById('fileManagementFab');
+                const ringEl = document.getElementById('fileManagementFabRing');
+                if (!ringEl || !ringEl.classList.contains('open')) return;
+
+                if ((fabEl && fabEl.contains(e.target)) || ringEl.contains(e.target)) {
+                    return;
+                }
+
+                closeFileManagementFabRing();
+            });
+
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape') closeFileManagementFabRing();
+            });
+        }
+    }
+
+    function setFileListSearchResult(message, isError) {
+        const resultEl = document.getElementById('fileListSearchResult');
+        if (!resultEl) return;
+        resultEl.textContent = message || '';
+        resultEl.classList.toggle('error', !!isError);
+    }
+
+    function collectTitleNodeMatches(gateway, query) {
+        const matchedNodeIds = new Set();
+        let totalMatches = 0;
+
+        let nodes = [];
+        const tree = window.$ ? window.$('#fileList').jstree(true) : null;
+        if (tree && typeof tree.get_json === 'function') {
+            nodes = tree.get_json('#', { flat: true }) || [];
+        } else {
+            nodes = getJsTreeData();
+        }
+
+        nodes.forEach(function(node) {
+            if (!node) return;
+            const id = String(node.id || '');
+            if (!id || id === '#') return;
+
+            const data = node.data || {};
+            const path = String(data.path || '').trim();
+            if (path === '.easypocketmd_orders') return;
+            if (data.type === 'file' && isHiddenCrossSearchFile(path)) return;
+
+            const title = getBasename(path || String(node.text || '').trim());
+            if (!title) return;
+
+            const titleRes = gateway.findInText(String(title), query, { caseSensitive: false });
+            if (!titleRes || titleRes.code !== 200 || !titleRes.data) return;
+
+            const count = Number(titleRes.data.count || 0);
+            if (count > 0) {
+                matchedNodeIds.add(id);
+                totalMatches += count;
+            }
+        });
+
+        return {
+            matchedNodeIds: matchedNodeIds,
+            totalMatches: totalMatches
+        };
+    }
+
+    function clearFileListSearchFilter() {
+        fileListSearchState.query = '';
+        fileListSearchState.matchedNodeIds = new Set();
+        fileListSearchState.totalMatches = 0;
+        if (fileListSearchState.timer) {
+            clearTimeout(fileListSearchState.timer);
+            fileListSearchState.timer = null;
+        }
+        setFileListSearchResult('');
+        reapplyFileListSearchVisibility();
+    }
+
+    function reapplyFileListSearchVisibility() {
+        if (fileListSearchState.applyingVisibility || !window.$) return;
+        const tree = window.$('#fileList').jstree(true);
+        const root = document.getElementById('fileList');
+        if (!tree || !root) return;
+
+        const query = String(fileListSearchState.query || '').trim();
+        const nodeEls = root.querySelectorAll('li.jstree-node');
+
+        if (!query) {
+            nodeEls.forEach(function(el) { el.classList.remove('file-list-search-hidden'); });
+            return;
+        }
+
+        fileListSearchState.applyingVisibility = true;
+        try {
+            const visibleNodeIds = new Set();
+            fileListSearchState.matchedNodeIds.forEach(function(nodeId) {
+                const node = tree.get_node(String(nodeId));
+                if (!node) return;
+                visibleNodeIds.add(String(node.id));
+                let parentId = node.parent;
+                while (parentId && parentId !== '#') {
+                    visibleNodeIds.add(String(parentId));
+                    const parentNode = tree.get_node(parentId);
+                    if (!parentNode) break;
+                    parentId = parentNode.parent;
+                }
+            });
+
+            nodeEls.forEach(function(el) {
+                const id = String(el.id || '');
+                if (!id) return;
+                el.classList.toggle('file-list-search-hidden', !visibleNodeIds.has(id));
+            });
+
+            visibleNodeIds.forEach(function(id) {
+                const node = tree.get_node(id);
+                if (node && node.data && node.data.type === 'folder') {
+                    tree.open_node(id);
+                }
+            });
+        } finally {
+            fileListSearchState.applyingVisibility = false;
+        }
+    }
+
+    async function runFileListSearchNow() {
+        const query = String(fileListSearchState.query || '').trim();
+        if (!query) {
+            clearFileListSearchFilter();
+            return;
+        }
+
+        const gateway = global.wasmTextEngineGateway;
+        if (!gateway || typeof gateway.ensureReady !== 'function') {
+            setFileListSearchResult(isEn() ? 'WASM search is unavailable' : 'WASM 搜索不可用', true);
+            return;
+        }
+
+        const token = ++fileListSearchState.token;
+        setFileListSearchResult(isEn() ? 'Searching...' : '搜索中...', false);
+
+        const readyRes = await gateway.ensureReady();
+        if (token !== fileListSearchState.token) return;
+
+        if (!readyRes || readyRes.code !== 200) {
+            setFileListSearchResult((readyRes && readyRes.message) || (isEn() ? 'Search failed' : '搜索失败'), true);
+            return;
+        }
+
+        const titleMatchInfo = collectTitleNodeMatches(gateway, query);
+        const matchedNodeIds = new Set(titleMatchInfo.matchedNodeIds || []);
+        let totalMatches = Number(titleMatchInfo.totalMatches || 0);
+
+        if (fileListSearchState.scope === 'fullText') {
+            const fullTextRes = gateway.searchFilesDetailed(query, { caseSensitive: false });
+            if (token !== fileListSearchState.token) return;
+
+            if (!fullTextRes || fullTextRes.code !== 200 || !fullTextRes.data) {
+                setFileListSearchResult((fullTextRes && fullTextRes.message) || (isEn() ? 'Search failed' : '搜索失败'), true);
                 return;
             }
 
-            global.createNewFile();
+            const rows = Array.isArray(fullTextRes.data.files) ? fullTextRes.data.files : [];
+            rows.forEach(function(row) {
+                const docId = String((row && row.docId) || '');
+                if (!docId) return;
+                matchedNodeIds.add(docId);
+                totalMatches += Number((row && row.matchCount) || 0);
+            });
+        }
+
+        fileListSearchState.matchedNodeIds = matchedNodeIds;
+        fileListSearchState.totalMatches = totalMatches;
+        reapplyFileListSearchVisibility();
+
+        if (!matchedNodeIds.size) {
+            setFileListSearchResult(isEn() ? 'No matching nodes' : '未匹配到文件或文件夹', false);
+            return;
+        }
+
+        if (fileListSearchState.scope === 'fullText') {
+            setFileListSearchResult(
+                (isEn() ? 'Matched nodes: ' : '匹配节点：') + matchedNodeIds.size + '，' +
+                (isEn() ? 'total title/content hits: ' : '标题/全文总命中：') + totalMatches,
+                false
+            );
+        } else {
+            setFileListSearchResult(
+                (isEn() ? 'Matched titles (files and folders): ' : '标题匹配（文件+文件夹）：') + matchedNodeIds.size,
+                false
+            );
+        }
+    }
+
+    function scheduleFileListSearch() {
+        if (fileListSearchState.timer) clearTimeout(fileListSearchState.timer);
+        fileListSearchState.timer = setTimeout(function() {
+            fileListSearchState.timer = null;
+            runFileListSearchNow().catch(function(error) {
+                console.error('file list search failed:', error);
+                setFileListSearchResult(isEn() ? 'Search failed' : '搜索失败', true);
+            });
+        }, FILE_LIST_SEARCH_DEBOUNCE);
+    }
+
+    function bindFileListSearchIfNeeded() {
+        const toggleBtn = document.getElementById('fileListSearchBtn');
+        const panel = document.getElementById('fileListSearchPanel');
+        const input = document.getElementById('fileListSearchInput');
+        const scopeSelect = document.getElementById('fileListSearchScope');
+        if (!toggleBtn || !panel || !input || !scopeSelect || toggleBtn.dataset.bound === '1') return;
+
+        toggleBtn.dataset.bound = '1';
+        scopeSelect.value = 'title';
+        fileListSearchState.scope = 'title';
+
+        const closeSearchPanel = function() {
+            panel.style.display = 'none';
+            toggleBtn.classList.remove('active');
+            input.value = '';
+            clearFileListSearchFilter();
+        };
+
+        toggleBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            const isOpen = panel.style.display !== 'none';
+            if (isOpen) {
+                closeSearchPanel();
+                return;
+            }
+
+            panel.style.display = '';
+            toggleBtn.classList.add('active');
+            setFileListSearchResult(isEn() ? 'Title search by default' : '默认仅搜索标题', false);
+            setTimeout(function() { input.focus(); }, 0);
+        });
+
+        input.addEventListener('input', function() {
+            fileListSearchState.query = String(input.value || '');
+            scheduleFileListSearch();
+        });
+
+        input.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                runFileListSearchNow().catch(function(error) {
+                    console.error('file list search failed:', error);
+                    setFileListSearchResult(isEn() ? 'Search failed' : '搜索失败', true);
+                });
+            }
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                closeSearchPanel();
+            }
+        });
+
+        scopeSelect.addEventListener('change', function() {
+            fileListSearchState.scope = String(scopeSelect.value || 'title');
+            if (!String(fileListSearchState.query || '').trim()) {
+                setFileListSearchResult(
+                    fileListSearchState.scope === 'fullText'
+                        ? (isEn() ? 'Full-text search mode' : '全文搜索模式')
+                        : (isEn() ? 'Title-only search mode' : '仅标题搜索模式'),
+                    false
+                );
+                return;
+            }
+            scheduleFileListSearch();
         });
     }
 
@@ -2685,6 +3000,8 @@
                     window.$(this).append(menuBtn);
                 }
             });
+
+            reapplyFileListSearchVisibility();
         })
         .on('ready.jstree', function() {
             expandActiveFile();
@@ -2878,6 +3195,7 @@
         loadOrders();
         initFileTree();
         bindFileManagementFabIfNeeded();
+        bindFileListSearchIfNeeded();
         notifyInitialFileListRendered();
         if (wasVisible && fileListSidebar) {
             fileListSidebar.classList.add('show');
@@ -3732,6 +4050,8 @@
         if (typeof global.saveCurrentFile === 'function' && g('currentFileId')) {
             await global.saveCurrentFile(false);
         }
+
+        closeFileManagementFabRing();
 
         const files = g('files');
         const file = files.find(f => f.id === fileId && f.type === 'file');

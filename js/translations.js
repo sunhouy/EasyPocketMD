@@ -19,8 +19,14 @@
             // 文件列表
             fileListTitle: '文件列表',
             fileListHelp: '点击三个点显示更多功能',
+            fileListSearch: '搜索文件',
+            fileListSearchPlaceholder: '搜索文件...',
+            searchScopeTitleOnly: '仅标题',
+            searchScopeFullText: '全文',
             newFile: '新建文件',
             newFolder: '新建文件夹',
+            fabFileLabel: '文件',
+            fabFolderLabel: '文件夹',
             fileListHelpText: '文件列表功能提示： <br><br>• 点击文件：打开文件 <br>• 点击文件夹：展开/收起子内容 <br>• 点击文件/文件夹右侧的三个点：显示更多操作菜单（历史版本重命名、移动、删除等）',
 
             // 登录/注册
@@ -702,8 +708,14 @@
             // File list
             fileListTitle: 'File List',
             fileListHelp: 'Click the three dots for more functions',
+            fileListSearch: 'Search Files',
+            fileListSearchPlaceholder: 'Search files...',
+            searchScopeTitleOnly: 'Title',
+            searchScopeFullText: 'Full Text',
             newFile: 'New File',
             newFolder: 'New Folder',
+            fabFileLabel: 'File',
+            fabFolderLabel: 'Folder',
             fileListHelpText: 'File List Tips:\n\n• Click file: Open file\n• Click folder: Expand/collapse\n• Click the three dots to the right of the file/folder: Show more options (rename, move, delete, etc.)',
 
             // Login/Register

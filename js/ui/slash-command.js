@@ -667,6 +667,9 @@ function createPanel() {
     close.type = 'button';
     close.className = 'slash-command-close';
     close.innerHTML = '<i class="fas fa-times"></i>';
+    close.addEventListener('mousedown', function(event) {
+        event.preventDefault();
+    });
     close.addEventListener('click', function(event) {
         event.preventDefault();
         event.stopPropagation();
@@ -676,6 +679,20 @@ function createPanel() {
 
     var list = document.createElement('div');
     list.className = 'slash-command-list';
+
+    list.addEventListener('mousedown', function(event) {
+        if (event.button !== 0) return;
+
+        var target = event.target;
+        var start = target && target.nodeType === 3 ? target.parentElement : target;
+        var row = start && start.closest ? start.closest('.slash-command-item') : null;
+        if (!row) return;
+
+        // Keep the editor caret alive so clicking an item does not blur the editor
+        // and collapse the slash panel before the click handler runs.
+        event.preventDefault();
+        state.ignoreSelectionChangeUntil = Date.now() + 500;
+    });
 
     var activateByEvent = function(event, source) {
         if (!event) return;
@@ -815,14 +832,37 @@ function renderItems() {
             '<span class="slash-command-item-group">' + groupLabel + '</span>';
 
         row.addEventListener('mouseenter', function() {
-            state.activeIndex = index;
-            renderItems();
+            setActiveIndex(index, false);
         });
 
         state.list.appendChild(row);
     });
 
+    updateActiveRowClasses();
     ensureActiveItemVisible();
+}
+
+function updateActiveRowClasses() {
+    if (!state.list) return;
+    var rows = state.list.querySelectorAll('.slash-command-item');
+    rows.forEach(function(row, index) {
+        if (index === state.activeIndex) {
+            row.classList.add('active');
+        } else {
+            row.classList.remove('active');
+        }
+    });
+}
+
+function setActiveIndex(index, shouldScroll) {
+    if (!Array.isArray(state.items) || state.items.length === 0) return;
+    if (index < 0 || index >= state.items.length) return;
+    if (state.activeIndex === index) return;
+    state.activeIndex = index;
+    updateActiveRowClasses();
+    if (shouldScroll) {
+        ensureActiveItemVisible();
+    }
 }
 
 function ensureActiveItemVisible() {
@@ -966,9 +1006,8 @@ async function refreshFromCaret() {
 function moveActive(delta) {
     if (!state.items.length) return;
     var count = state.items.length;
-    state.activeIndex = (state.activeIndex + delta + count) % count;
-    renderItems();
-    ensureActiveItemVisible();
+    var nextIndex = (state.activeIndex + delta + count) % count;
+    setActiveIndex(nextIndex, true);
 }
 
 function onEditorKeyDown(event) {
