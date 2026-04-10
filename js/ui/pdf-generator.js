@@ -426,6 +426,18 @@ async function loadPdfDocumentWithNativeFallback(pdfUrl) {
         console.warn('[PDF Debug] Native PDF loading failed, fallback to direct URL:', nativeError);
     }
 
+    try {
+        const response = await fetch(pdfUrl, { cache: 'no-store' });
+        if (!response.ok) {
+            throw new Error('HTTP ' + response.status);
+        }
+        const buffer = await response.arrayBuffer();
+        const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(buffer) });
+        return await loadingTask.promise;
+    } catch (fetchError) {
+        console.warn('[PDF Debug] Fetch-arrayBuffer PDF loading failed, fallback to URL:', fetchError);
+    }
+
     const loadingTask = pdfjsLib.getDocument(pdfUrl);
     return await loadingTask.promise;
 }

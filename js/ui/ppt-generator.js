@@ -1603,18 +1603,31 @@ JSON 结构：
     function promptFilenameAndDownloadPPT() {
         var defaultFileName = getDefaultPPTFileName();
 
-        if (typeof global.showFilenameDialog === 'function') {
-            global.showFilenameDialog(defaultFileName, 'pptx', function(filename) {
-                doDownloadPPT(filename);
+        if (document && document.activeElement && typeof document.activeElement.blur === 'function') {
+            document.activeElement.blur();
+        }
+
+        var openFilenameDialog = function() {
+            if (typeof global.showFilenameDialog === 'function') {
+                global.showFilenameDialog(defaultFileName, 'pptx', function(filename) {
+                    doDownloadPPT(filename);
+                });
+                return;
+            }
+
+            showCustomPrompt(isEn() ? 'Enter file name:' : '输入文件名：', defaultFileName, function(filename) {
+                if (filename === null) return;
+                var finalName = (filename || defaultFileName).trim();
+                doDownloadPPT(finalName || defaultFileName);
             });
+        };
+
+        if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) {
+            requestAnimationFrame(openFilenameDialog);
             return;
         }
 
-        showCustomPrompt(isEn() ? 'Enter file name:' : '输入文件名：', defaultFileName, function(filename) {
-            if (filename === null) return;
-            var finalName = (filename || defaultFileName).trim();
-            doDownloadPPT(finalName || defaultFileName);
-        });
+        openFilenameDialog();
     }
 
     // 实际下载 - 调用后端 API 生成 PPT

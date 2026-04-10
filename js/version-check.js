@@ -83,10 +83,7 @@
                 return CLIENT_DOWNLOAD_LINKS.macos;
             }
             if (ua.indexOf('linux') !== -1) {
-                if (/ubuntu|debian|mint|kali|pop|deepin|uos/.test(ua)) {
-                    return CLIENT_DOWNLOAD_LINKS.linuxDeb;
-                }
-                return CLIENT_DOWNLOAD_LINKS.linuxAppImage;
+                return CLIENT_DOWNLOAD_LINKS.linuxDeb;
             }
             return CLIENT_DOWNLOAD_LINKS.windows;
         }

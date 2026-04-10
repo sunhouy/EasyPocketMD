@@ -254,18 +254,44 @@
         // console.log('[Lifecycle] Web lifecycle handlers initialized');
     }
 
+    async function resolveCapacitorAppPlugin() {
+        if (capacitorApp && typeof capacitorApp.addListener === 'function') {
+            return capacitorApp;
+        }
+
+        if (global.Capacitor && global.Capacitor.Plugins && global.Capacitor.Plugins.App && typeof global.Capacitor.Plugins.App.addListener === 'function') {
+            return global.Capacitor.Plugins.App;
+        }
+
+        try {
+            const appModuleName = '@capacitor/app';
+            const appModule = await import(/* @vite-ignore */ appModuleName);
+            if (appModule && appModule.App && typeof appModule.App.addListener === 'function') {
+                return appModule.App;
+            }
+        } catch (importError) {
+            // @capacitor/app may be absent in web-only builds; fallback below.
+        }
+
+        if (global.CapacitorApp && typeof global.CapacitorApp.addListener === 'function') {
+            return global.CapacitorApp;
+        }
+
+        return null;
+    }
+
     /**
      * 初始化 Capacitor 生命周期处理
      */
-    function initCapacitorLifecycle() {
+    async function initCapacitorLifecycle() {
         if (!global.Capacitor) return;
 
         // 通过 Capacitor 注入的原生插件对象注册生命周期监听。
         try {
-            capacitorApp = global.Capacitor.Plugins ? global.Capacitor.Plugins.App : null;
+            capacitorApp = await resolveCapacitorAppPlugin();
 
             if (!capacitorApp || typeof capacitorApp.addListener !== 'function') {
-                console.warn('[Lifecycle] Capacitor App plugin unavailable');
+                console.info('[Lifecycle] Capacitor App plugin unavailable, using web lifecycle fallback');
                 return;
             }
 
