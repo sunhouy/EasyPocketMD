@@ -114,10 +114,13 @@
     ],
     "fileAssociations": [
       {
-        "ext": [
-          "md",
-          "markdown"
-        ],
+        "ext": "md",
+        "name": "Markdown Document",
+        "description": "Markdown file",
+        "role": "Editor"
+      },
+      {
+        "ext": "markdown",
         "name": "Markdown Document",
         "description": "Markdown file",
         "role": "Editor"

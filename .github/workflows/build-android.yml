@@ -62,14 +62,23 @@ jobs:
         run: |
           TAG_NAME=${{ github.event_name == 'workflow_dispatch' && github.event.inputs.release_tag != '' && github.event.inputs.release_tag || github.ref_name }}
           VERSION=$(echo "$TAG_NAME" | sed 's/^v//')
-          
-          # 确保版本号符合 semver 规范（主版本.次版本.修订版本）
-          if echo "$VERSION" | grep -q '^[0-9]\+\.[0-9]\+$'; then
-            # 如果是 x.y 格式，添加 .0 变成 x.y.0
-            VERSION="$VERSION.0"
-          elif echo "$VERSION" | grep -q '^[0-9]\+$'; then
-            # 如果是 x 格式，添加 .0.0 变成 x.0.0
+
+          # workflow_dispatch 未指定 tag 时，ref 可能是 main；此时回退到 package.json 版本
+          if ! echo "$VERSION" | grep -q '^[0-9]\+\(\.[0-9]\+\)\{0,2\}$'; then
+            VERSION=$(node -p "require('./package.json').version")
+          fi
+
+          # 统一补齐到 x.y.z
+          if echo "$VERSION" | grep -q '^[0-9]\+$'; then
             VERSION="$VERSION.0.0"
+          elif echo "$VERSION" | grep -q '^[0-9]\+\.[0-9]\+$'; then
+            VERSION="$VERSION.0"
+          fi
+
+          # 二次兜底，确保输出严格 semver
+          if ! echo "$VERSION" | grep -q '^[0-9]\+\.[0-9]\+\.[0-9]\+$'; then
+            echo "Invalid version resolved: $VERSION"
+            exit 1
           fi
           
           # 生成 versionCode：主版本*10000 + 次版本*100 + 修订版本

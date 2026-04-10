@@ -376,6 +376,60 @@ export async function generatePDF(htmlContent, settings, filename) {
     }
 }
 
+function base64ToUint8Array(base64Data) {
+    const normalized = String(base64Data || '').replace(/^data:.*;base64,/, '');
+    const binary = atob(normalized);
+    const length = binary.length;
+    const bytes = new Uint8Array(length);
+    for (let i = 0; i < length; i++) {
+        bytes[i] = binary.charCodeAt(i);
+    }
+    return bytes;
+}
+
+async function loadPdfDocumentWithNativeFallback(pdfUrl) {
+    const isCapacitorNative = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+    const isHttpUrl = typeof pdfUrl === 'string' && /^https?:\/\//i.test(pdfUrl);
+
+    if (!isCapacitorNative || !isHttpUrl) {
+        const loadingTask = pdfjsLib.getDocument(pdfUrl);
+        return await loadingTask.promise;
+    }
+
+    try {
+        const { Filesystem, Directory } = await import('@capacitor/filesystem');
+
+        if (typeof Filesystem.downloadFile === 'function') {
+            const tempFilename = `preview_${Date.now()}_${Math.random().toString(36).slice(2)}.pdf`;
+            const downloadResult = await Filesystem.downloadFile({
+                url: pdfUrl,
+                path: tempFilename,
+                directory: Directory.Cache,
+                recursive: true
+            });
+
+            const filePath = downloadResult.path || tempFilename;
+            const readResult = await Filesystem.readFile({
+                path: filePath,
+                directory: Directory.Cache
+            });
+
+            if (typeof readResult.data !== 'string' || !readResult.data) {
+                throw new Error('Native PDF read returned empty data');
+            }
+
+            const pdfData = base64ToUint8Array(readResult.data);
+            const loadingTask = pdfjsLib.getDocument({ data: pdfData });
+            return await loadingTask.promise;
+        }
+    } catch (nativeError) {
+        console.warn('[PDF Debug] Native PDF loading failed, fallback to direct URL:', nativeError);
+    }
+
+    const loadingTask = pdfjsLib.getDocument(pdfUrl);
+    return await loadingTask.promise;
+}
+
 /**
  * Render PDF from URL to a container using pdf.js
  * @param {string} pdfUrl 
@@ -396,8 +450,7 @@ export async function renderPDF(pdfUrl, container) {
             ? window.resolveResourceUrl(pdfUrl, resolveBase)
             : pdfUrl;
 
-        const loadingTask = pdfjsLib.getDocument(pdfUrl);
-        const pdf = await loadingTask.promise;
+        const pdf = await loadPdfDocumentWithNativeFallback(pdfUrl);
 
         container.innerHTML = ''; // Clear container
 

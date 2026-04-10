@@ -4,16 +4,26 @@ import { readFileSync, existsSync, writeFileSync, readFile, cpSync } from 'node:
 import { join, resolve } from 'node:path';
 
 const versionPath = join(__dirname, 'version.json');
+const packageJsonPath = join(__dirname, 'package.json');
 const wasmJsPath = join(__dirname, 'wasm_text_engine', 'dist', 'text_engine.js');
 const wasmBinPath = join(__dirname, 'wasm_text_engine', 'dist', 'text_engine.wasm');
 const hasWasmTextEngineDist = existsSync(wasmJsPath) && existsSync(wasmBinPath);
 let cacheVersion = 'v1';
+let appPackageVersion = '0.0.0';
 if (existsSync(versionPath)) {
   try {
     const versionData = JSON.parse(readFileSync(versionPath, 'utf8'));
     cacheVersion = versionData.version || 'v1';
   } catch (e) {
     console.warn('Failed to read version:', e);
+  }
+}
+if (existsSync(packageJsonPath)) {
+  try {
+    const packageData = JSON.parse(readFileSync(packageJsonPath, 'utf8'));
+    appPackageVersion = packageData.version || '0.0.0';
+  } catch (e) {
+    console.warn('Failed to read package version:', e);
   }
 }
 
@@ -124,7 +134,8 @@ export default defineConfig({
   base: './',
   define: {
     __WASM_TEXT_ENGINE_PRESENT__: JSON.stringify(hasWasmTextEngineDist),
-    __APP_BUILD_TAG__: JSON.stringify(cacheVersion)
+    __APP_BUILD_TAG__: JSON.stringify(cacheVersion),
+    __APP_PACKAGE_VERSION__: JSON.stringify(appPackageVersion)
   },
   server: {
     port: 8080,

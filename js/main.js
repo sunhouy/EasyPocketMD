@@ -1047,7 +1047,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 ? window.wasmTextEngineGateway.getStatus()
                 : null;
             if (res && res.code === 200) {
-                console.info('[text-engine] wasm ready', { init: res, status: status });
+                console.info('wasm loaded successfully');
             } else {
                 console.warn('[text-engine] wasm unavailable, fallback to built-in implementation', { init: res, status: status });
             }
@@ -1388,18 +1388,6 @@ document.addEventListener('DOMContentLoaded', function() {
             if (typeof window.showInsertPicker === 'function') window.showInsertPicker();
             else window.showInsertMenu();
         });
-        bindDesktopButton('desktopFormulaBtn', async function() {
-            if (typeof window.showFormulaPicker !== 'function') {
-                await import('./formula-picker.js');
-            }
-            if (typeof window.showFormulaPicker === 'function') window.showFormulaPicker();
-        });
-        bindDesktopButton('desktopChartBtn', async function() {
-            if (typeof window.showChartPicker !== 'function') {
-                await import('./ui/chart.js');
-            }
-            if (typeof window.showChartPicker === 'function') window.showChartPicker();
-        });
         bindDesktopButton('desktopEditUndoBtn', function() {
             if (window.vditor && window.vditor.vditor && window.vditor.vditor.undo) {
                 window.vditor.vditor.undo.undo(window.vditor.vditor);
@@ -1419,12 +1407,41 @@ document.addEventListener('DOMContentLoaded', function() {
         bindDesktopButton('desktopSettingsBtn', function() { window.showSettingsDialog(); });
         bindDesktopButton('desktopEditBtn', function(e) {
             e.stopPropagation();
-            if (desktopEditDropdown) desktopEditDropdown.classList.toggle('show');
+            if (desktopEditDropdown) {
+                var willShowEdit = !desktopEditDropdown.classList.contains('show');
+                desktopEditDropdown.classList.toggle('show');
+                if (willShowEdit) {
+                    var editRect = e.currentTarget.getBoundingClientRect();
+                    var bodyStyles = window.getComputedStyle(document.body);
+                    var toolbarOffset = parseFloat(bodyStyles.getPropertyValue('--top-toolbar-offset')) || 0;
+                    var toolbarHeight = parseFloat(bodyStyles.getPropertyValue('--top-toolbar-height')) || 0;
+                    desktopEditDropdown.style.position = 'fixed';
+                    desktopEditDropdown.style.top = Math.max(editRect.bottom + 2, toolbarOffset + toolbarHeight + 1) + 'px';
+                    desktopEditDropdown.style.left = Math.round(editRect.left) + 'px';
+                    desktopEditDropdown.style.right = 'auto';
+                    desktopEditDropdown.style.zIndex = '1200';
+                }
+            }
             closeDesktopDrop();
         });
         bindDesktopButton('desktopMoreBtn', function(e) {
             e.stopPropagation();
-            if (desktopDropdown) desktopDropdown.classList.toggle('show');
+            if (desktopDropdown) {
+                var willShowMore = !desktopDropdown.classList.contains('show');
+                desktopDropdown.classList.toggle('show');
+                if (willShowMore) {
+                    var moreRect = e.currentTarget.getBoundingClientRect();
+                    var bodyStyles = window.getComputedStyle(document.body);
+                    var toolbarOffset = parseFloat(bodyStyles.getPropertyValue('--top-toolbar-offset')) || 0;
+                    var toolbarHeight = parseFloat(bodyStyles.getPropertyValue('--top-toolbar-height')) || 0;
+                    var moreWidth = desktopDropdown.offsetWidth || desktopDropdown.scrollWidth || 210;
+                    desktopDropdown.style.position = 'fixed';
+                    desktopDropdown.style.top = Math.max(moreRect.bottom + 2, toolbarOffset + toolbarHeight + 1) + 'px';
+                    desktopDropdown.style.left = Math.round(moreRect.right - moreWidth) + 'px';
+                    desktopDropdown.style.right = 'auto';
+                    desktopDropdown.style.zIndex = '1200';
+                }
+            }
             closeDesktopEditDrop();
         });
 
@@ -2693,4 +2710,11 @@ document.addEventListener('DOMContentLoaded', function() {
             exitPresentationMode();
         }
     }
+
+    // Native app update check: compare packaged version with static.yhsun.cn/version.txt.
+    setTimeout(function() {
+        if (typeof window.checkNativeAppVersionUpdate === 'function') {
+            window.checkNativeAppVersionUpdate();
+        }
+    }, 1800);
 });

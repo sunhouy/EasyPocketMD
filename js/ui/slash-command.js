@@ -383,14 +383,6 @@ function renderItems() {
             renderItems();
         });
 
-        row.addEventListener('pointerdown', function(event) {
-            invokeRow(event);
-        });
-
-        row.addEventListener('mousedown', function(event) {
-            invokeRow(event);
-        });
-
         row.addEventListener('click', function(event) {
             invokeRow(event);
         });
