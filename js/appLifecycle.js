@@ -39,9 +39,10 @@
 
             // 2. 保存当前文件到 localStorage
             const currentFileId = global.currentFileId;
-            const vditor = global.vditor;
-            if (currentFileId && vditor) {
-                const content = vditor.getValue();
+            if (currentFileId) {
+                const content = typeof global.getCurrentEditorContent === 'function'
+                    ? global.getCurrentEditorContent(currentFileId, '')
+                    : (global.vditor && typeof global.vditor.getValue === 'function' ? global.vditor.getValue() : '');
                 const files = global.files || [];
                 const fileIndex = files.findIndex(f => f.id === currentFileId);
 
@@ -49,6 +50,9 @@
                     files[fileIndex].content = content;
                     files[fileIndex].lastModified = Date.now();
                     localStorage.setItem('vditor_files', JSON.stringify(files));
+                    if (global.currentUser && typeof global.markPendingServerSync === 'function') {
+                        global.markPendingServerSync(currentFileId, true);
+                    }
                 }
             }
 
@@ -111,28 +115,27 @@
 
             // 2. 保存所有未保存的文件到 localStorage
             const files = global.files || [];
-            const vditor = global.vditor;
             const currentFileId = global.currentFileId;
             let hasChanges = false;
 
             files.forEach(function(file) {
                 if (file.type !== 'file') return;
-                
-                // 获取最新内容（当前打开的文件从编辑器获取，其他从 file.content）
+
+                const isDirty = !!(global.unsavedChanges && global.unsavedChanges[file.id]);
+                if (!isDirty) return;
+
                 let content = file.content;
-                if (file.id === currentFileId && vditor) {
-                    content = vditor.getValue();
+                if (file.id === currentFileId && typeof global.getCurrentEditorContent === 'function') {
+                    content = global.getCurrentEditorContent(file.id, file.content);
                 }
-                
-                // 检查是否有未保存的更改
-                const lastSynced = global.lastSyncedContent[file.id];
-                if (content !== lastSynced) {
-                    file.content = content;
-                    file.lastModified = Date.now();
-                    global.lastSyncedContent[file.id] = content;
-                    global.unsavedChanges[file.id] = false;
-                    hasChanges = true;
+
+                file.content = content;
+                file.lastModified = Date.now();
+                global.unsavedChanges[file.id] = false;
+                if (global.currentUser && typeof global.markPendingServerSync === 'function') {
+                    global.markPendingServerSync(file.id, true);
                 }
+                hasChanges = true;
             });
 
             if (hasChanges) {
@@ -231,8 +234,12 @@
                     global.syncCurrentFileWithBeacon();
                 }
             } else if (document.visibilityState === 'visible') {
-                // 页面重新可见，检查是否需要恢复草稿
-                checkAndOfferDraftRecovery();
+                const hasUnsaved = (global.files || []).some(function(file) {
+                    return file && global.unsavedChanges && global.unsavedChanges[file.id];
+                });
+                if (!hasUnsaved) {
+                    checkAndOfferDraftRecovery();
+                }
             }
         });
 
