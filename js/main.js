@@ -63,6 +63,112 @@ document.addEventListener('DOMContentLoaded', function() {
     window.lastSyncedContent = {};
     window.unsavedChanges = {};
     window.vditor = null;
+    window.vditorReady = false;
+    window.vditorInitPromise = null;
+    var shellInitialized = false;
+    var hasBoundGlobalClickGuard = false;
+    var hasBootstrappedWasmRuntime = false;
+    var shareModeActive = !!(new URLSearchParams(window.location.search).get('share_id'));
+    window.startInFileManagementMode = false;
+    window.deferInitialFileOpen = false;
+    window.isFileManagementMode = false;
+
+    function toggleFileManagementBodyClass(enabled) {
+        document.body.classList.toggle('file-management-mode', !!enabled);
+    }
+
+    window.enterFileManagementMode = function(options) {
+        var opts = options || {};
+        window.isFileManagementMode = true;
+        toggleFileManagementBodyClass(true);
+
+        var sidebar = document.getElementById('fileListSidebar');
+        if (sidebar) sidebar.classList.add('show');
+
+        if (opts.refresh && typeof window.loadFiles === 'function') {
+            window.loadFiles();
+        }
+    };
+
+    window.enterEditorMode = function() {
+        window.isFileManagementMode = false;
+        window.deferInitialFileOpen = false;
+        toggleFileManagementBodyClass(false);
+
+        var sidebar = document.getElementById('fileListSidebar');
+        if (sidebar) sidebar.classList.remove('show');
+    };
+
+    function showPrimaryFileInterface() {
+        if (window.isFileManagementMode) {
+            window.enterFileManagementMode({ refresh: true });
+            return;
+        }
+        var sidebar = document.getElementById('fileListSidebar');
+        if (sidebar) sidebar.classList.toggle('show');
+    }
+
+    function initializeAppShellOnce() {
+        if (shellInitialized) return;
+        shellInitialized = true;
+        initUserInterface();
+        initMobileFeatures();
+        initElectronOpenFileBridge();
+        initGlobalKeyboardShortcuts();
+    }
+
+    function ensureWasmRuntimeBootstrapped() {
+        if (hasBootstrappedWasmRuntime) return;
+        hasBootstrappedWasmRuntime = true;
+        if (window.wasmTextEngineGateway && typeof window.wasmTextEngineGateway.init === 'function') {
+            window.wasmTextEngineGateway.init().then(function(res) {
+                var status = typeof window.wasmTextEngineGateway.getStatus === 'function'
+                    ? window.wasmTextEngineGateway.getStatus()
+                    : null;
+                if (res && res.code === 200) {
+                    console.info('wasm loaded successfully');
+                } else {
+                    console.warn('[text-engine] wasm unavailable, fallback to built-in implementation', { init: res, status: status });
+                }
+            }).catch(function(error) {
+                var status = typeof window.wasmTextEngineGateway.getStatus === 'function'
+                    ? window.wasmTextEngineGateway.getStatus()
+                    : null;
+                console.warn('[text-engine] wasm init failed, fallback to built-in implementation', { error: error, status: status });
+            });
+        }
+    }
+
+    window.ensureVditorInitialized = function() {
+        if (window.vditor && window.vditorReady) {
+            return Promise.resolve(window.vditor);
+        }
+        if (window.vditorInitPromise) {
+            return window.vditorInitPromise;
+        }
+
+        window.vditorInitPromise = new Promise(function(resolve, reject) {
+            window.__resolveVditorInit = resolve;
+            window.__rejectVditorInit = reject;
+            try {
+                window.vditor = new Vditor('vditor', editorConfig);
+            } catch (error) {
+                window.vditorInitPromise = null;
+                window.__resolveVditorInit = null;
+                window.__rejectVditorInit = null;
+                reject(error);
+            }
+        });
+
+        return window.vditorInitPromise;
+    };
+
+    window.onInitialFileListRendered = function() {
+        // 文件列表首屏可见后立即启动编辑器初始化（异步，不阻塞当前视图）。
+        window.ensureVditorInitialized().catch(function(error) {
+            console.error('Failed to initialize Vditor after file list ready:', error);
+        });
+    };
     var TOOLBAR_EASTER_EGG_KEY = 'vditor_uncertainty_unlocked';
     var toolbarEasterEggTapCount = 0;
     var toolbarEasterEggLastTapAt = 0;
@@ -276,8 +382,7 @@ document.addEventListener('DOMContentLoaded', function() {
         switch (actionId) {
         case 'openFileMenu':
             if (clickElementById('desktopFileBtn')) return;
-            var sidebar = document.getElementById('fileListSidebar');
-            if (sidebar) sidebar.classList.toggle('show');
+            showPrimaryFileInterface();
             return;
         case 'openLoginMenu':
             if (clickElementById('desktopLoginBtn')) return;
@@ -662,8 +767,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function handleBottomFileList() {
-        var sidebar = document.getElementById('fileListSidebar');
-        if (sidebar) sidebar.classList.toggle('show');
+        showPrimaryFileInterface();
     }
 
     function renderToolbarButtonSettings() {
@@ -784,6 +888,15 @@ document.addEventListener('DOMContentLoaded', function() {
     if (!window.userSettings.uiMode) {
         window.userSettings.uiMode = 'auto'; // auto, mobile, desktop
     }
+    if (!window.userSettings.defaultFileOpening) {
+        window.userSettings.defaultFileOpening = 'lastEdited';
+    }
+
+    var shouldOpenFileListFirst = window.userSettings.defaultFileOpening === 'fileList';
+    window.startInFileManagementMode = !shareModeActive && shouldOpenFileListFirst;
+    window.deferInitialFileOpen = !!window.startInFileManagementMode;
+    window.isFileManagementMode = !!window.startInFileManagementMode;
+
     window.userSettings.keyboardShortcuts = getEffectiveKeyboardShortcuts(window.userSettings);
     applyDebugModeSetting(window.userSettings.enableDebugMode, false);
 
@@ -971,11 +1084,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // 初始化用户界面和移动特性
             var continueAfterEngineReady = function() {
-                initUserInterface();
-                initMobileFeatures();
+                initializeAppShellOnce();
                 initSlashCommandRuntime();
-                initElectronOpenFileBridge();
-                initGlobalKeyboardShortcuts();
             };
 
             if (window.wasmTextEngineGateway && typeof window.wasmTextEngineGateway.ensureReady === 'function') {
@@ -983,28 +1093,29 @@ document.addEventListener('DOMContentLoaded', function() {
             } else {
                 continueAfterEngineReady();
             }
-            document.addEventListener('click', function(e) {
-                var dropdown = document.getElementById('mobileDropdown');
-                var menuBtn = document.getElementById('mobileMenuBtn');
-                var overlay = document.getElementById('mobileActionSheetOverlay');
-                var userMenu = document.getElementById('userMenuDropdown');
-                var fileListSidebar = document.getElementById('fileListSidebar');
-                var mobileFileBtn = document.getElementById('mobileFileBtn');
+            if (!hasBoundGlobalClickGuard) {
+                hasBoundGlobalClickGuard = true;
+                document.addEventListener('click', function(e) {
+                    var dropdown = document.getElementById('mobileDropdown');
+                    var menuBtn = document.getElementById('mobileMenuBtn');
+                    var overlay = document.getElementById('mobileActionSheetOverlay');
+                    var userMenu = document.getElementById('userMenuDropdown');
 
-                var desktopDropdown = document.getElementById('desktopMoreDropdown');
-                var desktopMoreBtn = document.getElementById('desktopMoreBtn');
-                var desktopEditDropdown = document.getElementById('desktopEditDropdown');
-                var desktopEditBtn = document.getElementById('desktopEditBtn');
+                    var desktopDropdown = document.getElementById('desktopMoreDropdown');
+                    var desktopMoreBtn = document.getElementById('desktopMoreBtn');
+                    var desktopEditDropdown = document.getElementById('desktopEditDropdown');
+                    var desktopEditBtn = document.getElementById('desktopEditBtn');
 
-                if (menuBtn && dropdown && !menuBtn.contains(e.target) && !dropdown.contains(e.target)) dropdown.classList.remove('show');
-                if (desktopDropdown && desktopMoreBtn && !desktopMoreBtn.contains(e.target) && !desktopDropdown.contains(e.target)) desktopDropdown.classList.remove('show');
-                if (desktopEditDropdown && desktopEditBtn && !desktopEditBtn.contains(e.target) && !desktopEditDropdown.contains(e.target)) desktopEditDropdown.classList.remove('show');
-                if (overlay && e.target === overlay) window.hideMobileActionSheet();
-                var mobileLoginBtn = document.getElementById('mobileLoginBtn');
-                var desktopLoginBtn = document.getElementById('desktopLoginBtn');
-                var loginTriggerClicked = (mobileLoginBtn && mobileLoginBtn.contains(e.target)) || (desktopLoginBtn && desktopLoginBtn.contains(e.target));
-                if (userMenu && !loginTriggerClicked && !userMenu.contains(e.target)) userMenu.classList.remove('show');
-            });
+                    if (menuBtn && dropdown && !menuBtn.contains(e.target) && !dropdown.contains(e.target)) dropdown.classList.remove('show');
+                    if (desktopDropdown && desktopMoreBtn && !desktopMoreBtn.contains(e.target) && !desktopDropdown.contains(e.target)) desktopDropdown.classList.remove('show');
+                    if (desktopEditDropdown && desktopEditBtn && !desktopEditBtn.contains(e.target) && !desktopEditDropdown.contains(e.target)) desktopEditDropdown.classList.remove('show');
+                    if (overlay && e.target === overlay) window.hideMobileActionSheet();
+                    var mobileLoginBtn = document.getElementById('mobileLoginBtn');
+                    var desktopLoginBtn = document.getElementById('desktopLoginBtn');
+                    var loginTriggerClicked = (mobileLoginBtn && mobileLoginBtn.contains(e.target)) || (desktopLoginBtn && desktopLoginBtn.contains(e.target));
+                    if (userMenu && !loginTriggerClicked && !userMenu.contains(e.target)) userMenu.classList.remove('show');
+                });
+            }
             if (window.vditor && window.vditor.vditor && window.vditor.vditor.ir) {
                 window.vditor.vditor.ir.element.addEventListener('input', function() {
                     if (window.currentFileId) {
@@ -1036,28 +1147,14 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // ECharts 懒加载：图表将在用户滚动到可见区域或点击时渲染
             // 不再在初始化时自动渲染所有图表，提升首屏加载性能
+
+            if (typeof window.__resolveVditorInit === 'function') {
+                window.__resolveVditorInit(window.vditor);
+            }
+            window.__resolveVditorInit = null;
+            window.__rejectVditorInit = null;
         }
     };
-
-    window.vditor = new Vditor('vditor', editorConfig);
-
-    if (window.wasmTextEngineGateway && typeof window.wasmTextEngineGateway.init === 'function') {
-        window.wasmTextEngineGateway.init().then(function(res) {
-            var status = typeof window.wasmTextEngineGateway.getStatus === 'function'
-                ? window.wasmTextEngineGateway.getStatus()
-                : null;
-            if (res && res.code === 200) {
-                console.info('wasm loaded successfully');
-            } else {
-                console.warn('[text-engine] wasm unavailable, fallback to built-in implementation', { init: res, status: status });
-            }
-        }).catch(function(error) {
-            var status = typeof window.wasmTextEngineGateway.getStatus === 'function'
-                ? window.wasmTextEngineGateway.getStatus()
-                : null;
-            console.warn('[text-engine] wasm init failed, fallback to built-in implementation', { error: error, status: status });
-        });
-    }
 
     // 顶部提示横幅相关函数
     let currentNoticeType = null;
@@ -1235,7 +1332,7 @@ document.addEventListener('DOMContentLoaded', function() {
         var addFolderBtn = document.getElementById('addFolderBtn');
         if (addFolderBtn) addFolderBtn.addEventListener('click', window.createNewFolder);
         var mobileFileBtn = document.getElementById('mobileFileBtn');
-        if (mobileFileBtn) mobileFileBtn.addEventListener('click', function() { document.getElementById('fileListSidebar').classList.toggle('show'); });
+        if (mobileFileBtn) mobileFileBtn.addEventListener('click', showPrimaryFileInterface);
 
         // 演示模式按钮仅在桌面端显示
         var mobilePresentationBtn = document.getElementById('mobilePresentationBtn');
@@ -1380,8 +1477,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (modeToggle) modeToggle.addEventListener('click', window.toggleNightMode);
 
         bindDesktopButton('desktopFileBtn', function() {
-            var sidebar = document.getElementById('fileListSidebar');
-            if (sidebar) sidebar.classList.toggle('show');
+            showPrimaryFileInterface();
         });
         bindDesktopButton('desktopLoginBtn', function() { window.handleLoginButtonClick(); });
         bindDesktopButton('desktopInsertBtn', function() {
@@ -1674,7 +1770,7 @@ document.addEventListener('DOMContentLoaded', function() {
             { id: 'mobileSettingsBtn', fn: window.showSettingsDialog },
             { id: 'saveFileBtn', fn: handleBottomSave },
             { id: 'modeToggle', fn: window.toggleNightMode },
-            { id: 'mobileFileBtn', fn: function() { document.getElementById('fileListSidebar').classList.toggle('show'); } }
+            { id: 'mobileFileBtn', fn: showPrimaryFileInterface }
         ];
         btns.forEach(function(b) {
             var el = document.getElementById(b.id);
@@ -2349,8 +2445,54 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     // 关于对话框
+    function updateAboutVersionDisplay() {
+        var versionLabel = document.getElementById('currentVersionValue');
+        if (!versionLabel) return;
+        var version = typeof window.getCurrentAppVersion === 'function'
+            ? window.getCurrentAppVersion()
+            : (typeof __APP_PACKAGE_VERSION__ === 'string' ? __APP_PACKAGE_VERSION__ : '0.0.0');
+        versionLabel.textContent = version || '0.0.0';
+    }
+
+    var checkUpdateBtn = document.getElementById('checkUpdateBtn');
+    if (checkUpdateBtn) {
+        checkUpdateBtn.addEventListener('click', async function() {
+            var btn = this;
+            if (btn.disabled) return;
+
+            var textSpan = btn.querySelector('span');
+            var originalText = textSpan ? textSpan.textContent : '';
+            var checkingText = window.i18n ? window.i18n.t('checkingUpdate') : '正在检测...';
+
+            btn.disabled = true;
+            if (textSpan) textSpan.textContent = checkingText;
+
+            try {
+                if (typeof window.checkNativeAppVersionUpdate !== 'function') {
+                    throw new Error('version checker unavailable');
+                }
+
+                var result = await window.checkNativeAppVersionUpdate({ force: true });
+                if (result && result.code === 200 && result.data && result.data.status === 'already-latest') {
+                    window.showMessage(window.i18n ? window.i18n.t('alreadyLatestVersion') : '当前已是最新版本', 'success');
+                } else if (!result || result.code !== 200) {
+                    window.showMessage(window.i18n ? window.i18n.t('checkUpdateFailed') : '检测更新失败，请稍后重试', 'error');
+                }
+            } catch (error) {
+                console.warn('Manual update check failed:', error);
+                window.showMessage(window.i18n ? window.i18n.t('checkUpdateFailed') : '检测更新失败，请稍后重试', 'error');
+            } finally {
+                btn.disabled = false;
+                if (textSpan) {
+                    textSpan.textContent = window.i18n ? window.i18n.t('checkUpdate') : (originalText || '检测更新');
+                }
+            }
+        });
+    }
+
     window.showAboutDialog = function() {
         var modal = document.getElementById('aboutModalOverlay');
+        updateAboutVersionDisplay();
         if (modal) modal.classList.add('show');
     };
 
@@ -2709,6 +2851,18 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!document.fullscreenElement && !document.webkitFullscreenElement && !document.msFullscreenElement) {
             exitPresentationMode();
         }
+    }
+
+    initializeAppShellOnce();
+    ensureWasmRuntimeBootstrapped();
+
+    if (window.startInFileManagementMode) {
+        window.enterFileManagementMode();
+    } else {
+        window.enterEditorMode();
+        window.ensureVditorInitialized().catch(function(error) {
+            console.error('Failed to initialize Vditor at startup:', error);
+        });
     }
 
     // Native app update check: compare packaged version with static.yhsun.cn/version.txt.

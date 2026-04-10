@@ -173,19 +173,32 @@
 
     async function checkNativeAppVersionUpdate(options) {
         var settings = options || {};
-        if (!isNativeRuntime()) {
-            return { code: 200, message: 'skip non-native runtime' };
+        var allowWebCheck = !!settings.force;
+        if (!isNativeRuntime() && !allowWebCheck) {
+            return {
+                code: 200,
+                message: 'skip non-native runtime',
+                data: { status: 'skipped', runtime: 'web' }
+            };
         }
 
         if (!shouldCheckNow(!!settings.force)) {
-            return { code: 200, message: 'skip by interval' };
+            return {
+                code: 200,
+                message: 'skip by interval',
+                data: { status: 'skipped-interval' }
+            };
         }
 
         markChecked();
 
         var currentVersion = getCurrentVersion();
         if (!currentVersion) {
-            return { code: 500, message: 'current version unavailable' };
+            return {
+                code: 500,
+                message: 'current version unavailable',
+                data: { status: 'error' }
+            };
         }
 
         var latestVersion = '';
@@ -193,32 +206,78 @@
             latestVersion = await fetchRemoteVersion();
         } catch (error) {
             console.warn('[version-check] Failed to fetch remote version:', error);
-            return { code: 500, message: 'fetch remote version failed' };
+            return {
+                code: 500,
+                message: 'fetch remote version failed',
+                data: {
+                    status: 'error',
+                    currentVersion: currentVersion
+                }
+            };
         }
 
         if (!latestVersion) {
-            return { code: 500, message: 'remote version is empty' };
+            return {
+                code: 500,
+                message: 'remote version is empty',
+                data: {
+                    status: 'error',
+                    currentVersion: currentVersion
+                }
+            };
         }
 
         if (compareVersions(latestVersion, currentVersion) <= 0) {
             removeStorageItem(LAST_DISMISSED_VERSION_KEY);
-            return { code: 200, message: 'already latest' };
+            return {
+                code: 200,
+                message: 'already latest',
+                data: {
+                    status: 'already-latest',
+                    currentVersion: currentVersion,
+                    latestVersion: latestVersion
+                }
+            };
         }
 
         var dismissedVersion = normalizeVersion(getStorageItem(LAST_DISMISSED_VERSION_KEY));
         if (!settings.force && dismissedVersion === latestVersion) {
-            return { code: 200, message: 'dismissed already' };
+            return {
+                code: 200,
+                message: 'dismissed already',
+                data: {
+                    status: 'dismissed',
+                    currentVersion: currentVersion,
+                    latestVersion: latestVersion
+                }
+            };
         }
 
         var confirmed = await promptUserForUpdate(currentVersion, latestVersion);
         if (confirmed) {
             removeStorageItem(LAST_DISMISSED_VERSION_KEY);
             openDownloadPage();
-            return { code: 200, message: 'update accepted' };
+            return {
+                code: 200,
+                message: 'update accepted',
+                data: {
+                    status: 'update-accepted',
+                    currentVersion: currentVersion,
+                    latestVersion: latestVersion
+                }
+            };
         }
 
         setStorageItem(LAST_DISMISSED_VERSION_KEY, latestVersion);
-        return { code: 200, message: 'update deferred' };
+        return {
+            code: 200,
+            message: 'update deferred',
+            data: {
+                status: 'update-deferred',
+                currentVersion: currentVersion,
+                latestVersion: latestVersion
+            }
+        };
     }
 
     global.getCurrentAppVersion = getCurrentVersion;

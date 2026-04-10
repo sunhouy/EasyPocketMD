@@ -6,6 +6,7 @@ const state = {
     list: null,
     empty: null,
     title: null,
+    hint: null,
     close: null,
     editorElement: null,
     items: [],
@@ -17,7 +18,9 @@ const state = {
     requestSeq: 0,
     refreshTimer: null,
     handlers: null,
-    docBound: false
+    docBound: false,
+    ignoreSelectionChangeUntil: 0,
+    lastTouchActivationAt: 0
 };
 
 const moduleLoaders = {
@@ -34,6 +37,13 @@ const moduleLoaders = {
 };
 
 const loadedModules = {};
+
+const actionInsertFallback = {
+    insertTable: '| 列1 | 列2 |\n| --- | --- |\n| 内容1 | 内容2 |',
+    insertMermaid: '```mermaid\ngraph TD\n    A[开始] --> B[步骤]\n```',
+    insertInlineFormula: '$x^2$',
+    insertBlockFormula: '$$\nE=mc^2\n$$'
+};
 
 function isEnglish() {
     return !!(window.i18n && window.i18n.getLanguage && window.i18n.getLanguage() === 'en');
@@ -52,6 +62,7 @@ function notify(message, type) {
 function getEditorElement() {
     var vditor = window.vditor;
     if (!vditor || !vditor.vditor) return null;
+
     var mode = vditor.vditor.currentMode || vditor.vditor.mode || (vditor.vditor.currentOptions && vditor.vditor.currentOptions.mode);
     if (mode === 'wysiwyg' && vditor.vditor.wysiwyg) return vditor.vditor.wysiwyg.element;
     if (mode === 'ir' && vditor.vditor.ir) return vditor.vditor.ir.element;
@@ -76,127 +87,6 @@ function shouldUseSlash() {
     return !!(gateway && typeof gateway.ensureReady === 'function' && typeof gateway.slashPalette === 'function');
 }
 
-function createPanel() {
-    if (state.panel && document.body.contains(state.panel)) return;
-
-    var panel = document.createElement('div');
-    panel.id = SLASH_PANEL_ID;
-    panel.className = 'slash-command-panel';
-    panel.style.display = 'none';
-
-    var header = document.createElement('div');
-    header.className = 'slash-command-header';
-
-    var title = document.createElement('div');
-    title.className = 'slash-command-title';
-    header.appendChild(title);
-
-    var hint = document.createElement('div');
-    hint.className = 'slash-command-hint';
-    header.appendChild(hint);
-
-    var close = document.createElement('button');
-    close.type = 'button';
-    close.className = 'slash-command-close';
-    close.innerHTML = '<i class="fas fa-times"></i>';
-    close.addEventListener('click', function(event) {
-        event.preventDefault();
-        hidePanel();
-    });
-    header.appendChild(close);
-
-    var list = document.createElement('div');
-    list.className = 'slash-command-list';
-
-    var empty = document.createElement('div');
-    empty.className = 'slash-command-empty';
-    empty.style.display = 'none';
-
-    panel.appendChild(header);
-    panel.appendChild(list);
-    panel.appendChild(empty);
-
-    state.panel = panel;
-    state.list = list;
-    state.empty = empty;
-    state.title = title;
-    state.hint = hint;
-    state.close = close;
-
-    updatePanelHeader();
-
-    document.body.appendChild(panel);
-}
-
-function updatePanelHeader() {
-    if (!state.panel) return;
-    var en = isEnglish();
-    state.title.textContent = en ? '/ Commands' : '/ 快捷操作';
-
-    var key = activationKey();
-    if (key === 'Off' || key === 'Custom') {
-        state.hint.textContent = en ? 'Click to run' : '点击执行';
-    } else {
-        state.hint.textContent = (en ? 'Press ' : '按 ') + key + (en ? ' to run' : ' 执行');
-    }
-
-    if (state.close) {
-        state.close.title = en ? 'Close' : '关闭';
-        state.close.setAttribute('aria-label', en ? 'Close slash commands' : '关闭快捷操作');
-    }
-}
-
-function showPanel() {
-    if (!state.panel) return;
-    updatePanelHeader();
-    state.panel.style.display = 'block';
-    state.visible = true;
-}
-
-function hidePanel() {
-    if (!state.panel) return;
-    state.panel.style.display = 'none';
-    state.visible = false;
-    state.items = [];
-    state.activeIndex = 0;
-    state.slashContext = null;
-}
-
-function scheduleRefresh() {
-    if (state.refreshTimer) {
-        clearTimeout(state.refreshTimer);
-    }
-    state.refreshTimer = setTimeout(function() {
-        state.refreshTimer = null;
-        refreshFromCaret();
-    }, 60);
-}
-
-function isNodeInsideEditor(node, editorElement) {
-    if (!node || !editorElement) return false;
-    if (node === editorElement) return true;
-    if (node.nodeType === 3) return editorElement.contains(node.parentNode);
-    return editorElement.contains(node);
-}
-
-function closestBlock(node, editorElement) {
-    var current = node && node.nodeType === 3 ? node.parentElement : node;
-    while (current && current !== editorElement) {
-        if (/^(P|DIV|LI|TD|TH|H1|H2|H3|H4|H5|H6|PRE|BLOCKQUOTE)$/.test(current.tagName || '')) {
-            return current;
-        }
-        current = current.parentElement;
-    }
-    return editorElement;
-}
-
-function canTriggerSlash(textBefore, slashIndex) {
-    if (slashIndex < 0) return false;
-    if (slashIndex === 0) return true;
-    var prev = textBefore.charAt(slashIndex - 1);
-    return isSlashWordDelimiter(prev);
-}
-
 function isSlashWordDelimiter(ch) {
     if (!ch) return false;
     return /[\s\(\[\{\"'`~!@#$%^&*+=|\\:;,.<>?，。；：、！？（）【】《》]/.test(ch);
@@ -210,6 +100,32 @@ function hasSlashWordDelimiter(text) {
         }
     }
     return false;
+}
+
+function canTriggerSlash(textBefore, slashIndex) {
+    if (slashIndex < 0) return false;
+    if (slashIndex === 0) return true;
+    return isSlashWordDelimiter(textBefore.charAt(slashIndex - 1));
+}
+
+function isNodeInsideEditor(node, editorElement) {
+    if (!node || !editorElement) return false;
+    if (node === editorElement) return true;
+    if (node.nodeType === 3) {
+        return !!(node.parentNode && editorElement.contains(node.parentNode));
+    }
+    return editorElement.contains(node);
+}
+
+function closestBlock(node, editorElement) {
+    var current = node && node.nodeType === 3 ? node.parentElement : node;
+    while (current && current !== editorElement) {
+        if (/^(P|DIV|LI|TD|TH|H1|H2|H3|H4|H5|H6|PRE|BLOCKQUOTE)$/.test(current.tagName || '')) {
+            return current;
+        }
+        current = current.parentElement;
+    }
+    return editorElement;
 }
 
 function getSlashContext(editorElement) {
@@ -273,45 +189,70 @@ function resolveOffsetToNode(container, targetOffset) {
     return null;
 }
 
-function removeSlashQuery(context) {
-    if (!context || !context.block) return;
+function restoreCaretFromContext(context) {
+    if (!context || !context.caretNode) return false;
+
     var selection = window.getSelection ? window.getSelection() : null;
-    if (!selection) return;
+    if (!selection) return false;
+
+    try {
+        var range = document.createRange();
+        range.setStart(context.caretNode, context.caretOffset);
+        range.collapse(true);
+        selection.removeAllRanges();
+        selection.addRange(range);
+        return true;
+    } catch (error) {
+        return false;
+    }
+}
+
+function removeSlashQuery(context) {
+    if (!context || !context.block) return false;
+
+    restoreCaretFromContext(context);
+
+    var selection = window.getSelection ? window.getSelection() : null;
+    if (!selection) return false;
 
     var startPoint = resolveOffsetToNode(context.block, context.slashOffsetInBlock);
-    if (!startPoint) return;
+    if (!startPoint) return false;
 
-    var range = document.createRange();
-    range.setStart(startPoint.node, startPoint.offset);
-    range.setEnd(context.caretNode, context.caretOffset);
-
-    selection.removeAllRanges();
-    selection.addRange(range);
-    range.deleteContents();
-
-    selection.removeAllRanges();
-    selection.addRange(range);
+    try {
+        var range = document.createRange();
+        range.setStart(startPoint.node, startPoint.offset);
+        range.setEnd(context.caretNode, context.caretOffset);
+        selection.removeAllRanges();
+        selection.addRange(range);
+        range.deleteContents();
+        selection.removeAllRanges();
+        selection.addRange(range);
+        return true;
+    } catch (error) {
+        console.warn('[slash-command] remove slash query failed:', error);
+        return false;
+    }
 }
 
 function insertTextAtCursor(text) {
-    if (!text) return;
-    var inserted = false;
+    if (!text) return false;
 
+    var inserted = false;
     try {
         inserted = !!document.execCommand('insertText', false, text);
-    } catch (e) {
+    } catch (error) {
         inserted = false;
     }
-
-    if (inserted) return;
+    if (inserted) return true;
 
     if (window.vditor && typeof window.vditor.insertValue === 'function') {
         window.vditor.insertValue(text);
-        return;
+        return true;
     }
 
     var selection = window.getSelection ? window.getSelection() : null;
-    if (!selection || selection.rangeCount === 0) return;
+    if (!selection || selection.rangeCount === 0) return false;
+
     var range = selection.getRangeAt(0);
     range.deleteContents();
     var textNode = document.createTextNode(text);
@@ -320,6 +261,18 @@ function insertTextAtCursor(text) {
     range.collapse(true);
     selection.removeAllRanges();
     selection.addRange(range);
+    return true;
+}
+
+async function saveCurrentFileSilently() {
+    if (!window.currentFileId) return;
+    if (typeof window.saveCurrentFile !== 'function') return;
+
+    try {
+        await window.saveCurrentFile(false);
+    } catch (error) {
+        console.warn('[slash-command] auto save failed:', error);
+    }
 }
 
 function commandLabel(item) {
@@ -336,6 +289,497 @@ function commandDescription(item) {
         return item.descriptionEn || item.description || item.descriptionZh || '';
     }
     return item.descriptionZh || item.description || item.descriptionEn || '';
+}
+
+function clickFirstExistingButton(ids) {
+    if (!Array.isArray(ids)) return false;
+    for (var i = 0; i < ids.length; i++) {
+        var el = document.getElementById(ids[i]);
+        if (el) {
+            el.click();
+            return true;
+        }
+    }
+    return false;
+}
+
+async function ensureImported(moduleKey) {
+    if (loadedModules[moduleKey]) return true;
+
+    var loader = moduleLoaders[moduleKey];
+    if (typeof loader !== 'function') {
+        console.warn('[slash-command] unknown module key:', moduleKey);
+        return false;
+    }
+
+    try {
+        await loader();
+        loadedModules[moduleKey] = true;
+        return true;
+    } catch (error) {
+        console.warn('[slash-command] import failed:', moduleKey, error);
+        return false;
+    }
+}
+
+function activateUploadInput() {
+    var uploadInput = document.getElementById('upload');
+    if (!uploadInput) return false;
+    uploadInput.click();
+    return true;
+}
+
+async function runAction(action) {
+    switch (action) {
+        case 'openFileList': {
+            var sidebar = document.getElementById('fileListSidebar');
+            if (sidebar) {
+                sidebar.classList.toggle('show');
+                return true;
+            }
+            return clickFirstExistingButton(['mobileFileBtn', 'desktopFileBtn', 'mobileBottomFileListBtn']);
+        }
+
+        case 'showFileListHelp': {
+            var fileListHelp = document.getElementById('fileListHelp');
+            if (fileListHelp) {
+                fileListHelp.click();
+                return true;
+            }
+            return false;
+        }
+
+        case 'showFileManager':
+            if (typeof window.showFileManager !== 'function') await ensureImported('fileManager');
+            if (typeof window.showFileManager === 'function') {
+                window.showFileManager();
+                return true;
+            }
+            return clickFirstExistingButton(['mobileFileManagerBtn', 'desktopFileManagerBtn']);
+
+        case 'newFile':
+            if (typeof window.createNewFile === 'function') {
+                window.createNewFile();
+                return true;
+            }
+            return false;
+
+        case 'newFolder':
+            if (typeof window.createNewFolder === 'function') {
+                window.createNewFolder();
+                return true;
+            }
+            return false;
+
+        case 'openHistory':
+            if (typeof window.showHistoryModal === 'function' && window.currentFileId) {
+                var current = (window.files || []).find(function(file) { return file.id === window.currentFileId; });
+                window.showHistoryModal(window.currentFileId, current ? current.name : '');
+                return true;
+            }
+            return false;
+
+        case 'renameFile':
+            if (typeof window.renameFile === 'function' && window.currentFileId) {
+                window.renameFile(window.currentFileId);
+                return true;
+            }
+            return false;
+
+        case 'moveFile':
+            if (typeof window.moveFile === 'function' && window.currentFileId) {
+                window.moveFile(window.currentFileId);
+                return true;
+            }
+            return false;
+
+        case 'deleteFile':
+            if (typeof window.deleteFile === 'function' && window.currentFileId) {
+                await window.deleteFile(window.currentFileId);
+                return true;
+            }
+            return false;
+
+        case 'openLocalFile':
+            if (typeof window.openExternalLocalFileByDialog === 'function') {
+                await window.openExternalLocalFileByDialog();
+                return true;
+            }
+            return clickFirstExistingButton(['mobileOpenLocalFileBtn', 'desktopOpenLocalFileBtn']);
+
+        case 'openDiff':
+            if (typeof window.showFileDiffDialog === 'function') {
+                window.showFileDiffDialog();
+                return true;
+            }
+            return clickFirstExistingButton(['mobileFileDiffBtn', 'desktopFileDiffBtn']);
+
+        case 'login':
+        case 'register':
+            if (typeof window.handleLoginButtonClick === 'function') {
+                window.handleLoginButtonClick();
+                return true;
+            }
+            return clickFirstExistingButton(['mobileLoginBtn', 'desktopLoginBtn']);
+
+        case 'logout':
+            if (typeof window.logout === 'function') {
+                await window.logout();
+                return true;
+            }
+            return false;
+
+        case 'showInsertPicker':
+            if (typeof window.showInsertPicker !== 'function') await ensureImported('insertPicker');
+            if (typeof window.showInsertPicker === 'function') {
+                window.showInsertPicker();
+                return true;
+            }
+            return clickFirstExistingButton(['mobileInsertBtn', 'desktopInsertBtn']);
+
+        case 'showFootnotePicker':
+            if (typeof window.showFootnotePicker !== 'function') await ensureImported('insertPicker');
+            if (typeof window.showFootnotePicker === 'function') {
+                window.showFootnotePicker();
+                return true;
+            }
+            return clickFirstExistingButton(['mobileInsertBtn', 'desktopInsertBtn']);
+
+        case 'showMindmapPicker':
+            if (typeof window.showMindmapPicker !== 'function') await ensureImported('insertPicker');
+            if (typeof window.showMindmapPicker === 'function') {
+                window.showMindmapPicker();
+                return true;
+            }
+            return clickFirstExistingButton(['mobileInsertBtn', 'desktopInsertBtn']);
+
+        case 'showFormulaPicker':
+            if (typeof window.showFormulaPicker !== 'function') await ensureImported('formulaPicker');
+            if (typeof window.showFormulaPicker === 'function') {
+                window.showFormulaPicker();
+                return true;
+            }
+            return clickFirstExistingButton(['mobileFormulaBtn', 'desktopFormulaBtn']);
+
+        case 'showChartPicker':
+        case 'showEChartsPicker':
+            if (typeof window.showChartPicker !== 'function') await ensureImported('chartPicker');
+            if (typeof window.showChartPicker === 'function') {
+                window.showChartPicker();
+                return true;
+            }
+            return clickFirstExistingButton(['mobileChartBtn', 'desktopChartBtn']);
+
+        case 'showEmojiPicker':
+            if (typeof window.showEmojiPicker !== 'function') await ensureImported('emojiPicker');
+            if (typeof window.showEmojiPicker === 'function') {
+                window.showEmojiPicker();
+                return true;
+            }
+            return false;
+
+        case 'uploadImage':
+        case 'uploadFile':
+            return activateUploadInput();
+
+        case 'saveCurrentFile':
+            if (typeof window.saveCurrentFile === 'function') {
+                await window.saveCurrentFile(true);
+                return true;
+            }
+            return clickFirstExistingButton(['saveFileBtn', 'mobileBottomSaveBtn', 'desktopEditSaveBtn']);
+
+        case 'undo':
+            if (window.vditor && window.vditor.vditor && window.vditor.vditor.undo) {
+                window.vditor.vditor.undo.undo(window.vditor.vditor);
+                return true;
+            }
+            return clickFirstExistingButton(['mobileUndoBtn', 'desktopEditUndoBtn']);
+
+        case 'redo':
+            if (window.vditor && window.vditor.vditor && window.vditor.vditor.undo) {
+                window.vditor.vditor.undo.redo(window.vditor.vditor);
+                return true;
+            }
+            return clickFirstExistingButton(['mobileRedoBtn', 'desktopEditRedoBtn']);
+
+        case 'openFindReplace':
+        case 'searchFiles':
+            if (typeof window.showFindDialog === 'function') {
+                window.showFindDialog();
+                return true;
+            }
+            return clickFirstExistingButton(['mobileFindBtn', 'desktopFindBtn']);
+
+        case 'clearContent':
+            if (window.vditor) {
+                window.vditor.setValue('');
+                return true;
+            }
+            return clickFirstExistingButton(['mobileClearBtn', 'desktopClearBtn']);
+
+        case 'openSettings':
+        case 'themeMode':
+        case 'changeEditorMode':
+        case 'changeUiMode':
+        case 'changeFontSize':
+        case 'toggleOutline':
+        case 'changeStorageLocation':
+        case 'toggleMdAssociation':
+        case 'configureToolbarButtons':
+        case 'toggleWasmTextEngine':
+            if (typeof window.showSettingsDialog === 'function') {
+                window.showSettingsDialog();
+                return true;
+            }
+            return clickFirstExistingButton(['mobileSettingsBtn', 'desktopSettingsBtn', 'mobileBottomSettingsBtn']);
+
+        case 'showModeSelection':
+            return clickFirstExistingButton(['desktopModeBtn', 'mobileModeBtn']);
+
+        case 'setModeWysiwyg':
+        case 'setModeIr':
+        case 'setModeSv': {
+            var modeValue = action === 'setModeWysiwyg' ? 'wysiwyg' : (action === 'setModeIr' ? 'ir' : 'sv');
+            localStorage.setItem('vditor_editor_mode', modeValue);
+            window.location.reload();
+            return true;
+        }
+
+        case 'setLightMode':
+        case 'setDarkMode':
+        case 'setSystemMode': {
+            var theme = action === 'setLightMode' ? 'light' : (action === 'setDarkMode' ? 'dark' : 'system');
+            window.userSettings = window.userSettings || {};
+            window.userSettings.themeMode = theme;
+            localStorage.setItem('vditor_settings', JSON.stringify(window.userSettings));
+            window.location.reload();
+            return true;
+        }
+
+        case 'exportMd':
+        case 'exportTxt':
+        case 'exportHtml':
+        case 'exportDocx':
+        case 'exportPdf':
+        case 'exportPpt':
+        case 'openExportMenu':
+            if (typeof window.exportContent !== 'function') await ensureImported('exportPanel');
+            if (typeof window.exportContent === 'function') {
+                window.exportContent();
+                return true;
+            }
+            return clickFirstExistingButton(['mobileExportBtn', 'desktopExportBtn', 'mobileBottomExportBtn']);
+
+        case 'shareDocument':
+            if (typeof window.showShareDialog !== 'function') await ensureImported('sharePanel');
+            if (typeof window.showShareDialog === 'function') {
+                window.showShareDialog();
+                return true;
+            }
+            return clickFirstExistingButton(['mobileShareBtn', 'desktopShareBtn', 'mobileBottomShareBtn']);
+
+        case 'importFiles':
+            if (typeof window.importFiles === 'function') {
+                window.importFiles();
+                return true;
+            }
+            return clickFirstExistingButton(['mobileImportBtn', 'desktopImportBtn', 'mobileBottomImportBtn']);
+
+        case 'showPrintDialog':
+            if (typeof window.showPrintDialog !== 'function') await ensureImported('printPanel');
+            if (typeof window.showPrintDialog === 'function') {
+                window.showPrintDialog();
+                return true;
+            }
+            return clickFirstExistingButton(['mobilePrintBtn', 'desktopPrintBtn']);
+
+        case 'videoCall': {
+            var modal = document.getElementById('videoCallModalOverlay');
+            var iframe = document.getElementById('videoCallIframe');
+            if (modal && iframe) {
+                var isDarkMode = window.nightMode || document.body.classList.contains('night-mode');
+                iframe.src = 'https://webrtc.yhsun.cn/' + (isDarkMode ? '?darkMode=true' : '');
+                modal.classList.add('show');
+                return true;
+            }
+            return clickFirstExistingButton(['mobileVideoCallBtn']);
+        }
+
+        case 'presentationMode':
+            return clickFirstExistingButton(['desktopPresentationBtn', 'mobilePresentationBtn']);
+
+        case 'openAIAssistant':
+            if (typeof window.showAIPanel !== 'function') await ensureImported('aiAssistant');
+            if (typeof window.showAIPanel === 'function') {
+                window.showAIPanel();
+                return true;
+            }
+            return clickFirstExistingButton(['mobileAIBtn']);
+
+        case 'serviceStatus':
+            if (typeof window.showServiceStatusDialog === 'function') {
+                window.showServiceStatusDialog();
+                return true;
+            }
+            return clickFirstExistingButton(['serviceStatusBtn']);
+
+        case 'help':
+            if (typeof window.showAboutDialog === 'function') {
+                window.showAboutDialog();
+                return true;
+            }
+            return clickFirstExistingButton(['aboutBtn', 'desktopAboutBtn']);
+
+        case 'openUncertaintyCalculator':
+            if (typeof window.showUncertaintyCalculator !== 'function') await ensureImported('uncertaintyCalculator');
+            if (typeof window.showUncertaintyCalculator === 'function') {
+                window.showUncertaintyCalculator();
+                return true;
+            }
+            return clickFirstExistingButton(['mobileUncertaintyBtn']);
+
+        default:
+            return false;
+    }
+}
+
+function createPanel() {
+    if (state.panel && document.body.contains(state.panel)) return;
+
+    var panel = document.createElement('div');
+    panel.id = SLASH_PANEL_ID;
+    panel.className = 'slash-command-panel';
+    panel.style.display = 'none';
+
+    var header = document.createElement('div');
+    header.className = 'slash-command-header';
+
+    var title = document.createElement('div');
+    title.className = 'slash-command-title';
+    header.appendChild(title);
+
+    var hint = document.createElement('div');
+    hint.className = 'slash-command-hint';
+    header.appendChild(hint);
+
+    var close = document.createElement('button');
+    close.type = 'button';
+    close.className = 'slash-command-close';
+    close.innerHTML = '<i class="fas fa-times"></i>';
+    close.addEventListener('click', function(event) {
+        event.preventDefault();
+        event.stopPropagation();
+        hidePanel();
+    });
+    header.appendChild(close);
+
+    var list = document.createElement('div');
+    list.className = 'slash-command-list';
+
+    var activateByEvent = function(event, source) {
+        if (!event) return;
+
+        var target = event.target;
+        var start = target && target.nodeType === 3 ? target.parentElement : target;
+        var row = start && start.closest ? start.closest('.slash-command-item') : null;
+        if (!row) return;
+
+        if (source === 'click' && Date.now() - state.lastTouchActivationAt < 500) {
+            return;
+        }
+
+        event.preventDefault();
+        event.stopPropagation();
+
+        state.ignoreSelectionChangeUntil = Date.now() + 500;
+        if (source === 'touchend') {
+            state.lastTouchActivationAt = Date.now();
+        }
+
+        var index = Number(row.dataset.index);
+        if (!Number.isFinite(index)) return;
+        executeByIndex(index);
+    };
+
+    list.addEventListener('touchend', function(event) {
+        activateByEvent(event, 'touchend');
+    });
+
+    list.addEventListener('click', function(event) {
+        activateByEvent(event, 'click');
+    });
+
+    var empty = document.createElement('div');
+    empty.className = 'slash-command-empty';
+    empty.style.display = 'none';
+
+    panel.addEventListener('pointerdown', function() {
+        state.ignoreSelectionChangeUntil = Date.now() + 500;
+    });
+
+    panel.addEventListener('touchstart', function() {
+        state.ignoreSelectionChangeUntil = Date.now() + 500;
+    }, { passive: true });
+
+    panel.appendChild(header);
+    panel.appendChild(list);
+    panel.appendChild(empty);
+
+    state.panel = panel;
+    state.list = list;
+    state.empty = empty;
+    state.title = title;
+    state.hint = hint;
+    state.close = close;
+
+    updatePanelHeader();
+    document.body.appendChild(panel);
+}
+
+function updatePanelHeader() {
+    if (!state.panel) return;
+
+    var en = isEnglish();
+    state.title.textContent = en ? '/ Commands' : '/ 快捷操作';
+
+    var key = activationKey();
+    if (key === 'Off' || key === 'Custom') {
+        state.hint.textContent = en ? 'Click to run' : '点击执行';
+    } else {
+        state.hint.textContent = (en ? 'Press ' : '按 ') + key + (en ? ' to run' : ' 执行');
+    }
+
+    if (state.close) {
+        state.close.title = en ? 'Close' : '关闭';
+        state.close.setAttribute('aria-label', en ? 'Close slash commands' : '关闭快捷操作');
+    }
+}
+
+function showPanel() {
+    if (!state.panel) return;
+    updatePanelHeader();
+    state.panel.style.display = 'block';
+    state.visible = true;
+}
+
+function hidePanel() {
+    if (!state.panel) return;
+    state.panel.style.display = 'none';
+    state.visible = false;
+    state.items = [];
+    state.activeIndex = 0;
+    state.slashContext = null;
+}
+
+function scheduleRefresh(delay) {
+    if (state.refreshTimer) {
+        clearTimeout(state.refreshTimer);
+    }
+    state.refreshTimer = setTimeout(function() {
+        state.refreshTimer = null;
+        refreshFromCaret();
+    }, typeof delay === 'number' ? delay : 60);
 }
 
 function renderItems() {
@@ -370,21 +814,9 @@ function renderItems() {
             '</span>' +
             '<span class="slash-command-item-group">' + groupLabel + '</span>';
 
-        var invokeRow = function(event) {
-            if (event) {
-                event.preventDefault();
-                event.stopPropagation();
-            }
-            executeByIndex(index, 'pointer');
-        };
-
         row.addEventListener('mouseenter', function() {
             state.activeIndex = index;
             renderItems();
-        });
-
-        row.addEventListener('click', function(event) {
-            invokeRow(event);
         });
 
         state.list.appendChild(row);
@@ -395,6 +827,7 @@ function renderItems() {
 
 function ensureActiveItemVisible() {
     if (!state.list) return;
+
     var activeItem = state.list.querySelector('.slash-command-item.active');
     if (!activeItem) return;
 
@@ -423,372 +856,8 @@ function isActivationEvent(event, key) {
     return false;
 }
 
-function clickFirstExistingButton(ids) {
-    if (!Array.isArray(ids)) return false;
-    for (var i = 0; i < ids.length; i++) {
-        var el = document.getElementById(ids[i]);
-        if (el) {
-            el.click();
-            return true;
-        }
-    }
-    return false;
-}
-
-async function ensureImported(moduleKey) {
-    if (loadedModules[moduleKey]) return true;
-
-    var loader = moduleLoaders[moduleKey];
-    if (typeof loader !== 'function') {
-        console.warn('[slash-command] unknown module key:', moduleKey);
-        return false;
-    }
-
-    try {
-        await loader();
-        loadedModules[moduleKey] = true;
-        return true;
-    } catch (error) {
-        console.warn('[slash-command] import failed:', moduleKey, error);
-        return false;
-    }
-}
-
-async function runAction(action) {
-    switch (action) {
-        case 'openFileList': {
-            var sidebar = document.getElementById('fileListSidebar');
-            if (sidebar) sidebar.classList.toggle('show');
-            return true;
-        }
-        case 'showFileManager':
-            if (typeof window.showFileManager !== 'function') {
-                await ensureImported('fileManager');
-            }
-            if (typeof window.showFileManager === 'function') {
-                window.showFileManager();
-                return true;
-            }
-            return clickFirstExistingButton(['mobileFileManagerBtn', 'desktopFileManagerBtn']);
-        case 'newFile':
-            if (typeof window.createNewFile === 'function') window.createNewFile();
-            return true;
-        case 'newFolder':
-            if (typeof window.createNewFolder === 'function') window.createNewFolder();
-            return true;
-        case 'openHistory': {
-            if (typeof window.showHistoryModal === 'function' && window.currentFileId) {
-                var current = (window.files || []).find(function(file) { return file.id === window.currentFileId; });
-                window.showHistoryModal(window.currentFileId, current ? current.name : '');
-            }
-            return true;
-        }
-        case 'renameFile':
-            if (typeof window.renameFile === 'function' && window.currentFileId) window.renameFile(window.currentFileId);
-            return true;
-        case 'moveFile':
-            if (typeof window.moveFile === 'function' && window.currentFileId) window.moveFile(window.currentFileId);
-            return true;
-        case 'deleteFile':
-            if (typeof window.deleteFile === 'function' && window.currentFileId) await window.deleteFile(window.currentFileId);
-            return true;
-        case 'openLocalFile':
-            if (typeof window.openExternalLocalFileByDialog === 'function') await window.openExternalLocalFileByDialog();
-            return true;
-        case 'openDiff':
-            if (typeof window.showFileDiffDialog === 'function') window.showFileDiffDialog();
-            return true;
-        case 'login':
-        case 'register':
-            if (typeof window.handleLoginButtonClick === 'function') window.handleLoginButtonClick();
-            return true;
-        case 'logout':
-            if (typeof window.logout === 'function') await window.logout();
-            return true;
-        case 'showInsertPicker':
-            if (typeof window.showInsertPicker !== 'function') {
-                await ensureImported('insertPicker');
-            }
-            if (typeof window.showInsertPicker === 'function') {
-                window.showInsertPicker();
-                return true;
-            }
-            return clickFirstExistingButton(['mobileInsertBtn', 'desktopInsertBtn']);
-        case 'showFootnotePicker':
-            if (typeof window.showFootnotePicker !== 'function') {
-                await ensureImported('insertPicker');
-            }
-            if (typeof window.showFootnotePicker === 'function') {
-                window.showFootnotePicker();
-                return true;
-            }
-            return clickFirstExistingButton(['mobileInsertBtn', 'desktopInsertBtn']);
-        case 'showMindmapPicker':
-            if (typeof window.showMindmapPicker !== 'function') {
-                await ensureImported('insertPicker');
-            }
-            if (typeof window.showMindmapPicker === 'function') {
-                window.showMindmapPicker();
-                return true;
-            }
-            return clickFirstExistingButton(['mobileInsertBtn', 'desktopInsertBtn']);
-        case 'showFormulaPicker':
-            if (typeof window.showFormulaPicker !== 'function') {
-                await ensureImported('formulaPicker');
-            }
-            if (typeof window.showFormulaPicker === 'function') {
-                window.showFormulaPicker();
-                return true;
-            }
-            return clickFirstExistingButton(['mobileFormulaBtn', 'desktopFormulaBtn']);
-        case 'showChartPicker':
-        case 'showEChartsPicker':
-            if (typeof window.showChartPicker !== 'function') {
-                await ensureImported('chartPicker');
-            }
-            if (typeof window.showChartPicker === 'function') {
-                window.showChartPicker();
-                return true;
-            }
-            return clickFirstExistingButton(['mobileChartBtn', 'desktopChartBtn']);
-        case 'showEmojiPicker':
-            if (typeof window.showEmojiPicker !== 'function') {
-                await ensureImported('emojiPicker');
-            }
-            if (typeof window.showEmojiPicker === 'function') window.showEmojiPicker();
-            return true;
-        case 'uploadImage':
-        case 'uploadFile': {
-            var uploadInput = document.getElementById('upload');
-            if (uploadInput) uploadInput.click();
-            return true;
-        }
-        case 'saveCurrentFile':
-            if (typeof window.saveCurrentFile === 'function') await window.saveCurrentFile(true);
-            return true;
-        case 'undo':
-            if (window.vditor && window.vditor.vditor && window.vditor.vditor.undo) window.vditor.vditor.undo.undo(window.vditor.vditor);
-            return true;
-        case 'redo':
-            if (window.vditor && window.vditor.vditor && window.vditor.vditor.undo) window.vditor.vditor.undo.redo(window.vditor.vditor);
-            return true;
-        case 'openFindReplace':
-        case 'searchFiles':
-            if (typeof window.showFindDialog === 'function') window.showFindDialog();
-            return typeof window.showFindDialog === 'function' || clickFirstExistingButton(['mobileFindBtn', 'desktopFindBtn']);
-        case 'clearContent':
-            if (window.vditor) window.vditor.setValue('');
-            return true;
-        case 'openSettings':
-        case 'themeMode':
-        case 'changeEditorMode':
-        case 'changeUiMode':
-        case 'changeFontSize':
-        case 'toggleOutline':
-        case 'changeStorageLocation':
-        case 'toggleMdAssociation':
-        case 'configureToolbarButtons':
-        case 'toggleWasmTextEngine':
-            if (typeof window.showSettingsDialog === 'function') window.showSettingsDialog();
-            return true;
-        case 'showModeSelection': {
-            var desktopModeBtn = document.getElementById('desktopModeBtn');
-            var mobileModeBtn = document.getElementById('mobileModeBtn');
-            if (desktopModeBtn) {
-                desktopModeBtn.click();
-                return true;
-            }
-            if (mobileModeBtn) {
-                mobileModeBtn.click();
-                return true;
-            }
-            return false;
-        }
-        case 'setModeWysiwyg':
-        case 'setModeIr':
-        case 'setModeSv': {
-            var modeValue = action === 'setModeWysiwyg' ? 'wysiwyg' : (action === 'setModeIr' ? 'ir' : 'sv');
-            localStorage.setItem('vditor_editor_mode', modeValue);
-            window.location.reload();
-            return true;
-        }
-        case 'setLightMode':
-        case 'setDarkMode':
-        case 'setSystemMode': {
-            var mode = action === 'setLightMode' ? 'light' : (action === 'setDarkMode' ? 'dark' : 'system');
-            window.userSettings = window.userSettings || {};
-            window.userSettings.themeMode = mode;
-            localStorage.setItem('vditor_settings', JSON.stringify(window.userSettings));
-            window.location.reload();
-            return true;
-        }
-        case 'exportMd':
-        case 'exportTxt':
-        case 'exportHtml':
-        case 'exportDocx':
-        case 'exportPdf':
-        case 'exportPpt':
-        case 'openExportMenu':
-            if (typeof window.exportContent !== 'function') {
-                await ensureImported('exportPanel');
-            }
-            if (typeof window.exportContent === 'function') {
-                window.exportContent();
-                return true;
-            }
-            return clickFirstExistingButton(['mobileExportBtn', 'desktopExportBtn', 'mobileBottomExportBtn']);
-        case 'shareDocument':
-            if (typeof window.showShareDialog !== 'function') {
-                await ensureImported('sharePanel');
-            }
-            if (typeof window.showShareDialog === 'function') {
-                window.showShareDialog();
-                return true;
-            }
-            return clickFirstExistingButton(['mobileShareBtn', 'desktopShareBtn', 'mobileBottomShareBtn']);
-        case 'importFiles':
-            if (typeof window.importFiles === 'function') window.importFiles();
-            return typeof window.importFiles === 'function' || clickFirstExistingButton(['mobileImportBtn', 'desktopImportBtn', 'mobileBottomImportBtn']);
-        case 'showPrintDialog':
-            if (typeof window.showPrintDialog !== 'function') {
-                await ensureImported('printPanel');
-            }
-            if (typeof window.showPrintDialog === 'function') {
-                window.showPrintDialog();
-                return true;
-            }
-            return clickFirstExistingButton(['mobilePrintBtn', 'desktopPrintBtn']);
-        case 'videoCall': {
-            var modal = document.getElementById('videoCallModalOverlay');
-            var iframe = document.getElementById('videoCallIframe');
-            if (modal && iframe) {
-                var isDarkMode = window.nightMode || document.body.classList.contains('night-mode');
-                iframe.src = 'https://webrtc.yhsun.cn/' + (isDarkMode ? '?darkMode=true' : '');
-                modal.classList.add('show');
-                return true;
-            }
-
-            var mobileVideoCallBtn = document.getElementById('mobileVideoCallBtn');
-            if (mobileVideoCallBtn) {
-                mobileVideoCallBtn.click();
-                return true;
-            }
-            return false;
-        }
-        case 'presentationMode': {
-            var desktopPresentationBtn = document.getElementById('desktopPresentationBtn');
-            var mobilePresentationBtn = document.getElementById('mobilePresentationBtn');
-            if (desktopPresentationBtn) {
-                desktopPresentationBtn.click();
-            } else if (mobilePresentationBtn) {
-                mobilePresentationBtn.click();
-            }
-            return true;
-        }
-        case 'openAIAssistant':
-            if (typeof window.showAIPanel !== 'function') {
-                await ensureImported('aiAssistant');
-            }
-            if (typeof window.showAIPanel === 'function') {
-                window.showAIPanel();
-                return true;
-            }
-            return clickFirstExistingButton(['mobileAIBtn']);
-        case 'serviceStatus':
-            if (typeof window.showServiceStatusDialog === 'function') {
-                window.showServiceStatusDialog();
-                return true;
-            }
-            return clickFirstExistingButton(['serviceStatusBtn']);
-        case 'showFileListHelp': {
-            var fileListHelp = document.getElementById('fileListHelp');
-            if (fileListHelp) {
-                fileListHelp.click();
-                return true;
-            }
-            return false;
-        }
-        case 'help':
-            if (typeof window.showAboutDialog === 'function') {
-                window.showAboutDialog();
-                return true;
-            }
-            return clickFirstExistingButton(['aboutBtn', 'desktopAboutBtn']);
-        case 'openUncertaintyCalculator':
-            if (typeof window.showUncertaintyCalculator !== 'function') {
-                await ensureImported('uncertaintyCalculator');
-            }
-            if (typeof window.showUncertaintyCalculator === 'function') {
-                window.showUncertaintyCalculator();
-                return true;
-            }
-            return clickFirstExistingButton(['mobileUncertaintyBtn']);
-        default:
-            return false;
-    }
-}
-
-function restoreCaretFromContext(context) {
-    if (!context || !context.caretNode) return false;
-    var selection = window.getSelection ? window.getSelection() : null;
-    if (!selection) return false;
-
-    try {
-        var range = document.createRange();
-        range.setStart(context.caretNode, context.caretOffset);
-        range.collapse(true);
-        selection.removeAllRanges();
-        selection.addRange(range);
-        return true;
-    } catch (error) {
-        return false;
-    }
-}
-
-function safelyRemoveSlashQuery(context) {
-    if (!context) return false;
-
-    restoreCaretFromContext(context);
-
-    try {
-        removeSlashQuery(context);
-        return true;
-    } catch (error) {
-        console.warn('[slash-command] remove slash query failed:', error);
-        return false;
-    }
-}
-
-async function saveCurrentFileSilently() {
-    if (!window.currentFileId) return;
-    if (typeof window.saveCurrentFile !== 'function') return;
-
-    try {
-        await window.saveCurrentFile(false);
-    } catch (error) {
-        console.warn('[slash-command] auto save failed:', error);
-    }
-}
-
-function maybeTemplateByAction(action) {
-    if (action === 'insertTable') {
-        return '| 列1 | 列2 |\n| --- | --- |\n| 内容1 | 内容2 |';
-    }
-    if (action === 'insertMermaid') {
-        return '```mermaid\ngraph TD\n    A[开始] --> B[步骤]\n```';
-    }
-    if (action === 'insertInlineFormula') {
-        return '$x^2$';
-    }
-    if (action === 'insertBlockFormula') {
-        return '$$\nE=mc^2\n$$';
-    }
-    return '';
-}
-
 async function executeCommand(item, context) {
     hidePanel();
-
     if (!item) return;
 
     var editor = getEditorElement();
@@ -796,13 +865,13 @@ async function executeCommand(item, context) {
         editor.focus();
     }
 
-    var removedSlash = safelyRemoveSlashQuery(context);
-    if (removedSlash) {
+    var removed = removeSlashQuery(context);
+    if (removed) {
         await saveCurrentFileSilently();
     }
 
     var action = item.action || '';
-    var insertText = item.insertText || maybeTemplateByAction(action);
+    var insertText = item.insertText || actionInsertFallback[action] || '';
 
     var actionHandled = await runAction(action);
     if (!actionHandled && insertText) {
@@ -813,11 +882,6 @@ async function executeCommand(item, context) {
 
     if (!actionHandled && !insertText) {
         notify(isEnglish() ? 'Command is not available yet' : '该操作暂未开放', 'warning');
-        return;
-    }
-
-    if (!actionHandled && insertText) {
-        insertTextAtCursor(insertText);
     }
 }
 
@@ -826,9 +890,10 @@ function executeByIndex(index) {
 
     var item = state.items[index];
     if (!item) return;
-    var context = state.slashContext;
 
+    var context = state.slashContext;
     state.executing = true;
+
     Promise.resolve(executeCommand(item, context)).catch(function(error) {
         console.error('[slash-command] execute failed:', error);
         notify(isEnglish() ? 'Command execution failed' : '快捷操作执行失败', 'error');
@@ -911,7 +976,7 @@ function onEditorKeyDown(event) {
 
     if (!state.visible) {
         if (event.key === '/' || event.key === 'Process') {
-            scheduleRefresh();
+            scheduleRefresh(20);
         }
         return;
     }
@@ -936,7 +1001,7 @@ function onEditorKeyDown(event) {
 
     if (isActivationEvent(event, activationKey())) {
         event.preventDefault();
-        executeByIndex(state.activeIndex, 'keyboard');
+        executeByIndex(state.activeIndex);
     }
 }
 
@@ -997,7 +1062,7 @@ function bindDocumentEventsOnce() {
     if (state.docBound) return;
     state.docBound = true;
 
-    document.addEventListener('mousedown', function(event) {
+    document.addEventListener('pointerdown', function(event) {
         if (!state.visible) return;
         var target = event.target;
         if (state.panel && state.panel.contains(target)) return;
@@ -1008,7 +1073,7 @@ function bindDocumentEventsOnce() {
     document.addEventListener('selectionchange', function() {
         if (!state.visible) return;
         if (state.composing) return;
-        if (state.panel && document.activeElement && state.panel.contains(document.activeElement)) return;
+        if (Date.now() < state.ignoreSelectionChangeUntil) return;
         scheduleRefresh();
     });
 
