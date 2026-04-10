@@ -725,7 +725,7 @@
         }
         markPendingServerSync(currentFileId, true);
         try {
-            const saveResult = await global.syncFileToServer(currentFileId);
+            const saveResult = await global.syncFileToServer(currentFileId, { background: !isManual });
             if (isManual && contentChanged && saveResult) {
                 try { await global.createHistoryVersion(file.name, content); } catch (e) { console.warn('创建历史版本失败', e); }
             }
@@ -938,10 +938,40 @@
         return global.wasmTextEngineGateway.collectFolderPaths(payload);
     }
 
+    function isWasmFileOpsReady() {
+        if (!global.wasmTextEngineGateway || typeof global.wasmTextEngineGateway.getStatus !== 'function') {
+            return true;
+        }
+        const status = global.wasmTextEngineGateway.getStatus();
+        return !!(status && status.ready && !status.disabledByError);
+    }
+
+    function deferFileTreeWorkUntilWasmReady(callback, label) {
+        if (isWasmFileOpsReady()) return false;
+        if (typeof global.ensureWasmTextEngineReady !== 'function') {
+            throw new Error('wasm text engine is required before ' + label);
+        }
+        global.ensureWasmTextEngineReady().then(function() {
+            callback();
+        }).catch(function(error) {
+            console.error('[files] wasm gating failed before ' + label + ':', error);
+            if (typeof global.showMessage === 'function') {
+                global.showMessage(
+                    (isEn() ? 'Initialization failed: ' : '初始化失败：') + ((error && error.message) || 'wasm text engine unavailable'),
+                    'error'
+                );
+            }
+        });
+        return true;
+    }
+
     // ---------- 服务器同步相关 ----------
     async function loadFilesFromServer(preserveFileName) {
         if (!g('currentUser')) return;
         try {
+            if (typeof global.ensureWasmTextEngineReady === 'function') {
+                await global.ensureWasmTextEngineReady();
+            }
             await refreshOwnerShareCache(true);
             var api = global.getApiBaseUrl ? global.getApiBaseUrl() : 'api';
             const response = await fetch(api + '/files?username=' + encodeURIComponent(g('currentUser').username), {
@@ -1003,6 +1033,7 @@
                     if (!f.type) f.type = 'file';
                     normalizeExternalLocalFileRecord(f);
                 });
+                syncCurrentEditorSnapshotIntoFiles(localFiles);
 
                 // 当用户从未登录 -> 登录时，本地可能存在服务器从未见过的文件。
                 // 这些文件不应弹冲突窗口，应直接上传并保存到用户服务器上。
@@ -2083,11 +2114,13 @@
     }
 
     function loadLocalFiles() {
+        if (deferFileTreeWorkUntilWasmReady(loadLocalFiles, 'loadLocalFiles')) return;
         const localFiles = JSON.parse(localStorage.getItem('vditor_files') || '[]');
         localFiles.forEach(f => {
             if (!f.type) f.type = 'file';
             normalizeExternalLocalFileRecord(f);
         });
+        syncCurrentEditorSnapshotIntoFiles(localFiles);
         if (localFiles.length === 0) {
             global.files = [];
             if (shouldAutoOpenInitialFile()) {
@@ -2839,6 +2872,7 @@
     }
 
     function loadFiles() {
+        if (deferFileTreeWorkUntilWasmReady(loadFiles, 'loadFiles')) return;
         const fileListSidebar = document.getElementById('fileListSidebar');
         const wasVisible = fileListSidebar && fileListSidebar.classList.contains('show');
         loadOrders();
@@ -3696,7 +3730,7 @@
     async function openFile(fileId) {
         // 先保存当前文档
         if (typeof global.saveCurrentFile === 'function' && g('currentFileId')) {
-            await global.saveCurrentFile(true);
+            await global.saveCurrentFile(false);
         }
 
         const files = g('files');
@@ -4241,11 +4275,9 @@
         // 移动端适当拉长保存间隔，减少输入过程中对主线程的占用。
         var delay = global.isMobileEditorEnvironment ? 2500 : 1000;
         global.autoSaveTimer = setTimeout(function() {
-            global.saveCurrentFile();
-            // 保存后清除草稿（因为已经正式保存了）
-            if (global.draftRecovery) {
-                global.draftRecovery.clearDraft();
-            }
+            Promise.resolve(global.saveCurrentFile(false)).catch(function(error) {
+                console.warn('自动保存失败:', error);
+            });
         }, delay);
     }
 
@@ -4284,15 +4316,16 @@
         });
         if (filesToSync.length === 0) return;
         try {
-            for (var i = 0; i < filesToSync.length; i++) await global.syncFileToServer(filesToSync[i].id);
+            for (var i = 0; i < filesToSync.length; i++) await global.syncFileToServer(filesToSync[i].id, { background: true });
         } catch (error) {
             await tryHandleTokenExpired(error);
             console.error('同步失败', error);
         }
     }
 
-    async function syncFileToServer(fileId) {
+    async function syncFileToServer(fileId, options) {
         if (!g('currentUser')) return;
+        const backgroundSync = !options || options.background !== false;
         const files = g('files');
         const file = files.find(function(f) { return f.id === fileId; });
         if (!file) return;
@@ -4326,8 +4359,15 @@
                 if (serverSnapshot && serverSnapshot.content !== baseContent) {
                     if (content !== baseContent) {
                         markPendingServerSync(fileId, true);
-                        global.showMessage(isEn() ? 'Conflict detected: server has newer content, please resolve it first' : '检测到冲突：服务器有更新内容，请先处理冲突', 'warning');
-                        await loadFilesFromServer(file.name);
+                        global.showMessage(
+                            backgroundSync
+                                ? (isEn() ? 'Detected remote updates for this file, local changes were kept for later sync' : '检测到该文件存在远端更新，已保留本地修改等待后续处理')
+                                : (isEn() ? 'Conflict detected: server has newer content, please resolve it first' : '检测到冲突：服务器有更新内容，请先处理冲突'),
+                            'warning'
+                        );
+                        if (!backgroundSync) {
+                            await loadFilesFromServer(file.name);
+                        }
                         return false;
                     }
 
@@ -6035,5 +6075,8 @@
     global.showFindDialog = showFindDialog;
     global.openExternalLocalFileByDialog = openExternalLocalFileByDialog;
     global.openExternalLocalFileByPath = openExternalLocalFileByPath;
+    global.setEditorContentForFile = setEditorContentForFile;
+    global.getCurrentEditorContent = getCurrentEditorContent;
+    global.syncCurrentEditorSnapshotIntoFiles = syncCurrentEditorSnapshotIntoFiles;
 
 })(typeof window !== 'undefined' ? window : this);
