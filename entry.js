@@ -3,6 +3,7 @@ import '@fortawesome/fontawesome-free/css/all.min.css';
 import './css/styles.css';
 
 import './js/jquery-global.js';
+import './js/tauri-bridge.js';
 import 'jstree/dist/themes/default/style.min.css';
 import 'jstree';
 

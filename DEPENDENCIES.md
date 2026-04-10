@@ -44,7 +44,7 @@ This project would not have been possible without the incredible work of the ope
 
 ### Development Dependencies
 - [Capacitor](https://capacitorjs.com/) – Cross‑platform apps
-- [Electron](https://www.electronjs.org/) – Desktop apps
+- [Tauri](https://tauri.app/) – Desktop apps
 - [Vite](https://vitejs.dev/) – Build tool
 - [Jest](https://jestjs.io/) – Testing framework
 - [Supertest](https://github.com/visionmedia/supertest) – HTTP assertions

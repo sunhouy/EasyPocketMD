@@ -1,4 +1,4 @@
-name: Build Electron App
+name: Build Tauri App
 
 on:
   push:
@@ -29,7 +29,6 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
-
       - name: Setup Emscripten
         run: |
           if [ ! -d "$HOME/emsdk" ]; then
@@ -59,20 +58,20 @@ jobs:
             wasm_text_engine/dist/text_engine.wasm
           if-no-files-found: error
 
-  build-electron:
+  build-tauri:
     needs: build-wasm
     strategy:
       matrix:
         include:
           - os: windows-latest
-            script: build:electron:win
-            artifactName: md-electron-win
+            script: build:tauri:win
+            artifactName: md-tauri-win
           - os: ubuntu-latest
-            script: build:electron:linux
-            artifactName: md-electron-linux
+            script: build:tauri:linux
+            artifactName: md-tauri-linux
           - os: macos-latest
-            script: build:electron:mac
-            artifactName: md-electron-mac
+            script: build:tauri:mac
+            artifactName: md-tauri-mac
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout source
@@ -89,10 +88,24 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Linux build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.0-dev \
+            libjavascriptcoregtk-4.0-dev \
+            libsoup2.4-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf
+
       - name: Clean install dependencies
         shell: bash
         run: |
-          # Clean install to avoid rollup platform-specific module issues
           rm -rf node_modules package-lock.json
           npm install
 
@@ -111,13 +124,9 @@ jobs:
               version = require('./package.json').version || '0.0.0';
             }
             const parts = version.split('.').filter(Boolean);
-            if (parts.length === 1) {
-              version = parts[0] + '.0.0';
-            } else if (parts.length === 2) {
-              version = parts[0] + '.' + parts[1] + '.0';
-            } else if (parts.length >= 3) {
-              version = parts[0] + '.' + parts[1] + '.' + parts[2];
-            }
+            if (parts.length === 1) version = parts[0] + '.0.0';
+            else if (parts.length === 2) version = parts[0] + '.' + parts[1] + '.0';
+            else if (parts.length >= 3) version = parts[0] + '.' + parts[1] + '.' + parts[2];
             if (!/^\\d+\\.\\d+\\.\\d+$/.test(version)) {
               console.error('Invalid version resolved:', version);
               process.exit(1);
@@ -127,95 +136,94 @@ jobs:
           echo "VERSION=$VERSION" >> $GITHUB_ENV
           echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
 
-      - name: Update package.json version
+      - name: Sync app versions
         shell: bash
         run: |
           node -e '
             const fs = require("fs");
-            const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
-            pkg.version = process.env.VERSION;
-            fs.writeFileSync("package.json", JSON.stringify(pkg, null, 2));
+            const version = process.env.VERSION;
+
+            const pkgPath = "package.json";
+            const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8"));
+            pkg.version = version;
+            fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2));
+
+            const tauriPath = "src-tauri/tauri.conf.json";
+            const tauriConfig = JSON.parse(fs.readFileSync(tauriPath, "utf8"));
+            tauriConfig.package = tauriConfig.package || {};
+            tauriConfig.package.version = version;
+            fs.writeFileSync(tauriPath, JSON.stringify(tauriConfig, null, 2));
+
+            const cargoPath = "src-tauri/Cargo.toml";
+            const cargoRaw = fs.readFileSync(cargoPath, "utf8");
+            const patched = cargoRaw.replace(/^version\\s*=\\s*"[^"]+"/m, `version = "${version}"`);
+            fs.writeFileSync(cargoPath, patched);
           '
 
-      - name: Build web app (Vite)
-        run: npm run build:web
-
-      - name: Verify WASM packaged in dist
-        run: npm run wasm:text:verify:dist
-
-      - name: Build Electron app (${{ matrix.script }})
+      - name: Build Tauri app (${{ matrix.script }})
         run: npm run ${{ matrix.script }}
 
-      - name: Upload Electron artifacts
+      - name: Upload Tauri artifacts
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifactName }}
           path: |
-            dist-electron-new/**
+            src-tauri/target/release/bundle/**
           if-no-files-found: warn
 
-  publish-electron-release:
-    needs: build-electron
+  publish-tauri-release:
+    needs: build-tauri
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && github.event.inputs.release_tag != '')
     concurrency:
       group: gh-release-${{ github.repository }}-${{ github.event_name == 'workflow_dispatch' && github.event.inputs.release_tag != '' && github.event.inputs.release_tag || github.ref_name }}
       cancel-in-progress: false
-
     steps:
-      - name: Download Windows Electron artifact
+      - name: Download Windows Tauri artifact
         uses: actions/download-artifact@v4
         with:
-          name: md-electron-win
-          path: downloads/electron/win
+          name: md-tauri-win
+          path: downloads/tauri/win
 
-      - name: Download Linux Electron artifact
+      - name: Download Linux Tauri artifact
         uses: actions/download-artifact@v4
         with:
-          name: md-electron-linux
-          path: downloads/electron/linux
+          name: md-tauri-linux
+          path: downloads/tauri/linux
 
-      - name: Download macOS Electron artifact
+      - name: Download macOS Tauri artifact
         uses: actions/download-artifact@v4
         with:
-          name: md-electron-mac
-          path: downloads/electron/mac
+          name: md-tauri-mac
+          path: downloads/tauri/mac
 
       - name: Prepare release assets
         run: |
-          # Extract version from tag (e.g., v1.2.3 -> 1.2.3)
           TAG_NAME=${{ github.event_name == 'workflow_dispatch' && github.event.inputs.release_tag != '' && github.event.inputs.release_tag || github.ref_name }}
           VERSION=$(echo "$TAG_NAME" | sed 's/^v//')
-          
-          # Create release directory
           mkdir -p release
-          
-          # Find and copy only the setup file, excluding elevate.exe
-          setup_file=$(find downloads/electron/win -name "*.exe" -not -name "elevate.exe" | grep -i setup | head -1)
-          if [ -n "$setup_file" ]; then
-            cp "$setup_file" "release/easypocketmd-$VERSION.exe"
-            echo "Copied setup file: $(basename "$setup_file") -> easypocketmd-$VERSION.exe"
-          else
-            # If no setup file found, try to find any exe file
-            exe_file=$(find downloads/electron/win -name "*.exe" -not -name "elevate.exe" | head -1)
-            if [ -n "$exe_file" ]; then
-              cp "$exe_file" "release/easypocketmd-$VERSION.exe"
-              echo "Copied exe file: $(basename "$exe_file") -> easypocketmd-$VERSION.exe"
-            else
-              echo "No exe files found"
-            fi
-          fi
-          
-          # Copy Linux deb files
-          cp downloads/electron/linux/*.deb release/ || true
-          
-          # Copy Linux AppImage files
-          cp downloads/electron/linux/*.AppImage release/ || true
-          
-          # Copy macOS dmg files
-          cp downloads/electron/mac/*.dmg release/ || true
 
-      - name: Upload Electron assets to GitHub Release
+          win_installer=$(find downloads/tauri/win -name "*.exe" | head -1)
+          if [ -n "$win_installer" ]; then
+            cp "$win_installer" "release/easypocketmd-$VERSION.exe"
+          fi
+
+          linux_deb=$(find downloads/tauri/linux -name "*.deb" | head -1)
+          if [ -n "$linux_deb" ]; then
+            cp "$linux_deb" release/
+          fi
+
+          linux_appimage=$(find downloads/tauri/linux -name "*.AppImage" | head -1)
+          if [ -n "$linux_appimage" ]; then
+            cp "$linux_appimage" release/
+          fi
+
+          mac_dmg=$(find downloads/tauri/mac -name "*.dmg" | head -1)
+          if [ -n "$mac_dmg" ]; then
+            cp "$mac_dmg" release/
+          fi
+
+      - name: Upload Tauri assets to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.release_tag != '' && github.event.inputs.release_tag || github.ref_name }}
@@ -225,122 +233,101 @@ jobs:
             release/*.AppImage
             release/*.dmg
 
-  deploy-electron:
-    needs: build-electron
+  deploy-tauri:
+    needs: build-tauri
     runs-on: ubuntu-latest
     steps:
-      # 下载 Windows 产物
-      - name: Download Windows Electron artifact
+      - name: Download Windows Tauri artifact
         uses: actions/download-artifact@v4
         with:
-          name: md-electron-win
-          path: downloads/electron/win
+          name: md-tauri-win
+          path: downloads/tauri/win
 
-      # 下载 Linux 产物
-      - name: Download Linux Electron artifact
+      - name: Download Linux Tauri artifact
         uses: actions/download-artifact@v4
         with:
-          name: md-electron-linux
-          path: downloads/electron/linux
+          name: md-tauri-linux
+          path: downloads/tauri/linux
 
-      # 下载 macOS 产物
-      - name: Download macOS Electron artifact
+      - name: Download macOS Tauri artifact
         uses: actions/download-artifact@v4
         with:
-          name: md-electron-mac
-          path: downloads/electron/mac
+          name: md-tauri-mac
+          path: downloads/tauri/mac
 
-      # 在服务器上创建对应目录
-      - name: Create electron directories on server
+      - name: Create tauri directories on server
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           password: ${{ secrets.SERVER_PASSWORD }}
           script: |
-            mkdir -p /www/wwwroot/static/electron/win
-            mkdir -p /www/wwwroot/static/electron/linux
-            mkdir -p /www/wwwroot/static/electron/macos
+            mkdir -p /www/wwwroot/static/tauri/win
+            mkdir -p /www/wwwroot/static/tauri/linux
+            mkdir -p /www/wwwroot/static/tauri/macos
 
-      # 准备部署产物（仅安装包，且使用固定文件名）
       - name: Prepare deployment installer files
         run: |
           mkdir -p deploy/win deploy/linux deploy/macos
-          
-          # Windows: 仅保留安装包，重命名为 easypocketmd_windows.exe
-          setup_file=$(find downloads/electron/win -name "*.exe" -not -name "elevate.exe" | grep -i setup | head -1)
-          if [ -n "$setup_file" ]; then
-            cp "$setup_file" "deploy/win/easypocketmd_windows.exe"
-            echo "Prepared Windows installer: easypocketmd_windows.exe"
+
+          win_installer=$(find downloads/tauri/win -name "*.exe" | head -1)
+          if [ -n "$win_installer" ]; then
+            cp "$win_installer" "deploy/win/easypocketmd_windows.exe"
           else
-            exe_file=$(find downloads/electron/win -name "*.exe" -not -name "elevate.exe" | head -1)
-            if [ -n "$exe_file" ]; then
-              cp "$exe_file" "deploy/win/easypocketmd_windows.exe"
-              echo "Prepared Windows installer from fallback exe: easypocketmd_windows.exe"
-            else
-              echo "No Windows installer (.exe) found"
-              exit 1
-            fi
+            echo "No Windows installer (.exe) found"
+            exit 1
           fi
 
-          # Linux: 仅保留 .deb 和 .AppImage，统一重命名
-          linux_deb=$(find downloads/electron/linux -name "*.deb" | head -1)
+          linux_deb=$(find downloads/tauri/linux -name "*.deb" | head -1)
           if [ -n "$linux_deb" ]; then
             cp "$linux_deb" "deploy/linux/easypocketmd_linux.deb"
-            echo "Prepared Linux installer: easypocketmd_linux.deb"
           else
             echo "No Linux installer (.deb) found"
             exit 1
           fi
 
-          linux_appimage=$(find downloads/electron/linux -name "*.AppImage" | head -1)
+          linux_appimage=$(find downloads/tauri/linux -name "*.AppImage" | head -1)
           if [ -n "$linux_appimage" ]; then
             cp "$linux_appimage" "deploy/linux/easypocketmd_linux.appimage"
-            echo "Prepared Linux installer: easypocketmd_linux.appimage"
           else
             echo "No Linux installer (.AppImage) found"
             exit 1
           fi
 
-          # macOS: 仅保留 .dmg，重命名为 easypocketmd_macos.dmg
-          mac_dmg=$(find downloads/electron/mac -name "*.dmg" | head -1)
+          mac_dmg=$(find downloads/tauri/mac -name "*.dmg" | head -1)
           if [ -n "$mac_dmg" ]; then
             cp "$mac_dmg" "deploy/macos/easypocketmd_macos.dmg"
-            echo "Prepared macOS installer: easypocketmd_macos.dmg"
           else
             echo "No macOS installer (.dmg) found"
             exit 1
           fi
 
-      # 上传 Windows 产物
-      - name: Upload Windows Electron artifacts
+      - name: Upload Windows Tauri artifact
         uses: appleboy/scp-action@master
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           password: ${{ secrets.SERVER_PASSWORD }}
           source: "deploy/win/easypocketmd_windows.exe"
-          target: "/www/wwwroot/static/electron/win"
-          strip_components: 2   # 去除 deploy/win/ 前缀
+          target: "/www/wwwroot/static/tauri/win"
+          strip_components: 2
 
-      # 上传 Linux 产物
-      - name: Upload Linux Electron artifacts
+      - name: Upload Linux Tauri artifacts
         uses: appleboy/scp-action@master
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           password: ${{ secrets.SERVER_PASSWORD }}
           source: "deploy/linux/*"
-          target: "/www/wwwroot/static/electron/linux"
-          strip_components: 2   # 去除 deploy/linux/ 前缀
+          target: "/www/wwwroot/static/tauri/linux"
+          strip_components: 2
 
-      # 上传 macOS 产物
-      - name: Upload macOS Electron artifacts
+      - name: Upload macOS Tauri artifact
         uses: appleboy/scp-action@master
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           password: ${{ secrets.SERVER_PASSWORD }}
           source: "deploy/macos/easypocketmd_macos.dmg"
-          target: "/www/wwwroot/static/electron/macos"
-          strip_components: 2   # 去除 deploy/macos/ 前缀
+          target: "/www/wwwroot/static/tauri/macos"
+          strip_components: 2

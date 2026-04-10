@@ -1,6 +1,6 @@
 /**
  * 应用生命周期管理模块
- * 处理 Web、Capacitor 和 Electron 环境的应用生命周期事件
+ * 处理 Web、Capacitor 和桌面壳环境（Tauri）应用生命周期事件
  * 确保应用在关闭、后台运行等情况下数据不丢失
  */
 (function(global) {
@@ -20,9 +20,9 @@
     function detectEnvironment() {
         return {
             isCapacitor: typeof global.Capacitor !== 'undefined' && global.Capacitor.isNativePlatform(),
-            isElectron: typeof global.electron !== 'undefined' || /electron/i.test(navigator.userAgent),
+            isDesktop: typeof global.electron !== 'undefined' || typeof global.__TAURI__ !== 'undefined' || /electron/i.test(navigator.userAgent),
             isWeb: !((typeof global.Capacitor !== 'undefined' && global.Capacitor.isNativePlatform()) ||
-                     (typeof global.electron !== 'undefined' || /electron/i.test(navigator.userAgent)))
+                     (typeof global.electron !== 'undefined' || typeof global.__TAURI__ !== 'undefined' || /electron/i.test(navigator.userAgent)))
         };
     }
 
@@ -333,27 +333,23 @@
     }
 
     /**
-     * 初始化 Electron 生命周期处理
+     * 初始化桌面壳生命周期处理（通过桥接事件兼容）
      */
-    function initElectronLifecycle() {
+    function initDesktopLifecycle() {
         if (!global.electron) return;
 
-        // 监听 Electron 的关闭事件
+        // 监听桌面壳的关闭事件
         if (global.electron.ipcRenderer) {
-            // 主进程请求关闭窗口
+            // 应用即将关闭
             global.electron.ipcRenderer.on('app-before-close', function() {
-                // console.log('[Lifecycle] Electron app before close');
                 emergencySave();
             });
 
             // 窗口即将关闭
             global.electron.ipcRenderer.on('window-before-close', function() {
-                // console.log('[Lifecycle] Electron window before close');
                 emergencySave();
             });
         }
-
-        // console.log('[Lifecycle] Electron lifecycle handlers initialized');
     }
 
     /**
@@ -621,8 +617,8 @@
             initCapacitorLifecycle();
         }
 
-        if (env.isElectron) {
-            initElectronLifecycle();
+        if (env.isDesktop) {
+            initDesktopLifecycle();
         }
 
         // 启动时检查是否需要恢复草稿

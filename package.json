@@ -2,7 +2,6 @@
   "name": "easypocketmd",
   "version": "2.4.2",
   "description": "基于Vditor的移动端轻量化在线markdown编辑器，可进行多文件管理。支持可视化插入格式、公式、图表，上传文件和图片，降低学习和操作门槛；支持多端文件同步，历史版本，文件分享，日间、夜间模式切换，导入本地文件，导出文档，云打印功能",
-  "main": "electron-main.js",
   "scripts": {
     "dev": "vite",
     "build": "npm run wasm:text:build && node version.js && vite build && npm run wasm:text:verify:dist",
@@ -10,9 +9,11 @@
     "test": "NODE_ENV=test jest --runInBand --forceExit",
     "check-deploy": "node scripts/check-deploy.js",
     "start": "node api/server.js",
-    "build:electron:win": "electron-builder -w --x64 --publish=never",
-    "build:electron:linux": "electron-builder -l AppImage deb --x64 --publish=never",
-    "build:electron:mac": "electron-builder -m --publish=never",
+    "tauri:dev": "tauri dev",
+    "build:tauri": "tauri build",
+    "build:tauri:win": "tauri build --bundles nsis",
+    "build:tauri:linux": "tauri build --bundles deb,appimage",
+    "build:tauri:mac": "tauri build --bundles dmg",
     "bump-version": "node version.js",
     "cap:init": "cap init",
     "cap:add:android": "cap add android",
@@ -88,59 +89,13 @@
     "@capacitor/assets": "^3.0.0",
     "@capacitor/cli": "^6.1.2",
     "@capacitor/core": "^6.1.2",
+    "@tauri-apps/cli": "^1.6.3",
     "@capacitor/filesystem": "^6.0.0",
     "@capacitor/share": "^6.0.0",
-    "electron": "^35.7.5",
-    "electron-builder": "^26.8.1",
     "jest": "^30.2.0",
     "jest-environment-jsdom": "^30.3.0",
     "supertest": "^7.2.2",
     "vite": "^7.3.1",
     "vite-plugin-static-copy": "^3.2.0"
-  },
-  "build": {
-    "appId": "cn.yhsun.md",
-    "productName": "MarkdownEditor",
-    "directories": {
-      "output": "dist-electron-new"
-    },
-    "npmRebuild": false,
-    "files": [
-      "dist/**/*",
-      "electron-main.js",
-      "preload.js",
-      "icon.png",
-      "package.json"
-    ],
-    "fileAssociations": [
-      {
-        "ext": "md",
-        "name": "Markdown Document",
-        "description": "Markdown file",
-        "role": "Editor"
-      },
-      {
-        "ext": "markdown",
-        "name": "Markdown Document",
-        "description": "Markdown file",
-        "role": "Editor"
-      }
-    ],
-    "linux": {
-      "target": [
-        "AppImage",
-        "deb"
-      ]
-    },
-    "win": {
-      "target": [
-        "nsis"
-      ]
-    },
-    "mac": {
-      "target": [
-        "dmg"
-      ]
-    }
   }
 }

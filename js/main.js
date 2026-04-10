@@ -114,7 +114,7 @@ document.addEventListener('DOMContentLoaded', function() {
         shellInitialized = true;
         initUserInterface();
         initMobileFeatures();
-        initElectronOpenFileBridge();
+        initDesktopOpenFileBridge();
         initGlobalKeyboardShortcuts();
     }
 
@@ -917,22 +917,22 @@ document.addEventListener('DOMContentLoaded', function() {
     window.userSettings.keyboardShortcuts = getEffectiveKeyboardShortcuts(window.userSettings);
     applyDebugModeSetting(window.userSettings.enableDebugMode, false);
 
-    let electronOpenFileBridgeInitialized = false;
+    let desktopOpenFileBridgeInitialized = false;
 
-    async function syncMdAssociationSettingFromElectron() {
+    async function syncMdAssociationSettingFromDesktop() {
         if (!window.electron || typeof window.electron.getMdAssociationEnabled !== 'function') return;
         try {
             const enabled = await window.electron.getMdAssociationEnabled();
             window.userSettings.mdFileAssociationEnabled = !!enabled;
             localStorage.setItem('vditor_settings', JSON.stringify(window.userSettings));
         } catch (error) {
-            console.warn('Failed to load md association setting from Electron:', error);
+            console.warn('Failed to load md association setting from desktop runtime:', error);
         }
     }
 
-    function initElectronOpenFileBridge() {
-        if (!window.electron || typeof window.electron.onOpenLocalFileRequest !== 'function' || electronOpenFileBridgeInitialized) return;
-        electronOpenFileBridgeInitialized = true;
+    function initDesktopOpenFileBridge() {
+        if (!window.electron || typeof window.electron.onOpenLocalFileRequest !== 'function' || desktopOpenFileBridgeInitialized) return;
+        desktopOpenFileBridgeInitialized = true;
 
         window.electron.onOpenLocalFileRequest(async function(filePath) {
             if (!filePath || typeof window.openExternalLocalFileByPath !== 'function') return;
@@ -945,7 +945,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    syncMdAssociationSettingFromElectron();
+    syncMdAssociationSettingFromDesktop();
 
     function getEffectiveInterfaceMode(settings) {
         var targetSettings = settings || window.userSettings || {};
@@ -1062,7 +1062,7 @@ document.addEventListener('DOMContentLoaded', function() {
         height: '100%',
         width: '100%',
         placeholder: window.i18n ? window.i18n.t('startEditing') : '开始编辑...支持 Markdown 语法',
-        cdn: window.electron ? './vditor' : (window.location.protocol === 'file:' ? './vditor' : '/vditor'), // 兼容 Electron 和 Web 环境的本地目录
+        cdn: window.electron ? './vditor' : (window.location.protocol === 'file:' ? './vditor' : '/vditor'), // 兼容桌面壳与 Web 环境的本地目录
         lang: 'en_US', // 彻底禁用中文语言文件，使用默认英语
         toolbar: ['emoji', 'br', 'bold', 'italic', 'strike', '|', 'line', 'quote', 'list', 'ordered-list', 'check', 'outdent', 'indent', 'code', 'inline-code', 'insert-after', 'insert-before', 'upload', 'link', 'table', 'record', 'edit-mode', 'both', 'preview', 'fullscreen', 'outline', 'code-theme', 'content-theme', 'export', 'info', 'help', 'br'],
         customWysiwygToolbar: function() {}, // 修复报错
@@ -1668,7 +1668,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 height: editorConfig.height,
                 width: editorConfig.width,
                 placeholder: window.i18n ? window.i18n.t('startEditing') : '开始编辑...支持 Markdown 语法',
-                cdn: window.electron ? './vditor' : (window.location.protocol === 'file:' ? './vditor' : '/vditor'), // 兼容 Electron 和 Web 环境的本地目录
+                cdn: window.electron ? './vditor' : (window.location.protocol === 'file:' ? './vditor' : '/vditor'), // 兼容桌面壳与 Web 环境的本地目录
                 lang: 'en_US', // 彻底禁用中文语言文件，使用默认英语
                 toolbar: ['emoji', 'br', 'bold', 'italic', 'strike', '|', 'line', 'quote', 'list', 'ordered-list', 'check', 'outdent', 'indent', 'code', 'inline-code', 'insert-after', 'insert-before', 'upload', 'link', 'table', 'record', 'edit-mode', 'both', 'preview', 'fullscreen', 'outline', 'code-theme', 'content-theme', 'export', 'info', 'help', 'br'],
                 customWysiwygToolbar: function() {},
@@ -2492,10 +2492,10 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         return {
             android: 'https://static.yhsun.cn/android/app-release.apk',
-            windows: 'https://static.yhsun.cn/electron/win/easypocketmd_windows.exe',
-            macos: 'https://static.yhsun.cn/electron/macos/easypocketmd_mac.dmg',
-            linuxAppImage: 'https://static.yhsun.cn/electron/linux/easypocketmd_linux.appimage',
-            linuxDeb: 'https://static.yhsun.cn/electron/linux/easypocketmd_linux.deb'
+            windows: 'https://static.yhsun.cn/tauri/win/easypocketmd_windows.exe',
+            macos: 'https://static.yhsun.cn/tauri/macos/easypocketmd_macos.dmg',
+            linuxAppImage: 'https://static.yhsun.cn/tauri/linux/easypocketmd_linux.appimage',
+            linuxDeb: 'https://static.yhsun.cn/tauri/linux/easypocketmd_linux.deb'
         };
     }
 
