@@ -2480,6 +2480,102 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     // 关于对话框
+    function isNativeClientRuntime() {
+        var isCapacitor = !!(window.Capacitor && typeof window.Capacitor.isNativePlatform === 'function' && window.Capacitor.isNativePlatform());
+        var isElectron = !!(window.electron || (window.process && window.process.type));
+        return isCapacitor || isElectron;
+    }
+
+    function getClientDownloadLinks() {
+        if (typeof window.getClientDownloadLinks === 'function') {
+            return window.getClientDownloadLinks();
+        }
+        return {
+            android: 'https://static.yhsun.cn/android/app-release.apk',
+            windows: 'https://static.yhsun.cn/electron/win/easypocketmd_windows.exe',
+            macos: 'https://static.yhsun.cn/electron/macos/easypocketmd_mac.dmg',
+            linuxAppImage: 'https://static.yhsun.cn/electron/linux/easypocketmd_linux.appimage',
+            linuxDeb: 'https://static.yhsun.cn/electron/linux/easypocketmd_linux.deb'
+        };
+    }
+
+    function getRecommendedDownloadKey() {
+        var ua = String(navigator.userAgent || '').toLowerCase();
+        if (ua.indexOf('android') !== -1) return 'android';
+        if (ua.indexOf('win') !== -1) return 'windows';
+        if (ua.indexOf('mac') !== -1) return 'macos';
+        if (ua.indexOf('linux') !== -1) {
+            if (/ubuntu|debian|mint|kali|pop|deepin|uos/.test(ua)) return 'linuxDeb';
+            return 'linuxAppImage';
+        }
+        return 'windows';
+    }
+
+    function setAnchorHref(id, href) {
+        var el = document.getElementById(id);
+        if (!el || !href) return;
+        el.setAttribute('href', href);
+    }
+
+    function getAboutDownloadConfig() {
+        return {
+            android: { id: 'aboutDownloadAndroidBtn', textKey: 'downloadAndroidApk' },
+            windows: { id: 'aboutDownloadWindowsBtn', textKey: 'downloadWindowsExe' },
+            macos: { id: 'aboutDownloadMacBtn', textKey: 'downloadMacDmg' },
+            linuxAppImage: { id: 'aboutDownloadLinuxAppImageBtn', textKey: 'downloadLinuxAppImage' },
+            linuxDeb: { id: 'aboutDownloadLinuxDebBtn', textKey: 'downloadLinuxDeb' }
+        };
+    }
+
+    function getAboutDownloadLabelByKey(key) {
+        var config = getAboutDownloadConfig()[key];
+        if (!config) return window.i18n ? window.i18n.t('downloadRecommendedClient') : '下载推荐客户端';
+        if (window.i18n && typeof window.i18n.t === 'function') {
+            return window.i18n.t(config.textKey);
+        }
+        var fallback = {
+            downloadAndroidApk: '下载 Android APK',
+            downloadWindowsExe: '下载 Windows 安装包',
+            downloadMacDmg: '下载 macOS 安装包',
+            downloadLinuxAppImage: '下载 Linux AppImage',
+            downloadLinuxDeb: '下载 Linux .deb'
+        };
+        return fallback[config.textKey] || '下载推荐客户端';
+    }
+
+    function updateAboutRuntimeSection() {
+        var nativeSection = document.getElementById('aboutNativeUpdateSection');
+        var browserSection = document.getElementById('aboutBrowserDownloadSection');
+        var isNative = isNativeClientRuntime();
+
+        if (nativeSection) nativeSection.style.display = isNative ? '' : 'none';
+        if (browserSection) browserSection.style.display = isNative ? 'none' : '';
+
+        var links = getClientDownloadLinks();
+        var downloadConfig = getAboutDownloadConfig();
+        Object.keys(downloadConfig).forEach(function(key) {
+            var cfg = downloadConfig[key];
+            setAnchorHref(cfg.id, links[key]);
+        });
+
+        var preferredKey = getRecommendedDownloadKey();
+        var preferredHref = links[preferredKey] || links.windows;
+        var recommendedBtn = document.getElementById('aboutRecommendedDownloadBtn');
+        if (recommendedBtn) {
+            recommendedBtn.setAttribute('href', preferredHref);
+            var textSpan = recommendedBtn.querySelector('span');
+            if (textSpan) {
+                textSpan.textContent = getAboutDownloadLabelByKey(preferredKey);
+            }
+        }
+
+        Object.keys(downloadConfig).forEach(function(key) {
+            var btn = document.getElementById(downloadConfig[key].id);
+            if (!btn) return;
+            btn.style.display = key === preferredKey ? 'none' : '';
+        });
+    }
+
     function updateAboutVersionDisplay() {
         var versionLabel = document.getElementById('currentVersionValue');
         if (!versionLabel) return;
@@ -2527,6 +2623,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     window.showAboutDialog = function() {
         var modal = document.getElementById('aboutModalOverlay');
+        updateAboutRuntimeSection();
         updateAboutVersionDisplay();
         if (modal) modal.classList.add('show');
     };
