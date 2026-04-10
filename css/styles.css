@@ -89,7 +89,7 @@ body.is-capacitor [contenteditable="true"] {
 
 .editor-container {
     position: absolute;
-    top: 50px;
+    top: calc(var(--top-toolbar-offset) + var(--top-toolbar-height));
     bottom: 50px;
     left: 0;
     right: 0;
@@ -100,7 +100,7 @@ body.is-capacitor [contenteditable="true"] {
 }
 
 body.has-top-notice .editor-container {
-    top: calc(50px + 40px);
+    top: calc(var(--top-toolbar-offset) + var(--top-toolbar-height));
 }
 
 body.has-top-notice {
@@ -241,10 +241,15 @@ body.has-top-notice .custom-fullscreen-btn {
     width: 100%;
     height: 100%;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
     padding: 0 6px;
     overflow-x: auto;
+    overflow-y: hidden;
     white-space: nowrap;
+}
+
+.desktop-toolbar > * {
+    flex-shrink: 0;
 }
 
 .desktop-toolbar::-webkit-scrollbar {
@@ -832,14 +837,14 @@ body.keyboard-open .editor-container {
 
 .file-list-sidebar {
     position: fixed;
-    top: 70px;
+    top: calc(var(--top-toolbar-offset) + var(--top-toolbar-height));
     left: 20px;
     background: white;
     border-radius: 8px;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
     z-index: 1000;
     width: 300px;
-    max-height: calc(100vh - 140px);
+    max-height: calc(100vh - var(--top-toolbar-offset) - var(--top-toolbar-height) - 20px);
     overflow: hidden;
     padding: 0;
     display: none;
@@ -1790,10 +1795,56 @@ body.ui-mode-desktop .desktop-toolbar {
     display: flex;
 }
 
+body.ui-mode-desktop {
+    --top-toolbar-height: 36px;
+    --top-toolbar-padding-x: 8px;
+}
+
 body.ui-mode-desktop .mobile-toolbar-container,
-body.ui-mode-desktop .mobile-toolbar,
-body.ui-mode-desktop .desktop-toolbar {
+body.ui-mode-desktop .mobile-toolbar {
     overflow: visible;
+}
+
+body.ui-mode-desktop .mobile-toolbar-container {
+    padding: 1px var(--top-toolbar-padding-x);
+    background: #f4f6fb;
+    border-bottom: 1px solid #d7deea;
+    box-shadow: none;
+}
+
+body.ui-mode-desktop .desktop-toolbar {
+    gap: 2px;
+    padding: 0 1px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    font-family: "JetBrains Mono", "Cascadia Code", "SFMono-Regular", Menlo, Consolas, monospace;
+}
+
+body.ui-mode-desktop .desktop-toolbar-btn {
+    height: 24px;
+    padding: 0 7px;
+    font-size: 12px;
+    border-radius: 3px;
+    color: #273142;
+    border: 1px solid transparent;
+    background: transparent;
+    letter-spacing: 0.1px;
+}
+
+body.ui-mode-desktop .desktop-toolbar-btn:hover {
+    background: #e8edf5;
+    border-color: #d1d9e7;
+}
+
+body.ui-mode-desktop .desktop-toolbar-btn:active {
+    background: #dde4f1;
+    border-color: #c3cde0;
+}
+
+body.ui-mode-desktop #desktopToolbar > .desktop-dropdown {
+    margin-left: 5px;
+    padding-left: 7px;
+    border-left: 1px solid #d4dbe7;
 }
 
 body.ui-mode-desktop .toolbar-left-actions,
@@ -1808,6 +1859,15 @@ body.ui-mode-desktop .mobile-bottom-bar {
 
 body.ui-mode-desktop .editor-container {
     bottom: 0;
+}
+
+body.ui-mode-desktop #loginModalOverlay {
+    align-items: flex-start;
+    padding-top: calc(var(--top-toolbar-offset) + var(--top-toolbar-height) + 8px);
+}
+
+body.ui-mode-desktop #loginModalOverlay .modal.login-modal {
+    margin: 0 auto;
 }
 
 body.ui-mode-mobile .desktop-toolbar {
@@ -1954,7 +2014,7 @@ body.night-mode .long-file-preview {
 .user-menu-dropdown {
     display: none;
     position: absolute;
-    top: 60px;
+    top: calc(var(--top-toolbar-offset) + var(--top-toolbar-height));
     left: 20px;
     background: white;
     border-radius: 12px;
@@ -3185,6 +3245,32 @@ body.night-mode .desktop-toolbar-btn {
 body.night-mode .desktop-toolbar-btn:hover {
     background: #3a3f4e;
     border-color: #4d5568;
+}
+
+body.night-mode.ui-mode-desktop .mobile-toolbar-container {
+    background: #202531;
+    border-bottom-color: #373f52;
+    box-shadow: none;
+}
+
+body.night-mode.ui-mode-desktop .desktop-toolbar-btn {
+    color: #d4dbeb;
+    border-color: transparent;
+    background: transparent;
+}
+
+body.night-mode.ui-mode-desktop .desktop-toolbar-btn:hover {
+    background: #2d3443;
+    border-color: #465069;
+}
+
+body.night-mode.ui-mode-desktop .desktop-toolbar-btn:active {
+    background: #262d3b;
+    border-color: #3f4960;
+}
+
+body.night-mode.ui-mode-desktop #desktopToolbar > .desktop-dropdown {
+    border-left-color: #3b4355;
 }
 
 body.night-mode .desktop-edit-group {

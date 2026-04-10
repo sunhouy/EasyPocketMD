@@ -107,11 +107,20 @@ jobs:
           VERSION=$(node -e "
             let tagName = process.argv[1];
             let version = tagName.replace(/^v/, '');
-            const parts = version.split('.');
+            if (!/^\\d+(?:\\.\\d+){0,2}$/.test(version)) {
+              version = require('./package.json').version || '0.0.0';
+            }
+            const parts = version.split('.').filter(Boolean);
             if (parts.length === 1) {
               version = parts[0] + '.0.0';
             } else if (parts.length === 2) {
               version = parts[0] + '.' + parts[1] + '.0';
+            } else if (parts.length >= 3) {
+              version = parts[0] + '.' + parts[1] + '.' + parts[2];
+            }
+            if (!/^\\d+\\.\\d+\\.\\d+$/.test(version)) {
+              console.error('Invalid version resolved:', version);
+              process.exit(1);
             }
             console.log(version);
           " "$TAG_NAME")
