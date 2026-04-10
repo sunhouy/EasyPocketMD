@@ -4685,8 +4685,81 @@ body.night-mode #aiPPTOutlineSection label[style*="color:#555"] {
     border-top: 1px solid #e6edf7;
 }
 
+.about-contact-note {
+    margin: 0 0 10px;
+    font-size: 13px;
+    line-height: 1.6;
+    color: #4f5f78;
+}
+
+.about-contact-note a {
+    color: #1f66c1;
+    text-decoration: none;
+}
+
+.about-contact-note a:hover {
+    text-decoration: underline;
+}
+
+.about-download-card {
+    margin: 0 auto 14px;
+    width: min(420px, 100%);
+    border-radius: 12px;
+    border: 1px solid #d7e4f6;
+    background: linear-gradient(140deg, #f6fbff 0%, #edf5ff 100%);
+    padding: 12px;
+}
+
+.about-download-title {
+    margin: 0;
+    color: #233750;
+    font-size: 15px;
+    font-weight: 700;
+}
+
+.about-download-hint {
+    margin: 8px 0 10px;
+    font-size: 13px;
+    color: #4e627f;
+    line-height: 1.55;
+}
+
+.about-platform-chips {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+}
+
+.about-platform-chip {
+    border-radius: 999px;
+    border: 1px solid #c9d9ef;
+    background: #ffffff;
+    color: #2d4668;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 4px 10px;
+}
+
+.about-download-primary-btn {
+    text-decoration: none;
+    margin-bottom: 10px;
+}
+
+.about-download-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+
 @media (max-width: 540px) {
     .about-action-buttons {
+        grid-template-columns: 1fr;
+    }
+
+    .about-download-grid {
         grid-template-columns: 1fr;
     }
 }
@@ -4832,6 +4905,33 @@ body.night-mode .about-link-btn:hover {
 
 body.night-mode .about-divider {
     border-top-color: #3a4558;
+}
+
+body.night-mode .about-contact-note {
+    color: #c0cde2;
+}
+
+body.night-mode .about-contact-note a {
+    color: #86baff;
+}
+
+body.night-mode .about-download-card {
+    border-color: #3e4f6a;
+    background: linear-gradient(140deg, #2a3547 0%, #243043 100%);
+}
+
+body.night-mode .about-download-title {
+    color: #e0e8f8;
+}
+
+body.night-mode .about-download-hint {
+    color: #bdcbe3;
+}
+
+body.night-mode .about-platform-chip {
+    border-color: #4b5f7e;
+    background: #2e3a4d;
+    color: #d8e2f2;
 }
 
 /* Slash 命令面板 */

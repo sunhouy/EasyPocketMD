@@ -5,6 +5,13 @@
     var VERSION_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
     var LAST_CHECK_AT_KEY = 'vditor_native_version_check_at';
     var LAST_DISMISSED_VERSION_KEY = 'vditor_native_version_dismissed';
+    var CLIENT_DOWNLOAD_LINKS = {
+        android: 'https://static.yhsun.cn/android/app-release.apk',
+        windows: 'https://static.yhsun.cn/electron/win/easypocketmd_windows.exe',
+        macos: 'https://static.yhsun.cn/electron/macos/easypocketmd_mac.dmg',
+        linuxAppImage: 'https://static.yhsun.cn/electron/linux/easypocketmd_linux.appimage',
+        linuxDeb: 'https://static.yhsun.cn/electron/linux/easypocketmd_linux.deb'
+    };
 
     function isCapacitorNative() {
         return !!(global.Capacitor && typeof global.Capacitor.isNativePlatform === 'function' && global.Capacitor.isNativePlatform());
@@ -64,21 +71,37 @@
 
     function getPreferredDownloadUrl() {
         if (isCapacitorNative()) {
-            return 'https://static.yhsun.cn/android/app-release.apk';
+            return CLIENT_DOWNLOAD_LINKS.android;
         }
 
         if (isElectronRuntime()) {
             var ua = (navigator.userAgent || '').toLowerCase();
             if (ua.indexOf('win') !== -1) {
-                return 'https://static.yhsun.cn/electron/win/easypocketmd_windows.exe';
+                return CLIENT_DOWNLOAD_LINKS.windows;
             }
             if (ua.indexOf('mac') !== -1) {
-                return 'https://static.yhsun.cn/electron/macos/easypocketmd_macos.dmg';
+                return CLIENT_DOWNLOAD_LINKS.macos;
             }
-            return 'https://static.yhsun.cn/electron/linux/easypocketmd_linux.appimage';
+            if (ua.indexOf('linux') !== -1) {
+                if (/ubuntu|debian|mint|kali|pop|deepin|uos/.test(ua)) {
+                    return CLIENT_DOWNLOAD_LINKS.linuxDeb;
+                }
+                return CLIENT_DOWNLOAD_LINKS.linuxAppImage;
+            }
+            return CLIENT_DOWNLOAD_LINKS.windows;
         }
 
         return 'https://md.yhsun.cn/intro.html';
+    }
+
+    function getClientDownloadLinks() {
+        return {
+            android: CLIENT_DOWNLOAD_LINKS.android,
+            windows: CLIENT_DOWNLOAD_LINKS.windows,
+            macos: CLIENT_DOWNLOAD_LINKS.macos,
+            linuxAppImage: CLIENT_DOWNLOAD_LINKS.linuxAppImage,
+            linuxDeb: CLIENT_DOWNLOAD_LINKS.linuxDeb
+        };
     }
 
     function getLanguage() {
@@ -282,4 +305,5 @@
 
     global.getCurrentAppVersion = getCurrentVersion;
     global.checkNativeAppVersionUpdate = checkNativeAppVersionUpdate;
+    global.getClientDownloadLinks = getClientDownloadLinks;
 })(typeof window !== 'undefined' ? window : this);
