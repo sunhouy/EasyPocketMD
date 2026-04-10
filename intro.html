@@ -706,7 +706,7 @@
 </div>
 
 <!-- 模态框 -->
-<div id="downloadModal" class="modal-overlay"><div class="modal-container"><div class="modal-header"><h3>📥 全平台下载</h3><button class="close-modal" id="closeModalBtn">&times;</button></div><table class="downloads-full-table"><thead><tr><th>平台</th><th>推荐版本</th><th>下载链接</th></tr></thead><tbody><tr><td>Android</td><td>APK</td><td><a href="https://static.yhsun.cn/android/app-release.apk" target="_blank" rel="noreferrer">app-release.apk</a></td></tr><tr><td>Windows</td><td>.exe</td><td><a href="https://static.yhsun.cn/electron/win/easypocketmd_windows.exe" target="_blank" rel="noreferrer">easypocketmd_windows.exe</a></td></tr><tr><td>macOS</td><td>.dmg</td><td><a href="https://static.yhsun.cn/electron/macos/easypocketmd_mac.dmg" target="_blank" rel="noreferrer">easypocketmd_mac.dmg</a></td></tr><tr><td>Linux</td><td>AppImage / deb</td><td><a href="https://static.yhsun.cn/electron/linux/easypocketmd_linux.appimage" target="_blank" rel="noreferrer">.AppImage</a> &nbsp;|&nbsp; <a href="https://static.yhsun.cn/electron/linux/easypocketmd_linux.deb" target="_blank" rel="noreferrer">.deb</a></td></tr><tr><td>Web在线</td><td>浏览器</td><td><a href="https://md.yhsun.cn/" target="_blank" rel="noreferrer">md.yhsun.cn</a></td></tr></tbody></table><div style="margin-top: 20px; text-align: right;"><button class="btn btn-secondary" id="modalCloseFooter">关闭</button></div></div></div>
+<div id="downloadModal" class="modal-overlay"><div class="modal-container"><div class="modal-header"><h3>📥 全平台下载</h3><button class="close-modal" id="closeModalBtn">&times;</button></div><table class="downloads-full-table"><thead><tr><th>平台</th><th>推荐版本</th><th>下载链接</th></tr></thead><tbody><tr><td>Android</td><td>APK</td><td><a href="https://static.yhsun.cn/android/app-release.apk" target="_blank" rel="noreferrer">app-release.apk</a></td></tr><tr><td>Windows</td><td>.exe</td><td><a href="https://static.yhsun.cn/tauri/win/easypocketmd_windows.exe" target="_blank" rel="noreferrer">easypocketmd_windows.exe</a></td></tr><tr><td>macOS</td><td>.dmg</td><td><a href="https://static.yhsun.cn/tauri/macos/easypocketmd_macos.dmg" target="_blank" rel="noreferrer">easypocketmd_macos.dmg</a></td></tr><tr><td>Linux</td><td>AppImage / deb</td><td><a href="https://static.yhsun.cn/tauri/linux/easypocketmd_linux.appimage" target="_blank" rel="noreferrer">.AppImage</a> &nbsp;|&nbsp; <a href="https://static.yhsun.cn/tauri/linux/easypocketmd_linux.deb" target="_blank" rel="noreferrer">.deb</a></td></tr><tr><td>Web在线</td><td>浏览器</td><td><a href="https://md.yhsun.cn/" target="_blank" rel="noreferrer">md.yhsun.cn</a></td></tr></tbody></table><div style="margin-top: 20px; text-align: right;"><button class="btn btn-secondary" id="modalCloseFooter">关闭</button></div></div></div>
 
 <script>
   (function() {
@@ -735,21 +735,21 @@
       windows: {
         title: '🪟 Windows 客户端',
         desc: '适用于 Windows，推荐 .exe 安装包',
-        url: 'https://static.yhsun.cn/electron/win/easypocketmd_windows.exe',
+        url: 'https://static.yhsun.cn/tauri/win/easypocketmd_windows.exe',
         text: '下载 Windows .exe',
         note: '当前系统推荐 Windows 安装包'
       },
       macos: {
         title: '🍎 macOS 客户端',
         desc: '适用于 macOS，推荐 .dmg 安装包',
-        url: 'https://static.yhsun.cn/electron/macos/easypocketmd_mac.dmg',
+        url: 'https://static.yhsun.cn/tauri/macos/easypocketmd_macos.dmg',
         text: '下载 macOS .dmg',
         note: '当前系统推荐 macOS 安装包'
       },
       linux: {
         title: '🐧 Linux 客户端',
         desc: '适用于 Linux，推荐 AppImage 便携版本',
-        url: 'https://static.yhsun.cn/electron/linux/easypocketmd_linux.appimage',
+        url: 'https://static.yhsun.cn/tauri/linux/easypocketmd_linux.appimage',
         text: '下载 Linux AppImage',
         note: '当前系统推荐 Linux 安装包'
       },
@@ -763,7 +763,7 @@
       desktop_other: {
         title: '💻 桌面客户端',
         desc: '根据系统选择对应安装包，支持多平台',
-        url: 'https://static.yhsun.cn/electron/win/easypocketmd_windows.exe',
+        url: 'https://static.yhsun.cn/tauri/win/easypocketmd_windows.exe',
         text: '下载桌面安装包',
         note: '根据系统选择对应安装包'
       }

@@ -1,10 +1,10 @@
     (function() {
-        // 在 Electron 环境下 (window.electron 已定义)、Capacitor 环境或本地文件协议 (file://) 下不注册 Service Worker
-        const isElectron = !!(window.electron || (window.process && window.process.type));
+        // 在桌面壳环境（Tauri/Electron 兼容桥）、Capacitor 或 file:// 下不注册 Service Worker
+        const isDesktopRuntime = !!(window.electron || window.__TAURI__ || (window.process && window.process.type));
         const isCapacitor = !!window.Capacitor;
         const isLocalFile = window.location.protocol === 'file:';
         
-        if ('serviceWorker' in navigator && !isElectron && !isCapacitor && !isLocalFile) {
+        if ('serviceWorker' in navigator && !isDesktopRuntime && !isCapacitor && !isLocalFile) {
             window.addEventListener('load', async function() {
                 try {
                     const registrations = await navigator.serviceWorker.getRegistrations();

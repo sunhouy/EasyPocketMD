@@ -10,6 +10,7 @@ dist/
 dist-electron/
 dist-electron-new/
 build/
+src-tauri/target/
 uploads/
 temp_uploads/
 user_files/

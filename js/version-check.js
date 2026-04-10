@@ -7,22 +7,22 @@
     var LAST_DISMISSED_VERSION_KEY = 'vditor_native_version_dismissed';
     var CLIENT_DOWNLOAD_LINKS = {
         android: 'https://static.yhsun.cn/android/app-release.apk',
-        windows: 'https://static.yhsun.cn/electron/win/easypocketmd_windows.exe',
-        macos: 'https://static.yhsun.cn/electron/macos/easypocketmd_mac.dmg',
-        linuxAppImage: 'https://static.yhsun.cn/electron/linux/easypocketmd_linux.appimage',
-        linuxDeb: 'https://static.yhsun.cn/electron/linux/easypocketmd_linux.deb'
+        windows: 'https://static.yhsun.cn/tauri/win/easypocketmd_windows.exe',
+        macos: 'https://static.yhsun.cn/tauri/macos/easypocketmd_macos.dmg',
+        linuxAppImage: 'https://static.yhsun.cn/tauri/linux/easypocketmd_linux.appimage',
+        linuxDeb: 'https://static.yhsun.cn/tauri/linux/easypocketmd_linux.deb'
     };
 
     function isCapacitorNative() {
         return !!(global.Capacitor && typeof global.Capacitor.isNativePlatform === 'function' && global.Capacitor.isNativePlatform());
     }
 
-    function isElectronRuntime() {
-        return !!(global.electron || (global.process && global.process.type));
+    function isDesktopRuntime() {
+        return !!(global.electron || global.__TAURI__ || (global.process && global.process.type));
     }
 
     function isNativeRuntime() {
-        return isCapacitorNative() || isElectronRuntime();
+        return isCapacitorNative() || isDesktopRuntime();
     }
 
     function normalizeVersion(raw) {
@@ -74,7 +74,7 @@
             return CLIENT_DOWNLOAD_LINKS.android;
         }
 
-        if (isElectronRuntime()) {
+        if (isDesktopRuntime()) {
             var ua = (navigator.userAgent || '').toLowerCase();
             if (ua.indexOf('win') !== -1) {
                 return CLIENT_DOWNLOAD_LINKS.windows;
