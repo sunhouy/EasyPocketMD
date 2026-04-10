@@ -1025,19 +1025,21 @@
                     mergeFiles(localFiles, serverFiles);
                     loadFiles();
 
-                    // 如果有指定要保留的文件，尝试打开它
-                    if (preserveFileName) {
-                        const preservedFile = g('files').find(f => f.name === preserveFileName && f.type === 'file');
-                        if (preservedFile) {
-                            openFile(preservedFile.id);
-                        } else if (g('files').length > 0) {
-                            openFirstFile();
+                    if (shouldAutoOpenInitialFile()) {
+                        // 如果有指定要保留的文件，尝试打开它
+                        if (preserveFileName) {
+                            const preservedFile = g('files').find(f => f.name === preserveFileName && f.type === 'file');
+                            if (preservedFile) {
+                                openFile(preservedFile.id);
+                            } else if (g('files').length > 0) {
+                                openFirstFile();
+                            } else {
+                                createDefaultFile();
+                            }
                         } else {
-                            createDefaultFile();
+                            if (g('files').length > 0) openFirstFile();
+                            else createDefaultFile();
                         }
-                    } else {
-                        if (g('files').length > 0) openFirstFile();
-                        else createDefaultFile();
                     }
 
                     // 自动同步待同步列表中的文件（用户强制退出时未同步的文件）
@@ -1888,18 +1890,20 @@
 
         loadFiles();
 
-        // 如果有指定要保留的文件，尝试打开它
-        if (preserveFileName) {
-            const preservedFile = g('files').find(f => f.name === preserveFileName && f.type === 'file');
-            if (preservedFile) {
-                openFile(preservedFile.id);
-            } else if (g('files').length > 0) {
-                openFirstFile();
+        if (shouldAutoOpenInitialFile()) {
+            // 如果有指定要保留的文件，尝试打开它
+            if (preserveFileName) {
+                const preservedFile = g('files').find(f => f.name === preserveFileName && f.type === 'file');
+                if (preservedFile) {
+                    openFile(preservedFile.id);
+                } else if (g('files').length > 0) {
+                    openFirstFile();
+                } else {
+                    createDefaultFile();
+                }
             } else {
-                createDefaultFile();
+                if (g('files').length > 0) openFirstFile();
             }
-        } else {
-            if (g('files').length > 0) openFirstFile();
         }
         global.showMessage(isEn() ? 'Conflict resolved, files synced' : '冲突已解决，文件已同步');
     }
@@ -1937,23 +1941,156 @@
         });
     }
 
+    let hasNotifiedInitialFileListRendered = false;
+
+    function shouldAutoOpenInitialFile() {
+        return !global.deferInitialFileOpen;
+    }
+
+    function notifyInitialFileListRendered() {
+        if (hasNotifiedInitialFileListRendered) return;
+        hasNotifiedInitialFileListRendered = true;
+
+        if (global.startInFileManagementMode) {
+            const loadingEl = document.getElementById('loading');
+            if (loadingEl) loadingEl.style.display = 'none';
+        }
+
+        if (typeof global.onInitialFileListRendered === 'function') {
+            global.onInitialFileListRendered();
+        }
+    }
+
+    function bindFileManagementFabIfNeeded() {
+        const fab = document.getElementById('fileManagementFab');
+        if (!fab || fab.dataset.bound === '1') return;
+
+        fab.dataset.bound = '1';
+        fab.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            if (typeof global.showMobileActionSheet === 'function') {
+                global.showMobileActionSheet(
+                    isEn() ? 'Create' : '新建',
+                    [
+                        {
+                            icon: '<i class="fas fa-file"></i>',
+                            text: isEn() ? 'New File' : '新建文件',
+                            action: function() { global.createNewFile(); }
+                        },
+                        {
+                            icon: '<i class="fas fa-folder-plus"></i>',
+                            text: isEn() ? 'New Folder' : '新建文件夹',
+                            action: function() { global.createNewFolder(); }
+                        }
+                    ]
+                );
+                return;
+            }
+
+            global.createNewFile();
+        });
+    }
+
+    function getFileListPreview(content) {
+        const text = String(content || '')
+            .replace(/```[\s\S]*?```/g, ' ')
+            .replace(/`[^`]*`/g, ' ')
+            .replace(/!\[[^\]]*\]\([^)]*\)/g, ' ')
+            .replace(/\[[^\]]*\]\([^)]*\)/g, ' ')
+            .replace(/[>#*_~|\-]/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+
+        if (!text) return isEn() ? 'No content' : '暂无内容';
+        return text.length > 26 ? (text.slice(0, 26) + '...') : text;
+    }
+
+    function formatFileListModifiedTime(ts) {
+        const value = Number(ts || Date.now());
+        if (!Number.isFinite(value)) return '';
+        try {
+            return new Date(value).toLocaleString();
+        } catch (error) {
+            return '';
+        }
+    }
+
+    function renderFileNodeInlineMeta(anchorEl, nodeId) {
+        if (!anchorEl || !nodeId || !window.$) return;
+
+        const $anchor = window.$(anchorEl);
+        const tree = window.$('#fileList').jstree(true);
+        if (!tree) return;
+
+        const node = tree.get_node(nodeId);
+        if (!node || !node.data || node.data.type !== 'file') {
+            return;
+        }
+
+        const file = (g('files') || []).find(function(item) {
+            return String(item.id) === String(nodeId) && item.type === 'file';
+        });
+        if (!file) return;
+
+        let $meta = $anchor.find('.file-list-inline-meta');
+        if (!$meta.length) {
+            $meta = window.$(
+                '<span class="file-list-inline-meta">' +
+                    '<span class="file-list-inline-preview"></span>' +
+                    '<span class="file-list-inline-time"></span>' +
+                '</span>'
+            );
+            $anchor.append($meta);
+        }
+
+        $meta.find('.file-list-inline-preview').text(getFileListPreview(file.content));
+        $meta.find('.file-list-inline-time').text(formatFileListModifiedTime(file.lastModified));
+    }
+
+    function resolveNodeIdFromAnchorId(anchorId) {
+        const raw = String(anchorId || '').trim();
+        if (!raw) return '';
+
+        if (raw.startsWith('jstree_anchor_')) {
+            return raw.slice('jstree_anchor_'.length);
+        }
+
+        if (raw.endsWith('_anchor')) {
+            return raw.slice(0, -('_anchor'.length));
+        }
+
+        return raw;
+    }
+
     function loadLocalFiles() {
         const localFiles = JSON.parse(localStorage.getItem('vditor_files') || '[]');
         localFiles.forEach(f => {
             if (!f.type) f.type = 'file';
             normalizeExternalLocalFileRecord(f);
         });
-        if (localFiles.length === 0) createDefaultFile();
-        else {
+        if (localFiles.length === 0) {
+            global.files = [];
+            if (shouldAutoOpenInitialFile()) {
+                createDefaultFile();
+            } else {
+                loadFiles();
+            }
+        } else {
             global.files = localFiles;
             loadFiles();
-            if (g('files').length > 0) openFirstFile();
+            if (g('files').length > 0 && shouldAutoOpenInitialFile()) openFirstFile();
         }
     }
 
     // 打开第一个文件（忽略文件夹和系统文件）
     function openFirstFile() {
         const defaultOpening = g('userSettings') && g('userSettings').defaultFileOpening || 'lastEdited';
+
+        if (defaultOpening === 'fileList') {
+            return;
+        }
         
         if (defaultOpening === 'firstFile') {
             // 直接打开第一个非系统文件
@@ -2205,10 +2342,7 @@
                 if (sizeA !== sizeB) return sizeB - sizeA; // 大的在前
             }
             // alphabetical 或其他情况：按名称排序
-            
-            // 文件夹排前面
-            if (a.data.type === 'folder' && b.data.type === 'file') return -1;
-            if (a.data.type === 'file' && b.data.type === 'folder') return 1;
+
             return a.text.localeCompare(b.text);
         });
         
@@ -2434,8 +2568,11 @@
              renameFileInternal(data.node.id, data.text);
         })
         .on('loaded.jstree refresh.jstree open_node.jstree', function() {
-            window.$('.jstree-anchor').each(function() {
-                const nodeId = window.$(this).attr('id').replace('jstree_anchor_', '');
+            window.$('#fileList .jstree-anchor').each(function() {
+                const anchorId = window.$(this).attr('id');
+                const nodeId = resolveNodeIdFromAnchorId(anchorId);
+                renderFileNodeInlineMeta(this, nodeId);
+
                 if (!window.$(this).find('.file-menu-btn').length) {
                     const menuBtn = window.$('<i class="fas fa-ellipsis-v file-menu-btn"></i>');
                     menuBtn.click(function(e) {
@@ -2688,6 +2825,8 @@
         const wasVisible = fileListSidebar && fileListSidebar.classList.contains('show');
         loadOrders();
         initFileTree();
+        bindFileManagementFabIfNeeded();
+        notifyInitialFileListRendered();
         if (wasVisible && fileListSidebar) {
             fileListSidebar.classList.add('show');
         }
@@ -3563,6 +3702,14 @@
         }
         
         const useLongFileMode = shouldUseLongFileMode(content);
+        if (typeof global.enterEditorMode === 'function') {
+            global.enterEditorMode();
+        }
+
+        if (!useLongFileMode && typeof global.ensureVditorInitialized === 'function') {
+            await global.ensureVditorInitialized();
+        }
+
         if (useLongFileMode) {
             const wasAlreadyLongForSameFile = isLongFileEditorActiveFor(fileId);
             activateLongFileEditor(fileId, content);

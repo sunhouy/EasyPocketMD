@@ -225,6 +225,97 @@ Provide 5-10 most relevant formulas. Only return the formula list, no explanatio
     }
 });
 
+// AI Emoji Search endpoint
+router.post('/emoji', async (req, res) => {
+    try {
+        const { keyword, language } = req.body;
+
+        if (!keyword) {
+            return res.status(400).json({
+                code: 400,
+                message: 'Keyword is required'
+            });
+        }
+
+        const apiKey = process.env.DASHSCOPE_API_KEY;
+        if (!apiKey) {
+            return res.status(500).json({
+                code: 500,
+                message: 'AI API Key is not configured on server'
+            });
+        }
+
+        const isEnglish = language === 'en';
+        const systemPrompt = isEnglish
+            ? `You are an emoji search assistant.
+Given a keyword, return 8-12 relevant emojis with short English and Chinese names.
+Return plain text only, one item per line, in this format:
+emoji | english_name | chinese_name
+
+Example:
+😀 | grinning face | 咧嘴笑
+🙏 | folded hands | 祈祷
+
+No extra explanations, no markdown.`
+            : `你是表情搜索助手。
+根据关键词返回 8-12 个相关表情，并附简短英文名和中文名。
+只返回纯文本，每行一个，格式如下：
+emoji | english_name | chinese_name
+
+例如：
+😀 | grinning face | 咧嘴笑
+🙏 | folded hands | 祈祷
+
+不要额外解释，不要 markdown。`;
+
+        const userPrompt = isEnglish
+            ? `Find emojis related to: "${keyword}"`
+            : `搜索与"${keyword}"相关的表情`;
+
+        const requestBody = JSON.stringify({
+            model: 'qwen-turbo',
+            input: {
+                messages: [
+                    {
+                        role: 'system',
+                        content: systemPrompt
+                    },
+                    {
+                        role: 'user',
+                        content: userPrompt
+                    }
+                ]
+            },
+            parameters: {
+                result_format: 'message'
+            }
+        });
+
+        const response = await makeAiRequest(requestBody);
+
+        if (response.output && response.output.choices && response.output.choices.length > 0) {
+            const aiContent = response.output.choices[0].message.content;
+            return res.json({
+                code: 200,
+                data: aiContent
+            });
+        }
+
+        console.error('DashScope API unexpected response:', response);
+        return res.status(500).json({
+            code: 500,
+            message: 'AI processing failed',
+            error: response.message || 'Unknown error'
+        });
+    } catch (error) {
+        console.error('AI Emoji Search error:', error);
+        return res.status(500).json({
+            code: 500,
+            message: error.message || 'Internal server error'
+        });
+    }
+});
+
 // AI Chart Search endpoint
 router.post('/chart', async (req, res) => {
     try {

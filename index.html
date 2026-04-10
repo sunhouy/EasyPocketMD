@@ -236,6 +236,10 @@
     </div>
 </div>
 
+<button class="file-management-fab" id="fileManagementFab" type="button" aria-label="create">
+    <i class="fas fa-plus"></i>
+</button>
+
 <!-- 登录注册模态窗口 -->
 <div class="modal-overlay" id="loginModalOverlay">
     <div class="modal login-modal">
@@ -506,6 +510,7 @@
                 <div class="radio-group" id="defaultFileOpeningSetting">
                     <label><input type="radio" name="defaultFileOpening" value="lastEdited"> <span data-i18n="lastEditedFile">上次编辑的文件</span></label>
                     <label><input type="radio" name="defaultFileOpening" value="firstFile"> <span data-i18n="firstFile">第一个文件</span></label>
+                    <label><input type="radio" name="defaultFileOpening" value="fileList"> <span data-i18n="fileListFirst">先打开文件列表</span></label>
                 </div>
             </div>
             <div class="form-group">
@@ -583,20 +588,41 @@
 
 <!-- 关于模态窗口 -->
 <div class="modal-overlay" id="aboutModalOverlay">
-    <div class="modal" style="position:relative;max-height:85vh;overflow:hidden;display:flex;flex-direction:column;">
+    <div class="modal about-modal" style="position:relative;max-height:85vh;overflow:hidden;display:flex;flex-direction:column;">
         <button class="modal-close-btn" id="closeAboutBtn" style="position:absolute;top:15px;right:15px;background:none;border:none;font-size:20px;cursor:pointer;z-index:10;">
             <i class="fas fa-times"></i>
         </button>
         <div class="modal-header" style="flex-shrink:0;">
             <h2 data-i18n="about">关于</h2>
         </div>
-        <div class="modal-content" style="text-align: center;flex:1;overflow-y:auto;">
-            <p><strong data-i18n="pageTitle">EasyPocketMD</strong></p>
-            <p data-i18n="author">作者：孙厚运</p>
-            <p data-i18n="description">一款几乎零学习成本的 Markdown 编辑器：无需记忆语法，也能轻松插入格式化文本、LaTeX 公式和图表。配合智能搜索与 AI 助手，常用功能都能几步完成。实时协作、AI 辅助写作与流畅编辑体验，全部整合在美观的界面中。</p>
-            <p><a href="https://yhsun.cn/" target="_blank">功能介绍</a></p>
-            <p><a href="https://github.com/sunhouy/markdown">GitHub地址</a></p>
-            <hr>
+        <div class="modal-content about-modal-content" style="text-align: center;flex:1;overflow-y:auto;">
+            <p class="about-brand"><strong data-i18n="pageTitle">EasyPocketMD</strong></p>
+            <p class="about-author" data-i18n="author">作者：孙厚运</p>
+            <p class="about-description" data-i18n="description">一款几乎零学习成本的 Markdown 编辑器：无需记忆语法，也能轻松插入格式化文本、LaTeX 公式和图表。配合智能搜索与 AI 助手，常用功能都能几步完成。实时协作、AI 辅助写作与流畅编辑体验，全部整合在美观的界面中。</p>
+
+            <div class="about-version-card">
+                <div class="about-version-row">
+                    <span class="about-version-label" data-i18n="currentVersion">当前版本</span>
+                    <span class="about-version-value" id="currentVersionValue">-</span>
+                </div>
+                <button class="about-update-btn" id="checkUpdateBtn" type="button">
+                    <i class="fas fa-sync-alt"></i>
+                    <span data-i18n="checkUpdate">检测更新</span>
+                </button>
+            </div>
+
+            <div class="about-action-buttons">
+                <a class="about-link-btn" href="https://yhsun.cn/" target="_blank" rel="noopener noreferrer">
+                    <i class="fas fa-circle-info"></i>
+                    <span data-i18n="featureIntro">功能介绍</span>
+                </a>
+                <a class="about-link-btn" href="https://github.com/sunhouy/markdown" target="_blank" rel="noopener noreferrer">
+                    <i class="fab fa-github"></i>
+                    <span data-i18n="github">GitHub地址</span>
+                </a>
+            </div>
+
+            <hr class="about-divider">
             <p><a href="https://beian.miit.gov.cn/" target="_blank" data-i18n="icp">京ICP备2025154249号</a></p>
         </div>
     </div>
