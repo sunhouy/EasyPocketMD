@@ -96,12 +96,30 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            libwebkit2gtk-4.0-dev \
-            libjavascriptcoregtk-4.0-dev \
+            libwebkit2gtk-4.1-dev \
+            libjavascriptcoregtk-4.1-dev \
             libsoup2.4-dev \
             libappindicator3-dev \
             librsvg2-dev \
             patchelf
+
+      - name: Linux compatibility aliases for tauri v1
+        if: runner.os == 'Linux'
+        run: |
+          set -e
+          mkdir -p "$HOME/.pkgconfig"
+
+          cp /usr/lib/x86_64-linux-gnu/pkgconfig/javascriptcoregtk-4.1.pc "$HOME/.pkgconfig/javascriptcoregtk-4.0.pc"
+          cp /usr/lib/x86_64-linux-gnu/pkgconfig/webkit2gtk-4.1.pc "$HOME/.pkgconfig/webkit2gtk-4.0.pc"
+
+          sed -i 's/javascriptcoregtk-4\.1/javascriptcoregtk-4.0/g' "$HOME/.pkgconfig/javascriptcoregtk-4.0.pc"
+          sed -i 's/webkit2gtk-4\.1/webkit2gtk-4.0/g' "$HOME/.pkgconfig/webkit2gtk-4.0.pc"
+
+          echo "PKG_CONFIG_PATH=$HOME/.pkgconfig:${PKG_CONFIG_PATH:-}" >> "$GITHUB_ENV"
+
+          sudo ln -sf /lib/x86_64-linux-gnu/libjavascriptcoregtk-4.1.so /lib/x86_64-linux-gnu/libjavascriptcoregtk-4.0.so
+          sudo ln -sf /lib/x86_64-linux-gnu/libwebkit2gtk-4.1.so /lib/x86_64-linux-gnu/libwebkit2gtk-4.0.so
+          sudo ldconfig
 
       - name: Clean install dependencies
         shell: bash
