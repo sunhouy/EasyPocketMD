@@ -1,7 +1,7 @@
 {
   "name": "easypocketmd",
-  "version": "2.4.2",
-  "description": "基于Vditor的移动端轻量化在线markdown编辑器，可进行多文件管理。支持可视化插入格式、公式、图表，上传文件和图片，降低学习和操作门槛；支持多端文件同步，历史版本，文件分享，日间、夜间模式切换，导入本地文件，导出文档，云打印功能",
+  "version": "2.4.5",
+  "description": "一款几乎零学习成本的 Markdown 编辑器：无需记忆语法，也能轻松插入格式化文本、LaTeX 公式和图表。配合智能搜索与 AI 助手，常用功能都能几步完成。实时协作、AI 辅助写作与流畅编辑体验，全部整合在美观的界面中。",
   "scripts": {
     "dev": "vite",
     "build": "npm run wasm:text:build && node version.js && vite build && npm run wasm:text:verify:dist",

@@ -49,6 +49,9 @@ jobs:
       - name: Verify WASM source artifacts
         run: npm run wasm:text:verify
 
+      - name: Generate Tauri icons
+        run: npx tauri icon src-tauri/icon-rgba.png
+
       - name: Upload WASM build artifact
         uses: actions/upload-artifact@v4
         with:
