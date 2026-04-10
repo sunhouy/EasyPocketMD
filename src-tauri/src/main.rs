@@ -5,9 +5,12 @@ use base64::Engine;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::Mutex;
 use tauri::{AppHandle, Manager};
 
 const SETTINGS_FILE: &str = "desktop-settings.json";
+
+struct PendingOpenFilePath(Mutex<Option<String>>);
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -342,10 +345,24 @@ fn emit_open_file_event(app: &AppHandle, path: PathBuf) {
     let _ = app.emit_all("open-local-file-request", path_to_string(&path));
 }
 
+#[tauri::command]
+fn consume_pending_open_file_path(
+    pending_open_file_path: tauri::State<'_, PendingOpenFilePath>,
+) -> Option<String> {
+    match pending_open_file_path.0.lock() {
+        Ok(mut guard) => guard.take(),
+        Err(_) => None,
+    }
+}
+
 fn main() {
     tauri::Builder::default()
+        .manage(PendingOpenFilePath(Mutex::new(None)))
         .setup(|app| {
             if let Some(path) = extract_open_file_path(std::env::args().skip(1)) {
+                if let Ok(mut guard) = app.state::<PendingOpenFilePath>().0.lock() {
+                    *guard = Some(path_to_string(&path));
+                }
                 emit_open_file_event(&app.app_handle(), path);
             }
             Ok(())
@@ -357,7 +374,8 @@ fn main() {
             read_local_file,
             write_local_file,
             get_md_association_enabled,
-            set_md_association_enabled
+            set_md_association_enabled,
+            consume_pending_open_file_path
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

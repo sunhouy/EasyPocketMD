@@ -112,17 +112,31 @@ jobs:
           set -e
           mkdir -p "$HOME/.pkgconfig"
 
-          cp /usr/lib/x86_64-linux-gnu/pkgconfig/javascriptcoregtk-4.1.pc "$HOME/.pkgconfig/javascriptcoregtk-4.0.pc"
-          cp /usr/lib/x86_64-linux-gnu/pkgconfig/webkit2gtk-4.1.pc "$HOME/.pkgconfig/webkit2gtk-4.0.pc"
+          cat > "$HOME/.pkgconfig/javascriptcoregtk-4.0.pc" << 'EOF'
+          prefix=/usr
+          exec_prefix=${prefix}
+          libdir=${exec_prefix}/lib/x86_64-linux-gnu
+          includedir=${prefix}/include
 
-          sed -i 's/javascriptcoregtk-4\.1/javascriptcoregtk-4.0/g' "$HOME/.pkgconfig/javascriptcoregtk-4.0.pc"
-          sed -i 's/webkit2gtk-4\.1/webkit2gtk-4.0/g' "$HOME/.pkgconfig/webkit2gtk-4.0.pc"
+          Name: javascriptcoregtk-4.0
+          Description: Compatibility alias for javascriptcoregtk-4.1
+          Version: 2.0
+          Requires: javascriptcoregtk-4.1
+          EOF
+
+          cat > "$HOME/.pkgconfig/webkit2gtk-4.0.pc" << 'EOF'
+          prefix=/usr
+          exec_prefix=${prefix}
+          libdir=${exec_prefix}/lib/x86_64-linux-gnu
+          includedir=${prefix}/include
+
+          Name: webkit2gtk-4.0
+          Description: Compatibility alias for webkit2gtk-4.1
+          Version: 2.0
+          Requires: webkit2gtk-4.1
+          EOF
 
           echo "PKG_CONFIG_PATH=$HOME/.pkgconfig:${PKG_CONFIG_PATH:-}" >> "$GITHUB_ENV"
-
-          sudo ln -sf /lib/x86_64-linux-gnu/libjavascriptcoregtk-4.1.so /lib/x86_64-linux-gnu/libjavascriptcoregtk-4.0.so
-          sudo ln -sf /lib/x86_64-linux-gnu/libwebkit2gtk-4.1.so /lib/x86_64-linux-gnu/libwebkit2gtk-4.0.so
-          sudo ldconfig
 
       - name: Clean install dependencies
         shell: bash
