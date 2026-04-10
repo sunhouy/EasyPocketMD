@@ -172,6 +172,9 @@
             <div class="file-list-help" id="fileListHelp" data-i18n-title="fileListHelp" title="右键或长按显示更多功能">
                 <i class="fas fa-question-circle"></i>
             </div>
+            <button class="file-list-search-btn" id="fileListSearchBtn" data-i18n-title="fileListSearch" title="搜索">
+                <i class="fas fa-search"></i>
+            </button>
             <button class="file-list-graph-btn" id="knowledgeGraphBtn" data-i18n-title="knowledgeGraph" title="知识图谱">
                 <i class="fas fa-project-diagram"></i>
             </button>
@@ -179,6 +182,16 @@
                 <i class="fas fa-times"></i>
             </button>
         </div>
+    </div>
+    <div class="file-list-search-panel" id="fileListSearchPanel" style="display:none;">
+        <div class="file-list-search-row">
+            <input id="fileListSearchInput" class="file-list-search-input" data-i18n-placeholder="fileListSearchPlaceholder" placeholder="搜索文件..." />
+            <select id="fileListSearchScope" class="file-list-search-scope" data-i18n-title="searchScopeTitleOnly" title="仅标题">
+                <option value="title" data-i18n="searchScopeTitleOnly">仅标题</option>
+                <option value="fullText" data-i18n="searchScopeFullText">全文</option>
+            </select>
+        </div>
+        <div class="file-list-search-result" id="fileListSearchResult"></div>
     </div>
     <div id="fileList">
         <!-- 文件列表将在这里动态生成 -->
@@ -239,6 +252,16 @@
 <button class="file-management-fab" id="fileManagementFab" type="button" aria-label="create">
     <i class="fas fa-plus"></i>
 </button>
+<div class="file-management-fab-ring" id="fileManagementFabRing" aria-hidden="true">
+    <button class="file-management-fab-item file" id="fileManagementFabNewFile" type="button" data-i18n-title="newFile" title="新建文件">
+        <i class="fas fa-file"></i>
+        <span class="file-management-fab-item-label" data-i18n="fabFileLabel">文件</span>
+    </button>
+    <button class="file-management-fab-item folder" id="fileManagementFabNewFolder" type="button" data-i18n-title="newFolder" title="新建文件夹">
+        <i class="fas fa-folder-plus"></i>
+        <span class="file-management-fab-item-label" data-i18n="fabFolderLabel">文件夹</span>
+    </button>
+</div>
 
 <!-- 登录注册模态窗口 -->
 <div class="modal-overlay" id="loginModalOverlay">
