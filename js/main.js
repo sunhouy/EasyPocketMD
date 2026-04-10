@@ -934,15 +934,33 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!window.electron || typeof window.electron.onOpenLocalFileRequest !== 'function' || desktopOpenFileBridgeInitialized) return;
         desktopOpenFileBridgeInitialized = true;
 
-        window.electron.onOpenLocalFileRequest(async function(filePath) {
+        var lastDesktopOpenFilePath = null;
+
+        async function handleDesktopOpenFileRequest(filePath) {
             if (!filePath || typeof window.openExternalLocalFileByPath !== 'function') return;
+            if (filePath === lastDesktopOpenFilePath) return;
+            lastDesktopOpenFilePath = filePath;
             try {
                 await window.openExternalLocalFileByPath(filePath);
             } catch (error) {
                 console.error('Failed to open local file from system event:', error);
                 window.showMessage((window.i18n ? window.i18n.t('localFileOpenFailed') : '打开本地文件失败') + ': ' + error.message, 'error');
             }
+        }
+
+        window.electron.onOpenLocalFileRequest(function(filePath) {
+            handleDesktopOpenFileRequest(filePath);
         });
+
+        if (typeof window.electron.consumePendingOpenFilePath === 'function') {
+            window.electron.consumePendingOpenFilePath()
+                .then(function(filePath) {
+                    handleDesktopOpenFileRequest(filePath);
+                })
+                .catch(function(error) {
+                    console.warn('Failed to consume pending open file path:', error);
+                });
+        }
     }
 
     syncMdAssociationSettingFromDesktop();
@@ -1334,7 +1352,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         };
 
-        var handleWasmStartupFailure = function(error) {
+        var handleStartupFailure = function(error) {
             const message = (window.i18n ? window.i18n.t('syncFailed') : '初始化失败') +
                 ': ' + ((error && error.message) || 'wasm text engine unavailable');
             console.error('[startup] wasm text engine failed before file workspace boot', error);
@@ -1346,11 +1364,27 @@ document.addEventListener('DOMContentLoaded', function() {
             if (loadingEl) loadingEl.style.display = 'none';
         };
 
-        if (typeof window.ensureWasmTextEngineReady === 'function') {
-            window.ensureWasmTextEngineReady().then(bootFileWorkspace).catch(handleWasmStartupFailure);
-        } else {
-            bootFileWorkspace();
-        }
+        var bootFileWorkspaceSafely = function() {
+            try {
+                bootFileWorkspace();
+            } catch (error) {
+                handleStartupFailure(error);
+            }
+        };
+
+        var ensureWasmReadyBeforeWorkspaceBoot = function() {
+            if (typeof window.ensureWasmTextEngineReady !== 'function') {
+                return Promise.resolve();
+            }
+            return window.ensureWasmTextEngineReady().catch(function(error) {
+                // Capacitor 冷启动时 wasm 预热失败不应阻断主流程，继续走 JS 回退能力。
+                console.warn('[startup] wasm prewarm failed, continue with fallback runtime', error);
+            });
+        };
+
+        ensureWasmReadyBeforeWorkspaceBoot()
+            .then(bootFileWorkspaceSafely)
+            .catch(handleStartupFailure);
         var fileListClose = document.getElementById('fileListClose');
         if (fileListClose) fileListClose.addEventListener('click', function() { document.getElementById('fileListSidebar').classList.remove('show'); });
 

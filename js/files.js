@@ -315,16 +315,29 @@
     }
 
     function getCurrentEditorContent(fileId, fallbackContent) {
+        const fallback = String(fallbackContent || '');
+
         if (isLongFileEditorActiveFor(fileId)) {
             const textarea = getLongFileTextarea();
-            return textarea ? String(textarea.value || '') : String(fallbackContent || '');
+            return textarea ? String(textarea.value || '') : fallback;
         }
 
-        if (g('vditor') && typeof g('vditor').getValue === 'function') {
-            return g('vditor').getValue();
+        const vditor = g('vditor');
+        if (!vditor || typeof vditor.getValue !== 'function') {
+            return fallback;
         }
 
-        return String(fallbackContent || '');
+        // 冷启动阶段可能存在实例对象已创建但内部 Lute 尚未就绪的窗口期。
+        if (global.vditorReady === false || !vditor.vditor) {
+            return fallback;
+        }
+
+        try {
+            return vditor.getValue();
+        } catch (error) {
+            console.warn('读取编辑器内容失败，回退到本地快照:', error);
+            return fallback;
+        }
     }
 
     function isTokenErrorMessage(message) {

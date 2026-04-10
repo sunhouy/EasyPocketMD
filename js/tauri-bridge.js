@@ -23,6 +23,17 @@
         return null;
     }
 
+    function getDialogOpenApi() {
+        if (!global.__TAURI__) return null;
+        if (global.__TAURI__.dialog && typeof global.__TAURI__.dialog.open === 'function') {
+            return global.__TAURI__.dialog.open;
+        }
+        if (global.__TAURI__.core && global.__TAURI__.core.dialog && typeof global.__TAURI__.core.dialog.open === 'function') {
+            return global.__TAURI__.core.dialog.open;
+        }
+        return null;
+    }
+
     function bindEvent(channel, callback) {
         if (typeof callback !== 'function') return function() {};
 
@@ -86,7 +97,61 @@
             return invokeCommand('get_local_file_path', { name: name });
         },
         openLocalFileDialog: function() {
-            return invokeCommand('open_local_file_dialog');
+            var openDialog = getDialogOpenApi();
+            if (!openDialog) {
+                return invokeCommand('open_local_file_dialog');
+            }
+
+            return openDialog({
+                multiple: false,
+                filters: [
+                    { name: 'Markdown', extensions: ['md', 'markdown', 'txt'] }
+                ]
+            }).then(function(selectedPath) {
+                if (!selectedPath || (Array.isArray(selectedPath) && selectedPath.length === 0)) {
+                    return {
+                        canceled: true,
+                        success: null,
+                        path: null,
+                        name: null,
+                        content: null,
+                        error: null,
+                        localFileMode: null
+                    };
+                }
+
+                var path = Array.isArray(selectedPath) ? selectedPath[0] : selectedPath;
+                return invokeCommand('read_local_file', { filePath: String(path) })
+                    .then(function(result) {
+                        if (result && typeof result === 'object') {
+                            result.canceled = false;
+                            if (!result.path) {
+                                result.path = String(path);
+                            }
+                            return result;
+                        }
+                        return {
+                            canceled: false,
+                            success: false,
+                            path: String(path),
+                            name: null,
+                            content: null,
+                            error: 'Invalid local file read response',
+                            localFileMode: null
+                        };
+                    })
+                    .catch(function(error) {
+                        return {
+                            canceled: false,
+                            success: false,
+                            path: String(path),
+                            name: null,
+                            content: null,
+                            error: error && error.message ? error.message : String(error),
+                            localFileMode: null
+                        };
+                    });
+            });
         },
         readLocalFile: function(filePath) {
             return invokeCommand('read_local_file', { filePath: filePath });
@@ -99,6 +164,9 @@
         },
         setMdAssociationEnabled: function(enabled) {
             return invokeCommand('set_md_association_enabled', { enabled: !!enabled });
+        },
+        consumePendingOpenFilePath: function() {
+            return invokeCommand('consume_pending_open_file_path');
         },
         onOpenLocalFileRequest: function(callback) {
             return bindEvent('open-local-file-request', callback);
