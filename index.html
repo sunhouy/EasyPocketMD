@@ -431,157 +431,228 @@
             <h2 data-i18n="settings">设置</h2>
         </div>
         <div class="modal-form" style="flex:1;overflow-y:auto;padding-right:5px;">
-            <div class="form-group">
-                <label data-i18n="defaultEditorMode">默认编辑器模式</label>
-                <div class="radio-group" id="defaultEditorMode">
-                    <label><input type="radio" name="editorMode" value="wysiwyg"> <span data-i18n="wysiwyg">所见即所得</span></label>
-                    <label><input type="radio" name="editorMode" value="ir"> <span data-i18n="instantRender">即时渲染</span></label>
-                    <label><input type="radio" name="editorMode" value="sv"> <span data-i18n="splitPreview">分屏预览</span></label>
-                </div>
+            <div class="settings-guidance" role="note">
+                <div class="settings-guidance-title" data-i18n="settingsQuickGuide">设置已按功能分组，可按“编辑体验 → 文件与存储 → 高级选项”顺序配置。</div>
+                <div class="settings-guidance-subtitle" data-i18n="settingsSaveHint">修改后点击保存立即生效，带“需刷新后生效”提示的选项会在刷新后完全生效。</div>
             </div>
-            <div class="form-group">
-                <label data-i18n="themeMode">主题模式</label>
-                <div class="radio-group" id="themeMode">
-                    <label><input type="radio" name="themeMode" value="light"> <span data-i18n="lightMode">日间模式</span></label>
-                    <label><input type="radio" name="themeMode" value="dark"> <span data-i18n="darkMode">夜间模式</span></label>
-                    <label><input type="radio" name="themeMode" value="system"> <span data-i18n="followSystem">跟随系统</span></label>
+
+            <section class="settings-section" aria-labelledby="settingsEditorGroupTitle">
+                <div class="settings-section-header">
+                    <h3 class="settings-section-title" id="settingsEditorGroupTitle" data-i18n="settingsGroupEditor">编辑与界面</h3>
+                    <p class="settings-section-hint" data-i18n="settingsGroupEditorHint">用于调整编辑习惯、视觉风格与阅读密度，建议优先设置。</p>
                 </div>
-            </div>
-            <div class="form-group">
-                <label data-i18n="interfaceStyleMode">界面样式模式</label>
-                <div class="radio-group" id="interfaceStyleModeSetting">
-                    <label><input type="radio" name="uiMode" value="auto"> <span data-i18n="interfaceStyleAuto">自动（根据设备）</span></label>
-                    <label><input type="radio" name="uiMode" value="mobile"> <span data-i18n="interfaceStyleMobile">手机样式</span></label>
-                    <label><input type="radio" name="uiMode" value="desktop"> <span data-i18n="interfaceStyleDesktop">电脑样式</span></label>
-                </div>
-            </div>
-            <div class="form-group">
-                <label data-i18n="language">语言</label>
-                <div class="radio-group" id="languageMode">
-                    <label><input type="radio" name="language" value="zh"> <span data-i18n="chinese">中文</span></label>
-                    <label><input type="radio" name="language" value="en"> <span data-i18n="english">English</span></label>
-                </div>
-            </div>
-            <div class="form-group">
-                <label data-i18n="fontSize">字体大小</label>
-                <div class="select-group" id="fontSizeGroup">
-                    <select id="fontSizeSelect" class="form-control">
-                        <option value="12px">12px</option>
-                        <option value="14px">14px</option>
-                        <option value="16px" selected>16px</option>
-                        <option value="18px">18px</option>
-                        <option value="20px">20px</option>
-                    </select>
-                </div>
-            </div>
-            <div class="form-group show-outline-setting">
-                <label data-i18n="showOutline">显示大纲视图</label>
-                <div class="checkbox-group">
-                    <label><input type="checkbox" id="showOutlineCheckbox"> <span></span></label>
-                </div>
-            </div>
-            <div class="form-group settings-collapsible-group">
-                <details id="slashCommandDetails" class="settings-collapsible">
-                    <summary class="settings-collapsible-summary">
-                        <span data-i18n="slashCommand">斜杠快捷命令</span>
-                    </summary>
-                    <div class="settings-collapsible-body">
-                        <div class="checkbox-group">
-                            <label><input type="checkbox" id="slashCommandEnabledCheckbox"> <span data-i18n="slashCommandEnable">在编辑器输入 / 时显示快捷操作列表</span></label>
+                <ul class="settings-list" role="list">
+                    <li class="settings-list-item">
+                        <div class="form-group">
+                            <label data-i18n="defaultEditorMode">默认编辑器模式</label>
+                            <div class="radio-group" id="defaultEditorMode">
+                                <label><input type="radio" name="editorMode" value="wysiwyg"> <span data-i18n="wysiwyg">所见即所得</span></label>
+                                <label><input type="radio" name="editorMode" value="ir"> <span data-i18n="instantRender">即时渲染</span></label>
+                                <label><input type="radio" name="editorMode" value="sv"> <span data-i18n="splitPreview">分屏预览</span></label>
+                            </div>
                         </div>
-                        <label class="settings-sub-label" for="slashCommandActivationKeySelect" data-i18n="slashCommandActivationKey">执行快捷键</label>
-                        <div class="select-group">
-                            <select id="slashCommandActivationKeySelect" class="form-control">
-                                <option value="Tab" data-i18n="slashActivationTab">Tab</option>
-                                <option value="Enter" data-i18n="slashActivationEnter">Enter</option>
-                                <option value="Space" data-i18n="slashActivationSpace">Space</option>
-                                <option value="Ctrl+K" data-i18n="slashActivationCtrlK">Ctrl+K</option>
-                                <option value="Ctrl+J" data-i18n="slashActivationCtrlJ">Ctrl+J</option>
-                                <option value="Alt+Space" data-i18n="slashActivationAltSpace">Alt+Space</option>
-                            </select>
+                    </li>
+                    <li class="settings-list-item">
+                        <div class="form-group">
+                            <label data-i18n="themeMode">主题模式</label>
+                            <div class="radio-group" id="themeMode">
+                                <label><input type="radio" name="themeMode" value="light"> <span data-i18n="lightMode">日间模式</span></label>
+                                <label><input type="radio" name="themeMode" value="dark"> <span data-i18n="darkMode">夜间模式</span></label>
+                                <label><input type="radio" name="themeMode" value="system"> <span data-i18n="followSystem">跟随系统</span></label>
+                            </div>
                         </div>
-                    </div>
-                </details>
-            </div>
-            <div class="form-group settings-collapsible-group">
-                <details id="keyboardShortcutsDetails" class="settings-collapsible">
-                    <summary class="settings-collapsible-summary">
-                        <span data-i18n="keyboardShortcuts">快捷键</span>
-                    </summary>
-                    <div class="settings-collapsible-body">
-                        <div id="keyboardShortcutsSettings" class="keyboard-shortcuts-settings">
-                            <!-- 动态生成 -->
+                    </li>
+                    <li class="settings-list-item">
+                        <div class="form-group">
+                            <label data-i18n="interfaceStyleMode">界面样式模式</label>
+                            <div class="radio-group" id="interfaceStyleModeSetting">
+                                <label><input type="radio" name="uiMode" value="auto"> <span data-i18n="interfaceStyleAuto">自动（根据设备）</span></label>
+                                <label><input type="radio" name="uiMode" value="mobile"> <span data-i18n="interfaceStyleMobile">手机样式</span></label>
+                                <label><input type="radio" name="uiMode" value="desktop"> <span data-i18n="interfaceStyleDesktop">电脑样式</span></label>
+                            </div>
                         </div>
-                        <div class="settings-hint" data-i18n="keyboardShortcutsHint">支持单字母或组合键（如 F、Ctrl+S、Alt+M），留空表示禁用该快捷键</div>
-                    </div>
-                </details>
-            </div>
-            <div class="form-group">
-                <label data-i18n="defaultStorageLocation">默认存储位置</label>
-                <div class="radio-group" id="storageLocationSetting">
-                    <label><input type="radio" name="storageLocation" value="cloud"> <span data-i18n="storageCloud">云端存储</span></label>
-                    <label><input type="radio" name="storageLocation" value="local"> <span data-i18n="storageLocal">本地存储</span></label>
-                </div>
-            </div>
-            <div class="form-group">
-                <label data-i18n="defaultFileOpening">默认文件打开方式</label>
-                <div class="radio-group" id="defaultFileOpeningSetting">
-                    <label><input type="radio" name="defaultFileOpening" value="lastEdited"> <span data-i18n="lastEditedFile">上次编辑的文件</span></label>
-                    <label><input type="radio" name="defaultFileOpening" value="firstFile"> <span data-i18n="firstFile">第一个文件</span></label>
-                    <label><input type="radio" name="defaultFileOpening" value="fileList"> <span data-i18n="fileListFirst">先打开文件列表</span></label>
-                </div>
-            </div>
-            <div class="form-group">
-                <label data-i18n="defaultSorting">默认排序方式</label>
-                <div class="radio-group" id="defaultSortingSetting">
-                    <label><input type="radio" name="defaultSorting" value="modifiedTime"> <span data-i18n="sortByModifiedTime">修改时间</span></label>
-                    <label><input type="radio" name="defaultSorting" value="alphabetical"> <span data-i18n="sortAlphabetically">首字母</span></label>
-                    <label><input type="radio" name="defaultSorting" value="fileSize"> <span data-i18n="sortByFileSize">文件大小</span></label>
-                </div>
-            </div>
-            <div class="form-group" id="mdAssociationSetting" style="display:none;">
-                <label data-i18n="mdFileAssociation">.md 文件关联</label>
-                <div class="checkbox-group">
-                    <label><input type="checkbox" id="mdAssociationCheckbox"> <span data-i18n="mdFileAssociationDesc">允许通过系统打开 .md 文件时自动在应用中打开</span></label>
-                </div>
-            </div>
-            <div class="form-group settings-collapsible-group">
-                <details id="toolbarButtonsDetails" class="settings-collapsible">
-                    <summary class="settings-collapsible-summary">
-                        <span data-i18n="bottomToolbarButtons">底部工具栏按钮 (5-7个)</span>
-                    </summary>
-                    <div class="settings-collapsible-body">
-                        <div class="checkbox-group" id="toolbarButtonsSettings">
-                            <!-- 动态生成 -->
+                    </li>
+                    <li class="settings-list-item">
+                        <div class="form-group">
+                            <label data-i18n="language">语言</label>
+                            <div class="radio-group" id="languageMode">
+                                <label><input type="radio" name="language" value="zh"> <span data-i18n="chinese">中文</span></label>
+                                <label><input type="radio" name="language" value="en"> <span data-i18n="english">English</span></label>
+                            </div>
                         </div>
-                    </div>
-                </details>
-            </div>
-            <div class="form-group settings-collapsible-group">
-                <details id="storageManagementDetails" class="settings-collapsible">
-                    <summary id="storageManagementSummary" class="settings-collapsible-summary">
-                        <span data-i18n="storageManagement">空间管理</span>
-                    </summary>
-                    <div class="settings-collapsible-body">
-                        <div id="storageUsagePanel" class="storage-usage-panel">
-                            <div id="storageUsageLoading" data-i18n="storageUsageCalculating" class="storage-usage-loading">正在计算存储占用...</div>
-                            <div id="storageUsageList" class="storage-usage-list"></div>
+                    </li>
+                    <li class="settings-list-item">
+                        <div class="form-group">
+                            <label data-i18n="fontSize">字体大小</label>
+                            <div class="select-group" id="fontSizeGroup">
+                                <select id="fontSizeSelect" class="form-control">
+                                    <option value="12px">12px</option>
+                                    <option value="14px">14px</option>
+                                    <option value="16px" selected>16px</option>
+                                    <option value="18px">18px</option>
+                                    <option value="20px">20px</option>
+                                </select>
+                            </div>
                         </div>
-                        <div class="space-management-actions">
-                            <button type="button" class="modal-btn secondary" id="clearCacheStorageBtn" data-i18n="clearCacheStorage">清空 Cache Storage</button>
-                            <button type="button" class="modal-btn secondary" id="clearIndexedDBBtn" data-i18n="clearIndexedDB">清空 IndexedDB</button>
-                            <button type="button" class="modal-btn secondary" id="clearServiceWorkerBtn" data-i18n="clearServiceWorker">清空 Service Worker</button>
-                            <button type="button" class="modal-btn secondary" id="clearCookiesBtn" data-i18n="clearCookies">清空 Cookies</button>
+                    </li>
+                    <li class="settings-list-item show-outline-setting">
+                        <div class="form-group">
+                            <label data-i18n="showOutline">显示大纲视图</label>
+                            <div class="checkbox-group">
+                                <label><input type="checkbox" id="showOutlineCheckbox"> <span></span></label>
+                            </div>
+                            <div class="settings-inline-hint" data-i18n="settingsRequiresRefresh">需刷新后生效</div>
                         </div>
-                    </div>
-                </details>
-            </div>
-            <div class="form-group">
-                <label data-i18n="debugMode">调试模式</label>
-                <div class="checkbox-group">
-                    <label><input type="checkbox" id="debugModeCheckbox"> <span data-i18n="debugModeEnable">开启调试模式</span></label>
+                    </li>
+                </ul>
+            </section>
+
+            <section class="settings-section" aria-labelledby="settingsProductivityGroupTitle">
+                <div class="settings-section-header">
+                    <h3 class="settings-section-title" id="settingsProductivityGroupTitle" data-i18n="settingsGroupProductivity">效率与快捷操作</h3>
+                    <p class="settings-section-hint" data-i18n="settingsGroupProductivityHint">快捷命令、快捷键和工具栏配置建议一起调整，操作习惯更一致。</p>
                 </div>
-            </div>
+                <ul class="settings-list" role="list">
+                    <li class="settings-list-item">
+                        <div class="form-group settings-collapsible-group">
+                            <details id="slashCommandDetails" class="settings-collapsible">
+                                <summary class="settings-collapsible-summary">
+                                    <span data-i18n="slashCommand">斜杠快捷命令</span>
+                                </summary>
+                                <div class="settings-collapsible-body">
+                                    <div class="checkbox-group">
+                                        <label><input type="checkbox" id="slashCommandEnabledCheckbox"> <span data-i18n="slashCommandEnable">在编辑器输入 / 时显示快捷操作列表</span></label>
+                                    </div>
+                                    <label class="settings-sub-label" for="slashCommandActivationKeySelect" data-i18n="slashCommandActivationKey">执行快捷键</label>
+                                    <div class="select-group">
+                                        <select id="slashCommandActivationKeySelect" class="form-control">
+                                            <option value="Tab" data-i18n="slashActivationTab">Tab</option>
+                                            <option value="Enter" data-i18n="slashActivationEnter">Enter</option>
+                                            <option value="Space" data-i18n="slashActivationSpace">Space</option>
+                                            <option value="Ctrl+K" data-i18n="slashActivationCtrlK">Ctrl+K</option>
+                                            <option value="Ctrl+J" data-i18n="slashActivationCtrlJ">Ctrl+J</option>
+                                            <option value="Alt+Space" data-i18n="slashActivationAltSpace">Alt+Space</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </details>
+                        </div>
+                    </li>
+                    <li class="settings-list-item">
+                        <div class="form-group settings-collapsible-group">
+                            <details id="keyboardShortcutsDetails" class="settings-collapsible">
+                                <summary class="settings-collapsible-summary">
+                                    <span data-i18n="keyboardShortcuts">快捷键</span>
+                                </summary>
+                                <div class="settings-collapsible-body">
+                                    <div id="keyboardShortcutsSettings" class="keyboard-shortcuts-settings">
+                                        <!-- 动态生成 -->
+                                    </div>
+                                    <div class="settings-hint" data-i18n="keyboardShortcutsHint">支持单字母或组合键（如 F、Ctrl+S、Alt+M），留空表示禁用该快捷键</div>
+                                </div>
+                            </details>
+                        </div>
+                    </li>
+                    <li class="settings-list-item">
+                        <div class="form-group settings-collapsible-group">
+                            <details id="toolbarButtonsDetails" class="settings-collapsible">
+                                <summary class="settings-collapsible-summary">
+                                    <span data-i18n="bottomToolbarButtons">底部工具栏按钮 (5-7个)</span>
+                                </summary>
+                                <div class="settings-collapsible-body">
+                                    <div class="checkbox-group" id="toolbarButtonsSettings">
+                                        <!-- 动态生成 -->
+                                    </div>
+                                </div>
+                            </details>
+                        </div>
+                    </li>
+                </ul>
+            </section>
+
+            <section class="settings-section" aria-labelledby="settingsFileGroupTitle">
+                <div class="settings-section-header">
+                    <h3 class="settings-section-title" id="settingsFileGroupTitle" data-i18n="settingsGroupFile">文件与存储</h3>
+                    <p class="settings-section-hint" data-i18n="settingsGroupFileHint">控制文件默认打开行为、排序方式和数据保存位置。</p>
+                </div>
+                <ul class="settings-list" role="list">
+                    <li class="settings-list-item">
+                        <div class="form-group">
+                            <label data-i18n="defaultStorageLocation">默认存储位置</label>
+                            <div class="radio-group" id="storageLocationSetting">
+                                <label><input type="radio" name="storageLocation" value="cloud"> <span data-i18n="storageCloud">云端存储</span></label>
+                                <label><input type="radio" name="storageLocation" value="local"> <span data-i18n="storageLocal">本地存储</span></label>
+                            </div>
+                        </div>
+                    </li>
+                    <li class="settings-list-item">
+                        <div class="form-group">
+                            <label data-i18n="defaultFileOpening">默认文件打开方式</label>
+                            <div class="radio-group" id="defaultFileOpeningSetting">
+                                <label><input type="radio" name="defaultFileOpening" value="lastEdited"> <span data-i18n="lastEditedFile">上次编辑的文件</span></label>
+                                <label><input type="radio" name="defaultFileOpening" value="firstFile"> <span data-i18n="firstFile">第一个文件</span></label>
+                                <label><input type="radio" name="defaultFileOpening" value="fileList"> <span data-i18n="fileListFirst">先打开文件列表</span></label>
+                            </div>
+                        </div>
+                    </li>
+                    <li class="settings-list-item">
+                        <div class="form-group">
+                            <label data-i18n="defaultSorting">默认排序方式</label>
+                            <div class="radio-group" id="defaultSortingSetting">
+                                <label><input type="radio" name="defaultSorting" value="modifiedTime"> <span data-i18n="sortByModifiedTime">修改时间</span></label>
+                                <label><input type="radio" name="defaultSorting" value="alphabetical"> <span data-i18n="sortAlphabetically">首字母</span></label>
+                                <label><input type="radio" name="defaultSorting" value="fileSize"> <span data-i18n="sortByFileSize">文件大小</span></label>
+                            </div>
+                        </div>
+                    </li>
+                    <li class="settings-list-item">
+                        <div class="form-group settings-collapsible-group">
+                            <details id="storageManagementDetails" class="settings-collapsible">
+                                <summary id="storageManagementSummary" class="settings-collapsible-summary">
+                                    <span data-i18n="storageManagement">空间管理</span>
+                                </summary>
+                                <div class="settings-collapsible-body">
+                                    <div id="storageUsagePanel" class="storage-usage-panel">
+                                        <div id="storageUsageLoading" data-i18n="storageUsageCalculating" class="storage-usage-loading">正在计算存储占用...</div>
+                                        <div id="storageUsageList" class="storage-usage-list"></div>
+                                    </div>
+                                    <div class="space-management-actions">
+                                        <button type="button" class="modal-btn secondary" id="clearCacheStorageBtn" data-i18n="clearCacheStorage">清空 Cache Storage</button>
+                                        <button type="button" class="modal-btn secondary" id="clearIndexedDBBtn" data-i18n="clearIndexedDB">清空 IndexedDB</button>
+                                        <button type="button" class="modal-btn secondary" id="clearServiceWorkerBtn" data-i18n="clearServiceWorker">清空 Service Worker</button>
+                                        <button type="button" class="modal-btn secondary" id="clearCookiesBtn" data-i18n="clearCookies">清空 Cookies</button>
+                                    </div>
+                                </div>
+                            </details>
+                        </div>
+                    </li>
+                </ul>
+            </section>
+
+            <section class="settings-section" aria-labelledby="settingsAdvancedGroupTitle">
+                <div class="settings-section-header">
+                    <h3 class="settings-section-title" id="settingsAdvancedGroupTitle" data-i18n="settingsGroupAdvanced">高级与维护</h3>
+                    <p class="settings-section-hint" data-i18n="settingsGroupAdvancedHint">包含系统关联和调试选项，仅在需要时开启。</p>
+                </div>
+                <ul class="settings-list" role="list">
+                    <li class="settings-list-item">
+                        <div class="form-group" id="mdAssociationSetting" style="display:none;">
+                            <label data-i18n="mdFileAssociation">.md 文件关联</label>
+                            <div class="checkbox-group">
+                                <label><input type="checkbox" id="mdAssociationCheckbox"> <span data-i18n="mdFileAssociationDesc">允许通过系统打开 .md 文件时自动在应用中打开</span></label>
+                            </div>
+                        </div>
+                    </li>
+                    <li class="settings-list-item">
+                        <div class="form-group">
+                            <label data-i18n="debugMode">调试模式</label>
+                            <div class="checkbox-group">
+                                <label><input type="checkbox" id="debugModeCheckbox"> <span data-i18n="debugModeEnable">开启调试模式</span></label>
+                            </div>
+                        </div>
+                    </li>
+                </ul>
+            </section>
             <div class="modal-actions" style="flex-shrink:0;padding-top:10px;">
                 <button class="modal-btn primary" id="saveSettingsBtn" data-i18n="save">保存</button>
             </div>

@@ -893,6 +893,179 @@ body.keyboard-open .editor-container {
     gap: 15px;
 }
 
+.settings-guidance {
+    padding: 12px 14px;
+    border: 1px solid #d9e9ff;
+    border-radius: 10px;
+    background: linear-gradient(180deg, #f5f9ff 0%, #eef5ff 100%);
+}
+
+.settings-guidance-title {
+    font-size: 13px;
+    line-height: 1.5;
+    color: #1f3a5a;
+    font-weight: 600;
+}
+
+.settings-guidance-subtitle {
+    margin-top: 4px;
+    font-size: 12px;
+    line-height: 1.5;
+    color: #4f6782;
+}
+
+.settings-section {
+    border: 1px solid #e8edf3;
+    border-radius: 12px;
+    background: #fafcff;
+    overflow: hidden;
+}
+
+.settings-section-header {
+    padding: 12px 14px;
+    border-bottom: 1px solid #e8edf3;
+    background: #f2f7fd;
+}
+
+.settings-section-title {
+    margin: 0;
+    font-size: 14px;
+    color: #27415f;
+}
+
+.settings-section-hint {
+    margin: 6px 0 0;
+    font-size: 12px;
+    color: #5e7590;
+    line-height: 1.4;
+}
+
+.settings-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.settings-list-item {
+    padding: 12px 14px;
+    border-bottom: 1px solid #edf2f8;
+}
+
+.settings-list-item:last-child {
+    border-bottom: none;
+}
+
+.settings-list-item .form-group {
+    margin: 0;
+}
+
+.settings-inline-hint {
+    margin-top: 6px;
+    font-size: 12px;
+    color: #677f98;
+}
+
+#settingsModalOverlay .modal-form {
+    min-height: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
+    pointer-events: auto;
+}
+
+#settingsModalOverlay .settings-section,
+#settingsModalOverlay .settings-section-header,
+#settingsModalOverlay .settings-list,
+#settingsModalOverlay .settings-list-item,
+#settingsModalOverlay .form-group,
+#settingsModalOverlay .radio-group,
+#settingsModalOverlay .checkbox-group,
+#settingsModalOverlay .select-group {
+    pointer-events: auto;
+}
+
+/* Settings modal: robust layout for scroll/click across mobile browsers and WebView */
+#settingsModalOverlay {
+    padding: 12px;
+    align-items: center;
+    justify-content: center;
+}
+
+#settingsModalOverlay .modal {
+    width: min(920px, calc(100vw - 24px));
+    max-width: 920px;
+    height: calc(100vh - 24px);
+    max-height: calc(100vh - 24px) !important;
+    display: grid !important;
+    grid-template-rows: auto minmax(0, 1fr);
+    overflow: hidden !important;
+    padding: 16px;
+}
+
+@supports (height: 100dvh) {
+    #settingsModalOverlay .modal {
+        height: calc(100dvh - 24px);
+        max-height: calc(100dvh - 24px) !important;
+    }
+}
+
+#settingsModalOverlay .modal-header {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    padding: 0 42px 10px 0;
+    background: inherit;
+}
+
+#settingsModalOverlay .modal-form {
+    display: block;
+    min-height: 0;
+    max-height: none;
+    overflow-y: auto !important;
+    overflow-x: hidden;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
+    padding-right: 6px !important;
+}
+
+#settingsModalOverlay .modal-actions {
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
+    margin-top: 14px;
+    padding-top: 10px;
+    background: linear-gradient(to top, #ffffff 72%, rgba(255, 255, 255, 0));
+}
+
+body.night-mode #settingsModalOverlay .modal-actions {
+    background: linear-gradient(to top, #2d2d2d 72%, rgba(45, 45, 45, 0));
+}
+
+@media (max-width: 768px) {
+    #settingsModalOverlay {
+        padding: 0;
+        align-items: stretch;
+        justify-content: stretch;
+    }
+
+    #settingsModalOverlay .modal {
+        width: 100vw;
+        max-width: none;
+        border-radius: 0;
+        height: 100vh;
+        max-height: 100vh !important;
+        padding: 12px;
+    }
+
+    @supports (height: 100dvh) {
+        #settingsModalOverlay .modal {
+            height: 100dvh;
+            max-height: 100dvh !important;
+        }
+    }
+}
+
 .form-group {
     display: flex;
     flex-direction: column;
@@ -3688,6 +3861,42 @@ body.night-mode .tab-btn:hover {
 
 body.night-mode .form-group label {
     color: #ccc;
+}
+
+body.night-mode .settings-guidance {
+    border-color: #4e6179;
+    background: linear-gradient(180deg, #2f3d4e 0%, #2a3645 100%);
+}
+
+body.night-mode .settings-guidance-title {
+    color: #eef5ff;
+}
+
+body.night-mode .settings-guidance-subtitle {
+    color: #c7d7eb;
+}
+
+body.night-mode .settings-section {
+    border-color: #445467;
+    background: #2d3743;
+}
+
+body.night-mode .settings-section-header {
+    border-bottom-color: #445467;
+    background: #323f4f;
+}
+
+body.night-mode .settings-section-title {
+    color: #edf4ff;
+}
+
+body.night-mode .settings-section-hint,
+body.night-mode .settings-inline-hint {
+    color: #bdd0e6;
+}
+
+body.night-mode .settings-list-item {
+    border-bottom-color: #3f4f62;
 }
 
 body.night-mode .settings-collapsible {
