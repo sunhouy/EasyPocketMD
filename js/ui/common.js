@@ -2,6 +2,9 @@
 (function(global) {
     'use strict';
 
+    var DAY_THEME_COLOR = '#f3f4f6';
+    var NIGHT_THEME_COLOR = '#0f172a';
+
     function g(name) { return global[name]; }
 
     function hideMobileActionSheet() {
@@ -83,6 +86,7 @@
 
             localStorage.setItem('vditor_night_mode', 'true');
             if (g('vditor')) g('vditor').setTheme('dark');
+            syncThemeColor();
             global.showMessage(window.i18n ? window.i18n.t('switchedToNight') : '已切换到夜间模式');
         } else {
             document.body.classList.remove('night-mode');
@@ -90,7 +94,37 @@
             if (modeToggle) modeToggle.innerHTML = '<i class="fas fa-moon"></i>';
             localStorage.setItem('vditor_night_mode', 'false');
             if (g('vditor')) g('vditor').setTheme('classic');
+            syncThemeColor();
             global.showMessage(window.i18n ? window.i18n.t('switchedToDay') : '已切换到日间模式');
+        }
+    }
+
+    function getCurrentThemeColor() {
+        return global.nightMode ? NIGHT_THEME_COLOR : DAY_THEME_COLOR;
+    }
+
+    function syncThemeColor() {
+        var color = getCurrentThemeColor();
+        var meta = document.querySelector('meta[name="theme-color"]');
+        if (!meta) {
+            meta = document.createElement('meta');
+            meta.setAttribute('name', 'theme-color');
+            document.head.appendChild(meta);
+        }
+        meta.setAttribute('content', color);
+
+        // Hint native window theme so Android status bar icons stay readable.
+        try {
+            var tauriRoot = global.__TAURI__ || null;
+            var windowApi = tauriRoot && (tauriRoot.window || (tauriRoot.core && tauriRoot.core.window));
+            if (windowApi && typeof windowApi.getCurrentWindow === 'function') {
+                var currentWindow = windowApi.getCurrentWindow();
+                if (currentWindow && typeof currentWindow.setTheme === 'function') {
+                    Promise.resolve(currentWindow.setTheme(global.nightMode ? 'dark' : 'light')).catch(function() {});
+                }
+            }
+        } catch (error) {
+            // Ignore native theme sync failures; meta theme-color is still applied.
         }
     }
 
@@ -159,5 +193,6 @@
     global.showInsertMenu = showInsertMenu;
     global.debounce = debounce;
     global.escapeHtml = escapeHtml;
+    global.syncThemeColor = syncThemeColor;
 
 })(typeof window !== 'undefined' ? window : this);

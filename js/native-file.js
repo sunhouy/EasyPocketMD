@@ -67,6 +67,12 @@
         return !!global.__TAURI__ || !!(global.desktopRuntime && global.desktopRuntime.type === 'tauri');
     }
 
+    function isAndroidTauriRuntime() {
+        if (!isTauriRuntime()) return false;
+        var ua = (navigator.userAgent || '').toLowerCase();
+        return ua.indexOf('android') !== -1;
+    }
+
     function isTextPayload(payload) {
         return typeof payload === 'string' || payload instanceof String;
     }
@@ -113,7 +119,7 @@
         }
 
         // Fallback path: use Rust-side save dialog + write command when JS plugin APIs are unavailable.
-        if (!dialog || !fs) {
+        if (isAndroidTauriRuntime() || !dialog || !fs) {
             var fallbackContent;
             if (payload && typeof payload.url === 'string') {
                 var response = await fetch(resolveUrl(payload.url), { cache: 'no-store' });
@@ -128,6 +134,10 @@
                 var bytes = await toUint8Array(payload);
                 var mimeType = (options && options.mimeType) || 'application/octet-stream';
                 fallbackContent = await blobToDataUrl(new Blob([bytes], { type: mimeType }));
+            }
+
+            if (!invoke) {
+                throw new Error('Tauri invoke API is unavailable');
             }
 
             var fallbackPath = await invoke('save_file_with_dialog', {
