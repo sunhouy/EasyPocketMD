@@ -8,4 +8,12 @@ module.exports = {
   detectOpenHandles: true,
   setupFiles: ['<rootDir>/tests/setup.js'],
   testMatch: ['**/tests/**/*.test.js'],
+  collectCoverage: true,
+  collectCoverageFrom: [
+    'api/models/**/*.js',
+    'api/utils/**/*.js',
+    '!**/node_modules/**',
+  ],
+  coverageDirectory: 'coverage',
+  coverageReporters: ['text', 'lcov', 'html'],
 };

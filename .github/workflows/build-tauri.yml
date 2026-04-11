@@ -198,6 +198,10 @@ jobs:
           echo "Debian Depends: $DEPENDS"
 
           echo "$DEPENDS" | grep -q "libwebkit2gtk-4.1-0"
+          if echo "$DEPENDS" | grep -q "libwebkit2gtk-4.0-37"; then
+            echo "Legacy dependency detected: libwebkit2gtk-4.0-37"
+            exit 1
+          fi
           echo "$DEPENDS" | grep -q "libjavascriptcoregtk-4.1-0"
           echo "$DEPENDS" | grep -q "libsoup-3.0-0"
 

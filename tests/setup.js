@@ -60,6 +60,7 @@ jest.mock('fs', () => ({
     ...jest.requireActual('fs'),
     existsSync: jest.fn().mockReturnValue(true),
     readFileSync: jest.fn().mockReturnValue(''),
+    writeFileSync: jest.fn(),
     mkdirSync: jest.fn(),
     createWriteStream: jest.fn(() => {
         const { PassThrough } = require('stream');
