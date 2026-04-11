@@ -588,15 +588,13 @@ jobs:
           mkdir -p deploy/linux
 
           linux_deb=$(find downloads/linux -name "*.deb" | head -1)
-          linux_appimage=$(find downloads/linux -name "*.AppImage" | head -1)
 
-          if [ -z "$linux_deb" ] || [ -z "$linux_appimage" ]; then
-            echo "Missing Linux installer files"
+          if [ -z "$linux_deb" ]; then
+            echo "Missing Linux installer (.deb)"
             exit 1
           fi
 
           cp "$linux_deb" "deploy/linux/easypocketmd_linux.deb"
-          cp "$linux_appimage" "deploy/linux/easypocketmd_linux.appimage"
 
       - name: Upload Linux Tauri artifacts
         uses: appleboy/scp-action@master
@@ -604,7 +602,7 @@ jobs:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           password: ${{ secrets.SERVER_PASSWORD }}
-          source: deploy/linux/*
+          source: deploy/linux/easypocketmd_linux.deb
           target: /www/wwwroot/static/tauri/linux
           strip_components: 2
 

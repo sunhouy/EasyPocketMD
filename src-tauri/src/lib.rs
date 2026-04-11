@@ -346,6 +346,47 @@ fn write_local_file(file_path: String, content: String) -> WriteLocalFileRespons
 }
 
 #[tauri::command]
+fn save_file_with_dialog(
+    app: AppHandle,
+    name: String,
+    content: String,
+    title: Option<String>,
+) -> Result<String, String> {
+    let suggested_name = safe_file_name(&name);
+
+    let mut builder = app.dialog().file();
+    if let Some(title) = title {
+        if !title.trim().is_empty() {
+            builder = builder.set_title(title);
+        }
+    }
+
+    let target = builder
+        .set_file_name(&suggested_name)
+        .blocking_save_file()
+        .ok_or_else(|| "Save canceled".to_string())?;
+
+    let target_path = target
+        .into_path()
+        .map_err(|error| error.to_string())?;
+
+    if content.starts_with("data:") {
+        let base64_data = content
+            .split_once(',')
+            .map(|(_, payload)| payload)
+            .ok_or_else(|| "invalid data url".to_string())?;
+        let bytes = BASE64_ENGINE
+            .decode(base64_data)
+            .map_err(|error| error.to_string())?;
+        fs::write(&target_path, bytes).map_err(|error| error.to_string())?;
+    } else {
+        fs::write(&target_path, content).map_err(|error| error.to_string())?;
+    }
+
+    Ok(path_to_string(&target_path))
+}
+
+#[tauri::command]
 fn get_md_association_enabled(app: AppHandle) -> bool {
     read_settings(&app).md_file_association_enabled
 }
@@ -395,6 +436,7 @@ pub fn run() {
             open_local_file_dialog,
             read_local_file,
             write_local_file,
+            save_file_with_dialog,
             get_md_association_enabled,
             set_md_association_enabled,
             consume_pending_open_file_path

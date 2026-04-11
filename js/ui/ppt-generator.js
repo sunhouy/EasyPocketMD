@@ -1622,11 +1622,6 @@ JSON 结构：
             });
         };
 
-        if (window.nativeFileOps && window.nativeFileOps.isTauriRuntime()) {
-            requestAnimationFrame(openFilenameDialog);
-            return;
-        }
-
         openFilenameDialog();
     }
 
