@@ -4,8 +4,8 @@
       {
         "label": "main",
         "title": "EasyPocketMD",
-        "fullscreen": true,
-        "decorations": false,
+        "fullscreen": false,
+        "decorations": true,
         "useHttpsScheme": true,
         "visible": true
       }

@@ -178,6 +178,31 @@ jobs:
             npm run tauri:android:init
           fi
 
+      - name: Force custom Android launcher icon resources
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          ICON_SOURCE="src-tauri/icon-rgba.png"
+          if [ ! -f "$ICON_SOURCE" ]; then
+            ICON_SOURCE="icon.png"
+          fi
+          if [ ! -f "$ICON_SOURCE" ]; then
+            echo "Custom icon source not found"
+            exit 1
+          fi
+
+          RES_DIR="src-tauri/gen/android/app/src/main/res"
+          if [ ! -d "$RES_DIR" ]; then
+            echo "Android resources directory not found: $RES_DIR"
+            exit 1
+          fi
+
+          while IFS= read -r mipmap_dir; do
+            cp "$ICON_SOURCE" "$mipmap_dir/ic_launcher.png"
+            cp "$ICON_SOURCE" "$mipmap_dir/ic_launcher_round.png"
+          done < <(find "$RES_DIR" -maxdepth 1 -type d -name 'mipmap-*')
+
       - name: Tune Android build for smaller APK
         shell: bash
         run: |

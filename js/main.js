@@ -1026,6 +1026,9 @@ document.addEventListener('DOMContentLoaded', function() {
         var modeToggleEl = document.getElementById('modeToggle');
         if (modeToggleEl) modeToggleEl.innerHTML = '<i class="fas fa-sun"></i>';
     }
+    if (typeof window.syncThemeColor === 'function') {
+        window.syncThemeColor();
+    }
 
     // 应用翻译到页面元素
     function applyTranslations() {
