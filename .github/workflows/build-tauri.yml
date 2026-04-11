@@ -200,29 +200,42 @@ jobs:
           dpkg-deb -R "$DEB_FILE" "$UNPACK_DIR"
 
           CONTROL_FILE="$UNPACK_DIR/DEBIAN/control"
-          OLD_DEPENDS="$(awk '
-            /^Depends:/ {
-              sub(/^Depends:[[:space:]]*/, "", $0);
-              dep=$0;
-              in_dep=1;
-              next;
-            }
-            in_dep && /^[[:space:]]/ {
-              sub(/^[[:space:]]*/, "", $0);
-              dep=dep ", " $0;
-              next;
-            }
-            in_dep {
-              print dep;
-              exit;
-            }
-            END {
-              if (in_dep) print dep;
-            }
-          ' "$CONTROL_FILE")"
+          OLD_DEPENDS="$(dpkg-deb -f "$DEB_FILE" Depends || true)"
           echo "Original Debian Depends: $OLD_DEPENDS"
 
-          NEW_DEPENDS="$(printf '%s' "$OLD_DEPENDS" | tr '\n' ',' | perl -pe 's/(^|,\s*)libwebkit2gtk-4\.0-37(?=,|$)//g; s/,\s*,/, /g; s/^,\s*//; s/\s*,\s*$//')"
+          NEW_DEPENDS="$(OLD_DEPENDS="$OLD_DEPENDS" python3 - <<'PY'
+import os
+import sys
+
+raw = os.environ.get('OLD_DEPENDS', '').strip()
+parts = [part.strip() for part in raw.split(',') if part.strip()]
+required = [
+    'libwebkit2gtk-4.1-0',
+    'libjavascriptcoregtk-4.1-0',
+    'libsoup-3.0-0',
+    'libgtk-3-0',
+]
+
+seen = set()
+result = []
+
+def add_dep(dep):
+    dep = dep.strip()
+    if not dep or dep == 'libwebkit2gtk-4.0-37':
+        return
+    if dep not in seen:
+        seen.add(dep)
+        result.append(dep)
+
+for part in parts:
+    add_dep(part)
+
+for dep in required:
+    add_dep(dep)
+
+sys.stdout.write(', '.join(result))
+PY
+)
           echo "Normalized Debian Depends: $NEW_DEPENDS"
 
           awk '
@@ -242,8 +255,7 @@ jobs:
             }
           ' "$CONTROL_FILE" > "$CONTROL_FILE.cleaned"
           mv "$CONTROL_FILE.cleaned" "$CONTROL_FILE"
-          
-          # Format Depends line with safe single-line output (no embedded newlines)
+
           printf 'Depends: %s\n' "$NEW_DEPENDS" >> "$CONTROL_FILE"
 
           dpkg-deb -b "$UNPACK_DIR" "$DEB_FILE"
