@@ -99,7 +99,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          yes | sdkmanager --licenses > /dev/null
+          echo "y" | sdkmanager --licenses > /dev/null || true
           sdkmanager \
             "platform-tools" \
             "platforms;android-${ANDROID_API_LEVEL}" \
@@ -154,6 +154,7 @@ jobs:
             const tauriPath = "src-tauri/tauri.conf.json";
             const tauriConfig = JSON.parse(fs.readFileSync(tauriPath, "utf8"));
             tauriConfig.version = version;
+              if (tauriConfig.package) delete tauriConfig.package;
             fs.writeFileSync(tauriPath, JSON.stringify(tauriConfig, null, 2));
 
             const cargoPath = "src-tauri/Cargo.toml";

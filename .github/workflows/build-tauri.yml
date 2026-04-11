@@ -172,8 +172,7 @@ jobs:
             const tauriPath = "src-tauri/tauri.conf.json";
             const tauriConfig = JSON.parse(fs.readFileSync(tauriPath, "utf8"));
             tauriConfig.version = version;
-            tauriConfig.package = tauriConfig.package || {};
-            tauriConfig.package.version = version;
+            if (tauriConfig.package) delete tauriConfig.package;
             fs.writeFileSync(tauriPath, JSON.stringify(tauriConfig, null, 2));
 
             const cargoPath = "src-tauri/Cargo.toml";
@@ -342,8 +341,7 @@ jobs:
             const tauriPath = "src-tauri/tauri.conf.json";
             const tauriConfig = JSON.parse(fs.readFileSync(tauriPath, "utf8"));
             tauriConfig.version = version;
-            tauriConfig.package = tauriConfig.package || {};
-            tauriConfig.package.version = version;
+              if (tauriConfig.package) delete tauriConfig.package;
             fs.writeFileSync(tauriPath, JSON.stringify(tauriConfig, null, 2));
 
             const cargoPath = "src-tauri/Cargo.toml";
@@ -429,8 +427,7 @@ jobs:
             const tauriPath = "src-tauri/tauri.conf.json";
             const tauriConfig = JSON.parse(fs.readFileSync(tauriPath, "utf8"));
             tauriConfig.version = version;
-            tauriConfig.package = tauriConfig.package || {};
-            tauriConfig.package.version = version;
+            if (tauriConfig.package) delete tauriConfig.package;
             fs.writeFileSync(tauriPath, JSON.stringify(tauriConfig, null, 2));
 
             const cargoPath = "src-tauri/Cargo.toml";
