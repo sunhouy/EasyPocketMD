@@ -10,7 +10,34 @@
     let isInitialized = false;
     let leaveSaveInFlight = false;
     let lastLeaveSaveAt = 0;
+    let tauriCloseGuard = false;
     const LEAVE_SAVE_COOLDOWN_MS = 1200;
+
+    function shouldAutoSaveCurrentExternalLocalFile() {
+        const currentFileId = global.currentFileId;
+        if (!currentFileId) return false;
+        if (!global.unsavedChanges || !global.unsavedChanges[currentFileId]) return false;
+        const files = global.files || [];
+        const currentFile = files.find(function(file) {
+            return file && file.id === currentFileId && file.type === 'file';
+        });
+        if (!currentFile || !currentFile.isExternalLocal) return false;
+
+        // browser-file 模式无法原路径回写，避免在最小化/关闭时触发下载弹窗。
+        if (currentFile.localFileMode === 'browser-file') return false;
+        return typeof global.saveCurrentFile === 'function';
+    }
+
+    async function flushCurrentExternalLocalFile(reason) {
+        if (!shouldAutoSaveCurrentExternalLocalFile()) return false;
+        try {
+            await global.saveCurrentFile(false);
+            return true;
+        } catch (error) {
+            console.warn('[Lifecycle] external local auto-save failed (' + reason + '):', error);
+            return false;
+        }
+    }
 
     /**
      * 检测运行环境
@@ -78,6 +105,8 @@
         lastLeaveSaveAt = now;
 
         try {
+            // 先尝试回写外部本地文件（异步），再执行兜底紧急保存。
+            Promise.resolve(flushCurrentExternalLocalFile(reason)).catch(function() {});
             emergencySave();
         } catch (e) {
             console.warn('[Lifecycle] leave save failed (' + reason + '):', e);
@@ -183,6 +212,7 @@
     function initWebLifecycle() {
         // beforeunload: 强制保存，如果保存失败则阻止退出
         window.addEventListener('beforeunload', function(e) {
+            scheduleLeaveSave('beforeunload');
             const unsaved = global.unsavedChanges || {};
             const hasUnsaved = (global.files || []).some(f => unsaved[f.id]);
 
@@ -209,12 +239,19 @@
 
         // pagehide: 页面即将被隐藏/卸载
         window.addEventListener('pagehide', function(e) {
+            scheduleLeaveSave('pagehide');
             forceSaveToLocalStorage();
+        });
+
+        // 桌面最小化、切后台或失焦通常会触发 blur。
+        window.addEventListener('blur', function() {
+            scheduleLeaveSave('blur');
         });
 
         // visibilitychange: 页面可见性变化
         document.addEventListener('visibilitychange', function() {
             if (document.visibilityState === 'hidden') {
+                scheduleLeaveSave('visibility-hidden');
                 // 切后台时立即执行完整保存
                 forceSaveToLocalStorage();
                 // 如果已登录，尝试同步到服务器
@@ -246,19 +283,73 @@
      * 初始化桌面壳生命周期处理（通过桥接事件兼容）
      */
     function initDesktopLifecycle() {
-        if (!global.electron) return;
+        if (!global.electron && !global.__TAURI__) return;
 
         // 监听桌面壳的关闭事件
         if (global.electron.ipcRenderer) {
             // 应用即将关闭
             global.electron.ipcRenderer.on('app-before-close', function() {
+                scheduleLeaveSave('desktop-app-before-close');
                 emergencySave();
             });
 
             // 窗口即将关闭
             global.electron.ipcRenderer.on('window-before-close', function() {
+                scheduleLeaveSave('desktop-window-before-close');
                 emergencySave();
             });
+        }
+
+        // Tauri 环境：拦截关闭请求，先保存再关闭，避免异步写盘被中断。
+        try {
+            const tauriRoot = global.__TAURI__ || null;
+            const windowApi = tauriRoot && (tauriRoot.window || (tauriRoot.core && tauriRoot.core.window));
+            if (!windowApi || typeof windowApi.getCurrentWindow !== 'function') return;
+
+            const currentWindow = windowApi.getCurrentWindow();
+            if (!currentWindow) return;
+
+            if (typeof currentWindow.onCloseRequested === 'function') {
+                currentWindow.onCloseRequested(function(event) {
+                    if (tauriCloseGuard) return;
+                    tauriCloseGuard = true;
+                    if (event && typeof event.preventDefault === 'function') {
+                        event.preventDefault();
+                    }
+
+                    Promise.resolve(flushCurrentExternalLocalFile('tauri-close-requested'))
+                        .finally(function() {
+                            try {
+                                emergencySave();
+                            } catch (error) {
+                                console.warn('[Lifecycle] emergency save failed before tauri close:', error);
+                            }
+                        })
+                        .finally(function() {
+                            if (typeof currentWindow.close === 'function') {
+                                Promise.resolve(currentWindow.close()).catch(function() {});
+                            }
+                        });
+                });
+            }
+
+            if (typeof currentWindow.onFocusChanged === 'function') {
+                currentWindow.onFocusChanged(function(event) {
+                    var focused = true;
+                    if (typeof event === 'boolean') {
+                        focused = event;
+                    } else if (event && Object.prototype.hasOwnProperty.call(event, 'payload')) {
+                        focused = !!event.payload;
+                    } else if (event && Object.prototype.hasOwnProperty.call(event, 'focused')) {
+                        focused = !!event.focused;
+                    }
+                    if (!focused) {
+                        scheduleLeaveSave('tauri-focus-lost');
+                    }
+                });
+            }
+        } catch (error) {
+            console.warn('[Lifecycle] Failed to bind tauri lifecycle listeners:', error);
         }
     }
 

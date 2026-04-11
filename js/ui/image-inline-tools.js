@@ -1,3 +1,5 @@
+import CropperModule from 'cropperjs';
+
 (function(global) {
     'use strict';
 
@@ -367,17 +369,11 @@
 
     function loadCropperLibrary() {
         if (!cropperLoadPromise) {
-            cropperLoadPromise = import('cropperjs').then(function(module) {
-                return module.default || module;
-            }).catch(function(primaryError) {
-                return import('cropperjs/dist/cropper').then(function(module) {
-                    return module.default || module;
-                }).catch(function() {
-                    if (global.Cropper) {
-                        return global.Cropper;
-                    }
-                    throw primaryError;
-                });
+            cropperLoadPromise = Promise.resolve(CropperModule || global.Cropper).then(function(CropperCtor) {
+                if (!CropperCtor) {
+                    throw new Error('Cropper library unavailable');
+                }
+                return CropperCtor;
             });
         }
         return cropperLoadPromise;

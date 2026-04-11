@@ -271,12 +271,22 @@
                 return Promise.reject(new Error('URL is required'));
             }
 
-            var opener = getOpenerApi();
-            if (opener && typeof opener.openUrl === 'function') {
-                return opener.openUrl(target);
-            }
+            return invokeCommand('open_external_url', { url: target }).catch(function() {
+                var opener = getOpenerApi();
+                if (opener && typeof opener.openUrl === 'function') {
+                    return Promise.resolve(opener.openUrl(target)).catch(function() {
+                        var opened = global.open(target, '_blank', 'noopener,noreferrer');
+                        if (!opened) {
+                            global.location.href = target;
+                        }
+                    });
+                }
 
-            return invokeCommand('plugin:opener|open_url', { url: target });
+                var opened = global.open(target, '_blank', 'noopener,noreferrer');
+                if (!opened) {
+                    global.location.href = target;
+                }
+            });
         },
         syncAndroidSystemUi: function(isDarkMode) {
             try {
@@ -296,16 +306,23 @@
                     return Promise.resolve(false);
                 }
 
-                var tasks = [];
-                if (typeof currentWindow.setFullscreen === 'function') {
-                    tasks.push(Promise.resolve(currentWindow.setFullscreen(false)).catch(function() {}));
-                }
-                if (typeof currentWindow.setTheme === 'function') {
-                    tasks.push(Promise.resolve(currentWindow.setTheme(isDarkMode ? 'dark' : 'light')).catch(function() {}));
-                }
+                var statusBarColor = isDarkMode ? '#0f172a' : '#f3f4f6';
 
-                return Promise.all(tasks).then(function() {
-                    return true;
+                return invokeCommand('set_android_system_ui', {
+                    darkMode: !!isDarkMode,
+                    statusBarColor: statusBarColor
+                }).catch(function() {
+                    var tasks = [];
+                    if (typeof currentWindow.setFullscreen === 'function') {
+                        tasks.push(Promise.resolve(currentWindow.setFullscreen(false)).catch(function() {}));
+                    }
+                    if (typeof currentWindow.setTheme === 'function') {
+                        tasks.push(Promise.resolve(currentWindow.setTheme(isDarkMode ? 'dark' : 'light')).catch(function() {}));
+                    }
+
+                    return Promise.all(tasks).then(function() {
+                        return true;
+                    });
                 });
             } catch (error) {
                 return Promise.resolve(false);
@@ -336,4 +353,27 @@
     global.desktopRuntime = {
         type: 'tauri'
     };
+
+    // Android webview may re-enter immersive state during lifecycle transitions.
+    // Keep forcing non-fullscreen state so status bar stays visible.
+    try {
+        var isAndroid = (global.navigator && /android/i.test(global.navigator.userAgent || ''));
+        if (isAndroid && global.electron && typeof global.electron.syncAndroidSystemUi === 'function') {
+            var applyUi = function() {
+                var nightMode = !!(global.nightMode === true || (global.document && global.document.body && global.document.body.classList.contains('night-mode')));
+                global.electron.syncAndroidSystemUi(nightMode).catch(function() {});
+            };
+
+            applyUi();
+            if (global.document) {
+                global.document.addEventListener('visibilitychange', applyUi, false);
+            }
+            global.addEventListener('focus', applyUi, false);
+            global.addEventListener('pageshow', applyUi, false);
+            setTimeout(applyUi, 500);
+            setTimeout(applyUi, 1800);
+        }
+    } catch (error) {
+        // no-op
+    }
 })(typeof window !== 'undefined' ? window : this);
