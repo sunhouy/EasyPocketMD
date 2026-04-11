@@ -30,6 +30,17 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "fileAssociations": [
+      {
+        "ext": [
+          "md",
+          "markdown"
+        ],
+        "name": "Markdown Document",
+        "description": "Markdown document",
+        "mimeType": "text/markdown"
+      }
+    ],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -37,6 +48,11 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
+    "linux": {
+      "deb": {
+        "desktopTemplate": "deb/easypocketmd.desktop.hbs"
+      }
+    },
     "android": {
       "autoIncrementVersionCode": true,
       "minSdkVersion": 24

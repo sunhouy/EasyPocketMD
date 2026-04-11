@@ -1,5 +1,3 @@
-#![cfg_attr(windows, windows_subsystem = "windows")]
-
 use base64::engine::general_purpose::STANDARD as BASE64_ENGINE;
 use base64::Engine;
 use serde::{Deserialize, Serialize};
@@ -129,6 +127,9 @@ fn chrono_like_now() -> u128 {
 }
 
 fn normalize_file_path(file_path: String) -> PathBuf {
+    if cfg!(windows) && file_path.starts_with("\\\\?\\") {
+        return PathBuf::from(file_path.trim_start_matches("\\\\?\\"));
+    }
     if cfg!(windows) && file_path.starts_with("file:///") {
         let trimmed = file_path.trim_start_matches("file:///");
         return PathBuf::from(trimmed.replace('/', "\\"));
@@ -430,6 +431,7 @@ pub fn run() {
         })
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             save_local_file,
             get_local_file_path,

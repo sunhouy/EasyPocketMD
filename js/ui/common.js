@@ -123,6 +123,9 @@
                     Promise.resolve(currentWindow.setTheme(global.nightMode ? 'dark' : 'light')).catch(function() {});
                 }
             }
+            if (global.electron && typeof global.electron.syncAndroidSystemUi === 'function') {
+                Promise.resolve(global.electron.syncAndroidSystemUi(global.nightMode === true)).catch(function() {});
+            }
         } catch (error) {
             // Ignore native theme sync failures; meta theme-color is still applied.
         }

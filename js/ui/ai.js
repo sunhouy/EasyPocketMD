@@ -381,14 +381,27 @@
             var pdfBtn = document.createElement('button');
             pdfBtn.innerHTML = '<i class="fas fa-file-pdf"></i> ' + (isEn() ? 'Download' : '下载');
             pdfBtn.style.cssText = 'padding:8px 16px;background:#dc3545;color:white;border:none;border-radius:4px;cursor:pointer;font-size:14px;font-weight:bold;';
-            pdfBtn.onclick = function() {
-                 var a = document.createElement('a');
-                 a.href = pdfUrl;
-                 a.download = isEn() ? 'AI_Layout_Document.pdf' : 'AI排版文档.pdf';
-                 a.target = '_blank';
-                 document.body.appendChild(a);
-                 a.click();
-                 document.body.removeChild(a);
+            pdfBtn.onclick = async function() {
+                 try {
+                    var filename = isEn() ? 'AI_Layout_Document.pdf' : 'AI排版文档.pdf';
+                    if (window.nativeFileOps && window.nativeFileOps.isTauriRuntime()) {
+                        await window.nativeFileOps.saveFile({ url: pdfUrl }, {
+                            filename: filename,
+                            mimeType: 'application/pdf'
+                        });
+                        return;
+                    }
+
+                    var a = document.createElement('a');
+                    a.href = pdfUrl;
+                    a.download = filename;
+                    a.target = '_blank';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                 } catch (error) {
+                    global.showMessage((isEn() ? 'Download failed: ' : '下载失败: ') + ((error && error.message) || ''), 'error');
+                 }
             };
 
             // 4. 关闭 (Close)
