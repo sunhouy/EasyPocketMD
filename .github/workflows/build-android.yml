@@ -117,6 +117,9 @@ jobs:
       - name: Verify WASM source artifacts
         run: npm run wasm:text:verify
 
+      - name: Build web frontend
+        run: npm run build:web
+
       - name: Extract version from tag
         shell: bash
         run: |

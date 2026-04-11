@@ -222,7 +222,7 @@ jobs:
           ' "$CONTROL_FILE")"
           echo "Original Debian Depends: $OLD_DEPENDS"
 
-          NEW_DEPENDS="$(printf '%s' "$OLD_DEPENDS" | perl -pe 's/(^|,\s*)libwebkit2gtk-4\.0-37(?=,|$)//g; s/,\s*,/, /g; s/^,\s*//; s/\s*,\s*$//')"
+          NEW_DEPENDS="$(printf '%s' "$OLD_DEPENDS" | tr '\n' ',' | perl -pe 's/(^|,\s*)libwebkit2gtk-4\.0-37(?=,|$)//g; s/,\s*,/, /g; s/^,\s*//; s/\s*,\s*$//')"
           echo "Normalized Debian Depends: $NEW_DEPENDS"
 
           awk '
@@ -242,6 +242,8 @@ jobs:
             }
           ' "$CONTROL_FILE" > "$CONTROL_FILE.cleaned"
           mv "$CONTROL_FILE.cleaned" "$CONTROL_FILE"
+          
+          # Format Depends line with safe single-line output (no embedded newlines)
           printf 'Depends: %s\n' "$NEW_DEPENDS" >> "$CONTROL_FILE"
 
           dpkg-deb -b "$UNPACK_DIR" "$DEB_FILE"
