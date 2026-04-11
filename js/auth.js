@@ -277,6 +277,44 @@
 
         const deleteAccountBtn = document.getElementById('deleteAccountBtn');
         if (deleteAccountBtn) deleteAccountBtn.onclick = deleteAccount;
+
+        // Bind collapse events
+        const changePasswordHeader = document.getElementById('changePasswordHeader');
+        if (changePasswordHeader) {
+            changePasswordHeader.onclick = () => toggleCollapse('changePassword');
+            // Start collapsed
+            setCollapseState('changePassword', true);
+        }
+
+        const deleteAccountHeader = document.getElementById('deleteAccountHeader');
+        if (deleteAccountHeader) {
+            deleteAccountHeader.onclick = () => toggleCollapse('deleteAccount');
+            // Start collapsed
+            setCollapseState('deleteAccount', true);
+        }
+    }
+
+    function toggleCollapse(id) {
+        const header = document.getElementById(id + 'Header');
+        const content = document.getElementById(id + 'Content');
+        if (!header || !content) return;
+
+        const isCollapsed = header.classList.contains('collapsed');
+        setCollapseState(id, !isCollapsed);
+    }
+
+    function setCollapseState(id, collapsed) {
+        const header = document.getElementById(id + 'Header');
+        const content = document.getElementById(id + 'Content');
+        if (!header || !content) return;
+
+        if (collapsed) {
+            header.classList.add('collapsed');
+            content.classList.add('collapsed');
+        } else {
+            header.classList.remove('collapsed');
+            content.classList.remove('collapsed');
+        }
     }
 
     async function changePassword() {
@@ -361,8 +399,8 @@
             return;
         }
 
-        // Show custom confirmation
-        const confirmed = await g('customConfirm')(t('deleteAccountConfirmMessage'));
+        // Show confirmation
+        const confirmed = window.confirm(t('deleteAccountConfirmMessage'));
         if (!confirmed) return;
 
         try {
