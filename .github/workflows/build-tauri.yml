@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       release_tag:
-        description: '要发布到 GitHub Release 的 tag（例如 v1.2.3；留空则使用当前 ref 的 tag）'
+        description: '要发布到 GitHub Release 的 tag（例如 v1.2.3；留空则只构建不发版）'
         required: false
         type: string
 
@@ -61,21 +61,9 @@ jobs:
             wasm_text_engine/dist/text_engine.wasm
           if-no-files-found: error
 
-  build-tauri:
+  build-tauri-linux:
     needs: build-wasm
-    strategy:
-      matrix:
-        include:
-          - os: windows-latest
-            script: build:tauri:win
-            artifactName: md-tauri-win
-          - os: ubuntu-latest
-            script: build:tauri:linux
-            artifactName: md-tauri-linux
-          - os: macos-latest
-            script: build:tauri:mac
-            artifactName: md-tauri-mac
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-22.04
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
@@ -94,39 +82,20 @@ jobs:
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Install Linux build dependencies
-        if: runner.os == 'Linux'
+      - name: Install Linux build dependencies (Tauri v1)
         run: |
           sudo apt-get update
           sudo apt-get install -y \
             pkg-config \
-            libwebkit2gtk-4.1-dev \
-            libjavascriptcoregtk-4.1-dev \
+            libwebkit2gtk-4.0-dev \
+            libjavascriptcoregtk-4.0-dev \
             libsoup2.4-dev \
-            libappindicator3-dev \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev \
             librsvg2-dev \
             patchelf
 
-      - name: Linux compatibility aliases for tauri v1
-        if: runner.os == 'Linux'
-        run: |
-          set -euxo pipefail
-          mkdir -p "$HOME/.pkgconfig"
-
-          JSC_PC_DIR="$(pkg-config --variable=pcfiledir javascriptcoregtk-4.1)"
-          WEBKIT_PC_DIR="$(pkg-config --variable=pcfiledir webkit2gtk-4.1)"
-
-          ln -sf "$JSC_PC_DIR/javascriptcoregtk-4.1.pc" "$HOME/.pkgconfig/javascriptcoregtk-4.0.pc"
-          ln -sf "$WEBKIT_PC_DIR/webkit2gtk-4.1.pc" "$HOME/.pkgconfig/webkit2gtk-4.0.pc"
-
-          export PKG_CONFIG_PATH="$HOME/.pkgconfig:$JSC_PC_DIR:$WEBKIT_PC_DIR:/usr/share/pkgconfig:${PKG_CONFIG_PATH:-}"
-          echo "PKG_CONFIG_PATH=$PKG_CONFIG_PATH" >> "$GITHUB_ENV"
-
-          pkg-config --print-errors --modversion javascriptcoregtk-4.0
-          pkg-config --print-errors --modversion webkit2gtk-4.0
-
       - name: Clean install dependencies
-        shell: bash
         run: |
           rm -rf node_modules package-lock.json
           npm install
@@ -135,7 +104,6 @@ jobs:
         run: npm run wasm:text:verify
 
       - name: Extract version from tag
-        id: extract-version
         shell: bash
         run: |
           TAG_NAME="${{ github.event_name == 'workflow_dispatch' && github.event.inputs.release_tag != '' && github.event.inputs.release_tag || github.ref_name }}"
@@ -155,8 +123,7 @@ jobs:
             }
             console.log(version);
           " "$TAG_NAME")
-          echo "VERSION=$VERSION" >> $GITHUB_ENV
-          echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
 
       - name: Sync app versions
         shell: bash
@@ -182,19 +149,238 @@ jobs:
             fs.writeFileSync(cargoPath, patched);
           '
 
-      - name: Build Tauri app (${{ matrix.script }})
-        run: npm run ${{ matrix.script }}
+      - name: Build Tauri app (Linux)
+        run: npm run build:tauri:linux
 
-      - name: Upload Tauri artifacts
+      - name: Upload Linux Tauri artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.artifactName }}
-          path: |
-            src-tauri/target/release/bundle/**
-          if-no-files-found: warn
+          name: md-tauri-linux
+          path: src-tauri/target/release/bundle/**
+          if-no-files-found: error
 
-  publish-tauri-release:
-    needs: build-tauri
+  build-tauri-windows:
+    needs: build-wasm
+    runs-on: windows-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Download WASM build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: wasm-text-engine-dist
+          path: wasm_text_engine/dist
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Clean install dependencies
+        shell: bash
+        run: |
+          rm -rf node_modules package-lock.json
+          npm install
+
+      - name: Verify WASM source artifacts
+        run: npm run wasm:text:verify
+
+      - name: Extract version from tag
+        shell: bash
+        run: |
+          TAG_NAME="${{ github.event_name == 'workflow_dispatch' && github.event.inputs.release_tag != '' && github.event.inputs.release_tag || github.ref_name }}"
+          VERSION=$(node -e "
+            let tagName = process.argv[1];
+            let version = tagName.replace(/^v/, '');
+            if (!/^\\d+(?:\\.\\d+){0,2}$/.test(version)) {
+              version = require('./package.json').version || '0.0.0';
+            }
+            const parts = version.split('.').filter(Boolean);
+            if (parts.length === 1) version = parts[0] + '.0.0';
+            else if (parts.length === 2) version = parts[0] + '.' + parts[1] + '.0';
+            else if (parts.length >= 3) version = parts[0] + '.' + parts[1] + '.' + parts[2];
+            if (!/^\\d+\\.\\d+\\.\\d+$/.test(version)) {
+              console.error('Invalid version resolved:', version);
+              process.exit(1);
+            }
+            console.log(version);
+          " "$TAG_NAME")
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+
+      - name: Sync app versions
+        shell: bash
+        run: |
+          node -e '
+            const fs = require("fs");
+            const version = process.env.VERSION;
+
+            const pkgPath = "package.json";
+            const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8"));
+            pkg.version = version;
+            fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2));
+
+            const tauriPath = "src-tauri/tauri.conf.json";
+            const tauriConfig = JSON.parse(fs.readFileSync(tauriPath, "utf8"));
+            tauriConfig.package = tauriConfig.package || {};
+            tauriConfig.package.version = version;
+            fs.writeFileSync(tauriPath, JSON.stringify(tauriConfig, null, 2));
+
+            const cargoPath = "src-tauri/Cargo.toml";
+            const cargoRaw = fs.readFileSync(cargoPath, "utf8");
+            const patched = cargoRaw.replace(/^version\\s*=\\s*"[^"]+"/m, `version = "${version}"`);
+            fs.writeFileSync(cargoPath, patched);
+          '
+
+      - name: Build Tauri app (Windows)
+        run: npm run build:tauri:win
+
+      - name: Upload Windows Tauri artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: md-tauri-win
+          path: src-tauri/target/release/bundle/**
+          if-no-files-found: error
+
+  build-tauri-macos:
+    needs: build-wasm
+    runs-on: macos-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Download WASM build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: wasm-text-engine-dist
+          path: wasm_text_engine/dist
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Clean install dependencies
+        shell: bash
+        run: |
+          rm -rf node_modules package-lock.json
+          npm install
+
+      - name: Verify WASM source artifacts
+        run: npm run wasm:text:verify
+
+      - name: Extract version from tag
+        shell: bash
+        run: |
+          TAG_NAME="${{ github.event_name == 'workflow_dispatch' && github.event.inputs.release_tag != '' && github.event.inputs.release_tag || github.ref_name }}"
+          VERSION=$(node -e "
+            let tagName = process.argv[1];
+            let version = tagName.replace(/^v/, '');
+            if (!/^\\d+(?:\\.\\d+){0,2}$/.test(version)) {
+              version = require('./package.json').version || '0.0.0';
+            }
+            const parts = version.split('.').filter(Boolean);
+            if (parts.length === 1) version = parts[0] + '.0.0';
+            else if (parts.length === 2) version = parts[0] + '.' + parts[1] + '.0';
+            else if (parts.length >= 3) version = parts[0] + '.' + parts[1] + '.' + parts[2];
+            if (!/^\\d+\\.\\d+\\.\\d+$/.test(version)) {
+              console.error('Invalid version resolved:', version);
+              process.exit(1);
+            }
+            console.log(version);
+          " "$TAG_NAME")
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+
+      - name: Sync app versions
+        shell: bash
+        run: |
+          node -e '
+            const fs = require("fs");
+            const version = process.env.VERSION;
+
+            const pkgPath = "package.json";
+            const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8"));
+            pkg.version = version;
+            fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2));
+
+            const tauriPath = "src-tauri/tauri.conf.json";
+            const tauriConfig = JSON.parse(fs.readFileSync(tauriPath, "utf8"));
+            tauriConfig.package = tauriConfig.package || {};
+            tauriConfig.package.version = version;
+            fs.writeFileSync(tauriPath, JSON.stringify(tauriConfig, null, 2));
+
+            const cargoPath = "src-tauri/Cargo.toml";
+            const cargoRaw = fs.readFileSync(cargoPath, "utf8");
+            const patched = cargoRaw.replace(/^version\\s*=\\s*"[^"]+"/m, `version = "${version}"`);
+            fs.writeFileSync(cargoPath, patched);
+          '
+
+      - name: Build Tauri app (macOS)
+        run: npm run build:tauri:mac
+
+      - name: Upload macOS Tauri artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: md-tauri-mac
+          path: src-tauri/target/release/bundle/**
+          if-no-files-found: error
+
+  publish-release-linux:
+    needs: build-tauri-linux
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && github.event.inputs.release_tag != '')
+    concurrency:
+      group: gh-release-${{ github.repository }}-${{ github.event_name == 'workflow_dispatch' && github.event.inputs.release_tag != '' && github.event.inputs.release_tag || github.ref_name }}
+      cancel-in-progress: false
+    steps:
+      - name: Download Linux Tauri artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: md-tauri-linux
+          path: downloads/linux
+
+      - name: Resolve release metadata
+        id: meta
+        shell: bash
+        run: |
+          TAG_NAME="${{ github.event_name == 'workflow_dispatch' && github.event.inputs.release_tag != '' && github.event.inputs.release_tag || github.ref_name }}"
+          VERSION=$(echo "$TAG_NAME" | sed 's/^v//')
+          echo "tag_name=$TAG_NAME" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Prepare Linux release assets
+        shell: bash
+        run: |
+          mkdir -p release
+          linux_deb=$(find downloads/linux -name "*.deb" | head -1)
+          linux_appimage=$(find downloads/linux -name "*.AppImage" | head -1)
+
+          if [ -z "$linux_deb" ] || [ -z "$linux_appimage" ]; then
+            echo "Missing Linux bundle files (.deb/.AppImage)"
+            exit 1
+          fi
+
+          cp "$linux_deb" "release/easypocketmd-${{ steps.meta.outputs.version }}-linux-amd64.deb"
+          cp "$linux_appimage" "release/easypocketmd-${{ steps.meta.outputs.version }}-linux-amd64.AppImage"
+
+      - name: Upload Linux assets to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.meta.outputs.tag_name }}
+          files: |
+            release/*.deb
+            release/*.AppImage
+          overwrite_files: true
+          fail_on_unmatched_files: true
+
+  publish-release-windows:
+    needs: build-tauri-windows
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && github.event.inputs.release_tag != '')
     concurrency:
@@ -205,134 +391,115 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: md-tauri-win
-          path: downloads/tauri/win
+          path: downloads/win
 
-      - name: Download Linux Tauri artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: md-tauri-linux
-          path: downloads/tauri/linux
-
-      - name: Download macOS Tauri artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: md-tauri-mac
-          path: downloads/tauri/mac
-
-      - name: Prepare release assets
+      - name: Resolve release metadata
+        id: meta
+        shell: bash
         run: |
-          TAG_NAME=${{ github.event_name == 'workflow_dispatch' && github.event.inputs.release_tag != '' && github.event.inputs.release_tag || github.ref_name }}
+          TAG_NAME="${{ github.event_name == 'workflow_dispatch' && github.event.inputs.release_tag != '' && github.event.inputs.release_tag || github.ref_name }}"
           VERSION=$(echo "$TAG_NAME" | sed 's/^v//')
+          echo "tag_name=$TAG_NAME" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Prepare Windows release assets
+        shell: bash
+        run: |
           mkdir -p release
+          win_installer=$(find downloads/win -name "*.exe" | head -1)
 
-          win_installer=$(find downloads/tauri/win -name "*.exe" | head -1)
-          if [ -n "$win_installer" ]; then
-            cp "$win_installer" "release/easypocketmd-$VERSION.exe"
+          if [ -z "$win_installer" ]; then
+            echo "Missing Windows installer (.exe)"
+            exit 1
           fi
 
-          linux_deb=$(find downloads/tauri/linux -name "*.deb" | head -1)
-          if [ -n "$linux_deb" ]; then
-            cp "$linux_deb" release/
-          fi
+          cp "$win_installer" "release/easypocketmd-${{ steps.meta.outputs.version }}-windows-x64.exe"
 
-          linux_appimage=$(find downloads/tauri/linux -name "*.AppImage" | head -1)
-          if [ -n "$linux_appimage" ]; then
-            cp "$linux_appimage" release/
-          fi
-
-          mac_dmg=$(find downloads/tauri/mac -name "*.dmg" | head -1)
-          if [ -n "$mac_dmg" ]; then
-            cp "$mac_dmg" release/
-          fi
-
-      - name: Upload Tauri assets to GitHub Release
+      - name: Upload Windows assets to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.release_tag != '' && github.event.inputs.release_tag || github.ref_name }}
-          files: |
-            release/easypocketmd-*.exe
-            release/*.deb
-            release/*.AppImage
-            release/*.dmg
+          tag_name: ${{ steps.meta.outputs.tag_name }}
+          files: release/*.exe
+          overwrite_files: true
+          fail_on_unmatched_files: true
 
-  deploy-tauri:
-    needs: build-tauri
+  publish-release-macos:
+    needs: build-tauri-macos
     runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && github.event.inputs.release_tag != '')
+    concurrency:
+      group: gh-release-${{ github.repository }}-${{ github.event_name == 'workflow_dispatch' && github.event.inputs.release_tag != '' && github.event.inputs.release_tag || github.ref_name }}
+      cancel-in-progress: false
     steps:
-      - name: Download Windows Tauri artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: md-tauri-win
-          path: downloads/tauri/win
-
-      - name: Download Linux Tauri artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: md-tauri-linux
-          path: downloads/tauri/linux
-
       - name: Download macOS Tauri artifact
         uses: actions/download-artifact@v4
         with:
           name: md-tauri-mac
-          path: downloads/tauri/mac
+          path: downloads/mac
 
-      - name: Create tauri directories on server
+      - name: Resolve release metadata
+        id: meta
+        shell: bash
+        run: |
+          TAG_NAME="${{ github.event_name == 'workflow_dispatch' && github.event.inputs.release_tag != '' && github.event.inputs.release_tag || github.ref_name }}"
+          VERSION=$(echo "$TAG_NAME" | sed 's/^v//')
+          echo "tag_name=$TAG_NAME" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Prepare macOS release assets
+        shell: bash
+        run: |
+          mkdir -p release
+          mac_dmg=$(find downloads/mac -name "*.dmg" | head -1)
+
+          if [ -z "$mac_dmg" ]; then
+            echo "Missing macOS installer (.dmg)"
+            exit 1
+          fi
+
+          cp "$mac_dmg" "release/easypocketmd-${{ steps.meta.outputs.version }}-macos-universal.dmg"
+
+      - name: Upload macOS assets to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.meta.outputs.tag_name }}
+          files: release/*.dmg
+          overwrite_files: true
+          fail_on_unmatched_files: true
+
+  deploy-tauri-linux:
+    needs: build-tauri-linux
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Linux Tauri artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: md-tauri-linux
+          path: downloads/linux
+
+      - name: Ensure Linux deploy directory exists
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           password: ${{ secrets.SERVER_PASSWORD }}
-          script: |
-            mkdir -p /www/wwwroot/static/tauri/win
-            mkdir -p /www/wwwroot/static/tauri/linux
-            mkdir -p /www/wwwroot/static/tauri/macos
+          script: mkdir -p /www/wwwroot/static/tauri/linux
 
-      - name: Prepare deployment installer files
+      - name: Prepare Linux deployment files
+        shell: bash
         run: |
-          mkdir -p deploy/win deploy/linux deploy/macos
+          mkdir -p deploy/linux
 
-          win_installer=$(find downloads/tauri/win -name "*.exe" | head -1)
-          if [ -n "$win_installer" ]; then
-            cp "$win_installer" "deploy/win/easypocketmd_windows.exe"
-          else
-            echo "No Windows installer (.exe) found"
+          linux_deb=$(find downloads/linux -name "*.deb" | head -1)
+          linux_appimage=$(find downloads/linux -name "*.AppImage" | head -1)
+
+          if [ -z "$linux_deb" ] || [ -z "$linux_appimage" ]; then
+            echo "Missing Linux installer files"
             exit 1
           fi
 
-          linux_deb=$(find downloads/tauri/linux -name "*.deb" | head -1)
-          if [ -n "$linux_deb" ]; then
-            cp "$linux_deb" "deploy/linux/easypocketmd_linux.deb"
-          else
-            echo "No Linux installer (.deb) found"
-            exit 1
-          fi
-
-          linux_appimage=$(find downloads/tauri/linux -name "*.AppImage" | head -1)
-          if [ -n "$linux_appimage" ]; then
-            cp "$linux_appimage" "deploy/linux/easypocketmd_linux.appimage"
-          else
-            echo "No Linux installer (.AppImage) found"
-            exit 1
-          fi
-
-          mac_dmg=$(find downloads/tauri/mac -name "*.dmg" | head -1)
-          if [ -n "$mac_dmg" ]; then
-            cp "$mac_dmg" "deploy/macos/easypocketmd_macos.dmg"
-          else
-            echo "No macOS installer (.dmg) found"
-            exit 1
-          fi
-
-      - name: Upload Windows Tauri artifact
-        uses: appleboy/scp-action@master
-        with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SERVER_USER }}
-          password: ${{ secrets.SERVER_PASSWORD }}
-          source: "deploy/win/easypocketmd_windows.exe"
-          target: "/www/wwwroot/static/tauri/win"
-          strip_components: 2
+          cp "$linux_deb" "deploy/linux/easypocketmd_linux.deb"
+          cp "$linux_appimage" "deploy/linux/easypocketmd_linux.appimage"
 
       - name: Upload Linux Tauri artifacts
         uses: appleboy/scp-action@master
@@ -340,9 +507,81 @@ jobs:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           password: ${{ secrets.SERVER_PASSWORD }}
-          source: "deploy/linux/*"
-          target: "/www/wwwroot/static/tauri/linux"
+          source: deploy/linux/*
+          target: /www/wwwroot/static/tauri/linux
           strip_components: 2
+
+  deploy-tauri-windows:
+    needs: build-tauri-windows
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Windows Tauri artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: md-tauri-win
+          path: downloads/win
+
+      - name: Ensure Windows deploy directory exists
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          password: ${{ secrets.SERVER_PASSWORD }}
+          script: mkdir -p /www/wwwroot/static/tauri/win
+
+      - name: Prepare Windows deployment file
+        shell: bash
+        run: |
+          mkdir -p deploy/win
+          win_installer=$(find downloads/win -name "*.exe" | head -1)
+
+          if [ -z "$win_installer" ]; then
+            echo "Missing Windows installer (.exe)"
+            exit 1
+          fi
+
+          cp "$win_installer" "deploy/win/easypocketmd_windows.exe"
+
+      - name: Upload Windows Tauri artifact
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          password: ${{ secrets.SERVER_PASSWORD }}
+          source: deploy/win/easypocketmd_windows.exe
+          target: /www/wwwroot/static/tauri/win
+          strip_components: 2
+
+  deploy-tauri-macos:
+    needs: build-tauri-macos
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download macOS Tauri artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: md-tauri-mac
+          path: downloads/mac
+
+      - name: Ensure macOS deploy directory exists
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          password: ${{ secrets.SERVER_PASSWORD }}
+          script: mkdir -p /www/wwwroot/static/tauri/macos
+
+      - name: Prepare macOS deployment file
+        shell: bash
+        run: |
+          mkdir -p deploy/macos
+          mac_dmg=$(find downloads/mac -name "*.dmg" | head -1)
+
+          if [ -z "$mac_dmg" ]; then
+            echo "Missing macOS installer (.dmg)"
+            exit 1
+          fi
+
+          cp "$mac_dmg" "deploy/macos/easypocketmd_macos.dmg"
 
       - name: Upload macOS Tauri artifact
         uses: appleboy/scp-action@master
@@ -350,6 +589,6 @@ jobs:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           password: ${{ secrets.SERVER_PASSWORD }}
-          source: "deploy/macos/easypocketmd_macos.dmg"
-          target: "/www/wwwroot/static/tauri/macos"
+          source: deploy/macos/easypocketmd_macos.dmg
+          target: /www/wwwroot/static/tauri/macos
           strip_components: 2
