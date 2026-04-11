@@ -4,7 +4,7 @@
     var OCR_API = 'https://ocr.yhsun.cn/';
 
     function getNativeAwareResolveBase() {
-        var isNativeLike = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) ||
+        var isNativeLike = !!(window.nativeFileOps && window.nativeFileOps.isTauriRuntime && window.nativeFileOps.isTauriRuntime()) ||
             !!window.electron ||
             (window.location && window.location.protocol === 'file:');
 

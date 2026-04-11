@@ -6,23 +6,19 @@
     var LAST_CHECK_AT_KEY = 'vditor_native_version_check_at';
     var LAST_DISMISSED_VERSION_KEY = 'vditor_native_version_dismissed';
     var CLIENT_DOWNLOAD_LINKS = {
-        android: 'https://static.yhsun.cn/android/app-release.apk',
+        android: 'https://static.yhsun.cn/tauri/android/easypocketmd_android.apk',
         windows: 'https://static.yhsun.cn/tauri/win/easypocketmd_windows.exe',
         macos: 'https://static.yhsun.cn/tauri/macos/easypocketmd_macos.dmg',
         linuxAppImage: 'https://static.yhsun.cn/tauri/linux/easypocketmd_linux.appimage',
         linuxDeb: 'https://static.yhsun.cn/tauri/linux/easypocketmd_linux.deb'
     };
 
-    function isCapacitorNative() {
-        return !!(global.Capacitor && typeof global.Capacitor.isNativePlatform === 'function' && global.Capacitor.isNativePlatform());
-    }
-
     function isDesktopRuntime() {
         return !!(global.electron || global.__TAURI__ || (global.process && global.process.type));
     }
 
     function isNativeRuntime() {
-        return isCapacitorNative() || isDesktopRuntime();
+        return isDesktopRuntime();
     }
 
     function normalizeVersion(raw) {
@@ -70,12 +66,11 @@
     }
 
     function getPreferredDownloadUrl() {
-        if (isCapacitorNative()) {
-            return CLIENT_DOWNLOAD_LINKS.android;
-        }
-
         if (isDesktopRuntime()) {
             var ua = (navigator.userAgent || '').toLowerCase();
+            if (ua.indexOf('android') !== -1) {
+                return CLIENT_DOWNLOAD_LINKS.android;
+            }
             if (ua.indexOf('win') !== -1) {
                 return CLIENT_DOWNLOAD_LINKS.windows;
             }

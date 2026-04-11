@@ -1,6 +1,6 @@
 /**
  * 应用生命周期管理模块
- * 处理 Web、Capacitor 和桌面壳环境（Tauri）应用生命周期事件
+ * 处理 Web 与桌面壳环境（Tauri）应用生命周期事件
  * 确保应用在关闭、后台运行等情况下数据不丢失
  */
 (function(global) {
@@ -8,8 +8,6 @@
 
     // 保存原始的文件列表引用，用于紧急保存
     let isInitialized = false;
-    let capacitorApp = null;
-    let capacitorDialog = null;
     let leaveSaveInFlight = false;
     let lastLeaveSaveAt = 0;
     const LEAVE_SAVE_COOLDOWN_MS = 1200;
@@ -19,10 +17,9 @@
      */
     function detectEnvironment() {
         return {
-            isCapacitor: typeof global.Capacitor !== 'undefined' && global.Capacitor.isNativePlatform(),
+            isTauri: typeof global.desktopRuntime !== 'undefined' && global.desktopRuntime && global.desktopRuntime.type === 'tauri',
             isDesktop: typeof global.electron !== 'undefined' || typeof global.__TAURI__ !== 'undefined' || /electron/i.test(navigator.userAgent),
-            isWeb: !((typeof global.Capacitor !== 'undefined' && global.Capacitor.isNativePlatform()) ||
-                     (typeof global.electron !== 'undefined' || typeof global.__TAURI__ !== 'undefined' || /electron/i.test(navigator.userAgent)))
+            isWeb: !((typeof global.electron !== 'undefined' || typeof global.__TAURI__ !== 'undefined' || /electron/i.test(navigator.userAgent)))
         };
     }
 
@@ -90,15 +87,6 @@
                 leaveSaveInFlight = false;
             }, LEAVE_SAVE_COOLDOWN_MS);
         }
-    }
-
-    function loadCapacitorDialogPlugin() {
-        if (capacitorDialog) return capacitorDialog;
-        if (global.Capacitor && global.Capacitor.Plugins && global.Capacitor.Plugins.Dialog) {
-            capacitorDialog = global.Capacitor.Plugins.Dialog;
-            return capacitorDialog;
-        }
-        return null;
     }
 
     /**
@@ -254,84 +242,6 @@
         // console.log('[Lifecycle] Web lifecycle handlers initialized');
     }
 
-    async function resolveCapacitorAppPlugin() {
-        if (capacitorApp && typeof capacitorApp.addListener === 'function') {
-            return capacitorApp;
-        }
-
-        if (global.Capacitor && global.Capacitor.Plugins && global.Capacitor.Plugins.App && typeof global.Capacitor.Plugins.App.addListener === 'function') {
-            return global.Capacitor.Plugins.App;
-        }
-
-        try {
-            const appModuleName = '@capacitor/app';
-            const appModule = await import(/* @vite-ignore */ appModuleName);
-            if (appModule && appModule.App && typeof appModule.App.addListener === 'function') {
-                return appModule.App;
-            }
-        } catch (importError) {
-            // @capacitor/app may be absent in web-only builds; fallback below.
-        }
-
-        if (global.CapacitorApp && typeof global.CapacitorApp.addListener === 'function') {
-            return global.CapacitorApp;
-        }
-
-        return null;
-    }
-
-    /**
-     * 初始化 Capacitor 生命周期处理
-     */
-    async function initCapacitorLifecycle() {
-        if (!global.Capacitor) return;
-
-        // 通过 Capacitor 注入的原生插件对象注册生命周期监听。
-        try {
-            capacitorApp = await resolveCapacitorAppPlugin();
-
-            if (!capacitorApp || typeof capacitorApp.addListener !== 'function') {
-                console.info('[Lifecycle] Capacitor App plugin unavailable, using web lifecycle fallback');
-                return;
-            }
-
-            // 应用状态变化（前台/后台）
-            capacitorApp.addListener('appStateChange', function(state) {
-                if (!state.isActive) {
-                    scheduleLeaveSave('capacitor:appStateChange:hidden');
-                } else {
-                    checkAndOfferDraftRecovery();
-                }
-            });
-
-            // pause 在 Android 切后台/切任务时会触发，作为 appStateChange 的补充。
-            capacitorApp.addListener('pause', function() {
-                scheduleLeaveSave('capacitor:pause');
-            });
-
-            // Android 返回按钮处理
-            capacitorApp.addListener('backButton', function() {
-                // 检查是否有未保存的更改
-                const unsaved = global.unsavedChanges || {};
-                const hasUnsaved = (global.files || []).some(f => unsaved[f.id]);
-
-                if (hasUnsaved) {
-                    // 显示确认对话框
-                    if (confirm(global.i18n ? global.i18n.t('confirmLeave') : '您有未保存的文件，确定要离开吗？')) {
-                        scheduleLeaveSave('capacitor:backButton');
-                        capacitorApp.exitApp();
-                    }
-                } else {
-                    capacitorApp.exitApp();
-                }
-            });
-
-            // console.log('[Lifecycle] Capacitor lifecycle handlers initialized');
-        } catch (e) {
-            console.warn('[Lifecycle] Failed to initialize Capacitor lifecycle:', e);
-        }
-    }
-
     /**
      * 初始化桌面壳生命周期处理（通过桥接事件兼容）
      */
@@ -436,49 +346,10 @@
 
         const title = global.i18n ? global.i18n.t('draftRecoveryTitle') : '恢复草稿';
 
-        if (env.isCapacitor && capacitorApp) {
-            // Capacitor 环境使用原生对话框
-            try {
-                const Dialog = loadCapacitorDialogPlugin();
-                if (Dialog && typeof Dialog.confirm === 'function') {
-                    Dialog.confirm({
-                        title: title,
-                        message: message
-                    }).then(function(result) {
-                        if (result.value) {
-                            performDraftRecovery();
-                        } else {
-                            global.draftRecovery.clearDraft();
-                        }
-                    }).catch(function() {
-                        if (confirm(message)) {
-                            performDraftRecovery();
-                        } else {
-                            global.draftRecovery.clearDraft();
-                        }
-                    });
-                } else {
-                    if (confirm(message)) {
-                        performDraftRecovery();
-                    } else {
-                        global.draftRecovery.clearDraft();
-                    }
-                }
-            } catch (e) {
-                // 回退到普通 confirm
-                if (confirm(message)) {
-                    performDraftRecovery();
-                } else {
-                    global.draftRecovery.clearDraft();
-                }
-            }
+        if (confirm(message)) {
+            performDraftRecovery();
         } else {
-            // Web/Electron 环境
-            if (confirm(message)) {
-                performDraftRecovery();
-            } else {
-                global.draftRecovery.clearDraft();
-            }
+            global.draftRecovery.clearDraft();
         }
     }
 
@@ -504,61 +375,14 @@
               `云端版本时间: ${serverTime}\n\n` +
               `云端版本较新。点击"确定"使用云端版本，点击"取消"恢复本地草稿。`;
 
-        if (env.isCapacitor && capacitorApp) {
-            // Capacitor 环境使用原生对话框
-            try {
-                const Dialog = loadCapacitorDialogPlugin();
-                if (Dialog && typeof Dialog.confirm === 'function') {
-                    Dialog.confirm({
-                        title: title,
-                        message: message
-                    }).then(function(result) {
-                        if (result.value) {
-                            // 使用云端版本，清除草稿
-                            global.draftRecovery.clearDraft();
-                            const msg = isEn ? 'Using server version' : '已使用云端版本';
-                            if (global.showMessage) {
-                                global.showMessage(msg, 'info');
-                            }
-                        } else {
-                            // 恢复本地草稿
-                            performDraftRecovery();
-                        }
-                    }).catch(function() {
-                        if (confirm(message)) {
-                            global.draftRecovery.clearDraft();
-                        } else {
-                            performDraftRecovery();
-                        }
-                    });
-                } else {
-                    if (confirm(message)) {
-                        global.draftRecovery.clearDraft();
-                    } else {
-                        performDraftRecovery();
-                    }
-                }
-            } catch (e) {
-                // 回退到普通 confirm
-                if (confirm(message)) {
-                    global.draftRecovery.clearDraft();
-                } else {
-                    performDraftRecovery();
-                }
+        if (confirm(message)) {
+            global.draftRecovery.clearDraft();
+            const msg = isEn ? 'Using server version' : '已使用云端版本';
+            if (global.showMessage) {
+                global.showMessage(msg, 'info');
             }
         } else {
-            // Web/Electron 环境
-            if (confirm(message)) {
-                // 使用云端版本，清除草稿
-                global.draftRecovery.clearDraft();
-                const msg = isEn ? 'Using server version' : '已使用云端版本';
-                if (global.showMessage) {
-                    global.showMessage(msg, 'info');
-                }
-            } else {
-                // 恢复本地草稿
-                performDraftRecovery();
-            }
+            performDraftRecovery();
         }
     }
 
@@ -612,10 +436,6 @@
 
         // 根据环境初始化相应的生命周期处理
         initWebLifecycle(); // Web 环境总是初始化
-
-        if (env.isCapacitor) {
-            initCapacitorLifecycle();
-        }
 
         if (env.isDesktop) {
             initDesktopLifecycle();

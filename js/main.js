@@ -15,12 +15,8 @@ document.addEventListener('DOMContentLoaded', function() {
         applyTranslations();
     }
     var isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-    var isCapacitor = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
-    window.isMobileEditorEnvironment = isMobileDevice || isCapacitor;
+    window.isMobileEditorEnvironment = isMobileDevice;
     window.editorInterfaceMode = window.isMobileEditorEnvironment ? 'mobile' : 'desktop';
-    if (isCapacitor) {
-        document.body.classList.add('is-capacitor');
-    }
 
     function getTargetElement(target) {
         if (!target) return null;
@@ -43,7 +39,7 @@ document.addEventListener('DOMContentLoaded', function() {
         return !!el.closest('button, .mobile-action-btn, .bottom-btn, .dropdown-item, .mobile-toolbar-container, .mobile-bottom-bar, .file-list-sidebar, .modal-overlay, .sync-status, .jstree-anchor, .file-menu-btn');
     }
 
-    if (isMobileDevice || isCapacitor) {
+    if (isMobileDevice) {
         document.addEventListener('contextmenu', function(e) {
             if (!shouldBlockContextMenu(e.target)) return;
             e.preventDefault();
@@ -971,7 +967,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (configuredMode === 'mobile' || configuredMode === 'desktop') {
             return configuredMode;
         }
-        return (isMobileDevice || isCapacitor) ? 'mobile' : 'desktop';
+        return isMobileDevice ? 'mobile' : 'desktop';
     }
 
     function applyInterfaceMode(settings) {
@@ -1377,7 +1373,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 return Promise.resolve();
             }
             return window.ensureWasmTextEngineReady().catch(function(error) {
-                // Capacitor 冷启动时 wasm 预热失败不应阻断主流程，继续走 JS 回退能力。
+                // 冷启动时 wasm 预热失败不应阻断主流程，继续走 JS 回退能力。
                 console.warn('[startup] wasm prewarm failed, continue with fallback runtime', error);
             });
         };
@@ -2515,9 +2511,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // 关于对话框
     function isNativeClientRuntime() {
-        var isCapacitor = !!(window.Capacitor && typeof window.Capacitor.isNativePlatform === 'function' && window.Capacitor.isNativePlatform());
         var isElectron = !!(window.electron || (window.process && window.process.type));
-        return isCapacitor || isElectron;
+        var isTauri = !!(window.desktopRuntime && window.desktopRuntime.type === 'tauri');
+        return isTauri || isElectron;
     }
 
     function getClientDownloadLinks() {
@@ -2525,7 +2521,7 @@ document.addEventListener('DOMContentLoaded', function() {
             return window.getClientDownloadLinks();
         }
         return {
-            android: 'https://static.yhsun.cn/android/app-release.apk',
+            android: 'https://static.yhsun.cn/tauri/android/easypocketmd_android.apk',
             windows: 'https://static.yhsun.cn/tauri/win/easypocketmd_windows.exe',
             macos: 'https://static.yhsun.cn/tauri/macos/easypocketmd_macos.dmg',
             linuxAppImage: 'https://static.yhsun.cn/tauri/linux/easypocketmd_linux.appimage',

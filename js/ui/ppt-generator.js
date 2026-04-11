@@ -1622,7 +1622,7 @@ JSON 结构：
             });
         };
 
-        if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) {
+        if (window.nativeFileOps && window.nativeFileOps.isTauriRuntime()) {
             requestAnimationFrame(openFilenameDialog);
             return;
         }
@@ -1721,38 +1721,10 @@ JSON 结构：
             // 下载文件
             var blob = await response.blob();
 
-            if (window.Capacitor && window.Capacitor.isNativePlatform()) {
-                // Capacitor 环境：将 Blob 写入临时文件后调用系统分享/保存
-                var base64Data = await new Promise(function(resolve, reject) {
-                    var reader = new FileReader();
-                    reader.onloadend = function() {
-                        try {
-                            var result = reader.result || '';
-                            var base64 = String(result).split(',')[1] || '';
-                            resolve(base64);
-                        } catch (err) {
-                            reject(err);
-                        }
-                    };
-                    reader.onerror = function() {
-                        reject(new Error('读取文件失败'));
-                    };
-                    reader.readAsDataURL(blob);
-                });
-
-                var fsModule = await import('@capacitor/filesystem');
-                var shareModule = await import('@capacitor/share');
-                var writeResult = await fsModule.Filesystem.writeFile({
-                    path: fileName,
-                    data: base64Data,
-                    directory: fsModule.Directory.Cache
-                });
-
-                await shareModule.Share.share({
-                    title: fileName,
-                    text: fileName,
-                    url: writeResult.uri,
-                    dialogTitle: isEn() ? 'Save or Share File' : '保存或分享文件'
+            if (window.nativeFileOps && window.nativeFileOps.isTauriRuntime()) {
+                await window.nativeFileOps.saveFile(blob, {
+                    filename: fileName,
+                    mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
                 });
             } else {
                 var url = window.URL.createObjectURL(blob);

@@ -68,7 +68,7 @@
     }
 
     function isSpecialResourceUrl(url) {
-        return typeof url === 'string' && /^(blob:|data:|file:|capacitor:|content:)/i.test(url);
+        return typeof url === 'string' && /^(blob:|data:|file:|content:)/i.test(url);
     }
 
     function isAbsoluteUrl(url) {
@@ -118,10 +118,10 @@
                 return normalizeApiBase(configuredApiBase);
             }
 
-            // 在 Electron 应用、Capacitor 应用或本地 file:// 协议下运行，直接请求远程服务器
+            // 在桌面壳环境或本地 file:// 协议下运行，直接请求远程服务器
             if (window.electron || 
                 (window.location && (window.location.protocol === 'file:' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) ||
-                (window.Capacitor && window.Capacitor.isNativePlatform())) {
+                (window.desktopRuntime && window.desktopRuntime.type === 'tauri')) {
                 return 'https://md.yhsun.cn/api';
             }
             if (window.location && window.location.origin) {
@@ -147,7 +147,7 @@
 
             if (window.electron || 
                 (window.location && (window.location.protocol === 'file:' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) ||
-                (window.Capacitor && window.Capacitor.isNativePlatform())) {
+                (window.desktopRuntime && window.desktopRuntime.type === 'tauri')) {
                 return 'https://md.yhsun.cn';
             }
             return window.location.origin;

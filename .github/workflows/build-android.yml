@@ -1,4 +1,4 @@
-name: Build Android APK
+name: Build Android App
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       release_tag:
-        description: '要发布到 GitHub Release 的 tag（例如 v1.2.3；留空则使用当前 ref 的 tag）'
+        description: 'Tag to publish to GitHub Release (e.g. v1.2.3); leave empty to build only'
         required: false
         type: string
 
@@ -16,11 +16,15 @@ permissions:
 
 env:
   NODE_VERSION: '20'
+  JAVA_VERSION: '17'
+  ANDROID_API_LEVEL: '34'
+  ANDROID_BUILD_TOOLS: '34.0.0'
+  ANDROID_NDK_VERSION: '26.3.11579264'
+
 
 jobs:
-  build-android:
+  build-wasm:
     runs-on: ubuntu-latest
-    
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
@@ -29,13 +33,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-
-      - name: Setup Java
-        uses: actions/setup-java@v4
-        with:
-          java-version: '17'
-          distribution: 'temurin'
-
 
       - name: Setup Emscripten
         run: |
@@ -57,260 +54,237 @@ jobs:
       - name: Verify WASM source artifacts
         run: npm run wasm:text:verify
 
+      - name: Upload WASM build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: wasm-text-engine-dist
+          path: |
+            wasm_text_engine/dist/text_engine.js
+            wasm_text_engine/dist/text_engine.wasm
+          if-no-files-found: error
+
+  build-tauri-android:
+    needs: build-wasm
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Download WASM build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: wasm-text-engine-dist
+          path: wasm_text_engine/dist
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK components
+        shell: bash
+        run: |
+          set -euo pipefail
+          yes | sdkmanager --licenses > /dev/null
+          sdkmanager \
+            "platform-tools" \
+            "platforms;android-${ANDROID_API_LEVEL}" \
+            "build-tools;${ANDROID_BUILD_TOOLS}" \
+            "ndk;${ANDROID_NDK_VERSION}"
+
+          echo "ANDROID_NDK_HOME=${ANDROID_SDK_ROOT}/ndk/${ANDROID_NDK_VERSION}" >> "$GITHUB_ENV"
+          echo "NDK_HOME=${ANDROID_SDK_ROOT}/ndk/${ANDROID_NDK_VERSION}" >> "$GITHUB_ENV"
+
+      - name: Clean install dependencies
+        run: |
+          rm -rf node_modules package-lock.json
+          npm install
+
+      - name: Verify WASM source artifacts
+        run: npm run wasm:text:verify
+
       - name: Extract version from tag
-        id: extract-version
+        shell: bash
         run: |
-          TAG_NAME=${{ github.event_name == 'workflow_dispatch' && github.event.inputs.release_tag != '' && github.event.inputs.release_tag || github.ref_name }}
-          VERSION=$(echo "$TAG_NAME" | sed 's/^v//')
+          TAG_NAME="${{ github.event_name == 'workflow_dispatch' && github.event.inputs.release_tag != '' && github.event.inputs.release_tag || github.ref_name }}"
+          VERSION=$(node -e "
+            let tagName = process.argv[1];
+            let version = tagName.replace(/^v/, '');
+            if (!/^\\d+(?:\\.\\d+){0,2}$/.test(version)) {
+              version = require('./package.json').version || '0.0.0';
+            }
+            const parts = version.split('.').filter(Boolean);
+            if (parts.length === 1) version = parts[0] + '.0.0';
+            else if (parts.length === 2) version = parts[0] + '.' + parts[1] + '.0';
+            else if (parts.length >= 3) version = parts[0] + '.' + parts[1] + '.' + parts[2];
+            if (!/^\\d+\\.\\d+\\.\\d+$/.test(version)) {
+              console.error('Invalid version resolved:', version);
+              process.exit(1);
+            }
+            console.log(version);
+          " "$TAG_NAME")
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
 
-          # workflow_dispatch 未指定 tag 时，ref 可能是 main；此时回退到 package.json 版本
-          if ! echo "$VERSION" | grep -q '^[0-9]\+\(\.[0-9]\+\)\{0,2\}$'; then
-            VERSION=$(node -p "require('./package.json').version")
-          fi
-
-          # 统一补齐到 x.y.z
-          if echo "$VERSION" | grep -q '^[0-9]\+$'; then
-            VERSION="$VERSION.0.0"
-          elif echo "$VERSION" | grep -q '^[0-9]\+\.[0-9]\+$'; then
-            VERSION="$VERSION.0"
-          fi
-
-          # 二次兜底，确保输出严格 semver
-          if ! echo "$VERSION" | grep -q '^[0-9]\+\.[0-9]\+\.[0-9]\+$'; then
-            echo "Invalid version resolved: $VERSION"
-            exit 1
-          fi
-          
-          # 生成 versionCode：主版本*10000 + 次版本*100 + 修订版本
-          VERSION_CODE=$(echo "$VERSION" | awk -F. '{ 
-              major = $1 ? $1 : 0; 
-              minor = $2 ? $2 : 0; 
-              patch = $3 ? $3 : 0; 
-              printf("%d", major * 10000 + minor * 100 + patch) 
-          }')
-          
-          echo "VERSION=$VERSION" >> $GITHUB_ENV
-          echo "VERSION_CODE=$VERSION_CODE" >> $GITHUB_ENV
-          echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
-
-      - name: Update package.json version
+      - name: Sync app versions
+        shell: bash
         run: |
-          node -e "
-            const fs = require('fs');
-            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
-            pkg.version = process.env.VERSION;
-            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2));
-          "
+          node -e '
+            const fs = require("fs");
+            const version = process.env.VERSION;
 
-      - name: Build web app
-        run: npm run build
+            const pkgPath = "package.json";
+            const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8"));
+            pkg.version = version;
+            fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2));
 
-      - name: Verify WASM packaged in dist
-        run: npm run wasm:text:verify:dist
+            const tauriPath = "src-tauri/tauri.conf.json";
+            const tauriConfig = JSON.parse(fs.readFileSync(tauriPath, "utf8"));
+            tauriConfig.version = version;
+            fs.writeFileSync(tauriPath, JSON.stringify(tauriConfig, null, 2));
 
-      - name: Add Android platform
+            const cargoPath = "src-tauri/Cargo.toml";
+            const cargoRaw = fs.readFileSync(cargoPath, "utf8");
+            const patched = cargoRaw.replace(/^version\s*=\s*"[^"]+"/m, `version = "${version}"`);
+            fs.writeFileSync(cargoPath, patched);
+          '
+
+      - name: Initialize Android project (if needed)
+        shell: bash
         run: |
-          if [ ! -d "android" ]; then
-            npx cap add android
+          set -euo pipefail
+          if [ ! -d "src-tauri/gen/android" ]; then
+            npm run tauri:android:init
           fi
-
-      - name: Sync Capacitor
-        run: npx cap sync
-
-      - name: Configure Android Permissions
-        run: |
-          # 确保 AndroidManifest.xml 包含摄像头和麦克风权限
-          MANIFEST_FILE="android/app/src/main/AndroidManifest.xml"
-          
-          # 检查并添加权限
-          if [ -f "$MANIFEST_FILE" ]; then
-            # 添加 CAMERA 权限（如果不存在）
-            if ! grep -q 'android.permission.CAMERA' "$MANIFEST_FILE"; then
-              sed -i '/<manifest[^>]*>/a\    <uses-permission android:name="android.permission.CAMERA" />' "$MANIFEST_FILE"
-            fi
-            
-            # 添加 RECORD_AUDIO 权限（如果不存在）
-            if ! grep -q 'android.permission.RECORD_AUDIO' "$MANIFEST_FILE"; then
-              sed -i '/<manifest[^>]*>/a\    <uses-permission android:name="android.permission.RECORD_AUDIO" />' "$MANIFEST_FILE"
-            fi
-            
-            # 添加 MODIFY_AUDIO_SETTINGS 权限（如果不存在）
-            if ! grep -q 'android.permission.MODIFY_AUDIO_SETTINGS' "$MANIFEST_FILE"; then
-              sed -i '/<manifest[^>]*>/a\    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />' "$MANIFEST_FILE"
-            fi
-            
-            # 添加 INTERNET 权限（如果不存在）
-            if ! grep -q 'android.permission.INTERNET' "$MANIFEST_FILE"; then
-              sed -i '/<manifest[^>]*>/a\    <uses-permission android:name="android.permission.INTERNET" />' "$MANIFEST_FILE"
-            fi
-
-            # 快速校验 XML 是否可解析，尽早暴露格式问题
-            python3 -c "import xml.etree.ElementTree as ET; ET.parse('$MANIFEST_FILE'); print('AndroidManifest.xml XML validation passed')"
-            
-            echo "AndroidManifest.xml 权限配置完成："
-            grep -E 'uses-permission' "$MANIFEST_FILE" || echo "未找到权限声明"
-          else
-            echo "错误: AndroidManifest.xml 文件不存在"
-            exit 1
-          fi
-
-      - name: Generate Android Assets (Icons & Splash)
-        run: |
-          # 确保 assets 目录存在并包含图标
-          mkdir -p assets
-          if [ -f "icon.png" ]; then
-            cp icon.png assets/icon.png
-          fi
-          # 生成 Android 资源文件
-          npm run cap:assets
 
       - name: Setup Android signing keystore (from secrets)
         env:
           JKS_BASE64: ${{ secrets.JKS_BASE64 }}
-        run: |
-          mkdir -p android/app
-          printf '%s' "$JKS_BASE64" | base64 --decode > android/app/release.keystore
-          chmod 600 android/app/release.keystore
-
-      - name: Configure Gradle for signing and version
-        env:
           JKS_ALIAS: ${{ secrets.JKS_ALIAS }}
           JKS_PASSWORD: ${{ secrets.JKS_PASSWORD }}
+          IS_RELEASE: ${{ startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && github.event.inputs.release_tag != '') }}
+        shell: bash
         run: |
-          cat > android/app/build.gradle << 'EOF'
-          apply plugin: 'com.android.application'
+          set -euo pipefail
 
-          android {
-              namespace "cn.yhsun.md"
-              compileSdkVersion rootProject.ext.compileSdkVersion
-              defaultConfig {
-                  applicationId "cn.yhsun.md"
-                  minSdkVersion rootProject.ext.minSdkVersion
-                  targetSdkVersion rootProject.ext.targetSdkVersion
-                  versionCode $VERSION_CODE
-                  versionName "$VERSION"
-                  testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
-                  aaptOptions {
-                     ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
-                  }
-              }
-              signingConfigs {
-                  release {
-                      if (project.hasProperty('RELEASE_STORE_FILE')) {
-                          storeFile file(RELEASE_STORE_FILE)
-                          storePassword RELEASE_STORE_PASSWORD
-                          keyAlias RELEASE_KEY_ALIAS
-                          keyPassword RELEASE_KEY_PASSWORD
-                      }
-                  }
-              }
-              buildTypes {
-                  release {
-                      minifyEnabled false
-                      proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
-                      signingConfig signingConfigs.release
-                  }
-              }
-          }
+          if [ -z "${JKS_BASE64:-}" ] || [ -z "${JKS_ALIAS:-}" ] || [ -z "${JKS_PASSWORD:-}" ]; then
+            if [ "${IS_RELEASE}" = "true" ]; then
+              echo "Missing required signing secrets (JKS_BASE64 / JKS_ALIAS / JKS_PASSWORD) for release build"
+              exit 1
+            fi
+            echo "Signing secrets not configured. Continue with unsigned/non-release signing."
+            exit 0
+          fi
 
-          repositories {
-              google()
-              mavenCentral()
-              flatDir {
-                  dirs 'libs'
-              }
-          }
+          mkdir -p src-tauri/gen/android/app
+          printf '%s' "$JKS_BASE64" | base64 --decode > src-tauri/gen/android/app/release.keystore
+          chmod 600 src-tauri/gen/android/app/release.keystore
 
-          dependencies {
-              implementation fileTree(dir: 'libs', include: ['*.jar'])
-              implementation "androidx.appcompat:appcompat:1.6.1"
-              implementation "androidx.coordinatorlayout:coordinatorlayout:1.2.0"
-              implementation "androidx.core:core-splashscreen:1.0.1"
-              implementation project(':capacitor-android')
-              testImplementation 'junit:junit:4.13.2'
-              androidTestImplementation 'androidx.test.ext:junit:1.1.5'
-              androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
-          }
-
-          apply from: 'capacitor.build.gradle'
-
-          try {
-              def servicesJSON = file('google-services.json')
-              if (servicesJSON.text) {
-                  apply plugin: 'com.google.gms.google-services'
-              }
-          } catch(Exception e) {
-              logger.info("google-services.json not found, google-services plugin not applied. Push Notifications won't work")
-          }
-          EOF
-          
-          # 使用 sed 替换版本号变量
-          sed -i "s/\$VERSION_CODE/$VERSION_CODE/g" android/app/build.gradle
-          sed -i "s/\$VERSION/$VERSION/g" android/app/build.gradle
-          
-          cat > android/gradle.properties << EOF
-          android.useAndroidX=true
-          android.enableJetifier=true
-          RELEASE_STORE_FILE=release.keystore
-          RELEASE_STORE_PASSWORD=$JKS_PASSWORD
-          RELEASE_KEY_ALIAS=$JKS_ALIAS
-          RELEASE_KEY_PASSWORD=$JKS_PASSWORD
+          cat > src-tauri/gen/android/keystore.properties <<EOF
+          storePassword=${JKS_PASSWORD}
+          keyPassword=${JKS_PASSWORD}
+          keyAlias=${JKS_ALIAS}
+          storeFile=app/release.keystore
           EOF
 
-      - name: Build Android APK
-        run: |
-          cd android
-          chmod +x gradlew
-          ./gradlew assembleRelease
+          cat > src-tauri/gen/android/key.properties <<EOF
+          storePassword=${JKS_PASSWORD}
+          keyPassword=${JKS_PASSWORD}
+          keyAlias=${JKS_ALIAS}
+          storeFile=app/release.keystore
+          EOF
 
-      - name: Upload APK artifact
+      - name: Build Tauri Android APK
+        env:
+          TAURI_ANDROID_KEYSTORE_PATH: ${{ github.workspace }}/src-tauri/gen/android/app/release.keystore
+          TAURI_ANDROID_KEY_ALIAS: ${{ secrets.JKS_ALIAS }}
+          TAURI_ANDROID_KEY_PASSWORD: ${{ secrets.JKS_PASSWORD }}
+          TAURI_ANDROID_KEYSTORE_PASSWORD: ${{ secrets.JKS_PASSWORD }}
+        run: npm run tauri:android:build
+
+      - name: Upload Android artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: easypocketmd-android-apk
-          path: android/app/build/outputs/apk/release/app-release.apk
+          name: md-tauri-android
+          path: |
+            src-tauri/gen/android/app/build/outputs/apk/**/*.apk
+            src-tauri/gen/android/app/build/outputs/bundle/**/*.aab
+          if-no-files-found: error
 
-  publish-release:
-    needs: build-android
+  publish-release-android:
+    needs: build-tauri-android
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && github.event.inputs.release_tag != '')
     concurrency:
       group: gh-release-${{ github.repository }}-${{ github.event_name == 'workflow_dispatch' && github.event.inputs.release_tag != '' && github.event.inputs.release_tag || github.ref_name }}
       cancel-in-progress: false
-
     steps:
-      - name: Download APK artifact
+      - name: Download Android artifact
         uses: actions/download-artifact@v4
         with:
-          name: easypocketmd-android-apk
+          name: md-tauri-android
           path: downloads/android
 
-      - name: Prepare release asset
-        env:
-          RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.release_tag != '' && github.event.inputs.release_tag || github.ref_name }}
+      - name: Resolve release metadata
+        id: meta
+        shell: bash
         run: |
-          mkdir -p release-assets
-          cp downloads/android/app-release.apk "release-assets/easypocketmd-android-${RELEASE_TAG}.apk"
+          TAG_NAME="${{ github.event_name == 'workflow_dispatch' && github.event.inputs.release_tag != '' && github.event.inputs.release_tag || github.ref_name }}"
+          VERSION=$(echo "$TAG_NAME" | sed 's/^v//')
+          echo "tag_name=$TAG_NAME" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
-      - name: Upload APK to GitHub Release
+      - name: Prepare Android release assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release
+
+          APK_FILE=$(find downloads/android -type f -name "*.apk" | head -n 1)
+          if [ -z "${APK_FILE:-}" ]; then
+            echo "Missing Android APK artifact"
+            exit 1
+          fi
+
+          cp "$APK_FILE" "release/easypocketmd-${{ steps.meta.outputs.version }}-android.apk"
+
+          AAB_FILE=$(find downloads/android -type f -name "*.aab" | head -n 1 || true)
+          if [ -n "${AAB_FILE:-}" ]; then
+            cp "$AAB_FILE" "release/easypocketmd-${{ steps.meta.outputs.version }}-android.aab"
+          fi
+
+      - name: Upload Android assets to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.release_tag != '' && github.event.inputs.release_tag || github.ref_name }}
+          tag_name: ${{ steps.meta.outputs.tag_name }}
           files: |
-            release-assets/*.apk
+            release/*.apk
+            release/*.aab
+          overwrite_files: true
+          fail_on_unmatched_files: false
 
   deploy-android:
-    needs: build-android
+    needs: build-tauri-android
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
-    
     steps:
-      - name: Checkout source
-        uses: actions/checkout@v4
-
-      - name: Download APK artifact
+      - name: Download Android artifact
         uses: actions/download-artifact@v4
         with:
-          name: easypocketmd-android-apk
+          name: md-tauri-android
           path: downloads/android
 
       - name: Create android directory on server
@@ -321,12 +295,12 @@ jobs:
           password: ${{ secrets.SERVER_PASSWORD }}
           script: mkdir -p /www/wwwroot/static/android
 
-      - name: Upload APK to server
+      - name: Upload Android artifacts to server
         uses: appleboy/scp-action@master
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           password: ${{ secrets.SERVER_PASSWORD }}
-          source: "downloads/android/*"
-          target: "/www/wwwroot/static/android"
+          source: downloads/android/*
+          target: /www/wwwroot/static/android
           strip_components: 2
