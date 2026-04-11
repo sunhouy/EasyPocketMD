@@ -4,6 +4,7 @@
 db.sql
 .env
 
+coverage/
 cat-market/
 node_modules/
 dist/
