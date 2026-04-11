@@ -12,6 +12,9 @@
         if (api.dialog && typeof api.dialog.save === 'function') {
             return api.dialog;
         }
+        if (api.plugin && api.plugin.dialog && typeof api.plugin.dialog.save === 'function') {
+            return api.plugin.dialog;
+        }
         return null;
     }
 
@@ -19,11 +22,20 @@
         var api = getTauriApi();
         if (!api) return null;
         if (api.fs) return api.fs;
+        if (api.plugin && api.plugin.fs) return api.plugin.fs;
+        return null;
+    }
+
+    function getInvokeApi() {
+        var api = getTauriApi();
+        if (!api) return null;
+        if (typeof api.invoke === 'function') return api.invoke;
+        if (api.core && typeof api.core.invoke === 'function') return api.core.invoke;
         return null;
     }
 
     function isTauriRuntime() {
-        return !!(global.desktopRuntime && global.desktopRuntime.type === 'tauri' && global.__TAURI__);
+        return !!global.__TAURI__ || !!(global.desktopRuntime && global.desktopRuntime.type === 'tauri');
     }
 
     function isTextPayload(payload) {
@@ -63,11 +75,52 @@
     async function saveWithTauri(payload, options) {
         var dialog = getDialogApi();
         var fs = getFsApi();
+        var invoke = getInvokeApi();
         var filename = options && options.filename ? String(options.filename) : 'download';
         var defaultPath = options && options.defaultPath ? String(options.defaultPath) : filename;
 
-        if (!dialog || !fs) {
+        if ((!dialog || !fs) && !invoke) {
             throw new Error('Tauri file APIs are unavailable');
+        }
+
+        // Fallback path: use Rust-side save dialog + write command when JS plugin APIs are unavailable.
+        if (!dialog || !fs) {
+            var fallbackContent;
+            if (payload && typeof payload.url === 'string') {
+                var response = await fetch(payload.url, { cache: 'no-store' });
+                if (!response.ok) {
+                    throw new Error('HTTP ' + response.status);
+                }
+                var blobFromUrl = await response.blob();
+                var mimeFromUrl = blobFromUrl.type || (options && options.mimeType) || 'application/octet-stream';
+                var bytesFromUrl = new Uint8Array(await blobFromUrl.arrayBuffer());
+                var binaryFromUrl = '';
+                for (var i = 0; i < bytesFromUrl.length; i++) {
+                    binaryFromUrl += String.fromCharCode(bytesFromUrl[i]);
+                }
+                fallbackContent = 'data:' + mimeFromUrl + ';base64,' + btoa(binaryFromUrl);
+            } else if (isTextPayload(payload)) {
+                fallbackContent = String(payload);
+            } else {
+                var bytes = await toUint8Array(payload);
+                var mimeType = (options && options.mimeType) || 'application/octet-stream';
+                var binary = '';
+                for (var j = 0; j < bytes.length; j++) {
+                    binary += String.fromCharCode(bytes[j]);
+                }
+                fallbackContent = 'data:' + mimeType + ';base64,' + btoa(binary);
+            }
+
+            var fallbackPath = await invoke('save_file_with_dialog', {
+                name: filename,
+                content: fallbackContent,
+                title: options && options.title ? String(options.title) : null
+            });
+
+            if (!fallbackPath) {
+                return { canceled: true, path: null };
+            }
+            return { canceled: false, path: String(fallbackPath) };
         }
 
         var savePath = await dialog.save({

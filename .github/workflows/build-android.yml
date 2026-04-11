@@ -20,6 +20,7 @@ env:
   ANDROID_API_LEVEL: '34'
   ANDROID_BUILD_TOOLS: '34.0.0'
   ANDROID_NDK_VERSION: '26.3.11579264'
+  ANDROID_ABI: 'arm64-v8a'
 
 
 jobs:
@@ -90,7 +91,7 @@ jobs:
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android
+          targets: aarch64-linux-android
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
@@ -113,6 +114,9 @@ jobs:
         run: |
           rm -rf node_modules package-lock.json
           npm install
+
+      - name: Generate Tauri icons
+        run: npx tauri icon src-tauri/icon-rgba.png
 
       - name: Verify WASM source artifacts
         run: npm run wasm:text:verify
@@ -174,23 +178,97 @@ jobs:
             npm run tauri:android:init
           fi
 
+      - name: Tune Android build for smaller APK
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          APP_GRADLE_KTS="src-tauri/gen/android/app/build.gradle.kts"
+          APP_GRADLE_GROOVY="src-tauri/gen/android/app/build.gradle"
+          PROGUARD_RULES="src-tauri/gen/android/app/proguard-rules.pro"
+
+          if [ -f "$APP_GRADLE_KTS" ] && ! grep -q "EPM_ANDROID_SIZE_TUNING" "$APP_GRADLE_KTS"; then
+            {
+              echo ""
+              echo "// EPM_ANDROID_SIZE_TUNING"
+              echo "android {"
+              echo "  defaultConfig {"
+              echo "    ndk {"
+              echo "      abiFilters += listOf(\"arm64-v8a\")"
+              echo "    }"
+              echo "  }"
+              echo "  buildTypes {"
+              echo "    getByName(\"release\") {"
+              echo "      isMinifyEnabled = true"
+              echo "      isShrinkResources = true"
+              echo "      proguardFiles("
+              echo "        getDefaultProguardFile(\"proguard-android-optimize.txt\"),"
+              echo "        \"proguard-rules.pro\""
+              echo "      )"
+              echo "    }"
+              echo "  }"
+              echo "  packaging {"
+              echo "    resources {"
+              echo "      excludes += setOf("
+              echo "        \"META-INF/AL2.0\","
+              echo "        \"META-INF/LGPL2.1\","
+              echo "        \"META-INF/*.kotlin_module\","
+              echo "        \"DebugProbesKt.bin\""
+              echo "      )"
+              echo "    }"
+              echo "  }"
+              echo "}"
+            } >> "$APP_GRADLE_KTS"
+          fi
+
+          if [ -f "$APP_GRADLE_GROOVY" ] && ! grep -q "EPM_ANDROID_SIZE_TUNING" "$APP_GRADLE_GROOVY"; then
+            {
+              echo ""
+              echo "// EPM_ANDROID_SIZE_TUNING"
+              echo "android {"
+              echo "  defaultConfig {"
+              echo "    ndk {"
+              echo "      abiFilters 'arm64-v8a'"
+              echo "    }"
+              echo "  }"
+              echo "  buildTypes {"
+              echo "    release {"
+              echo "      minifyEnabled true"
+              echo "      shrinkResources true"
+              echo "      proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'"
+              echo "    }"
+              echo "  }"
+              echo "  packagingOptions {"
+              echo "    resources {"
+              echo "      excludes += ['META-INF/AL2.0', 'META-INF/LGPL2.1', 'META-INF/*.kotlin_module', 'DebugProbesKt.bin']"
+              echo "    }"
+              echo "  }"
+              echo "}"
+            } >> "$APP_GRADLE_GROOVY"
+          fi
+
+          if [ ! -f "$PROGUARD_RULES" ]; then
+            {
+              echo "# Keep WebView JS bridges and Tauri runtime integration classes."
+              echo "-keep class app.tauri.** { *; }"
+              echo "-keep class com.tauri.** { *; }"
+              echo "-keep class * extends android.app.Activity"
+            } > "$PROGUARD_RULES"
+          fi
+
       - name: Setup Android signing keystore (from secrets)
         env:
           JKS_BASE64: ${{ secrets.JKS_BASE64 }}
           JKS_ALIAS: ${{ secrets.JKS_ALIAS }}
           JKS_PASSWORD: ${{ secrets.JKS_PASSWORD }}
-          IS_RELEASE: ${{ startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && github.event.inputs.release_tag != '') }}
         shell: bash
         run: |
           set -euo pipefail
 
           if [ -z "${JKS_BASE64:-}" ] || [ -z "${JKS_ALIAS:-}" ] || [ -z "${JKS_PASSWORD:-}" ]; then
-            if [ "${IS_RELEASE}" = "true" ]; then
-              echo "Missing required signing secrets (JKS_BASE64 / JKS_ALIAS / JKS_PASSWORD) for release build"
-              exit 1
-            fi
-            echo "Signing secrets not configured. Continue with unsigned/non-release signing."
-            exit 0
+            echo "Missing required signing secrets (JKS_BASE64 / JKS_ALIAS / JKS_PASSWORD)."
+            echo "Android workflow is configured to require signed APK output."
+            exit 1
           fi
 
           mkdir -p src-tauri/gen/android/app
@@ -217,15 +295,52 @@ jobs:
           TAURI_ANDROID_KEY_ALIAS: ${{ secrets.JKS_ALIAS }}
           TAURI_ANDROID_KEY_PASSWORD: ${{ secrets.JKS_PASSWORD }}
           TAURI_ANDROID_KEYSTORE_PASSWORD: ${{ secrets.JKS_PASSWORD }}
-        run: npm run tauri:android:build
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx tauri android build --apk --target aarch64
+
+      - name: Collect signed Android artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/android
+
+          SIGNED_APK="$(find src-tauri/gen/android/app/build/outputs/apk -type f -name '*release*.apk' ! -name '*unsigned*.apk' ! -name '*unaligned*.apk' | head -n 1)"
+          if [ -z "${SIGNED_APK:-}" ]; then
+            echo "No signed release APK found"
+            find src-tauri/gen/android/app/build/outputs/apk -type f -name '*.apk' -print || true
+            exit 1
+          fi
+
+          cp "$SIGNED_APK" artifacts/android/easypocketmd-android-arm64-release.apk
+
+          SIGNED_AAB="$(find src-tauri/gen/android/app/build/outputs/bundle -type f -name '*release*.aab' | head -n 1 || true)"
+          if [ -n "${SIGNED_AAB:-}" ]; then
+            cp "$SIGNED_AAB" artifacts/android/easypocketmd-android-arm64-release.aab
+          fi
+
+      - name: Verify APK signature
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK_FILE="artifacts/android/easypocketmd-android-arm64-release.apk"
+          if [ ! -f "$APK_FILE" ]; then
+            echo "APK not found for signature verification: $APK_FILE"
+            exit 1
+          fi
+          APKSIGNER_BIN="${ANDROID_SDK_ROOT}/build-tools/${ANDROID_BUILD_TOOLS}/apksigner"
+          if [ -x "$APKSIGNER_BIN" ]; then
+            "$APKSIGNER_BIN" verify --verbose --print-certs "$APK_FILE"
+          else
+            apksigner verify --verbose --print-certs "$APK_FILE"
+          fi
 
       - name: Upload Android artifacts
         uses: actions/upload-artifact@v4
         with:
           name: md-tauri-android
-          path: |
-            src-tauri/gen/android/app/build/outputs/apk/**/*.apk
-            src-tauri/gen/android/app/build/outputs/bundle/**/*.aab
+          path: artifacts/android/*
           if-no-files-found: error
 
   publish-release-android:
@@ -257,7 +372,10 @@ jobs:
           set -euo pipefail
           mkdir -p release
 
-          APK_FILE=$(find downloads/android -type f -name "*.apk" | head -n 1)
+          APK_FILE=$(find downloads/android -type f -name "easypocketmd-android-arm64-release.apk" | head -n 1)
+          if [ -z "${APK_FILE:-}" ]; then
+            APK_FILE=$(find downloads/android -type f -name "*release*.apk" ! -name "*unsigned*.apk" ! -name "*unaligned*.apk" | head -n 1)
+          fi
           if [ -z "${APK_FILE:-}" ]; then
             echo "Missing Android APK artifact"
             exit 1
@@ -265,7 +383,10 @@ jobs:
 
           cp "$APK_FILE" "release/easypocketmd-${{ steps.meta.outputs.version }}-android.apk"
 
-          AAB_FILE=$(find downloads/android -type f -name "*.aab" | head -n 1 || true)
+          AAB_FILE=$(find downloads/android -type f -name "easypocketmd-android-arm64-release.aab" | head -n 1 || true)
+          if [ -z "${AAB_FILE:-}" ]; then
+            AAB_FILE=$(find downloads/android -type f -name "*release*.aab" | head -n 1 || true)
+          fi
           if [ -n "${AAB_FILE:-}" ]; then
             cp "$AAB_FILE" "release/easypocketmd-${{ steps.meta.outputs.version }}-android.aab"
           fi
@@ -299,12 +420,35 @@ jobs:
           password: ${{ secrets.SERVER_PASSWORD }}
           script: mkdir -p /www/wwwroot/static/android
 
+      - name: Prepare Android deployment files
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p deploy/android
+
+          APK_FILE=$(find downloads/android -type f -name "easypocketmd-android-arm64-release.apk" | head -n 1)
+          if [ -z "${APK_FILE:-}" ]; then
+            APK_FILE=$(find downloads/android -type f -name "*release*.apk" ! -name "*unsigned*.apk" ! -name "*unaligned*.apk" | head -n 1)
+          fi
+
+          if [ -z "${APK_FILE:-}" ]; then
+            echo "Missing signed Android APK artifact"
+            exit 1
+          fi
+
+          cp "$APK_FILE" deploy/android/easypocketmd_android.apk
+
+          AAB_FILE=$(find downloads/android -type f -name "easypocketmd-android-arm64-release.aab" | head -n 1 || true)
+          if [ -n "${AAB_FILE:-}" ]; then
+            cp "$AAB_FILE" deploy/android/easypocketmd_android.aab
+          fi
+
       - name: Upload Android artifacts to server
         uses: appleboy/scp-action@master
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           password: ${{ secrets.SERVER_PASSWORD }}
-          source: downloads/android/*
+          source: deploy/android/*
           target: /www/wwwroot/static/android
           strip_components: 2
