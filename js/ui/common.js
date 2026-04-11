@@ -112,23 +112,6 @@
             document.head.appendChild(meta);
         }
         meta.setAttribute('content', color);
-
-        // Hint native window theme so Android status bar icons stay readable.
-        try {
-            var tauriRoot = global.__TAURI__ || null;
-            var windowApi = tauriRoot && (tauriRoot.window || (tauriRoot.core && tauriRoot.core.window));
-            if (windowApi && typeof windowApi.getCurrentWindow === 'function') {
-                var currentWindow = windowApi.getCurrentWindow();
-                if (currentWindow && typeof currentWindow.setTheme === 'function') {
-                    Promise.resolve(currentWindow.setTheme(global.nightMode ? 'dark' : 'light')).catch(function() {});
-                }
-            }
-            if (global.electron && typeof global.electron.syncAndroidSystemUi === 'function') {
-                Promise.resolve(global.electron.syncAndroidSystemUi(global.nightMode === true)).catch(function() {});
-            }
-        } catch (error) {
-            // Ignore native theme sync failures; meta theme-color is still applied.
-        }
     }
 
     function showFormatMenu() {
