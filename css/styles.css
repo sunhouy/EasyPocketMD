@@ -5459,118 +5459,61 @@ body.night-mode .password-strength-bar {
 
 /* User settings modal styles */
 .settings-section {
-    padding: 8px 0;
+    padding: 4px 0;
 }
 
 .settings-section-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 12px 0;
-    cursor: pointer;
-    user-select: none;
-    -webkit-user-select: none;
-}
-
-.settings-section-header:hover {
-    background-color: rgba(0, 0, 0, 0.03);
-    border-radius: 6px;
+    padding: 8px 0;
+    cursor: default;
 }
 
 .settings-section-title {
-    font-size: 16px;
+    font-size: 15px;
     font-weight: 600;
     margin: 0;
     color: #333;
 }
 
-.collapse-section {
+.settings-section .form-group {
     margin-bottom: 12px;
 }
 
-.collapse-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 14px 16px;
-    cursor: pointer;
-    user-select: none;
-    -webkit-user-select: none;
-    background: #f8f9fa;
-    border-radius: 8px;
-    transition: background-color 0.2s ease;
-    border: 1px solid #e9ecef;
-    min-height: 52px;
-    box-sizing: border-box;
+.settings-section .form-group:last-of-type {
+    margin-bottom: 10px;
 }
 
-.collapse-header:hover {
-    background: #e9ecef;
-}
-
-.collapse-header .settings-section-title {
-    margin: 0;
-    font-size: 15px;
-}
-
-.collapse-icon {
-    color: #6c757d;
-    transition: transform 0.3s ease;
-    font-size: 14px;
-    flex-shrink: 0;
-    width: 20px;
-    text-align: center;
-}
-
-.collapse-header.collapsed .collapse-icon {
-    transform: rotate(-90deg);
-}
-
-.collapse-content {
-    max-height: 800px;
-    overflow: hidden;
-    transition: max-height 0.35s ease, padding 0.35s ease, opacity 0.35s ease;
-    padding: 20px 16px;
-    opacity: 1;
-    box-sizing: border-box;
-}
-
-.collapse-content.collapsed {
-    max-height: 0;
-    padding: 0 16px;
-    opacity: 0;
-}
-
-.collapse-content .form-group {
-    margin-bottom: 18px;
-}
-
-.collapse-content .form-group:last-of-type {
-    margin-bottom: 16px;
-}
-
-.collapse-content .form-group label {
+.settings-section .form-group label {
     display: block;
-    margin-bottom: 8px;
+    margin-bottom: 6px;
+    font-size: 14px;
 }
 
-.collapse-content .form-group input {
+.settings-section .form-group input {
     width: 100%;
     box-sizing: border-box;
+    font-size: 14px;
+    padding: 8px 12px;
 }
 
-.collapse-content .modal-actions {
-    margin-top: 8px;
+.settings-section .modal-actions {
+    margin-top: 4px;
 }
 
-.collapse-content .modal-actions .modal-btn {
-    min-height: 42px;
+.settings-section .modal-actions .modal-btn {
+    min-height: 38px;
+    font-size: 14px;
+}
+
+.settings-section-hint {
+    margin-bottom: 12px;
+    font-size: 13px;
+    line-height: 1.5;
 }
 
 /* Ensure user settings modal has proper size */
 #userSettingsModalOverlay .modal {
-    min-width: 360px;
-    max-width: 480px;
+    min-width: 340px;
+    max-width: 440px;
     width: 90vw;
 }
 
@@ -5595,23 +5538,6 @@ body.night-mode .password-strength-bar {
 /* Night mode styles for user settings */
 body.night-mode .settings-section-title {
     color: #e5eefc;
-}
-
-body.night-mode .settings-section-header:hover {
-    background-color: rgba(255, 255, 255, 0.05);
-}
-
-body.night-mode .collapse-header {
-    background: #2a3444;
-    border-color: #344256;
-}
-
-body.night-mode .collapse-header:hover {
-    background: #344256;
-}
-
-body.night-mode .collapse-icon {
-    color: #9fb0c4;
 }
 
 body.night-mode .user-settings-btn {

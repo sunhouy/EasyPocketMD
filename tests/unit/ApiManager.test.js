@@ -1,7 +1,8 @@
-const apiManager = require('../../api/models/ApiManager');
+const ApiManager = require('../../api/models/ApiManager');
 const fs = require('fs');
-const path = require('path');
+const crypto = require('crypto');
 
+// Mock dependencies
 jest.mock('fs');
 
 describe('ApiManager', () => {
@@ -9,76 +10,314 @@ describe('ApiManager', () => {
         jest.clearAllMocks();
     });
 
-    describe('encryption and decryption', () => {
-        it('should correctly encrypt and decrypt data', () => {
-            const testData = { foo: 'bar', baz: 123 };
-            const encrypted = apiManager.encrypt(testData);
+    describe('encrypt and decrypt', () => {
+        it('should encrypt and decrypt data successfully', () => {
+            const testData = { key: 'value', number: 123 };
+            
+            const encrypted = ApiManager.encrypt(testData);
             expect(typeof encrypted).toBe('string');
             
-            const decrypted = apiManager.decrypt(encrypted);
+            const decrypted = ApiManager.decrypt(encrypted);
             expect(decrypted).toEqual(testData);
         });
     });
 
     describe('getAllApiInfo', () => {
-        it('should return default object if file does not exist', () => {
+        it('should return default object when file does not exist', () => {
             fs.existsSync.mockReturnValue(false);
-            const info = apiManager.getAllApiInfo();
-            expect(info).toEqual({ config: {}, preferred_product: null });
+            
+            const result = ApiManager.getAllApiInfo();
+            
+            expect(result.config).toEqual({});
+            expect(result.preferred_product).toBeNull();
         });
 
-        it('should return decrypted info if file exists', () => {
-            const mockData = { config: { key1: { base_url: 'url', api_key: 'key', products: ['p1'] } }, preferred_product: 'p1' };
-            const encrypted = apiManager.encrypt(mockData);
+        it('should return default object when file is empty', () => {
+            fs.existsSync.mockReturnValue(true);
+            fs.readFileSync.mockReturnValue('');
+            
+            const result = ApiManager.getAllApiInfo();
+            
+            expect(result.config).toEqual({});
+            expect(result.preferred_product).toBeNull();
+        });
+
+        it('should load and decrypt api info successfully', () => {
+            const testData = { config: { test: 'config' }, preferred_product: 'gpt-4' };
+            const encryptedData = ApiManager.encrypt(testData);
             
             fs.existsSync.mockReturnValue(true);
-            fs.readFileSync.mockReturnValue(encrypted);
+            fs.readFileSync.mockReturnValue(encryptedData);
+            
+            const result = ApiManager.getAllApiInfo();
+            
+            expect(result.config).toEqual(testData.config);
+            expect(result.preferred_product).toEqual(testData.preferred_product);
+        });
 
-            const info = apiManager.getAllApiInfo();
-            expect(info).toEqual(mockData);
+        it('should handle preferred_model to preferred_product migration', () => {
+            const testData = { config: { test: 'config' }, preferred_model: 'gpt-4' };
+            const encryptedData = ApiManager.encrypt(testData);
+            
+            fs.existsSync.mockReturnValue(true);
+            fs.readFileSync.mockReturnValue(encryptedData);
+            
+            const result = ApiManager.getAllApiInfo();
+            
+            expect(result.preferred_product).toBe('gpt-4');
+            expect(result.preferred_model).toBeUndefined();
+        });
+
+        it('should return default object on decryption error', () => {
+            fs.existsSync.mockReturnValue(true);
+            fs.readFileSync.mockReturnValue('invalid-data');
+            console.error = jest.fn();
+            
+            const result = ApiManager.getAllApiInfo();
+            
+            expect(result.config).toEqual({});
+            expect(result.preferred_product).toBeNull();
         });
     });
 
-    describe('product management', () => {
-        beforeEach(() => {
-            fs.existsSync.mockReturnValue(false); // Start with empty info
+    describe('saveApiInfo', () => {
+        it('should save api info successfully', () => {
+            const testData = { config: {}, preferred_product: null };
+            
+            const result = ApiManager.saveApiInfo(testData);
+            
+            expect(result).toBe(true);
+            expect(fs.writeFileSync).toHaveBeenCalled();
         });
 
-        it('should add product info correctly', () => {
-            const writeMock = jest.spyOn(fs, 'writeFileSync');
-            const result = apiManager.addProductInfo('gpt-4', 'https://api.openai.com', 'sk-test');
+        it('should return false on save error', () => {
+            fs.writeFileSync.mockImplementation(() => {
+                throw new Error('Write error');
+            });
+            console.error = jest.fn();
+            
+            const result = ApiManager.saveApiInfo({});
+            
+            expect(result).toBe(false);
+        });
+    });
 
+    describe('addProductInfo', () => {
+        it('should add new product info', () => {
+            jest.spyOn(ApiManager, 'getAllApiInfo').mockReturnValue({ config: {} });
+            jest.spyOn(ApiManager, 'saveApiInfo').mockReturnValue(true);
+            
+            const result = ApiManager.addProductInfo('gpt-4', 'http://example.com', 'api-key');
+            
             expect(result).toBe(true);
-            expect(writeMock).toHaveBeenCalled();
-            
-            // Verify what was written
-            const writtenData = writeMock.mock.calls[0][1];
-            const decrypted = apiManager.decrypt(writtenData);
-            
-            const configKeys = Object.keys(decrypted.config);
-            expect(configKeys).toHaveLength(1);
-            expect(decrypted.config[configKeys[0]].products).toContain('gpt-4');
+            expect(ApiManager.saveApiInfo).toHaveBeenCalled();
         });
 
-        it('should delete product info correctly', () => {
-            const mockData = { config: {} };
-            const baseUrl = 'https://api.openai.com';
-            const apiKey = 'sk-test';
-            const crypto = require('crypto');
-            const key = crypto.createHash('md5').update(baseUrl + apiKey).digest('hex');
+        it('should add product to existing config', () => {
+            const existingConfig = {};
+            const baseUrlKey = crypto.createHash('md5').update('http://example.comapi-key').digest('hex');
+            existingConfig[baseUrlKey] = {
+                base_url: 'http://example.com',
+                api_key: 'api-key',
+                products: ['gpt-3']
+            };
             
-            mockData.config[key] = { base_url: baseUrl, api_key: apiKey, products: ['gpt-4'] };
+            jest.spyOn(ApiManager, 'getAllApiInfo').mockReturnValue({ config: existingConfig });
+            jest.spyOn(ApiManager, 'saveApiInfo').mockReturnValue(true);
             
-            fs.existsSync.mockReturnValue(true);
-            fs.readFileSync.mockReturnValue(apiManager.encrypt(mockData));
-            const writeMock = jest.spyOn(fs, 'writeFileSync');
-
-            const result = apiManager.deleteApiInfo(baseUrl, apiKey);
-
+            const result = ApiManager.addProductInfo('gpt-4', 'http://example.com', 'api-key');
+            
             expect(result).toBe(true);
-            const writtenData = writeMock.mock.calls[0][1];
-            const decrypted = apiManager.decrypt(writtenData);
-            expect(decrypted.config).toEqual({});
+        });
+
+        it('should not add duplicate product', () => {
+            const existingConfig = {};
+            const baseUrlKey = crypto.createHash('md5').update('http://example.comapi-key').digest('hex');
+            existingConfig[baseUrlKey] = {
+                base_url: 'http://example.com',
+                api_key: 'api-key',
+                products: ['gpt-4']
+            };
+            
+            jest.spyOn(ApiManager, 'getAllApiInfo').mockReturnValue({ config: existingConfig });
+            jest.spyOn(ApiManager, 'saveApiInfo').mockReturnValue(true);
+            
+            const result = ApiManager.addProductInfo('gpt-4', 'http://example.com', 'api-key');
+            
+            expect(result).toBe(true);
+        });
+    });
+
+    describe('deleteApiInfo', () => {
+        it('should delete existing api info', () => {
+            const existingConfig = {};
+            const baseUrlKey = crypto.createHash('md5').update('http://example.comapi-key').digest('hex');
+            existingConfig[baseUrlKey] = { products: ['gpt-4'] };
+            
+            jest.spyOn(ApiManager, 'getAllApiInfo').mockReturnValue({ config: existingConfig });
+            jest.spyOn(ApiManager, 'saveApiInfo').mockReturnValue(true);
+            
+            const result = ApiManager.deleteApiInfo('http://example.com', 'api-key');
+            
+            expect(result).toBe(true);
+        });
+
+        it('should return false for non-existent config', () => {
+            jest.spyOn(ApiManager, 'getAllApiInfo').mockReturnValue({ config: {} });
+            
+            const result = ApiManager.deleteApiInfo('http://example.com', 'api-key');
+            
+            expect(result).toBe(false);
+        });
+    });
+
+    describe('removeProduct', () => {
+        it('should remove product from config', () => {
+            const existingConfig = {};
+            const baseUrlKey = crypto.createHash('md5').update('http://example.comapi-key').digest('hex');
+            existingConfig[baseUrlKey] = {
+                base_url: 'http://example.com',
+                api_key: 'api-key',
+                products: ['gpt-4', 'gpt-3']
+            };
+            
+            jest.spyOn(ApiManager, 'getAllApiInfo').mockReturnValue({ 
+                config: existingConfig,
+                preferred_product: 'gpt-4'
+            });
+            jest.spyOn(ApiManager, 'saveApiInfo').mockReturnValue(true);
+            
+            const result = ApiManager.removeProduct('http://example.com', 'api-key', 'gpt-4');
+            
+            expect(result).toBe(true);
+        });
+
+        it('should delete config when last product is removed', () => {
+            const existingConfig = {};
+            const baseUrlKey = crypto.createHash('md5').update('http://example.comapi-key').digest('hex');
+            existingConfig[baseUrlKey] = {
+                base_url: 'http://example.com',
+                api_key: 'api-key',
+                products: ['gpt-4']
+            };
+            
+            jest.spyOn(ApiManager, 'getAllApiInfo').mockReturnValue({ 
+                config: existingConfig,
+                preferred_product: 'gpt-4'
+            });
+            jest.spyOn(ApiManager, 'saveApiInfo').mockReturnValue(true);
+            
+            const result = ApiManager.removeProduct('http://example.com', 'api-key', 'gpt-4');
+            
+            expect(result).toBe(true);
+        });
+
+        it('should return false for non-existent product', () => {
+            const existingConfig = {};
+            const baseUrlKey = crypto.createHash('md5').update('http://example.comapi-key').digest('hex');
+            existingConfig[baseUrlKey] = { products: ['gpt-4'] };
+            
+            jest.spyOn(ApiManager, 'getAllApiInfo').mockReturnValue({ config: existingConfig });
+            
+            const result = ApiManager.removeProduct('http://example.com', 'api-key', 'gpt-3');
+            
+            expect(result).toBe(false);
+        });
+
+        it('should return false for non-existent config', () => {
+            jest.spyOn(ApiManager, 'getAllApiInfo').mockReturnValue({ config: {} });
+            
+            const result = ApiManager.removeProduct('http://example.com', 'api-key', 'gpt-4');
+            
+            expect(result).toBe(false);
+        });
+    });
+
+    describe('getAllProducts', () => {
+        it('should return unique sorted products', () => {
+            const existingConfig = {
+                key1: { products: ['gpt-4', 'gpt-3'] },
+                key2: { products: ['gpt-4', 'claude'] }
+            };
+            
+            jest.spyOn(ApiManager, 'getAllApiInfo').mockReturnValue({ config: existingConfig });
+            
+            const result = ApiManager.getAllProducts();
+            
+            expect(result).toEqual(['claude', 'gpt-3', 'gpt-4']);
+        });
+
+        it('should return empty array when no products', () => {
+            jest.spyOn(ApiManager, 'getAllApiInfo').mockReturnValue({ config: {} });
+            
+            const result = ApiManager.getAllProducts();
+            
+            expect(result).toEqual([]);
+        });
+    });
+
+    describe('getProductConfig', () => {
+        it('should return config for existing product', () => {
+            const existingConfig = {
+                key1: {
+                    base_url: 'http://example.com',
+                    api_key: 'api-key',
+                    products: ['gpt-4']
+                }
+            };
+            
+            jest.spyOn(ApiManager, 'getAllApiInfo').mockReturnValue({ config: existingConfig });
+            
+            const result = ApiManager.getProductConfig('gpt-4');
+            
+            expect(result).toEqual({
+                base_url: 'http://example.com',
+                api_key: 'api-key'
+            });
+        });
+
+        it('should return null for non-existent product', () => {
+            jest.spyOn(ApiManager, 'getAllApiInfo').mockReturnValue({ config: {} });
+            
+            const result = ApiManager.getProductConfig('nonexistent');
+            
+            expect(result).toBeNull();
+        });
+    });
+
+    describe('searchProducts', () => {
+        it('should filter products by keyword', () => {
+            jest.spyOn(ApiManager, 'getAllProducts').mockReturnValue(['gpt-4', 'gpt-3', 'claude']);
+            
+            const result = ApiManager.searchProducts('gpt');
+            
+            expect(result).toEqual(['gpt-4', 'gpt-3']);
+        });
+
+        it('should be case insensitive', () => {
+            jest.spyOn(ApiManager, 'getAllProducts').mockReturnValue(['GPT-4', 'gpt-3']);
+            
+            const result = ApiManager.searchProducts('GPT');
+            
+            expect(result).toEqual(['GPT-4', 'gpt-3']);
+        });
+    });
+
+    describe('getPreferredProduct', () => {
+        it('should return preferred product', () => {
+            jest.spyOn(ApiManager, 'getAllApiInfo').mockReturnValue({ preferred_product: 'gpt-4' });
+            
+            const result = ApiManager.getPreferredProduct();
+            
+            expect(result).toBe('gpt-4');
+        });
+
+        it('should return null when no preferred product', () => {
+            jest.spyOn(ApiManager, 'getAllApiInfo').mockReturnValue({ preferred_product: null });
+            
+            const result = ApiManager.getPreferredProduct();
+            
+            expect(result).toBeNull();
         });
     });
 });

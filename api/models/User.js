@@ -486,7 +486,7 @@ class User {
             await connection.execute('DELETE FROM member_records WHERE username = ?', [username]);
 
             // Delete file shares
-            await connection.execute('DELETE FROM file_shares WHERE owner_username = ? OR shared_with_username = ?', [username, username]);
+            await connection.execute('DELETE FROM file_shares WHERE username = ?', [username]);
 
             // Delete user
             await connection.execute('DELETE FROM users WHERE username = ?', [username]);
