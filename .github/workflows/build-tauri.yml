@@ -184,6 +184,31 @@ jobs:
       - name: Build Tauri app (Linux)
         run: npm run build:tauri:linux
 
+      - name: Normalize Debian package dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          DEB_FILE="$(find src-tauri/target/release/bundle/deb -name '*.deb' | head -n 1)"
+          if [ -z "${DEB_FILE:-}" ]; then
+            echo "No .deb file found after Linux build"
+            exit 1
+          fi
+
+          TMP_DIR="$(mktemp -d)"
+          UNPACK_DIR="$TMP_DIR/unpack"
+          mkdir -p "$UNPACK_DIR"
+          dpkg-deb -R "$DEB_FILE" "$UNPACK_DIR"
+
+          CONTROL_FILE="$UNPACK_DIR/DEBIAN/control"
+          OLD_DEPENDS="$(sed -n 's/^Depends: //p' "$CONTROL_FILE")"
+          echo "Original Debian Depends: $OLD_DEPENDS"
+
+          NEW_DEPENDS="$(printf '%s' "$OLD_DEPENDS" | perl -pe 's/(^|,\s*)libwebkit2gtk-4\.0-37(?=,|$)//g; s/,\s*,/, /g; s/^,\s*//; s/\s*,\s*$//')"
+          echo "Normalized Debian Depends: $NEW_DEPENDS"
+
+          sed -i "s/^Depends: .*/Depends: $NEW_DEPENDS/" "$CONTROL_FILE"
+          dpkg-deb -b "$UNPACK_DIR" "$DEB_FILE"
+
       - name: Validate Debian package dependencies
         shell: bash
         run: |
