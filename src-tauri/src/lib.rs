@@ -431,120 +431,6 @@ fn open_external_url(app: AppHandle, url: String) -> Result<bool, String> {
     Ok(true)
 }
 
-#[cfg(target_os = "android")]
-fn parse_hex_color_to_argb(color: &str) -> Option<i32> {
-    let raw = color.trim().trim_start_matches('#');
-    if raw.len() == 6 {
-        let rgb = u32::from_str_radix(raw, 16).ok()?;
-        let argb = 0xFF00_0000u32 | rgb;
-        return Some(argb as i32);
-    }
-    if raw.len() == 8 {
-        let argb = u32::from_str_radix(raw, 16).ok()?;
-        return Some(argb as i32);
-    }
-    None
-}
-
-#[cfg(target_os = "android")]
-fn apply_android_system_ui_native(dark_mode: bool, status_bar_color: Option<String>) -> Result<bool, String> {
-    use jni::objects::{JObject, JValue};
-    use jni::JavaVM;
-
-    let context = ndk_context::android_context();
-    let vm_ptr = context.vm();
-    let activity_ptr = context.context();
-
-    if vm_ptr.is_null() || activity_ptr.is_null() {
-        return Err("android context is unavailable".to_string());
-    }
-
-    let jvm = unsafe { JavaVM::from_raw(vm_ptr.cast()) }.map_err(|error| error.to_string())?;
-    let mut env = jvm.attach_current_thread().map_err(|error| error.to_string())?;
-
-    let activity = unsafe { JObject::from_raw(activity_ptr.cast()) };
-
-    let window = env
-        .call_method(&activity, "getWindow", "()Landroid/view/Window;", &[])
-        .and_then(|value| value.l())
-        .map_err(|error| error.to_string())?;
-
-    // Ensure system bars are app-controlled and fullscreen is disabled.
-    let flag_draws_system_bar_backgrounds: i32 = 0x8000_0000u32 as i32;
-    let flag_fullscreen: i32 = 0x0000_0400;
-
-    env.call_method(
-        &window,
-        "addFlags",
-        "(I)V",
-        &[JValue::Int(flag_draws_system_bar_backgrounds)],
-    )
-    .map_err(|error| error.to_string())?;
-
-    env.call_method(
-        &window,
-        "clearFlags",
-        "(I)V",
-        &[JValue::Int(flag_fullscreen)],
-    )
-    .map_err(|error| error.to_string())?;
-
-    if let Some(color) = status_bar_color.and_then(|value| parse_hex_color_to_argb(&value)) {
-        env.call_method(
-            &window,
-            "setStatusBarColor",
-            "(I)V",
-            &[JValue::Int(color)],
-        )
-        .map_err(|error| error.to_string())?;
-    }
-
-    let decor_view = env
-        .call_method(&window, "getDecorView", "()Landroid/view/View;", &[])
-        .and_then(|value| value.l())
-        .map_err(|error| error.to_string())?;
-
-    let current_vis = env
-        .call_method(&decor_view, "getSystemUiVisibility", "()I", &[])
-        .and_then(|value| value.i())
-        .map_err(|error| error.to_string())?;
-
-    let light_status_bar: i32 = 0x0000_2000;
-    let ui_fullscreen: i32 = 0x0000_0004;
-    let ui_hide_navigation: i32 = 0x0000_0002;
-    let ui_immersive_sticky: i32 = 0x0000_1000;
-
-    let mut next_vis = current_vis & !(ui_fullscreen | ui_hide_navigation | ui_immersive_sticky);
-    if dark_mode {
-        next_vis &= !light_status_bar;
-    } else {
-        next_vis |= light_status_bar;
-    }
-
-    env.call_method(
-        &decor_view,
-        "setSystemUiVisibility",
-        "(I)V",
-        &[JValue::Int(next_vis)],
-    )
-    .map_err(|error| error.to_string())?;
-
-    // activity object is managed by Android; prevent JNI local-ref cleanup on foreign ref.
-    let _ = activity.into_raw();
-
-    Ok(true)
-}
-
-#[cfg(not(target_os = "android"))]
-fn apply_android_system_ui_native(_dark_mode: bool, _status_bar_color: Option<String>) -> Result<bool, String> {
-    Ok(false)
-}
-
-#[tauri::command]
-fn set_android_system_ui(dark_mode: bool, status_bar_color: Option<String>) -> Result<bool, String> {
-    apply_android_system_ui_native(dark_mode, status_bar_color)
-}
-
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -569,7 +455,6 @@ pub fn run() {
             write_local_file,
             save_file_with_dialog,
             open_external_url,
-            set_android_system_ui,
             get_md_association_enabled,
             set_md_association_enabled,
             consume_pending_open_file_path

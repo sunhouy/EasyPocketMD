@@ -288,46 +288,6 @@
                 }
             });
         },
-        syncAndroidSystemUi: function(isDarkMode) {
-            try {
-                var ua = (navigator.userAgent || '').toLowerCase();
-                if (ua.indexOf('android') === -1) {
-                    return Promise.resolve(false);
-                }
-
-                var tauriRoot = global.__TAURI__ || null;
-                var windowApi = tauriRoot && (tauriRoot.window || (tauriRoot.core && tauriRoot.core.window));
-                if (!windowApi || typeof windowApi.getCurrentWindow !== 'function') {
-                    return Promise.resolve(false);
-                }
-
-                var currentWindow = windowApi.getCurrentWindow();
-                if (!currentWindow) {
-                    return Promise.resolve(false);
-                }
-
-                var statusBarColor = isDarkMode ? '#0f172a' : '#f3f4f6';
-
-                return invokeCommand('set_android_system_ui', {
-                    darkMode: !!isDarkMode,
-                    statusBarColor: statusBarColor
-                }).catch(function() {
-                    var tasks = [];
-                    if (typeof currentWindow.setFullscreen === 'function') {
-                        tasks.push(Promise.resolve(currentWindow.setFullscreen(false)).catch(function() {}));
-                    }
-                    if (typeof currentWindow.setTheme === 'function') {
-                        tasks.push(Promise.resolve(currentWindow.setTheme(isDarkMode ? 'dark' : 'light')).catch(function() {}));
-                    }
-
-                    return Promise.all(tasks).then(function() {
-                        return true;
-                    });
-                });
-            } catch (error) {
-                return Promise.resolve(false);
-            }
-        },
         getMdAssociationEnabled: function() {
             return invokeCommand('get_md_association_enabled');
         },
@@ -353,27 +313,4 @@
     global.desktopRuntime = {
         type: 'tauri'
     };
-
-    // Android webview may re-enter immersive state during lifecycle transitions.
-    // Keep forcing non-fullscreen state so status bar stays visible.
-    try {
-        var isAndroid = (global.navigator && /android/i.test(global.navigator.userAgent || ''));
-        if (isAndroid && global.electron && typeof global.electron.syncAndroidSystemUi === 'function') {
-            var applyUi = function() {
-                var nightMode = !!(global.nightMode === true || (global.document && global.document.body && global.document.body.classList.contains('night-mode')));
-                global.electron.syncAndroidSystemUi(nightMode).catch(function() {});
-            };
-
-            applyUi();
-            if (global.document) {
-                global.document.addEventListener('visibilitychange', applyUi, false);
-            }
-            global.addEventListener('focus', applyUi, false);
-            global.addEventListener('pageshow', applyUi, false);
-            setTimeout(applyUi, 500);
-            setTimeout(applyUi, 1800);
-        }
-    } catch (error) {
-        // no-op
-    }
 })(typeof window !== 'undefined' ? window : this);
