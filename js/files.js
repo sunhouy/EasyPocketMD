@@ -291,9 +291,61 @@
             return;
         }
 
-        if (g('vditor') && typeof g('vditor').setValue === 'function') {
-            g('vditor').setValue(normalizedContent);
+        const vditor = g('vditor');
+        if (vditor && typeof vditor.setValue === 'function') {
+            if (!isVditorValueBridgeReady(vditor)) {
+                scheduleDeferredVditorValueApply(fileId, normalizedContent);
+                return;
+            }
+
+            try {
+                vditor.setValue(normalizedContent);
+            } catch (error) {
+                console.warn('设置编辑器内容失败，等待编辑器就绪后重试:', error);
+                scheduleDeferredVditorValueApply(fileId, normalizedContent);
+            }
+            return;
         }
+
+        if (isCurrentFile) {
+            scheduleDeferredVditorValueApply(fileId, normalizedContent);
+        }
+    }
+
+    function isVditorValueBridgeReady(vditorInstance) {
+        const vditor = vditorInstance || g('vditor');
+        if (!vditor || typeof vditor.getValue !== 'function' || typeof vditor.setValue !== 'function') {
+            return false;
+        }
+
+        const internal = vditor.vditor;
+        if (!internal || !internal.lute) {
+            return false;
+        }
+
+        return typeof internal.lute.Md2VditorDOM === 'function';
+    }
+
+    function scheduleDeferredVditorValueApply(fileId, content) {
+        if (typeof global.ensureVditorInitialized !== 'function') {
+            return;
+        }
+
+        Promise.resolve(global.ensureVditorInitialized()).then(function(instance) {
+            const activeFileId = g('currentFileId');
+            if (String(activeFileId || '') !== String(fileId || '')) {
+                return;
+            }
+            if (isLongFileEditorActiveFor(fileId)) {
+                return;
+            }
+            if (!isVditorValueBridgeReady(instance)) {
+                return;
+            }
+            instance.setValue(String(content || ''));
+        }).catch(function(error) {
+            console.warn('延迟设置编辑器内容失败:', error);
+        });
     }
 
     function syncCurrentEditorSnapshotIntoFiles(targetFiles, options) {
@@ -328,7 +380,7 @@
         }
 
         // 冷启动阶段可能存在实例对象已创建但内部 Lute 尚未就绪的窗口期。
-        if (global.vditorReady === false || !vditor.vditor) {
+        if (global.vditorReady === false || !isVditorValueBridgeReady(vditor)) {
             return fallback;
         }
 
@@ -6276,7 +6328,7 @@
                 vditor.deleteValue();
                 vditor.insertValue(replaceText, true);
             } else {
-                const currentText = vditor.getValue() || '';
+                const currentText = getCurrentEditorContent(currentFileId, currentFile ? currentFile.content : '');
                 const newText = currentText.slice(0, target.start) + replaceText + currentText.slice(target.end);
                 vditor.setValue(newText, true);
             }

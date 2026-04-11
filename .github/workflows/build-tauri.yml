@@ -99,6 +99,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
+            pkg-config \
             libwebkit2gtk-4.1-dev \
             libjavascriptcoregtk-4.1-dev \
             libsoup2.4-dev \
@@ -109,34 +110,20 @@ jobs:
       - name: Linux compatibility aliases for tauri v1
         if: runner.os == 'Linux'
         run: |
-          set -e
+          set -euxo pipefail
           mkdir -p "$HOME/.pkgconfig"
 
-          cat > "$HOME/.pkgconfig/javascriptcoregtk-4.0.pc" << 'EOF'
-          prefix=/usr
-          exec_prefix=${prefix}
-          libdir=${exec_prefix}/lib/x86_64-linux-gnu
-          includedir=${prefix}/include
+          JSC_PC_DIR="$(pkg-config --variable=pcfiledir javascriptcoregtk-4.1)"
+          WEBKIT_PC_DIR="$(pkg-config --variable=pcfiledir webkit2gtk-4.1)"
 
-          Name: javascriptcoregtk-4.0
-          Description: Compatibility alias for javascriptcoregtk-4.1
-          Version: 2.0
-          Requires: javascriptcoregtk-4.1
-          EOF
+          ln -sf "$JSC_PC_DIR/javascriptcoregtk-4.1.pc" "$HOME/.pkgconfig/javascriptcoregtk-4.0.pc"
+          ln -sf "$WEBKIT_PC_DIR/webkit2gtk-4.1.pc" "$HOME/.pkgconfig/webkit2gtk-4.0.pc"
 
-          cat > "$HOME/.pkgconfig/webkit2gtk-4.0.pc" << 'EOF'
-          prefix=/usr
-          exec_prefix=${prefix}
-          libdir=${exec_prefix}/lib/x86_64-linux-gnu
-          includedir=${prefix}/include
+          export PKG_CONFIG_PATH="$HOME/.pkgconfig:$JSC_PC_DIR:$WEBKIT_PC_DIR:/usr/share/pkgconfig:${PKG_CONFIG_PATH:-}"
+          echo "PKG_CONFIG_PATH=$PKG_CONFIG_PATH" >> "$GITHUB_ENV"
 
-          Name: webkit2gtk-4.0
-          Description: Compatibility alias for webkit2gtk-4.1
-          Version: 2.0
-          Requires: webkit2gtk-4.1
-          EOF
-
-          echo "PKG_CONFIG_PATH=$HOME/.pkgconfig:${PKG_CONFIG_PATH:-}" >> "$GITHUB_ENV"
+          pkg-config --print-errors --modversion javascriptcoregtk-4.0
+          pkg-config --print-errors --modversion webkit2gtk-4.0
 
       - name: Clean install dependencies
         shell: bash
