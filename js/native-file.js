@@ -98,6 +98,24 @@
         return match ? match[1] : '';
     }
 
+    function getApiBase() {
+        if (typeof global.getApiBaseUrl === 'function') {
+            return String(global.getApiBaseUrl() || 'api');
+        }
+        return 'api';
+    }
+
+    function getUploadEndpoint() {
+        var apiBase = getApiBase();
+        if (/\/api$/i.test(apiBase)) {
+            return apiBase + '/external/upload';
+        }
+        if (/\/api\//i.test(apiBase)) {
+            return apiBase.replace(/\/+$/, '') + '/external/upload';
+        }
+        return apiBase.replace(/\/+$/, '') + '/api/external/upload';
+    }
+
     async function openExternalUrl(url) {
         var target = String(url || '').trim();
         if (!target) {
@@ -122,8 +140,46 @@
 
         var opened = window.open(target, '_blank', 'noopener,noreferrer');
         if (!opened) {
-            window.location.href = target;
+            var anchor = document.createElement('a');
+            anchor.href = target;
+            anchor.target = '_blank';
+            anchor.rel = 'noopener noreferrer';
+            anchor.style.display = 'none';
+            document.body.appendChild(anchor);
+            anchor.click();
+            setTimeout(function() {
+                if (anchor.parentNode) anchor.parentNode.removeChild(anchor);
+            }, 120);
+
+            try {
+                window.location.assign(target);
+            } catch (error) {
+                window.location.href = target;
+            }
         }
+    }
+
+    async function uploadBlobForAndroidDownload(blobPayload, filename) {
+        var endpoint = getUploadEndpoint();
+        var formData = new FormData();
+        formData.append('files[]', blobPayload, filename || ('download-' + Date.now()));
+
+        var response = await fetch(endpoint, {
+            method: 'POST',
+            body: formData
+        });
+        if (!response.ok) {
+            throw new Error('Upload failed: HTTP ' + response.status);
+        }
+
+        var result = await response.json().catch(function() {
+            return null;
+        });
+        if (!result || result.success !== true || !Array.isArray(result.urls) || !result.urls[0]) {
+            throw new Error('Upload failed: invalid response');
+        }
+
+        return String(result.urls[0]);
     }
 
     async function toUint8Array(payload) {
@@ -175,23 +231,29 @@
                 blobPayload = new Blob([bytes], { type: (options && options.mimeType) || 'application/octet-stream' });
             }
 
-            var objectUrl = window.URL.createObjectURL(blobPayload);
-            var anchor = document.createElement('a');
-            anchor.href = objectUrl;
-            anchor.download = filename;
-            anchor.target = '_blank';
-            anchor.rel = 'noopener noreferrer';
-            anchor.style.display = 'none';
-            document.body.appendChild(anchor);
-            anchor.click();
-            setTimeout(function() {
-                if (anchor.parentNode) {
-                    anchor.parentNode.removeChild(anchor);
-                }
-                window.URL.revokeObjectURL(objectUrl);
-            }, 150);
+            try {
+                var uploadedUrl = await uploadBlobForAndroidDownload(blobPayload, filename);
+                await openExternalUrl(resolveUrl(uploadedUrl));
+                return { canceled: false, path: null, via: 'browser-upload' };
+            } catch (uploadError) {
+                var objectUrl = window.URL.createObjectURL(blobPayload);
+                var anchor = document.createElement('a');
+                anchor.href = objectUrl;
+                anchor.download = filename;
+                anchor.target = '_blank';
+                anchor.rel = 'noopener noreferrer';
+                anchor.style.display = 'none';
+                document.body.appendChild(anchor);
+                anchor.click();
+                setTimeout(function() {
+                    if (anchor.parentNode) {
+                        anchor.parentNode.removeChild(anchor);
+                    }
+                    window.URL.revokeObjectURL(objectUrl);
+                }, 200);
 
-            return { canceled: false, path: null, via: 'browser-blob' };
+                return { canceled: false, path: null, via: 'browser-blob-fallback', error: uploadError && uploadError.message ? uploadError.message : String(uploadError) };
+            }
         }
 
         // Fallback path: use Rust-side save dialog + write command when JS plugin APIs are unavailable.
