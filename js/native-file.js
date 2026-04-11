@@ -1,37 +1,66 @@
 (function(global) {
     'use strict';
 
-    function getTauriApi() {
-        if (!global.__TAURI__) return null;
-        return global.__TAURI__.core || global.__TAURI__;
+    function getTauriRoot() {
+        return global.__TAURI__ || null;
     }
 
     function getDialogApi() {
-        var api = getTauriApi();
-        if (!api) return null;
-        if (api.dialog && typeof api.dialog.save === 'function') {
-            return api.dialog;
+        var root = getTauriRoot();
+        if (!root) return null;
+        if (root.dialog && typeof root.dialog.save === 'function') {
+            return root.dialog;
         }
-        if (api.plugin && api.plugin.dialog && typeof api.plugin.dialog.save === 'function') {
-            return api.plugin.dialog;
+        if (root.core && root.core.dialog && typeof root.core.dialog.save === 'function') {
+            return root.core.dialog;
+        }
+        if (root.plugin && root.plugin.dialog && typeof root.plugin.dialog.save === 'function') {
+            return root.plugin.dialog;
+        }
+        if (root.core && root.core.plugin && root.core.plugin.dialog && typeof root.core.plugin.dialog.save === 'function') {
+            return root.core.plugin.dialog;
         }
         return null;
     }
 
     function getFsApi() {
-        var api = getTauriApi();
-        if (!api) return null;
-        if (api.fs) return api.fs;
-        if (api.plugin && api.plugin.fs) return api.plugin.fs;
+        var root = getTauriRoot();
+        if (!root) return null;
+        if (root.fs) return root.fs;
+        if (root.core && root.core.fs) return root.core.fs;
+        if (root.plugin && root.plugin.fs) return root.plugin.fs;
+        if (root.core && root.core.plugin && root.core.plugin.fs) return root.core.plugin.fs;
         return null;
     }
 
     function getInvokeApi() {
-        var api = getTauriApi();
-        if (!api) return null;
-        if (typeof api.invoke === 'function') return api.invoke;
-        if (api.core && typeof api.core.invoke === 'function') return api.core.invoke;
+        var root = getTauriRoot();
+        if (!root) return null;
+        if (root.core && typeof root.core.invoke === 'function') return root.core.invoke;
+        if (typeof root.invoke === 'function') return root.invoke;
         return null;
+    }
+
+    function resolveUrl(url) {
+        if (typeof url !== 'string') return url;
+        if (typeof global.resolveResourceUrl === 'function') {
+            var base = typeof global.getAppOrigin === 'function' ? global.getAppOrigin() : window.location.href;
+            return global.resolveResourceUrl(url, base);
+        }
+        return url;
+    }
+
+    function blobToDataUrl(blob) {
+        return new Promise(function(resolve, reject) {
+            var reader = new FileReader();
+            reader.onload = function() {
+                resolve(String(reader.result || ''));
+            };
+            reader.onerror = function() {
+                reject(reader.error || new Error('Failed to read blob'));
+            };
+            reader.readAsDataURL(blob);
+        });
     }
 
     function isTauriRuntime() {
@@ -87,28 +116,18 @@
         if (!dialog || !fs) {
             var fallbackContent;
             if (payload && typeof payload.url === 'string') {
-                var response = await fetch(payload.url, { cache: 'no-store' });
+                var response = await fetch(resolveUrl(payload.url), { cache: 'no-store' });
                 if (!response.ok) {
                     throw new Error('HTTP ' + response.status);
                 }
                 var blobFromUrl = await response.blob();
-                var mimeFromUrl = blobFromUrl.type || (options && options.mimeType) || 'application/octet-stream';
-                var bytesFromUrl = new Uint8Array(await blobFromUrl.arrayBuffer());
-                var binaryFromUrl = '';
-                for (var i = 0; i < bytesFromUrl.length; i++) {
-                    binaryFromUrl += String.fromCharCode(bytesFromUrl[i]);
-                }
-                fallbackContent = 'data:' + mimeFromUrl + ';base64,' + btoa(binaryFromUrl);
+                fallbackContent = await blobToDataUrl(blobFromUrl);
             } else if (isTextPayload(payload)) {
                 fallbackContent = String(payload);
             } else {
                 var bytes = await toUint8Array(payload);
                 var mimeType = (options && options.mimeType) || 'application/octet-stream';
-                var binary = '';
-                for (var j = 0; j < bytes.length; j++) {
-                    binary += String.fromCharCode(bytes[j]);
-                }
-                fallbackContent = 'data:' + mimeType + ';base64,' + btoa(binary);
+                fallbackContent = await blobToDataUrl(new Blob([bytes], { type: mimeType }));
             }
 
             var fallbackPath = await invoke('save_file_with_dialog', {
@@ -134,9 +153,9 @@
 
         if (isTextPayload(payload)) {
             if (typeof fs.writeTextFile === 'function') {
-                await fs.writeTextFile(savePath, String(payload));
+                await fs.writeTextFile(String(savePath), String(payload));
             } else if (typeof fs.writeFile === 'function') {
-                await fs.writeFile(savePath, new TextEncoder().encode(String(payload)));
+                await fs.writeFile(String(savePath), new TextEncoder().encode(String(payload)));
             } else {
                 throw new Error('Tauri text writer is unavailable');
             }
@@ -145,7 +164,7 @@
 
         var bytes = await toUint8Array(payload);
         if (typeof fs.writeFile === 'function') {
-            await fs.writeFile(savePath, bytes);
+            await fs.writeFile(String(savePath), bytes);
         } else {
             throw new Error('Tauri binary writer is unavailable');
         }

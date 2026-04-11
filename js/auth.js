@@ -272,11 +272,47 @@
         const closeBtn = document.getElementById('closeUserSettingsBtn');
         if (closeBtn) closeBtn.onclick = hideUserSettingsModal;
 
+        const openChangePasswordBtn = document.getElementById('openChangePasswordBtn');
+        if (openChangePasswordBtn) openChangePasswordBtn.onclick = function() {
+            hideUserSettingsModal();
+            showChangePasswordModal();
+        };
+
+        const openDeleteAccountBtn = document.getElementById('openDeleteAccountBtn');
+        if (openDeleteAccountBtn) openDeleteAccountBtn.onclick = function() {
+            hideUserSettingsModal();
+            showDeleteAccountModal();
+        };
+    }
+
+    function showChangePasswordModal() {
+        const modal = document.getElementById('changePasswordModalOverlay');
+        if (!modal) return;
+        modal.classList.add('show');
+        bindChangePasswordModalEvents();
+        document.addEventListener('keydown', handleChangePasswordModalKeydown);
+    }
+
+    function hideChangePasswordModal() {
+        const modal = document.getElementById('changePasswordModalOverlay');
+        if (!modal) return;
+        modal.classList.remove('show');
+        document.removeEventListener('keydown', handleChangePasswordModalKeydown);
+    }
+
+    function handleChangePasswordModalKeydown(e) {
+        if (e.key === 'Escape') hideChangePasswordModal();
+    }
+
+    function bindChangePasswordModalEvents() {
+        const closeBtn = document.getElementById('closeChangePasswordBtn');
+        if (closeBtn) closeBtn.onclick = hideChangePasswordModal;
+
+        const cancelBtn = document.getElementById('cancelChangePasswordBtn');
+        if (cancelBtn) cancelBtn.onclick = hideChangePasswordModal;
+
         const changePasswordBtn = document.getElementById('changePasswordBtn');
         if (changePasswordBtn) changePasswordBtn.onclick = changePassword;
-
-        const deleteAccountBtn = document.getElementById('deleteAccountBtn');
-        if (deleteAccountBtn) deleteAccountBtn.onclick = deleteAccount;
     }
 
     async function changePassword() {
@@ -341,6 +377,36 @@
         }
     }
 
+    function showDeleteAccountModal() {
+        const modal = document.getElementById('deleteAccountModalOverlay');
+        if (!modal) return;
+        modal.classList.add('show');
+        bindDeleteAccountModalEvents();
+        document.addEventListener('keydown', handleDeleteAccountModalKeydown);
+    }
+
+    function hideDeleteAccountModal() {
+        const modal = document.getElementById('deleteAccountModalOverlay');
+        if (!modal) return;
+        modal.classList.remove('show');
+        document.removeEventListener('keydown', handleDeleteAccountModalKeydown);
+    }
+
+    function handleDeleteAccountModalKeydown(e) {
+        if (e.key === 'Escape') hideDeleteAccountModal();
+    }
+
+    function bindDeleteAccountModalEvents() {
+        const closeBtn = document.getElementById('closeDeleteAccountBtn');
+        if (closeBtn) closeBtn.onclick = hideDeleteAccountModal;
+
+        const cancelBtn = document.getElementById('cancelDeleteAccountBtn');
+        if (cancelBtn) cancelBtn.onclick = hideDeleteAccountModal;
+
+        const deleteAccountBtn = document.getElementById('deleteAccountBtn');
+        if (deleteAccountBtn) deleteAccountBtn.onclick = deleteAccount;
+    }
+
     async function deleteAccount() {
         const confirmUsername = document.getElementById('deleteAccountConfirmUsername')?.value.trim();
         const message = document.getElementById('deleteAccountMessage');
@@ -385,7 +451,7 @@
                 localStorage.removeItem('vditor_files');
                 localStorage.removeItem('guestNoticeDismissed');
                 
-                hideUserSettingsModal();
+                hideDeleteAccountModal();
                 showUserInfo();
                 global.showMessage(t('deleteAccountSuccess'));
                 showLoginModal();

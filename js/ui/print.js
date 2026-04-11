@@ -16,17 +16,6 @@ async function getPDFGenerator() {
     return { generatePDF: global.generatePDF, renderPDF: global.renderPDF };
 }
 
-function shouldUseLocalPdfFallback(error) {
-    if (!(window.nativeFileOps && window.nativeFileOps.isTauriRuntime && window.nativeFileOps.isTauriRuntime())) {
-        return false;
-    }
-
-    var message = (error && error.message ? String(error.message) : '').toLowerCase();
-    return message.indexOf('failed to fetch') !== -1 ||
-        message.indexOf('network') !== -1 ||
-        message.indexOf('load failed') !== -1;
-}
-
 function getResourceResolveBase() {
     var isNativeLike = !!(window.nativeFileOps && window.nativeFileOps.isTauriRuntime && window.nativeFileOps.isTauriRuntime()) ||
         !!window.electron ||
@@ -1494,19 +1483,7 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
             var htmlContent = await preparePrintContent(content, settings);
             // 懒加载 PDF 生成器并生成PDF
             const { generatePDF } = await getPDFGenerator();
-            var pdfUrl;
-            try {
-                pdfUrl = await generatePDF(htmlContent, settings, 'document.pdf');
-            } catch (serverError) {
-                if (!shouldUseLocalPdfFallback(serverError)) {
-                    throw serverError;
-                }
-
-                console.warn('Server PDF generation failed, fallback to local conversion:', serverError);
-                var fallbackSettings = Object.assign({}, settings, { conversionMethod: 'local' });
-                pdfUrl = await generatePDF(htmlContent, fallbackSettings, 'document.pdf');
-                global.showMessage(isEn() ? 'Server conversion unavailable, switched to local conversion' : '后端转换不可用，已切换本地转换');
-            }
+            var pdfUrl = await generatePDF(htmlContent, settings, 'document.pdf');
             
             loadingModal.remove();
 
@@ -1693,18 +1670,7 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
             var htmlContent = await preparePrintContent(content, settings);
             // 懒加载 PDF 生成器并生成PDF
             const { generatePDF } = await getPDFGenerator();
-            try {
-                pdfUrl = await generatePDF(htmlContent, settings);
-            } catch (serverError) {
-                if (!shouldUseLocalPdfFallback(serverError)) {
-                    throw serverError;
-                }
-
-                console.warn('Server PDF generation failed, fallback to local preview conversion:', serverError);
-                var fallbackSettings = Object.assign({}, settings, { conversionMethod: 'local' });
-                pdfUrl = await generatePDF(htmlContent, fallbackSettings);
-                global.showMessage(isEn() ? 'Server conversion unavailable, switched to local preview' : '后端转换不可用，已切换本地预览');
-            }
+            pdfUrl = await generatePDF(htmlContent, settings);
 
             // PDF生成完成，直接显示预览
             showPreview();
