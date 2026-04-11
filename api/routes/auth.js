@@ -115,4 +115,38 @@ router.post('/verify', async (req, res) => {
     res.json(result);
 });
 
+// Change Password
+router.post('/change_password', async (req, res) => {
+    const { username, current_password, new_password } = req.body;
+    if (!username || !current_password || !new_password) {
+        return res.json({ code: 400, message: '缺少必要参数' });
+    }
+    
+    // Authenticate first
+    const auth = await userModel.login(username, current_password);
+    if (auth.code !== 200) {
+        return res.json({ code: 401, message: '用户身份验证失败' });
+    }
+    
+    const result = await userModel.changePassword(username, current_password, new_password);
+    res.json(result);
+});
+
+// Delete Account
+router.post('/delete_account', async (req, res) => {
+    const { username, password } = req.body;
+    if (!username || !password) {
+        return res.json({ code: 400, message: '缺少必要参数' });
+    }
+    
+    // Authenticate first
+    const auth = await userModel.login(username, password);
+    if (auth.code !== 200) {
+        return res.json({ code: 401, message: '用户身份验证失败' });
+    }
+    
+    const result = await userModel.deleteAccount(username);
+    res.json(result);
+});
+
 module.exports = router;

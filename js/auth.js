@@ -15,6 +15,93 @@
         return global.i18n ? global.i18n.t(key) : key;
     }
 
+    // zxcvbn 懒加载
+    let zxcvbnLoaded = false;
+    let zxcvbn = null;
+
+    async function loadZxcvbn() {
+        if (zxcvbnLoaded && zxcvbn) {
+            return zxcvbn;
+        }
+        try {
+            // 动态加载 zxcvbn
+            const module = await import('zxcvbn');
+            zxcvbn = module.default;
+            zxcvbnLoaded = true;
+            return zxcvbn;
+        } catch (error) {
+            console.error('加载 zxcvbn 失败:', error);
+            return null;
+        }
+    }
+
+    // 验证用户名
+    function validateUsername(username) {
+        const regex = /^[a-zA-Z0-9]{3,20}$/;
+        return regex.test(username);
+    }
+
+    // 验证密码
+    function validatePassword(password) {
+        return password.length >= 6 && password.length <= 30;
+    }
+
+    // 更新密码强度指示器
+    function updatePasswordStrengthIndicator(password) {
+        const container = document.getElementById('passwordStrengthContainer');
+        const fill = document.getElementById('passwordStrengthFill');
+        const text = document.getElementById('passwordStrengthText');
+
+        if (!container || !fill || !text) return;
+
+        if (!password || password.length === 0) {
+            container.style.display = 'none';
+            return;
+        }
+
+        container.style.display = 'flex';
+
+        // 先移除所有 strength 类
+        fill.className = 'password-strength-fill';
+        text.className = 'password-strength-text';
+
+        if (!zxcvbnLoaded) {
+            // zxcvbn 还未加载，使用简单规则
+            let score = 0;
+            if (password.length >= 8) score++;
+            if (password.length >= 12) score++;
+            if (/[a-z]/.test(password) && /[A-Z]/.test(password)) score++;
+            if (/\d/.test(password)) score++;
+            if (/[^a-zA-Z0-9]/.test(password)) score++;
+
+            updateStrengthUI(score, fill, text);
+            return;
+        }
+
+        // 使用 zxcvbn 计算密码强度
+        try {
+            const result = zxcvbn(password);
+            updateStrengthUI(result.score, fill, text);
+        } catch (error) {
+            console.error('计算密码强度失败:', error);
+        }
+    }
+
+    // 更新强度 UI
+    function updateStrengthUI(score, fill, text) {
+        const strengthLabels = [
+            t('passwordStrengthVeryWeak'),
+            t('passwordStrengthWeak'),
+            t('passwordStrengthFair'),
+            t('passwordStrengthStrong'),
+            t('passwordStrengthVeryStrong')
+        ];
+
+        fill.classList.add('strength-' + score);
+        text.classList.add('strength-' + score);
+        text.textContent = strengthLabels[score];
+    }
+
     /**
      * 验证 Token 是否有效
      * @returns {Promise<boolean>} 是否有效
@@ -162,6 +249,161 @@
         }
     }
 
+    function showUserSettingsModal() {
+        const modal = document.getElementById('userSettingsModalOverlay');
+        if (!modal) return;
+        modal.classList.add('show');
+        bindUserSettingsModalEvents();
+        document.addEventListener('keydown', handleUserSettingsModalKeydown);
+    }
+
+    function hideUserSettingsModal() {
+        const modal = document.getElementById('userSettingsModalOverlay');
+        if (!modal) return;
+        modal.classList.remove('show');
+        document.removeEventListener('keydown', handleUserSettingsModalKeydown);
+    }
+
+    function handleUserSettingsModalKeydown(e) {
+        if (e.key === 'Escape') hideUserSettingsModal();
+    }
+
+    function bindUserSettingsModalEvents() {
+        const closeBtn = document.getElementById('closeUserSettingsBtn');
+        if (closeBtn) closeBtn.onclick = hideUserSettingsModal;
+
+        const changePasswordBtn = document.getElementById('changePasswordBtn');
+        if (changePasswordBtn) changePasswordBtn.onclick = changePassword;
+
+        const deleteAccountBtn = document.getElementById('deleteAccountBtn');
+        if (deleteAccountBtn) deleteAccountBtn.onclick = deleteAccount;
+    }
+
+    async function changePassword() {
+        const currentPassword = document.getElementById('currentPassword')?.value.trim();
+        const newPassword = document.getElementById('newPassword')?.value.trim();
+        const confirmNewPassword = document.getElementById('confirmNewPassword')?.value.trim();
+        const message = document.getElementById('changePasswordMessage');
+
+        if (!currentPassword || !newPassword || !confirmNewPassword) {
+            if (message) {
+                message.textContent = t('enterUsernameAndPassword');
+                message.className = 'modal-message error';
+            }
+            return;
+        }
+
+        if (newPassword !== confirmNewPassword) {
+            if (message) {
+                message.textContent = t('passwordNotMatch');
+                message.className = 'modal-message error';
+            }
+            return;
+        }
+
+        try {
+            const apiUrl = (global.getApiBaseUrl ? global.getApiBaseUrl() : 'api') + '/auth/change_password';
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    username: global.currentUser.username,
+                    current_password: currentPassword,
+                    new_password: newPassword
+                })
+            });
+            const result = global.parseJsonResponse ? await global.parseJsonResponse(response) : await response.json();
+
+            if (message) {
+                if (result.code === 200) {
+                    message.textContent = t('passwordChangedSuccess');
+                    message.className = 'modal-message success';
+                    
+                    // Update current user's password in localStorage
+                    global.currentUser.password = newPassword;
+                    localStorage.setItem('vditor_user', JSON.stringify(global.currentUser));
+                    
+                    // Clear password fields
+                    document.getElementById('currentPassword').value = '';
+                    document.getElementById('newPassword').value = '';
+                    document.getElementById('confirmNewPassword').value = '';
+                } else {
+                    message.textContent = result.message || t('passwordChangedFailed');
+                    message.className = 'modal-message error';
+                }
+            }
+        } catch (error) {
+            console.error('修改密码错误:', error);
+            if (message) {
+                message.textContent = t('networkErrorPleaseRetry');
+                message.className = 'modal-message error';
+            }
+        }
+    }
+
+    async function deleteAccount() {
+        const confirmUsername = document.getElementById('deleteAccountConfirmUsername')?.value.trim();
+        const message = document.getElementById('deleteAccountMessage');
+
+        if (!confirmUsername) {
+            if (message) {
+                message.textContent = t('deleteAccountConfirm');
+                message.className = 'modal-message error';
+            }
+            return;
+        }
+
+        if (confirmUsername !== global.currentUser.username) {
+            if (message) {
+                message.textContent = t('deleteAccountConfirmMismatch');
+                message.className = 'modal-message error';
+            }
+            return;
+        }
+
+        // Show custom confirmation
+        const confirmed = await g('customConfirm')(t('deleteAccountConfirmMessage'));
+        if (!confirmed) return;
+
+        try {
+            const apiUrl = (global.getApiBaseUrl ? global.getApiBaseUrl() : 'api') + '/auth/delete_account';
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    username: global.currentUser.username,
+                    password: global.currentUser.password
+                })
+            });
+            const result = global.parseJsonResponse ? await global.parseJsonResponse(response) : await response.json();
+
+            if (result.code === 200) {
+                // Clear user data
+                if (global.stopAutoSync) global.stopAutoSync();
+                global.currentUser = null;
+                localStorage.removeItem('vditor_user');
+                localStorage.removeItem('vditor_files');
+                localStorage.removeItem('guestNoticeDismissed');
+                
+                hideUserSettingsModal();
+                showUserInfo();
+                global.showMessage(t('deleteAccountSuccess'));
+                showLoginModal();
+            } else {
+                if (message) {
+                    message.textContent = result.message || t('deleteAccountFailed');
+                    message.className = 'modal-message error';
+                }
+            }
+        } catch (error) {
+            console.error('注销账户错误:', error);
+            if (message) {
+                message.textContent = t('networkErrorPleaseRetry');
+                message.className = 'modal-message error';
+            }
+        }
+    }
+
     function showLoginModal() {
         const modal = document.getElementById('loginModalOverlay');
         if (!modal) return;
@@ -192,6 +434,67 @@
         const registerTabBtn = document.getElementById('registerTabBtn');
         if (loginTabBtn) loginTabBtn.onclick = switchToLoginTab;
         if (registerTabBtn) registerTabBtn.onclick = switchToRegisterTab;
+
+        // 绑定用户名输入事件
+        const registerUsernameInput = document.getElementById('registerUsername');
+        if (registerUsernameInput) {
+            registerUsernameInput.addEventListener('input', function() {
+                validateUsernameInput(this.value);
+            });
+        }
+
+        // 绑定密码输入事件
+        const registerPasswordInput = document.getElementById('registerPassword');
+        if (registerPasswordInput) {
+            registerPasswordInput.addEventListener('input', function() {
+                validatePasswordInput(this.value);
+                updatePasswordStrengthIndicator(this.value);
+                // 懒加载 zxcvbn
+                if (!zxcvbnLoaded) {
+                    loadZxcvbn();
+                }
+            });
+        }
+    }
+
+    // 验证用户名输入
+    function validateUsernameInput(username) {
+        const hint = document.getElementById('registerUsernameHint');
+        if (!hint) return;
+
+        if (!username || username.length === 0) {
+            hint.textContent = t('usernameRequirements');
+            hint.className = 'validation-hint';
+            return;
+        }
+
+        if (validateUsername(username)) {
+            hint.textContent = t('usernameRequirements');
+            hint.className = 'validation-hint success';
+        } else {
+            hint.textContent = t('usernameInvalid');
+            hint.className = 'validation-hint error';
+        }
+    }
+
+    // 验证密码输入
+    function validatePasswordInput(password) {
+        const hint = document.getElementById('registerPasswordHint');
+        if (!hint) return;
+
+        if (!password || password.length === 0) {
+            hint.textContent = t('passwordRequirements');
+            hint.className = 'validation-hint';
+            return;
+        }
+
+        if (validatePassword(password)) {
+            hint.textContent = t('passwordRequirements');
+            hint.className = 'validation-hint success';
+        } else {
+            hint.textContent = t('passwordInvalid');
+            hint.className = 'validation-hint error';
+        }
     }
 
     function handleModalKeydown(e) {
@@ -350,6 +653,25 @@
         if (!username || !password) {
             if (message) {
                 message.textContent = t('enterUsernameAndPassword');
+                message.className = 'modal-message error';
+            }
+            _registerSubmitting = false;
+            return;
+        }
+
+        // 前端验证
+        if (!validateUsername(username)) {
+            if (message) {
+                message.textContent = t('usernameInvalid');
+                message.className = 'modal-message error';
+            }
+            _registerSubmitting = false;
+            return;
+        }
+
+        if (!validatePassword(password)) {
+            if (message) {
+                message.textContent = t('passwordInvalid');
                 message.className = 'modal-message error';
             }
             _registerSubmitting = false;
@@ -543,7 +865,19 @@
             if (dropdown) {
                 const userInfoItem = document.getElementById('userInfoItem');
                 if (userInfoItem) {
-                    userInfoItem.innerHTML = '<i class="fas fa-user"></i> ' + global.currentUser.username;
+                    // Set the username in the first span
+                    const usernameSpan = userInfoItem.querySelector('span');
+                    if (usernameSpan) {
+                        usernameSpan.innerHTML = '<i class="fas fa-user"></i> ' + global.currentUser.username;
+                    }
+                }
+                const settingsBtn = document.getElementById('userSettingsBtn');
+                if (settingsBtn) {
+                    settingsBtn.onclick = function(e) {
+                        e.stopPropagation();
+                        dropdown.classList.remove('show');
+                        showUserSettingsModal();
+                    };
                 }
                 const logoutItem = document.getElementById('logoutItem');
                 if (logoutItem) {
@@ -569,5 +903,7 @@
     global.handleTokenExpired = handleTokenExpired;
     global.isTokenError = isTokenError;
     global.authenticatedFetch = authenticatedFetch;
+    global.showUserSettingsModal = showUserSettingsModal;
+    global.hideUserSettingsModal = hideUserSettingsModal;
 
 })(typeof window !== 'undefined' ? window : this);

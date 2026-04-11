@@ -82,16 +82,17 @@
     "vditor": "^3.11.2",
     "wkhtmltopdf": "^0.4.0",
     "ws": "^8.18.0",
-    "xlsx": "^0.18.5"
+    "xlsx": "^0.18.5",
+    "zxcvbn": "^4.4.2"
   },
   "devDependencies": {
     "@capacitor/android": "^6.1.2",
     "@capacitor/assets": "^3.0.0",
     "@capacitor/cli": "^6.1.2",
     "@capacitor/core": "^6.1.2",
-    "@tauri-apps/cli": "^1.6.3",
     "@capacitor/filesystem": "^6.0.0",
     "@capacitor/share": "^6.0.0",
+    "@tauri-apps/cli": "^1.6.3",
     "jest": "^30.2.0",
     "jest-environment-jsdom": "^30.3.0",
     "supertest": "^7.2.2",

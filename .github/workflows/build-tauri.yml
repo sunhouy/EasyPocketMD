@@ -89,6 +89,7 @@ jobs:
             pkg-config \
             libwebkit2gtk-4.1-dev \
             libjavascriptcoregtk-4.1-dev \
+            libsoup2.4-dev \
             libgtk-3-dev \
             libayatana-appindicator3-dev \
             librsvg2-dev \
@@ -96,8 +97,6 @@ jobs:
 
           if apt-cache show libsoup-3.0-dev >/dev/null 2>&1; then
             sudo apt-get install -y libsoup-3.0-dev
-          else
-            sudo apt-get install -y libsoup2.4-dev
           fi
 
       - name: Linux compatibility aliases for tauri v1
@@ -116,6 +115,7 @@ jobs:
 
           pkg-config --print-errors --modversion javascriptcoregtk-4.0
           pkg-config --print-errors --modversion webkit2gtk-4.0
+          pkg-config --print-errors --modversion libsoup-2.4
 
       - name: Clean install dependencies
         run: |
