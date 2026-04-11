@@ -301,6 +301,9 @@ jobs:
           npx tauri android build --apk --target aarch64
 
       - name: Collect signed Android artifacts
+        env:
+          JKS_ALIAS: ${{ secrets.JKS_ALIAS }}
+          JKS_PASSWORD: ${{ secrets.JKS_PASSWORD }}
         shell: bash
         run: |
           set -euo pipefail
@@ -308,9 +311,41 @@ jobs:
 
           SIGNED_APK="$(find src-tauri/gen/android/app/build/outputs/apk -type f -name '*release*.apk' ! -name '*unsigned*.apk' ! -name '*unaligned*.apk' | head -n 1)"
           if [ -z "${SIGNED_APK:-}" ]; then
-            echo "No signed release APK found"
-            find src-tauri/gen/android/app/build/outputs/apk -type f -name '*.apk' -print || true
-            exit 1
+            echo "No signed release APK found, attempting manual signing..."
+
+            UNSIGNED_APK="$(find src-tauri/gen/android/app/build/outputs/apk -type f -name '*release*unsigned.apk' | head -n 1)"
+            if [ -z "${UNSIGNED_APK:-}" ]; then
+              echo "No unsigned release APK found for manual signing"
+              find src-tauri/gen/android/app/build/outputs/apk -type f -name '*.apk' -print || true
+              exit 1
+            fi
+
+            KEYSTORE_PATH="src-tauri/gen/android/app/release.keystore"
+            if [ ! -f "$KEYSTORE_PATH" ]; then
+              echo "Keystore not found at $KEYSTORE_PATH"
+              exit 1
+            fi
+
+            APKSIGNER_BIN="${ANDROID_SDK_ROOT}/build-tools/${ANDROID_BUILD_TOOLS}/apksigner"
+            ZIPALIGN_BIN="${ANDROID_SDK_ROOT}/build-tools/${ANDROID_BUILD_TOOLS}/zipalign"
+            if [ ! -x "$APKSIGNER_BIN" ]; then
+              APKSIGNER_BIN="apksigner"
+            fi
+            if [ ! -x "$ZIPALIGN_BIN" ]; then
+              ZIPALIGN_BIN="zipalign"
+            fi
+
+            ALIGNED_APK="artifacts/android/easypocketmd-android-arm64-release-aligned.apk"
+            SIGNED_APK="artifacts/android/easypocketmd-android-arm64-release-signed.apk"
+
+            "$ZIPALIGN_BIN" -f -p 4 "$UNSIGNED_APK" "$ALIGNED_APK"
+            "$APKSIGNER_BIN" sign \
+              --ks "$KEYSTORE_PATH" \
+              --ks-key-alias "$JKS_ALIAS" \
+              --ks-pass "pass:$JKS_PASSWORD" \
+              --key-pass "pass:$JKS_PASSWORD" \
+              --out "$SIGNED_APK" \
+              "$ALIGNED_APK"
           fi
 
           cp "$SIGNED_APK" artifacts/android/easypocketmd-android-arm64-release.apk
