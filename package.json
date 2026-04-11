@@ -9,6 +9,7 @@
     "test": "NODE_ENV=test jest --runInBand --forceExit",
     "check-deploy": "node scripts/check-deploy.js",
     "start": "node api/server.js",
+    "tauri": "tauri",
     "tauri:dev": "tauri dev",
     "tauri:android:init": "tauri android init",
     "tauri:android:dev": "tauri android dev",
