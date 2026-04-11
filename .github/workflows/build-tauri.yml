@@ -203,39 +203,7 @@ jobs:
           OLD_DEPENDS="$(dpkg-deb -f "$DEB_FILE" Depends || true)"
           echo "Original Debian Depends: $OLD_DEPENDS"
 
-            NEW_DEPENDS="$(OLD_DEPENDS="$OLD_DEPENDS" python3 - <<'PY'
-            import os
-            import sys
-
-            raw = os.environ.get('OLD_DEPENDS', '').strip()
-            parts = [part.strip() for part in raw.split(',') if part.strip()]
-            required = [
-              'libwebkit2gtk-4.1-0',
-              'libjavascriptcoregtk-4.1-0',
-              'libsoup-3.0-0',
-              'libgtk-3-0',
-            ]
-
-            seen = set()
-            result = []
-
-            def add_dep(dep):
-              dep = dep.strip()
-              if not dep or dep == 'libwebkit2gtk-4.0-37':
-                return
-              if dep not in seen:
-                seen.add(dep)
-                result.append(dep)
-
-            for part in parts:
-              add_dep(part)
-
-            for dep in required:
-              add_dep(dep)
-
-            sys.stdout.write(', '.join(result))
-            PY
-            )"
+              NEW_DEPENDS="$(OLD_DEPENDS="$OLD_DEPENDS" python3 -c 'import os,sys; raw=os.environ.get("OLD_DEPENDS","").strip(); parts=[part.strip() for part in raw.split(",") if part.strip()]; required=["libwebkit2gtk-4.1-0","libjavascriptcoregtk-4.1-0","libsoup-3.0-0","libgtk-3-0"]; seen=set(); result=[]; add_dep=lambda dep: None if (not dep or dep == "libwebkit2gtk-4.0-37" or dep in seen) else (seen.add(dep), result.append(dep)); [add_dep(part) for part in parts]; [add_dep(dep) for dep in required]; sys.stdout.write(", ".join(result))')"
           echo "Normalized Debian Depends: $NEW_DEPENDS"
 
           awk '
