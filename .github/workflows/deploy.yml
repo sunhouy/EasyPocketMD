@@ -52,8 +52,13 @@ jobs:
       run: npm run wasm:text:verify
 
     - name: Run tests
-      run: npm test
+      run: npm test && npx jest --coverage
 
+    - name: Upload results to Codecov
+      uses: codecov/codecov-action@v5
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+        
   deploy:
     runs-on: ubuntu-latest
     needs: test

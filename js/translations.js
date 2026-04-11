@@ -720,7 +720,30 @@
             insertChart: '插入图表',
             loadingEchartsTemplates: '加载 ECharts 模板中...',
             failedToLoadEchartsTemplates: '加载 ECharts 模板失败，请刷新重试。',
-            noEchartsTemplates: '暂无 ECharts 模板'
+            noEchartsTemplates: '暂无 ECharts 模板',
+
+            // 用户设置
+            userSettings: '账户设置',
+            changePassword: '修改密码',
+            deleteAccount: '注销账户',
+            currentPassword: '当前密码',
+            enterCurrentPassword: '请输入当前密码',
+            newPassword: '新密码',
+            enterNewPassword: '请输入新密码',
+            confirmNewPassword: '确认新密码',
+            enterConfirmNewPassword: '请再次输入新密码',
+            passwordChangedSuccess: '密码修改成功',
+            passwordChangedFailed: '密码修改失败',
+            passwordNotMatch: '两次输入的新密码不一致',
+            currentPasswordIncorrect: '当前密码错误',
+            deleteAccountConfirm: '请输入用户名以确认注销账户',
+            deleteAccountWarning: '警告：此操作不可撤销！将删除您的所有文件和历史记录。',
+            deleteAccountConfirmUsername: '请输入您的用户名确认注销：',
+            deleteAccountSuccess: '账户已成功注销',
+            deleteAccountFailed: '注销账户失败',
+            deleteAccountConfirmMismatch: '输入的用户名不正确',
+            deleteAccountConfirmTitle: '确认注销账户',
+            deleteAccountConfirmMessage: '您确定要注销账户吗？此操作不可撤销，将删除您的所有文件和历史记录。'
         },
         en: {
             // Page title and header
@@ -1434,7 +1457,30 @@
             insertChart: 'Insert Chart',
             loadingEchartsTemplates: 'Loading ECharts templates...',
             failedToLoadEchartsTemplates: 'Failed to load ECharts templates. Please refresh and try again.',
-            noEchartsTemplates: 'No ECharts templates available'
+            noEchartsTemplates: 'No ECharts templates available',
+
+            // User settings
+            userSettings: 'Account Settings',
+            changePassword: 'Change Password',
+            deleteAccount: 'Delete Account',
+            currentPassword: 'Current Password',
+            enterCurrentPassword: 'Enter current password',
+            newPassword: 'New Password',
+            enterNewPassword: 'Enter new password',
+            confirmNewPassword: 'Confirm New Password',
+            enterConfirmNewPassword: 'Confirm new password',
+            passwordChangedSuccess: 'Password changed successfully',
+            passwordChangedFailed: 'Failed to change password',
+            passwordNotMatch: 'New passwords do not match',
+            currentPasswordIncorrect: 'Current password is incorrect',
+            deleteAccountConfirm: 'Please enter your username to confirm account deletion',
+            deleteAccountWarning: 'Warning: This action is irreversible! All your files and history will be deleted.',
+            deleteAccountConfirmUsername: 'Please enter your username to confirm deletion:',
+            deleteAccountSuccess: 'Account deleted successfully',
+            deleteAccountFailed: 'Failed to delete account',
+            deleteAccountConfirmMismatch: 'Incorrect username entered',
+            deleteAccountConfirmTitle: 'Confirm Account Deletion',
+            deleteAccountConfirmMessage: 'Are you sure you want to delete your account? This action is irreversible and will delete all your files and history.'
         }
     };
 
