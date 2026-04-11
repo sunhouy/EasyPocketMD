@@ -973,6 +973,7 @@
             <button class="desktop-toolbar-btn" id="desktopFileBtn" data-i18n="fileMenu">文件</button>
             <button class="desktop-toolbar-btn" id="desktopLoginBtn" data-i18n="login">登录</button>
             <button class="desktop-toolbar-btn" id="desktopInsertBtn" data-i18n="insert">插入</button>
+            <button class="desktop-toolbar-btn" id="desktopAIBtn" data-i18n="aiAssistant">AI助手</button>
 
             <div class="desktop-dropdown">
                 <button class="desktop-toolbar-btn" id="desktopEditBtn" data-i18n="edit">编辑</button>
@@ -1080,56 +1081,85 @@
 
 <!-- 用户设置模态窗口 -->
 <div class="modal-overlay" id="userSettingsModalOverlay">
-    <div class="modal" style="position:relative;max-height:85vh;overflow:hidden;display:flex;flex-direction:column;">
+    <div class="modal" style="position:relative;">
         <button class="modal-close-btn" id="closeUserSettingsBtn" style="position:absolute;top:15px;right:15px;background:none;border:none;font-size:20px;cursor:pointer;z-index:10;">
             <i class="fas fa-times"></i>
         </button>
         <div class="modal-header" style="flex-shrink:0;">
             <h2 data-i18n="userSettings">账户设置</h2>
         </div>
-        <div class="modal-form" style="flex:1;overflow-y:auto;padding-right:5px;">
-            
-            <!-- 修改密码区域 -->
-            <section class="settings-section" aria-labelledby="changePasswordGroupTitle">
-                <div class="settings-section-header">
-                    <h3 class="settings-section-title" id="changePasswordGroupTitle" data-i18n="changePassword">修改密码</h3>
-                </div>
-                <div class="form-group">
-                    <label for="currentPassword" data-i18n="currentPassword">当前密码</label>
-                    <input type="password" id="currentPassword" data-i18n-placeholder="enterCurrentPassword" placeholder="请输入当前密码">
-                </div>
-                <div class="form-group">
-                    <label for="newPassword" data-i18n="newPassword">新密码</label>
-                    <input type="password" id="newPassword" data-i18n-placeholder="enterNewPassword" placeholder="请输入新密码">
-                </div>
-                <div class="form-group">
-                    <label for="confirmNewPassword" data-i18n="confirmNewPassword">确认新密码</label>
-                    <input type="password" id="confirmNewPassword" data-i18n-placeholder="enterConfirmNewPassword" placeholder="请再次输入新密码">
-                </div>
-                <div class="modal-message" id="changePasswordMessage"></div>
-                <div class="modal-actions">
-                    <button class="modal-btn primary" id="changePasswordBtn" data-i18n="changePassword">修改密码</button>
-                </div>
-            </section>
-            
-            <hr style="border:none;border-top:1px solid #eee;margin:16px 0;">
-            
-            <!-- 注销账户区域 -->
-            <section class="settings-section" aria-labelledby="deleteAccountGroupTitle">
-                <div class="settings-section-header">
-                    <h3 class="settings-section-title" id="deleteAccountGroupTitle" data-i18n="deleteAccount">注销账户</h3>
-                </div>
-                <div class="settings-section-hint" style="color:#dc3545;font-weight:500;" data-i18n="deleteAccountWarning">警告：此操作不可撤销！将删除您的所有文件和历史记录。</div>
-                <div class="form-group">
-                    <label for="deleteAccountConfirmUsername" data-i18n="deleteAccountConfirmUsername">请输入您的用户名确认注销：</label>
-                    <input type="text" id="deleteAccountConfirmUsername" data-i18n-placeholder="username" placeholder="用户名">
-                </div>
-                <div class="modal-message" id="deleteAccountMessage"></div>
-                <div class="modal-actions">
-                    <button class="modal-btn" style="background:#dc3545;color:white;" id="deleteAccountBtn" data-i18n="deleteAccount">注销账户</button>
-                </div>
-            </section>
-            
+        <div class="modal-form" style="padding-right:5px;">
+            <div class="settings-list" role="list">
+                <button class="settings-list-item" id="openChangePasswordBtn" style="width:100%;padding:16px;border:none;background:transparent;cursor:pointer;text-align:left;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center;">
+                    <span style="display:flex;align-items:center;gap:12px;">
+                        <i class="fas fa-key" style="color:#4a90e2;"></i>
+                        <span data-i18n="changePassword">修改密码</span>
+                    </span>
+                    <i class="fas fa-chevron-right" style="color:#999;"></i>
+                </button>
+                <button class="settings-list-item" id="openDeleteAccountBtn" style="width:100%;padding:16px;border:none;background:transparent;cursor:pointer;text-align:left;display:flex;justify-content:space-between;align-items:center;">
+                    <span style="display:flex;align-items:center;gap:12px;">
+                        <i class="fas fa-user-slash" style="color:#dc3545;"></i>
+                        <span data-i18n="deleteAccount">注销账户</span>
+                    </span>
+                    <i class="fas fa-chevron-right" style="color:#999;"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 修改密码模态窗口 -->
+<div class="modal-overlay" id="changePasswordModalOverlay">
+    <div class="modal" style="position:relative;">
+        <button class="modal-close-btn" id="closeChangePasswordBtn" style="position:absolute;top:15px;right:15px;background:none;border:none;font-size:20px;cursor:pointer;z-index:10;">
+            <i class="fas fa-times"></i>
+        </button>
+        <div class="modal-header" style="flex-shrink:0;">
+            <h2 data-i18n="changePassword">修改密码</h2>
+        </div>
+        <div class="modal-form" style="padding-right:5px;">
+            <div class="form-group">
+                <label for="currentPassword" data-i18n="currentPassword">当前密码</label>
+                <input type="password" id="currentPassword" data-i18n-placeholder="enterCurrentPassword" placeholder="请输入当前密码">
+            </div>
+            <div class="form-group">
+                <label for="newPassword" data-i18n="newPassword">新密码</label>
+                <input type="password" id="newPassword" data-i18n-placeholder="enterNewPassword" placeholder="请输入新密码">
+            </div>
+            <div class="form-group">
+                <label for="confirmNewPassword" data-i18n="confirmNewPassword">确认新密码</label>
+                <input type="password" id="confirmNewPassword" data-i18n-placeholder="enterConfirmNewPassword" placeholder="请再次输入新密码">
+            </div>
+            <div class="modal-message" id="changePasswordMessage"></div>
+            <div class="modal-actions">
+                <button class="modal-btn secondary" id="cancelChangePasswordBtn" data-i18n="cancel">取消</button>
+                <button class="modal-btn primary" id="changePasswordBtn" data-i18n="changePassword">修改密码</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 注销账户模态窗口 -->
+<div class="modal-overlay" id="deleteAccountModalOverlay">
+    <div class="modal" style="position:relative;">
+        <button class="modal-close-btn" id="closeDeleteAccountBtn" style="position:absolute;top:15px;right:15px;background:none;border:none;font-size:20px;cursor:pointer;z-index:10;">
+            <i class="fas fa-times"></i>
+        </button>
+        <div class="modal-header" style="flex-shrink:0;">
+            <h2 data-i18n="deleteAccount">注销账户</h2>
+        </div>
+        <div class="modal-form" style="padding-right:5px;">
+            <div class="settings-section-hint" style="color:#dc3545;font-weight:500;" data-i18n="deleteAccountWarning">警告：此操作不可撤销！将删除您的所有文件和历史记录。</div>
+            <div class="form-group">
+                <label for="deleteAccountConfirmUsername" data-i18n="deleteAccountConfirmUsername">请输入您的用户名确认注销：</label>
+                <input type="text" id="deleteAccountConfirmUsername" data-i18n-placeholder="username" placeholder="用户名">
+            </div>
+            <div class="modal-message" id="deleteAccountMessage"></div>
+            <div class="modal-actions">
+                <button class="modal-btn secondary" id="cancelDeleteAccountBtn" data-i18n="cancel">取消</button>
+                <button class="modal-btn" style="background:#dc3545;color:white;" id="deleteAccountBtn" data-i18n="deleteAccount">注销账户</button>
+            </div>
         </div>
     </div>
 </div>

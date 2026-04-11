@@ -200,6 +200,7 @@ document.addEventListener('DOMContentLoaded', function() {
         { id: 'openFileMenu', textKey: 'keyboardShortcutFileMenu', defaultValue: 'F', allowInEditor: false, toolbarButtonId: 'desktopFileBtn', toolbarTextKey: 'fileMenu' },
         { id: 'openLoginMenu', textKey: 'keyboardShortcutLoginMenu', defaultValue: 'U', allowInEditor: false, toolbarButtonId: 'desktopLoginBtn', toolbarTextKey: 'login' },
         { id: 'openInsertMenu', textKey: 'keyboardShortcutInsertMenu', defaultValue: 'I', allowInEditor: false, toolbarButtonId: 'desktopInsertBtn', toolbarTextKey: 'insert' },
+        { id: 'openAIAssistant', textKey: 'keyboardShortcutAIAssistant', defaultValue: 'A', allowInEditor: false, toolbarButtonId: 'desktopAIBtn', toolbarTextKey: 'aiAssistant' },
         { id: 'openEditMenu', textKey: 'keyboardShortcutEditMenu', defaultValue: 'E', allowInEditor: false, toolbarButtonId: 'desktopEditBtn', toolbarTextKey: 'edit' },
         { id: 'openSettingsMenu', textKey: 'keyboardShortcutSettingsMenu', defaultValue: 'S', allowInEditor: false, toolbarButtonId: 'desktopSettingsBtn', toolbarTextKey: 'settings' },
         { id: 'openMoreMenu', textKey: 'keyboardShortcutMoreMenu', defaultValue: 'M', allowInEditor: false, toolbarButtonId: 'desktopMoreBtn', toolbarTextKey: 'more' },
@@ -408,6 +409,20 @@ document.addEventListener('DOMContentLoaded', function() {
             } else if (typeof window.showInsertMenu === 'function') {
                 window.showInsertMenu();
             }
+            return;
+        case 'openAIAssistant':
+            if (clickElementById('desktopAIBtn')) return;
+            if (typeof window.showAIPanel !== 'function') {
+                import('./ui/ai-assistant.js').then(function() {
+                    if (typeof window.showAIPanel === 'function') {
+                        window.showAIPanel();
+                    }
+                }).catch(function(error) {
+                    console.error('Failed to load AI assistant module:', error);
+                });
+                return;
+            }
+            window.showAIPanel();
             return;
         case 'openEditMenu':
             clickElementById('desktopEditBtn');
@@ -1548,6 +1563,14 @@ document.addEventListener('DOMContentLoaded', function() {
         bindDesktopButton('desktopInsertBtn', function() {
             if (typeof window.showInsertPicker === 'function') window.showInsertPicker();
             else window.showInsertMenu();
+        });
+        bindDesktopButton('desktopAIBtn', async function() {
+            if (typeof window.showAIPanel !== 'function') {
+                await import('./ui/ai-assistant.js');
+            }
+            if (typeof window.showAIPanel === 'function') {
+                window.showAIPanel();
+            }
         });
         bindDesktopButton('desktopEditUndoBtn', function() {
             if (window.vditor && window.vditor.vditor && window.vditor.vditor.undo) {

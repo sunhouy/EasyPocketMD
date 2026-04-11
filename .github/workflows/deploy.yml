@@ -254,24 +254,59 @@ jobs:
           ln -s "$SHARED_DIR/user_files" user_files
           echo "✓ 符号链接创建完成"
 
-          # 安装依赖 - 使用更可靠的方式
-          echo "[3/4] 安装依赖..."
-          # 清理 npm 缓存，避免旧缓存问题
-          npm cache clean --force 2>/dev/null || true
-          
-          # 使用 npm ci 如果有 package-lock.json，否则使用 npm install
+          # 安装依赖（优先复用共享缓存，仅在依赖变更时安装）
+          echo "[3/4] 准备 Node 依赖..."
+          LOCK_HASH=""
+          CACHE_NODE_DIR="$SHARED_DIR/node_modules_prod"
+          CACHE_HASH_FILE="$SHARED_DIR/node_modules_prod.lock.sha256"
+          CACHE_TMP_DIR="$SHARED_DIR/node_modules_prod.tmp"
+          REUSED_NODE_MODULES="false"
+
           if [ -f "package-lock.json" ]; then
-            echo "使用 npm ci (基于 package-lock.json)..."
-            timeout 300 npm ci --omit=dev --prefer-offline --no-audit --no-fund || {
-              echo "npm ci 失败，尝试 npm install..."
-              timeout 300 npm install --omit=dev --prefer-offline --no-audit --no-fund
-            }
-          else
-            echo "使用 npm install..."
-            timeout 300 npm install --omit=dev --prefer-offline --no-audit --no-fund
+            LOCK_HASH=$(sha256sum package-lock.json | awk '{print $1}')
           fi
 
-          echo "✓ 依赖安装完成"
+          if [ -n "$LOCK_HASH" ] && [ -d "$CACHE_NODE_DIR" ] && [ -f "$CACHE_HASH_FILE" ] && [ "$(cat "$CACHE_HASH_FILE")" = "$LOCK_HASH" ]; then
+            echo "检测到共享依赖缓存命中，复用已有 node_modules..."
+            rm -rf node_modules
+            mkdir -p node_modules
+            if command -v rsync > /dev/null 2>&1; then
+              rsync -a --delete "$CACHE_NODE_DIR/" "node_modules/"
+            else
+              cp -a "$CACHE_NODE_DIR/." "node_modules/"
+            fi
+            REUSED_NODE_MODULES="true"
+          fi
+
+          if [ "$REUSED_NODE_MODULES" != "true" ]; then
+            echo "共享缓存未命中，执行依赖安装..."
+            if [ -f "package-lock.json" ]; then
+              echo "使用 npm ci (基于 package-lock.json)..."
+              timeout 300 npm ci --omit=dev --prefer-offline --no-audit --no-fund || {
+                echo "npm ci 失败，尝试 npm install..."
+                timeout 300 npm install --omit=dev --prefer-offline --no-audit --no-fund
+              }
+            else
+              echo "使用 npm install..."
+              timeout 300 npm install --omit=dev --prefer-offline --no-audit --no-fund
+            fi
+
+            if [ -n "$LOCK_HASH" ]; then
+              echo "更新共享 node_modules 缓存..."
+              rm -rf "$CACHE_TMP_DIR"
+              mkdir -p "$CACHE_TMP_DIR"
+              if command -v rsync > /dev/null 2>&1; then
+                rsync -a --delete "node_modules/" "$CACHE_TMP_DIR/"
+              else
+                cp -a "node_modules/." "$CACHE_TMP_DIR/"
+              fi
+              rm -rf "$CACHE_NODE_DIR"
+              mv "$CACHE_TMP_DIR" "$CACHE_NODE_DIR"
+              printf '%s\n' "$LOCK_HASH" > "$CACHE_HASH_FILE"
+            fi
+          fi
+
+          echo "✓ Node 依赖准备完成"
 
           # 验证安装
           echo "[4/4] 验证安装..."
@@ -529,6 +564,9 @@ jobs:
           set -e
           export PATH="$PATH:${{ env.REMOTE_NODE_BIN }}"
           PM2_BIN="${{ env.REMOTE_NODE_BIN }}/pm2"
+          SHARED_DIR="/www/wwwroot/js_shared"
+          PRINT_VENV="$SHARED_DIR/print_venv"
+          PRINT_REQ_HASH_FILE="$SHARED_DIR/print_requirements.sha256"
 
           LINK_PATH="/www/wwwroot/js"
           if [ -L "$LINK_PATH" ]; then
@@ -550,20 +588,37 @@ jobs:
 
           echo "使用 Python: $PYTHON_CMD"
 
-          # 创建并激活虚拟环境
-          echo "创建虚拟环境..."
-          $PYTHON_CMD -m venv venv
-          source venv/bin/activate
+          mkdir -p "$SHARED_DIR"
 
-          # 安装依赖
+          # 复用共享虚拟环境，仅在 requirements 变化时重新安装
           if [ -f "requirements.txt" ]; then
-            echo "安装 Python 依赖..."
-            pip install --upgrade pip -q
-            pip install -r requirements.txt -q
+            REQ_HASH=$(sha256sum requirements.txt | awk '{print $1}')
+            NEED_REINSTALL="true"
+
+            if [ -d "$PRINT_VENV" ] && [ -f "$PRINT_REQ_HASH_FILE" ] && [ "$(cat "$PRINT_REQ_HASH_FILE")" = "$REQ_HASH" ]; then
+              NEED_REINSTALL="false"
+              echo "复用已有 print 虚拟环境（requirements 未变化）"
+            fi
+
+            if [ "$NEED_REINSTALL" = "true" ]; then
+              echo "requirements 有变化，重建共享 print 虚拟环境..."
+              rm -rf "$PRINT_VENV"
+              $PYTHON_CMD -m venv "$PRINT_VENV"
+              "$PRINT_VENV/bin/python" -m pip install --upgrade pip -q
+              "$PRINT_VENV/bin/python" -m pip install -r requirements.txt -q
+              printf '%s\n' "$REQ_HASH" > "$PRINT_REQ_HASH_FILE"
+              echo "✓ print 依赖安装完成"
+            fi
+          else
+            echo "警告: requirements.txt 不存在，继续使用系统 Python"
           fi
 
-          # 获取虚拟环境中的 Python 解释器路径
-          VENV_PYTHON="$(pwd)/venv/bin/python"
+          # 优先使用共享虚拟环境中的 Python 解释器
+          if [ -x "$PRINT_VENV/bin/python" ]; then
+            VENV_PYTHON="$PRINT_VENV/bin/python"
+          else
+            VENV_PYTHON="$PYTHON_CMD"
+          fi
 
           # 零停机重启打印服务器
           echo "零停机重启打印服务器..."
