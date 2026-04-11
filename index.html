@@ -279,10 +279,19 @@
             <div class="form-group">
                 <label for="registerUsername" data-i18n="username">用户名</label>
                 <input type="text" id="registerUsername" data-i18n-placeholder="enterUsername" placeholder="请输入用户名">
+                <div class="validation-hint" id="registerUsernameHint" data-i18n="usernameRequirements" style="font-size:12px;color:#666;margin-top:4px;">用户名必须是3-20个字符，仅包含英文和数字</div>
             </div>
             <div class="form-group">
                 <label for="registerPassword" data-i18n="password">密码</label>
                 <input type="password" id="registerPassword" data-i18n-placeholder="enterPassword" placeholder="请输入密码">
+                <div class="validation-hint" id="registerPasswordHint" data-i18n="passwordRequirements" style="font-size:12px;color:#666;margin-top:4px;">密码必须是6-30个字符</div>
+                <div class="password-strength-container" id="passwordStrengthContainer" style="margin-top:8px;display:none;">
+                    <div class="password-strength-label" data-i18n="passwordStrength">密码强度：</div>
+                    <div class="password-strength-bar">
+                        <div class="password-strength-fill" id="passwordStrengthFill"></div>
+                    </div>
+                    <div class="password-strength-text" id="passwordStrengthText"></div>
+                </div>
             </div>
             <div class="form-group">
                 <label for="registerInviteCode" data-i18n="inviteCode">邀请码 (可选)</label>
@@ -1064,8 +1073,67 @@
 
 <!-- 用户菜单下拉 -->
 <div class="user-menu-dropdown" id="userMenuDropdown">
-    <div class="dropdown-item" id="userInfoItem"></div>
+    <div class="dropdown-item" id="userInfoItem" style="display:flex;align-items:center;justify-content:space-between;">
+        <span style="flex:1;"></span>
+        <button class="user-settings-btn" id="userSettingsBtn" data-i18n-title="userSettings" title="账户设置" style="background:none;border:none;cursor:pointer;padding:0;margin-left:8px;">
+            <i class="fas fa-cog"></i>
+        </button>
+    </div>
     <button class="dropdown-item" id="logoutItem"><i class="fas fa-sign-out-alt"></i> <span data-i18n="logout">退出登录</span></button>
+</div>
+
+<!-- 用户设置模态窗口 -->
+<div class="modal-overlay" id="userSettingsModalOverlay">
+    <div class="modal" style="position:relative;max-height:85vh;overflow:hidden;display:flex;flex-direction:column;">
+        <button class="modal-close-btn" id="closeUserSettingsBtn" style="position:absolute;top:15px;right:15px;background:none;border:none;font-size:20px;cursor:pointer;z-index:10;">
+            <i class="fas fa-times"></i>
+        </button>
+        <div class="modal-header" style="flex-shrink:0;">
+            <h2 data-i18n="userSettings">账户设置</h2>
+        </div>
+        <div class="modal-form" style="flex:1;overflow-y:auto;padding-right:5px;">
+            
+            <section class="settings-section" aria-labelledby="changePasswordGroupTitle">
+                <div class="settings-section-header">
+                    <h3 class="settings-section-title" id="changePasswordGroupTitle" data-i18n="changePassword">修改密码</h3>
+                </div>
+                <div class="form-group">
+                    <label for="currentPassword" data-i18n="currentPassword">当前密码</label>
+                    <input type="password" id="currentPassword" data-i18n-placeholder="enterCurrentPassword" placeholder="请输入当前密码">
+                </div>
+                <div class="form-group">
+                    <label for="newPassword" data-i18n="newPassword">新密码</label>
+                    <input type="password" id="newPassword" data-i18n-placeholder="enterNewPassword" placeholder="请输入新密码">
+                </div>
+                <div class="form-group">
+                    <label for="confirmNewPassword" data-i18n="confirmNewPassword">确认新密码</label>
+                    <input type="password" id="confirmNewPassword" data-i18n-placeholder="enterConfirmNewPassword" placeholder="请再次输入新密码">
+                </div>
+                <div class="modal-message" id="changePasswordMessage"></div>
+                <div class="modal-actions">
+                    <button class="modal-btn primary" id="changePasswordBtn" data-i18n="changePassword">修改密码</button>
+                </div>
+            </section>
+            
+            <hr style="border:none;border-top:1px solid #eee;margin:20px 0;">
+            
+            <section class="settings-section" aria-labelledby="deleteAccountGroupTitle">
+                <div class="settings-section-header">
+                    <h3 class="settings-section-title" id="deleteAccountGroupTitle" data-i18n="deleteAccount">注销账户</h3>
+                </div>
+                <div class="settings-section-hint" style="color:#dc3545;font-weight:500;" data-i18n="deleteAccountWarning">警告：此操作不可撤销！将删除您的所有文件和历史记录。</div>
+                <div class="form-group">
+                    <label for="deleteAccountConfirmUsername" data-i18n="deleteAccountConfirmUsername">请输入您的用户名确认注销：</label>
+                    <input type="text" id="deleteAccountConfirmUsername" data-i18n-placeholder="username" placeholder="用户名">
+                </div>
+                <div class="modal-message" id="deleteAccountMessage"></div>
+                <div class="modal-actions">
+                    <button class="modal-btn" style="background:#dc3545;color:white;" id="deleteAccountBtn" data-i18n="deleteAccount">注销账户</button>
+                </div>
+            </section>
+            
+        </div>
+    </div>
 </div>
 
 <!-- PPT页面编辑器全屏模态框 -->

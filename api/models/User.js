@@ -46,6 +46,17 @@ class User {
 
     // Register user
     async register(username, password, inviteCode = null) {
+        // Validate username: 3-20 characters, only letters and numbers
+        const usernameRegex = /^[a-zA-Z0-9]{3,20}$/;
+        if (!usernameRegex.test(username)) {
+            return { code: 400, message: '用户名必须是3-20个字符，仅包含英文和数字' };
+        }
+
+        // Validate password: 6-30 characters
+        if (password.length < 6 || password.length > 30) {
+            return { code: 400, message: '密码必须是6-30个字符' };
+        }
+
         const connection = await db.getConnection();
         try {
             await connection.beginTransaction();
@@ -405,6 +416,88 @@ class User {
             };
         } catch (error) {
             return { code: 500, message: '获取头像失败: ' + error.message };
+        }
+    }
+
+    // Change Password
+    async changePassword(username, currentPassword, newPassword) {
+        const connection = await db.getConnection();
+        try {
+            await connection.beginTransaction();
+
+            // Get user
+            const [rows] = await connection.execute('SELECT password FROM users WHERE username = ?', [username]);
+            if (rows.length === 0) {
+                await connection.rollback();
+                return { code: 404, message: '用户不存在' };
+            }
+
+            const user = rows[0];
+            const isMatch = await this.verifyPassword(currentPassword, user.password);
+
+            if (!isMatch) {
+                await connection.rollback();
+                return { code: 401, message: '当前密码错误' };
+            }
+
+            // Update password
+            const hashedPassword = await this.encryptPassword(newPassword);
+            await connection.execute('UPDATE users SET password = ? WHERE username = ?', [hashedPassword, username]);
+
+            await connection.commit();
+            return { code: 200, message: '密码修改成功' };
+        } catch (error) {
+            await connection.rollback();
+            return { code: 500, message: '密码修改失败: ' + error.message };
+        } finally {
+            connection.release();
+        }
+    }
+
+    // Delete Account
+    async deleteAccount(username) {
+        const connection = await db.getConnection();
+        try {
+            await connection.beginTransaction();
+
+            // Get user ID
+            const [userRows] = await connection.execute('SELECT id FROM users WHERE username = ?', [username]);
+            if (userRows.length === 0) {
+                await connection.rollback();
+                return { code: 404, message: '用户不存在' };
+            }
+
+            const userId = userRows[0].id;
+
+            // Delete file content first (due to foreign key constraints)
+            await connection.execute(`
+                DELETE c FROM file_content c
+                JOIN file_history h ON c.history_id = h.id
+                WHERE h.user_id = ?
+            `, [userId]);
+
+            // Delete file history
+            await connection.execute('DELETE FROM file_history WHERE user_id = ?', [userId]);
+
+            // Delete user files
+            await connection.execute('DELETE FROM user_files WHERE username = ?', [username]);
+
+            // Delete member records
+            await connection.execute('DELETE FROM member_records WHERE username = ?', [username]);
+
+            // Delete file shares
+            await connection.execute('DELETE FROM file_shares WHERE owner_username = ? OR shared_with_username = ?', [username, username]);
+
+            // Delete user
+            await connection.execute('DELETE FROM users WHERE username = ?', [username]);
+
+            await connection.commit();
+            return { code: 200, message: '账户已成功注销' };
+        } catch (error) {
+            await connection.rollback();
+            return { code: 500, message: '注销账户失败: ' + error.message };
+        } finally {
+            connection.release();
         }
     }
 }

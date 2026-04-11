@@ -743,7 +743,19 @@
             deleteAccountFailed: '注销账户失败',
             deleteAccountConfirmMismatch: '输入的用户名不正确',
             deleteAccountConfirmTitle: '确认注销账户',
-            deleteAccountConfirmMessage: '您确定要注销账户吗？此操作不可撤销，将删除您的所有文件和历史记录。'
+            deleteAccountConfirmMessage: '您确定要注销账户吗？此操作不可撤销，将删除您的所有文件和历史记录。',
+
+            // 注册验证
+            usernameRequirements: '用户名必须是3-20个字符，仅包含英文和数字',
+            passwordRequirements: '密码必须是6-30个字符',
+            usernameInvalid: '用户名格式不正确',
+            passwordInvalid: '密码长度不正确',
+            passwordStrength: '密码强度',
+            passwordStrengthVeryWeak: '非常弱',
+            passwordStrengthWeak: '弱',
+            passwordStrengthFair: '一般',
+            passwordStrengthStrong: '强',
+            passwordStrengthVeryStrong: '非常强'
         },
         en: {
             // Page title and header
@@ -1480,7 +1492,19 @@
             deleteAccountFailed: 'Failed to delete account',
             deleteAccountConfirmMismatch: 'Incorrect username entered',
             deleteAccountConfirmTitle: 'Confirm Account Deletion',
-            deleteAccountConfirmMessage: 'Are you sure you want to delete your account? This action is irreversible and will delete all your files and history.'
+            deleteAccountConfirmMessage: 'Are you sure you want to delete your account? This action is irreversible and will delete all your files and history.',
+
+            // Registration validation
+            usernameRequirements: 'Username must be 3-20 characters, containing only letters and numbers',
+            passwordRequirements: 'Password must be 6-30 characters',
+            usernameInvalid: 'Invalid username format',
+            passwordInvalid: 'Invalid password length',
+            passwordStrength: 'Password Strength',
+            passwordStrengthVeryWeak: 'Very Weak',
+            passwordStrengthWeak: 'Weak',
+            passwordStrengthFair: 'Fair',
+            passwordStrengthStrong: 'Strong',
+            passwordStrengthVeryStrong: 'Very Strong'
         }
     };
 
