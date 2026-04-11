@@ -20,6 +20,21 @@
 
     async function fetchResource(url, localData = null) {
         try {
+            const resolvedUrl = (typeof global.resolveResourceUrl === 'function')
+                ? global.resolveResourceUrl(url, typeof global.getAppOrigin === 'function' ? global.getAppOrigin() : undefined)
+                : url;
+
+            if (!resolvedUrl || typeof resolvedUrl !== 'string') {
+                throw new Error('Invalid resource URL');
+            }
+
+            if (/^(blob:|data:|local:|content:|file:)/i.test(resolvedUrl)) {
+                if (localData) {
+                    return { notModified: true, data: localData.data, contentType: localData.contentType };
+                }
+                throw new Error(`Unsupported resource URL: ${resolvedUrl}`);
+            }
+
             const headers = {};
             if (localData) {
                 if (localData.etag) {
@@ -31,7 +46,7 @@
                 }
             }
 
-            const response = await fetch(url, { headers });
+            const response = await fetch(resolvedUrl, { headers });
 
             if (response.status === 304) {
                 return { notModified: true, data: localData.data, contentType: localData.contentType };
@@ -54,7 +69,7 @@
                 lastModified: lastModified ? new Date(lastModified).getTime() : Date.now()
             };
         } catch (error) {
-            console.error('Failed to fetch resource:', error);
+            console.error('Failed to fetch resource:', url, error);
             if (localData) {
                 return { notModified: true, data: localData.data, contentType: localData.contentType };
             }

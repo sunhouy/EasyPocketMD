@@ -1,5 +1,6 @@
 import 'vditor/dist/index.css';
 import '@fortawesome/fontawesome-free/css/all.min.css';
+import 'cropperjs/dist/cropper.css';
 import './css/styles.css';
 
 import './js/jquery-global.js';

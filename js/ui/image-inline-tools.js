@@ -367,11 +367,8 @@
 
     function loadCropperLibrary() {
         if (!cropperLoadPromise) {
-            cropperLoadPromise = Promise.all([
-                import('cropperjs'),
-                import('cropperjs/dist/cropper.css')
-            ]).then(function(modules) {
-                return modules[0].default || modules[0];
+            cropperLoadPromise = import('cropperjs').then(function(module) {
+                return module.default || module;
             });
         }
         return cropperLoadPromise;
@@ -936,19 +933,50 @@
             var Cropper = await loadCropperLibrary();
             destroyActiveCropper(cropModal);
 
-            var imageResponse = await fetch(targetImage.src, { mode: 'cors' });
-            if (!imageResponse.ok) {
-                throw new Error('图片加载失败: ' + imageResponse.status);
+            var sourceSrc = targetImage.getAttribute('src') || targetImage.src || '';
+            var resolvedSrc = sourceSrc;
+
+            if (typeof global.resolveResourceUrl === 'function') {
+                resolvedSrc = global.resolveResourceUrl(sourceSrc, getNativeAwareResolveBase());
             }
 
-            var imageBlob = await imageResponse.blob();
-            var objectUrl = URL.createObjectURL(imageBlob);
-            cropModal.dataset.epmdCropObjectUrl = objectUrl;
-            await new Promise(function(resolve, reject) {
-                cropTarget.onload = function() { resolve(); };
-                cropTarget.onerror = function() { reject(new Error('图片解析失败')); };
-                cropTarget.src = objectUrl;
-            });
+            if (global.ResourceLoader && typeof global.ResourceLoader.getLocalBlobUrl === 'function') {
+                var localBlobUrl = await global.ResourceLoader.getLocalBlobUrl(sourceSrc);
+                if (!localBlobUrl && resolvedSrc !== sourceSrc) {
+                    localBlobUrl = await global.ResourceLoader.getLocalBlobUrl(resolvedSrc);
+                }
+                if (localBlobUrl) {
+                    resolvedSrc = localBlobUrl;
+                }
+            }
+
+            cropTarget.crossOrigin = 'anonymous';
+
+            try {
+                await new Promise(function(resolve, reject) {
+                    cropTarget.onload = function() { resolve(); };
+                    cropTarget.onerror = function() { reject(new Error('图片解析失败')); };
+                    cropTarget.src = resolvedSrc;
+                });
+            } catch (loadError) {
+                if (!resolvedSrc || /^(blob:|data:|local:|content:|file:)/i.test(resolvedSrc)) {
+                    throw loadError;
+                }
+
+                var imageResponse = await fetch(resolvedSrc, { mode: 'cors' });
+                if (!imageResponse.ok) {
+                    throw new Error('图片加载失败: ' + imageResponse.status);
+                }
+
+                var imageBlob = await imageResponse.blob();
+                var objectUrl = URL.createObjectURL(imageBlob);
+                cropModal.dataset.epmdCropObjectUrl = objectUrl;
+                await new Promise(function(resolve, reject) {
+                    cropTarget.onload = function() { resolve(); };
+                    cropTarget.onerror = function() { reject(new Error('图片解析失败')); };
+                    cropTarget.src = objectUrl;
+                });
+            }
 
             activeCropper = new Cropper(cropTarget, {
                 viewMode: 1,
