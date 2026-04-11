@@ -34,6 +34,29 @@
         return null;
     }
 
+    function getFsApi() {
+        if (!global.__TAURI__) return null;
+        if (global.__TAURI__.fs) {
+            return global.__TAURI__.fs;
+        }
+        if (global.__TAURI__.core && global.__TAURI__.core.fs) {
+            return global.__TAURI__.core.fs;
+        }
+        return null;
+    }
+
+    function buildFileResponse(path, content) {
+        return {
+            canceled: false,
+            success: true,
+            path: String(path),
+            name: String(path).split(/[\\/]/).pop() || null,
+            content: content,
+            error: null,
+            localFileMode: 'tauri'
+        };
+    }
+
     function bindEvent(channel, callback) {
         if (typeof callback !== 'function') return function() {};
 
@@ -98,6 +121,7 @@
         },
         openLocalFileDialog: function() {
             var openDialog = getDialogOpenApi();
+            var fs = getFsApi();
             if (!openDialog) {
                 return invokeCommand('open_local_file_dialog');
             }
@@ -121,6 +145,22 @@
                 }
 
                 var path = Array.isArray(selectedPath) ? selectedPath[0] : selectedPath;
+                if (fs && typeof fs.readTextFile === 'function') {
+                    return fs.readTextFile(String(path)).then(function(content) {
+                        return buildFileResponse(path, content);
+                    }).catch(function(error) {
+                        return {
+                            canceled: false,
+                            success: false,
+                            path: String(path),
+                            name: null,
+                            content: null,
+                            error: error && error.message ? error.message : String(error),
+                            localFileMode: null
+                        };
+                    });
+                }
+
                 return invokeCommand('read_local_file', { filePath: String(path) })
                     .then(function(result) {
                         if (result && typeof result === 'object') {
@@ -154,9 +194,25 @@
             });
         },
         readLocalFile: function(filePath) {
+            var fs = getFsApi();
+            if (fs && typeof fs.readTextFile === 'function') {
+                return fs.readTextFile(String(filePath)).then(function(content) {
+                    return buildFileResponse(filePath, content);
+                });
+            }
             return invokeCommand('read_local_file', { filePath: filePath });
         },
         writeLocalFile: function(filePath, content) {
+            var fs = getFsApi();
+            if (fs && typeof fs.writeTextFile === 'function') {
+                return fs.writeTextFile(String(filePath), String(content)).then(function() {
+                    return {
+                        success: true,
+                        path: String(filePath),
+                        error: null
+                    };
+                });
+            }
             return invokeCommand('write_local_file', { filePath: filePath, content: content });
         },
         getMdAssociationEnabled: function() {

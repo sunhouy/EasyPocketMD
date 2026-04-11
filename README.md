@@ -1,19 +1,22 @@
 # EasyPocketMD
 ![EasyPocketMD](assets/readme/logo.png)
 
-**AI powered · Superfast · Cross Platform**
+**AI powered · Superfast · Cross Platform · Android APK via Tauri**
 
 <p align="center"><a href="README_zh_CN.md">中文</a> &nbsp;|&nbsp; <a href="https://md.yhsun.cn/">Demo</a></p>
 
 A Markdown editor that removes the learning curve — insert formatted text, LaTeX formulas, and diagrams without memorizing any syntax. With intelligent search and AI assistance, everything is just a few clicks away.
 
 Real-time collaboration, AI-assisted writing, and a smooth editing experience — all wrapped in a beautiful Material Design interface.
+The Android client is built with Tauri mobile and shipped as an APK.
 
 If you find this useful, please ⭐ star the repo – it means a lot to me.
 
 [![Build and Deploy](https://github.com/sunhouy/EasyPocketMD/actions/workflows/deploy.yml/badge.svg)](https://github.com/sunhouy/EasyPocketMD/actions/workflows/deploy.yml)
-[![Build Android APK](https://github.com/sunhouy/EasyPocketMD/actions/workflows/build-android.yml/badge.svg)](https://github.com/sunhouy/EasyPocketMD/actions/workflows/build-android.yml)
 [![Build Tauri App](https://github.com/sunhouy/EasyPocketMD/actions/workflows/build-tauri.yml/badge.svg)](https://github.com/sunhouy/EasyPocketMD/actions/workflows/build-tauri.yml)
+[![codecov](https://codecov.io/gh/sunhouy/EasyPocketMD/graph/badge.svg?token=8E02GDKIKQ)](https://codecov.io/gh/sunhouy/EasyPocketMD)
+![NPM Downloads](https://img.shields.io/npm/dw/easypocketmd)
+
 
 [![Python 3.6+](https://img.shields.io/badge/python-3.6+-blue.svg)](https://www.python.org/downloads/)
 [![Node.js](https://img.shields.io/badge/node.js-%3E%3D18.0.0-brightgreen.svg)](https://nodejs.org/)
@@ -104,6 +107,14 @@ npm install -g pm2
 pm2 start api/server.js --name "easypocketmd"
 ```
 
+### Tauri Android Build
+
+After installing the Tauri mobile prerequisites, build the Android APK with:
+```bash
+npm run tauri:android:init
+npm run tauri:android:build
+```
+
 
 ## 📊 How We Compare
 
@@ -125,7 +136,7 @@ pm2 start api/server.js --name "easypocketmd"
 The project uses a JavaScript + Python architecture. The backend is implemented with Node.js, while the cloud printing server and client are implemented with Python. The frontend is developed with native JavaScript, ensuring excellent performance.
 ```
 api/     Backend API interfaces
-assets/  Capacitor application resources
+assets/  Static application resources
 css/     Frontend CSS styles
 js/      Frontend JavaScript scripts
 print/   Cloud printing server and client code

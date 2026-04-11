@@ -17,7 +17,7 @@ async function getPDFGenerator() {
 }
 
 function shouldUseLocalPdfFallback(error) {
-    if (!(window.Capacitor && window.Capacitor.isNativePlatform())) {
+    if (!(window.nativeFileOps && window.nativeFileOps.isTauriRuntime && window.nativeFileOps.isTauriRuntime())) {
         return false;
     }
 
@@ -28,7 +28,7 @@ function shouldUseLocalPdfFallback(error) {
 }
 
 function getResourceResolveBase() {
-    var isNativeLike = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) ||
+    var isNativeLike = !!(window.nativeFileOps && window.nativeFileOps.isTauriRuntime && window.nativeFileOps.isTauriRuntime()) ||
         !!window.electron ||
         (window.location && window.location.protocol === 'file:');
     if (isNativeLike && window.getAppOrigin) {
@@ -37,93 +37,28 @@ function getResourceResolveBase() {
     return window.location.href;
 }
 
-/**
- * 在 Capacitor 中处理文件下载/分享
- * @param {string} data 数据内容（可以是 URL 也可以是纯文本/HTML）
- * @param {string} filename 文件名
- * @param {string} mimeType MIME 类型
- * @param {boolean} isRawData 是否是原始数据（不是 URL）
- */
-async function downloadInCapacitor(data, filename, mimeType, isRawData = false) {
-    try {
-        const { Filesystem, Directory } = await import('@capacitor/filesystem');
-        const { Share } = await import('@capacitor/share');
-
-        const resourceUrl = isRawData
-            ? ''
-            : (global.resolveResourceUrl
-                ? global.resolveResourceUrl(data, getResourceResolveBase())
-                : data);
-        const isBlobUrl = !isRawData && typeof resourceUrl === 'string' && resourceUrl.startsWith('blob:');
-
-        let fileUri = '';
-
-        if (isRawData) {
-            // 原始文本数据转 base64
-            const base64Data = btoa(unescape(encodeURIComponent(data)));
-            const writeResult = await Filesystem.writeFile({
-                path: filename,
-                data: base64Data,
-                directory: Directory.Cache
-            });
-            fileUri = writeResult.uri;
-        } else {
-            // 原生下载优先，规避 WebView 的 fetch/CORS 限制
-            if (!isBlobUrl && window.Capacitor && window.Capacitor.isNativePlatform() && typeof Filesystem.downloadFile === 'function') {
-                try {
-                    const downloadResult = await Filesystem.downloadFile({
-                        url: resourceUrl,
-                        path: filename,
-                        directory: Directory.Cache,
-                        recursive: true
-                    });
-                    const uriResult = await Filesystem.getUri({
-                        path: downloadResult.path || filename,
-                        directory: Directory.Cache
-                    });
-                    fileUri = uriResult.uri;
-                } catch (downloadError) {
-                    console.warn('Native downloadFile failed, fallback to fetch:', downloadError);
-                }
-            }
-
-            if (!fileUri) {
-                const response = await fetch(resourceUrl, { cache: 'no-store' });
-                if (!response.ok) {
-                    throw new Error('HTTP ' + response.status);
-                }
-                const blob = await response.blob();
-                const base64Data = await new Promise((resolve) => {
-                    const reader = new FileReader();
-                    reader.onloadend = () => {
-                        const base64 = reader.result.split(',')[1];
-                        resolve(base64);
-                    };
-                    reader.readAsDataURL(blob);
-                });
-
-                const writeResult = await Filesystem.writeFile({
-                    path: filename,
-                    data: base64Data,
-                    directory: Directory.Cache
-                });
-                fileUri = writeResult.uri;
-            }
-        }
-
-        // 分享文件（这在移动端通常是保存到文件的最佳方式）
-        await Share.share({
-            title: filename,
-            text: filename,
-            url: fileUri,
-            dialogTitle: isEn() ? 'Save or Share File' : '保存或分享文件'
+async function downloadGeneratedFile(payload, filename, mimeType) {
+    if (window.nativeFileOps && window.nativeFileOps.isTauriRuntime()) {
+        return window.nativeFileOps.saveFile(payload, {
+            filename: filename,
+            mimeType: mimeType
         });
-
-        global.showMessage(isEn() ? 'File ready to save' : '文件已就绪，请选择保存位置');
-    } catch (error) {
-        console.error('Capacitor download error:', error);
-        global.showMessage((isEn() ? 'Download failed: ' : '下载失败: ') + error.message, 'error');
     }
+
+    var blob = payload instanceof Blob ? payload : new Blob([payload], { type: mimeType || 'application/octet-stream' });
+    var objectUrl = window.URL.createObjectURL(blob);
+    var anchor = document.createElement('a');
+    anchor.href = objectUrl;
+    anchor.download = filename;
+    document.body.appendChild(anchor);
+    anchor.click();
+
+    setTimeout(function() {
+        if (anchor.parentNode) {
+            anchor.parentNode.removeChild(anchor);
+        }
+        window.URL.revokeObjectURL(objectUrl);
+    }, 100);
 }
 
     /**
@@ -1580,15 +1515,13 @@ async function downloadInCapacitor(data, filename, mimeType, isRawData = false) 
                 ? global.resolveResourceUrl(pdfUrl, getResourceResolveBase())
                 : pdfUrl;
 
-            // 如果是 Capacitor 环境，使用特殊的下载逻辑
-            if (window.Capacitor && window.Capacitor.isNativePlatform()) {
-                // Get filename from current file name if available
+            if (window.nativeFileOps && window.nativeFileOps.isTauriRuntime()) {
                 var currentFileName = isEn() ? 'document' : '文档';
                 var currentNode = g('currentFileId') ? g('fileTree').jstree(true).get_node(g('currentFileId')) : null;
                 if (currentNode) {
                     currentFileName = currentNode.text.replace(/\.md$/, '');
                 }
-                await downloadInCapacitor(fullPdfUrl, currentFileName + '.pdf', 'application/pdf');
+                await downloadGeneratedFile({ url: fullPdfUrl }, currentFileName + '.pdf', 'application/pdf');
                 return;
             }
 
@@ -1714,9 +1647,8 @@ async function downloadInCapacitor(data, filename, mimeType, isRawData = false) 
                         ? global.resolveResourceUrl(pdfUrl, getResourceResolveBase())
                         : pdfUrl;
                     
-                    // 如果是 Capacitor 环境，使用特殊的下载逻辑
-                    if (window.Capacitor && window.Capacitor.isNativePlatform()) {
-                        await downloadInCapacitor(fullPdfUrl, (isEn() ? 'document' : '文档') + '.pdf', 'application/pdf');
+                    if (window.nativeFileOps && window.nativeFileOps.isTauriRuntime()) {
+                        await downloadGeneratedFile({ url: fullPdfUrl }, (isEn() ? 'document' : '文档') + '.pdf', 'application/pdf');
                         return;
                     }
                     

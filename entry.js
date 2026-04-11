@@ -4,6 +4,7 @@ import './css/styles.css';
 
 import './js/jquery-global.js';
 import './js/tauri-bridge.js';
+import './js/native-file.js';
 import 'jstree/dist/themes/default/style.min.css';
 import 'jstree';
 

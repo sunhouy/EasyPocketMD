@@ -706,7 +706,7 @@
 </div>
 
 <!-- 模态框 -->
-<div id="downloadModal" class="modal-overlay"><div class="modal-container"><div class="modal-header"><h3>📥 全平台下载</h3><button class="close-modal" id="closeModalBtn">&times;</button></div><table class="downloads-full-table"><thead><tr><th>平台</th><th>推荐版本</th><th>下载链接</th></tr></thead><tbody><tr><td>Android</td><td>APK</td><td><a href="https://static.yhsun.cn/android/app-release.apk" target="_blank" rel="noreferrer">app-release.apk</a></td></tr><tr><td>Windows</td><td>.exe</td><td><a href="https://static.yhsun.cn/tauri/win/easypocketmd_windows.exe" target="_blank" rel="noreferrer">easypocketmd_windows.exe</a></td></tr><tr><td>macOS</td><td>.dmg</td><td><a href="https://static.yhsun.cn/tauri/macos/easypocketmd_macos.dmg" target="_blank" rel="noreferrer">easypocketmd_macos.dmg</a></td></tr><tr><td>Linux</td><td>AppImage / deb</td><td><a href="https://static.yhsun.cn/tauri/linux/easypocketmd_linux.appimage" target="_blank" rel="noreferrer">.AppImage</a> &nbsp;|&nbsp; <a href="https://static.yhsun.cn/tauri/linux/easypocketmd_linux.deb" target="_blank" rel="noreferrer">.deb</a></td></tr><tr><td>Web在线</td><td>浏览器</td><td><a href="https://md.yhsun.cn/" target="_blank" rel="noreferrer">md.yhsun.cn</a></td></tr></tbody></table><div style="margin-top: 20px; text-align: right;"><button class="btn btn-secondary" id="modalCloseFooter">关闭</button></div></div></div>
+<div id="downloadModal" class="modal-overlay"><div class="modal-container"><div class="modal-header"><h3>📥 全平台下载</h3><button class="close-modal" id="closeModalBtn">&times;</button></div><table class="downloads-full-table"><thead><tr><th>平台</th><th>推荐版本</th><th>下载链接</th></tr></thead><tbody><tr><td>Windows</td><td>.exe</td><td><a href="https://static.yhsun.cn/tauri/win/easypocketmd_windows.exe" target="_blank" rel="noreferrer">easypocketmd_windows.exe</a></td></tr><tr><td>macOS</td><td>.dmg</td><td><a href="https://static.yhsun.cn/tauri/macos/easypocketmd_macos.dmg" target="_blank" rel="noreferrer">easypocketmd_macos.dmg</a></td></tr><tr><td>Linux</td><td>AppImage / deb</td><td><a href="https://static.yhsun.cn/tauri/linux/easypocketmd_linux.appimage" target="_blank" rel="noreferrer">.AppImage</a> &nbsp;|&nbsp; <a href="https://static.yhsun.cn/tauri/linux/easypocketmd_linux.deb" target="_blank" rel="noreferrer">.deb</a></td></tr><tr><td>Web在线</td><td>浏览器</td><td><a href="https://md.yhsun.cn/" target="_blank" rel="noreferrer">md.yhsun.cn</a></td></tr></tbody></table><div style="margin-top: 20px; text-align: right;"><button class="btn btn-secondary" id="modalCloseFooter">关闭</button></div></div></div>
 
 <script>
   (function() {
@@ -725,14 +725,7 @@
 
     // 2. 下载链接映射
     const recommendByPlatform = {
-      android: {
-        title: '📱 Android 客户端',
-        desc: '专为移动端优化，随时编辑同步',
-        url: 'https://static.yhsun.cn/android/app-release.apk',
-        text: '下载 Android APK',
-        note: '当前系统推荐 Android 版本'
-      },
-      windows: {
+            windows: {
         title: '🪟 Windows 客户端',
         desc: '适用于 Windows，推荐 .exe 安装包',
         url: 'https://static.yhsun.cn/tauri/win/easypocketmd_windows.exe',

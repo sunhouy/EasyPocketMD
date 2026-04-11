@@ -1,64 +1,46 @@
 {
-  "$schema": "https://schema.tauri.app/config/1",
+  "productName": "EasyPocketMD",
+  "version": "2.4.2",
+  "identifier": "cn.yhsun.md",
   "build": {
     "beforeBuildCommand": "npm run build:web",
-    "beforeDevCommand": "npm run dev",
-    "devPath": "http://localhost:8080",
-    "distDir": "../dist",
-    "withGlobalTauri": true
+    "beforeDevCommand": "npm run dev -- --host 0.0.0.0 --port 8080",
+    "devUrl": "http://localhost:8080",
+    "frontendDist": "../dist"
   },
-  "package": {
-    "productName": "EasyPocketMD",
-    "version": "2.4.2"
-  },
-  "tauri": {
-    "allowlist": {
-      "all": false,
-      "dialog": {
-        "open": true
-      },
-      "fs": {
-        "all": true
-      },
-      "path": {
-        "all": true
-      },
-      "shell": {
-        "open": true
-      }
-    },
-    "bundle": {
-      "active": true,
-      "identifier": "cn.yhsun.md",
-      "targets": "all",
-      "deb": {
-        "depends": [
-          "libgtk-3-0",
-          "libwebkit2gtk-4.1-0",
-          "libjavascriptcoregtk-4.1-0 | libjavascriptcoregtk-4.0-18",
-          "libsoup-3.0-0 | libsoup2.4-1",
-          "libayatana-appindicator3-1 | libappindicator3-1",
-          "librsvg2-2"
-        ]
-      },
-      "icon": [
-        "icons/32x32.png",
-        "icons/128x128.png",
-        "icons/128x128@2x.png",
-        "icons/icon.icns",
-        "icons/icon.ico"
-      ]
+  "app": {
+    "withGlobalTauri": true,
+    "security": {
+      "csp": null
     },
     "windows": [
       {
+        "label": "main",
         "title": "EasyPocketMD",
         "width": 1200,
         "height": 800,
         "minWidth": 800,
         "minHeight": 600,
         "resizable": true,
-        "fullscreen": false
+        "fullscreen": false,
+        "visible": true
       }
     ]
-  }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "android": {
+      "autoIncrementVersionCode": true,
+      "minSdkVersion": 24
+    }
+  },
+  "plugins": {}
 }

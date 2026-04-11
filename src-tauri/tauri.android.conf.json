@@ -1,0 +1,14 @@
+{
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "EasyPocketMD",
+        "fullscreen": true,
+        "decorations": false,
+        "useHttpsScheme": true,
+        "visible": true
+      }
+    ]
+  }
+}

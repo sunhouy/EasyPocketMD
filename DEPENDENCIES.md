@@ -43,7 +43,6 @@ This project would not have been possible without the incredible work of the ope
 - [qdarkstyle](https://github.com/ColinDuquesnoy/QDarkStyleSheet) – Dark theme for Qt
 
 ### Development Dependencies
-- [Capacitor](https://capacitorjs.com/) – Cross‑platform apps
 - [Tauri](https://tauri.app/) – Desktop apps
 - [Vite](https://vitejs.dev/) – Build tool
 - [Jest](https://jestjs.io/) – Testing framework

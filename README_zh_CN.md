@@ -1,18 +1,18 @@
 # EasyPocketMD
 ![EasyPocketMD](assets/readme/logo.png)
 
-**AI 驱动 · 极速 · 跨平台**
+**AI 驱动 · 极速 · 跨平台 · Tauri Android APK**
 
 <p align="center"><a href="README.md">English</a> &nbsp;|&nbsp; <a href="https://md.yhsun.cn/">DEMO</a></p>
 
 一款几乎零学习成本的 Markdown 编辑器：无需记忆语法，也能轻松插入格式化文本、LaTeX 公式和图表。配合智能搜索与 AI 助手，常用功能都能几步完成。
 
 实时协作、AI 辅助写作与流畅编辑体验，全部整合在美观的 Material Design 界面中。
+Android 客户端使用 Tauri mobile 构建，并输出 APK。
 
 如果这个项目对你有帮助，欢迎点一个 ⭐ Star，这是对我非常重要的支持。
 
 [![Build and Deploy](https://github.com/sunhouy/EasyPocketMD/actions/workflows/deploy.yml/badge.svg)](https://github.com/sunhouy/EasyPocketMD/actions/workflows/deploy.yml)
-[![Build Android APK](https://github.com/sunhouy/EasyPocketMD/actions/workflows/build-android.yml/badge.svg)](https://github.com/sunhouy/EasyPocketMD/actions/workflows/build-android.yml)
 [![Build Tauri App](https://github.com/sunhouy/EasyPocketMD/actions/workflows/build-tauri.yml/badge.svg)](https://github.com/sunhouy/EasyPocketMD/actions/workflows/build-tauri.yml)
 
 [![Python 3.6+](https://img.shields.io/badge/python-3.6+-blue.svg)](https://www.python.org/downloads/)
@@ -104,6 +104,14 @@ npm install -g pm2
 pm2 start api/server.js --name "easypocketmd"
 ```
 
+### Tauri Android 构建
+
+安装好 Tauri mobile 依赖后，可直接构建 Android APK：
+```bash
+npm run tauri:android:init
+npm run tauri:android:build
+```
+
 
 ## 📊 对比说明
 
@@ -125,7 +133,7 @@ pm2 start api/server.js --name "easypocketmd"
 项目采用 JavaScript + Python 架构。后端由 Node.js 实现，云打印服务端与客户端由 Python 实现。前端基于原生 JavaScript 开发，以保证优秀性能。
 ```
 api/     后端 API 接口
-assets/  Capacitor 应用资源
+assets/  静态应用资源
 css/     前端 CSS 样式
 js/      前端 JavaScript 脚本
 print/   云打印服务端与客户端代码

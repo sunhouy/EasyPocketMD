@@ -388,44 +388,6 @@ function base64ToUint8Array(base64Data) {
 }
 
 async function loadPdfDocumentWithNativeFallback(pdfUrl) {
-    const isCapacitorNative = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
-    const isHttpUrl = typeof pdfUrl === 'string' && /^https?:\/\//i.test(pdfUrl);
-
-    if (!isCapacitorNative || !isHttpUrl) {
-        const loadingTask = pdfjsLib.getDocument(pdfUrl);
-        return await loadingTask.promise;
-    }
-
-    try {
-        const { Filesystem, Directory } = await import('@capacitor/filesystem');
-
-        if (typeof Filesystem.downloadFile === 'function') {
-            const tempFilename = `preview_${Date.now()}_${Math.random().toString(36).slice(2)}.pdf`;
-            const downloadResult = await Filesystem.downloadFile({
-                url: pdfUrl,
-                path: tempFilename,
-                directory: Directory.Cache,
-                recursive: true
-            });
-
-            const filePath = downloadResult.path || tempFilename;
-            const readResult = await Filesystem.readFile({
-                path: filePath,
-                directory: Directory.Cache
-            });
-
-            if (typeof readResult.data !== 'string' || !readResult.data) {
-                throw new Error('Native PDF read returned empty data');
-            }
-
-            const pdfData = base64ToUint8Array(readResult.data);
-            const loadingTask = pdfjsLib.getDocument({ data: pdfData });
-            return await loadingTask.promise;
-        }
-    } catch (nativeError) {
-        console.warn('[PDF Debug] Native PDF loading failed, fallback to direct URL:', nativeError);
-    }
-
     try {
         const response = await fetch(pdfUrl, { cache: 'no-store' });
         if (!response.ok) {
@@ -450,7 +412,7 @@ async function loadPdfDocumentWithNativeFallback(pdfUrl) {
 export async function renderPDF(pdfUrl, container) {
     try {
 
-        const isNativeLike = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) ||
+        const isNativeLike = !!(window.nativeFileOps && window.nativeFileOps.isTauriRuntime && window.nativeFileOps.isTauriRuntime()) ||
             !!window.electron ||
             (window.location && window.location.protocol === 'file:');
         const resolveBase = isNativeLike && window.getAppOrigin

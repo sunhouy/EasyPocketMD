@@ -1,0 +1,1 @@
+{"main-capability":{"identifier":"main-capability","description":"Main window access for editing, file dialogs and file system operations.","local":true,"windows":["main"],"permissions":["core:default","dialog:default","fs:default","fs:read-files","fs:write-files"]}}

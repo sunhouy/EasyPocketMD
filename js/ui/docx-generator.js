@@ -79,33 +79,10 @@ async function exportDOCX(content, settings, customFilename) {
         }
 
         // 下载文件
-        if (window.Capacitor && window.Capacitor.isNativePlatform()) {
-            // Capacitor 环境：使用 blob 转 base64 后分享
-            const base64Data = await new Promise((resolve) => {
-                const reader = new FileReader();
-                reader.onloadend = () => {
-                    const base64 = reader.result.split(',')[1];
-                    resolve(base64);
-                };
-                reader.readAsDataURL(blob);
-            });
-
-            const { Filesystem, Directory } = await import('@capacitor/filesystem');
-            const { Share } = await import('@capacitor/share');
-
-            // 写入临时文件
-            const writeResult = await Filesystem.writeFile({
-                path: filename,
-                data: base64Data,
-                directory: Directory.Cache
-            });
-
-            // 分享文件（在移动端弹出保存/分享对话框）
-            await Share.share({
-                title: filename,
-                text: filename,
-                url: writeResult.uri,
-                dialogTitle: isEn() ? 'Save or Share File' : '保存或分享文件'
+        if (window.nativeFileOps && window.nativeFileOps.isTauriRuntime()) {
+            await window.nativeFileOps.saveFile(blob, {
+                filename: filename,
+                mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
             });
         } else {
             // 普通浏览器环境
