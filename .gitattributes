@@ -34,11 +34,7 @@ dist/                linguist-generated
 build/               linguist-generated
 coverage/            linguist-generated
 *.log                linguist-generated
-intro.html           linguist-vendored
 
 tests/               linguist-vendored
-webrtc/**            linguist-documentation
-
-.github/workflows/*.yml linguist-detectable=true linguist-type=programming
 
 dev/** linguist-generated=true

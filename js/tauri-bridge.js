@@ -45,6 +45,27 @@
         return null;
     }
 
+    function getOpenerApi() {
+        if (!global.__TAURI__) return null;
+        if (global.__TAURI__.opener && typeof global.__TAURI__.opener.openUrl === 'function') {
+            return global.__TAURI__.opener;
+        }
+        if (global.__TAURI__.core && global.__TAURI__.core.opener && typeof global.__TAURI__.core.opener.openUrl === 'function') {
+            return global.__TAURI__.core.opener;
+        }
+        return null;
+    }
+
+    function shouldUseInvokeForPath(filePath) {
+        var path = String(filePath || '');
+        if (!path) return true;
+        if (/^file:\/\//i.test(path)) return true;
+        if (/^[a-zA-Z]:[\\/]/.test(path)) return true;
+        if (/^\\\\\\?\\/.test(path)) return true;
+        if (/^\\\\/.test(path)) return true;
+        return false;
+    }
+
     function buildFileResponse(path, content) {
         return {
             canceled: false,
@@ -148,16 +169,35 @@
                 if (fs && typeof fs.readTextFile === 'function') {
                     return fs.readTextFile(String(path)).then(function(content) {
                         return buildFileResponse(path, content);
-                    }).catch(function(error) {
-                        return {
-                            canceled: false,
-                            success: false,
-                            path: String(path),
-                            name: null,
-                            content: null,
-                            error: error && error.message ? error.message : String(error),
-                            localFileMode: null
-                        };
+                    }).catch(function() {
+                        return invokeCommand('read_local_file', { filePath: String(path) })
+                            .then(function(result) {
+                                if (result && result.success) {
+                                    result.canceled = false;
+                                    if (!result.path) result.path = String(path);
+                                    return result;
+                                }
+                                return {
+                                    canceled: false,
+                                    success: false,
+                                    path: String(path),
+                                    name: null,
+                                    content: null,
+                                    error: (result && result.error) || 'Failed to read local file',
+                                    localFileMode: null
+                                };
+                            })
+                            .catch(function(error) {
+                                return {
+                                    canceled: false,
+                                    success: false,
+                                    path: String(path),
+                                    name: null,
+                                    content: null,
+                                    error: error && error.message ? error.message : String(error),
+                                    localFileMode: null
+                                };
+                            });
                     });
                 }
 
@@ -195,15 +235,23 @@
         },
         readLocalFile: function(filePath) {
             var fs = getFsApi();
+            if (shouldUseInvokeForPath(filePath)) {
+                return invokeCommand('read_local_file', { filePath: filePath });
+            }
             if (fs && typeof fs.readTextFile === 'function') {
                 return fs.readTextFile(String(filePath)).then(function(content) {
                     return buildFileResponse(filePath, content);
+                }).catch(function() {
+                    return invokeCommand('read_local_file', { filePath: filePath });
                 });
             }
             return invokeCommand('read_local_file', { filePath: filePath });
         },
         writeLocalFile: function(filePath, content) {
             var fs = getFsApi();
+            if (shouldUseInvokeForPath(filePath)) {
+                return invokeCommand('write_local_file', { filePath: filePath, content: content });
+            }
             if (fs && typeof fs.writeTextFile === 'function') {
                 return fs.writeTextFile(String(filePath), String(content)).then(function() {
                     return {
@@ -211,9 +259,57 @@
                         path: String(filePath),
                         error: null
                     };
+                }).catch(function() {
+                    return invokeCommand('write_local_file', { filePath: filePath, content: content });
                 });
             }
             return invokeCommand('write_local_file', { filePath: filePath, content: content });
+        },
+        openExternalUrl: function(url) {
+            var target = String(url || '').trim();
+            if (!target) {
+                return Promise.reject(new Error('URL is required'));
+            }
+
+            var opener = getOpenerApi();
+            if (opener && typeof opener.openUrl === 'function') {
+                return opener.openUrl(target);
+            }
+
+            return invokeCommand('plugin:opener|open_url', { url: target });
+        },
+        syncAndroidSystemUi: function(isDarkMode) {
+            try {
+                var ua = (navigator.userAgent || '').toLowerCase();
+                if (ua.indexOf('android') === -1) {
+                    return Promise.resolve(false);
+                }
+
+                var tauriRoot = global.__TAURI__ || null;
+                var windowApi = tauriRoot && (tauriRoot.window || (tauriRoot.core && tauriRoot.core.window));
+                if (!windowApi || typeof windowApi.getCurrentWindow !== 'function') {
+                    return Promise.resolve(false);
+                }
+
+                var currentWindow = windowApi.getCurrentWindow();
+                if (!currentWindow) {
+                    return Promise.resolve(false);
+                }
+
+                var tasks = [];
+                if (typeof currentWindow.setFullscreen === 'function') {
+                    tasks.push(Promise.resolve(currentWindow.setFullscreen(false)).catch(function() {}));
+                }
+                if (typeof currentWindow.setTheme === 'function') {
+                    tasks.push(Promise.resolve(currentWindow.setTheme(isDarkMode ? 'dark' : 'light')).catch(function() {}));
+                }
+
+                return Promise.all(tasks).then(function() {
+                    return true;
+                });
+            } catch (error) {
+                return Promise.resolve(false);
+            }
         },
         getMdAssociationEnabled: function() {
             return invokeCommand('get_md_association_enabled');

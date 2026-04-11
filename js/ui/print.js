@@ -215,6 +215,21 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
         document.body.appendChild(modal);
 
         modal.addEventListener('click', function(e) {
+            var link = e.target && e.target.closest ? e.target.closest('a.download-link-btn') : null;
+            if (!link) return;
+            if (!(window.nativeFileOps && window.nativeFileOps.isTauriRuntime && window.nativeFileOps.isTauriRuntime())) {
+                return;
+            }
+
+            var href = link.getAttribute('href') || '';
+            if (!href) return;
+            e.preventDefault();
+            Promise.resolve(window.nativeFileOps.openExternalUrl(href)).catch(function(error) {
+                console.warn('Failed to open download url in external browser:', error);
+            });
+        });
+
+        modal.addEventListener('click', function(e) {
             if (e.target === modal) modal.remove();
         });
     }

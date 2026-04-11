@@ -41,6 +41,14 @@
         return null;
     }
 
+    function getOpenerApi() {
+        var root = getTauriRoot();
+        if (!root) return null;
+        if (root.opener && typeof root.opener.openUrl === 'function') return root.opener;
+        if (root.core && root.core.opener && typeof root.core.opener.openUrl === 'function') return root.core.opener;
+        return null;
+    }
+
     function resolveUrl(url) {
         if (typeof url !== 'string') return url;
         if (typeof global.resolveResourceUrl === 'function') {
@@ -90,6 +98,34 @@
         return match ? match[1] : '';
     }
 
+    async function openExternalUrl(url) {
+        var target = String(url || '').trim();
+        if (!target) {
+            throw new Error('URL is required');
+        }
+
+        var opener = getOpenerApi();
+        if (opener && typeof opener.openUrl === 'function') {
+            await opener.openUrl(target);
+            return;
+        }
+
+        var invoke = getInvokeApi();
+        if (invoke) {
+            try {
+                await invoke('plugin:opener|open_url', { url: target });
+                return;
+            } catch (error) {
+                // Fall back to browser open below.
+            }
+        }
+
+        var opened = window.open(target, '_blank', 'noopener,noreferrer');
+        if (!opened) {
+            window.location.href = target;
+        }
+    }
+
     async function toUint8Array(payload) {
         if (payload instanceof Uint8Array) return payload;
         if (ArrayBuffer.isView(payload)) {
@@ -118,8 +154,48 @@
             throw new Error('Tauri file APIs are unavailable');
         }
 
+        // Android prefers browser-managed download UX.
+        if (isAndroidTauriRuntime()) {
+            if (payload && typeof payload.url === 'string') {
+                await openExternalUrl(resolveUrl(payload.url));
+                return { canceled: false, path: null, via: 'browser' };
+            }
+
+            // Non-URL payloads cannot be handed to external browser directly.
+            // Keep browser download fallback and avoid tauri-local fetch path.
+            var blobPayload;
+            if (isBlobLike(payload)) {
+                blobPayload = payload;
+            } else if (isArrayBufferLike(payload)) {
+                blobPayload = new Blob([payload], { type: (options && options.mimeType) || 'application/octet-stream' });
+            } else if (isTextPayload(payload)) {
+                blobPayload = new Blob([String(payload)], { type: (options && options.mimeType) || 'text/plain' });
+            } else {
+                var bytes = await toUint8Array(payload);
+                blobPayload = new Blob([bytes], { type: (options && options.mimeType) || 'application/octet-stream' });
+            }
+
+            var objectUrl = window.URL.createObjectURL(blobPayload);
+            var anchor = document.createElement('a');
+            anchor.href = objectUrl;
+            anchor.download = filename;
+            anchor.target = '_blank';
+            anchor.rel = 'noopener noreferrer';
+            anchor.style.display = 'none';
+            document.body.appendChild(anchor);
+            anchor.click();
+            setTimeout(function() {
+                if (anchor.parentNode) {
+                    anchor.parentNode.removeChild(anchor);
+                }
+                window.URL.revokeObjectURL(objectUrl);
+            }, 150);
+
+            return { canceled: false, path: null, via: 'browser-blob' };
+        }
+
         // Fallback path: use Rust-side save dialog + write command when JS plugin APIs are unavailable.
-        if (isAndroidTauriRuntime() || !dialog || !fs) {
+        if (!dialog || !fs) {
             var fallbackContent;
             if (payload && typeof payload.url === 'string') {
                 var response = await fetch(resolveUrl(payload.url), { cache: 'no-store' });
@@ -131,9 +207,9 @@
             } else if (isTextPayload(payload)) {
                 fallbackContent = String(payload);
             } else {
-                var bytes = await toUint8Array(payload);
-                var mimeType = (options && options.mimeType) || 'application/octet-stream';
-                fallbackContent = await blobToDataUrl(new Blob([bytes], { type: mimeType }));
+                var fallbackBytes = await toUint8Array(payload);
+                var fallbackMimeType = (options && options.mimeType) || 'application/octet-stream';
+                fallbackContent = await blobToDataUrl(new Blob([fallbackBytes], { type: fallbackMimeType }));
             }
 
             if (!invoke) {
@@ -229,7 +305,9 @@
 
     global.nativeFileOps = {
         isTauriRuntime: isTauriRuntime,
+        isAndroidTauriRuntime: isAndroidTauriRuntime,
         saveFile: saveFile,
+        openExternalUrl: openExternalUrl,
         getResourceResolveBase: function() {
             if (isTauriRuntime() && typeof global.getAppOrigin === 'function') {
                 return global.getAppOrigin();

@@ -369,6 +369,15 @@
         if (!cropperLoadPromise) {
             cropperLoadPromise = import('cropperjs').then(function(module) {
                 return module.default || module;
+            }).catch(function(primaryError) {
+                return import('cropperjs/dist/cropper').then(function(module) {
+                    return module.default || module;
+                }).catch(function() {
+                    if (global.Cropper) {
+                        return global.Cropper;
+                    }
+                    throw primaryError;
+                });
             });
         }
         return cropperLoadPromise;
@@ -715,7 +724,6 @@
                 <div style="margin-bottom: 20px;">
                     <label style="display: block; margin-bottom: 8px; font-size: 14px;">裁剪</label>
                     <button class="epmd-modal-btn epmd-crop-open" style="padding: 8px 12px; background: ${btnBg}; color: ${btnTextColor}; border: 1px solid ${borderColor}; border-radius: 6px; cursor: pointer; width: 100%;">打开裁剪工具</button>
-                    <div style="font-size: 12px; margin-top: 8px; color: ${nightMode ? '#cccccc' : '#666'};">将打开全屏裁剪窗口，支持手机触控拖拽与缩放。</div>
                 </div>
 
                 <div style="margin-bottom: 20px;">
