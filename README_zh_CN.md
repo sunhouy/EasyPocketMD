@@ -75,6 +75,10 @@ Android 客户端使用 Tauri mobile 构建，并输出 APK。
 git clone https://github.com/sunhouy/EasyPocketMD.git
 cd md
 ```
+或者从npm：
+```bash
+npm i easypocketmd
+```
 
 2. 安装 Node.js 依赖
 ```bash
