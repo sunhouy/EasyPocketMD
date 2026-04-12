@@ -1,7 +1,6 @@
 /**
  * Vditor 初始化、界面与功能绑定
  */
-import startupAsciiArt from '../ascii.md?raw';
 import { initSlashCommandRuntime } from './ui/slash-command.js';
 
 document.addEventListener('DOMContentLoaded', function() {

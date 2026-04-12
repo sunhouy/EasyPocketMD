@@ -312,6 +312,13 @@
             if (typeof currentWindow.onCloseRequested === 'function') {
                 currentWindow.onCloseRequested(function(event) {
                     if (tauriCloseGuard) return;
+
+                    // 无需外部本地文件落盘时，不拦截关闭，避免 ACL 变化导致无法退出。
+                    if (!shouldAutoSaveCurrentExternalLocalFile()) {
+                        scheduleLeaveSave('tauri-close-requested-fast-path');
+                        return;
+                    }
+
                     tauriCloseGuard = true;
                     if (event && typeof event.preventDefault === 'function') {
                         event.preventDefault();
@@ -327,7 +334,12 @@
                         })
                         .finally(function() {
                             if (typeof currentWindow.close === 'function') {
-                                Promise.resolve(currentWindow.close()).catch(function() {});
+                                Promise.resolve(currentWindow.close()).catch(function(error) {
+                                    tauriCloseGuard = false;
+                                    console.warn('[Lifecycle] tauri close retry failed:', error);
+                                });
+                            } else {
+                                tauriCloseGuard = false;
                             }
                         });
                 });

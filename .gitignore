@@ -1,15 +1,12 @@
 .git/
 .idea/
 
-db.sql
+
 .env
 
 coverage/
-cat-market/
 node_modules/
 dist/
-dist-electron/
-dist-electron-new/
 build/
 src-tauri/target/
 uploads/
