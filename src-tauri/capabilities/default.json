@@ -5,6 +5,9 @@
   "windows": ["main"],
   "permissions": [
     "core:default",
+    "core:window:default",
+    "core:window:allow-close",
+    "core:window:allow-destroy",
     "dialog:default",
     "opener:allow-open-url",
     "fs:default",
