@@ -16,6 +16,7 @@ permissions:
 
 env:
   NODE_VERSION: '24'
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
   JAVA_VERSION: '17'
   ANDROID_API_LEVEL: '34'
   ANDROID_BUILD_TOOLS: '34.0.0'
@@ -28,10 +29,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout source
-        uses: actions/checkout@v6
+        uses: actions/checkout@v5
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v5
         with:
           node-version: ${{ env.NODE_VERSION }}
 
@@ -56,7 +57,7 @@ jobs:
         run: npm run wasm:text:verify
 
       - name: Upload WASM build artifact
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v5
         with:
           name: wasm-text-engine-dist
           path: |
@@ -69,16 +70,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout source
-        uses: actions/checkout@v6
+        uses: actions/checkout@v5
 
       - name: Download WASM build artifact
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@v5
         with:
           name: wasm-text-engine-dist
           path: wasm_text_engine/dist
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v5
         with:
           node-version: ${{ env.NODE_VERSION }}
 
@@ -409,7 +410,7 @@ jobs:
           fi
 
       - name: Upload Android artifacts
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v5
         with:
           name: md-tauri-android
           path: artifacts/android/*
@@ -424,7 +425,7 @@ jobs:
       cancel-in-progress: false
     steps:
       - name: Download Android artifact
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@v5
         with:
           name: md-tauri-android
           path: downloads/android
@@ -479,7 +480,7 @@ jobs:
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     steps:
       - name: Download Android artifact
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@v5
         with:
           name: md-tauri-android
           path: downloads/android
