@@ -17,6 +17,7 @@ permissions:
 
 env:
   NODE_VERSION: '24'
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
   REMOTE_NODE_BIN: '/www/server/nodejs/v24.14.1/bin'
 
 jobs:
@@ -24,10 +25,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout source
-      uses: actions/checkout@v6
+      uses: actions/checkout@v5
 
     - name: Setup Node.js
-      uses: actions/setup-node@v6
+      uses: actions/setup-node@v5
       with:
         node-version: ${{ env.NODE_VERSION }}
 
@@ -66,10 +67,10 @@ jobs:
 
     steps:
     - name: Checkout source
-      uses: actions/checkout@v6
+      uses: actions/checkout@v5
 
     - name: Setup Node.js
-      uses: actions/setup-node@v6
+      uses: actions/setup-node@v5
       with:
         node-version: ${{ env.NODE_VERSION }}
 
@@ -599,7 +600,7 @@ jobs:
     outputs:
       changed: ${{ steps.filter.outputs.print }}
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v5
     - uses: dorny/paths-filter@v3
       id: filter
       with:
@@ -627,7 +628,7 @@ jobs:
             ext: ''
     runs-on: ${{ matrix.os }}
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v5
 
     - name: Set up Python
       uses: actions/setup-python@v5
@@ -644,7 +645,7 @@ jobs:
         pyinstaller --onefile --windowed --name print_client_${{ matrix.target }} print/print_gui.py
 
     - name: Upload artifact
-      uses: actions/upload-artifact@v7
+      uses: actions/upload-artifact@v5
       with:
         name: print_client_${{ matrix.target }}
         path: dist/print_client_${{ matrix.target }}${{ matrix.ext }}
@@ -655,19 +656,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Download Windows artifact
-      uses: actions/download-artifact@v8
+      uses: actions/download-artifact@v5
       with:
         name: print_client_windows
         path: downloads
 
     - name: Download Linux artifact
-      uses: actions/download-artifact@v8
+      uses: actions/download-artifact@v5
       with:
         name: print_client_linux
         path: downloads
 
     - name: Download macOS artifact
-      uses: actions/download-artifact@v8
+      uses: actions/download-artifact@v5
       with:
         name: print_client_macos
         path: downloads

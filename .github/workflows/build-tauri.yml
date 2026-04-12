@@ -16,16 +16,17 @@ permissions:
 
 env:
   NODE_VERSION: '24'
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
 
 jobs:
   build-wasm:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout source
-        uses: actions/checkout@v6
+        uses: actions/checkout@v5
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v5
         with:
           node-version: ${{ env.NODE_VERSION }}
 
@@ -53,7 +54,7 @@ jobs:
         run: npx tauri icon src-tauri/icon-rgba.png
 
       - name: Upload WASM build artifact
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v5
         with:
           name: wasm-text-engine-dist
           path: |
@@ -66,16 +67,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout source
-        uses: actions/checkout@v6
+        uses: actions/checkout@v5
 
       - name: Download WASM build artifact
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@v5
         with:
           name: wasm-text-engine-dist
           path: wasm_text_engine/dist
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v5
         with:
           node-version: ${{ env.NODE_VERSION }}
 
@@ -250,7 +251,7 @@ jobs:
           echo "$DEPENDS" | grep -q "libsoup-3.0-0"
 
       - name: Upload Linux Tauri artifacts
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v5
         with:
           name: md-tauri-linux
           path: src-tauri/target/release/bundle/**
@@ -261,16 +262,16 @@ jobs:
     runs-on: windows-latest
     steps:
       - name: Checkout source
-        uses: actions/checkout@v6
+        uses: actions/checkout@v5
 
       - name: Download WASM build artifact
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@v5
         with:
           name: wasm-text-engine-dist
           path: wasm_text_engine/dist
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v5
         with:
           node-version: ${{ env.NODE_VERSION }}
 
@@ -336,7 +337,7 @@ jobs:
         run: npm run build:tauri:win
 
       - name: Upload Windows Tauri artifacts
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v5
         with:
           name: md-tauri-win
           path: src-tauri/target/release/bundle/**
@@ -347,16 +348,16 @@ jobs:
     runs-on: macos-latest
     steps:
       - name: Checkout source
-        uses: actions/checkout@v6
+        uses: actions/checkout@v5
 
       - name: Download WASM build artifact
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@v5
         with:
           name: wasm-text-engine-dist
           path: wasm_text_engine/dist
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v5
         with:
           node-version: ${{ env.NODE_VERSION }}
 
@@ -422,7 +423,7 @@ jobs:
         run: npm run build:tauri:mac
 
       - name: Upload macOS Tauri artifacts
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v5
         with:
           name: md-tauri-mac
           path: src-tauri/target/release/bundle/**
@@ -437,7 +438,7 @@ jobs:
       cancel-in-progress: false
     steps:
       - name: Download Linux Tauri artifact
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@v5
         with:
           name: md-tauri-linux
           path: downloads/linux
@@ -485,7 +486,7 @@ jobs:
       cancel-in-progress: false
     steps:
       - name: Download Windows Tauri artifact
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@v5
         with:
           name: md-tauri-win
           path: downloads/win
@@ -529,7 +530,7 @@ jobs:
       cancel-in-progress: false
     steps:
       - name: Download macOS Tauri artifact
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@v5
         with:
           name: md-tauri-mac
           path: downloads/mac
@@ -569,7 +570,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download Linux Tauri artifact
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@v5
         with:
           name: md-tauri-linux
           path: downloads/linux
@@ -611,7 +612,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download Windows Tauri artifact
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@v5
         with:
           name: md-tauri-win
           path: downloads/win
@@ -652,7 +653,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download macOS Tauri artifact
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@v5
         with:
           name: md-tauri-mac
           path: downloads/mac
