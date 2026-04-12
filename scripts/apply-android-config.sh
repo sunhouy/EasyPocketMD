@@ -6,12 +6,16 @@ set -e
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ANDROID_RES_DIR="$PROJECT_ROOT/src-tauri/gen/android/app/src/main/res"
 ANDROID_MANIFEST_PATH="$PROJECT_ROOT/src-tauri/gen/android/app/src/main/AndroidManifest.xml"
+ANDROID_PACKAGE_NAME="$(node -e 'const fs = require("fs"); const path = require("path"); const configPath = path.join(process.argv[1], "src-tauri", "tauri.conf.json"); const config = JSON.parse(fs.readFileSync(configPath, "utf8")); const identifier = config.identifier || config.package?.identifier || config.tauri?.bundle?.identifier || "cn.yhsun.md"; process.stdout.write(identifier);' "$PROJECT_ROOT")"
+ANDROID_GENERATED_DIR="$PROJECT_ROOT/src-tauri/gen/android/app/src/main/java/${ANDROID_PACKAGE_NAME//./\/}/generated"
+TAURI_ACTIVITY_PATH="$ANDROID_GENERATED_DIR/TauriActivity.kt"
 
 echo "🔧 正在应用 Android 状态栏配置..."
 
 # 创建必要的目录
 mkdir -p "$ANDROID_RES_DIR/values"
 mkdir -p "$ANDROID_RES_DIR/values-night"
+mkdir -p "$ANDROID_GENERATED_DIR"
 # 复制 themes.xml (Light mode)
 cat > "$ANDROID_RES_DIR/values/themes.xml" << 'EOF'
 <?xml version="1.0" encoding="utf-8"?>
@@ -67,6 +71,68 @@ if [ -f "$ANDROID_MANIFEST_PATH" ]; then
 else
     echo "⚠️ AndroidManifest.xml 尚未生成，待 tauri android init 后会自动注入 adjustResize"
 fi
+
+cat > "$TAURI_ACTIVITY_PATH" << EOF
+// Copyright 2019-2024 Tauri Programme within The Commons Conservancy
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: MIT
+
+/* THIS FILE IS AUTO-GENERATED. DO NOT MODIFY!! */
+
+package $ANDROID_PACKAGE_NAME
+
+import android.content.Intent
+import android.content.res.Configuration
+import app.tauri.plugin.PluginManager
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.ProcessLifecycleOwner
+
+object TauriLifecycleObserver : DefaultLifecycleObserver {
+        override fun onResume(owner: LifecycleOwner) {
+            super.onResume(owner)
+            PluginManager.onResume()
+        }
+
+        override fun onPause(owner: LifecycleOwner) {
+            super.onPause(owner)
+            PluginManager.onPause()
+        }
+
+        override fun onStop(owner: LifecycleOwner) {
+            super.onStop(owner)
+            PluginManager.onStop()
+        }
+}
+
+abstract class TauriActivity : WryActivity() {
+    override val handleBackNavigation: Boolean = false
+
+    fun getPluginManager(): PluginManager {
+        return PluginManager
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        PluginManager.onNewIntent(intent)
+    }
+
+    override fun onRestart() {
+        super.onRestart()
+        PluginManager.onRestart(this)
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        PluginManager.onDestroy(this)
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        PluginManager.onConfigurationChanged(newConfig)
+    }
+}
+EOF
 
 echo ""
 echo "✨ Android 状态栏配置应用完成！"
