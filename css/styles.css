@@ -11,13 +11,16 @@
     --top-toolbar-btn-size: 32px;
     --top-toolbar-btn-gap: 6px;
     --top-toolbar-btn-top: calc(var(--top-toolbar-offset) + (var(--top-toolbar-height) - var(--top-toolbar-btn-size)) / 2);
+    --mobile-bottom-bar-height: 50px;
+    --keyboard-inset-bottom: 0px;
+    --app-viewport-height: 100vh;
 }
 
 body {
     margin: 0;
     padding: 0;
     padding-top: env(safe-area-inset-top);
-    height: 100vh;
+    height: var(--app-viewport-height);
     background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     transition: background 0.3s ease;
@@ -61,7 +64,7 @@ body {
 .editor-container {
     position: absolute;
     top: calc(var(--top-toolbar-offset) + var(--top-toolbar-height));
-    bottom: 50px;
+    bottom: calc(var(--mobile-bottom-bar-height) + var(--keyboard-inset-bottom));
     left: 0;
     right: 0;
     width: 100%;
@@ -609,7 +612,7 @@ body.night-mode .file-list-search-result {
 
 .mobile-bottom-bar {
     position: fixed;
-    bottom: 0;
+    bottom: var(--keyboard-inset-bottom);
     left: 0;
     right: 0;
     background: white;
@@ -744,11 +747,11 @@ body.mobile-fullscreen .editor-container {
 }
 
 body.keyboard-open .mobile-bottom-bar {
-    display: none !important;
+    display: block !important;
 }
 
 body.keyboard-open .editor-container {
-    bottom: 0 !important;
+    bottom: calc(var(--mobile-bottom-bar-height) + var(--keyboard-inset-bottom)) !important;
 }
 
 .mobile-action-sheet {
@@ -798,6 +801,7 @@ body.keyboard-open .editor-container {
     display: none;
     align-items: center;
     justify-content: center;
+    padding: calc(env(safe-area-inset-top, 0px) + 10px) 10px calc(var(--keyboard-inset-bottom) + 10px);
 }
 
 .modal-overlay.show {
@@ -810,6 +814,8 @@ body.keyboard-open .editor-container {
     padding: 30px;
     width: 90%;
     max-width: 400px;
+    max-height: calc(var(--app-viewport-height) - env(safe-area-inset-top, 0px) - var(--keyboard-inset-bottom) - 20px);
+    overflow: auto;
     box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
     animation: modalFadeIn 0.3s ease;
     position: relative;
@@ -997,7 +1003,7 @@ body.keyboard-open .editor-container {
 
 /* Settings modal: robust layout for scroll/click across mobile browsers and WebView */
 #settingsModalOverlay {
-    padding: 12px;
+    padding: calc(env(safe-area-inset-top, 0px) + 12px) 12px calc(var(--keyboard-inset-bottom) + 12px);
     align-items: center;
     justify-content: center;
 }
@@ -1005,8 +1011,8 @@ body.keyboard-open .editor-container {
 #settingsModalOverlay .modal {
     width: min(920px, calc(100vw - 24px));
     max-width: 920px;
-    height: calc(100vh - 24px);
-    max-height: calc(100vh - 24px) !important;
+    height: calc(var(--app-viewport-height) - env(safe-area-inset-top, 0px) - var(--keyboard-inset-bottom) - 24px);
+    max-height: calc(var(--app-viewport-height) - env(safe-area-inset-top, 0px) - var(--keyboard-inset-bottom) - 24px) !important;
     display: grid !important;
     grid-template-rows: auto minmax(0, 1fr);
     overflow: hidden !important;
@@ -1055,7 +1061,7 @@ body.night-mode #settingsModalOverlay .modal-actions {
 
 @media (max-width: 768px) {
     #settingsModalOverlay {
-        padding: 0;
+        padding: env(safe-area-inset-top, 0px) 0 var(--keyboard-inset-bottom);
         align-items: stretch;
         justify-content: stretch;
     }
@@ -1064,8 +1070,8 @@ body.night-mode #settingsModalOverlay .modal-actions {
         width: 100vw;
         max-width: none;
         border-radius: 0;
-        height: 100vh;
-        max-height: 100vh !important;
+        height: calc(var(--app-viewport-height) - env(safe-area-inset-top, 0px) - var(--keyboard-inset-bottom));
+        max-height: calc(var(--app-viewport-height) - env(safe-area-inset-top, 0px) - var(--keyboard-inset-bottom)) !important;
         padding: 16px;
     }
 
@@ -1802,11 +1808,11 @@ body.night-mode #settingsModalOverlay .modal-actions {
 }
 
 .conflict-modal {
-    max-width: 100vw;
-    width: 100vw;
-    max-height: 100vh;
-    height: 100vh;
-    border-radius: 0;
+    max-width: 100vw !important;
+    width: 100vw !important;
+    max-height: calc(var(--app-viewport-height) - env(safe-area-inset-top, 0px) - var(--keyboard-inset-bottom)) !important;
+    height: calc(var(--app-viewport-height) - env(safe-area-inset-top, 0px) - var(--keyboard-inset-bottom)) !important;
+    border-radius: 0 !important;
     padding: 15px;
     margin: 0;
 }
@@ -2062,11 +2068,11 @@ body.night-mode #settingsModalOverlay .modal-actions {
 }
 
 .diff-modal {
-    max-width: 100vw;
-    width: 100vw;
-    max-height: 100vh;
-    height: 100vh;
-    border-radius: 0;
+    max-width: 100vw !important;
+    width: 100vw !important;
+    max-height: calc(var(--app-viewport-height) - env(safe-area-inset-top, 0px) - var(--keyboard-inset-bottom)) !important;
+    height: calc(var(--app-viewport-height) - env(safe-area-inset-top, 0px) - var(--keyboard-inset-bottom)) !important;
+    border-radius: 0 !important;
     padding: 15px;
     margin: 0;
 }
@@ -2619,8 +2625,25 @@ body.night-mode .long-file-preview {
 }
 
 .history-modal {
-    max-width: 90vw;
-    max-height: 85vh;
+    max-width: 100vw !important;
+    width: min(100vw, 960px);
+    max-height: calc(var(--app-viewport-height) - env(safe-area-inset-top, 0px) - var(--keyboard-inset-bottom) - 12px) !important;
+    height: min(calc(var(--app-viewport-height) - env(safe-area-inset-top, 0px) - var(--keyboard-inset-bottom) - 12px), 92vh);
+}
+
+@media (max-width: 768px) {
+    .history-modal {
+        width: 100vw !important;
+        height: calc(var(--app-viewport-height) - env(safe-area-inset-top, 0px) - var(--keyboard-inset-bottom)) !important;
+        max-height: calc(var(--app-viewport-height) - env(safe-area-inset-top, 0px) - var(--keyboard-inset-bottom)) !important;
+        border-radius: 0;
+        margin: 0;
+    }
+
+    .history-list {
+        max-height: none;
+        height: 100%;
+    }
 }
 
 .history-info {

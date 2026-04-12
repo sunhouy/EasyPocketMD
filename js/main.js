@@ -17,6 +17,189 @@ document.addEventListener('DOMContentLoaded', function() {
     window.isMobileEditorEnvironment = isMobileDevice;
     window.editorInterfaceMode = window.isMobileEditorEnvironment ? 'mobile' : 'desktop';
 
+    function isAndroidClient() {
+        return /Android/i.test(navigator.userAgent || '');
+    }
+
+    function initAndroidViewportInsets() {
+        if (!isAndroidClient()) return;
+
+        var root = document.documentElement;
+        var baselineHeight = (window.visualViewport && window.visualViewport.height)
+            ? Math.round(window.visualViewport.height)
+            : Math.round(window.innerHeight || 0);
+
+        function syncInsets() {
+            var viewportHeight = (window.visualViewport && window.visualViewport.height)
+                ? Math.round(window.visualViewport.height)
+                : Math.round(window.innerHeight || 0);
+
+            if (viewportHeight > baselineHeight) {
+                baselineHeight = viewportHeight;
+            }
+
+            var rawKeyboardInset = Math.max(0, baselineHeight - viewportHeight);
+            var keyboardInset = rawKeyboardInset > 80 ? rawKeyboardInset : 0;
+            var keyboardOpen = keyboardInset > 0;
+
+            root.style.setProperty('--app-viewport-height', viewportHeight + 'px');
+            root.style.setProperty('--keyboard-inset-bottom', keyboardInset + 'px');
+            document.body.classList.toggle('keyboard-open', keyboardOpen);
+
+            if (!keyboardOpen) return;
+
+            var active = document.activeElement;
+            if (!active) return;
+            if (!active.matches('input, textarea, [contenteditable="true"], .vditor-ir__input, .vditor-wysiwyg')) return;
+
+            setTimeout(function() {
+                try {
+                    active.scrollIntoView({ block: 'center', inline: 'nearest' });
+                } catch (e) {
+                    active.scrollIntoView();
+                }
+            }, 60);
+        }
+
+        syncInsets();
+        window.addEventListener('resize', syncInsets);
+        window.addEventListener('orientationchange', function() {
+            baselineHeight = (window.visualViewport && window.visualViewport.height)
+                ? Math.round(window.visualViewport.height)
+                : Math.round(window.innerHeight || 0);
+            syncInsets();
+        });
+
+        if (window.visualViewport) {
+            window.visualViewport.addEventListener('resize', syncInsets);
+            window.visualViewport.addEventListener('scroll', syncInsets);
+        }
+
+        document.addEventListener('focusin', syncInsets, true);
+        document.addEventListener('focusout', function() {
+            setTimeout(syncInsets, 90);
+        }, true);
+    }
+
+    function getVisibleModalOverlays() {
+        return Array.from(document.querySelectorAll('.modal-overlay, .mobile-action-sheet-overlay')).filter(function(el) {
+            if (!el) return false;
+            if (el.classList.contains('show')) return true;
+            if (el.style.display && el.style.display !== 'none') return true;
+            var computed = window.getComputedStyle(el);
+            return computed.display !== 'none' && computed.visibility !== 'hidden';
+        });
+    }
+
+    function applySafeAreaToOverlay(overlay) {
+        if (!overlay) return;
+        if (!overlay.classList.contains('modal-overlay') && !overlay.classList.contains('mobile-action-sheet-overlay')) return;
+
+        overlay.style.setProperty('padding-top', 'calc(env(safe-area-inset-top, 0px) + 10px)', 'important');
+        overlay.style.setProperty('padding-bottom', 'calc(var(--keyboard-inset-bottom, 0px) + 10px)', 'important');
+
+        if (!overlay.classList.contains('mobile-action-sheet-overlay')) {
+            overlay.style.setProperty('padding-left', '10px', 'important');
+            overlay.style.setProperty('padding-right', '10px', 'important');
+        }
+
+        var modal = overlay.querySelector('.modal');
+        if (!modal) return;
+
+        var fullHeight = 'calc(var(--app-viewport-height, 100vh) - env(safe-area-inset-top, 0px) - var(--keyboard-inset-bottom, 0px) - 20px)';
+        modal.style.setProperty('max-height', fullHeight, 'important');
+
+        if (modal.classList.contains('conflict-modal') || modal.classList.contains('diff-modal') || modal.classList.contains('history-modal')) {
+            modal.style.setProperty('height', 'calc(var(--app-viewport-height, 100vh) - env(safe-area-inset-top, 0px) - var(--keyboard-inset-bottom, 0px))', 'important');
+        }
+    }
+
+    function initModalSafeAreaObserver() {
+        Array.from(document.querySelectorAll('.modal-overlay, .mobile-action-sheet-overlay')).forEach(applySafeAreaToOverlay);
+
+        var observer = new MutationObserver(function(mutations) {
+            mutations.forEach(function(mutation) {
+                if (mutation.type === 'childList') {
+                    mutation.addedNodes.forEach(function(node) {
+                        if (!node || node.nodeType !== 1) return;
+
+                        if (node.matches && (node.matches('.modal-overlay') || node.matches('.mobile-action-sheet-overlay'))) {
+                            applySafeAreaToOverlay(node);
+                        }
+
+                        if (node.querySelectorAll) {
+                            node.querySelectorAll('.modal-overlay, .mobile-action-sheet-overlay').forEach(applySafeAreaToOverlay);
+                        }
+                    });
+                }
+
+                if (mutation.type === 'attributes' && mutation.target) {
+                    if (mutation.target.matches && (mutation.target.matches('.modal-overlay') || mutation.target.matches('.mobile-action-sheet-overlay'))) {
+                        applySafeAreaToOverlay(mutation.target);
+                    }
+                }
+            });
+        });
+
+        observer.observe(document.body, {
+            childList: true,
+            subtree: true,
+            attributes: true,
+            attributeFilter: ['class', 'style']
+        });
+    }
+
+    function closeOverlayByBackPress(overlay) {
+        if (!overlay) return false;
+
+        if (overlay.id === 'settingsModalOverlay' && typeof requestCloseSettingsDialog === 'function') {
+            requestCloseSettingsDialog();
+            return true;
+        }
+
+        if (overlay.id === 'videoCallModalOverlay') {
+            var iframe = document.getElementById('videoCallIframe');
+            if (iframe) iframe.src = '';
+        }
+
+        if (overlay.id === 'mobileActionSheetOverlay' && typeof window.hideMobileActionSheet === 'function') {
+            window.hideMobileActionSheet();
+            return true;
+        }
+
+        var closeBtn = overlay.querySelector('.modal-close-btn, #cancelConflictBtn, #closeDiffModalBtn, #closeHistoryBtn, #closeAboutBtn, #closeServiceStatusBtn, #cancelSettingsBtn');
+        if (closeBtn) {
+            closeBtn.click();
+        } else {
+            overlay.classList.remove('show');
+            overlay.style.display = 'none';
+        }
+
+        var computed = window.getComputedStyle(overlay);
+        return computed.display === 'none' || !overlay.classList.contains('show');
+    }
+
+    function initAndroidBackModalBehavior() {
+        if (!isAndroidClient() || !window.history || typeof window.history.pushState !== 'function') return;
+
+        var guardState = { epmBackGuard: true };
+        var currentState = window.history.state || {};
+        if (!currentState.epmBackGuard) {
+            window.history.pushState(guardState, document.title, window.location.href);
+        }
+
+        window.addEventListener('popstate', function() {
+            var overlays = getVisibleModalOverlays();
+            if (!overlays.length) return;
+
+            var topOverlay = overlays[overlays.length - 1];
+            var closed = closeOverlayByBackPress(topOverlay);
+            if (closed) {
+                window.history.pushState(guardState, document.title, window.location.href);
+            }
+        });
+    }
+
     function getTargetElement(target) {
         if (!target) return null;
         if (target.nodeType === 3 && target.parentElement) return target.parentElement;
@@ -3040,6 +3223,9 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     initializeAppShellOnce();
+    initAndroidViewportInsets();
+    initModalSafeAreaObserver();
+    initAndroidBackModalBehavior();
     ensureWasmRuntimeBootstrapped();
 
     if (window.startInFileManagementMode) {

@@ -66,6 +66,33 @@
         return false;
     }
 
+    function getParentPath(filePath) {
+        var raw = String(filePath || '');
+        if (!raw) return '';
+        var normalized = raw.replace(/\\+/g, '/');
+        var idx = normalized.lastIndexOf('/');
+        if (idx <= 0) return '';
+        return normalized.slice(0, idx);
+    }
+
+    async function ensureParentDirectory(fs, filePath) {
+        if (!fs) return;
+        var parentPath = getParentPath(filePath);
+        if (!parentPath) return;
+
+        try {
+            if (typeof fs.mkdir === 'function') {
+                await fs.mkdir(parentPath, { recursive: true });
+                return;
+            }
+            if (typeof fs.createDir === 'function') {
+                await fs.createDir(parentPath, { recursive: true });
+            }
+        } catch (error) {
+            // 如果目录已存在或当前 fs 适配器不支持该路径，继续走写入流程并兜底 invoke。
+        }
+    }
+
     function buildFileResponse(path, content) {
         return {
             canceled: false,
@@ -249,11 +276,10 @@
         },
         writeLocalFile: function(filePath, content) {
             var fs = getFsApi();
-            if (shouldUseInvokeForPath(filePath)) {
-                return invokeCommand('write_local_file', { filePath: filePath, content: content });
-            }
             if (fs && typeof fs.writeTextFile === 'function') {
-                return fs.writeTextFile(String(filePath), String(content)).then(function() {
+                return ensureParentDirectory(fs, filePath).then(function() {
+                    return fs.writeTextFile(String(filePath), String(content));
+                }).then(function() {
                     return {
                         success: true,
                         path: String(filePath),
@@ -263,6 +289,11 @@
                     return invokeCommand('write_local_file', { filePath: filePath, content: content });
                 });
             }
+
+            if (shouldUseInvokeForPath(filePath)) {
+                return invokeCommand('write_local_file', { filePath: filePath, content: content });
+            }
+
             return invokeCommand('write_local_file', { filePath: filePath, content: content });
         },
         openExternalUrl: function(url) {

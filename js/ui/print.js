@@ -1513,7 +1513,12 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
                 if (currentNode) {
                     currentFileName = currentNode.text.replace(/\.md$/, '');
                 }
-                await downloadGeneratedFile({ url: fullPdfUrl }, currentFileName + '.pdf', 'application/pdf');
+                var nativeResp = await fetch(fullPdfUrl, { cache: 'no-store' });
+                if (!nativeResp.ok) {
+                    throw new Error('HTTP ' + nativeResp.status);
+                }
+                var nativeBlob = await nativeResp.blob();
+                await downloadGeneratedFile(nativeBlob, currentFileName + '.pdf', 'application/pdf');
                 return;
             }
 
@@ -1640,7 +1645,12 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
                         : pdfUrl;
                     
                     if (window.nativeFileOps && window.nativeFileOps.isTauriRuntime()) {
-                        await downloadGeneratedFile({ url: fullPdfUrl }, (isEn() ? 'document' : '文档') + '.pdf', 'application/pdf');
+                        var previewResp = await fetch(fullPdfUrl, { cache: 'no-store' });
+                        if (!previewResp.ok) {
+                            throw new Error('HTTP ' + previewResp.status);
+                        }
+                        var previewBlob = await previewResp.blob();
+                        await downloadGeneratedFile(previewBlob, (isEn() ? 'document' : '文档') + '.pdf', 'application/pdf');
                         return;
                     }
                     
