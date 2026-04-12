@@ -15,6 +15,39 @@
         return global.i18n ? global.i18n.t(key) : key;
     }
 
+    // 辅助函数：设置按钮加载状态
+    function setButtonLoading(buttonId, loading, loadingTextKey) {
+        const btn = document.getElementById(buttonId);
+        if (!btn) return;
+        
+        const btnTextSpan = btn.querySelector('.btn-text');
+        const btnSpinner = btn.querySelector('.btn-spinner');
+        const btnLabel = btnTextSpan ? btnTextSpan.querySelector('[data-i18n]') : null;
+        
+        if (loading) {
+            // 保存原始文本
+            if (btnLabel) {
+                btn.dataset.originalText = btnLabel.getAttribute('data-i18n');
+            }
+            btn.classList.add('loading');
+            if (btnSpinner) {
+                btnSpinner.style.display = 'inline-block';
+            }
+            if (btnLabel && loadingTextKey) {
+                btnLabel.textContent = t(loadingTextKey);
+            }
+        } else {
+            // 恢复原始状态
+            btn.classList.remove('loading');
+            if (btnSpinner) {
+                btnSpinner.style.display = 'none';
+            }
+            if (btnLabel && btn.dataset.originalText) {
+                btnLabel.textContent = t(btn.dataset.originalText);
+            }
+        }
+    }
+
     // zxcvbn 懒加载
     let zxcvbnLoaded = false;
     let zxcvbn = null;
@@ -634,6 +667,9 @@
             return;
         }
 
+        // 显示加载状态
+        setButtonLoading('loginSubmitBtn', true, 'loginLoading');
+
         try {
             const apiUrl = (global.getApiBaseUrl ? global.getApiBaseUrl() : 'api') + '/auth/login';
             const response = await fetch(apiUrl, {
@@ -692,6 +728,8 @@
                 } else {
                     message.textContent = result.message || t('loginFailed');
                     message.className = 'modal-message error';
+                    // 失败时移除加载状态
+                    setButtonLoading('loginSubmitBtn', false);
                 }
             }
         } catch (error) {
@@ -700,6 +738,8 @@
                 message.textContent = t('networkErrorPleaseRetry');
                 message.className = 'modal-message error';
             }
+            // 错误时移除加载状态
+            setButtonLoading('loginSubmitBtn', false);
         } finally {
             // 无论成功或失败，都释放锁，允许再次提交
             _loginSubmitting = false;
@@ -743,6 +783,9 @@
             _registerSubmitting = false;
             return;
         }
+
+        // 显示加载状态
+        setButtonLoading('registerSubmitBtn', true, 'registerLoading');
 
         try {
             const requestBody = { username: username, password: password };
@@ -883,6 +926,8 @@
                 } else {
                     message.textContent = result.message || t('registerFailed');
                     message.className = 'modal-message error';
+                    // 失败时移除加载状态
+                    setButtonLoading('registerSubmitBtn', false);
                 }
             }
         } catch (error) {
@@ -891,6 +936,8 @@
                 message.textContent = t('networkErrorPleaseRetry');
                 message.className = 'modal-message error';
             }
+            // 错误时移除加载状态
+            setButtonLoading('registerSubmitBtn', false);
         } finally {
             // 释放锁
             _registerSubmitting = false;

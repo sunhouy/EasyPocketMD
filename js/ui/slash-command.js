@@ -19,8 +19,7 @@ const state = {
     refreshTimer: null,
     handlers: null,
     docBound: false,
-    ignoreSelectionChangeUntil: 0,
-    lastTouchActivationAt: 0
+    ignoreSelectionChangeUntil: 0
 };
 
 const moduleLoaders = {
@@ -694,7 +693,7 @@ function createPanel() {
         state.ignoreSelectionChangeUntil = Date.now() + 500;
     });
 
-    var activateByEvent = function(event, source) {
+    var activateByEvent = function(event) {
         if (!event) return;
 
         var target = event.target;
@@ -702,29 +701,18 @@ function createPanel() {
         var row = start && start.closest ? start.closest('.slash-command-item') : null;
         if (!row) return;
 
-        if (source === 'click' && Date.now() - state.lastTouchActivationAt < 500) {
-            return;
-        }
-
         event.preventDefault();
         event.stopPropagation();
 
         state.ignoreSelectionChangeUntil = Date.now() + 500;
-        if (source === 'touchend') {
-            state.lastTouchActivationAt = Date.now();
-        }
 
         var index = Number(row.dataset.index);
         if (!Number.isFinite(index)) return;
         executeByIndex(index);
     };
 
-    list.addEventListener('touchend', function(event) {
-        activateByEvent(event, 'touchend');
-    });
-
     list.addEventListener('click', function(event) {
-        activateByEvent(event, 'click');
+        activateByEvent(event);
     });
 
     var empty = document.createElement('div');

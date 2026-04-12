@@ -6,7 +6,7 @@
     var LAST_CHECK_AT_KEY = 'vditor_native_version_check_at';
     var LAST_DISMISSED_VERSION_KEY = 'vditor_native_version_dismissed';
     var CLIENT_DOWNLOAD_LINKS = {
-        android: 'https://static.yhsun.cn/tauri/android/easypocketmd_android.apk',
+        android: 'https://static.yhsun.cn/android/easypocketmd_android.apk',
         windows: 'https://static.yhsun.cn/tauri/win/easypocketmd_windows.exe',
         macos: 'https://static.yhsun.cn/tauri/macos/easypocketmd_macos.dmg',
         linuxAppImage: 'https://static.yhsun.cn/tauri/linux/easypocketmd_linux.appimage',
@@ -170,6 +170,22 @@
 
     function openDownloadPage() {
         var url = getPreferredDownloadUrl();
+        try {
+            if (global.nativeFileOps && typeof global.nativeFileOps.openExternalUrl === 'function') {
+                Promise.resolve(global.nativeFileOps.openExternalUrl(url)).catch(function() {
+                    global.open(url, '_blank', 'noopener');
+                });
+                return;
+            }
+            if (global.electron && typeof global.electron.openExternalUrl === 'function') {
+                Promise.resolve(global.electron.openExternalUrl(url)).catch(function() {
+                    global.open(url, '_blank', 'noopener');
+                });
+                return;
+            }
+        } catch (error) {
+            // fallback to web open below
+        }
         global.open(url, '_blank', 'noopener');
     }
 
