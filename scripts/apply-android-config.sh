@@ -5,7 +5,7 @@ set -e
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ANDROID_RES_DIR="$PROJECT_ROOT/src-tauri/gen/android/app/src/main/res"
-ANDROID_SRC_DIR="$PROJECT_ROOT/src-tauri/gen/android/app/src/main/java/com/yhsun/md"
+ANDROID_SRC_DIR="$PROJECT_ROOT/src-tauri/gen/android/app/src/main/java/cn/yhsun/md"
 ANDROID_MANIFEST_PATH="$PROJECT_ROOT/src-tauri/gen/android/app/src/main/AndroidManifest.xml"
 
 echo "🔧 正在应用 Android 状态栏配置..."
@@ -61,19 +61,16 @@ echo "✅ Dark mode themes.xml 已应用"
 
 # 复制 MainActivity.kt
 cat > "$ANDROID_SRC_DIR/MainActivity.kt" << 'EOF'
-package com.yhsun.md
+package cn.yhsun.md
 
 import android.os.Bundle
-import androidx.core.view.WindowCompat
 import com.tauri.app.TauriActivity
 
 class MainActivity : TauriActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        
-        // 设置应用布局不延伸到系统栏后方（状态栏不沉浸）
-        // 这样内容就不会被状态栏覆盖
-        WindowCompat.setDecorFitsSystemWindows(window, true)
+        // 键盘适配由 AndroidManifest.xml 的 adjustResize 托管，
+        // 避免引入额外 AndroidX 依赖导致 Kotlin 编译失败。
     }
 }
 EOF

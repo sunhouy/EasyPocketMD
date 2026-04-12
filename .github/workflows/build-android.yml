@@ -174,7 +174,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if [ ! -d "src-tauri/gen/android" ] || [ ! -f "src-tauri/gen/android/app/src/main/AndroidManifest.xml" ]; then
+          if [ ! -d "src-tauri/gen/android" ] \
+            || [ ! -f "src-tauri/gen/android/gradlew" ] \
+            || [ ! -f "src-tauri/gen/android/app/src/main/AndroidManifest.xml" ] \
+            || { [ ! -f "src-tauri/gen/android/app/build.gradle.kts" ] && [ ! -f "src-tauri/gen/android/app/build.gradle" ]; }; then
             npm run tauri:android:init
           fi
 
