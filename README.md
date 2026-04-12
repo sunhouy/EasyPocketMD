@@ -1,162 +1,173 @@
 # EasyPocketMD
 ![EasyPocketMD](assets/readme/logo.png)
 
-**AI powered · Superfast · Cross Platform · Android APK via Tauri**
+**AI 驱动 · 极速 · 跨平台**
 
-<p align="center"><a href="README_zh_CN.md">中文</a> &nbsp;|&nbsp; <a href="https://md.yhsun.cn/">Demo</a></p>
+<p align="center"><a href="README_EN.md">English</a> &nbsp;|&nbsp; <a href="https://md.yhsun.cn/">DEMO</a></p>
 
-A Markdown editor that removes the learning curve — insert formatted text, LaTeX formulas, and diagrams without memorizing any syntax. With intelligent search and AI assistance, everything is just a few clicks away.
+一款几乎零学习成本的 Markdown 编辑器：无需记忆语法，也能轻松插入格式化文本、LaTeX 公式和图表。配合智能搜索与 AI 助手，常用功能都能几步完成。
 
-Real-time collaboration, AI-assisted writing, and a smooth editing experience — all wrapped in a beautiful Material Design interface.
-The Android client is built with Tauri mobile and shipped as an APK.
+从写作到协作再到发布，EasyPocketMD 把复杂流程压缩成顺手的编辑体验。你可以把它当作一个更聪明的 Markdown 工作台：
 
-If you find this useful, please ⭐ star the repo – it means a lot to me.
+- `/` 斜杠命令直达任意操作，减少菜单查找和鼠标切换。
+- 文件搜索同时支持按标题和按内容检索，快速定位知识。
+- 桌面端基于 Tauri 构建，安装包通常只有十几 MB，启动轻快。
+- 内置知识图谱，帮助你把分散笔记串成可视化结构。
+- 支持直接打开本地 Markdown 文件，延续你已有的文件组织方式。
+
+实时协作、AI 辅助写作与流畅编辑体验，全部整合在美观的 Material Design 界面中。
+Android 客户端使用 Tauri mobile 构建，并输出 APK。
+
+如果这个项目对你有帮助，欢迎点一个 ⭐ Star，这是对我非常重要的支持。
 
 [![Build and Deploy](https://github.com/sunhouy/EasyPocketMD/actions/workflows/deploy.yml/badge.svg)](https://github.com/sunhouy/EasyPocketMD/actions/workflows/deploy.yml)
 [![Build Tauri App](https://github.com/sunhouy/EasyPocketMD/actions/workflows/build-tauri.yml/badge.svg)](https://github.com/sunhouy/EasyPocketMD/actions/workflows/build-tauri.yml)
 [![codecov](https://codecov.io/gh/sunhouy/EasyPocketMD/graph/badge.svg?token=8E02GDKIKQ)](https://codecov.io/gh/sunhouy/EasyPocketMD)
 ![NPM Downloads](https://img.shields.io/npm/dw/easypocketmd)
 
-
 [![Python 3.6+](https://img.shields.io/badge/python-3.6+-blue.svg)](https://www.python.org/downloads/)
 [![Node.js](https://img.shields.io/badge/node.js-%3E%3D18.0.0-brightgreen.svg)](https://nodejs.org/)
 
-## 📖 Table of Contents
-- [Features](#-features)
-- [Quick Start](#-quick-start)
-- [Comparison](#-how-we-compare)
-- [Architecture](#-project-architecture)
-- [Deployment](#-deployment)
-- [Demo](#-demo)
-- [License](#-license)
+## 📖 目录
+- [功能特性](#-功能特性)
+- [快速开始](#-快速开始)
+- [对比说明](#-对比说明)
+- [项目架构](#-项目架构)
+- [部署](#-部署)
+- [演示](#-演示)
+- [许可证](#-许可证)
 
-## ✨ Features
+## ✨ 功能特性
 
-### 🤖 AI Integration
+### 🤖 AI 集成
 
-- AI Writing Assistant – Help write, rewrite, auto-format, and even generate PPT slides from your document.
+- AI 写作助手：支持写作、改写、自动排版，甚至可根据文档生成 PPT。
 ![AI Writing Assistant](assets/readme/aigenppt.gif)
-- Smart Charts & Formulas – Generate LaTeX formulas and diagrams with AI prompts — no manual coding required.
+- 智能图表与公式：通过 AI 提示词生成 LaTeX 公式和图表，无需手写代码。
 ![AI Charts & Formulas](assets/readme/aigenformula.gif)
 
-### 👥 Collaboration & Communication
+### 👥 协作与沟通
 
-- Real-time Collaboration – Share documents and work together seamlessly.
+- 实时协作：共享文档并流畅协同编辑。
 ![Real-time Collaboration](assets/readme/share.gif)
-- Encrypted Video Call – Built-in two-person encrypted video call with dual-stack IPv6 support.
+- 加密视频通话：内置双人端到端加密视频通话，支持 IPv6 双栈网络。
 ![Encrypted Video Call](assets/readme/videocall.gif)
 
-### ✍️ Editing Experience
-- Three Preview Modes – WYSIWYG, live rendering, and split-screen preview.
-- Efficient Editing – Quick insertion of Markdown, LaTeX formulas, and charts. Full-text search and file diff support.
+### ✍️ 编辑体验
+- 三种预览模式：所见即所得、即时渲染、分屏预览。
+- 高效编辑：快速插入 Markdown、LaTeX 公式和图表；支持全文检索与文件差异对比。
 ![Editing Experience](assets/readme/insert.gif)
-- Version Control – Browse history and compare differences between versions.
+- 版本控制：浏览历史记录并比较不同版本差异。
 ![Version Control](assets/readme/history.gif)
 
 
-### 🔗 Compatibility & Design
-- Cross Platform – Works seamlessly across devices.
+### 🔗 兼容性与设计
+- 跨平台：在多种设备上保持一致且流畅的使用体验。
 ![Cross Platform](assets/readme/1_1.png)
-- File Import / Export – Import local documents; export to TXT, DOC, PDF, and more.
-- Cloud Print – Print remotely via the cloud print client.
+- 文件导入 / 导出：支持导入本地文档，导出为 TXT、DOC、PDF 等格式。
+- 云打印：通过云打印客户端实现远程打印。
 ![Cloud Print](assets/readme/cloudprint.gif)
-- Available on Windows, Linux, Android and the web — with consistent behavior across all platforms.
-- Modern UI – Clean Material Design with day/night mode support.
+- 支持 Windows、Linux、Android 与 Web，并在各平台保持一致行为。
+- 现代化界面：简洁的 Material Design，支持日间/夜间模式。
 
-## 🚀 Quick Start
-### Prerequisites
+## 🚀 快速开始
+### 环境要求
 - Node.js ≥ 18.0
 - Python ≥ 3.6
 - MySQL ≥ 5.7
 - Redis ≥ 6.0
 - npm ≥ 9.0
 
-### Installation
+### 安装
 
-1. Clone the repository
+1. 克隆仓库
 ```bash
 git clone https://github.com/sunhouy/EasyPocketMD.git
 cd md
 ```
+或者从npm：
+```bash
+npm i easypocketmd
+```
 
-2. Install Node.js dependencies
+2. 安装 Node.js 依赖
 ```bash
 npm install
 ```
 
-3. Copy the example configuration file and edit it with your own values:
+3. 复制示例配置文件并按需修改：
 ```
 cp .env.example .env
 ```
 
-4. Set up databases
-Create the MySQL database and tables. You can find the schema in db.sql. Ensure Redis is running.
+4. 初始化数据库
+创建 MySQL 数据库和数据表（结构见 db.sql），并确保 Redis 已运行。
 
-5. Build the frontend
+5. 构建前端
 ```bash
 npm run build
 ```
 
-6. Start the application
+6. 启动应用
 ```bash
 npm start
 ```
-For production (using PM2):
+生产环境（使用 PM2）：
 ```bash
 npm install -g pm2
 pm2 start api/server.js --name "easypocketmd"
 ```
 
-### Tauri Android Build
+### Tauri Android 构建
 
-After installing the Tauri mobile prerequisites, build the Android APK with:
+安装好 Tauri mobile 依赖后，可直接构建 Android APK：
 ```bash
 npm run tauri:android:init
 npm run tauri:android:build
 ```
 
 
-## 📊 How We Compare
+## 📊 对比说明
 
-| Feature                     | **Ours** | Typora | Obsidian | Notion | VS Code | Joplin                 |
-|-----------------------------|---------|--------|----------|--------|---------|------------------------|
-| **Data Privacy**            | 🔒 Local + Cloud | Local | Local | Cloud-only | Local | Local + Cloud optional |
-| **AI Writing Assistant**    | ✅ Native | ❌ | ❌ (via plugin) | ❌ | ❌ (via plugin) | ❌                      |
-| **AI Charts & Formulas**    | ✅ Native | ❌ | ❌ | ❌ | ❌ | ❌                      |
-| **AI PPT Generation**       | ✅ Native | ❌ | ❌ | ❌ | ❌ | ❌                      |
-| **Mobile Experience**       | 📱 First-class | Basic | Basic | Good | None | Basic                  |
-| **Real-time Collaboration** | ✅ E2EE encrypted | ❌ | ❌ | ✅ | ✅ (Live Share) | ❌                      |
-| **Encrypted Video Call**    | ✅ Built-in | ❌ | ❌ | ❌ | ❌ | ❌                      |
-| **Cloud Print**             | ✅ Native | ❌ | ❌ | ❌ | ❌ | ❌                      |
-| **Price**                   | Free / Open Source | $15 one-time | Free / $50/yr sync | Free tier | Free | Free                   |
+| 功能                         | **本项目** | Typora | Obsidian | Notion | VS Code | Joplin                 |
+|-----------------------------|-----------|--------|----------|--------|---------|------------------------|
+| **数据隐私**                 | 🔒 本地 + 云端 | 本地 | 本地 | 仅云端 | 本地 | 本地 + 可选云同步 |
+| **AI 写作助手**              | ✅ 原生支持 | ❌ | ❌（插件） | ❌ | ❌（插件） | ❌                      |
+| **AI 图表与公式**            | ✅ 原生支持 | ❌ | ❌ | ❌ | ❌ | ❌                      |
+| **AI 生成 PPT**             | ✅ 原生支持 | ❌ | ❌ | ❌ | ❌ | ❌                      |
+| **移动端体验**               | 📱 一流体验 | 基础 | 基础 | 良好 | 无 | 基础                  |
+| **实时协作**                 | ✅ E2EE 加密 | ❌ | ❌ | ✅ | ✅（Live Share） | ❌                      |
+| **加密视频通话**             | ✅ 内置 | ❌ | ❌ | ❌ | ❌ | ❌                      |
+| **云打印**                   | ✅ 原生支持 | ❌ | ❌ | ❌ | ❌ | ❌                      |
+| **价格**                     | 免费 / 开源 | 一次性 $15 | 免费 / $50/年同步 | 免费版 | 免费 | 免费                   |
 
 
-## 🏗️ Project Architecture
+## 🏗️ 项目架构
 
-The project uses a JavaScript + Python architecture. The backend is implemented with Node.js, while the cloud printing server and client are implemented with Python. The frontend is developed with native JavaScript, ensuring excellent performance.
+项目采用 JavaScript + Python 架构。后端由 Node.js 实现，云打印服务端与客户端由 Python 实现。前端基于原生 JavaScript 开发，以保证优秀性能。
 ```
-api/     Backend API interfaces
-assets/  Static application resources
-css/     Frontend CSS styles
-js/      Frontend JavaScript scripts
-print/   Cloud printing server and client code
-scripts/ Deployment scripts
-tests/   Test scripts
+api/     后端 API 接口
+assets/  静态应用资源
+css/     前端 CSS 样式
+js/      前端 JavaScript 脚本
+print/   云打印服务端与客户端代码
+scripts/ 部署脚本
+tests/   测试脚本
 ```
 
-## 🎬 Demo
+## 🎬 演示
 
 <https://md.yhsun.cn/>
 
-## 📧 Contact
+## 📧 联系方式
 `18763177732@139.com`
 
-## 📄 License
-This project is licensed under the MIT License.
+## 📄 许可证
+本项目基于 MIT License 开源。
 
-## 🙌 Acknowledgements
-Built with ❤️ using modern web technologies and open source tools.
+## 🙌 致谢
+基于现代 Web 技术与开源工具构建，向所有贡献者致敬。
 
-I'm deeply grateful to all the open‑source projects and their contributors that made EasyPocketMD possible.  
+非常感谢所有让 EasyPocketMD 成为可能的开源项目及其贡献者。
 
-See [DEPENDENCIES.md](./DEPENDENCIES.md) for the complete list of dependencies and licenses.
+完整依赖与许可证清单请见 [DEPENDENCIES.md](./DEPENDENCIES.md)。
