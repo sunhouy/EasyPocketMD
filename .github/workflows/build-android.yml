@@ -174,7 +174,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if [ ! -d "src-tauri/gen/android" ]; then
+          if [ ! -d "src-tauri/gen/android" ] || [ ! -f "src-tauri/gen/android/app/src/main/AndroidManifest.xml" ]; then
             npm run tauri:android:init
           fi
 
