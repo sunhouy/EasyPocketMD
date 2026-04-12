@@ -29,6 +29,9 @@ cat > "$ANDROID_RES_DIR/values/themes.xml" << 'EOF'
         <!-- Light status bar content (for light background) -->
         <item name="android:windowLightStatusBar">false</item>
     </style>
+
+    <!-- Tauri generated manifest may reference this style name -->
+    <style name="Theme.easypocketmd_tauri" parent="Theme.TauriApp" />
 </resources>
 EOF
 
@@ -48,6 +51,9 @@ cat > "$ANDROID_RES_DIR/values-night/themes.xml" << 'EOF'
         <!-- Dark status bar content (for dark background) -->
         <item name="android:windowLightStatusBar">false</item>
     </style>
+
+    <!-- Tauri generated manifest may reference this style name -->
+    <style name="Theme.easypocketmd_tauri" parent="Theme.TauriApp" />
 </resources>
 EOF
 
