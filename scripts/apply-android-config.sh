@@ -3,9 +3,10 @@
 
 set -e
 
-PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ANDROID_RES_DIR="$PROJECT_ROOT/src-tauri/gen/android/app/src/main/res"
 ANDROID_SRC_DIR="$PROJECT_ROOT/src-tauri/gen/android/app/src/main/java/com/yhsun/md"
+ANDROID_MANIFEST_PATH="$PROJECT_ROOT/src-tauri/gen/android/app/src/main/AndroidManifest.xml"
 
 echo "🔧 正在应用 Android 状态栏配置..."
 
@@ -72,6 +73,18 @@ class MainActivity : TauriActivity() {
 EOF
 
 echo "✅ MainActivity.kt 已应用"
+
+# 为软键盘弹出启用 adjustResize（底部工具栏自动顶到键盘上方）
+if [ -f "$ANDROID_MANIFEST_PATH" ]; then
+    if grep -q 'android:windowSoftInputMode=' "$ANDROID_MANIFEST_PATH"; then
+        sed -i -E 's/android:windowSoftInputMode="[^"]*"/android:windowSoftInputMode="adjustResize"/g' "$ANDROID_MANIFEST_PATH"
+    else
+        sed -i '0,/<activity /s/<activity /<activity android:windowSoftInputMode="adjustResize" /' "$ANDROID_MANIFEST_PATH"
+    fi
+    echo "✅ AndroidManifest.xml 已设置 windowSoftInputMode=adjustResize"
+else
+    echo "⚠️ AndroidManifest.xml 尚未生成，待 tauri android init 后会自动注入 adjustResize"
+fi
 
 echo ""
 echo "✨ Android 状态栏配置应用完成！"

@@ -28,6 +28,21 @@ document.addEventListener('DOMContentLoaded', function() {
         var baselineHeight = (window.visualViewport && window.visualViewport.height)
             ? Math.round(window.visualViewport.height)
             : Math.round(window.innerHeight || 0);
+        var lastKeyboardOpen = false;
+
+        function refreshEditorViewport() {
+            var vditor = window.vditor;
+            if (!vditor) return;
+            if (typeof vditor.resize === 'function') {
+                try {
+                    vditor.resize();
+                    return;
+                } catch (e) {
+                    // fall through
+                }
+            }
+            window.dispatchEvent(new Event('resize'));
+        }
 
         function syncInsets() {
             var viewportHeight = (window.visualViewport && window.visualViewport.height)
@@ -39,12 +54,18 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             var rawKeyboardInset = Math.max(0, baselineHeight - viewportHeight);
-            var keyboardInset = rawKeyboardInset > 80 ? rawKeyboardInset : 0;
-            var keyboardOpen = keyboardInset > 0;
+            var keyboardOpen = rawKeyboardInset > 80;
+            // Android 启用 adjustResize 后，窗口本身会收缩，避免再次手动抬升导致双重偏移。
+            var keyboardInset = 0;
 
             root.style.setProperty('--app-viewport-height', viewportHeight + 'px');
             root.style.setProperty('--keyboard-inset-bottom', keyboardInset + 'px');
             document.body.classList.toggle('keyboard-open', keyboardOpen);
+
+            if (keyboardOpen !== lastKeyboardOpen) {
+                lastKeyboardOpen = keyboardOpen;
+                setTimeout(refreshEditorViewport, 0);
+            }
 
             if (!keyboardOpen) return;
 
