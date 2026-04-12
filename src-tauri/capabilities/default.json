@@ -9,7 +9,6 @@
     "core:window:allow-close",
     "core:window:allow-destroy",
     "dialog:default",
-    "http:default",
     "opener:allow-open-url",
     "fs:default",
     "fs:read-files",
