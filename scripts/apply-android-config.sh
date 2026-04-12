@@ -64,7 +64,7 @@ cat > "$ANDROID_SRC_DIR/MainActivity.kt" << 'EOF'
 package cn.yhsun.md
 
 import android.os.Bundle
-import com.tauri.app.TauriActivity
+import app.tauri.TauriActivity
 
 class MainActivity : TauriActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
