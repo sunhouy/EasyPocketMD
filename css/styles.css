@@ -16,32 +16,13 @@
 body {
     margin: 0;
     padding: 0;
+    padding-top: env(safe-area-inset-top);
     height: 100vh;
     background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     transition: background 0.3s ease;
     overflow: hidden;
     position: relative;
-}
-
-/* Android/iOS status bar placeholder based on safe area inset. */
-.status-bar-placeholder {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: env(safe-area-inset-top, 0px);
-    background-color: #f3f4f6;
-    z-index: 998;
-    pointer-events: none;
-}
-
-.main-content {
-    margin-top: env(safe-area-inset-top, 0px);
-}
-
-body.night-mode .status-bar-placeholder {
-    background-color: #0f172a;
 }
 
 /* 移动端默认禁止界面文本被选中，减少误触带来的体验干扰。 */
