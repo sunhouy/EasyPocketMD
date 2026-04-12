@@ -5,7 +5,6 @@ set -e
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ANDROID_RES_DIR="$PROJECT_ROOT/src-tauri/gen/android/app/src/main/res"
-ANDROID_SRC_DIR="$PROJECT_ROOT/src-tauri/gen/android/app/src/main/java/cn/yhsun/md"
 ANDROID_MANIFEST_PATH="$PROJECT_ROOT/src-tauri/gen/android/app/src/main/AndroidManifest.xml"
 
 echo "🔧 正在应用 Android 状态栏配置..."
@@ -13,8 +12,6 @@ echo "🔧 正在应用 Android 状态栏配置..."
 # 创建必要的目录
 mkdir -p "$ANDROID_RES_DIR/values"
 mkdir -p "$ANDROID_RES_DIR/values-night"
-mkdir -p "$ANDROID_SRC_DIR"
-
 # 复制 themes.xml (Light mode)
 cat > "$ANDROID_RES_DIR/values/themes.xml" << 'EOF'
 <?xml version="1.0" encoding="utf-8"?>
@@ -58,24 +55,6 @@ cat > "$ANDROID_RES_DIR/values-night/themes.xml" << 'EOF'
 EOF
 
 echo "✅ Dark mode themes.xml 已应用"
-
-# 复制 MainActivity.kt
-cat > "$ANDROID_SRC_DIR/MainActivity.kt" << 'EOF'
-package cn.yhsun.md
-
-import android.os.Bundle
-import app.tauri.TauriActivity
-
-class MainActivity : TauriActivity() {
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        // 键盘适配由 AndroidManifest.xml 的 adjustResize 托管，
-        // 避免引入额外 AndroidX 依赖导致 Kotlin 编译失败。
-    }
-}
-EOF
-
-echo "✅ MainActivity.kt 已应用"
 
 # 为软键盘弹出启用 adjustResize（底部工具栏自动顶到键盘上方）
 if [ -f "$ANDROID_MANIFEST_PATH" ]; then
