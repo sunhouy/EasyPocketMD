@@ -24,7 +24,6 @@ import CropperModule from 'cropperjs';
     var cropperLoadPromise = null;
     var activeCropper = null;
     var activeCropperHost = null;
-    var lastImageToolOpenAt = 0;
 
     function escapeRegExp(str) {
         return String(str || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -121,7 +120,6 @@ import CropperModule from 'cropperjs';
         }
 
         blurActiveTextInput();
-        lastImageToolOpenAt = Date.now();
         showImageToolsModal(img);
     }
 
@@ -1195,20 +1193,9 @@ import CropperModule from 'cropperjs';
             img.dataset.epmdToolsBound = '1';
             img.style.cursor = 'pointer';
 
-            img.addEventListener('touchstart', function(e) {
-                openImageToolsFromInteraction(e, img);
-            }, { passive: false });
-
-            img.addEventListener('mousedown', function(e) {
-                if (typeof e.button === 'number' && e.button !== 0) return;
-                openImageToolsFromInteraction(e, img);
-            });
-
             img.addEventListener('click', function(e) {
-                // touchstart/mousedown already handled opening; swallow delayed click.
-                if (Date.now() - lastImageToolOpenAt < 450) {
-                    e.preventDefault();
-                    e.stopPropagation();
+                // Only open on an explicit click/tap; avoid non-primary mouse buttons.
+                if (typeof e.button === 'number' && e.button !== 0) {
                     return;
                 }
                 openImageToolsFromInteraction(e, img);

@@ -2547,7 +2547,7 @@ document.addEventListener('DOMContentLoaded', function() {
             return window.getClientDownloadLinks();
         }
         return {
-            android: 'https://static.yhsun.cn/tauri/android/easypocketmd_android.apk',
+            android: 'https://static.yhsun.cn/android/easypocketmd_android.apk',
             windows: 'https://static.yhsun.cn/tauri/win/easypocketmd_windows.exe',
             macos: 'https://static.yhsun.cn/tauri/macos/easypocketmd_macos.dmg',
             linuxAppImage: 'https://static.yhsun.cn/tauri/linux/easypocketmd_linux.appimage',
