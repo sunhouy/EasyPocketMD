@@ -55,7 +55,7 @@
         /* 顶部提示横幅 - 通用样式 */
         .top-notice-banner {
             position: fixed;
-            top: 0;
+            top: env(safe-area-inset-top, 0px);
             left: 0;
             right: 0;
             color: white;
@@ -141,6 +141,7 @@
 </head>
 
 <body>
+<div class="status-bar-placeholder" aria-hidden="true"></div>
 <!-- 顶部提示横幅 -->
 <div id="topNoticeBanner" class="top-notice-banner" style="display: none;">
     <div class="notice-content">
@@ -279,12 +280,10 @@
             <div class="form-group">
                 <label for="registerUsername" data-i18n="username">用户名</label>
                 <input type="text" id="registerUsername" data-i18n-placeholder="enterUsername" placeholder="请输入用户名">
-                <div class="validation-hint" id="registerUsernameHint" data-i18n="usernameRequirements" style="font-size:12px;color:#666;margin-top:4px;">用户名必须是3-20个字符，仅包含英文和数字</div>
             </div>
             <div class="form-group">
                 <label for="registerPassword" data-i18n="password">密码</label>
                 <input type="password" id="registerPassword" data-i18n-placeholder="enterPassword" placeholder="请输入密码">
-                <div class="validation-hint" id="registerPasswordHint" data-i18n="passwordRequirements" style="font-size:12px;color:#666;margin-top:4px;">密码必须是6-30个字符</div>
                 <div class="password-strength-container" id="passwordStrengthContainer" style="margin-top:8px;display:none;">
                     <div class="password-strength-label" data-i18n="passwordStrength">密码强度：</div>
                     <div class="password-strength-bar">
@@ -295,7 +294,7 @@
             </div>
             <div class="form-group">
                 <label for="registerInviteCode" data-i18n="inviteCode">邀请码 (可选)</label>
-                <input type="text" id="registerInviteCode" data-i18n-placeholder="enterInviteCode" placeholder="请输入邀请码">
+                <input type="text" id="registerInviteCode" data-i18n-placeholder="enterInviteCode" placeholder="可选">
             </div>
             <div class="modal-message" id="registerMessage"></div>
             <div class="modal-actions">
