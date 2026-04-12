@@ -6,8 +6,19 @@
   "permissions": [
     "core:default",
     "dialog:default",
+    "opener:allow-open-url",
     "fs:default",
     "fs:read-files",
-    "fs:write-files"
+    "fs:write-files",
+    {
+      "identifier": "opener:allow-open-url",
+      "allow": [
+        { "url": "https://*" },
+        { "url": "http://*" },
+        { "url": "mailto:*" },
+        { "url": "tel:*" },
+        { "url": "*://*" }
+      ]
+    }
   ]
 }

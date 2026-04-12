@@ -20,6 +20,78 @@
 
     let markedParserPromise = null;
     let longFilePreviewTimer = null;
+    let fileOpenRequestToken = 0;
+
+    function ensureFileSwitchLoadingOverlay() {
+        let overlay = document.getElementById('fileSwitchLoadingOverlay');
+        if (overlay) return overlay;
+
+        const editorContainer = document.querySelector('.editor-container');
+        if (!editorContainer) return null;
+
+        overlay = document.createElement('div');
+        overlay.id = 'fileSwitchLoadingOverlay';
+        overlay.className = 'file-switch-loading-overlay';
+        overlay.style.display = 'none';
+        overlay.innerHTML =
+            '<div class="file-switch-loading-card">' +
+                '<i class="fas fa-spinner fa-spin" aria-hidden="true"></i>' +
+                '<span id="fileSwitchLoadingText"></span>' +
+            '</div>';
+        editorContainer.appendChild(overlay);
+        return overlay;
+    }
+
+    function setEditorInteractionLocked(locked) {
+        const vditorContainer = document.getElementById('vditor');
+        if (vditorContainer) {
+            if (global.vditor && typeof global.vditor.disabled === 'function') {
+                global.vditor.disabled(!!locked);
+            }
+
+            const editableNodes = vditorContainer.querySelectorAll('[contenteditable]');
+            editableNodes.forEach(function(node) {
+                node.setAttribute('contenteditable', locked ? 'false' : 'true');
+            });
+
+            const textInputs = vditorContainer.querySelectorAll('textarea, input');
+            textInputs.forEach(function(node) {
+                node.readOnly = !!locked;
+            });
+
+            const toolbarBtns = vditorContainer.querySelectorAll('.vditor-toolbar__item, .vditor-toolbar__btn');
+            toolbarBtns.forEach(function(btn) {
+                btn.style.pointerEvents = locked ? 'none' : '';
+                btn.style.opacity = locked ? '0.5' : '';
+            });
+        }
+
+        const longTextarea = getLongFileTextarea();
+        if (longTextarea) {
+            longTextarea.readOnly = !!locked;
+        }
+
+        const longPreviewToggle = document.getElementById('longFilePreviewToggle');
+        if (longPreviewToggle) {
+            longPreviewToggle.disabled = !!locked;
+        }
+    }
+
+    function setFileSwitchLoading(loading) {
+        const isLoading = !!loading;
+        const overlay = ensureFileSwitchLoadingOverlay();
+        const text = document.getElementById('fileSwitchLoadingText');
+        if (text) {
+            text.textContent = isEn() ? 'Loading file...' : '正在加载文件...';
+        }
+
+        if (overlay) {
+            overlay.style.display = isLoading ? 'flex' : 'none';
+        }
+
+        setEditorInteractionLocked(isLoading);
+        global.isFileSwitchLoading = isLoading;
+    }
 
     function getLongFileEditorState() {
         if (!global.longFileEditorState) {
@@ -4111,62 +4183,80 @@
     }
 
     async function openFile(fileId) {
+        const requestToken = ++fileOpenRequestToken;
+        setFileSwitchLoading(true);
+
         // 先保存当前文档
         if (typeof global.saveCurrentFile === 'function' && g('currentFileId')) {
             await global.saveCurrentFile(false);
         }
 
-        closeFileManagementFabRing();
+        try {
+            if (requestToken !== fileOpenRequestToken) return;
 
-        const files = g('files');
-        const file = files.find(f => f.id === fileId && f.type === 'file');
-        if (!file) {
-            g('customAlert')(isEn() ? 'Cannot open folder' : '无法打开文件夹');
-            return;
-        }
-        global.currentFileId = fileId;
-        
-        // 记录最后打开的文件
-        localStorage.setItem('vditor_last_opened_file', fileId);
-        
-        let content = file.content;
-        if (global.LocalImageManager && global.LocalImageManager.convertLocalToBlob) {
-            try {
-                content = await global.LocalImageManager.convertLocalToBlob(content);
-            } catch (e) {
-                console.error('Failed to convert local images to blob:', e);
+            closeFileManagementFabRing();
+
+            const files = g('files');
+            const file = files.find(f => f.id === fileId && f.type === 'file');
+            if (!file) {
+                g('customAlert')(isEn() ? 'Cannot open folder' : '无法打开文件夹');
+                return;
+            }
+            global.currentFileId = fileId;
+
+            // 记录最后打开的文件
+            localStorage.setItem('vditor_last_opened_file', fileId);
+
+            let content = file.content;
+            if (global.LocalImageManager && global.LocalImageManager.convertLocalToBlob) {
+                try {
+                    content = await global.LocalImageManager.convertLocalToBlob(content);
+                } catch (e) {
+                    console.error('Failed to convert local images to blob:', e);
+                }
+            }
+
+            if (requestToken !== fileOpenRequestToken) return;
+
+            const useLongFileMode = shouldUseLongFileMode(content);
+            if (typeof global.enterEditorMode === 'function') {
+                global.enterEditorMode();
+            }
+
+            if (!useLongFileMode && typeof global.ensureVditorInitialized === 'function') {
+                await global.ensureVditorInitialized();
+            }
+
+            if (requestToken !== fileOpenRequestToken) return;
+
+            if (useLongFileMode) {
+                const wasAlreadyLongForSameFile = isLongFileEditorActiveFor(fileId);
+                activateLongFileEditor(fileId, content);
+                if (!wasAlreadyLongForSameFile) {
+                    const longModeNotice = window.i18n
+                        ? t('longFileModeNotice')
+                        : '检测到超长文件，已切换为高性能文本模式（禁用 Vditor 以避免卡顿）';
+                    global.showMessage(longModeNotice, 'warning');
+                }
+            } else {
+                deactivateLongFileEditor();
+                setEditorContentForFile(fileId, content);
+            }
+
+            await activateOwnerSharedSession(file, content);
+            if (requestToken !== fileOpenRequestToken) return;
+
+            await checkExternalLocalConflictForCurrentFile();
+            if (requestToken !== fileOpenRequestToken) return;
+
+            expandActiveFile();
+            global.startAutoSave();
+            global.showMessage(isEn() ? 'File opened: ' + file.name : '已打开文件: ' + file.name);
+        } finally {
+            if (requestToken === fileOpenRequestToken) {
+                setFileSwitchLoading(false);
             }
         }
-        
-        const useLongFileMode = shouldUseLongFileMode(content);
-        if (typeof global.enterEditorMode === 'function') {
-            global.enterEditorMode();
-        }
-
-        if (!useLongFileMode && typeof global.ensureVditorInitialized === 'function') {
-            await global.ensureVditorInitialized();
-        }
-
-        if (useLongFileMode) {
-            const wasAlreadyLongForSameFile = isLongFileEditorActiveFor(fileId);
-            activateLongFileEditor(fileId, content);
-            if (!wasAlreadyLongForSameFile) {
-                const longModeNotice = window.i18n
-                    ? t('longFileModeNotice')
-                    : '检测到超长文件，已切换为高性能文本模式（禁用 Vditor 以避免卡顿）';
-                global.showMessage(longModeNotice, 'warning');
-            }
-        } else {
-            deactivateLongFileEditor();
-            setEditorContentForFile(fileId, content);
-        }
-
-        await activateOwnerSharedSession(file, content);
-        await checkExternalLocalConflictForCurrentFile();
-
-        expandActiveFile();
-        global.startAutoSave();
-        global.showMessage(isEn() ? 'File opened: ' + file.name : '已打开文件: ' + file.name);
     }
 
     async function deleteFile(id) {
