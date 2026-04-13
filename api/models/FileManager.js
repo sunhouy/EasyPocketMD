@@ -34,7 +34,7 @@ class FileManager {
             }
 
             const [rows] = await db.execute(
-                'SELECT filename, content, content_version, last_modified FROM user_files WHERE username = ? ORDER BY last_modified DESC',
+                'SELECT filename, content, last_modified FROM user_files WHERE username = ? ORDER BY last_modified DESC',
                 [username]
             );
 
@@ -78,7 +78,7 @@ class FileManager {
             }
 
             const [rows] = await db.execute(
-                'SELECT filename, content, content_version, last_modified FROM user_files WHERE username = ? AND filename = ?',
+                'SELECT filename, content, last_modified, content_version FROM user_files WHERE username = ? AND filename = ?',
                 [username, filename]
             );
 
@@ -112,7 +112,19 @@ class FileManager {
         try {
             const connection = await db.getConnection();
             try {
-                await connection.beginTransaction();
+                const beginTransaction = typeof connection.beginTransaction === 'function'
+                    ? connection.beginTransaction.bind(connection)
+                    : null;
+                const commit = typeof connection.commit === 'function'
+                    ? connection.commit.bind(connection)
+                    : null;
+                const rollback = typeof connection.rollback === 'function'
+                    ? connection.rollback.bind(connection)
+                    : null;
+
+                if (beginTransaction) {
+                    await beginTransaction();
+                }
                 // Check if file exists
                 const [rows] = await connection.execute(
                     'SELECT id, content, last_modified, content_version FROM user_files WHERE username = ? AND filename = ? FOR UPDATE',
@@ -137,7 +149,9 @@ class FileManager {
                     const hashMismatch = hasBaseHash && baseHash !== serverHash;
 
                     if (versionMismatch || timestampMismatch || hashMismatch) {
-                        await connection.rollback();
+                        if (rollback) {
+                            await rollback();
+                        }
                         return {
                             code: 409,
                             message: '文件已被其他设备更新，请先同步后再保存',
@@ -156,12 +170,14 @@ class FileManager {
                 let message;
                 if (rows.length > 0) {
                     await connection.execute(
-                        'UPDATE user_files SET content = ?, content_version = content_version + 1, last_modified = NOW() WHERE username = ? AND filename = ?',
+                        'UPDATE user_files SET content = ?, last_modified = NOW(), content_version = content_version + 1 WHERE username = ? AND filename = ?',
                         [content, username, filename]
                     );
                     const nextVersion = Number(rows[0].content_version || 0) + 1;
                     message = '文件更新成功';
-                    await connection.commit();
+                    if (commit) {
+                        await commit();
+                    }
 
                     // Invalidate cache after successful save
                     await Cache.deleteUserFiles(username);
@@ -184,7 +200,9 @@ class FileManager {
                         [username, filename, content]
                     );
                     message = '文件保存成功';
-                    await connection.commit();
+                    if (commit) {
+                        await commit();
+                    }
 
                     // Invalidate cache after successful save
                     await Cache.deleteUserFiles(username);
@@ -202,8 +220,6 @@ class FileManager {
                         }
                     };
                 }
-
-                await connection.commit();
             } finally {
                 connection.release();
             }
