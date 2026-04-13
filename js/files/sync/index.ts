@@ -9,6 +9,10 @@ export function normalizeServerFileRecord(f: any): any {
     if (name.endsWith('/')) name = name.substring(0, name.length - 1);
   }
 
+  const hasContentVersion =
+    (f.content_version !== undefined && f.content_version !== null && f.content_version !== '') ||
+    (f.contentVersion !== undefined && f.contentVersion !== null && f.contentVersion !== '');
+
   return {
     ...f,
     name,
@@ -16,7 +20,7 @@ export function normalizeServerFileRecord(f: any): any {
     content,
     lastModified: f.last_modified || f.lastModified || Date.now(),
     serverLastModified: f.last_modified || f.lastModified || Date.now(),
-    contentVersion: Number(f.content_version || f.contentVersion || 0),
+    contentVersion: hasContentVersion ? Number(f.content_version ?? f.contentVersion) : null,
   };
 }
 
@@ -215,16 +219,25 @@ export function createSyncRuntimeApi(ctx: any) {
 
     try {
       const api = globalRef.getApiBaseUrl ? globalRef.getApiBaseUrl() : 'api';
+      const requestBody: any = {
+        username: g('currentUser').username,
+        filename: filenameToSend,
+        content: content,
+        base_last_modified: baseLastModified,
+      };
+      if (forcedBaseContentVersion !== null) {
+        requestBody.base_content_version = forcedBaseContentVersion;
+      } else {
+        const currentVersion = Number(file.contentVersion);
+        if (Number.isFinite(currentVersion) && currentVersion > 0) {
+          requestBody.base_content_version = currentVersion;
+        }
+      }
+
       const response = await fetch(api + '/files/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + g('currentUser').token },
-        body: JSON.stringify({
-          username: g('currentUser').username,
-          filename: filenameToSend,
-          content: content,
-          base_content_version: forcedBaseContentVersion !== null ? forcedBaseContentVersion : Number(file.contentVersion || 0),
-          base_last_modified: baseLastModified,
-        }),
+        body: JSON.stringify(requestBody),
       });
       const result = globalRef.parseJsonResponse ? await globalRef.parseJsonResponse(response) : await response.json();
       if (result.code === 200) {
@@ -323,9 +336,13 @@ export function createSyncRuntimeApi(ctx: any) {
       token: g('currentUser').token,
       filename: file.name,
       content: content,
-      base_content_version: Number(file.contentVersion || 0),
       base_last_modified: file.serverLastModified || file.lastModified || null,
     };
+
+    const beaconContentVersion = Number(file.contentVersion);
+    if (Number.isFinite(beaconContentVersion) && beaconContentVersion > 0) {
+      body.base_content_version = beaconContentVersion;
+    }
 
     try {
       const payload = new Blob([JSON.stringify(body)], { type: 'application/json' });
