@@ -626,7 +626,7 @@ import {
 
     function getOptimisticLockPayload(file) {
         if (!file) return {};
-        const baseLastModified = file.serverLastModified || file.baseLastModified || file.lastModified || null;
+        const baseLastModified = file.serverLastModified || file.baseLastModified || null;
         const payload = {
             base_content_version: Number(file.contentVersion || 0)
         };
@@ -1516,7 +1516,7 @@ import {
                     token: g('currentUser').token,
                     filename: filenameToSend,
                     content: f.type === 'folder' ? '{"meta":"folder"}' : content,
-                    base_last_modified: f.serverLastModified || f.lastModified || null
+                    base_last_modified: f.serverLastModified || null
                 };
 
                 const contentVersion = Number(f.contentVersion || 0);

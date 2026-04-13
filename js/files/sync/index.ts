@@ -149,7 +149,7 @@ export function createSyncRuntimeApi(ctx: any) {
     });
     if (!file) return;
 
-    const baseLastModified = baseLastModifiedOption || file.serverLastModified || file.lastModified || null;
+    const baseLastModified = baseLastModifiedOption || file.serverLastModified || null;
 
     let content;
     let filenameToSend = file.name;
@@ -336,7 +336,7 @@ export function createSyncRuntimeApi(ctx: any) {
       token: g('currentUser').token,
       filename: file.name,
       content: content,
-      base_last_modified: file.serverLastModified || file.lastModified || null,
+      base_last_modified: file.serverLastModified || null,
     };
 
     const beaconContentVersion = Number(file.contentVersion);
