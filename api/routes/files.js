@@ -39,7 +39,7 @@ router.get('/content', verifyUser, async (req, res) => {
 
 // Save file
 router.post('/save', verifyUser, async (req, res) => {
-    const { username, filename, content, create_history, base_last_modified, base_hash } = req.body;
+    const { username, filename, content, create_history, base_last_modified, base_hash, base_content_version } = req.body;
     if (!username || !filename) return res.json({ code: 400, message: '缺少必要参数' });
     
     const shouldCreateHistory = create_history === 'true' || create_history === true;
@@ -48,7 +48,7 @@ router.post('/save', verifyUser, async (req, res) => {
         filename,
         content,
         shouldCreateHistory,
-        { base_last_modified, base_hash }
+        { base_last_modified, base_hash, base_content_version }
     );
 
     if (result.code === 409) {

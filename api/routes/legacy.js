@@ -70,7 +70,16 @@ router.all('/index.php', upload.any(), async (req, res) => {
                 }
 
                 var createHistory = data.create_history === 'true' || data.create_history === true;
-                res.json(await fileManager.saveFileWithHistory(data.username, data.filename, data.content, createHistory));
+                var saveResult = await fileManager.saveFileWithHistory(data.username, data.filename, data.content, createHistory, {
+                    base_last_modified: data.base_last_modified,
+                    base_hash: data.base_hash,
+                    base_content_version: data.base_content_version
+                });
+                if (saveResult && saveResult.code === 409) {
+                    res.status(409).json(saveResult);
+                    break;
+                }
+                res.json(saveResult);
                 break;
 
             case 'delete':

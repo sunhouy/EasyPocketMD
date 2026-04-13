@@ -746,11 +746,11 @@ body.mobile-fullscreen .editor-container {
     to { opacity: 0; visibility: hidden; }
 }
 
-body.keyboard-open .mobile-bottom-bar {
+body.android-client.keyboard-open .mobile-bottom-bar {
     display: block !important;
 }
 
-body.keyboard-open .editor-container {
+body.android-client.keyboard-open .editor-container {
     bottom: calc(var(--mobile-bottom-bar-height) + var(--keyboard-inset-bottom)) !important;
 }
 
@@ -3835,10 +3835,11 @@ body.night-mode .mobile-action-btn {
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
 }
 
-body.night-mode .mobile-bottom-bar {
-    background: #2d2d2d;
-    border-top: 1px solid #444;
+body.android-client.night-mode .mobile-bottom-bar {
+    background: rgba(33, 41, 53, 0.88);
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
     box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.2);
+    backdrop-filter: blur(14px);
 }
 
 body.night-mode .bottom-btn {
