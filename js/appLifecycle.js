@@ -314,7 +314,7 @@
                     if (tauriCloseGuard) return;
 
                     // 无需外部本地文件落盘时，不拦截关闭，避免 ACL 变化导致无法退出。
-                    if (!shouldAutoSaveCurrentExternalLocalFile()) {
+                    if (!shouldAutoSaveCurrentFileOnLeave()) {
                         scheduleLeaveSave('tauri-close-requested-fast-path');
                         return;
                     }
@@ -324,7 +324,7 @@
                         event.preventDefault();
                     }
 
-                    Promise.resolve(flushCurrentExternalLocalFile('tauri-close-requested'))
+                    Promise.resolve(flushCurrentFileOnLeave('tauri-close-requested'))
                         .finally(function() {
                             try {
                                 emergencySave();
