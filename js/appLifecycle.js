@@ -54,7 +54,9 @@
      * 紧急保存所有数据
      * 在应用即将关闭时调用
      */
-    function emergencySave() {
+    function emergencySave(options) {
+        const opts = options || {};
+        const allowRemoteSync = !!opts.allowRemoteSync;
         try {
             // 1. 立即备份当前草稿
             if (global.draftRecovery) {
@@ -80,8 +82,8 @@
                 }
             }
 
-            // 3. 同步到服务器（如果已登录）
-            if (global.currentUser && global.syncCurrentFileWithBeacon) {
+            // 3. 需要时才同步到服务器，避免与常规保存链路并发冲突。
+            if (allowRemoteSync && global.currentUser && global.syncCurrentFileWithBeacon) {
                 global.syncCurrentFileWithBeacon();
             }
 
@@ -96,7 +98,10 @@
     /**
      * 切后台/退出时统一调度一次保存，避免 pause 与 appStateChange 重复触发。
      */
-    function scheduleLeaveSave(reason) {
+    function scheduleLeaveSave(reason, options) {
+        const opts = options || {};
+        const skipAsyncFlush = !!opts.skipAsyncFlush;
+        const allowRemoteSync = !!opts.allowRemoteSync;
         const now = Date.now();
         if (leaveSaveInFlight) return;
         if (now - lastLeaveSaveAt < LEAVE_SAVE_COOLDOWN_MS) return;
@@ -106,8 +111,10 @@
 
         try {
             // 先尝试回写当前文件（异步），再执行兜底紧急保存。
-            Promise.resolve(flushCurrentFileOnLeave(reason)).catch(function() {});
-            emergencySave();
+            if (!skipAsyncFlush) {
+                Promise.resolve(flushCurrentFileOnLeave(reason)).catch(function() {});
+            }
+            emergencySave({ allowRemoteSync: allowRemoteSync });
         } catch (e) {
             console.warn('[Lifecycle] leave save failed (' + reason + '):', e);
         } finally {
@@ -212,7 +219,7 @@
     function initWebLifecycle() {
         // beforeunload: 强制保存，如果保存失败则阻止退出
         window.addEventListener('beforeunload', function(e) {
-            scheduleLeaveSave('beforeunload');
+            scheduleLeaveSave('beforeunload', { skipAsyncFlush: true, allowRemoteSync: false });
             const unsaved = global.unsavedChanges || {};
             const hasUnsaved = (global.files || []).some(f => unsaved[f.id]);
 
@@ -251,13 +258,9 @@
         // visibilitychange: 页面可见性变化
         document.addEventListener('visibilitychange', function() {
             if (document.visibilityState === 'hidden') {
-                scheduleLeaveSave('visibility-hidden');
+                scheduleLeaveSave('visibility-hidden', { allowRemoteSync: false });
                 // 切后台时立即执行完整保存
                 forceSaveToLocalStorage();
-                // 如果已登录，尝试同步到服务器
-                if (global.currentUser && global.syncCurrentFileWithBeacon) {
-                    global.syncCurrentFileWithBeacon();
-                }
             } else if (document.visibilityState === 'visible') {
                 const hasUnsaved = (global.files || []).some(function(file) {
                     return file && global.unsavedChanges && global.unsavedChanges[file.id];
@@ -290,13 +293,11 @@
             // 应用即将关闭
             global.electron.ipcRenderer.on('app-before-close', function() {
                 scheduleLeaveSave('desktop-app-before-close');
-                emergencySave();
             });
 
             // 窗口即将关闭
             global.electron.ipcRenderer.on('window-before-close', function() {
                 scheduleLeaveSave('desktop-window-before-close');
-                emergencySave();
             });
         }
 
@@ -327,7 +328,7 @@
                     Promise.resolve(flushCurrentFileOnLeave('tauri-close-requested'))
                         .finally(function() {
                             try {
-                                emergencySave();
+                                emergencySave({ allowRemoteSync: false });
                             } catch (error) {
                                 console.warn('[Lifecycle] emergency save failed before tauri close:', error);
                             }
