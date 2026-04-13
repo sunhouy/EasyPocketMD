@@ -13,7 +13,7 @@
     let tauriCloseGuard = false;
     const LEAVE_SAVE_COOLDOWN_MS = 1200;
 
-    function shouldAutoSaveCurrentExternalLocalFile() {
+    function shouldAutoSaveCurrentFileOnLeave() {
         const currentFileId = global.currentFileId;
         if (!currentFileId) return false;
         if (!global.unsavedChanges || !global.unsavedChanges[currentFileId]) return false;
@@ -21,20 +21,20 @@
         const currentFile = files.find(function(file) {
             return file && file.id === currentFileId && file.type === 'file';
         });
-        if (!currentFile || !currentFile.isExternalLocal) return false;
+        if (!currentFile) return false;
 
         // browser-file 模式无法原路径回写，避免在最小化/关闭时触发下载弹窗。
-        if (currentFile.localFileMode === 'browser-file') return false;
+        if (currentFile.isExternalLocal && currentFile.localFileMode === 'browser-file') return false;
         return typeof global.saveCurrentFile === 'function';
     }
 
-    async function flushCurrentExternalLocalFile(reason) {
-        if (!shouldAutoSaveCurrentExternalLocalFile()) return false;
+    async function flushCurrentFileOnLeave(reason) {
+        if (!shouldAutoSaveCurrentFileOnLeave()) return false;
         try {
             await global.saveCurrentFile(false);
             return true;
         } catch (error) {
-            console.warn('[Lifecycle] external local auto-save failed (' + reason + '):', error);
+            console.warn('[Lifecycle] leave auto-save failed (' + reason + '):', error);
             return false;
         }
     }
@@ -105,8 +105,8 @@
         lastLeaveSaveAt = now;
 
         try {
-            // 先尝试回写外部本地文件（异步），再执行兜底紧急保存。
-            Promise.resolve(flushCurrentExternalLocalFile(reason)).catch(function() {});
+            // 先尝试回写当前文件（异步），再执行兜底紧急保存。
+            Promise.resolve(flushCurrentFileOnLeave(reason)).catch(function() {});
             emergencySave();
         } catch (e) {
             console.warn('[Lifecycle] leave save failed (' + reason + '):', e);

@@ -149,7 +149,7 @@ class FileManager {
                     const baseVersion = hasBaseVersion ? Number(optimisticLock.base_content_version) : null;
 
                     const versionMismatch = hasBaseVersion && Number.isFinite(baseVersion) && Number(existing.content_version || 0) !== baseVersion;
-                    const timestampMismatch = hasBaseLastModified && baseLastModifiedMs !== null && serverLastModifiedMs !== null && baseLastModifiedMs !== serverLastModifiedMs;
+                    const timestampMismatch = !hasBaseVersion && hasBaseLastModified && baseLastModifiedMs !== null && serverLastModifiedMs !== null && baseLastModifiedMs !== serverLastModifiedMs;
                     const hashMismatch = hasBaseHash && baseHash !== serverHash;
 
                     if (versionMismatch || timestampMismatch || hashMismatch) {
