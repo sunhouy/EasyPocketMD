@@ -145,6 +145,8 @@ export function createSyncRuntimeApi(ctx: any) {
     });
     if (!file) return;
 
+    const baseLastModified = baseLastModifiedOption || file.serverLastModified || file.lastModified || null;
+
     let content;
     let filenameToSend = file.name;
     if (file.type === 'folder') {
@@ -162,7 +164,6 @@ export function createSyncRuntimeApi(ctx: any) {
 
       const baseContent = (g('lastSyncedContent') || {})[fileId];
       const baseContentVersion = forcedBaseContentVersion !== null ? forcedBaseContentVersion : Number(file.contentVersion || 0);
-      const baseLastModified = baseLastModifiedOption || file.serverLastModified || file.lastModified || null;
       if (!skipConflictCheck && baseContent !== undefined) {
         const serverSnapshot = await fetchServerFileSnapshot(file.name);
         if (serverSnapshot && serverSnapshot.content !== baseContent) {
