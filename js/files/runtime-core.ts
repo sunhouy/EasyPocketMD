@@ -636,6 +636,11 @@ import {
         return payload;
     }
 
+    function isCurrentFileDirty(currentFileId) {
+        const dirtyMap = g('unsavedChanges') || {};
+        return !!(currentFileId && dirtyMap[currentFileId]);
+    }
+
     if (!global.pendingServerSync) {
         global.pendingServerSync = loadPendingServerSync();
     }
