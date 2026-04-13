@@ -1712,10 +1712,21 @@ import {
             const localFileIndex = files.findIndex(function(file) {
                 return file && String(file.id) === String(conflict.fileId);
             });
+            const retryBaseLastModified = conflict.serverLastModified || conflict.serverModified || null;
+            const retryBaseContentVersionRaw = Number(conflict.serverContentVersion);
+            const retryBaseContentVersion = Number.isFinite(retryBaseContentVersionRaw) && retryBaseContentVersionRaw > 0
+                ? retryBaseContentVersionRaw
+                : null;
 
             if (localFileIndex !== -1) {
                 files[localFileIndex].content = contentToSave;
                 files[localFileIndex].lastModified = Date.now();
+                if (retryBaseLastModified) {
+                    files[localFileIndex].serverLastModified = retryBaseLastModified;
+                }
+                if (retryBaseContentVersion !== null) {
+                    files[localFileIndex].contentVersion = retryBaseContentVersion;
+                }
                 files[localFileIndex].isSynced = false;
                 localStorage.setItem('vditor_files', JSON.stringify(files));
             }
@@ -1730,7 +1741,8 @@ import {
                     background: false,
                     overrideContent: contentToSave,
                     skipConflictCheck: true,
-                    baseContentVersion: Number(conflict.serverContentVersion || 0)
+                    baseContentVersion: retryBaseContentVersion,
+                    baseLastModified: retryBaseLastModified
                 });
 
                 if (saveResult) {
@@ -1762,7 +1774,11 @@ import {
             if (localFileIndex !== -1) {
                 files[localFileIndex].content = conflict.serverContent || '';
                 files[localFileIndex].lastModified = Number(conflict.serverModified || Date.now());
-                files[localFileIndex].contentVersion = Number(conflict.serverContentVersion || 0);
+                files[localFileIndex].serverLastModified = conflict.serverLastModified || conflict.serverModified || files[localFileIndex].lastModified;
+                const serverContentVersionRaw = Number(conflict.serverContentVersion);
+                files[localFileIndex].contentVersion = Number.isFinite(serverContentVersionRaw) && serverContentVersionRaw > 0
+                    ? serverContentVersionRaw
+                    : null;
                 files[localFileIndex].isSynced = true;
                 localStorage.setItem('vditor_files', JSON.stringify(files));
             }
