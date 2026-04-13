@@ -27,7 +27,12 @@ class FileManager {
             const cached = await Cache.getUserFiles(username);
             const isCachedVersionShapeValid = !!(
                 cached &&
-                (!Array.isArray(cached.files) || cached.files.every(file => file && Object.prototype.hasOwnProperty.call(file, 'content_version')))
+                (!Array.isArray(cached.files) || cached.files.every(file => {
+                    if (!file) return false;
+                    if (!Object.prototype.hasOwnProperty.call(file, 'content_version')) return false;
+                    const v = Number(file.content_version);
+                    return Number.isFinite(v) && v > 0;
+                }))
             );
             if (cached && isCachedVersionShapeValid) {
                 return {
@@ -35,6 +40,10 @@ class FileManager {
                     message: '获取文件列表成功 (缓存)',
                     data: cached
                 };
+            }
+
+            if (cached && !isCachedVersionShapeValid) {
+                await Cache.deleteUserFiles(username);
             }
 
             const [rows] = await db.execute(
