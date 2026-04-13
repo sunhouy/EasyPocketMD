@@ -43,6 +43,19 @@ export function detectConflicts(
 
     const serverFile = serverFileMap[localFile.name];
     if (serverFile) {
+      // Local unsynced files created before login should not immediately raise a conflict prompt.
+      // They are merged as local-preferred and synced once after merge.
+      if (
+        localFile &&
+        localFile.type === 'file' &&
+        localFile.isSynced === false &&
+        !localFile.serverLastModified &&
+        serverFile.type === 'file' &&
+        serverFile.content !== localFile.content
+      ) {
+        return;
+      }
+
       if (editableSharedByFilename[localFile.name]) {
         localFile.content = serverFile.content;
         localFile.lastModified = serverFile.lastModified || Date.now();
@@ -168,7 +181,7 @@ export function createSyncRuntimeApi(ctx: any) {
 
       const baseContent = (g('lastSyncedContent') || {})[fileId];
       const baseContentVersion = forcedBaseContentVersion !== null ? forcedBaseContentVersion : Number(file.contentVersion || 0);
-      if (!skipConflictCheck && baseContent !== undefined) {
+      if (!skipConflictCheck && baseContent !== undefined && !file.preferLocalOnNextSync) {
         const serverSnapshot = await fetchServerFileSnapshot(file.name);
         if (serverSnapshot && serverSnapshot.content !== baseContent) {
           if (content === serverSnapshot.content) {
@@ -260,6 +273,7 @@ export function createSyncRuntimeApi(ctx: any) {
         });
         if (fileIndex !== -1) {
           files[fileIndex].isSynced = true;
+          files[fileIndex].preferLocalOnNextSync = false;
           files[fileIndex].lastModified = result.data && result.data.last_modified ? result.data.last_modified : Date.now();
           files[fileIndex].serverLastModified = result.data && result.data.last_modified ? result.data.last_modified : files[fileIndex].lastModified;
           files[fileIndex].contentVersion = Number(

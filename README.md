@@ -14,6 +14,10 @@
 - 桌面端基于 Tauri 构建，安装包通常只有十几 MB，启动轻快。
 - 内置知识图谱，帮助你把分散笔记串成可视化结构。
 - 支持直接打开本地 Markdown 文件，延续你已有的文件组织方式。
+我先做一次“存储与冲突链路”的彻底核查：定位本地文件到底落在哪里、登录时为何触发冲突、切换文件时是哪条保存路径返回 409。拿到证据后我会直接改，不会只给结论。
+
+Searched for regex vditor_files|IndexedDBManager|saveDraft|getAllDrafts|loadLocalFiles|detectConflicts|uploadLocalOnlyFilesToServerIfNeeded|isSynced (**/js/files/runtime-core.ts), 74 results
+Searched for regex vditor_files|IndexedDBManager|saveDraft|getAllDrafts|clearDrafts (**/js/**/*.js), 66 results
 
 实时协作、AI 辅助写作与流畅编辑体验，全部整合在美观的 Material Design 界面中。
 Android 客户端使用 Tauri mobile 构建，并输出 APK。

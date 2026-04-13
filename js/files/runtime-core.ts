@@ -1265,6 +1265,7 @@ import {
                 // 迁移：给本地文件增加type字段，默认为file
                 localFiles.forEach(f => {
                     if (!f.type) f.type = 'file';
+                    if (typeof f.isSynced !== 'boolean') f.isSynced = false;
                     if (f.contentVersion === undefined || f.contentVersion === null) {
                         const hasLocalContentVersion = f.content_version !== undefined && f.content_version !== null && f.content_version !== '';
                         f.contentVersion = hasLocalContentVersion ? Number(f.content_version) : null;
@@ -2027,7 +2028,27 @@ import {
                 mergedFiles.push(Object.assign({}, localFile));
                 return;
             }
-            if (!fileMap[localFile.name]) mergedFiles.push(Object.assign({}, localFile, { isSynced: false }));
+            const mergedServerFile = fileMap[localFile.name];
+            if (mergedServerFile) {
+                const shouldPreferUnsyncedLocal =
+                    localFile &&
+                    localFile.type === 'file' &&
+                    mergedServerFile.type === 'file' &&
+                    localFile.isSynced === false &&
+                    !localFile.serverLastModified &&
+                    localFile.content !== mergedServerFile.content;
+
+                if (shouldPreferUnsyncedLocal) {
+                    mergedServerFile.id = localFile.id || mergedServerFile.id;
+                    mergedServerFile.content = localFile.content;
+                    mergedServerFile.lastModified = localFile.lastModified || mergedServerFile.lastModified;
+                    mergedServerFile.isSynced = false;
+                    mergedServerFile.preferLocalOnNextSync = true;
+                }
+                return;
+            }
+
+            mergedFiles.push(Object.assign({}, localFile, { isSynced: false }));
         });
         global.files = mergedFiles;
         localStorage.setItem('vditor_files', JSON.stringify(global.files));
@@ -2482,6 +2503,7 @@ import {
         const localFiles = JSON.parse(localStorage.getItem('vditor_files') || '[]');
         localFiles.forEach(f => {
             if (!f.type) f.type = 'file';
+            if (typeof f.isSynced !== 'boolean') f.isSynced = false;
             normalizeExternalLocalFileRecord(f);
         });
         syncCurrentEditorSnapshotIntoFiles(localFiles);
