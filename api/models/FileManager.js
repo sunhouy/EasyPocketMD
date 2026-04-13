@@ -25,7 +25,11 @@ class FileManager {
         try {
             // Try to get from cache first
             const cached = await Cache.getUserFiles(username);
-            if (cached) {
+            const isCachedVersionShapeValid = !!(
+                cached &&
+                (!Array.isArray(cached.files) || cached.files.every(file => file && Object.prototype.hasOwnProperty.call(file, 'content_version')))
+            );
+            if (cached && isCachedVersionShapeValid) {
                 return {
                     code: 200,
                     message: '获取文件列表成功 (缓存)',
@@ -34,7 +38,7 @@ class FileManager {
             }
 
             const [rows] = await db.execute(
-                'SELECT filename, content, last_modified FROM user_files WHERE username = ? ORDER BY last_modified DESC',
+                'SELECT filename, content, last_modified, content_version FROM user_files WHERE username = ? ORDER BY last_modified DESC',
                 [username]
             );
 

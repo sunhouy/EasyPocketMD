@@ -1225,6 +1225,9 @@ import {
                     }
 
                     const serverLastModified = f.last_modified || f.lastModified || Date.now();
+                    const hasServerContentVersion =
+                        (f.content_version !== undefined && f.content_version !== null && f.content_version !== '') ||
+                        (f.contentVersion !== undefined && f.contentVersion !== null && f.contentVersion !== '');
                     return {
                         ...f,
                         name: name,
@@ -1232,7 +1235,7 @@ import {
                         content: content,
                         lastModified: serverLastModified,
                         serverLastModified: serverLastModified,
-                        contentVersion: Number(f.content_version || f.contentVersion || 0)
+                        contentVersion: hasServerContentVersion ? Number(f.content_version ?? f.contentVersion) : null
                     };
                 });
 
@@ -1263,7 +1266,8 @@ import {
                 localFiles.forEach(f => {
                     if (!f.type) f.type = 'file';
                     if (f.contentVersion === undefined || f.contentVersion === null) {
-                        f.contentVersion = Number(f.content_version || 0);
+                        const hasLocalContentVersion = f.content_version !== undefined && f.content_version !== null && f.content_version !== '';
+                        f.contentVersion = hasLocalContentVersion ? Number(f.content_version) : null;
                     }
                     normalizeExternalLocalFileRecord(f);
                 });
@@ -1288,7 +1292,11 @@ import {
                             serverContent: serverFile.content,
                             localModified: localFile.lastModified,
                             serverModified: serverFile.serverLastModified || serverFile.lastModified || Date.now(),
-                            serverContentVersion: Number(serverFile.contentVersion || serverFile.content_version || 0)
+                            serverContentVersion: (serverFile.contentVersion !== undefined && serverFile.contentVersion !== null && serverFile.contentVersion !== '')
+                                ? Number(serverFile.contentVersion)
+                                : ((serverFile.content_version !== undefined && serverFile.content_version !== null && serverFile.content_version !== '')
+                                    ? Number(serverFile.content_version)
+                                    : null)
                         };
                     }
                 }
@@ -1381,7 +1389,11 @@ import {
         return {
             content: result.data.content || '',
             lastModified: result.data.last_modified || Date.now(),
-            contentVersion: Number(result.data.content_version || result.data.contentVersion || 0)
+            contentVersion: (result.data.content_version !== undefined && result.data.content_version !== null && result.data.content_version !== '')
+                ? Number(result.data.content_version)
+                : ((result.data.contentVersion !== undefined && result.data.contentVersion !== null && result.data.contentVersion !== '')
+                    ? Number(result.data.contentVersion)
+                    : null)
         };
     }
 
@@ -1977,6 +1989,9 @@ import {
         const fileMap = {};
         serverFiles.forEach(function(serverFile) {
             const serverLastModified = serverFile.serverLastModified || serverFile.lastModified || Date.now();
+            const hasVersion =
+                (serverFile.contentVersion !== undefined && serverFile.contentVersion !== null && serverFile.contentVersion !== '') ||
+                (serverFile.content_version !== undefined && serverFile.content_version !== null && serverFile.content_version !== '');
             const file = {
                 id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
                 name: serverFile.name,
@@ -1984,7 +1999,7 @@ import {
                 content: serverFile.content,
                 lastModified: serverLastModified,
                 serverLastModified: serverLastModified,
-                contentVersion: Number(serverFile.contentVersion || serverFile.content_version || 0),
+                contentVersion: hasVersion ? Number(serverFile.contentVersion ?? serverFile.content_version) : null,
                 isSynced: true
             };
             mergedFiles.push(file);

@@ -126,7 +126,7 @@ describe('FileManager', () => {
             expect(result.data.files).toHaveLength(1);
             expect(result.data.files[0].name).toBe('test.md');
             expect(db.execute).toHaveBeenCalledWith(
-                expect.stringContaining('SELECT filename, content, last_modified FROM user_files'),
+                expect.stringContaining('SELECT filename, content, last_modified, content_version FROM user_files'),
                 ['testuser']
             );
             expect(Cache.setUserFiles).toHaveBeenCalled();
