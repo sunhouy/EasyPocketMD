@@ -6,7 +6,9 @@ import {
 	computeDiff,
 	renderDiffView,
 	bindCollapsedDiffInteractions,
-} from './conflict/index';
+} from './conflict/index';第三方库的类型定义有问题，但你又急需使用
+
+
 
 import './types';
 import './saveState';
