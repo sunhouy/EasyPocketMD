@@ -171,6 +171,20 @@ export function createSyncRuntimeApi(ctx: any) {
       if (!skipConflictCheck && baseContent !== undefined) {
         const serverSnapshot = await fetchServerFileSnapshot(file.name);
         if (serverSnapshot && serverSnapshot.content !== baseContent) {
+          if (content === serverSnapshot.content) {
+            file.content = serverSnapshot.content;
+            file.lastModified = serverSnapshot.lastModified || Date.now();
+            file.serverLastModified = serverSnapshot.lastModified || Date.now();
+            file.contentVersion = Number(serverSnapshot.contentVersion || file.contentVersion || 0) || null;
+            file.isSynced = true;
+            localStorage.setItem('vditor_files', JSON.stringify(files));
+            g('lastSyncedContent')[fileId] = serverSnapshot.content;
+            g('unsavedChanges')[fileId] = false;
+            markPendingServerSync(fileId, false);
+            globalRef.lastSaveConflictPending = false;
+            return true;
+          }
+
           if (content !== baseContent) {
             globalRef.showMessage(
               backgroundSync
