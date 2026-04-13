@@ -15,6 +15,7 @@ export function normalizeServerFileRecord(f: any): any {
     type,
     content,
     lastModified: f.last_modified || f.lastModified || Date.now(),
+    serverLastModified: f.last_modified || f.lastModified || Date.now(),
     contentVersion: Number(f.content_version || f.contentVersion || 0),
   };
 }
@@ -52,6 +53,7 @@ export function detectConflicts(
           serverContent: serverFile.content,
           localModified: localFile.lastModified,
           serverModified: serverFile.lastModified || Date.now(),
+          serverLastModified: serverFile.serverLastModified || serverFile.lastModified || Date.now(),
           serverContentVersion: Number(serverFile.contentVersion || 0),
         });
       }
@@ -134,6 +136,7 @@ export function createSyncRuntimeApi(ctx: any) {
     const backgroundSync = !options || options.background !== false;
     const overrideContent = options && typeof options.overrideContent === 'string' ? options.overrideContent : null;
     const skipConflictCheck = !!(options && options.skipConflictCheck);
+    const baseLastModifiedOption = options && options.baseLastModified ? options.baseLastModified : null;
     const forcedBaseContentVersion =
       options && Number.isFinite(Number(options.baseContentVersion)) ? Number(options.baseContentVersion) : null;
     const files = g('files');
@@ -159,6 +162,7 @@ export function createSyncRuntimeApi(ctx: any) {
 
       const baseContent = (g('lastSyncedContent') || {})[fileId];
       const baseContentVersion = forcedBaseContentVersion !== null ? forcedBaseContentVersion : Number(file.contentVersion || 0);
+      const baseLastModified = baseLastModifiedOption || file.serverLastModified || file.lastModified || null;
       if (!skipConflictCheck && baseContent !== undefined) {
         const serverSnapshot = await fetchServerFileSnapshot(file.name);
         if (serverSnapshot && serverSnapshot.content !== baseContent) {
@@ -183,6 +187,7 @@ export function createSyncRuntimeApi(ctx: any) {
                 serverContentVersion: Number(serverSnapshot.contentVersion || 0),
                 serverModified: serverSnapshot.lastModified || Date.now(),
                 localModified: file.lastModified || Date.now(),
+                serverLastModified: serverSnapshot.lastModified || Date.now(),
                 baseContentVersion: baseContentVersion,
               });
             }
@@ -191,6 +196,7 @@ export function createSyncRuntimeApi(ctx: any) {
 
           file.content = serverSnapshot.content;
           file.lastModified = serverSnapshot.lastModified || Date.now();
+          file.serverLastModified = serverSnapshot.lastModified || Date.now();
           file.contentVersion = Number(serverSnapshot.contentVersion || 0);
           file.isSynced = true;
           if (file.id === g('currentFileId')) {
@@ -216,7 +222,7 @@ export function createSyncRuntimeApi(ctx: any) {
           filename: filenameToSend,
           content: content,
           base_content_version: forcedBaseContentVersion !== null ? forcedBaseContentVersion : Number(file.contentVersion || 0),
-          base_last_modified: file.lastModified || null,
+          base_last_modified: baseLastModified,
         }),
       });
       const result = globalRef.parseJsonResponse ? await globalRef.parseJsonResponse(response) : await response.json();
@@ -227,6 +233,7 @@ export function createSyncRuntimeApi(ctx: any) {
         if (fileIndex !== -1) {
           files[fileIndex].isSynced = true;
           files[fileIndex].lastModified = result.data && result.data.last_modified ? result.data.last_modified : Date.now();
+          files[fileIndex].serverLastModified = result.data && result.data.last_modified ? result.data.last_modified : files[fileIndex].lastModified;
           files[fileIndex].contentVersion = Number(
             result.data && result.data.content_version
               ? result.data.content_version
@@ -253,6 +260,7 @@ export function createSyncRuntimeApi(ctx: any) {
             serverContentVersion: Number(result.data && result.data.server_content_version ? result.data.server_content_version : 0),
             serverModified: (result.data && result.data.server_last_modified) || Date.now(),
             localModified: file.lastModified || Date.now(),
+            serverLastModified: (result.data && result.data.server_last_modified) || Date.now(),
             baseContentVersion: Number(file.contentVersion || 0),
           });
         }
@@ -315,7 +323,7 @@ export function createSyncRuntimeApi(ctx: any) {
       filename: file.name,
       content: content,
       base_content_version: Number(file.contentVersion || 0),
-      base_last_modified: file.lastModified || null,
+      base_last_modified: file.serverLastModified || file.lastModified || null,
     };
 
     try {

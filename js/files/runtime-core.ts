@@ -626,18 +626,16 @@ import {
 
     function getOptimisticLockPayload(file) {
         if (!file) return {};
-        return {
-            base_content_version: Number(file.contentVersion || 0),
-            base_last_modified: file.lastModified || null
+        const baseLastModified = file.serverLastModified || file.baseLastModified || file.lastModified || null;
+        const payload = {
+            base_content_version: Number(file.contentVersion || 0)
         };
+        if (baseLastModified) {
+            payload.base_last_modified = baseLastModified;
+        }
+        return payload;
     }
 
-    function isCurrentFileDirty(currentFileId) {
-        const dirtyMap = g('unsavedChanges') || {};
-        return !!(currentFileId && dirtyMap[currentFileId]);
-    }
-
-    // 初始化 pendingServerSync（脚本加载即生效）
     if (!global.pendingServerSync) {
         global.pendingServerSync = loadPendingServerSync();
     }
@@ -1221,12 +1219,15 @@ import {
                         }
                     }
 
+                    const serverLastModified = f.last_modified || f.lastModified || Date.now();
                     return {
                         ...f,
                         name: name,
                         type: type,
                         content: content,
-                        lastModified: f.last_modified || f.lastModified || Date.now()
+                        lastModified: serverLastModified,
+                        serverLastModified: serverLastModified,
+                        contentVersion: Number(f.content_version || f.contentVersion || 0)
                     };
                 });
 
@@ -1256,6 +1257,9 @@ import {
                 // 迁移：给本地文件增加type字段，默认为file
                 localFiles.forEach(f => {
                     if (!f.type) f.type = 'file';
+                    if (f.contentVersion === undefined || f.contentVersion === null) {
+                        f.contentVersion = Number(f.content_version || 0);
+                    }
                     normalizeExternalLocalFileRecord(f);
                 });
                 syncCurrentEditorSnapshotIntoFiles(localFiles);
@@ -1278,7 +1282,7 @@ import {
                             localContent: localFile.content,
                             serverContent: serverFile.content,
                             localModified: localFile.lastModified,
-                            serverModified: serverFile.lastModified || Date.now(),
+                            serverModified: serverFile.serverLastModified || serverFile.lastModified || Date.now(),
                             serverContentVersion: Number(serverFile.contentVersion || serverFile.content_version || 0)
                         };
                     }
@@ -1414,9 +1418,10 @@ import {
             const hasLocalChanges = !file.isSynced || unsavedChanges[file.id] || editorContent !== baseContent;
             if (hasLocalChanges) return;
 
-            if (serverFile.content !== editorContent) {
+                if (serverFile.content !== editorContent) {
                 file.content = serverFile.content;
                 file.lastModified = serverFile.lastModified || Date.now();
+                    file.serverLastModified = serverFile.serverLastModified || serverFile.lastModified || Date.now();
                 file.isSynced = true;
                 lastSyncedContent[file.id] = serverFile.content;
                 unsavedChanges[file.id] = false;
@@ -1494,9 +1499,13 @@ import {
                     token: g('currentUser').token,
                     filename: filenameToSend,
                     content: f.type === 'folder' ? '{"meta":"folder"}' : content,
-                    base_content_version: Number(f.contentVersion || 0),
-                    base_last_modified: f.lastModified || null
+                    base_last_modified: f.serverLastModified || f.lastModified || null
                 };
+
+                const contentVersion = Number(f.contentVersion || 0);
+                if (Number.isFinite(contentVersion) && contentVersion > 0) {
+                    body.base_content_version = contentVersion;
+                }
 
                 const api = global.getApiBaseUrl ? global.getApiBaseUrl() : 'api';
                 const resp = await fetch(api + '/files/save', {
@@ -1536,12 +1545,14 @@ import {
                     // 标记本地为已同步，并把它加入 serverFiles，避免后续被当成缺失
                     f.isSynced = true;
                     f.lastModified = Date.now();
+                    f.serverLastModified = r.data && r.data.last_modified ? r.data.last_modified : f.lastModified;
                     f.contentVersion = Number(r.data && r.data.content_version ? r.data.content_version : (f.contentVersion || 1));
                     serverFiles.push({
                         name: f.name,
                         type: f.type,
                         content: f.type === 'folder' ? '{"meta":"folder"}' : content,
                         lastModified: f.lastModified,
+                        serverLastModified: f.serverLastModified,
                         contentVersion: f.contentVersion
                     });
                 } else {
@@ -1960,12 +1971,14 @@ import {
         const mergedFiles = [];
         const fileMap = {};
         serverFiles.forEach(function(serverFile) {
+            const serverLastModified = serverFile.serverLastModified || serverFile.lastModified || Date.now();
             const file = {
                 id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
                 name: serverFile.name,
                 type: serverFile.type || 'file',
                 content: serverFile.content,
-                lastModified: serverFile.lastModified || Date.now(),
+                lastModified: serverLastModified,
+                serverLastModified: serverLastModified,
                 contentVersion: Number(serverFile.contentVersion || serverFile.content_version || 0),
                 isSynced: true
             };
