@@ -21,6 +21,10 @@ document.addEventListener('DOMContentLoaded', function() {
         return /Android/i.test(navigator.userAgent || '');
     }
 
+    if (isAndroidClient()) {
+        document.body.classList.add('android-client');
+    }
+
     function initAndroidViewportInsets() {
         if (!isAndroidClient()) return;
 
@@ -1968,6 +1972,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (window.currentFileId) {
                     window.unsavedChanges[window.currentFileId] = true;
                     window.startAutoSave();
+                    if (window.draftRecovery) {
+                        window.draftRecovery.markDirty();
+                    }
                 }
             });
         }

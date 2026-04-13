@@ -34,13 +34,14 @@ class FileManager {
             }
 
             const [rows] = await db.execute(
-                'SELECT filename, content, last_modified FROM user_files WHERE username = ? ORDER BY last_modified DESC',
+                'SELECT filename, content, content_version, last_modified FROM user_files WHERE username = ? ORDER BY last_modified DESC',
                 [username]
             );
 
             const files = rows.map(row => ({
                 name: row.filename,
                 content: row.content,
+                content_version: row.content_version,
                 last_modified: row.last_modified
             }));
 
@@ -77,7 +78,7 @@ class FileManager {
             }
 
             const [rows] = await db.execute(
-                'SELECT filename, content, last_modified FROM user_files WHERE username = ? AND filename = ?',
+                'SELECT filename, content, content_version, last_modified FROM user_files WHERE username = ? AND filename = ?',
                 [username, filename]
             );
 
@@ -89,6 +90,7 @@ class FileManager {
             const result = {
                 filename: row.filename,
                 content: row.content,
+                content_version: row.content_version,
                 last_modified: row.last_modified
             };
 
@@ -110,15 +112,17 @@ class FileManager {
         try {
             const connection = await db.getConnection();
             try {
+                await connection.beginTransaction();
                 // Check if file exists
                 const [rows] = await connection.execute(
-                    'SELECT id, content, last_modified FROM user_files WHERE username = ? AND filename = ?',
+                    'SELECT id, content, last_modified, content_version FROM user_files WHERE username = ? AND filename = ? FOR UPDATE',
                     [username, filename]
                 );
 
+                const hasBaseVersion = optimisticLock.base_content_version !== undefined && optimisticLock.base_content_version !== null && optimisticLock.base_content_version !== '';
                 const hasBaseLastModified = optimisticLock.base_last_modified !== undefined && optimisticLock.base_last_modified !== null && optimisticLock.base_last_modified !== '';
                 const hasBaseHash = typeof optimisticLock.base_hash === 'string' && optimisticLock.base_hash.trim() !== '';
-                const shouldCheckOptimisticLock = hasBaseLastModified || hasBaseHash;
+                const shouldCheckOptimisticLock = hasBaseVersion || hasBaseLastModified || hasBaseHash;
 
                 if (rows.length > 0 && shouldCheckOptimisticLock) {
                     const existing = rows[0];
@@ -126,17 +130,21 @@ class FileManager {
                     const baseLastModifiedMs = this.toTimestampMillis(optimisticLock.base_last_modified);
                     const serverHash = this.computeContentHash(existing.content || '');
                     const baseHash = hasBaseHash ? optimisticLock.base_hash.trim() : null;
+                    const baseVersion = hasBaseVersion ? Number(optimisticLock.base_content_version) : null;
 
+                    const versionMismatch = hasBaseVersion && Number.isFinite(baseVersion) && Number(existing.content_version || 0) !== baseVersion;
                     const timestampMismatch = hasBaseLastModified && baseLastModifiedMs !== null && serverLastModifiedMs !== null && baseLastModifiedMs !== serverLastModifiedMs;
                     const hashMismatch = hasBaseHash && baseHash !== serverHash;
 
-                    if (timestampMismatch || hashMismatch) {
+                    if (versionMismatch || timestampMismatch || hashMismatch) {
+                        await connection.rollback();
                         return {
                             code: 409,
                             message: '文件已被其他设备更新，请先同步后再保存',
                             data: {
                                 username,
                                 filename,
+                                server_content_version: Number(existing.content_version || 0),
                                 server_last_modified: this.normalizeDbLastModified(existing.last_modified),
                                 server_hash: serverHash,
                                 server_content: existing.content || ''
@@ -148,31 +156,54 @@ class FileManager {
                 let message;
                 if (rows.length > 0) {
                     await connection.execute(
-                        'UPDATE user_files SET content = ?, last_modified = NOW() WHERE username = ? AND filename = ?',
+                        'UPDATE user_files SET content = ?, content_version = content_version + 1, last_modified = NOW() WHERE username = ? AND filename = ?',
                         [content, username, filename]
                     );
+                    const nextVersion = Number(rows[0].content_version || 0) + 1;
                     message = '文件更新成功';
+                    await connection.commit();
+
+                    // Invalidate cache after successful save
+                    await Cache.deleteUserFiles(username);
+                    await Cache.deleteFileContent(username, filename);
+
+                    return {
+                        code: 200,
+                        message,
+                        data: {
+                            username,
+                            filename,
+                            content_length: Buffer.byteLength(content, 'utf8'),
+                            content_version: nextVersion,
+                            last_modified: new Date().toISOString()
+                        }
+                    };
                 } else {
                     await connection.execute(
-                        'INSERT INTO user_files (username, filename, content, last_modified) VALUES (?, ?, ?, NOW())',
+                        'INSERT INTO user_files (username, filename, content, content_version, last_modified) VALUES (?, ?, ?, 1, NOW())',
                         [username, filename, content]
                     );
                     message = '文件保存成功';
+                    await connection.commit();
+
+                    // Invalidate cache after successful save
+                    await Cache.deleteUserFiles(username);
+                    await Cache.deleteFileContent(username, filename);
+
+                    return {
+                        code: 200,
+                        message,
+                        data: {
+                            username,
+                            filename,
+                            content_length: Buffer.byteLength(content, 'utf8'),
+                            content_version: 1,
+                            last_modified: new Date().toISOString()
+                        }
+                    };
                 }
 
-                // Invalidate cache after successful save
-                await Cache.deleteUserFiles(username);
-                await Cache.deleteFileContent(username, filename);
-
-                return {
-                    code: 200,
-                    message,
-                    data: {
-                        username,
-                        filename,
-                        content_length: Buffer.byteLength(content, 'utf8')
-                    }
-                };
+                await connection.commit();
             } finally {
                 connection.release();
             }

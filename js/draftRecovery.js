@@ -86,6 +86,11 @@
                 fileName: draft.fileName,
                 sessionId: draft.sessionId
             }));
+            if (global.IndexedDBManager && typeof global.IndexedDBManager.saveDraft === 'function') {
+                Promise.resolve(global.IndexedDBManager.saveDraft(draft)).catch(function(error) {
+                    console.warn('[Draft] Failed to persist IndexedDB backup:', error);
+                });
+            }
             isDirty = false;
         } catch (error) {
             console.error('[Draft] Failed to save draft:', error);
@@ -281,8 +286,20 @@
 
     function clearDraft() {
         try {
+            const draft = readDraft();
             localStorage.removeItem(DRAFT_KEY);
             localStorage.removeItem(DRAFT_META_KEY);
+            if (global.IndexedDBManager) {
+                if (draft && draft.fileId && typeof global.IndexedDBManager.deleteDraft === 'function') {
+                    Promise.resolve(global.IndexedDBManager.deleteDraft(draft.fileId)).catch(function(error) {
+                        console.warn('[Draft] Failed to clear IndexedDB backup:', error);
+                    });
+                } else if (typeof global.IndexedDBManager.clearDrafts === 'function') {
+                    Promise.resolve(global.IndexedDBManager.clearDrafts()).catch(function(error) {
+                        console.warn('[Draft] Failed to clear IndexedDB backups:', error);
+                    });
+                }
+            }
             isDirty = false;
         } catch (error) {
             console.error('[Draft] Failed to clear draft:', error);
