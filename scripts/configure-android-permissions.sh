@@ -19,6 +19,7 @@ fi
 
 # 权限列表
 PERMISSIONS=(
+    "android.permission.INTERNET"
     "android.permission.CAMERA"
     "android.permission.RECORD_AUDIO"
     "android.permission.READ_EXTERNAL_STORAGE"
@@ -52,6 +53,7 @@ mv "$TEMP_MANIFEST" "$MANIFEST_PATH"
 echo ""
 echo "✨ Android 权限配置完成！"
 echo "已添加的权限:"
+echo "  • 🌐 INTERNET - 网络访问"
 echo "  • 📷 CAMERA - 摄像头访问"
 echo "  • 🎤 RECORD_AUDIO - 麦克风访问"  
 echo "  • 📁 READ_EXTERNAL_STORAGE - 读取外部存储"

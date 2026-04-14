@@ -1512,7 +1512,7 @@ import {
         if (toUpload.length === 0) return;
 
         try {
-            global.showSyncStatus(isEn() ? 'Detected local new files, automatically uploading ' + toUpload.length + '...' : '检测到本地新文件，正在自动上传 ' + toUpload.length + ' 个...');
+            // global.showSyncStatus(isEn() ? 'Detected local new files, automatically uploading ' + toUpload.length + '...' : '检测到本地新文件，正在自动上传 ' + toUpload.length + ' 个...');
         } catch (e) {}
 
         // 逐个上传，确保顺序和稳定性
