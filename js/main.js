@@ -1402,6 +1402,17 @@ document.addEventListener('DOMContentLoaded', function() {
                 window.appLifecycle.init();
             }
 
+            // 懒加载代码运行器模块
+            import('./code-runner.js').then(function() {
+                console.log('Code runner module loaded successfully');
+                // 为现有代码块添加运行按钮
+                if (window.addRunButtons) {
+                    window.addRunButtons();
+                }
+            }).catch(function(error) {
+                console.error('Failed to load code runner module:', error);
+            });
+
             // ECharts 懒加载：图表将在用户滚动到可见区域或点击时渲染
             // 不再在初始化时自动渲染所有图表，提升首屏加载性能
 
@@ -1979,6 +1990,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
         }
+
+        // 重新加载代码运行器模块，为新代码块添加运行按钮
+        import('./code-runner.js').then(function() {
+            if (window.addRunButtons) {
+                window.addRunButtons();
+            }
+        }).catch(function(error) {
+            console.error('Failed to reload code runner module:', error);
+        });
 
         initSlashCommandRuntime();
     }

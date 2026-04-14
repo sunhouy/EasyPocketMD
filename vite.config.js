@@ -162,7 +162,8 @@ export default defineConfig({
         manualChunks: {
           vditor: ['vditor']
         }
-      }
+      },
+      external: ['node-fetch']
     },
     commonjsOptions: {
       transformMixedEsModules: true
