@@ -6,6 +6,8 @@ set -e
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ANDROID_RES_DIR="$PROJECT_ROOT/src-tauri/gen/android/app/src/main/res"
 ANDROID_MANIFEST_PATH="$PROJECT_ROOT/src-tauri/gen/android/app/src/main/AndroidManifest.xml"
+ANDROID_STRINGS_DIR="$ANDROID_RES_DIR/values"
+ANDROID_STRINGS_PATH="$ANDROID_STRINGS_DIR/strings.xml"
 ANDROID_PACKAGE_NAME="$(node -e 'const fs = require("fs"); const path = require("path"); const configPath = path.join(process.argv[1], "src-tauri", "tauri.conf.json"); const config = JSON.parse(fs.readFileSync(configPath, "utf8")); const identifier = config.identifier || config.package?.identifier || config.tauri?.bundle?.identifier || "cn.yhsun.md"; process.stdout.write(identifier);' "$PROJECT_ROOT")"
 ANDROID_MAIN_DIR="$PROJECT_ROOT/src-tauri/gen/android/app/src/main/java/${ANDROID_PACKAGE_NAME//./\/}"
 MAIN_ACTIVITY_PATH="$ANDROID_MAIN_DIR/MainActivity.kt"
@@ -19,6 +21,16 @@ mkdir -p "$ANDROID_RES_DIR/values"
 mkdir -p "$ANDROID_RES_DIR/values-night"
 mkdir -p "$ANDROID_MAIN_DIR"
 mkdir -p "$ANDROID_GENERATED_DIR"
+
+cat > "$ANDROID_STRINGS_PATH" << 'EOF'
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">EasyPocketMD</string>
+</resources>
+EOF
+
+echo "✅ strings.xml 已应用"
+
 # 复制 themes.xml (Light mode)
 cat > "$ANDROID_RES_DIR/values/themes.xml" << 'EOF'
 <?xml version="1.0" encoding="utf-8"?>
@@ -73,28 +85,36 @@ echo "✅ Dark mode themes.xml 已应用"
 
 # 为软键盘弹出启用 adjustResize（底部工具栏自动顶到键盘上方）
 if [ -f "$ANDROID_MANIFEST_PATH" ]; then
-        # Use Perl in slurp mode so both one-line and multi-line <activity ...> tags are handled.
-        perl -0777 -i -pe '
-            my $done = 0;
-            s{<activity\b([^>]*)>} {
-                my $attrs = $1;
-                return "<activity$attrs>" if $done++;
+        cat > "$ANDROID_MANIFEST_PATH" << 'EOF'
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
 
-                if ($attrs =~ /android:windowSoftInputMode\s*=\s*"[^"]*"/) {
-                    $attrs =~ s/android:windowSoftInputMode\s*=\s*"[^"]*"/android:windowSoftInputMode="adjustResize"/;
-                    "<activity$attrs>";
-                } else {
-                    "<activity android:windowSoftInputMode=\"adjustResize\"$attrs>";
-                }
-            }gse;
-        ' "$ANDROID_MANIFEST_PATH"
+    <application
+        android:label="@string/app_name"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:theme="@style/Theme.TauriApp">
+        <activity
+            android:name="cn.yhsun.md.MainActivity"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:windowSoftInputMode="adjustResize"
+            android:configChanges="orientation|keyboardHidden|screenSize|smallestScreenSize|screenLayout|uiMode|density">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>
+EOF
 
-        if grep -q 'android:windowSoftInputMode="adjustResize"' "$ANDROID_MANIFEST_PATH"; then
-                echo "✅ AndroidManifest.xml 已设置 windowSoftInputMode=adjustResize"
-        else
-                echo "❌ AndroidManifest.xml 未找到 windowSoftInputMode=adjustResize，终止构建"
-                exit 1
-        fi
+        echo "✅ AndroidManifest.xml 已应用启动器与 adjustResize 配置"
 else
     echo "⚠️ AndroidManifest.xml 尚未生成，待 tauri android init 后会自动注入 adjustResize"
 fi
@@ -103,16 +123,25 @@ cat > "$MAIN_ACTIVITY_PATH" << EOF
 package $ANDROID_PACKAGE_NAME
 
 import android.os.Bundle
-import android.view.WindowManager
-import androidx.core.view.WindowCompat
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.updatePadding
 
 class MainActivity : TauriActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // 让系统在输入法弹出时收缩内容区域，避免绘制到键盘下方。
-        WindowCompat.setDecorFitsSystemWindows(window, true)
-        window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
+        val rootView = window.decorView.findViewById<android.view.View>(android.R.id.content)
+
+        ViewCompat.setOnApplyWindowInsetsListener(rootView) { view, insets ->
+            val imeInsets = insets.getInsets(WindowInsetsCompat.Type.ime())
+            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+
+            view.updatePadding(
+                bottom = if (imeInsets.bottom > 0) imeInsets.bottom else systemBars.bottom
+            )
+            insets
+        }
     }
 }
 EOF
@@ -183,4 +212,4 @@ EOF
 
 echo ""
 echo "✨ Android 状态栏配置应用完成！"
-echo "状态栏将保持可见，颜色与日/夜间模式主题保持一致
+echo "状态栏将保持可见，颜色与日/夜间模式主题保持一致"
