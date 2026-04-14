@@ -27,7 +27,7 @@ EMSCRIPTEN_BINDINGS(text_engine_module) {
         .function("isHiddenCrossSearchFile", &WasmTextEngine::isHiddenCrossSearchFile)
         .function("collectFolderPaths", &WasmTextEngine::collectFolderPaths)
         .function("replaceAllText", &WasmTextEngine::replaceAllText)
-        .function("slashPalette", select_overload<std::string(const std::string&, const std::string&, int, int, bool) const>(&WasmTextEngine::slashPalette), "query", "language", with_default<int>(24), with_default<int>(0), with_default<bool>(false))
+        .function("slashPalette", select_overload<std::string(const std::string&, const std::string&, int, int, bool) const>(&WasmTextEngine::slashPalette), "query", "language", "limit", "offset", "includeHidden")
         .function("slashPaletteSettings", &WasmTextEngine::slashPaletteSettings);
 }
 
