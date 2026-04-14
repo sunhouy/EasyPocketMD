@@ -17,6 +17,10 @@ document.addEventListener('DOMContentLoaded', function() {
     window.isMobileEditorEnvironment = isMobileDevice;
     window.editorInterfaceMode = window.isMobileEditorEnvironment ? 'mobile' : 'desktop';
 
+    function isAndroidClient() {
+        return /Android/i.test(navigator.userAgent || '');
+    }
+
     function getVisibleModalOverlays() {
         return Array.from(document.querySelectorAll('.modal-overlay, .mobile-action-sheet-overlay')).filter(function(el) {
             if (!el) return false;
