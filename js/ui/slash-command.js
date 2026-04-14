@@ -477,6 +477,15 @@ async function runAction(action) {
             }
             return false;
 
+        case 'insertEmoji':
+            // 直接插入表情符号
+            if (insertText) {
+                insertTextAtCursor(insertText);
+                await saveCurrentFileSilently();
+                return true;
+            }
+            return false;
+
         case 'uploadImage':
         case 'uploadFile':
             return activateUploadInput();
