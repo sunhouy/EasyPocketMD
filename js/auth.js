@@ -691,7 +691,10 @@
                     message.textContent = t('loginSuccessSyncing');
                     message.className = 'modal-message success';
 
-                    setTimeout(async () => {
+                    // 移除加载状态
+                        setButtonLoading('loginSubmitBtn', false);
+                        
+                        setTimeout(async () => {
                         hideLoginModal();
                         showUserInfo();
                         global.showMessage(t('loginSuccessStartSync'));
@@ -819,6 +822,9 @@
                         message.textContent = t('registerSuccessAutoLogin');
                         message.className = 'modal-message success';
 
+                        // 移除加载状态
+                        setButtonLoading('registerSubmitBtn', false);
+                        
                         setTimeout(async () => {
                             hideLoginModal();
                             showUserInfo();
@@ -854,6 +860,8 @@
                         // 登录失败，但仍显示注册成功，让用户手动登录
                         message.textContent = t('registerSuccessAutoLogin');
                         message.className = 'modal-message success';
+                        // 移除加载状态
+                        setButtonLoading('registerSubmitBtn', false);
                         setTimeout(() => {
                             switchToLoginTab();
                         }, 1500);
@@ -881,6 +889,9 @@
                         message.textContent = t('autoLoginSuccess');
                         message.className = 'modal-message success';
 
+                        // 移除加载状态
+                        setButtonLoading('registerSubmitBtn', false);
+                        
                         setTimeout(async () => {
                             hideLoginModal();
                             showUserInfo();
@@ -919,6 +930,8 @@
                         // 密码错误
                         message.textContent = t('userExistsPasswordIncorrect');
                         message.className = 'modal-message error';
+                        // 移除加载状态
+                        setButtonLoading('registerSubmitBtn', false);
                         setTimeout(() => {
                             switchToLoginTab();
                         }, 1500);
