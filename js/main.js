@@ -1169,14 +1169,11 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        var viewportHeight = computeViewportHeight();
-        root.style.setProperty('--app-viewport-height', viewportHeight ? viewportHeight + 'px' : '100%');
+        // Android + Tauri + adjustResize：依赖系统窗口收缩，不再手动计算键盘 inset。
+        root.style.setProperty('--app-viewport-height', '100%');
+        root.style.setProperty('--keyboard-inset-bottom', '0px');
 
-        var keyboardInsetBottom = 0;
-        var hasFocusedInput = isMobileTextInputActive();
-        root.style.setProperty('--keyboard-inset-bottom', keyboardInsetBottom + 'px');
-
-        var keyboardVisible = hasFocusedInput;
+        var keyboardVisible = isMobileTextInputActive();
         document.body.classList.toggle('mobile-keyboard-visible', keyboardVisible);
         document.body.classList.toggle('hide-mobile-bottom-toolbar-on-keyboard', keyboardVisible && isMobileToolbarHideEnabledForKeyboard());
     }
