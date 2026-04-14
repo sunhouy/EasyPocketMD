@@ -44,7 +44,6 @@ public:
         const std::string& query,
         const std::string& language,
         int limit = 24,
-        int offset = 0,
         bool includeHidden = false
     ) const;
     std::string slashPaletteSettings(const std::string& language) const;
