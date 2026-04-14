@@ -3,7 +3,7 @@
 
     function g(name) { return global[name]; }
 
-    var SUPPORTED_LANGUAGES = new Set(['python', 'py', 'javascript', 'js', 'typescript', 'ts', 'c', 'cpp', 'c++']);
+    var SUPPORTED_LANGUAGES = new Set(['python', 'py', 'javascript', 'js', 'typescript', 'ts', 'html', 'htm', 'c', 'cpp', 'c++']);
     var PYODIDE_VERSION = '0.25.1';
     var PYODIDE_CDN_BASES = [
         'https://static.yhsun.cn/cdn/pyodide/v' + PYODIDE_VERSION + '/full/'
@@ -63,11 +63,45 @@
         async runPython(code) {
             try {
                 var pyodide = await this.initPyodide();
+                var stdoutChunks = [];
+                var stderrChunks = [];
+
+                if (pyodide.setStdout) {
+                    pyodide.setStdout({
+                        batched: function(message) {
+                            stdoutChunks.push(String(message));
+                        }
+                    });
+                }
+
+                if (pyodide.setStderr) {
+                    pyodide.setStderr({
+                        batched: function(message) {
+                            stderrChunks.push(String(message));
+                        }
+                    });
+                }
+
                 var result = pyodide.runPython(code);
-                return { success: true, output: result };
+                var outputParts = [];
+                if (stdoutChunks.length) outputParts.push(stdoutChunks.join(''));
+                if (stderrChunks.length) outputParts.push(stderrChunks.join(''));
+                if (result !== undefined && result !== null && String(result).length > 0) {
+                    outputParts.push(String(result));
+                }
+
+                return { success: true, output: outputParts.join('') || 'Execution completed successfully' };
             } catch (error) {
                 return { success: false, error: error && error.message ? error.message : String(error) };
             }
+        }
+
+        async runHtml(code) {
+            return {
+                success: true,
+                output: String(code || ''),
+                outputType: 'html'
+            };
         }
 
         // 运行JavaScript/TypeScript代码
@@ -148,6 +182,9 @@
                 case 'typescript':
                 case 'ts':
                     return this.runJavaScript(code);
+                case 'html':
+                case 'htm':
+                    return this.runHtml(code);
                 case 'c':
                 case 'cpp':
                 case 'c++':
@@ -160,6 +197,208 @@
 
     // 初始化代码运行器
     const codeRunner = new CodeRunner();
+    const overlayState = {
+        host: null,
+        items: new Set(),
+        scheduled: false,
+        scrollHandlerBound: false
+    };
+
+    function ensureOverlayHost() {
+        if (overlayState.host && overlayState.host.isConnected) {
+            return overlayState.host;
+        }
+
+        var host = document.createElement('div');
+        host.className = 'code-runner-overlay-host';
+        host.style.cssText = [
+            'position: fixed',
+            'inset: 0',
+            'pointer-events: none',
+            'z-index: 99999'
+        ].join(';');
+        document.body.appendChild(host);
+        overlayState.host = host;
+        return host;
+    }
+
+    function getLanguageFromCodeBlock(codeBlock) {
+        return String(codeBlock && codeBlock.className ? codeBlock.className : '')
+            .replace('language-', '')
+            .split(' ')[0]
+            .toLowerCase();
+    }
+
+    function createOverlayItem(codeBlock) {
+        var host = ensureOverlayHost();
+        var item = document.createElement('div');
+        item.className = 'code-runner-overlay-item';
+        item.setAttribute('contenteditable', 'false');
+        item.style.cssText = [
+            'position: fixed',
+            'left: 0',
+            'top: 0',
+            'right: auto',
+            'transform: none',
+            'visibility: hidden',
+            'pointer-events: auto'
+        ].join(';');
+
+        var runButton = document.createElement('button');
+        runButton.className = 'code-run-button';
+        runButton.setAttribute('contenteditable', 'false');
+        runButton.innerHTML = '<i class="fas fa-play"></i> Run';
+        runButton.style.cssText = [
+            'display: inline-flex',
+            'align-items: center',
+            'gap: 6px',
+            'padding: 5px 10px',
+            'background-color: #4a90e2',
+            'color: white',
+            'border: none',
+            'border-radius: 4px',
+            'font-size: 12px',
+            'cursor: pointer',
+            'box-shadow: 0 2px 10px rgba(0,0,0,0.18)',
+            'pointer-events: auto'
+        ].join(';');
+
+        var outputDiv = document.createElement('div');
+        outputDiv.className = 'code-output';
+        outputDiv.setAttribute('contenteditable', 'false');
+        outputDiv.style.cssText = [
+            'margin-top: 8px',
+            'max-width: min(720px, calc(100vw - 24px))',
+            'max-height: 280px',
+            'overflow: auto',
+            'padding: 10px',
+            'background-color: #f5f5f5',
+            'border: 1px solid #ddd',
+            'border-radius: 6px',
+            'font-family: monospace',
+            'font-size: 14px',
+            'white-space: pre-wrap',
+            'display: none',
+            'box-shadow: 0 8px 24px rgba(0,0,0,0.15)',
+            'pointer-events: auto'
+        ].join(';');
+
+        var toolbar = document.createElement('div');
+        toolbar.style.cssText = [
+            'display: inline-flex',
+            'flex-direction: column',
+            'align-items: flex-end',
+            'pointer-events: auto'
+        ].join(';');
+        toolbar.appendChild(runButton);
+        toolbar.appendChild(outputDiv);
+        item.appendChild(toolbar);
+        host.appendChild(item);
+
+        var overlayItem = {
+            codeBlock: codeBlock,
+            item: item,
+            button: runButton,
+            output: outputDiv,
+            language: getLanguageFromCodeBlock(codeBlock),
+            isVisible: false
+        };
+
+        runButton.addEventListener('click', async function() {
+            var code = codeBlock.textContent;
+            outputDiv.style.display = 'block';
+            outputDiv.textContent = 'Running...';
+
+            var result = await codeRunner.runCode(overlayItem.language, code);
+
+            if (result.success) {
+                if (result.outputType === 'html') {
+                    outputDiv.innerHTML = '';
+                    var iframe = document.createElement('iframe');
+                    iframe.setAttribute('sandbox', 'allow-forms allow-modals allow-popups allow-scripts');
+                    iframe.setAttribute('referrerpolicy', 'no-referrer');
+                    iframe.style.cssText = [
+                        'display: block',
+                        'width: 100%',
+                        'height: 260px',
+                        'border: 0',
+                        'background: white',
+                        'border-radius: 4px'
+                    ].join(';');
+                    iframe.srcdoc = result.output || '';
+                    outputDiv.appendChild(iframe);
+                } else {
+                    outputDiv.textContent = result.output !== undefined ? result.output.toString() : 'Execution completed successfully';
+                }
+                outputDiv.style.backgroundColor = '#e8f5e8';
+            } else {
+                outputDiv.textContent = 'Error: ' + result.error;
+                outputDiv.style.backgroundColor = '#ffe8e8';
+            }
+
+            updateOverlayItemPosition(overlayItem);
+        });
+
+        overlayState.items.add(overlayItem);
+        return overlayItem;
+    }
+
+    function updateOverlayItemPosition(overlayItem) {
+        if (!overlayItem || !overlayItem.codeBlock || !overlayItem.item) return;
+
+        if (!overlayItem.codeBlock.isConnected || !overlayItem.item.isConnected) {
+            if (overlayItem.item.parentNode) {
+                overlayItem.item.parentNode.removeChild(overlayItem.item);
+            }
+            overlayState.items.delete(overlayItem);
+            return;
+        }
+
+        var rect = overlayItem.codeBlock.getBoundingClientRect();
+        if (!rect || rect.width === 0 || rect.height === 0) {
+            overlayItem.item.style.visibility = 'hidden';
+            overlayItem.isVisible = false;
+            return;
+        }
+
+        var top = Math.max(8, rect.top + 6);
+        var right = Math.max(8, window.innerWidth - rect.right + 8);
+        overlayItem.item.style.left = 'auto';
+        overlayItem.item.style.right = Math.round(right) + 'px';
+        overlayItem.item.style.top = Math.round(top) + 'px';
+        overlayItem.item.style.transform = 'none';
+        overlayItem.item.style.maxWidth = Math.max(120, Math.round(rect.width) - 16) + 'px';
+        overlayItem.item.style.display = 'block';
+        overlayItem.item.style.visibility = 'visible';
+        overlayItem.isVisible = true;
+        overlayItem.item.querySelector('.code-run-button').style.position = 'static';
+        overlayItem.item.querySelector('.code-output').style.position = 'relative';
+        overlayItem.item.querySelector('.code-output').style.left = 'auto';
+        overlayItem.item.querySelector('.code-output').style.right = 'auto';
+        overlayItem.item.querySelector('.code-output').style.top = 'auto';
+        overlayItem.item.style.pointerEvents = 'auto';
+        overlayItem.item.style.zIndex = '99999';
+    }
+
+    function scheduleOverlayUpdate() {
+        if (overlayState.scheduled) return;
+        overlayState.scheduled = true;
+        requestAnimationFrame(function() {
+            overlayState.scheduled = false;
+            overlayState.items.forEach(function(item) {
+                if (item.codeBlock && item.codeBlock.isConnected && item.item && item.item.isConnected) {
+                    updateOverlayItemPosition(item);
+                }
+            });
+        });
+    }
+
+    function ensureOverlayListeners() {
+        if (overlayState.scrollHandlerBound) return;
+        overlayState.scrollHandlerBound = true;
+        window.addEventListener('scroll', scheduleOverlayUpdate, true);
+        window.addEventListener('resize', scheduleOverlayUpdate);
+    }
 
     function isEditableCodeBlock(codeBlock) {
         if (!codeBlock || !codeBlock.closest) return false;
@@ -185,83 +424,16 @@
         codeBlocks.forEach(codeBlock => {
             // 检查是否已经添加了运行按钮
             const preElement = codeBlock.parentElement;
-            if (!preElement || preElement.dataset.codeRunnerBound === 'true' || preElement.querySelector('.code-run-button')) {
+            if (!preElement || preElement.dataset.codeRunnerBound === 'true') {
                 return;
             }
 
             preElement.dataset.codeRunnerBound = 'true';
-
-            // 获取语言类型
-            const language = codeBlock.className.replace('language-', '').split(' ')[0];
-
-            // 创建运行按钮
-            const runButton = document.createElement('button');
-            runButton.className = 'code-run-button';
-            runButton.setAttribute('contenteditable', 'false');
-            runButton.innerHTML = '<i class="fas fa-play"></i> Run';
-            runButton.style.cssText = `
-                position: absolute;
-                top: 5px;
-                right: 5px;
-                padding: 5px 10px;
-                background-color: #4a90e2;
-                color: white;
-                border: none;
-                border-radius: 4px;
-                font-size: 12px;
-                cursor: pointer;
-                z-index: 10;
-            `;
-
-            // 创建输出区域
-            const outputDiv = document.createElement('div');
-            outputDiv.className = 'code-output';
-            outputDiv.setAttribute('contenteditable', 'false');
-            outputDiv.style.cssText = `
-                position: absolute;
-                left: 0;
-                right: 0;
-                top: calc(100% + 10px);
-                padding: 10px;
-                background-color: #f5f5f5;
-                border: 1px solid #ddd;
-                border-radius: 4px;
-                font-family: monospace;
-                font-size: 14px;
-                white-space: pre-wrap;
-                display: none;
-                z-index: 9;
-            `;
-
-            // 为代码块容器添加相对定位
-            preElement.style.position = 'relative';
-
-            // 添加按钮和输出区域
-            preElement.appendChild(runButton);
-            preElement.parentNode.insertBefore(outputDiv, preElement.nextSibling);
-
-            // 添加点击事件
-            runButton.addEventListener('click', async function() {
-                const code = codeBlock.textContent;
-                const outputElement = preElement.parentNode.querySelector('.code-output');
-                
-                // 显示加载状态
-                outputElement.style.display = 'block';
-                outputElement.textContent = 'Running...';
-                
-                // 运行代码
-                const result = await codeRunner.runCode(language, code);
-                
-                // 显示结果
-                if (result.success) {
-                    outputElement.textContent = result.output !== undefined ? result.output.toString() : 'Execution completed successfully';
-                    outputElement.style.backgroundColor = '#e8f5e8';
-                } else {
-                    outputElement.textContent = 'Error: ' + result.error;
-                    outputElement.style.backgroundColor = '#ffe8e8';
-                }
-            });
+            createOverlayItem(codeBlock);
         });
+
+        ensureOverlayListeners();
+        scheduleOverlayUpdate();
     }
 
     // 监听DOM变化，为新添加的代码块添加运行按钮
