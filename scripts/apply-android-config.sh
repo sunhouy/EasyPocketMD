@@ -104,16 +104,26 @@ cat > "$MAIN_ACTIVITY_PATH" << EOF
 package $ANDROID_PACKAGE_NAME
 
 import android.os.Bundle
-import android.view.WindowManager
-import androidx.core.view.WindowCompat
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.updatePadding
 
 class MainActivity : TauriActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // 让系统在输入法弹出时收缩内容区域，避免绘制到键盘下方。
-        WindowCompat.setDecorFitsSystemWindows(window, true)
-        window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
+        val decorView = window.decorView
+        val rootView = decorView.findViewById<android.view.View>(android.R.id.content)
+
+        ViewCompat.setOnApplyWindowInsetsListener(rootView) { view, insets ->
+            val imeInsets = insets.getInsets(WindowInsetsCompat.Type.ime())
+            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+
+            view.updatePadding(
+                bottom = if (imeInsets.bottom > 0) imeInsets.bottom else systemBars.bottom
+            )
+            insets
+        }
     }
 }
 EOF
