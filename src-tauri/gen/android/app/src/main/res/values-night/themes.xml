@@ -9,8 +9,8 @@
         <item name="android:windowFullscreen">false</item>
         <!-- 禁用半透明状态栏 -->
         <item name="android:windowTranslucentStatus">false</item>
-        <!-- 设置状态栏颜色为透明，让系统布局扩展到状态栏 -->
-        <item name="android:statusBarColor">@android:color/transparent</item>
+        <!-- 设置明确状态栏颜色，避免沉浸式透传 -->
+        <item name="android:statusBarColor">#141821</item>
         <!-- Dark status bar content (for dark background) -->
         <item name="android:windowLightStatusBar">false</item>
     </style>
