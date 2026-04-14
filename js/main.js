@@ -1130,6 +1130,19 @@ document.addEventListener('DOMContentLoaded', function() {
         return window.editorInterfaceMode === 'mobile' && window.userSettings.hideBottomToolbarOnKeyboard === true;
     }
 
+    function isTauriAndroidRuntime() {
+        var hasTauriBridge = !!(window.__TAURI__ || window.__TAURI_INTERNALS__ || (window.desktopRuntime && window.desktopRuntime.type === 'tauri'));
+        return hasTauriBridge && isAndroidClient();
+    }
+
+    function isMobileTextInputActive() {
+        var activeEl = document.activeElement;
+        if (!activeEl || activeEl === document.body) return false;
+        if (typeof isEditorTarget === 'function' && isEditorTarget(activeEl)) return true;
+        if (typeof activeEl.closest === 'function' && activeEl.closest('input, textarea, [contenteditable="true"]')) return true;
+        return false;
+    }
+
     function computeViewportHeight() {
         if (window.visualViewport && typeof window.visualViewport.height === 'number') {
             return Math.max(0, Math.round(window.visualViewport.height));
@@ -1139,16 +1152,22 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function computeKeyboardInsetBottom(viewportHeight) {
         var currentHeight = Math.max(0, Math.round(viewportHeight || 0));
-        if (currentHeight > mobileViewportBaselineHeight) {
+        if (currentHeight > mobileViewportBaselineHeight || mobileViewportBaselineHeight === 0) {
             mobileViewportBaselineHeight = currentHeight;
         }
 
         if (window.visualViewport) {
-            var viewportBottom = Math.max(0, Math.round((window.visualViewport.height || 0) + (window.visualViewport.offsetTop || 0)));
+            var vvHeight = Math.max(0, Math.round(window.visualViewport.height || 0));
+            var vvOffsetTop = Math.max(0, Math.round(window.visualViewport.offsetTop || 0));
+            var viewportBottom = vvHeight + vvOffsetTop;
+
             if (viewportBottom > mobileViewportBaselineHeight) {
                 mobileViewportBaselineHeight = viewportBottom;
             }
-            return Math.max(0, mobileViewportBaselineHeight - viewportBottom);
+
+            var overlayInset = Math.max(0, Math.round((window.innerHeight || viewportBottom) - viewportBottom));
+            var resizeInset = Math.max(0, mobileViewportBaselineHeight - currentHeight);
+            return Math.max(overlayInset, resizeInset);
         }
 
         return Math.max(0, mobileViewportBaselineHeight - currentHeight);
@@ -1158,16 +1177,35 @@ document.addEventListener('DOMContentLoaded', function() {
         var root = document.documentElement;
         if (!root || !document.body) return;
 
+        if (window.editorInterfaceMode !== 'mobile') {
+            root.style.setProperty('--app-viewport-height', '100dvh');
+            root.style.setProperty('--keyboard-inset-bottom', '0px');
+            document.body.classList.remove('mobile-keyboard-visible', 'hide-mobile-bottom-toolbar-on-keyboard');
+            return;
+        }
+
+        if (!isTauriAndroidRuntime()) {
+            root.style.setProperty('--app-viewport-height', '100dvh');
+            root.style.setProperty('--keyboard-inset-bottom', '0px');
+            var browserKeyboardVisible = isMobileTextInputActive();
+            document.body.classList.toggle('mobile-keyboard-visible', browserKeyboardVisible);
+            document.body.classList.toggle('hide-mobile-bottom-toolbar-on-keyboard', browserKeyboardVisible && isMobileToolbarHideEnabledForKeyboard());
+            return;
+        }
+
         var viewportHeight = computeViewportHeight();
-        root.style.setProperty('--app-viewport-height', viewportHeight ? viewportHeight + 'px' : '100vh');
+        root.style.setProperty('--app-viewport-height', viewportHeight ? viewportHeight + 'px' : '100dvh');
 
         var keyboardInsetBottom = computeKeyboardInsetBottom(viewportHeight);
+        var hasFocusedInput = isMobileTextInputActive();
+        if (!hasFocusedInput && keyboardInsetBottom < 24) {
+            keyboardInsetBottom = 0;
+            mobileViewportBaselineHeight = Math.max(mobileViewportBaselineHeight, viewportHeight);
+        }
+        keyboardInsetBottom = Math.max(0, Math.min(keyboardInsetBottom, Math.round(viewportHeight * 0.6)));
         root.style.setProperty('--keyboard-inset-bottom', keyboardInsetBottom + 'px');
 
-        var keyboardVisible = keyboardInsetBottom > 120;
-        if (!keyboardVisible && !window.visualViewport && window.isMobileEditorEnvironment && typeof isEditorTarget === 'function') {
-            keyboardVisible = isEditorTarget(document.activeElement);
-        }
+        var keyboardVisible = keyboardInsetBottom > 24 || hasFocusedInput;
         document.body.classList.toggle('mobile-keyboard-visible', keyboardVisible);
         document.body.classList.toggle('hide-mobile-bottom-toolbar-on-keyboard', keyboardVisible && isMobileToolbarHideEnabledForKeyboard());
     }
@@ -1191,7 +1229,10 @@ document.addEventListener('DOMContentLoaded', function() {
             scheduleMobileViewportSync();
         });
         window.addEventListener('focusin', scheduleMobileViewportSync, true);
-        window.addEventListener('focusout', scheduleMobileViewportSync, true);
+        window.addEventListener('focusout', function() {
+            scheduleMobileViewportSync();
+            window.setTimeout(scheduleMobileViewportSync, 120);
+        }, true);
 
         if (window.visualViewport) {
             window.visualViewport.addEventListener('resize', scheduleMobileViewportSync);
