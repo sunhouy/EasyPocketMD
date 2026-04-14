@@ -55,4 +55,8 @@ import './js/ui/file-manager.js';
 // import './js/uncertainty-calculator.js';
 import './js/ui/insert-picker.js';
 
+// 代码运行器模块改为懒加载，不在首屏加载
+// import './js/code-runner.js';
+
 import './js/main.js';
+
