@@ -1,6 +1,6 @@
 {
   "name": "easypocketmd",
-  "version": "2.8.3",
+  "version": "2.8.4",
   "description": "一款几乎零学习成本的 Markdown 编辑器：无需记忆语法，也能轻松插入格式化文本、LaTeX 公式和图表。配合智能搜索与 AI 助手，常用功能都能几步完成。实时协作、AI 辅助写作与流畅编辑体验，全部整合在美观的界面中。",
   "scripts": {
     "dev": "vite",
