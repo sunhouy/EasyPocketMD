@@ -18,8 +18,8 @@ export function normalizeServerFileRecord(f: any): any {
     name,
     type,
     content,
-    lastModified: f.last_modified || f.lastModified || Date.now(),
-    serverLastModified: f.last_modified || f.lastModified || Date.now(),
+    lastModified: f.last_modified || f.lastModified || null,
+    serverLastModified: f.last_modified || f.lastModified || null,
     contentVersion: hasContentVersion ? Number(f.content_version ?? f.contentVersion) : null,
   };
 }
@@ -68,9 +68,9 @@ export function detectConflicts(
           filename: localFile.name,
           localContent: localFile.content,
           serverContent: serverFile.content,
-          localModified: localFile.lastModified,
-          serverModified: serverFile.lastModified || Date.now(),
-          serverLastModified: serverFile.serverLastModified || serverFile.lastModified || Date.now(),
+          localModified: localFile.lastModified || null,
+          serverModified: serverFile.lastModified || serverFile.serverLastModified || null,
+          serverLastModified: serverFile.serverLastModified || serverFile.lastModified || null,
           serverContentVersion: Number(serverFile.contentVersion || 0),
         });
       }
@@ -192,8 +192,8 @@ export function createSyncRuntimeApi(ctx: any) {
             if (serverSnapshot && serverSnapshot.content !== baseContent) {
               if (content === serverSnapshot.content) {
                 file.content = serverSnapshot.content;
-                file.lastModified = serverSnapshot.lastModified || Date.now();
-                file.serverLastModified = serverSnapshot.lastModified || Date.now();
+                file.lastModified = serverSnapshot.lastModified || file.lastModified || null;
+                file.serverLastModified = serverSnapshot.lastModified || file.serverLastModified || null;
                 file.contentVersion = Number(serverSnapshot.contentVersion || file.contentVersion || 0) || null;
                 file.isSynced = true;
                 localStorage.setItem('vditor_files', JSON.stringify(files));
@@ -223,9 +223,9 @@ export function createSyncRuntimeApi(ctx: any) {
                     localContent: content,
                     serverContent: serverSnapshot.content,
                     serverContentVersion: Number(serverSnapshot.contentVersion || 0),
-                    serverModified: serverSnapshot.lastModified || Date.now(),
-                    localModified: file.lastModified || Date.now(),
-                    serverLastModified: serverSnapshot.lastModified || Date.now(),
+                    serverModified: serverSnapshot.lastModified || null,
+                    localModified: file.lastModified || null,
+                    serverLastModified: serverSnapshot.lastModified || null,
                     baseContentVersion: baseContentVersion,
                   });
                 }
@@ -233,8 +233,8 @@ export function createSyncRuntimeApi(ctx: any) {
               }
 
               file.content = serverSnapshot.content;
-              file.lastModified = serverSnapshot.lastModified || Date.now();
-              file.serverLastModified = serverSnapshot.lastModified || Date.now();
+              file.lastModified = serverSnapshot.lastModified || file.lastModified || null;
+              file.serverLastModified = serverSnapshot.lastModified || file.serverLastModified || null;
               file.contentVersion = Number(serverSnapshot.contentVersion || 0);
               file.isSynced = true;
               if (file.id === g('currentFileId')) {
@@ -312,9 +312,9 @@ export function createSyncRuntimeApi(ctx: any) {
                 serverContentVersion: Number(
                   result.data && result.data.server_content_version ? result.data.server_content_version : 0,
                 ),
-                serverModified: (result.data && result.data.server_last_modified) || Date.now(),
-                localModified: file.lastModified || Date.now(),
-                serverLastModified: (result.data && result.data.server_last_modified) || Date.now(),
+                serverModified: (result.data && result.data.server_last_modified) || null,
+                localModified: file.lastModified || null,
+                serverLastModified: (result.data && result.data.server_last_modified) || null,
                 baseContentVersion: Number(file.contentVersion || 0),
               });
             }
