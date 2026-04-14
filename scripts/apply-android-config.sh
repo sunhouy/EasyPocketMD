@@ -33,8 +33,8 @@ cat > "$ANDROID_RES_DIR/values/themes.xml" << 'EOF'
         <item name="android:windowFullscreen">false</item>
         <!-- 禁用半透明状态栏 -->
         <item name="android:windowTranslucentStatus">false</item>
-        <!-- 设置状态栏颜色为透明，让系统布局扩展到状态栏 -->
-        <item name="android:statusBarColor">@android:color/transparent</item>
+        <!-- 设置明确状态栏颜色，避免沉浸式透传 -->
+        <item name="android:statusBarColor">#F5F7FA</item>
         <!-- Light status bar content (for light background) -->
         <item name="android:windowLightStatusBar">false</item>
     </style>
@@ -59,8 +59,8 @@ cat > "$ANDROID_RES_DIR/values-night/themes.xml" << 'EOF'
         <item name="android:windowFullscreen">false</item>
         <!-- 禁用半透明状态栏 -->
         <item name="android:windowTranslucentStatus">false</item>
-        <!-- 设置状态栏颜色为透明，让系统布局扩展到状态栏 -->
-        <item name="android:statusBarColor">@android:color/transparent</item>
+        <!-- 设置明确状态栏颜色，避免沉浸式透传 -->
+        <item name="android:statusBarColor">#141821</item>
         <!-- Dark status bar content (for dark background) -->
         <item name="android:windowLightStatusBar">false</item>
     </style>
@@ -105,12 +105,16 @@ package $ANDROID_PACKAGE_NAME
 
 import android.os.Bundle
 import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updatePadding
 
 class MainActivity : TauriActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // 保持状态栏非沉浸布局，让内容不绘制到状态栏后方。
+        WindowCompat.setDecorFitsSystemWindows(window, true)
 
         val decorView = window.decorView
         val rootView = decorView.findViewById<android.view.View>(android.R.id.content)
