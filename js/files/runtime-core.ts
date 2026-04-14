@@ -36,6 +36,17 @@ import {
     function isEn() { return window.i18n && window.i18n.getLanguage() === 'en'; }
     function t(key) { return window.i18n ? window.i18n.t(key) : key; }
 
+    function formatConflictTime(value) {
+        if (value === undefined || value === null || value === '') {
+            return isEn() ? 'Unknown time' : '未知时间';
+        }
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) {
+            return isEn() ? 'Unknown time' : '未知时间';
+        }
+        return date.toLocaleString();
+    }
+
     let tokenRecoveryInProgress = false;
     let lastTokenRecoveryAt = 0;
     const browserFileHandleMap = new Map();
@@ -1224,7 +1235,7 @@ import {
                         }
                     }
 
-                    const serverLastModified = f.last_modified || f.lastModified || Date.now();
+                    const serverLastModified = f.last_modified || f.lastModified || null;
                     const hasServerContentVersion =
                         (f.content_version !== undefined && f.content_version !== null && f.content_version !== '') ||
                         (f.contentVersion !== undefined && f.contentVersion !== null && f.contentVersion !== '');
@@ -1291,8 +1302,8 @@ import {
                             filename: preserveFileName,
                             localContent: localFile.content,
                             serverContent: serverFile.content,
-                            localModified: localFile.lastModified,
-                            serverModified: serverFile.serverLastModified || serverFile.lastModified || Date.now(),
+                            localModified: localFile.lastModified || null,
+                            serverModified: serverFile.serverLastModified || serverFile.lastModified || null,
                             serverContentVersion: (serverFile.contentVersion !== undefined && serverFile.contentVersion !== null && serverFile.contentVersion !== '')
                                 ? Number(serverFile.contentVersion)
                                 : ((serverFile.content_version !== undefined && serverFile.content_version !== null && serverFile.content_version !== '')
@@ -1389,7 +1400,7 @@ import {
 
         return {
             content: result.data.content || '',
-            lastModified: result.data.last_modified || Date.now(),
+            lastModified: result.data.last_modified || null,
             contentVersion: (result.data.content_version !== undefined && result.data.content_version !== null && result.data.content_version !== '')
                 ? Number(result.data.content_version)
                 : ((result.data.contentVersion !== undefined && result.data.contentVersion !== null && result.data.contentVersion !== '')
@@ -1438,8 +1449,11 @@ import {
 
                 if (serverFile.content !== editorContent) {
                 file.content = serverFile.content;
-                file.lastModified = serverFile.lastModified || Date.now();
-                    file.serverLastModified = serverFile.serverLastModified || serverFile.lastModified || Date.now();
+                file.lastModified = serverFile.lastModified || file.lastModified || null;
+                file.serverLastModified = serverFile.serverLastModified || serverFile.lastModified || file.serverLastModified || null;
+                file.contentVersion = serverFile.contentVersion !== null && serverFile.contentVersion !== undefined
+                    ? Number(serverFile.contentVersion)
+                    : file.contentVersion;
                 file.isSynced = true;
                 lastSyncedContent[file.id] = serverFile.content;
                 unsavedChanges[file.id] = false;
@@ -1635,8 +1649,8 @@ import {
         if (!diffModal || !diffContent) return;
 
         diffFileName.textContent = conflict.filename;
-        diffLocalTime.textContent = new Date(conflict.localModified).toLocaleString();
-        diffServerTime.textContent = new Date(conflict.serverModified).toLocaleString();
+        diffLocalTime.textContent = formatConflictTime(conflict.localModified);
+        diffServerTime.textContent = formatConflictTime(conflict.serverModified);
 
         const diffResult = computeDiff(conflict.localContent || '', conflict.serverContent || '');
         diffContent.innerHTML = renderDiffView(diffResult, { collapseSame: true });
@@ -1686,12 +1700,12 @@ import {
             '<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:18px;">' +
                 '<div style="flex:1;min-width:260px;padding:12px;border:1px solid ' + (nightMode ? '#444' : '#e5e7eb') + ';border-radius:10px;">' +
                     '<div style="font-weight:700;margin-bottom:8px;">' + (isEn() ? 'Local Version' : '本地版本') + '</div>' +
-                    '<div style="font-size:12px;color:' + (nightMode ? '#bbb' : '#666') + ';margin-bottom:8px;">' + (isEn() ? 'Modified:' : '修改时间：') + ' ' + new Date(conflict.localModified || Date.now()).toLocaleString() + '</div>' +
+                    '<div style="font-size:12px;color:' + (nightMode ? '#bbb' : '#666') + ';margin-bottom:8px;">' + (isEn() ? 'Modified:' : '修改时间：') + ' ' + formatConflictTime(conflict.localModified) + '</div>' +
                     '<pre class="save-conflict-preview" style="white-space:pre-wrap;word-break:break-word;max-height:220px;overflow:auto;margin:0;">' + escapeHtml(conflict.localContent || '') + '</pre>' +
                 '</div>' +
                 '<div style="flex:1;min-width:260px;padding:12px;border:1px solid ' + (nightMode ? '#444' : '#e5e7eb') + ';border-radius:10px;">' +
                     '<div style="font-weight:700;margin-bottom:8px;">' + (isEn() ? 'Server Version' : '服务器版本') + '</div>' +
-                    '<div style="font-size:12px;color:' + (nightMode ? '#bbb' : '#666') + ';margin-bottom:8px;">' + (isEn() ? 'Modified:' : '修改时间：') + ' ' + new Date(conflict.serverModified || Date.now()).toLocaleString() + '</div>' +
+                    '<div style="font-size:12px;color:' + (nightMode ? '#bbb' : '#666') + ';margin-bottom:8px;">' + (isEn() ? 'Modified:' : '修改时间：') + ' ' + formatConflictTime(conflict.serverModified) + '</div>' +
                     '<pre class="save-conflict-preview" style="white-space:pre-wrap;word-break:break-word;max-height:220px;overflow:auto;margin:0;">' + escapeHtml(conflict.serverContent || '') + '</pre>' +
                 '</div>' +
             '</div>' +
@@ -2005,7 +2019,7 @@ import {
         const mergedFiles = [];
         const fileMap = {};
         serverFiles.forEach(function(serverFile) {
-            const serverLastModified = serverFile.serverLastModified || serverFile.lastModified || Date.now();
+            const serverLastModified = serverFile.serverLastModified || serverFile.lastModified || null;
             const hasVersion =
                 (serverFile.contentVersion !== undefined && serverFile.contentVersion !== null && serverFile.contentVersion !== '') ||
                 (serverFile.content_version !== undefined && serverFile.content_version !== null && serverFile.content_version !== '');
