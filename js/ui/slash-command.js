@@ -15,6 +15,7 @@ const state = {
     slashContext: null,
     composing: false,
     executing: false,
+    loadingMore: false,
     requestSeq: 0,
     refreshTimer: null,
     handlers: null,
@@ -747,6 +748,9 @@ function createPanel() {
     state.hint = hint;
     state.close = close;
 
+    // 绑定滚动事件，实现懒加载
+    bindScrollEvent();
+
     updatePanelHeader();
     document.body.appendChild(panel);
 }
@@ -941,7 +945,8 @@ function executeByIndex(index) {
     });
 }
 
-async function fetchPaletteItems(query) {
+// 修改 fetchPaletteItems 函数，支持 offset 参数
+async function fetchPaletteItems(query, offset = 0) {
     var gateway = window.wasmTextEngineGateway;
     if (!gateway) return [];
 
@@ -952,7 +957,8 @@ async function fetchPaletteItems(query) {
 
     var result = gateway.slashPalette(query || '', {
         language: currentLanguageCode(),
-        limit: 80,
+        limit: offset > 0 ? 40 : 80,
+        offset: offset,
         includeHidden: false
     });
 
@@ -998,6 +1004,44 @@ async function refreshFromCaret() {
     createPanel();
     renderItems();
     showPanel();
+}
+
+// 懒加载更多项目
+async function loadMoreItems() {
+    if (state.loadingMore || !state.slashContext) return;
+    
+    state.loadingMore = true;
+    var currentCount = state.items.length;
+    
+    try {
+        var moreItems = await fetchPaletteItems(state.slashContext.query, currentCount);
+        if (moreItems.length > 0) {
+            state.items = state.items.concat(moreItems);
+            renderItems();
+        }
+    } catch (error) {
+        console.warn('[slash-command] load more failed:', error);
+    } finally {
+        state.loadingMore = false;
+    }
+}
+
+// 监听滚动事件，实现懒加载
+function bindScrollEvent() {
+    if (!state.list) return;
+    
+    state.list.addEventListener('scroll', function() {
+        if (state.loadingMore) return;
+        
+        var scrollTop = state.list.scrollTop;
+        var scrollHeight = state.list.scrollHeight;
+        var clientHeight = state.list.clientHeight;
+        
+        // 当滚动到距离底部 100px 时加载更多
+        if (scrollHeight - scrollTop - clientHeight < 100) {
+            loadMoreItems();
+        }
+    });
 }
 
 function moveActive(delta) {

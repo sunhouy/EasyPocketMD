@@ -589,11 +589,12 @@ std::string WasmTextEngine::slashPalette(
     const std::string& query,
     const std::string& language,
     int limit,
+    int offset,
     bool includeHidden
 ) const {
     const std::string normalizedQuery = normalizeSearchText(query);
     const std::string lang = languageCode(language);
-    const int maxItems = limit > 0 ? limit : 24;
+    const int maxItems = limit > 0 ? limit : (normalizedQuery.empty() ? 20 : 80);
 
     std::vector<RankedItem> ranked;
     const std::vector<CommandItem>& catalog = commandCatalog();
@@ -634,8 +635,10 @@ std::string WasmTextEngine::slashPalette(
 
     std::ostringstream items;
     items << "[";
-    for (size_t i = 0; i < ranked.size() && i < static_cast<size_t>(maxItems); ++i) {
-        if (i > 0) items << ",";
+    size_t startIndex = static_cast<size_t>(offset);
+    size_t endIndex = startIndex + static_cast<size_t>(maxItems);
+    for (size_t i = startIndex; i < ranked.size() && i < endIndex; ++i) {
+        if (i > startIndex) items << ",";
         items << serializeCommand(*ranked[i].item, lang, ranked[i].score, ranked[i].matchedField);
     }
     items << "]";
@@ -647,7 +650,9 @@ std::string WasmTextEngine::slashPalette(
     out << "\"groups\":" << groups.str() << ",";
     out << "\"settings\":" << buildSettingsJson(lang) << ",";
     out << "\"items\":" << items.str() << ",";
-    out << "\"total\":" << ranked.size();
+    out << "\"total\":" << ranked.size() << ",";
+    out << "\"lazyLoad\":" << (normalizedQuery.empty() && ranked.size() > maxItems) << ",";
+    out << "\"hasMore\":" << (endIndex < ranked.size());
     out << "}";
     return out.str();
 }
