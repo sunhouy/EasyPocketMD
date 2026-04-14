@@ -312,6 +312,32 @@ export function createSyncRuntimeApi(ctx: any) {
           }
 
           if (result.code === 409) {
+            const serverContentFromResult =
+              result.data && typeof result.data.server_content === 'string' ? result.data.server_content : '';
+            if (file.type !== 'folder' && content === serverContentFromResult) {
+              const serverLastModifiedFromResult =
+                (result.data && result.data.server_last_modified) || file.serverLastModified || file.lastModified || Date.now();
+              const serverContentVersionFromResult = Number(
+                result.data && result.data.server_content_version ? result.data.server_content_version : 0,
+              );
+
+              file.content = serverContentFromResult;
+              file.lastModified = serverLastModifiedFromResult;
+              file.serverLastModified = serverLastModifiedFromResult;
+              file.contentVersion = Number.isFinite(serverContentVersionFromResult) && serverContentVersionFromResult > 0
+                ? serverContentVersionFromResult
+                : Number(file.contentVersion || 0) || null;
+              file.isSynced = true;
+              file.preferLocalOnNextSync = false;
+
+              localStorage.setItem('vditor_files', JSON.stringify(files));
+              g('lastSyncedContent')[fileId] = serverContentFromResult;
+              g('unsavedChanges')[fileId] = false;
+              markPendingServerSync(fileId, false);
+              globalRef.lastSaveConflictPending = false;
+              return true;
+            }
+
             markPendingServerSync(fileId, true);
             if (backgroundSync) {
               return false;
