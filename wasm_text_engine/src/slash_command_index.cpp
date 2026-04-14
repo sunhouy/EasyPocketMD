@@ -275,13 +275,53 @@ const std::vector<CommandItem>& commandCatalog() {
         items.push_back(makeCommand("footnote", "insert", 825, "脚注", "Footnote", "插入脚注", "Insert a footnote", "showFootnotePicker", "fas fa-sticky-note", "", false, {"脚注", "footnote", "note"}, {"footnote", "note"}));
         items.push_back(makeCommand("mindMap", "insert", 820, "脑图", "Mind Map", "插入思维导图", "Insert a mind map", "showMindmapPicker", "fas fa-brain", "", false, {"脑图", "mind map", "mindmap", "思维导图"}, {"mind", "map"}));
 
+        // 公式分类和常用公式
         items.push_back(makeCommand("formula", "math", 815, "公式", "Formula", "打开公式面板", "Open the formula panel", "showFormulaPicker", "fas fa-superscript", "", false, {"公式", "数学公式", "formula", "latex"}, {"formula", "latex", "math"}));
         items.push_back(makeCommand("inlineFormula", "math", 810, "行内公式", "Inline Formula", "插入行内公式", "Insert an inline formula", "insertInlineFormula", "fas fa-superscript", "$x^2$", false, {"行内公式", "inline formula", "formula inline"}, {"inline", "formula"}));
         items.push_back(makeCommand("blockFormula", "math", 805, "块级公式", "Block Formula", "插入块级公式", "Insert a block formula", "insertBlockFormula", "fas fa-square-root-variable", "$$\nE=mc^2\n$$", false, {"块级公式", "block formula", "display formula"}, {"block", "formula"}));
-
-        items.push_back(makeCommand("chart", "chart", 800, "图表", "Chart", "打开图表面板", "Open the chart panel", "showChartPicker", "fas fa-chart-bar", "", false, {"图表", "图形", "chart"}, {"chart", "mermaid", "echarts", "diagram"}));
-        items.push_back(makeCommand("mermaid", "chart", 795, "Mermaid 图表", "Mermaid Chart", "插入 Mermaid 图表", "Insert a Mermaid chart", "insertMermaid", "fas fa-diagram-project", "", false, {"mermaid", "流程图", "graph"}, {"mermaid", "diagram"}));
-        items.push_back(makeCommand("eCharts", "chart", 790, "ECharts 图表", "ECharts Chart", "打开 ECharts 图表面板", "Open the ECharts chart panel", "showEChartsPicker", "fas fa-chart-line", "", false, {"echarts", "ECharts", "图表"}, {"echarts", "chart"}));
+        
+        // 常用数学符号
+        items.push_back(makeCommand("formulaPlus", "math", 800, "加号", "Plus", "插入加号", "Insert plus sign", "insertInlineFormula", "fas fa-plus", "$+$", false, {"加号", "plus", "add", "jia"}, {"formula", "math", "symbol"}));
+        items.push_back(makeCommand("formulaMinus", "math", 799, "减号", "Minus", "插入减号", "Insert minus sign", "insertInlineFormula", "fas fa-minus", "$-$", false, {"减号", "minus", "subtract", "jian"}, {"formula", "math", "symbol"}));
+        items.push_back(makeCommand("formulaTimes", "math", 798, "乘号", "Times", "插入乘号", "Insert times sign", "insertInlineFormula", "fas fa-times", "$\\times$", false, {"乘号", "times", "multiply", "cheng"}, {"formula", "math", "symbol"}));
+        items.push_back(makeCommand("formulaDivide", "math", 797, "除号", "Divide", "插入除号", "Insert divide sign", "insertInlineFormula", "fas fa-divide", "$\\div$", false, {"除号", "divide", "chu"}, {"formula", "math", "symbol"}));
+        items.push_back(makeCommand("formulaEqual", "math", 796, "等号", "Equal", "插入等号", "Insert equal sign", "insertInlineFormula", "fas fa-equals", "$= $", false, {"等号", "equal", "dengyu"}, {"formula", "math", "symbol"}));
+        items.push_back(makeCommand("formulaPi", "math", 795, "圆周率", "Pi", "插入圆周率符号", "Insert pi symbol", "insertInlineFormula", "fas fa-circle-dot", "$\\pi$", false, {"圆周率", "pi", "pai"}, {"formula", "math", "constant"}));
+        items.push_back(makeCommand("formulaInfinity", "math", 794, "无穷大", "Infinity", "插入无穷大符号", "Insert infinity symbol", "insertInlineFormula", "fas fa-infinity", "$\\infty$", false, {"无穷大", "infinity", "wuqiong"}, {"formula", "math", "symbol"}));
+        items.push_back(makeCommand("formulaSum", "math", 793, "求和", "Sum", "插入求和符号", "Insert sum symbol", "insertInlineFormula", "fas fa-sigma", "$\\sum$", false, {"求和", "sum", "qiuhe"}, {"formula", "math", "operator"}));
+        items.push_back(makeCommand("formulaIntegral", "math", 792, "积分", "Integral", "插入积分符号", "Insert integral symbol", "insertInlineFormula", "fas fa-integral", "$\\int$", false, {"积分", "integral", "jifen"}, {"formula", "math", "operator"}));
+        
+        // 图表类型
+        items.push_back(makeCommand("chart", "chart", 790, "图表", "Chart", "打开图表面板", "Open the chart panel", "showChartPicker", "fas fa-chart-bar", "", false, {"图表", "图形", "chart"}, {"chart", "mermaid", "echarts", "diagram"}));
+        items.push_back(makeCommand("mermaid", "chart", 785, "Mermaid 图表", "Mermaid Chart", "插入 Mermaid 图表", "Insert a Mermaid chart", "insertMermaid", "fas fa-diagram-project", "", false, {"mermaid", "流程图", "graph"}, {"mermaid", "diagram"}));
+        items.push_back(makeCommand("eCharts", "chart", 780, "ECharts 图表", "ECharts Chart", "打开 ECharts 图表面板", "Open the ECharts chart panel", "showEChartsPicker", "fas fa-chart-line", "", false, {"echarts", "ECharts", "图表"}, {"echarts", "chart"}));
+        
+        // Mermaid 图表类型
+        items.push_back(makeCommand("chartFlowchart", "chart", 775, "流程图", "Flowchart", "插入流程图", "Insert a flowchart", "insertMermaid", "fas fa-sitemap", "", false, {"流程图", "flowchart", "flow"}, {"mermaid", "diagram", "flow"}));
+        items.push_back(makeCommand("chartSequence", "chart", 774, "序列图", "Sequence Diagram", "插入序列图", "Insert a sequence diagram", "insertMermaid", "fas fa-exchange-alt", "", false, {"序列图", "sequence", "时序图"}, {"mermaid", "diagram", "sequence"}));
+        items.push_back(makeCommand("chartClass", "chart", 773, "类图", "Class Diagram", "插入类图", "Insert a class diagram", "insertMermaid", "fas fa-code", "", false, {"类图", "class", "classDiagram"}, {"mermaid", "diagram", "class"}));
+        items.push_back(makeCommand("chartState", "chart", 772, "状态图", "State Diagram", "插入状态图", "Insert a state diagram", "insertMermaid", "fas fa-sync-alt", "", false, {"状态图", "state", "stateDiagram"}, {"mermaid", "diagram", "state"}));
+        items.push_back(makeCommand("chartGantt", "chart", 771, "甘特图", "Gantt Chart", "插入甘特图", "Insert a gantt chart", "insertMermaid", "fas fa-chart-gantt", "", false, {"甘特图", "gantt", "project"}, {"mermaid", "diagram", "gantt"}));
+        items.push_back(makeCommand("chartPie", "chart", 770, "饼图", "Pie Chart", "插入饼图", "Insert a pie chart", "insertMermaid", "fas fa-chart-pie", "", false, {"饼图", "pie", "比例"}, {"mermaid", "diagram", "pie"}));
+        items.push_back(makeCommand("chartLine", "chart", 769, "折线图", "Line Chart", "插入折线图", "Insert a line chart", "insertMermaid", "fas fa-chart-line", "", false, {"折线图", "line", "趋势"}, {"mermaid", "diagram", "line"}));
+        items.push_back(makeCommand("chartBar", "chart", 768, "柱状图", "Bar Chart", "插入柱状图", "Insert a bar chart", "insertMermaid", "fas fa-chart-bar", "", false, {"柱状图", "bar", "条形图"}, {"mermaid", "diagram", "bar"}));
+        items.push_back(makeCommand("chartER", "chart", 767, "ER图", "ER Diagram", "插入ER图", "Insert an ER diagram", "insertMermaid", "fas fa-database", "", false, {"ER图", "er", "entity"}, {"mermaid", "diagram", "er"}));
+        items.push_back(makeCommand("chartMindmap", "chart", 766, "思维导图", "Mind Map", "插入思维导图", "Insert a mind map", "insertMermaid", "fas fa-brain", "", false, {"思维导图", "mindmap", "脑图"}, {"mermaid", "diagram", "mindmap"}));
+        
+        // 表情分类
+        items.push_back(makeCommand("emoji", "insert", 830, "表情", "Emoji", "插入表情", "Insert an emoji", "showEmojiPicker", "fas fa-smile", "", false, {"表情", "emoji"}, {"emoji", "smile"}));
+        
+        // 常用表情
+        items.push_back(makeCommand("emojiSmile", "insert", 829, "微笑", "Smile", "插入微笑表情", "Insert a smile emoji", "insertEmoji", "fas fa-smile", "😀", false, {"微笑", "smile", "happy"}, {"emoji", "face"}));
+        items.push_back(makeCommand("emojiLaugh", "insert", 828, "大笑", "Laugh", "插入大笑表情", "Insert a laugh emoji", "insertEmoji", "fas fa-laugh-beam", "😂", false, {"大笑", "laugh", "lol"}, {"emoji", "face"}));
+        items.push_back(makeCommand("emojiLove", "insert", 827, "爱心", "Love", "插入爱心表情", "Insert a love emoji", "insertEmoji", "fas fa-heart", "❤️", false, {"爱心", "love", "heart"}, {"emoji", "symbol"}));
+        items.push_back(makeCommand("emojiThumbsUp", "insert", 826, "点赞", "Thumbs Up", "插入点赞表情", "Insert a thumbs up emoji", "insertEmoji", "fas fa-thumbs-up", "👍", false, {"点赞", "thumbs up", "like"}, {"emoji", "hand"}));
+        items.push_back(makeCommand("emojiClap", "insert", 825, "鼓掌", "Clap", "插入鼓掌表情", "Insert a clap emoji", "insertEmoji", "fas fa-hands-clapping", "👏", false, {"鼓掌", "clap", "applause"}, {"emoji", "hand"}));
+        items.push_back(makeCommand("emojiThinking", "insert", 824, "思考", "Thinking", "插入思考表情", "Insert a thinking emoji", "insertEmoji", "fas fa-face-thinking", "🤔", false, {"思考", "thinking", "think"}, {"emoji", "face"}));
+        items.push_back(makeCommand("emojiSad", "insert", 823, "悲伤", "Sad", "插入悲伤表情", "Insert a sad emoji", "insertEmoji", "fas fa-face-sad-tear", "😢", false, {"悲伤", "sad", "cry"}, {"emoji", "face"}));
+        items.push_back(makeCommand("emojiAngry", "insert", 822, "生气", "Angry", "插入生气表情", "Insert an angry emoji", "insertEmoji", "fas fa-face-angry", "😠", false, {"生气", "angry", "mad"}, {"emoji", "face"}));
+        items.push_back(makeCommand("emojiSurprised", "insert", 821, "惊讶", "Surprised", "插入惊讶表情", "Insert a surprised emoji", "insertEmoji", "fas fa-face-surprise", "😮", false, {"惊讶", "surprised", "shock"}, {"emoji", "face"}));
+        items.push_back(makeCommand("emojiCool", "insert", 820, "酷", "Cool", "插入酷表情", "Insert a cool emoji", "insertEmoji", "fas fa-face-cool", "😎", false, {"酷", "cool", "sunglasses"}, {"emoji", "face"}));
 
         items.push_back(makeCommand("save", "edit", 780, "保存", "Save", "保存当前文档", "Save the current document", "saveCurrentFile", "fas fa-save", "", false, {"保存", "save"}, {"save", "write"}));
         items.push_back(makeCommand("undo", "edit", 775, "撤销", "Undo", "撤销上一步操作", "Undo the last action", "undo", "fas fa-undo", "", false, {"撤销", "undo"}, {"undo", "history"}));
@@ -549,11 +589,12 @@ std::string WasmTextEngine::slashPalette(
     const std::string& query,
     const std::string& language,
     int limit,
+    int offset,
     bool includeHidden
 ) const {
     const std::string normalizedQuery = normalizeSearchText(query);
     const std::string lang = languageCode(language);
-    const int maxItems = limit > 0 ? limit : 24;
+    const int maxItems = limit > 0 ? limit : (normalizedQuery.empty() ? 20 : 80);
 
     std::vector<RankedItem> ranked;
     const std::vector<CommandItem>& catalog = commandCatalog();
@@ -594,8 +635,10 @@ std::string WasmTextEngine::slashPalette(
 
     std::ostringstream items;
     items << "[";
-    for (size_t i = 0; i < ranked.size() && i < static_cast<size_t>(maxItems); ++i) {
-        if (i > 0) items << ",";
+    size_t startIndex = static_cast<size_t>(offset);
+    size_t endIndex = startIndex + static_cast<size_t>(maxItems);
+    for (size_t i = startIndex; i < ranked.size() && i < endIndex; ++i) {
+        if (i > startIndex) items << ",";
         items << serializeCommand(*ranked[i].item, lang, ranked[i].score, ranked[i].matchedField);
     }
     items << "]";
@@ -607,7 +650,9 @@ std::string WasmTextEngine::slashPalette(
     out << "\"groups\":" << groups.str() << ",";
     out << "\"settings\":" << buildSettingsJson(lang) << ",";
     out << "\"items\":" << items.str() << ",";
-    out << "\"total\":" << ranked.size();
+    out << "\"total\":" << ranked.size() << ",";
+    out << "\"lazyLoad\":" << (normalizedQuery.empty() && ranked.size() > maxItems) << ",";
+    out << "\"hasMore\":" << (endIndex < ranked.size());
     out << "}";
     return out.str();
 }
