@@ -82,6 +82,10 @@ body {
     background-color: #ffffff !important;
 }
 
+body.ui-mode-mobile .editor-container {
+    bottom: calc(var(--mobile-bottom-bar-height) + var(--keyboard-inset-bottom));
+}
+
 body.has-top-notice .editor-container {
     top: calc(var(--top-toolbar-offset) + var(--top-toolbar-height));
 }
@@ -480,7 +484,6 @@ body.night-mode .file-list-search-result {
     box-shadow: 0 2px 10px var(--toolbar-shadow-color);
     transition: all 0.3s ease;
     height: var(--top-toolbar-height);
-    backdrop-filter: blur(14px);
 }
 
 .mobile-toolbar {
@@ -622,7 +625,7 @@ body.night-mode .file-list-search-result {
 
 .mobile-bottom-bar {
     position: fixed;
-    bottom: 0;
+    bottom: var(--keyboard-inset-bottom);
     left: 0;
     right: 0;
     background: var(--toolbar-surface-color);
@@ -631,7 +634,6 @@ body.night-mode .file-list-search-result {
     box-shadow: 0 -2px 10px var(--toolbar-shadow-color);
     z-index: 1002;
     height: 50px;
-    backdrop-filter: blur(14px);
 }
 
 .bottom-bar-buttons {
@@ -724,7 +726,7 @@ body.mobile-keyboard-visible.hide-mobile-bottom-toolbar-on-keyboard .mobile-bott
 }
 
 body.mobile-keyboard-visible.hide-mobile-bottom-toolbar-on-keyboard .editor-container {
-    bottom: 0;
+    bottom: var(--keyboard-inset-bottom);
 }
 
 body.mobile-fullscreen .editor-container {
@@ -3862,10 +3864,9 @@ body.night-mode .mobile-action-btn {
 }
 
 body.night-mode .mobile-bottom-bar {
-    background: rgba(33, 41, 53, 0.88);
-    border-top: 1px solid rgba(255, 255, 255, 0.08);
-    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.2);
-    backdrop-filter: blur(14px);
+    background: var(--toolbar-surface-color);
+    border-top: 1px solid var(--toolbar-border-color);
+    box-shadow: 0 -2px 10px var(--toolbar-shadow-color);
 }
 
 body.night-mode .bottom-btn {
