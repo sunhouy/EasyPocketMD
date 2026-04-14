@@ -162,7 +162,8 @@ export default defineConfig({
         manualChunks: {
           vditor: ['vditor']
         }
-      }
+      },
+      external: ['node-fetch']
     },
     commonjsOptions: {
       transformMixedEsModules: true
@@ -172,7 +173,8 @@ export default defineConfig({
     include: ['docx']
   },
   plugins: [
-    viteStaticCopy({
+    // 暂时禁用viteStaticCopy插件，因为它可能导致JSON解析错误
+    /*viteStaticCopy({
       targets: [
         {
           src: 'node_modules/vditor/dist',
@@ -207,7 +209,7 @@ export default defineConfig({
           dest: 'wasm_text_engine'
         }] : [])
       ]
-    }),
+    }),*/
     {
       name: 'copy-vditor-files',
       writeBundle(options) {
