@@ -17,111 +17,6 @@ document.addEventListener('DOMContentLoaded', function() {
     window.isMobileEditorEnvironment = isMobileDevice;
     window.editorInterfaceMode = window.isMobileEditorEnvironment ? 'mobile' : 'desktop';
 
-    function isAndroidClient() {
-        return /Android/i.test(navigator.userAgent || '');
-    }
-
-    if (isAndroidClient()) {
-        document.body.classList.add('android-client');
-    }
-
-    function initAndroidViewportInsets() {
-        if (!isAndroidClient()) return;
-
-        var root = document.documentElement;
-        var baselineHeight = (window.visualViewport && window.visualViewport.height)
-            ? Math.round(window.visualViewport.height)
-            : Math.round(window.innerHeight || 0);
-        var lastKeyboardOpen = false;
-
-        function isTextEditingElement(el) {
-            if (!el || typeof el.matches !== 'function') return false;
-            if (el.matches('input, textarea, .vditor-ir__input, .vditor-wysiwyg')) return true;
-            if (el.isContentEditable) return true;
-            return false;
-        }
-
-        function updateKeyboardFocusState(keyboardOpen) {
-            var active = document.activeElement;
-            var hasTextFocus = keyboardOpen && isTextEditingElement(active);
-            document.body.classList.toggle('keyboard-input-focus', hasTextFocus);
-        }
-
-        function refreshEditorViewport() {
-            var vditor = window.vditor;
-            if (!vditor) return;
-            if (typeof vditor.resize === 'function') {
-                try {
-                    vditor.resize();
-                    return;
-                } catch (e) {
-                    // fall through
-                }
-            }
-            window.dispatchEvent(new Event('resize'));
-        }
-
-        function syncInsets() {
-            var viewportHeight = (window.visualViewport && window.visualViewport.height)
-                ? Math.round(window.visualViewport.height)
-                : Math.round(window.innerHeight || 0);
-
-            if (viewportHeight > baselineHeight) {
-                baselineHeight = viewportHeight;
-            }
-
-            var rawKeyboardInset = Math.max(0, baselineHeight - viewportHeight);
-            var keyboardOpen = rawKeyboardInset > 80;
-            // Android 启用 adjustResize 后，窗口本身会收缩，避免再次手动抬升导致双重偏移。
-            var keyboardInset = 0;
-
-            root.style.setProperty('--app-viewport-height', viewportHeight + 'px');
-            root.style.setProperty('--keyboard-inset-bottom', keyboardInset + 'px');
-            document.body.classList.toggle('keyboard-open', keyboardOpen);
-            updateKeyboardFocusState(keyboardOpen);
-
-            if (keyboardOpen !== lastKeyboardOpen) {
-                lastKeyboardOpen = keyboardOpen;
-                setTimeout(refreshEditorViewport, 0);
-            }
-
-            if (!keyboardOpen) return;
-
-            var active = document.activeElement;
-            if (!active) return;
-            if (!active.matches('input, textarea, [contenteditable="true"], .vditor-ir__input, .vditor-wysiwyg')) return;
-
-            setTimeout(function() {
-                try {
-                    active.scrollIntoView({ block: 'center', inline: 'nearest' });
-                } catch (e) {
-                    active.scrollIntoView();
-                }
-            }, 60);
-        }
-
-        syncInsets();
-        window.addEventListener('resize', syncInsets);
-        window.addEventListener('orientationchange', function() {
-            baselineHeight = (window.visualViewport && window.visualViewport.height)
-                ? Math.round(window.visualViewport.height)
-                : Math.round(window.innerHeight || 0);
-            syncInsets();
-        });
-
-        if (window.visualViewport) {
-            window.visualViewport.addEventListener('resize', syncInsets);
-            window.visualViewport.addEventListener('scroll', syncInsets);
-        }
-
-        document.addEventListener('focusin', function() {
-            syncInsets();
-        }, true);
-        document.addEventListener('focusout', function() {
-            setTimeout(syncInsets, 90);
-        }, true);
-    }
-
     function getVisibleModalOverlays() {
         return Array.from(document.querySelectorAll('.modal-overlay, .mobile-action-sheet-overlay')).filter(function(el) {
             if (!el) return false;
@@ -137,7 +32,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!overlay.classList.contains('modal-overlay') && !overlay.classList.contains('mobile-action-sheet-overlay')) return;
 
         overlay.style.setProperty('padding-top', 'calc(env(safe-area-inset-top, 0px) + 10px)', 'important');
-        overlay.style.setProperty('padding-bottom', 'calc(var(--keyboard-inset-bottom, 0px) + 10px)', 'important');
+        overlay.style.setProperty('padding-bottom', '10px', 'important');
 
         if (!overlay.classList.contains('mobile-action-sheet-overlay')) {
             overlay.style.setProperty('padding-left', '10px', 'important');
@@ -147,11 +42,11 @@ document.addEventListener('DOMContentLoaded', function() {
         var modal = overlay.querySelector('.modal');
         if (!modal) return;
 
-        var fullHeight = 'calc(var(--app-viewport-height, 100vh) - env(safe-area-inset-top, 0px) - var(--keyboard-inset-bottom, 0px) - 20px)';
+        var fullHeight = 'calc(100vh - env(safe-area-inset-top, 0px) - 20px)';
         modal.style.setProperty('max-height', fullHeight, 'important');
 
         if (modal.classList.contains('conflict-modal') || modal.classList.contains('diff-modal') || modal.classList.contains('history-modal')) {
-            modal.style.setProperty('height', 'calc(var(--app-viewport-height, 100vh) - env(safe-area-inset-top, 0px) - var(--keyboard-inset-bottom, 0px))', 'important');
+            modal.style.setProperty('height', 'calc(100vh - env(safe-area-inset-top, 0px))', 'important');
         }
     }
 
@@ -3267,8 +3162,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     initializeAppShellOnce();
-    initAndroidViewportInsets();
-    initModalSafeAreaObserver();
     initAndroidBackModalBehavior();
     ensureWasmRuntimeBootstrapped();
 
