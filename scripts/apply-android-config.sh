@@ -62,12 +62,28 @@ echo "✅ Dark mode themes.xml 已应用"
 
 # 为软键盘弹出启用 adjustResize（底部工具栏自动顶到键盘上方）
 if [ -f "$ANDROID_MANIFEST_PATH" ]; then
-    if grep -q 'android:windowSoftInputMode=' "$ANDROID_MANIFEST_PATH"; then
-        sed -i -E 's/android:windowSoftInputMode="[^"]*"/android:windowSoftInputMode="adjustResize"/g' "$ANDROID_MANIFEST_PATH"
-    else
-        sed -i '0,/<activity /s/<activity /<activity android:windowSoftInputMode="adjustResize" /' "$ANDROID_MANIFEST_PATH"
-    fi
-    echo "✅ AndroidManifest.xml 已设置 windowSoftInputMode=adjustResize"
+        # Use Perl in slurp mode so both one-line and multi-line <activity ...> tags are handled.
+        perl -0777 -i -pe '
+            my $done = 0;
+            s{<activity\b([^>]*)>} {
+                my $attrs = $1;
+                return "<activity$attrs>" if $done++;
+
+                if ($attrs =~ /android:windowSoftInputMode\s*=\s*"[^"]*"/) {
+                    $attrs =~ s/android:windowSoftInputMode\s*=\s*"[^"]*"/android:windowSoftInputMode="adjustResize"/;
+                    "<activity$attrs>";
+                } else {
+                    "<activity android:windowSoftInputMode=\"adjustResize\"$attrs>";
+                }
+            }gse;
+        ' "$ANDROID_MANIFEST_PATH"
+
+        if grep -q 'android:windowSoftInputMode="adjustResize"' "$ANDROID_MANIFEST_PATH"; then
+                echo "✅ AndroidManifest.xml 已设置 windowSoftInputMode=adjustResize"
+        else
+                echo "❌ AndroidManifest.xml 未找到 windowSoftInputMode=adjustResize，终止构建"
+                exit 1
+        fi
 else
     echo "⚠️ AndroidManifest.xml 尚未生成，待 tauri android init 后会自动注入 adjustResize"
 fi

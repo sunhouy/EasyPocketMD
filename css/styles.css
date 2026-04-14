@@ -14,6 +14,15 @@
     --mobile-bottom-bar-height: 50px;
     --keyboard-inset-bottom: 0px;
     --app-viewport-height: 100vh;
+    --toolbar-surface-color: rgba(255, 255, 255, 0.98);
+    --toolbar-border-color: #eaeaea;
+    --toolbar-shadow-color: rgba(0, 0, 0, 0.05);
+}
+
+body.night-mode {
+    --toolbar-surface-color: rgba(20, 24, 33, 0.96);
+    --toolbar-border-color: rgba(255, 255, 255, 0.08);
+    --toolbar-shadow-color: rgba(0, 0, 0, 0.35);
 }
 
 body {
@@ -464,13 +473,14 @@ body.night-mode .file-list-search-result {
     top: var(--top-toolbar-offset);
     left: 0;
     right: 0;
-    background: white;
+    background: var(--toolbar-surface-color);
     z-index: 1002;
     padding: 4px var(--top-toolbar-padding-x);
-    border-bottom: 1px solid #eaeaea;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+    border-bottom: 1px solid var(--toolbar-border-color);
+    box-shadow: 0 2px 10px var(--toolbar-shadow-color);
     transition: all 0.3s ease;
     height: var(--top-toolbar-height);
+    backdrop-filter: blur(14px);
 }
 
 .mobile-toolbar {
@@ -615,12 +625,13 @@ body.night-mode .file-list-search-result {
     bottom: 0;
     left: 0;
     right: 0;
-    background: white;
+    background: var(--toolbar-surface-color);
     padding: 5px 10px;
-    border-top: 1px solid #eaeaea;
-    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.05);
+    border-top: 1px solid var(--toolbar-border-color);
+    box-shadow: 0 -2px 10px var(--toolbar-shadow-color);
     z-index: 1002;
     height: 50px;
+    backdrop-filter: blur(14px);
 }
 
 .bottom-bar-buttons {
@@ -706,6 +717,14 @@ body.night-mode .file-list-search-result {
 body.mobile-fullscreen .mobile-toolbar-container,
 body.mobile-fullscreen .mobile-bottom-bar {
     display: none !important;
+}
+
+body.mobile-keyboard-visible.hide-mobile-bottom-toolbar-on-keyboard .mobile-bottom-bar {
+    display: none !important;
+}
+
+body.mobile-keyboard-visible.hide-mobile-bottom-toolbar-on-keyboard .editor-container {
+    bottom: 0;
 }
 
 body.mobile-fullscreen .editor-container {

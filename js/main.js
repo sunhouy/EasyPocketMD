@@ -779,6 +779,7 @@ document.addEventListener('DOMContentLoaded', function() {
         var slashCommandEnabledCheckbox = document.getElementById('slashCommandEnabledCheckbox');
         var slashCommandActivationKeySelect = document.getElementById('slashCommandActivationKeySelect');
         var mdAssociationCheckbox = document.getElementById('mdAssociationCheckbox');
+        var hideBottomToolbarOnKeyboardCheckbox = document.getElementById('hideBottomToolbarOnKeyboardCheckbox');
 
         return {
             editorMode: getCheckedRadioValue('editorMode', 'wysiwyg'),
@@ -787,6 +788,7 @@ document.addEventListener('DOMContentLoaded', function() {
             language: getCheckedRadioValue('language', window.i18n ? window.i18n.getLanguage() : 'zh'),
             fontSize: fontSizeSelect ? fontSizeSelect.value : '16px',
             showOutline: !!(showOutlineCheckbox && showOutlineCheckbox.checked),
+            hideBottomToolbarOnKeyboard: !!(hideBottomToolbarOnKeyboardCheckbox && hideBottomToolbarOnKeyboardCheckbox.checked),
             enableDebugMode: !!(debugModeCheckbox && debugModeCheckbox.checked),
             enableSlashCommand: slashCommandEnabledCheckbox ? slashCommandEnabledCheckbox.checked : true,
             slashCommandActivationKey: slashCommandActivationKeySelect ? (slashCommandActivationKeySelect.value || 'Tab') : 'Tab',
@@ -1035,6 +1037,9 @@ document.addEventListener('DOMContentLoaded', function() {
     if (typeof window.userSettings.mdFileAssociationEnabled !== 'boolean') {
         window.userSettings.mdFileAssociationEnabled = true;
     }
+    if (typeof window.userSettings.hideBottomToolbarOnKeyboard !== 'boolean') {
+        window.userSettings.hideBottomToolbarOnKeyboard = false;
+    }
     if (!window.userSettings.uiMode) {
         window.userSettings.uiMode = 'auto'; // auto, mobile, desktop
     }
@@ -1114,9 +1119,77 @@ document.addEventListener('DOMContentLoaded', function() {
 
         document.body.classList.remove('ui-mode-mobile', 'ui-mode-desktop');
         document.body.classList.add(mode === 'mobile' ? 'ui-mode-mobile' : 'ui-mode-desktop');
+        syncMobileViewportState();
+    }
+
+    var mobileViewportStateBound = false;
+    var mobileViewportSyncScheduled = false;
+
+    function isMobileToolbarHideEnabledForKeyboard() {
+        return window.editorInterfaceMode === 'mobile' && window.userSettings.hideBottomToolbarOnKeyboard === true;
+    }
+
+    function computeViewportHeight() {
+        if (window.visualViewport && typeof window.visualViewport.height === 'number') {
+            return Math.max(0, Math.round(window.visualViewport.height));
+        }
+        return Math.max(0, Math.round(window.innerHeight || document.documentElement.clientHeight || 0));
+    }
+
+    function computeKeyboardInsetBottom() {
+        if (!window.visualViewport) return 0;
+        var viewportHeight = Math.max(0, window.visualViewport.height || 0);
+        var offsetTop = Math.max(0, window.visualViewport.offsetTop || 0);
+        var inset = Math.max(0, (window.innerHeight || viewportHeight) - (viewportHeight + offsetTop));
+        return Math.round(inset);
+    }
+
+    function syncMobileViewportState() {
+        var root = document.documentElement;
+        if (!root || !document.body) return;
+
+        var viewportHeight = computeViewportHeight();
+        root.style.setProperty('--app-viewport-height', viewportHeight ? viewportHeight + 'px' : '100vh');
+
+        var keyboardInsetBottom = computeKeyboardInsetBottom();
+        root.style.setProperty('--keyboard-inset-bottom', keyboardInsetBottom + 'px');
+
+        var keyboardVisible = keyboardInsetBottom > 120;
+        if (!keyboardVisible && !window.visualViewport && window.isMobileEditorEnvironment && typeof isEditorTarget === 'function') {
+            keyboardVisible = isEditorTarget(document.activeElement);
+        }
+        document.body.classList.toggle('mobile-keyboard-visible', keyboardVisible);
+        document.body.classList.toggle('hide-mobile-bottom-toolbar-on-keyboard', keyboardVisible && isMobileToolbarHideEnabledForKeyboard());
+    }
+
+    function scheduleMobileViewportSync() {
+        if (mobileViewportSyncScheduled) return;
+        mobileViewportSyncScheduled = true;
+        window.requestAnimationFrame(function() {
+            mobileViewportSyncScheduled = false;
+            syncMobileViewportState();
+        });
+    }
+
+    function bindMobileViewportState() {
+        if (mobileViewportStateBound) return;
+        mobileViewportStateBound = true;
+
+        window.addEventListener('resize', scheduleMobileViewportSync);
+        window.addEventListener('orientationchange', scheduleMobileViewportSync);
+        window.addEventListener('focusin', scheduleMobileViewportSync, true);
+        window.addEventListener('focusout', scheduleMobileViewportSync, true);
+
+        if (window.visualViewport) {
+            window.visualViewport.addEventListener('resize', scheduleMobileViewportSync);
+            window.visualViewport.addEventListener('scroll', scheduleMobileViewportSync);
+        }
+
+        scheduleMobileViewportSync();
     }
 
     applyInterfaceMode(window.userSettings);
+    bindMobileViewportState();
 
     bindToolbarEasterEggTrigger();
 
@@ -2087,6 +2160,11 @@ document.addEventListener('DOMContentLoaded', function() {
             showOutlineCheckbox.checked = window.userSettings.showOutline || false;
         }
 
+        var hideBottomToolbarOnKeyboardCheckbox = document.getElementById('hideBottomToolbarOnKeyboardCheckbox');
+        if (hideBottomToolbarOnKeyboardCheckbox) {
+            hideBottomToolbarOnKeyboardCheckbox.checked = window.userSettings.hideBottomToolbarOnKeyboard === true;
+        }
+
         var debugModeCheckbox = document.getElementById('debugModeCheckbox');
         if (debugModeCheckbox) {
             debugModeCheckbox.checked = window.userSettings.enableDebugMode === true;
@@ -2463,6 +2541,7 @@ document.addEventListener('DOMContentLoaded', function() {
             uiMode: 'auto',
             fontSize: '16px',
             showOutline: false,
+            hideBottomToolbarOnKeyboard: false,
             enableDebugMode: false,
             enableSlashCommand: window.userSettings.enableSlashCommand !== false,
             slashCommandActivationKey: window.userSettings.slashCommandActivationKey || 'Tab',
@@ -2535,6 +2614,11 @@ document.addEventListener('DOMContentLoaded', function() {
         var showOutlineCheckbox = document.getElementById('showOutlineCheckbox');
         if (showOutlineCheckbox) {
             newSettings.showOutline = showOutlineCheckbox.checked;
+        }
+
+        var hideBottomToolbarOnKeyboardCheckbox = document.getElementById('hideBottomToolbarOnKeyboardCheckbox');
+        if (hideBottomToolbarOnKeyboardCheckbox) {
+            newSettings.hideBottomToolbarOnKeyboard = hideBottomToolbarOnKeyboardCheckbox.checked;
         }
 
         var debugModeCheckbox = document.getElementById('debugModeCheckbox');
@@ -2643,6 +2727,7 @@ document.addEventListener('DOMContentLoaded', function() {
         } else {
             applyTranslations();
             applyInterfaceMode(window.userSettings);
+            syncMobileViewportState();
             window.renderBottomToolbar();
             initMobileFeatures();
             initSlashCommandRuntime();
