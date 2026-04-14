@@ -2089,7 +2089,6 @@ import {
         });
         global.files = mergedFiles;
         localStorage.setItem('vditor_files', JSON.stringify(global.files));
-        var lastSyncedContent = g('lastSyncedContent');
         var unsavedChanges = g('unsavedChanges');
         mergedFiles.forEach(function(file) {
             lastSyncedContent[file.id] = file.content;
