@@ -1129,11 +1129,6 @@ document.addEventListener('DOMContentLoaded', function() {
         return window.editorInterfaceMode === 'mobile' && window.userSettings.hideBottomToolbarOnKeyboard === true;
     }
 
-    function isTauriAndroidRuntime() {
-        var hasTauriBridge = !!(window.__TAURI__ || window.__TAURI_INTERNALS__ || (window.desktopRuntime && window.desktopRuntime.type === 'tauri'));
-        return hasTauriBridge && isAndroidClient();
-    }
-
     function isMobileTextInputActive() {
         var activeEl = document.activeElement;
         if (!activeEl || activeEl === document.body) return false;
@@ -1142,38 +1137,19 @@ document.addEventListener('DOMContentLoaded', function() {
         return false;
     }
 
-    function computeViewportHeight() {
-        if (window.visualViewport && typeof window.visualViewport.height === 'number') {
-            return Math.max(0, Math.round(window.visualViewport.height));
-        }
-        return Math.max(0, Math.round(window.innerHeight || document.documentElement.clientHeight || 0));
-    }
-
     function syncMobileViewportState() {
         var root = document.documentElement;
         if (!root || !document.body) return;
 
-        if (window.editorInterfaceMode !== 'mobile') {
-            root.style.setProperty('--app-viewport-height', '100%');
-            root.style.setProperty('--keyboard-inset-bottom', '0px');
-            document.body.classList.remove('mobile-keyboard-visible', 'hide-mobile-bottom-toolbar-on-keyboard');
-            return;
-        }
-
-        if (!isTauriAndroidRuntime()) {
-            root.style.setProperty('--app-viewport-height', '100%');
-            root.style.setProperty('--keyboard-inset-bottom', '0px');
-            var browserKeyboardVisible = isMobileTextInputActive();
-            document.body.classList.toggle('mobile-keyboard-visible', browserKeyboardVisible);
-            document.body.classList.toggle('hide-mobile-bottom-toolbar-on-keyboard', browserKeyboardVisible && isMobileToolbarHideEnabledForKeyboard());
-            return;
-        }
-
-        // Android + Tauri + adjustResize：依赖系统窗口收缩，不再手动计算键盘 inset。
         root.style.setProperty('--app-viewport-height', '100%');
         root.style.setProperty('--keyboard-inset-bottom', '0px');
 
         var keyboardVisible = isMobileTextInputActive();
+        if (window.editorInterfaceMode !== 'mobile') {
+            document.body.classList.remove('mobile-keyboard-visible', 'hide-mobile-bottom-toolbar-on-keyboard');
+            return;
+        }
+
         document.body.classList.toggle('mobile-keyboard-visible', keyboardVisible);
         document.body.classList.toggle('hide-mobile-bottom-toolbar-on-keyboard', keyboardVisible && isMobileToolbarHideEnabledForKeyboard());
     }
@@ -1198,11 +1174,6 @@ document.addEventListener('DOMContentLoaded', function() {
             scheduleMobileViewportSync();
             window.setTimeout(scheduleMobileViewportSync, 120);
         }, true);
-
-        if (window.visualViewport) {
-            window.visualViewport.addEventListener('resize', scheduleMobileViewportSync);
-            window.visualViewport.addEventListener('scroll', scheduleMobileViewportSync);
-        }
 
         scheduleMobileViewportSync();
     }
