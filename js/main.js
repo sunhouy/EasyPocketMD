@@ -1124,6 +1124,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     var mobileViewportStateBound = false;
     var mobileViewportSyncScheduled = false;
+    var mobileViewportBaselineHeight = 0;
 
     function isMobileToolbarHideEnabledForKeyboard() {
         return window.editorInterfaceMode === 'mobile' && window.userSettings.hideBottomToolbarOnKeyboard === true;
@@ -1136,12 +1137,21 @@ document.addEventListener('DOMContentLoaded', function() {
         return Math.max(0, Math.round(window.innerHeight || document.documentElement.clientHeight || 0));
     }
 
-    function computeKeyboardInsetBottom() {
-        if (!window.visualViewport) return 0;
-        var viewportHeight = Math.max(0, window.visualViewport.height || 0);
-        var offsetTop = Math.max(0, window.visualViewport.offsetTop || 0);
-        var inset = Math.max(0, (window.innerHeight || viewportHeight) - (viewportHeight + offsetTop));
-        return Math.round(inset);
+    function computeKeyboardInsetBottom(viewportHeight) {
+        var currentHeight = Math.max(0, Math.round(viewportHeight || 0));
+        if (currentHeight > mobileViewportBaselineHeight) {
+            mobileViewportBaselineHeight = currentHeight;
+        }
+
+        if (window.visualViewport) {
+            var viewportBottom = Math.max(0, Math.round((window.visualViewport.height || 0) + (window.visualViewport.offsetTop || 0)));
+            if (viewportBottom > mobileViewportBaselineHeight) {
+                mobileViewportBaselineHeight = viewportBottom;
+            }
+            return Math.max(0, mobileViewportBaselineHeight - viewportBottom);
+        }
+
+        return Math.max(0, mobileViewportBaselineHeight - currentHeight);
     }
 
     function syncMobileViewportState() {
@@ -1151,7 +1161,7 @@ document.addEventListener('DOMContentLoaded', function() {
         var viewportHeight = computeViewportHeight();
         root.style.setProperty('--app-viewport-height', viewportHeight ? viewportHeight + 'px' : '100vh');
 
-        var keyboardInsetBottom = computeKeyboardInsetBottom();
+        var keyboardInsetBottom = computeKeyboardInsetBottom(viewportHeight);
         root.style.setProperty('--keyboard-inset-bottom', keyboardInsetBottom + 'px');
 
         var keyboardVisible = keyboardInsetBottom > 120;
@@ -1176,7 +1186,10 @@ document.addEventListener('DOMContentLoaded', function() {
         mobileViewportStateBound = true;
 
         window.addEventListener('resize', scheduleMobileViewportSync);
-        window.addEventListener('orientationchange', scheduleMobileViewportSync);
+        window.addEventListener('orientationchange', function() {
+            mobileViewportBaselineHeight = 0;
+            scheduleMobileViewportSync();
+        });
         window.addEventListener('focusin', scheduleMobileViewportSync, true);
         window.addEventListener('focusout', scheduleMobileViewportSync, true);
 
