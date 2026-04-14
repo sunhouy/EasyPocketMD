@@ -197,30 +197,15 @@
 
     // 初始化代码运行器
     const codeRunner = new CodeRunner();
-    const overlayState = {
+    const runnerUiState = {
+        initialized: false,
+        activeCodeBlock: null,
         host: null,
-        items: new Set(),
-        scheduled: false,
-        scrollHandlerBound: false
+        button: null,
+        outputPanel: null,
+        outputBody: null,
+        scheduleToken: false
     };
-
-    function ensureOverlayHost() {
-        if (overlayState.host && overlayState.host.isConnected) {
-            return overlayState.host;
-        }
-
-        var host = document.createElement('div');
-        host.className = 'code-runner-overlay-host';
-        host.style.cssText = [
-            'position: fixed',
-            'inset: 0',
-            'pointer-events: none',
-            'z-index: 99999'
-        ].join(';');
-        document.body.appendChild(host);
-        overlayState.host = host;
-        return host;
-    }
 
     function getLanguageFromCodeBlock(codeBlock) {
         return String(codeBlock && codeBlock.className ? codeBlock.className : '')
@@ -229,175 +214,213 @@
             .toLowerCase();
     }
 
-    function createOverlayItem(codeBlock) {
-        var host = ensureOverlayHost();
-        var item = document.createElement('div');
-        item.className = 'code-runner-overlay-item';
-        item.setAttribute('contenteditable', 'false');
-        item.style.cssText = [
-            'position: fixed',
-            'left: 0',
-            'top: 0',
-            'right: auto',
-            'transform: none',
-            'visibility: hidden',
-            'pointer-events: auto'
-        ].join(';');
-
-        var runButton = document.createElement('button');
-        runButton.className = 'code-run-button';
-        runButton.setAttribute('contenteditable', 'false');
-        runButton.innerHTML = '<i class="fas fa-play"></i> Run';
-        runButton.style.cssText = [
-            'display: inline-flex',
-            'align-items: center',
-            'gap: 6px',
-            'padding: 5px 10px',
-            'background-color: #4a90e2',
-            'color: white',
-            'border: none',
-            'border-radius: 4px',
-            'font-size: 12px',
-            'cursor: pointer',
-            'box-shadow: 0 2px 10px rgba(0,0,0,0.18)',
-            'pointer-events: auto'
-        ].join(';');
-
-        var outputDiv = document.createElement('div');
-        outputDiv.className = 'code-output';
-        outputDiv.setAttribute('contenteditable', 'false');
-        outputDiv.style.cssText = [
-            'margin-top: 8px',
-            'max-width: min(720px, calc(100vw - 24px))',
-            'max-height: 280px',
-            'overflow: auto',
-            'padding: 10px',
-            'background-color: #f5f5f5',
-            'border: 1px solid #ddd',
-            'border-radius: 6px',
-            'font-family: monospace',
-            'font-size: 14px',
-            'white-space: pre-wrap',
-            'display: none',
-            'box-shadow: 0 8px 24px rgba(0,0,0,0.15)',
-            'pointer-events: auto'
-        ].join(';');
-
-        var toolbar = document.createElement('div');
-        toolbar.style.cssText = [
-            'display: inline-flex',
-            'flex-direction: column',
-            'align-items: flex-end',
-            'pointer-events: auto'
-        ].join(';');
-        toolbar.appendChild(runButton);
-        toolbar.appendChild(outputDiv);
-        item.appendChild(toolbar);
-        host.appendChild(item);
-
-        var overlayItem = {
-            codeBlock: codeBlock,
-            item: item,
-            button: runButton,
-            output: outputDiv,
-            language: getLanguageFromCodeBlock(codeBlock),
-            isVisible: false
-        };
-
-        runButton.addEventListener('click', async function() {
-            var code = codeBlock.textContent;
-            outputDiv.style.display = 'block';
-            outputDiv.textContent = 'Running...';
-
-            var result = await codeRunner.runCode(overlayItem.language, code);
-
-            if (result.success) {
-                if (result.outputType === 'html') {
-                    outputDiv.innerHTML = '';
-                    var iframe = document.createElement('iframe');
-                    iframe.setAttribute('sandbox', 'allow-forms allow-modals allow-popups allow-scripts');
-                    iframe.setAttribute('referrerpolicy', 'no-referrer');
-                    iframe.style.cssText = [
-                        'display: block',
-                        'width: 100%',
-                        'height: 260px',
-                        'border: 0',
-                        'background: white',
-                        'border-radius: 4px'
-                    ].join(';');
-                    iframe.srcdoc = result.output || '';
-                    outputDiv.appendChild(iframe);
-                } else {
-                    outputDiv.textContent = result.output !== undefined ? result.output.toString() : 'Execution completed successfully';
-                }
-                outputDiv.style.backgroundColor = '#e8f5e8';
-            } else {
-                outputDiv.textContent = 'Error: ' + result.error;
-                outputDiv.style.backgroundColor = '#ffe8e8';
-            }
-
-            updateOverlayItemPosition(overlayItem);
-        });
-
-        overlayState.items.add(overlayItem);
-        return overlayItem;
+    function isRunnableCodeBlock(codeBlock) {
+        if (!codeBlock || !codeBlock.isConnected) return false;
+        if (isEditableCodeBlock(codeBlock)) return false;
+        return SUPPORTED_LANGUAGES.has(getLanguageFromCodeBlock(codeBlock));
     }
 
-    function updateOverlayItemPosition(overlayItem) {
-        if (!overlayItem || !overlayItem.codeBlock || !overlayItem.item) return;
+    function getCodeBlockFromTarget(target) {
+        if (!target || !target.closest) return null;
+        var codeNode = target.closest('pre code');
+        if (codeNode) return codeNode;
+        var preNode = target.closest('pre');
+        if (preNode && preNode.querySelector) {
+            return preNode.querySelector('code');
+        }
+        return null;
+    }
 
-        if (!overlayItem.codeBlock.isConnected || !overlayItem.item.isConnected) {
-            if (overlayItem.item.parentNode) {
-                overlayItem.item.parentNode.removeChild(overlayItem.item);
-            }
-            overlayState.items.delete(overlayItem);
+    function hideRunnerButton() {
+        if (!runnerUiState.button) return;
+        runnerUiState.button.style.display = 'none';
+    }
+
+    function showRunnerButtonFor(codeBlock) {
+        if (!runnerUiState.button) return;
+
+        if (!isRunnableCodeBlock(codeBlock)) {
+            hideRunnerButton();
+            runnerUiState.activeCodeBlock = null;
             return;
         }
 
-        var rect = overlayItem.codeBlock.getBoundingClientRect();
+        runnerUiState.activeCodeBlock = codeBlock;
+        var rect = codeBlock.getBoundingClientRect();
         if (!rect || rect.width === 0 || rect.height === 0) {
-            overlayItem.item.style.visibility = 'hidden';
-            overlayItem.isVisible = false;
+            hideRunnerButton();
             return;
         }
 
         var top = Math.max(8, rect.top + 6);
-        var right = Math.max(8, window.innerWidth - rect.right + 8);
-        overlayItem.item.style.left = 'auto';
-        overlayItem.item.style.right = Math.round(right) + 'px';
-        overlayItem.item.style.top = Math.round(top) + 'px';
-        overlayItem.item.style.transform = 'none';
-        overlayItem.item.style.maxWidth = Math.max(120, Math.round(rect.width) - 16) + 'px';
-        overlayItem.item.style.display = 'block';
-        overlayItem.item.style.visibility = 'visible';
-        overlayItem.isVisible = true;
-        overlayItem.item.querySelector('.code-run-button').style.position = 'static';
-        overlayItem.item.querySelector('.code-output').style.position = 'relative';
-        overlayItem.item.querySelector('.code-output').style.left = 'auto';
-        overlayItem.item.querySelector('.code-output').style.right = 'auto';
-        overlayItem.item.querySelector('.code-output').style.top = 'auto';
-        overlayItem.item.style.pointerEvents = 'auto';
-        overlayItem.item.style.zIndex = '99999';
+        var right = Math.max(8, window.innerWidth - rect.right + 6);
+        runnerUiState.button.style.display = 'inline-flex';
+        runnerUiState.button.style.top = Math.round(top) + 'px';
+        runnerUiState.button.style.right = Math.round(right) + 'px';
     }
 
-    function scheduleOverlayUpdate() {
-        if (overlayState.scheduled) return;
-        overlayState.scheduled = true;
+    function scheduleButtonRefresh() {
+        if (runnerUiState.scheduleToken) return;
+        runnerUiState.scheduleToken = true;
         requestAnimationFrame(function() {
-            overlayState.scheduled = false;
-            overlayState.items.forEach(function(item) {
-                if (item.codeBlock && item.codeBlock.isConnected && item.item && item.item.isConnected) {
-                    updateOverlayItemPosition(item);
-                }
-            });
+            runnerUiState.scheduleToken = false;
+            if (runnerUiState.activeCodeBlock) {
+                showRunnerButtonFor(runnerUiState.activeCodeBlock);
+            }
         });
     }
 
-    function ensureOverlayListeners() {
-        if (overlayState.scrollHandlerBound) return;
-        overlayState.scrollHandlerBound = true;
-        window.addEventListener('scroll', scheduleOverlayUpdate, true);
-        window.addEventListener('resize', scheduleOverlayUpdate);
+    function renderOutput(result) {
+        if (!runnerUiState.outputPanel || !runnerUiState.outputBody) return;
+
+        runnerUiState.outputPanel.style.display = 'block';
+        runnerUiState.outputBody.innerHTML = '';
+
+        if (result.success) {
+            runnerUiState.outputPanel.style.borderColor = '#b7e1b9';
+            runnerUiState.outputPanel.style.background = '#f3fbf3';
+
+            if (result.outputType === 'html') {
+                var iframe = document.createElement('iframe');
+                iframe.setAttribute('sandbox', 'allow-forms allow-modals allow-popups allow-scripts');
+                iframe.setAttribute('referrerpolicy', 'no-referrer');
+                iframe.style.cssText = [
+                    'display: block',
+                    'width: 100%',
+                    'height: 320px',
+                    'border: 1px solid #d7deea',
+                    'border-radius: 4px',
+                    'background: #fff'
+                ].join(';');
+                iframe.srcdoc = result.output || '';
+                runnerUiState.outputBody.appendChild(iframe);
+                return;
+            }
+
+            var pre = document.createElement('pre');
+            pre.style.cssText = 'margin:0;white-space:pre-wrap;word-break:break-word;';
+            pre.textContent = result.output !== undefined ? String(result.output) : 'Execution completed successfully';
+            runnerUiState.outputBody.appendChild(pre);
+            return;
+        }
+
+        runnerUiState.outputPanel.style.borderColor = '#efc2c2';
+        runnerUiState.outputPanel.style.background = '#fff5f5';
+        var err = document.createElement('pre');
+        err.style.cssText = 'margin:0;white-space:pre-wrap;word-break:break-word;color:#a93131;';
+        err.textContent = 'Error: ' + (result.error || 'Unknown error');
+        runnerUiState.outputBody.appendChild(err);
+    }
+
+    function ensureRunnerUi() {
+        if (runnerUiState.initialized) return;
+        runnerUiState.initialized = true;
+
+        var host = document.createElement('div');
+        host.className = 'code-runner-ui-host';
+        host.style.cssText = [
+            'position: fixed',
+            'inset: 0',
+            'pointer-events: none',
+            'z-index: 1500'
+        ].join(';');
+
+        var button = document.createElement('button');
+        button.className = 'code-run-button';
+        button.innerHTML = '<i class="fas fa-play"></i> Run';
+        button.style.cssText = [
+            'position: fixed',
+            'display: none',
+            'align-items: center',
+            'gap: 6px',
+            'padding: 5px 10px',
+            'background: #4a90e2',
+            'color: #fff',
+            'border: none',
+            'border-radius: 4px',
+            'font-size: 12px',
+            'cursor: pointer',
+            'box-shadow: 0 2px 10px rgba(0,0,0,0.16)',
+            'pointer-events: auto'
+        ].join(';');
+
+        var outputPanel = document.createElement('div');
+        outputPanel.className = 'code-output';
+        outputPanel.style.cssText = [
+            'position: fixed',
+            'right: 12px',
+            'bottom: 12px',
+            'width: min(560px, calc(100vw - 24px))',
+            'max-height: min(45vh, 380px)',
+            'overflow: auto',
+            'padding: 10px',
+            'border: 1px solid #d7deea',
+            'border-radius: 6px',
+            'background: #f7f9fc',
+            'font-family: monospace',
+            'font-size: 14px',
+            'display: none',
+            'pointer-events: auto',
+            'box-shadow: 0 8px 24px rgba(0,0,0,0.15)'
+        ].join(';');
+
+        var outputHeader = document.createElement('div');
+        outputHeader.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;font-family:inherit;font-size:12px;color:#5b6573;';
+        outputHeader.textContent = 'Run Output';
+        var closeBtn = document.createElement('button');
+        closeBtn.textContent = 'x';
+        closeBtn.style.cssText = 'border:none;background:transparent;cursor:pointer;color:#5b6573;font-size:13px;line-height:1;';
+        closeBtn.addEventListener('click', function() {
+            outputPanel.style.display = 'none';
+        });
+        outputHeader.appendChild(closeBtn);
+
+        var outputBody = document.createElement('div');
+        outputBody.style.cssText = 'white-space:pre-wrap;word-break:break-word;';
+
+        outputPanel.appendChild(outputHeader);
+        outputPanel.appendChild(outputBody);
+        host.appendChild(button);
+        host.appendChild(outputPanel);
+        document.body.appendChild(host);
+
+        runnerUiState.host = host;
+        runnerUiState.button = button;
+        runnerUiState.outputPanel = outputPanel;
+        runnerUiState.outputBody = outputBody;
+
+        button.addEventListener('click', async function() {
+            if (!runnerUiState.activeCodeBlock) return;
+            var language = getLanguageFromCodeBlock(runnerUiState.activeCodeBlock);
+            var code = runnerUiState.activeCodeBlock.textContent || '';
+            renderOutput({ success: true, output: 'Running...' });
+            var result = await codeRunner.runCode(language, code);
+            renderOutput(result);
+            scheduleButtonRefresh();
+        });
+
+        document.addEventListener('mousemove', function(event) {
+            var codeBlock = getCodeBlockFromTarget(event.target);
+            if (codeBlock) {
+                showRunnerButtonFor(codeBlock);
+            }
+        }, true);
+
+        document.addEventListener('click', function(event) {
+            var codeBlock = getCodeBlockFromTarget(event.target);
+            if (codeBlock) {
+                showRunnerButtonFor(codeBlock);
+                return;
+            }
+
+            if (!event.target.closest || !event.target.closest('.code-run-button')) {
+                hideRunnerButton();
+                runnerUiState.activeCodeBlock = null;
+            }
+        }, true);
+
+        window.addEventListener('scroll', scheduleButtonRefresh, true);
+        window.addEventListener('resize', scheduleButtonRefresh);
     }
 
     function isEditableCodeBlock(codeBlock) {
@@ -420,20 +443,14 @@
 
     // 为代码块添加运行按钮
     function addRunButtons(root) {
-        const codeBlocks = getRunnableCodeBlocks(root);
-        codeBlocks.forEach(codeBlock => {
-            // 检查是否已经添加了运行按钮
-            const preElement = codeBlock.parentElement;
-            if (!preElement || preElement.dataset.codeRunnerBound === 'true') {
-                return;
-            }
+        ensureRunnerUi();
 
-            preElement.dataset.codeRunnerBound = 'true';
-            createOverlayItem(codeBlock);
-        });
+        var codeBlocks = getRunnableCodeBlocks(root);
+        if (codeBlocks.length > 0 && !runnerUiState.activeCodeBlock) {
+            showRunnerButtonFor(codeBlocks[0]);
+        }
 
-        ensureOverlayListeners();
-        scheduleOverlayUpdate();
+        scheduleButtonRefresh();
     }
 
     // 监听DOM变化，为新添加的代码块添加运行按钮
