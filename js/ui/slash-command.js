@@ -36,6 +36,8 @@ const moduleLoaders = {
 };
 
 const loadedModules = {};
+let builtinSlashEntries = null;
+let builtinSlashLoadPromise = null;
 
 const actionInsertFallback = {
     insertTable: '| 列1 | 列2 |\n| --- | --- |\n| 内容1 | 内容2 |',
@@ -934,24 +936,186 @@ function executeByIndex(index) {
 
 async function fetchPaletteItems(query) {
     var gateway = window.wasmTextEngineGateway;
-    if (!gateway) return [];
+    var normalizedQuery = (query || '').trim();
+    var remoteItems = [];
 
-    var ready = await gateway.ensureReady();
-    if (!ready || ready.code !== 200) {
-        return [];
+    if (gateway) {
+        var ready = await gateway.ensureReady();
+        if (ready && ready.code === 200) {
+            var result = gateway.slashPalette(normalizedQuery, {
+                language: currentLanguageCode(),
+                limit: 80,
+                includeHidden: false
+            });
+
+            if (result && result.code === 200 && result.data && Array.isArray(result.data.items)) {
+                remoteItems = result.data.items;
+            }
+        }
     }
 
-    var result = gateway.slashPalette(query || '', {
-        language: currentLanguageCode(),
-        limit: 80,
-        includeHidden: false
+    var localItems = await searchBuiltinEntries(normalizedQuery, 80);
+    if (!remoteItems.length) return localItems;
+    if (!localItems.length) return remoteItems;
+    return mergePaletteItems(remoteItems, localItems, 80);
+}
+
+async function loadBuiltinSlashEntries() {
+    if (Array.isArray(builtinSlashEntries)) return builtinSlashEntries;
+
+    if (!builtinSlashLoadPromise) {
+        builtinSlashLoadPromise = import('./slash-builtin-index.js').then(function(mod) {
+            if (mod && typeof mod.getBuiltinSlashEntries === 'function') {
+                builtinSlashEntries = mod.getBuiltinSlashEntries();
+            }
+            if (!Array.isArray(builtinSlashEntries)) {
+                builtinSlashEntries = [];
+            }
+            return builtinSlashEntries;
+        }).catch(function(error) {
+            console.warn('[slash-command] load builtin slash index failed:', error);
+            builtinSlashEntries = [];
+            return builtinSlashEntries;
+        });
+    }
+
+    return builtinSlashLoadPromise;
+}
+
+function normalizeForMatch(text) {
+    return String(text || '').toLowerCase();
+}
+
+function scoreBuiltinItem(item, query) {
+    if (!query) return -1;
+
+    var q = normalizeForMatch(query);
+    var compactQ = q.replace(/\s+/g, '');
+    if (!compactQ) return -1;
+
+    var fields = [
+        { value: item.titleZh, exact: 280, prefix: 180, contain: 120 },
+        { value: item.titleEn, exact: 270, prefix: 170, contain: 110 },
+        { value: item.descriptionZh, exact: 90, prefix: 70, contain: 50 },
+        { value: item.descriptionEn, exact: 90, prefix: 70, contain: 50 },
+        { value: item.insertText, exact: 120, prefix: 90, contain: 60 }
+    ];
+
+    var best = -1;
+
+    for (var i = 0; i < fields.length; i++) {
+        var field = normalizeForMatch(fields[i].value);
+        if (!field) continue;
+
+        var compactField = field.replace(/\s+/g, '');
+        if (field === q || compactField === compactQ) {
+            best = Math.max(best, fields[i].exact);
+            continue;
+        }
+        if (field.indexOf(q) === 0 || compactField.indexOf(compactQ) === 0) {
+            best = Math.max(best, fields[i].prefix);
+            continue;
+        }
+        if (field.indexOf(q) !== -1 || compactField.indexOf(compactQ) !== -1) {
+            best = Math.max(best, fields[i].contain);
+        }
+    }
+
+    var aliases = Array.isArray(item.aliases) ? item.aliases : [];
+    for (var j = 0; j < aliases.length; j++) {
+        var alias = normalizeForMatch(aliases[j]);
+        if (!alias) continue;
+
+        var compactAlias = alias.replace(/\s+/g, '');
+        if (alias === q || compactAlias === compactQ) {
+            best = Math.max(best, 230);
+            continue;
+        }
+        if (alias.indexOf(q) === 0 || compactAlias.indexOf(compactQ) === 0) {
+            best = Math.max(best, 170);
+            continue;
+        }
+        if (alias.indexOf(q) !== -1 || compactAlias.indexOf(compactQ) !== -1) {
+            best = Math.max(best, 120);
+        }
+    }
+
+    var keywords = Array.isArray(item.keywords) ? item.keywords : [];
+    for (var k = 0; k < keywords.length; k++) {
+        var keyword = normalizeForMatch(keywords[k]);
+        if (!keyword) continue;
+
+        var compactKeyword = keyword.replace(/\s+/g, '');
+        if (keyword === q || compactKeyword === compactQ) {
+            best = Math.max(best, 160);
+            continue;
+        }
+        if (keyword.indexOf(q) === 0 || compactKeyword.indexOf(compactQ) === 0) {
+            best = Math.max(best, 120);
+            continue;
+        }
+        if (keyword.indexOf(q) !== -1 || compactKeyword.indexOf(compactQ) !== -1) {
+            best = Math.max(best, 80);
+        }
+    }
+
+    return best;
+}
+
+async function searchBuiltinEntries(query, limit) {
+    if (!query) return [];
+
+    var entries = await loadBuiltinSlashEntries();
+    if (!Array.isArray(entries) || !entries.length) return [];
+
+    var matched = [];
+    for (var i = 0; i < entries.length; i++) {
+        var item = entries[i];
+        var score = scoreBuiltinItem(item, query);
+        if (score < 0) continue;
+
+        var cloned = Object.assign({}, item);
+        cloned.score = score;
+        matched.push(cloned);
+    }
+
+    matched.sort(function(a, b) {
+        if ((b.score || 0) !== (a.score || 0)) return (b.score || 0) - (a.score || 0);
+        return commandLabel(a).localeCompare(commandLabel(b));
     });
 
-    if (!result || result.code !== 200 || !result.data || !Array.isArray(result.data.items)) {
-        return [];
+    return matched.slice(0, typeof limit === 'number' ? limit : 80);
+}
+
+function mergePaletteItems(primaryItems, secondaryItems, limit) {
+    var merged = [];
+    var seen = new Set();
+
+    function keyOf(item) {
+        if (!item) return '';
+        if (item.id) return 'id:' + item.id;
+        if (item.action) return 'action:' + item.action + '|text:' + (item.insertText || '');
+        return 'text:' + (item.title || item.titleZh || item.titleEn || '') + '|' + (item.insertText || '');
     }
 
-    return result.data.items;
+    function append(items) {
+        for (var i = 0; i < items.length; i++) {
+            var item = items[i];
+            var key = keyOf(item);
+            if (!key || seen.has(key)) continue;
+
+            seen.add(key);
+            merged.push(item);
+            if (merged.length >= limit) return;
+        }
+    }
+
+    append(primaryItems || []);
+    if (merged.length < limit) {
+        append(secondaryItems || []);
+    }
+
+    return merged;
 }
 
 async function refreshFromCaret() {
