@@ -193,6 +193,22 @@ jobs:
           set -euo pipefail
           bash scripts/configure-android-permissions.sh
 
+      - name: Verify Android manifest soft input mode (source)
+        shell: bash
+        run: |
+          set -euo pipefail
+          MANIFEST="src-tauri/gen/android/app/src/main/AndroidManifest.xml"
+          if [ ! -f "$MANIFEST" ]; then
+            echo "AndroidManifest.xml not found at $MANIFEST"
+            exit 1
+          fi
+          if ! grep -q 'android:windowSoftInputMode="adjustResize"' "$MANIFEST"; then
+            echo "android:windowSoftInputMode=adjustResize is missing in source AndroidManifest.xml"
+            echo "Current AndroidManifest.xml:" && cat "$MANIFEST"
+            exit 1
+          fi
+          echo "✅ Source AndroidManifest.xml contains windowSoftInputMode=adjustResize"
+
       - name: Force custom Android launcher icon resources
         shell: bash
         run: |
@@ -339,6 +355,26 @@ jobs:
         run: |
           set -euo pipefail
           npx tauri android build --apk --target aarch64
+
+      - name: Verify merged manifest soft input mode (release)
+        shell: bash
+        run: |
+          set -euo pipefail
+          MERGED_MANIFEST=""
+          while IFS= read -r file; do
+            if grep -q 'android:windowSoftInputMode="adjustResize"' "$file"; then
+              MERGED_MANIFEST="$file"
+              break
+            fi
+          done < <(find src-tauri/gen/android/app/build/intermediates -type f -name 'AndroidManifest.xml' 2>/dev/null || true)
+
+          if [ -z "${MERGED_MANIFEST:-}" ]; then
+            echo "No merged AndroidManifest.xml with adjustResize found under build/intermediates"
+            find src-tauri/gen/android/app/build/intermediates -type f -name 'AndroidManifest.xml' -print || true
+            exit 1
+          fi
+
+          echo "✅ Merged manifest verified: $MERGED_MANIFEST"
 
       - name: Collect signed Android artifacts
         env:
