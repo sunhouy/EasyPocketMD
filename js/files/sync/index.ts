@@ -29,6 +29,7 @@ export function detectConflicts(
   serverFiles: any[],
   pendingServerSync: Record<string, boolean>,
   editableSharedByFilename: Record<string, any>,
+  lastSyncedContent: Record<string, any>,
   isExternalLocalFile: (f: any) => boolean,
 ): any[] {
   const conflicts: any[] = [];
@@ -60,6 +61,19 @@ export function detectConflicts(
         localFile.content = serverFile.content;
         localFile.lastModified = serverFile.lastModified || Date.now();
         localFile.isSynced = true;
+        return;
+      }
+      const baseContent =
+        localFile && localFile.id && lastSyncedContent ? lastSyncedContent[localFile.id] : undefined;
+      const serverUnchangedSinceLastSync =
+        baseContent !== undefined &&
+        localFile.type === 'file' &&
+        serverFile.type === 'file' &&
+        serverFile.content === baseContent;
+
+      // If server content is still equal to our last synced snapshot,
+      // the difference is local-only and should not trigger a conflict dialog.
+      if (serverUnchangedSinceLastSync && localFile.content !== serverFile.content) {
         return;
       }
       if (serverFile.content !== localFile.content) {

@@ -621,6 +621,10 @@ body.night-mode .file-list-search-result {
     box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.05);
     z-index: 1002;
     height: 50px;
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+    transition: transform 0.22s ease, opacity 0.22s ease, visibility 0.22s ease;
 }
 
 .bottom-bar-buttons {
@@ -746,12 +750,15 @@ body.mobile-fullscreen .editor-container {
     to { opacity: 0; visibility: hidden; }
 }
 
-body.android-client.keyboard-open .mobile-bottom-bar {
-    display: block !important;
+body.android-client.keyboard-open.keyboard-input-focus .mobile-bottom-bar {
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(100%);
+    pointer-events: none;
 }
 
-body.android-client.keyboard-open .editor-container {
-    bottom: calc(var(--mobile-bottom-bar-height) + var(--keyboard-inset-bottom)) !important;
+body.android-client.keyboard-open.keyboard-input-focus .editor-container {
+    bottom: var(--keyboard-inset-bottom) !important;
 }
 
 .mobile-action-sheet {

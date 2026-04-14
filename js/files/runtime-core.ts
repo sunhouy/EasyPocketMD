@@ -1489,6 +1489,7 @@ import {
             serverFiles,
             g('pendingServerSync') || {},
             ownerShareCache.byFilename || {},
+            g('lastSyncedContent') || {},
             isExternalLocalFile
         );
     }
@@ -2018,6 +2019,8 @@ import {
     function mergeFiles(localFiles, serverFiles) {
         const mergedFiles = [];
         const fileMap = {};
+        const pendingServerSync = g('pendingServerSync') || {};
+        const lastSyncedContent = g('lastSyncedContent') || {};
         serverFiles.forEach(function(serverFile) {
             const serverLastModified = serverFile.serverLastModified || serverFile.lastModified || null;
             const hasVersion =
@@ -2044,6 +2047,15 @@ import {
             }
             const mergedServerFile = fileMap[localFile.name];
             if (mergedServerFile) {
+                const localBaseContent = localFile && localFile.id ? lastSyncedContent[localFile.id] : undefined;
+                const hasPendingLocalSync = !!(localFile && localFile.id && pendingServerSync[localFile.id]);
+                const serverUnchangedSinceLastSync =
+                    localFile &&
+                    localFile.type === 'file' &&
+                    mergedServerFile.type === 'file' &&
+                    localBaseContent !== undefined &&
+                    mergedServerFile.content === localBaseContent &&
+                    localFile.content !== mergedServerFile.content;
                 const shouldPreferUnsyncedLocal =
                     localFile &&
                     localFile.type === 'file' &&
@@ -2052,12 +2064,23 @@ import {
                     !localFile.serverLastModified &&
                     localFile.content !== mergedServerFile.content;
 
-                if (shouldPreferUnsyncedLocal) {
+                const shouldPreferLocal =
+                    shouldPreferUnsyncedLocal ||
+                    (hasPendingLocalSync && localFile.content !== mergedServerFile.content) ||
+                    serverUnchangedSinceLastSync;
+
+                if (shouldPreferLocal) {
                     mergedServerFile.id = localFile.id || mergedServerFile.id;
                     mergedServerFile.content = localFile.content;
                     mergedServerFile.lastModified = localFile.lastModified || mergedServerFile.lastModified;
+                    mergedServerFile.serverLastModified = localFile.serverLastModified || mergedServerFile.serverLastModified;
+                    mergedServerFile.contentVersion =
+                        localFile.contentVersion !== undefined && localFile.contentVersion !== null
+                            ? localFile.contentVersion
+                            : mergedServerFile.contentVersion;
                     mergedServerFile.isSynced = false;
                     mergedServerFile.preferLocalOnNextSync = true;
+                    markPendingServerSync(mergedServerFile.id, true);
                 }
                 return;
             }
@@ -4295,7 +4318,9 @@ import {
         file.content = content;
         file.lastModified = Date.now();
         localStorage.setItem('vditor_files', JSON.stringify(files));
-        showSaveStatus('saving');
+        if (isManual) {
+            showSaveStatus('saving');
+        }
 
         // 在线共享文档由 share websocket/update 通道负责写入，避免 owner 普通保存覆盖实时协作状态。
         if (
@@ -4305,7 +4330,9 @@ import {
             typeof global.scheduleSharedDocSync === 'function'
         ) {
             global.scheduleSharedDocSync();
-            showSaveStatus('saved');
+            if (isManual) {
+                showSaveStatus('saved');
+            }
             return;
         }
 
@@ -4318,8 +4345,10 @@ import {
         if (file.isExternalLocal && file.localFilePath && global.electron && typeof global.electron.writeLocalFile === 'function') {
             const writeResult = await global.electron.writeLocalFile(file.localFilePath, content);
             if (!writeResult || !writeResult.success) {
-                if (!global.lastSaveConflictPending) showSaveStatus('failed');
-                global.showMessage((isEn() ? 'Failed to save local file: ' : '保存本地文件失败：') + ((writeResult && writeResult.error) || ''), 'error');
+                if (isManual && !global.lastSaveConflictPending) showSaveStatus('failed');
+                if (isManual) {
+                    global.showMessage((isEn() ? 'Failed to save local file: ' : '保存本地文件失败：') + ((writeResult && writeResult.error) || ''), 'error');
+                }
                 return;
             }
             localExternalSnapshotMap.set(currentFileId, content);
@@ -4329,9 +4358,13 @@ import {
             const saveSynced = await syncFileAfterSaveIfNeeded(currentFileId, file, content, isManual, contentChanged);
             if (saveSynced) {
                 g('unsavedChanges')[currentFileId] = false;
-                showSaveStatus('saved');
+                if (isManual) {
+                    showSaveStatus('saved');
+                }
             } else {
-                showSaveStatus('failed');
+                if (isManual) {
+                    showSaveStatus('failed');
+                }
             }
             return;
         }
@@ -4346,14 +4379,18 @@ import {
                 const saveSynced = await syncFileAfterSaveIfNeeded(currentFileId, file, content, isManual, contentChanged);
                 if (saveSynced) {
                     g('unsavedChanges')[currentFileId] = false;
-                    showSaveStatus('saved');
-                } else if (!global.lastSaveConflictPending) {
+                    if (isManual) {
+                        showSaveStatus('saved');
+                    }
+                } else if (isManual && !global.lastSaveConflictPending) {
                     showSaveStatus('failed');
                 }
             } else {
                 if (writeResult && writeResult.error && !writeResult.canceled) {
-                    if (!global.lastSaveConflictPending) showSaveStatus('failed');
-                    global.showMessage((isEn() ? 'Failed to save local file: ' : '保存本地文件失败：') + (writeResult.error.message || ''), 'error');
+                    if (isManual && !global.lastSaveConflictPending) showSaveStatus('failed');
+                    if (isManual) {
+                        global.showMessage((isEn() ? 'Failed to save local file: ' : '保存本地文件失败：') + (writeResult.error.message || ''), 'error');
+                    }
                 }
                 downloadLocalContent(file.name, content);
                 localExternalSnapshotMap.set(currentFileId, content);
@@ -4363,8 +4400,10 @@ import {
                 const saveSynced = await syncFileAfterSaveIfNeeded(currentFileId, file, content, isManual, contentChanged);
                 if (saveSynced) {
                     g('unsavedChanges')[currentFileId] = false;
-                    showSaveStatus('saved');
-                } else if (!global.lastSaveConflictPending) {
+                    if (isManual) {
+                        showSaveStatus('saved');
+                    }
+                } else if (isManual && !global.lastSaveConflictPending) {
                     showSaveStatus('failed');
                 }
             }
@@ -4381,8 +4420,10 @@ import {
             const saveSynced = await syncFileAfterSaveIfNeeded(currentFileId, file, content, isManual, contentChanged);
             if (saveSynced) {
                 g('unsavedChanges')[currentFileId] = false;
-                showSaveStatus('saved');
-            } else if (!global.lastSaveConflictPending) {
+                if (isManual) {
+                    showSaveStatus('saved');
+                }
+            } else if (isManual && !global.lastSaveConflictPending) {
                 showSaveStatus('failed');
             }
             return;
@@ -4391,8 +4432,10 @@ import {
         const saveSynced = await syncFileAfterSaveIfNeeded(currentFileId, file, content, isManual, contentChanged);
         if (saveSynced) {
             g('unsavedChanges')[currentFileId] = false;
-            showSaveStatus('saved');
-        } else if (!global.lastSaveConflictPending) {
+            if (isManual) {
+                showSaveStatus('saved');
+            }
+        } else if (isManual && !global.lastSaveConflictPending) {
             showSaveStatus('failed');
         }
     }
@@ -4730,7 +4773,6 @@ import {
         }
 
         global.clearAutoSave();
-        showSaveStatus('saving');
         Promise.resolve(persistDraftBackup()).catch(function(error) {
             console.warn('[Autosave] draft backup failed:', error);
         });
@@ -6262,6 +6304,9 @@ import {
                     currentFile.lastModified = Date.now();
                 }
                 g('unsavedChanges')[currentFileId] = true;
+                if (typeof global.startAutoSave === 'function') {
+                    global.startAutoSave();
+                }
                 await performFind();
                 if (matches.length > 0) {
                     currentMatchIndex = Math.min(currentMatchIndex, matches.length - 1);
@@ -6310,6 +6355,9 @@ import {
                 currentFile.lastModified = Date.now();
             }
             g('unsavedChanges')[currentFileId] = true;
+            if (typeof global.startAutoSave === 'function') {
+                global.startAutoSave();
+            }
             findStatus.textContent = (isEn() ? 'Replaced ' : '已替换 ') + (replaceRes.data.replaced || 0) + (isEn() ? ' occurrences' : ' 处');
             findStatus.style.color = '#28a745';
             clearHighlights();
