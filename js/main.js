@@ -1124,7 +1124,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
     var mobileViewportStateBound = false;
     var mobileViewportSyncScheduled = false;
-    var mobileViewportBaselineHeight = 0;
 
     function isMobileToolbarHideEnabledForKeyboard() {
         return window.editorInterfaceMode === 'mobile' && window.userSettings.hideBottomToolbarOnKeyboard === true;
@@ -1150,42 +1149,19 @@ document.addEventListener('DOMContentLoaded', function() {
         return Math.max(0, Math.round(window.innerHeight || document.documentElement.clientHeight || 0));
     }
 
-    function computeKeyboardInsetBottom(viewportHeight) {
-        var currentHeight = Math.max(0, Math.round(viewportHeight || 0));
-        if (currentHeight > mobileViewportBaselineHeight || mobileViewportBaselineHeight === 0) {
-            mobileViewportBaselineHeight = currentHeight;
-        }
-
-        if (window.visualViewport) {
-            var vvHeight = Math.max(0, Math.round(window.visualViewport.height || 0));
-            var vvOffsetTop = Math.max(0, Math.round(window.visualViewport.offsetTop || 0));
-            var viewportBottom = vvHeight + vvOffsetTop;
-
-            if (viewportBottom > mobileViewportBaselineHeight) {
-                mobileViewportBaselineHeight = viewportBottom;
-            }
-
-            var overlayInset = Math.max(0, Math.round((window.innerHeight || viewportBottom) - viewportBottom));
-            var resizeInset = Math.max(0, mobileViewportBaselineHeight - currentHeight);
-            return Math.max(overlayInset, resizeInset);
-        }
-
-        return Math.max(0, mobileViewportBaselineHeight - currentHeight);
-    }
-
     function syncMobileViewportState() {
         var root = document.documentElement;
         if (!root || !document.body) return;
 
         if (window.editorInterfaceMode !== 'mobile') {
-            root.style.setProperty('--app-viewport-height', '100dvh');
+            root.style.setProperty('--app-viewport-height', '100%');
             root.style.setProperty('--keyboard-inset-bottom', '0px');
             document.body.classList.remove('mobile-keyboard-visible', 'hide-mobile-bottom-toolbar-on-keyboard');
             return;
         }
 
         if (!isTauriAndroidRuntime()) {
-            root.style.setProperty('--app-viewport-height', '100dvh');
+            root.style.setProperty('--app-viewport-height', '100%');
             root.style.setProperty('--keyboard-inset-bottom', '0px');
             var browserKeyboardVisible = isMobileTextInputActive();
             document.body.classList.toggle('mobile-keyboard-visible', browserKeyboardVisible);
@@ -1194,18 +1170,13 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         var viewportHeight = computeViewportHeight();
-        root.style.setProperty('--app-viewport-height', viewportHeight ? viewportHeight + 'px' : '100dvh');
+        root.style.setProperty('--app-viewport-height', viewportHeight ? viewportHeight + 'px' : '100%');
 
-        var keyboardInsetBottom = computeKeyboardInsetBottom(viewportHeight);
+        var keyboardInsetBottom = 0;
         var hasFocusedInput = isMobileTextInputActive();
-        if (!hasFocusedInput && keyboardInsetBottom < 24) {
-            keyboardInsetBottom = 0;
-            mobileViewportBaselineHeight = Math.max(mobileViewportBaselineHeight, viewportHeight);
-        }
-        keyboardInsetBottom = Math.max(0, Math.min(keyboardInsetBottom, Math.round(viewportHeight * 0.6)));
         root.style.setProperty('--keyboard-inset-bottom', keyboardInsetBottom + 'px');
 
-        var keyboardVisible = keyboardInsetBottom > 24 || hasFocusedInput;
+        var keyboardVisible = hasFocusedInput;
         document.body.classList.toggle('mobile-keyboard-visible', keyboardVisible);
         document.body.classList.toggle('hide-mobile-bottom-toolbar-on-keyboard', keyboardVisible && isMobileToolbarHideEnabledForKeyboard());
     }
@@ -1224,10 +1195,7 @@ document.addEventListener('DOMContentLoaded', function() {
         mobileViewportStateBound = true;
 
         window.addEventListener('resize', scheduleMobileViewportSync);
-        window.addEventListener('orientationchange', function() {
-            mobileViewportBaselineHeight = 0;
-            scheduleMobileViewportSync();
-        });
+        window.addEventListener('orientationchange', scheduleMobileViewportSync);
         window.addEventListener('focusin', scheduleMobileViewportSync, true);
         window.addEventListener('focusout', function() {
             scheduleMobileViewportSync();
