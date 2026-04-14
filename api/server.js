@@ -77,6 +77,7 @@ const fileRoutes = require('./routes/files');
 const shareRoutes = require('./routes/share');
 const adminRoutes = require('./routes/admin');
 const apiRoutes = require('./routes/api');
+const codeRunnerRoutes = require('./routes/code-runner');
 const convertRoutes = require('./routes/convert');
 const aiRoutes = require('./routes/ai');
 const userFilesRoutes = require('./routes/user_files');
@@ -110,6 +111,9 @@ app.use('/api/admin', strictLimiter, adminRoutes);
 
 // External API routes
 app.use('/api/external', apiLimiter, apiRoutes);
+
+// Code runner routes - server-side C/C++ compilation via emscripten
+app.use('/api/code-runner', apiLimiter, codeRunnerRoutes);
 
 // Convert routes - rate limiting for export functions
 app.use('/api/convert', convertLimiter, convertRoutes);

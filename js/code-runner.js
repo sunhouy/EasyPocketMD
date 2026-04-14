@@ -3,40 +3,70 @@
 
     function g(name) { return global[name]; }
 
+    var SUPPORTED_LANGUAGES = new Set(['python', 'py', 'javascript', 'js', 'typescript', 'ts', 'c', 'cpp', 'c++']);
+    var PYODIDE_VERSION = '0.25.1';
+    var PYODIDE_CDN_BASES = [
+        'https://static.yhsun.cn/cdn/pyodide/v' + PYODIDE_VERSION + '/full/'
+    ];
+
     // 代码运行器类
     class CodeRunner {
         constructor() {
+            this.cCompilerEndpoint = '/api/code-runner/run';
             this.pyodide = null;
             this.pyodideLoaded = false;
-            this.emscriptenModule = null;
+            this.pyodideLoadingPromise = null;
+            this.pyodideCdnBase = null;
         }
 
-        // 初始化Pyodide
         async initPyodide() {
-            if (!this.pyodideLoaded) {
-                try {
-                    const Pyodide = await import('pyodide');
-                    this.pyodide = await Pyodide.loadPyodide({
-                        indexURL: './node_modules/pyodide/dist/'
-                    });
-                    this.pyodideLoaded = true;
-                    console.log('Pyodide initialized successfully');
-                } catch (error) {
-                    console.error('Failed to initialize Pyodide:', error);
-                    throw error;
-                }
+            if (this.pyodideLoaded && this.pyodide) {
+                return this.pyodide;
             }
-            return this.pyodide;
+
+            if (this.pyodideLoadingPromise) {
+                return this.pyodideLoadingPromise;
+            }
+
+            var self = this;
+            this.pyodideLoadingPromise = (async function() {
+                var lastError = null;
+
+                for (var i = 0; i < PYODIDE_CDN_BASES.length; i++) {
+                    var baseUrl = PYODIDE_CDN_BASES[i];
+                    try {
+                        var moduleUrl = baseUrl + 'pyodide.mjs';
+                        var pyodideModule = await import(moduleUrl);
+                        self.pyodide = await pyodideModule.loadPyodide({
+                            indexURL: baseUrl
+                        });
+                        self.pyodideLoaded = true;
+                        self.pyodideCdnBase = baseUrl;
+                        return self.pyodide;
+                    } catch (error) {
+                        lastError = error;
+                    }
+                }
+
+                self.pyodideLoadingPromise = null;
+                throw lastError || new Error('Failed to load Pyodide from CDN');
+            })();
+
+            try {
+                return await this.pyodideLoadingPromise;
+            } catch (error) {
+                this.pyodideLoadingPromise = null;
+                throw error;
+            }
         }
 
-        // 运行Python代码
         async runPython(code) {
             try {
-                const pyodide = await this.initPyodide();
-                const result = pyodide.runPython(code);
+                var pyodide = await this.initPyodide();
+                var result = pyodide.runPython(code);
                 return { success: true, output: result };
             } catch (error) {
-                return { success: false, error: error.message };
+                return { success: false, error: error && error.message ? error.message : String(error) };
             }
         }
 
@@ -69,18 +99,47 @@
         }
 
         // 运行C/C++代码（通过Emscripten编译）
-        async runCpp(code) {
-            // 这里需要集成Emscripten编译和运行逻辑
-            // 由于Emscripten编译过程复杂，这里只提供一个占位实现
-            return {
-                success: false,
-                error: 'C/C++ code execution is not fully implemented yet. Please use JavaScript or Python for now.'
-            };
+        async runCpp(code, language) {
+            try {
+                const response = await fetch(this.cCompilerEndpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        code: code,
+                        language: language
+                    })
+                });
+
+                const payload = await response.json().catch(function() {
+                    return null;
+                });
+
+                if (!response.ok || !payload || payload.success === false) {
+                    return {
+                        success: false,
+                        error: (payload && payload.error) || 'Failed to execute C/C++ code'
+                    };
+                }
+
+                return {
+                    success: true,
+                    output: payload.output || ''
+                };
+            } catch (error) {
+                return {
+                    success: false,
+                    error: error && error.message ? error.message : String(error)
+                };
+            }
         }
 
         // 根据语言类型运行代码
         async runCode(language, code) {
-            switch (language.toLowerCase()) {
+            var normalizedLanguage = String(language || '').toLowerCase();
+
+            switch (normalizedLanguage) {
                 case 'python':
                 case 'py':
                     return this.runPython(code);
@@ -92,9 +151,9 @@
                 case 'c':
                 case 'cpp':
                 case 'c++':
-                    return this.runCpp(code);
+                    return this.runCpp(code, normalizedLanguage);
                 default:
-                    return { success: false, error: `Unsupported language: ${language}` };
+                    return { success: false, error: 'Unsupported language: ' + language };
             }
         }
     }
@@ -102,22 +161,38 @@
     // 初始化代码运行器
     const codeRunner = new CodeRunner();
 
+    function isEditableCodeBlock(codeBlock) {
+        if (!codeBlock || !codeBlock.closest) return false;
+        return !!codeBlock.closest('[contenteditable="true"], .vditor-wysiwyg, .vditor-ir__input, textarea, input');
+    }
+
+    function getCodeBlocks(root) {
+        var scope = root && root.querySelectorAll ? root : document;
+        return Array.from(scope.querySelectorAll('pre code'));
+    }
+
+    function getRunnableCodeBlocks(root) {
+        return getCodeBlocks(root).filter(function(codeBlock) {
+            if (!codeBlock || isEditableCodeBlock(codeBlock)) return false;
+            var language = String(codeBlock.className || '').replace('language-', '').split(' ')[0].toLowerCase();
+            return SUPPORTED_LANGUAGES.has(language);
+        });
+    }
+
     // 为代码块添加运行按钮
-    function addRunButtons() {
-        const codeBlocks = document.querySelectorAll('pre code');
+    function addRunButtons(root) {
+        const codeBlocks = getRunnableCodeBlocks(root);
         codeBlocks.forEach(codeBlock => {
             // 检查是否已经添加了运行按钮
-            if (codeBlock.parentElement.querySelector('.code-run-button')) {
+            const preElement = codeBlock.parentElement;
+            if (!preElement || preElement.dataset.codeRunnerBound === 'true' || preElement.querySelector('.code-run-button')) {
                 return;
             }
 
+            preElement.dataset.codeRunnerBound = 'true';
+
             // 获取语言类型
             const language = codeBlock.className.replace('language-', '').split(' ')[0];
-            
-            // 只处理支持的语言
-            if (!['python', 'py', 'javascript', 'js', 'typescript', 'ts', 'c', 'cpp', 'c++'].includes(language.toLowerCase())) {
-                return;
-            }
 
             // 创建运行按钮
             const runButton = document.createElement('button');
@@ -153,7 +228,6 @@
             `;
 
             // 为代码块容器添加相对定位
-            const preElement = codeBlock.parentElement;
             preElement.style.position = 'relative';
 
             // 添加按钮和输出区域
@@ -177,7 +251,7 @@
                     outputElement.textContent = result.output !== undefined ? result.output.toString() : 'Execution completed successfully';
                     outputElement.style.backgroundColor = '#e8f5e8';
                 } else {
-                    outputElement.textContent = `Error: ${result.error}`;
+                    outputElement.textContent = 'Error: ' + result.error;
                     outputElement.style.backgroundColor = '#ffe8e8';
                 }
             });
@@ -191,11 +265,11 @@
                 mutation.addedNodes.forEach(function(node) {
                     if (node.nodeType === 1) {
                         if (node.tagName === 'PRE' && node.querySelector('code')) {
-                            addRunButtons();
+                            addRunButtons(node.parentNode || document);
                         } else if (node.querySelectorAll) {
-                            const codeBlocks = node.querySelectorAll('pre code');
+                            const codeBlocks = getRunnableCodeBlocks(node);
                             if (codeBlocks.length > 0) {
-                                addRunButtons();
+                                addRunButtons(node);
                             }
                         }
                     }
