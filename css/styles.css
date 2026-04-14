@@ -952,9 +952,14 @@ body.android-client.keyboard-open.keyboard-input-focus .editor-container {
 
 .settings-section-title {
     margin: 0;
-    font-size: 15px;
+    font-size: 14px;
     font-weight: 600;
-    color: #27415f;
+    color: #4a4a4a;
+    padding-left: 10px;
+}
+
+.settings-list-item {
+    padding-left: 10px;
 }
 
 .settings-section-hint {
@@ -1039,6 +1044,13 @@ body.android-client.keyboard-open.keyboard-input-focus .editor-container {
     z-index: 2;
     padding: 0 42px 16px 0;
     background: inherit;
+    text-align: center;
+}
+
+#settingsModalOverlay .modal-header h2 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
 }
 
 #settingsModalOverlay .modal-form {
