@@ -197,6 +197,33 @@ jobs:
           fi
           echo "✅ Source AndroidManifest.xml contains windowSoftInputMode=adjustResize"
 
+      - name: Verify Android source config sync (no script patching)
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          MAIN_ACTIVITY="src-tauri/gen/android/app/src/main/java/cn/yhsun/md/MainActivity.kt"
+          THEME_LIGHT="src-tauri/gen/android/app/src/main/res/values/themes.xml"
+          THEME_DARK="src-tauri/gen/android/app/src/main/res/values-night/themes.xml"
+          MANIFEST="src-tauri/gen/android/app/src/main/AndroidManifest.xml"
+
+          for f in "$MAIN_ACTIVITY" "$THEME_LIGHT" "$THEME_DARK" "$MANIFEST"; do
+            if [ ! -f "$f" ]; then
+              echo "Missing required Android source file: $f"
+              exit 1
+            fi
+          done
+
+          grep -q 'setDecorFitsSystemWindows(window, true)' "$MAIN_ACTIVITY"
+          grep -q 'SOFT_INPUT_ADJUST_RESIZE' "$MAIN_ACTIVITY"
+          grep -q 'android:windowLayoutInDisplayCutoutMode' "$THEME_LIGHT"
+          grep -q 'android:windowSoftInputMode">adjustResize<' "$THEME_LIGHT"
+          grep -q 'android:windowLayoutInDisplayCutoutMode' "$THEME_DARK"
+          grep -q 'android:windowSoftInputMode">adjustResize<' "$THEME_DARK"
+          grep -q 'android.intent.category.LAUNCHER' "$MANIFEST"
+
+          echo "✅ Android source files are fully synced with required runtime/theme settings"
+
       - name: Force custom Android launcher icon resources
         shell: bash
         run: |
