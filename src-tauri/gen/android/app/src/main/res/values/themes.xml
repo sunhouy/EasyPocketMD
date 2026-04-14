@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.TauriApp" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <!-- 禁用边缘到边缘 cutout 扩展，避免与 adjustResize 冲突 -->
+        <item name="android:windowLayoutInDisplayCutoutMode">default</item>
+        <!-- 明确键盘弹出时收缩内容区域 -->
+        <item name="android:windowSoftInputMode">adjustResize</item>
+        <!-- 禁用全屏模式 -->
+        <item name="android:windowFullscreen">false</item>
+        <!-- 禁用半透明状态栏 -->
+        <item name="android:windowTranslucentStatus">false</item>
+        <!-- 设置状态栏颜色为透明，让系统布局扩展到状态栏 -->
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <!-- Light status bar content (for light background) -->
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+
+    <!-- Tauri generated manifest may reference this style name -->
+    <style name="Theme.easypocketmd_tauri" parent="Theme.TauriApp" />
+</resources>
