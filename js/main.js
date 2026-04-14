@@ -34,6 +34,19 @@ document.addEventListener('DOMContentLoaded', function() {
             : Math.round(window.innerHeight || 0);
         var lastKeyboardOpen = false;
 
+        function isTextEditingElement(el) {
+            if (!el || typeof el.matches !== 'function') return false;
+            if (el.matches('input, textarea, .vditor-ir__input, .vditor-wysiwyg')) return true;
+            if (el.isContentEditable) return true;
+            return false;
+        }
+
+        function updateKeyboardFocusState(keyboardOpen) {
+            var active = document.activeElement;
+            var hasTextFocus = keyboardOpen && isTextEditingElement(active);
+            document.body.classList.toggle('keyboard-input-focus', hasTextFocus);
+        }
+
         function refreshEditorViewport() {
             var vditor = window.vditor;
             if (!vditor) return;
@@ -65,6 +78,7 @@ document.addEventListener('DOMContentLoaded', function() {
             root.style.setProperty('--app-viewport-height', viewportHeight + 'px');
             root.style.setProperty('--keyboard-inset-bottom', keyboardInset + 'px');
             document.body.classList.toggle('keyboard-open', keyboardOpen);
+            updateKeyboardFocusState(keyboardOpen);
 
             if (keyboardOpen !== lastKeyboardOpen) {
                 lastKeyboardOpen = keyboardOpen;
@@ -100,7 +114,9 @@ document.addEventListener('DOMContentLoaded', function() {
             window.visualViewport.addEventListener('scroll', syncInsets);
         }
 
-        document.addEventListener('focusin', syncInsets, true);
+        document.addEventListener('focusin', function() {
+            syncInsets();
+        }, true);
         document.addEventListener('focusout', function() {
             setTimeout(syncInsets, 90);
         }, true);
