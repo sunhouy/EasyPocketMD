@@ -7,6 +7,8 @@ PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ANDROID_RES_DIR="$PROJECT_ROOT/src-tauri/gen/android/app/src/main/res"
 ANDROID_MANIFEST_PATH="$PROJECT_ROOT/src-tauri/gen/android/app/src/main/AndroidManifest.xml"
 ANDROID_PACKAGE_NAME="$(node -e 'const fs = require("fs"); const path = require("path"); const configPath = path.join(process.argv[1], "src-tauri", "tauri.conf.json"); const config = JSON.parse(fs.readFileSync(configPath, "utf8")); const identifier = config.identifier || config.package?.identifier || config.tauri?.bundle?.identifier || "cn.yhsun.md"; process.stdout.write(identifier);' "$PROJECT_ROOT")"
+ANDROID_MAIN_DIR="$PROJECT_ROOT/src-tauri/gen/android/app/src/main/java/${ANDROID_PACKAGE_NAME//./\/}"
+MAIN_ACTIVITY_PATH="$ANDROID_MAIN_DIR/MainActivity.kt"
 ANDROID_GENERATED_DIR="$PROJECT_ROOT/src-tauri/gen/android/app/src/main/java/${ANDROID_PACKAGE_NAME//./\/}/generated"
 TAURI_ACTIVITY_PATH="$ANDROID_GENERATED_DIR/TauriActivity.kt"
 
@@ -15,12 +17,17 @@ echo "🔧 正在应用 Android 状态栏配置..."
 # 创建必要的目录
 mkdir -p "$ANDROID_RES_DIR/values"
 mkdir -p "$ANDROID_RES_DIR/values-night"
+mkdir -p "$ANDROID_MAIN_DIR"
 mkdir -p "$ANDROID_GENERATED_DIR"
 # 复制 themes.xml (Light mode)
 cat > "$ANDROID_RES_DIR/values/themes.xml" << 'EOF'
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <style name="Theme.TauriApp" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <!-- 禁用边缘到边缘 cutout 扩展，避免与 adjustResize 冲突 -->
+        <item name="android:windowLayoutInDisplayCutoutMode">default</item>
+        <!-- 明确键盘弹出时收缩内容区域 -->
+        <item name="android:windowSoftInputMode">adjustResize</item>
         <!-- 禁用全屏模式 -->
         <item name="android:windowFullscreen">false</item>
         <!-- 禁用半透明状态栏 -->
@@ -43,6 +50,10 @@ cat > "$ANDROID_RES_DIR/values-night/themes.xml" << 'EOF'
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <style name="Theme.TauriApp" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <!-- 禁用边缘到边缘 cutout 扩展，避免与 adjustResize 冲突 -->
+        <item name="android:windowLayoutInDisplayCutoutMode">default</item>
+        <!-- 明确键盘弹出时收缩内容区域 -->
+        <item name="android:windowSoftInputMode">adjustResize</item>
         <!-- 禁用全屏模式 -->
         <item name="android:windowFullscreen">false</item>
         <!-- 禁用半透明状态栏 -->
@@ -87,6 +98,26 @@ if [ -f "$ANDROID_MANIFEST_PATH" ]; then
 else
     echo "⚠️ AndroidManifest.xml 尚未生成，待 tauri android init 后会自动注入 adjustResize"
 fi
+
+cat > "$MAIN_ACTIVITY_PATH" << EOF
+package $ANDROID_PACKAGE_NAME
+
+import android.os.Bundle
+import android.view.WindowManager
+import androidx.core.view.WindowCompat
+
+class MainActivity : TauriActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+
+        // 让系统在输入法弹出时收缩内容区域，避免绘制到键盘下方。
+        WindowCompat.setDecorFitsSystemWindows(window, true)
+        window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
+    }
+}
+EOF
+
+echo "✅ MainActivity.kt 已同步输入法/窗口配置"
 
 cat > "$TAURI_ACTIVITY_PATH" << EOF
 // Copyright 2019-2024 Tauri Programme within The Commons Conservancy
@@ -152,4 +183,4 @@ EOF
 
 echo ""
 echo "✨ Android 状态栏配置应用完成！"
-echo "状态栏将保持可见，颜色与日/夜间模式主题保持一致。"
+echo "状态栏将保持可见，颜色与日/夜间模式主题保持一致

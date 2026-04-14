@@ -181,18 +181,6 @@ jobs:
             npm run tauri:android:init
           fi
 
-      - name: Apply Android theme configuration (Status Bar, MainActivityConfiguration)
-        shell: bash
-        run: |
-          set -euo pipefail
-          bash scripts/apply-android-config.sh
-
-      - name: Configure Android permissions (Camera, Microphone, File Access)
-        shell: bash
-        run: |
-          set -euo pipefail
-          bash scripts/configure-android-permissions.sh
-
       - name: Verify Android manifest soft input mode (source)
         shell: bash
         run: |

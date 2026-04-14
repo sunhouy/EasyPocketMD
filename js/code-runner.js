@@ -163,7 +163,7 @@
 
     function isEditableCodeBlock(codeBlock) {
         if (!codeBlock || !codeBlock.closest) return false;
-        return !!codeBlock.closest('[contenteditable="true"], .vditor-wysiwyg, .vditor-ir__input, textarea, input');
+        return !!codeBlock.closest('.vditor-ir__input, textarea, input');
     }
 
     function getCodeBlocks(root) {
@@ -197,6 +197,7 @@
             // 创建运行按钮
             const runButton = document.createElement('button');
             runButton.className = 'code-run-button';
+            runButton.setAttribute('contenteditable', 'false');
             runButton.innerHTML = '<i class="fas fa-play"></i> Run';
             runButton.style.cssText = `
                 position: absolute;
@@ -215,8 +216,12 @@
             // 创建输出区域
             const outputDiv = document.createElement('div');
             outputDiv.className = 'code-output';
+            outputDiv.setAttribute('contenteditable', 'false');
             outputDiv.style.cssText = `
-                margin-top: 10px;
+                position: absolute;
+                left: 0;
+                right: 0;
+                top: calc(100% + 10px);
                 padding: 10px;
                 background-color: #f5f5f5;
                 border: 1px solid #ddd;
@@ -225,6 +230,7 @@
                 font-size: 14px;
                 white-space: pre-wrap;
                 display: none;
+                z-index: 9;
             `;
 
             // 为代码块容器添加相对定位
