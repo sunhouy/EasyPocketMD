@@ -136,6 +136,12 @@ import CropperModule from 'cropperjs';
         }
         var rotate = parseInt(img.dataset.epmdRotate || '0', 10);
         if (isNaN(rotate)) rotate = 0;
+        if (!rotate && img.style && img.style.transform) {
+            var rotateMatch = img.style.transform.match(/rotate\(([-\d.]+)deg\)/);
+            if (rotateMatch) {
+                rotate = parseInt(rotateMatch[1], 10) || 0;
+            }
+        }
         return {
             src: img.getAttribute('src') || '',
             alt: img.getAttribute('alt') || '',
@@ -309,6 +315,42 @@ import CropperModule from 'cropperjs';
         ext = ext.replace(/[^a-zA-Z0-9]/g, '') || 'png';
         var fileName = baseName + '_crop_' + Date.now() + '.' + ext;
         var file = fileFromBlob(blob, fileName);
+
+        var formData = new FormData();
+        formData.append('files[]', file);
+        if (global.currentUser) {
+            formData.append('username', global.currentUser.username);
+            formData.append('password', global.currentUser.password);
+        }
+        formData.append('uploadDir', 'uploads');
+
+        var apiUrl = (global.getApiBaseUrl ? global.getApiBaseUrl() : 'api') + '/external/upload';
+        var response = await fetch(apiUrl, { method: 'POST', body: formData });
+        var uploadResult;
+        try {
+            uploadResult = await response.json();
+        } catch (e) {
+            throw new Error('上传返回解析失败');
+        }
+
+        if (!response.ok || !uploadResult || uploadResult.success !== true) {
+            throw new Error((uploadResult && uploadResult.message) ? uploadResult.message : '上传失败');
+        }
+
+        var uploadedUrl = extractUploadedUrl(uploadResult);
+        if (!uploadedUrl) {
+            throw new Error('上传成功但未返回图片地址');
+        }
+        if (uploadedUrl.indexOf(' ') > -1) {
+            uploadedUrl = encodeURI(uploadedUrl);
+        }
+        return uploadedUrl;
+    }
+
+    async function uploadImageFile(file) {
+        if (!file) {
+            throw new Error('文件为空');
+        }
 
         var formData = new FormData();
         formData.append('files[]', file);
@@ -716,6 +758,11 @@ import CropperModule from 'cropperjs';
                 </div>
 
                 <div style="margin-bottom: 20px;">
+                    <label style="display: block; margin-bottom: 8px; font-size: 14px;">更换图片</label>
+                    <button class="epmd-modal-btn epmd-replace-image" style="padding: 8px 12px; background: ${btnBg}; color: ${btnTextColor}; border: 1px solid ${borderColor}; border-radius: 6px; cursor: pointer; width: 100%;">选择新图片</button>
+                </div>
+
+                <div style="margin-bottom: 20px;">
                     <label style="display: block; margin-bottom: 8px; font-size: 14px;">裁剪</label>
                     <button class="epmd-modal-btn epmd-crop-open" style="padding: 8px 12px; background: ${btnBg}; color: ${btnTextColor}; border: 1px solid ${borderColor}; border-radius: 6px; cursor: pointer; width: 100%;">打开裁剪工具</button>
                 </div>
@@ -789,7 +836,8 @@ import CropperModule from 'cropperjs';
         modal.querySelector('.epmd-rotate-left').onclick = function() {
             if (!currentEditingImage) return;
             var meta = getImageMeta(currentEditingImage);
-            var rotate = (meta.rotate - 90) % 360;
+            var normalizedRotate = ((meta.rotate % 360) + 360) % 360;
+            var rotate = (normalizedRotate - 90 + 360) % 360;
             applyImageStyle(currentEditingImage, 0, rotate);
             persistImageChange(currentEditingImage, 0, rotate);
         };
@@ -797,9 +845,60 @@ import CropperModule from 'cropperjs';
         modal.querySelector('.epmd-rotate-right').onclick = function() {
             if (!currentEditingImage) return;
             var meta = getImageMeta(currentEditingImage);
-            var rotate = (meta.rotate + 90) % 360;
+            var normalizedRotate = ((meta.rotate % 360) + 360) % 360;
+            var rotate = (normalizedRotate + 90) % 360;
             applyImageStyle(currentEditingImage, 0, rotate);
             persistImageChange(currentEditingImage, 0, rotate);
+        };
+
+        modal.querySelector('.epmd-replace-image').onclick = function() {
+            if (!currentEditingImage) return;
+            var input = document.createElement('input');
+            input.type = 'file';
+            input.accept = 'image/*';
+            input.onchange = async function(e) {
+                var file = e.target.files && e.target.files[0];
+                if (!file) return;
+
+                var meta = getImageMeta(currentEditingImage);
+                var oldSrc = currentEditingImage.getAttribute('src') || '';
+                var isLocal = oldSrc.startsWith('local://') || oldSrc.startsWith('blob:') || oldSrc.startsWith('data:image');
+
+                setPanelBusy(modal, true, '正在更换图片...');
+
+                try {
+                    var newSrc;
+                    if (isLocal) {
+                        var fileUrl = await global.ResourceLoader.storeLocalFile(file);
+                        var blobUrl = await global.ResourceLoader.getLocalBlobUrl(fileUrl);
+                        newSrc = blobUrl || fileUrl;
+                        if (global.LocalImageManager && global.LocalImageManager.registerUrlPair) {
+                            global.LocalImageManager.registerUrlPair(fileUrl, newSrc);
+                        }
+                    } else {
+                        newSrc = await uploadImageFile(file);
+                    }
+
+                    if (!newSrc) {
+                        throw new Error('上传失败');
+                    }
+
+                    applyImageStyle(currentEditingImage, meta.width, meta.rotate);
+                    var replaced = replaceImageSourceInEditor(oldSrc, newSrc, meta.width, meta.rotate, currentEditingImage.getAttribute('alt'));
+                    if (replaced) {
+                        global.showMessage ? global.showMessage('图片已更换', 'success') : alert('图片已更换');
+                    } else {
+                        currentEditingImage.setAttribute('src', newSrc);
+                        global.showMessage ? global.showMessage('图片已更换（编辑器更新失败）', 'warning') : alert('图片已更换');
+                    }
+                } catch (err) {
+                    console.error('Replace image error:', err);
+                    global.showMessage ? global.showMessage('更换图片失败', 'error') : alert('更换图片失败');
+                } finally {
+                    setPanelBusy(modal, false, '');
+                }
+            };
+            input.click();
         };
 
         modal.querySelector('.epmd-crop-open').onclick = function() {
