@@ -383,6 +383,51 @@ import CropperModule from 'cropperjs';
         return uploadedUrl;
     }
 
+    function dataURLToFile(dataUrl, filename) {
+        var arr = dataUrl.split(',');
+        var mime = arr[0].match(/:(.*?);/)[1];
+        var bstr = atob(arr[1]);
+        var n = bstr.length;
+        var u8arr = new Uint8Array(n);
+        while (n--) {
+            u8arr[n] = bstr.charCodeAt(n);
+        }
+        return new File([u8arr], filename, { type: mime });
+    }
+
+    async function uploadBase64Image(dataUrl) {
+        var blob = await (await fetch(dataUrl)).blob();
+        var formData = new FormData();
+        formData.append('files[]', blob, 'image.png');
+        if (global.currentUser) {
+            formData.append('username', global.currentUser.username);
+            formData.append('password', global.currentUser.password);
+        }
+        formData.append('uploadDir', 'uploads');
+
+        var apiUrl = (global.getApiBaseUrl ? global.getApiBaseUrl() : 'api') + '/external/upload';
+        var response = await fetch(apiUrl, { method: 'POST', body: formData });
+        var uploadResult;
+        try {
+            uploadResult = await response.json();
+        } catch (e) {
+            throw new Error('上传返回解析失败');
+        }
+
+        if (!response.ok || !uploadResult || uploadResult.success !== true) {
+            throw new Error((uploadResult && uploadResult.message) ? uploadResult.message : '上传失败');
+        }
+
+        var uploadedUrl = extractUploadedUrl(uploadResult);
+        if (!uploadedUrl) {
+            throw new Error('上传成功但未返回图片地址');
+        }
+        if (uploadedUrl.indexOf(' ') > -1) {
+            uploadedUrl = encodeURI(uploadedUrl);
+        }
+        return uploadedUrl;
+    }
+
     function editorContainsImageUrl(url) {
         if (!url || !global.vditor || typeof global.vditor.getValue !== 'function') {
             return false;
@@ -727,7 +772,8 @@ import CropperModule from 'cropperjs';
         content.style.cssText = `
             background: ${bg};
             border-radius: 12px;
-            max-width: 90vw;
+            width: 480px;
+            max-width: 95vw;
             max-height: 90vh;
             overflow-y: auto;
             box-shadow: 0 10px 40px rgba(0,0,0,0.3);
@@ -740,34 +786,77 @@ import CropperModule from 'cropperjs';
                     <h3 style="margin: 0; font-size: 16px;">图片工具</h3>
                     <button class="epmd-modal-close" style="background: none; border: none; font-size: 20px; cursor: pointer; color: ${textColor};">×</button>
                 </div>
-                
-                <div style="margin-bottom: 20px;">
+
+                <div style="margin-bottom: 16px;">
                     <label style="display: block; margin-bottom: 8px; font-size: 14px;">尺寸调整</label>
                     <div style="display: flex; gap: 8px; align-items: center;">
-                        <button class="epmd-modal-btn epmd-size-minus" style="padding: 8px 12px; background: ${btnBg}; color: ${btnTextColor}; border: 1px solid ${borderColor}; border-radius: 6px; cursor: pointer;">− 缩小</button>
-                        <button class="epmd-modal-btn epmd-size-plus" style="padding: 8px 12px; background: ${btnBg}; color: ${btnTextColor}; border: 1px solid ${borderColor}; border-radius: 6px; cursor: pointer;">+ 放大</button>
+                        <button class="epmd-modal-btn epmd-size-minus" style="flex:1; padding: 8px 12px; background: ${btnBg}; color: ${btnTextColor}; border: 1px solid ${borderColor}; border-radius: 6px; cursor: pointer;">− 缩小</button>
+                        <button class="epmd-modal-btn epmd-size-plus" style="flex:1; padding: 8px 12px; background: ${btnBg}; color: ${btnTextColor}; border: 1px solid ${borderColor}; border-radius: 6px; cursor: pointer;">+ 放大</button>
                     </div>
                 </div>
 
-                <div style="margin-bottom: 20px;">
+                <div style="margin-bottom: 16px;">
                     <label style="display: block; margin-bottom: 8px; font-size: 14px;">旋转</label>
                     <div style="display: flex; gap: 8px;">
-                        <button class="epmd-modal-btn epmd-rotate-left" style="padding: 8px 12px; background: ${btnBg}; color: ${btnTextColor}; border: 1px solid ${borderColor}; border-radius: 6px; cursor: pointer;">↺ 左转 90°</button>
-                        <button class="epmd-modal-btn epmd-rotate-right" style="padding: 8px 12px; background: ${btnBg}; color: ${btnTextColor}; border: 1px solid ${borderColor}; border-radius: 6px; cursor: pointer;">↻ 右转 90°</button>
+                        <button class="epmd-modal-btn epmd-rotate-left" style="flex:1; padding: 8px 12px; background: ${btnBg}; color: ${btnTextColor}; border: 1px solid ${borderColor}; border-radius: 6px; cursor: pointer;">↺ 左转 90°</button>
+                        <button class="epmd-modal-btn epmd-rotate-right" style="flex:1; padding: 8px 12px; background: ${btnBg}; color: ${btnTextColor}; border: 1px solid ${borderColor}; border-radius: 6px; cursor: pointer;">↻ 右转 90°</button>
                     </div>
                 </div>
 
-                <div style="margin-bottom: 20px;">
+                <div style="margin-bottom: 16px;">
                     <label style="display: block; margin-bottom: 8px; font-size: 14px;">更换图片</label>
                     <button class="epmd-modal-btn epmd-replace-image" style="padding: 8px 12px; background: ${btnBg}; color: ${btnTextColor}; border: 1px solid ${borderColor}; border-radius: 6px; cursor: pointer; width: 100%;">选择新图片</button>
                 </div>
 
-                <div style="margin-bottom: 20px;">
+                <div style="margin-bottom: 16px;">
                     <label style="display: block; margin-bottom: 8px; font-size: 14px;">裁剪</label>
                     <button class="epmd-modal-btn epmd-crop-open" style="padding: 8px 12px; background: ${btnBg}; color: ${btnTextColor}; border: 1px solid ${borderColor}; border-radius: 6px; cursor: pointer; width: 100%;">打开裁剪工具</button>
                 </div>
 
-                <div style="margin-bottom: 20px;">
+                <div style="margin-bottom: 16px;">
+                    <label style="display: block; margin-bottom: 8px; font-size: 14px;">下载</label>
+                    <button class="epmd-modal-btn epmd-download-image" style="padding: 8px 12px; background: ${btnBg}; color: ${btnTextColor}; border: 1px solid ${borderColor}; border-radius: 6px; cursor: pointer; width: 100%;">下载原图</button>
+                </div>
+
+                <div style="margin-bottom: 16px; border: 1px solid ${borderColor}; border-radius: 8px; overflow: hidden;">
+                    <div class="epmd-compress-toggle" style="padding: 10px 12px; background: ${nightMode ? '#2a2a2a' : '#f5f5f5'}; cursor: pointer; display: flex; justify-content: space-between; align-items: center;">
+                        <span style="font-size: 14px;">图片压缩</span>
+                        <span class="epmd-compress-arrow" style="transition: transform 0.2s;">▼</span>
+                    </div>
+                    <div class="epmd-compress-content" style="display: none; padding: 12px;">
+                        <div style="margin-bottom: 10px;">
+                            <label style="display: block; margin-bottom: 6px; font-size: 13px;">质量 (1-100): <span class="epmd-compress-quality-val">80</span></label>
+                            <input type="range" class="epmd-compress-quality" min="1" max="100" value="80" style="width: 100%;">
+                        </div>
+                        <div style="margin-bottom: 10px;">
+                            <label style="display: block; margin-bottom: 6px; font-size: 13px;">最大宽度 (px):</label>
+                            <input type="number" class="epmd-compress-maxwidth" value="1920" min="100" max="8000" style="width: 100%; padding: 6px; border: 1px solid ${borderColor}; border-radius: 4px; background: ${btnBg}; color: ${textColor};">
+                        </div>
+                        <button class="epmd-modal-btn epmd-compress-run" style="padding: 8px 12px; background: #4CAF50; color: white; border: none; border-radius: 6px; cursor: pointer; width: 100%;">压缩并替换</button>
+                        <div class="epmd-compress-status" style="margin-top: 8px; font-size: 12px; color: ${nightMode ? '#cccccc' : '#666'};"></div>
+                    </div>
+                </div>
+
+                <div style="margin-bottom: 16px; border: 1px solid ${borderColor}; border-radius: 8px; overflow: hidden;">
+                    <div class="epmd-convert-toggle" style="padding: 10px 12px; background: ${nightMode ? '#2a2a2a' : '#f5f5f5'}; cursor: pointer; display: flex; justify-content: space-between; align-items: center;">
+                        <span style="font-size: 14px;">格式转换</span>
+                        <span class="epmd-convert-arrow" style="transition: transform 0.2s;">▼</span>
+                    </div>
+                    <div class="epmd-convert-content" style="display: none; padding: 12px;">
+                        <div style="margin-bottom: 10px;">
+                            <label style="display: block; margin-bottom: 6px; font-size: 13px;">目标格式:</label>
+                            <select class="epmd-convert-format" style="width: 100%; padding: 8px; background: ${btnBg}; color: ${textColor}; border: 1px solid ${borderColor}; border-radius: 6px;">
+                                <option value="image/jpeg">JPEG</option>
+                                <option value="image/png">PNG</option>
+                                <option value="image/webp">WebP</option>
+                            </select>
+                        </div>
+                        <button class="epmd-modal-btn epmd-convert-run" style="padding: 8px 12px; background: #4CAF50; color: white; border: none; border-radius: 6px; cursor: pointer; width: 100%;">转换并替换</button>
+                        <div class="epmd-convert-status" style="margin-top: 8px; font-size: 12px; color: ${nightMode ? '#cccccc' : '#666'};"></div>
+                    </div>
+                </div>
+
+                <div style="margin-bottom: 16px;">
                     <label style="display: block; margin-bottom: 8px; font-size: 14px;">OCR 文字识别</label>
                     <select class="epmd-ocr-lang" style="width: 100%; padding: 8px; margin-bottom: 10px; background: ${btnBg}; color: ${textColor}; border: 1px solid ${borderColor}; border-radius: 6px;">
                         <option value="chi_tra+chi_sim+eng">繁+简+英</option>
@@ -780,7 +869,7 @@ import CropperModule from 'cropperjs';
                     <div class="epmd-ocr-status" style="margin-top: 10px; font-size: 12px; color: ${nightMode ? '#cccccc' : '#666'};"></div>
                 </div>
 
-                <div style="margin-bottom: 0; padding-top: 20px; border-top: 1px solid ${borderColor};">
+                <div style="margin-bottom: 0; padding-top: 16px; border-top: 1px solid ${borderColor};">
                     <button class="epmd-modal-btn epmd-delete-image" style="padding: 8px 12px; background: #f44336; color: white; border: 1px solid #d32f2f; border-radius: 6px; cursor: pointer; width: 100%; font-weight: bold;">删除图片</button>
                 </div>
             </div>
@@ -904,6 +993,186 @@ import CropperModule from 'cropperjs';
         modal.querySelector('.epmd-crop-open').onclick = function() {
             if (!currentEditingImage) return;
             openCropTool(currentEditingImage, modal);
+        };
+
+        modal.querySelector('.epmd-download-image').onclick = function() {
+            if (!currentEditingImage) return;
+            var src = currentEditingImage.getAttribute('src') || '';
+            if (!src) {
+                global.showMessage ? global.showMessage('无效的图片地址', 'error') : alert('无效的图片地址');
+                return;
+            }
+            var link = document.createElement('a');
+            link.href = src;
+            var filename = src.split('/').pop() || 'image.png';
+            if (!filename.match(/\.[a-zA-Z0-9]+$/)) {
+                var ext = src.match(/data:image\/([a-zA-Z]+)/);
+                if (ext) filename = 'image.' + ext[1];
+            }
+            link.download = filename;
+            link.target = '_blank';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        };
+
+        modal.querySelector('.epmd-compress-toggle').onclick = function() {
+            var content = modal.querySelector('.epmd-compress-content');
+            var arrow = modal.querySelector('.epmd-compress-arrow');
+            if (content.style.display === 'none') {
+                content.style.display = 'block';
+                arrow.style.transform = 'rotate(180deg)';
+            } else {
+                content.style.display = 'none';
+                arrow.style.transform = 'rotate(0deg)';
+            }
+        };
+
+        modal.querySelector('.epmd-compress-quality').oninput = function() {
+            var val = modal.querySelector('.epmd-compress-quality-val');
+            if (val) val.textContent = this.value;
+        };
+
+        modal.querySelector('.epmd-compress-run').onclick = async function() {
+            if (!currentEditingImage) return;
+            setPanelBusy(modal, true, '正在压缩...');
+            var statusEl = modal.querySelector('.epmd-compress-status');
+            if (statusEl) statusEl.textContent = '';
+
+            try {
+                var quality = parseInt(modal.querySelector('.epmd-compress-quality').value, 10) / 100;
+                var maxWidth = parseInt(modal.querySelector('.epmd-compress-maxwidth').value, 10) || 1920;
+
+                var canvas = document.createElement('canvas');
+                var ctx = canvas.getContext('2d');
+                var img = new Image();
+                img.crossOrigin = 'anonymous';
+
+                await new Promise(function(resolve, reject) {
+                    img.onload = resolve;
+                    img.onerror = reject;
+                    img.src = currentEditingImage.getAttribute('src') || '';
+                });
+
+                var width = img.width;
+                var height = img.height;
+                if (width > maxWidth) {
+                    height = (height * maxWidth) / width;
+                    width = maxWidth;
+                }
+
+                canvas.width = width;
+                canvas.height = height;
+                ctx.drawImage(img, 0, 0, width, height);
+
+                var meta = getImageMeta(currentEditingImage);
+                var oldSrc = currentEditingImage.getAttribute('src') || '';
+                var isLocal = oldSrc.startsWith('local://') || oldSrc.startsWith('blob:') || oldSrc.startsWith('data:image');
+
+                var dataUrl = canvas.toDataURL('image/jpeg', quality);
+                var newSrc;
+
+                if (isLocal) {
+                    var file = dataURLToFile(dataUrl, 'compressed.jpg');
+                    var fileUrl = await global.ResourceLoader.storeLocalFile(file);
+                    newSrc = await global.ResourceLoader.getLocalBlobUrl(fileUrl);
+                    if (global.LocalImageManager && global.LocalImageManager.registerUrlPair) {
+                        global.LocalImageManager.registerUrlPair(fileUrl, newSrc);
+                    }
+                } else {
+                    newSrc = await uploadBase64Image(dataUrl);
+                }
+
+                applyImageStyle(currentEditingImage, meta.width, meta.rotate);
+                var replaced = replaceImageSourceInEditor(oldSrc, newSrc, meta.width, meta.rotate, currentEditingImage.getAttribute('alt'));
+                if (replaced) {
+                    if (statusEl) statusEl.textContent = '压缩成功';
+                    global.showMessage ? global.showMessage('图片已压缩', 'success') : alert('图片已压缩');
+                } else {
+                    currentEditingImage.setAttribute('src', newSrc);
+                    if (statusEl) statusEl.textContent = '压缩成功（编辑器更新失败）';
+                    global.showMessage ? global.showMessage('图片已压缩', 'success') : alert('图片已压缩');
+                }
+            } catch (err) {
+                console.error('Compress error:', err);
+                if (statusEl) statusEl.textContent = '压缩失败';
+                global.showMessage ? global.showMessage('图片压缩失败', 'error') : alert('图片压缩失败');
+            } finally {
+                setPanelBusy(modal, false, '');
+            }
+        };
+
+        modal.querySelector('.epmd-convert-toggle').onclick = function() {
+            var content = modal.querySelector('.epmd-convert-content');
+            var arrow = modal.querySelector('.epmd-convert-arrow');
+            if (content.style.display === 'none') {
+                content.style.display = 'block';
+                arrow.style.transform = 'rotate(180deg)';
+            } else {
+                content.style.display = 'none';
+                arrow.style.transform = 'rotate(0deg)';
+            }
+        };
+
+        modal.querySelector('.epmd-convert-run').onclick = async function() {
+            if (!currentEditingImage) return;
+            setPanelBusy(modal, true, '正在转换...');
+            var statusEl = modal.querySelector('.epmd-convert-status');
+            if (statusEl) statusEl.textContent = '';
+
+            try {
+                var format = modal.querySelector('.epmd-convert-format').value;
+                var canvas = document.createElement('canvas');
+                var ctx = canvas.getContext('2d');
+                var img = new Image();
+                img.crossOrigin = 'anonymous';
+
+                await new Promise(function(resolve, reject) {
+                    img.onload = resolve;
+                    img.onerror = reject;
+                    img.src = currentEditingImage.getAttribute('src') || '';
+                });
+
+                canvas.width = img.width;
+                canvas.height = img.height;
+                ctx.drawImage(img, 0, 0);
+
+                var meta = getImageMeta(currentEditingImage);
+                var oldSrc = currentEditingImage.getAttribute('src') || '';
+                var isLocal = oldSrc.startsWith('local://') || oldSrc.startsWith('blob:') || oldSrc.startsWith('data:image');
+
+                var mimeExt = format.split('/')[1];
+                var dataUrl = canvas.toDataURL(format);
+                var newSrc;
+
+                if (isLocal) {
+                    var file = dataURLToFile(dataUrl, 'converted.' + mimeExt);
+                    var fileUrl = await global.ResourceLoader.storeLocalFile(file);
+                    newSrc = await global.ResourceLoader.getLocalBlobUrl(fileUrl);
+                    if (global.LocalImageManager && global.LocalImageManager.registerUrlPair) {
+                        global.LocalImageManager.registerUrlPair(fileUrl, newSrc);
+                    }
+                } else {
+                    newSrc = await uploadBase64Image(dataUrl);
+                }
+
+                applyImageStyle(currentEditingImage, meta.width, meta.rotate);
+                var replaced = replaceImageSourceInEditor(oldSrc, newSrc, meta.width, meta.rotate, currentEditingImage.getAttribute('alt'));
+                if (replaced) {
+                    if (statusEl) statusEl.textContent = '转换成功';
+                    global.showMessage ? global.showMessage('图片已转换', 'success') : alert('图片已转换');
+                } else {
+                    currentEditingImage.setAttribute('src', newSrc);
+                    if (statusEl) statusEl.textContent = '转换成功（编辑器更新失败）';
+                    global.showMessage ? global.showMessage('图片已转换', 'success') : alert('图片已转换');
+                }
+            } catch (err) {
+                console.error('Convert error:', err);
+                if (statusEl) statusEl.textContent = '转换失败';
+                global.showMessage ? global.showMessage('图片转换失败', 'error') : alert('图片转换失败');
+            } finally {
+                setPanelBusy(modal, false, '');
+            }
         };
 
         modal.querySelector('.epmd-ocr-run').onclick = function() {
