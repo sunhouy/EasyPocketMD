@@ -69,7 +69,7 @@
         select.onchange = (e) => {
             window.userSettings.storageLocation = e.target.value;
             localStorage.setItem('vditor_settings', JSON.stringify(window.userSettings));
-            global.showMessage(t('saveSuccess') || '保存成功', 'success');
+            // global.showMessage(t('saveSuccess') || '保存成功', 'success');
         };
 
         // File List

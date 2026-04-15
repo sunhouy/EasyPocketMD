@@ -930,7 +930,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (window.saveCurrentFile) {
             await window.saveCurrentFile(true);
             var t = function(key) { return window.i18n ? window.i18n.t(key) : key; };
-            window.showMessage(t('saveSuccess') || '保存成功', 'success');
+            // window.showMessage(t('saveSuccess') || '保存成功', 'success');
         }
     }
 
