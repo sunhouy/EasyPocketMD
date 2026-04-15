@@ -428,6 +428,38 @@ import CropperModule from 'cropperjs';
         return uploadedUrl;
     }
 
+    async function uploadBlobImage(blob, filename) {
+        var formData = new FormData();
+        formData.append('files[]', blob, filename);
+        if (global.currentUser) {
+            formData.append('username', global.currentUser.username);
+            formData.append('password', global.currentUser.password);
+        }
+        formData.append('uploadDir', 'uploads');
+
+        var apiUrl = (global.getApiBaseUrl ? global.getApiBaseUrl() : 'api') + '/external/upload';
+        var response = await fetch(apiUrl, { method: 'POST', body: formData });
+        var uploadResult;
+        try {
+            uploadResult = await response.json();
+        } catch (e) {
+            throw new Error('上传返回解析失败');
+        }
+
+        if (!response.ok || !uploadResult || uploadResult.success !== true) {
+            throw new Error((uploadResult && uploadResult.message) ? uploadResult.message : '上传失败');
+        }
+
+        var uploadedUrl = extractUploadedUrl(uploadResult);
+        if (!uploadedUrl) {
+            throw new Error('上传成功但未返回图片地址');
+        }
+        if (uploadedUrl.indexOf(' ') > -1) {
+            uploadedUrl = encodeURI(uploadedUrl);
+        }
+        return uploadedUrl;
+    }
+
     function editorContainsImageUrl(url) {
         if (!url || !global.vditor || typeof global.vditor.getValue !== 'function') {
             return false;
@@ -1056,41 +1088,65 @@ import CropperModule from 'cropperjs';
 
                 var width = img.width;
                 var height = img.height;
+
+                var wasmResult = null;
                 if (width > maxWidth) {
-                    height = (height * maxWidth) / width;
-                    width = maxWidth;
+                    try {
+                        var { compressImage } = await import(new URL('../../wasm_text_engine/js/image-compressor-client.js', window.location.href).href);
+                        var imageData = ctx.getImageData(0, 0, width, height);
+                        wasmResult = await compressImage(imageData.data, width, height, { quality: Math.round(quality * 100), maxWidth: maxWidth });
+                    } catch (wasmErr) {
+                        console.warn('WASM compression not available, using canvas:', wasmErr);
+                    }
                 }
 
-                canvas.width = width;
-                canvas.height = height;
-                ctx.drawImage(img, 0, 0, width, height);
+                var newWidth = width;
+                var newHeight = height;
+                if (wasmResult && wasmResult.code === 200 && wasmResult.data) {
+                    newWidth = wasmResult.data.width;
+                    newHeight = wasmResult.data.height;
+                    canvas.width = newWidth;
+                    canvas.height = newHeight;
+                    var wasmImgData = new ImageData(new Uint8ClampedArray(wasmResult.data.data.buffer), newWidth, newHeight);
+                    ctx.putImageData(wasmImgData, 0, 0);
+                    if (statusEl) statusEl.textContent = 'WASM压缩 ' + (wasmResult.data.originalSize / 1024).toFixed(1) + 'KB → ' + (wasmResult.data.compressedSize / 1024).toFixed(1) + 'KB';
+                } else {
+                    if (width > maxWidth) {
+                        newHeight = (height * maxWidth) / width;
+                        newWidth = maxWidth;
+                    }
+                    canvas.width = newWidth;
+                    canvas.height = newHeight;
+                    ctx.drawImage(img, 0, 0, newWidth, newHeight);
+                    if (statusEl) statusEl.textContent = 'Canvas压缩';
+                }
 
                 var meta = getImageMeta(currentEditingImage);
                 var oldSrc = currentEditingImage.getAttribute('src') || '';
                 var isLocal = oldSrc.startsWith('local://') || oldSrc.startsWith('blob:') || oldSrc.startsWith('data:image');
 
-                var dataUrl = canvas.toDataURL('image/jpeg', quality);
-                var newSrc;
+                var blob = await new Promise(function(resolve) {
+                    canvas.toBlob(resolve, 'image/jpeg', quality);
+                });
 
+                var newSrc;
                 if (isLocal) {
-                    var file = dataURLToFile(dataUrl, 'compressed.jpg');
+                    var file = new File([blob], 'compressed.jpg', { type: 'image/jpeg' });
                     var fileUrl = await global.ResourceLoader.storeLocalFile(file);
                     newSrc = await global.ResourceLoader.getLocalBlobUrl(fileUrl);
                     if (global.LocalImageManager && global.LocalImageManager.registerUrlPair) {
                         global.LocalImageManager.registerUrlPair(fileUrl, newSrc);
                     }
                 } else {
-                    newSrc = await uploadBase64Image(dataUrl);
+                    newSrc = await uploadBlobImage(blob, 'compressed.jpg');
                 }
 
                 applyImageStyle(currentEditingImage, meta.width, meta.rotate);
                 var replaced = replaceImageSourceInEditor(oldSrc, newSrc, meta.width, meta.rotate, currentEditingImage.getAttribute('alt'));
                 if (replaced) {
-                    if (statusEl) statusEl.textContent = '压缩成功';
                     global.showMessage ? global.showMessage('图片已压缩', 'success') : alert('图片已压缩');
                 } else {
                     currentEditingImage.setAttribute('src', newSrc);
-                    if (statusEl) statusEl.textContent = '压缩成功（编辑器更新失败）';
                     global.showMessage ? global.showMessage('图片已压缩', 'success') : alert('图片已压缩');
                 }
             } catch (err) {
@@ -1122,6 +1178,9 @@ import CropperModule from 'cropperjs';
 
             try {
                 var format = modal.querySelector('.epmd-convert-format').value;
+                var oldSrc = currentEditingImage.getAttribute('src') || '';
+                var isLocal = oldSrc.startsWith('local://') || oldSrc.startsWith('blob:') || oldSrc.startsWith('data:image');
+
                 var canvas = document.createElement('canvas');
                 var ctx = canvas.getContext('2d');
                 var img = new Image();
@@ -1130,7 +1189,7 @@ import CropperModule from 'cropperjs';
                 await new Promise(function(resolve, reject) {
                     img.onload = resolve;
                     img.onerror = reject;
-                    img.src = currentEditingImage.getAttribute('src') || '';
+                    img.src = oldSrc;
                 });
 
                 canvas.width = img.width;
@@ -1138,33 +1197,34 @@ import CropperModule from 'cropperjs';
                 ctx.drawImage(img, 0, 0);
 
                 var meta = getImageMeta(currentEditingImage);
-                var oldSrc = currentEditingImage.getAttribute('src') || '';
-                var isLocal = oldSrc.startsWith('local://') || oldSrc.startsWith('blob:') || oldSrc.startsWith('data:image');
-
                 var mimeExt = format.split('/')[1];
-                var dataUrl = canvas.toDataURL(format);
-                var newSrc;
+                var newFilename = 'converted.' + mimeExt;
 
+                var blob = await new Promise(function(resolve) {
+                    canvas.toBlob(resolve, format, 0.92);
+                });
+
+                var newSrc;
                 if (isLocal) {
-                    var file = dataURLToFile(dataUrl, 'converted.' + mimeExt);
+                    var file = new File([blob], newFilename, { type: format });
                     var fileUrl = await global.ResourceLoader.storeLocalFile(file);
                     newSrc = await global.ResourceLoader.getLocalBlobUrl(fileUrl);
                     if (global.LocalImageManager && global.LocalImageManager.registerUrlPair) {
                         global.LocalImageManager.registerUrlPair(fileUrl, newSrc);
                     }
                 } else {
-                    newSrc = await uploadBase64Image(dataUrl);
+                    newSrc = await uploadBlobImage(blob, newFilename);
                 }
 
                 applyImageStyle(currentEditingImage, meta.width, meta.rotate);
                 var replaced = replaceImageSourceInEditor(oldSrc, newSrc, meta.width, meta.rotate, currentEditingImage.getAttribute('alt'));
                 if (replaced) {
-                    if (statusEl) statusEl.textContent = '转换成功';
-                    global.showMessage ? global.showMessage('图片已转换', 'success') : alert('图片已转换');
+                    if (statusEl) statusEl.textContent = '转换成功: ' + mimeExt.toUpperCase();
+                    global.showMessage ? global.showMessage('图片已转换为' + mimeExt.toUpperCase(), 'success') : alert('图片已转换');
                 } else {
                     currentEditingImage.setAttribute('src', newSrc);
-                    if (statusEl) statusEl.textContent = '转换成功（编辑器更新失败）';
-                    global.showMessage ? global.showMessage('图片已转换', 'success') : alert('图片已转换');
+                    if (statusEl) statusEl.textContent = '转换成功: ' + mimeExt.toUpperCase();
+                    global.showMessage ? global.showMessage('图片已转换为' + mimeExt.toUpperCase(), 'success') : alert('图片已转换');
                 }
             } catch (err) {
                 console.error('Convert error:', err);

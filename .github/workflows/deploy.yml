@@ -48,8 +48,11 @@ jobs:
     - name: Build WASM text engine
       run: npm run wasm:text:build
 
+    - name: Build WASM image compressor
+      run: npm run wasm:image:build
+
     - name: Verify WASM source artifacts
-      run: npm run wasm:text:verify
+      run: npm run wasm:text:verify && npm run wasm:image:verify
 
     - name: Run tests
       run: npm test && npx jest --coverage
@@ -103,8 +106,11 @@ jobs:
     - name: Build WASM text engine
       run: npm run wasm:text:build
 
+    - name: Build WASM image compressor
+      run: npm run wasm:image:build
+
     - name: Verify WASM source artifacts
-      run: npm run wasm:text:verify
+      run: npm run wasm:text:verify && npm run wasm:image:verify
 
     - name: Create .env file
       run: |
@@ -137,13 +143,15 @@ jobs:
       run: npm run build
 
     - name: Verify WASM packaged in dist
-      run: npm run wasm:text:verify:dist
+      run: npm run wasm:text:verify:dist && npm run wasm:image:verify:dist
 
     - name: Capture WASM checksums
       id: wasm_checksums
       run: |
-        echo "js_sha256=$(sha256sum dist/wasm_text_engine/text_engine.js | awk '{print $1}')" >> "$GITHUB_OUTPUT"
-        echo "wasm_sha256=$(sha256sum dist/wasm_text_engine/text_engine.wasm | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+        echo "text_js_sha256=$(sha256sum dist/wasm_text_engine/text_engine.js | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+        echo "text_wasm_sha256=$(sha256sum dist/wasm_text_engine/text_engine.wasm | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+        echo "image_js_sha256=$(sha256sum dist/wasm_text_engine/image_compressor.js | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+        echo "image_wasm_sha256=$(sha256sum dist/wasm_text_engine/image_compressor.wasm | awk '{print $1}')" >> "$GITHUB_OUTPUT"
 
     - name: Create deployment tarball
       run: |
@@ -388,25 +396,46 @@ jobs:
 
           # 校验 WASM 产物是否为本次构建版本，避免旧产物被错误复用
           echo "校验 WASM 产物版本与完整性..."
-          EXPECTED_JS_SHA="${{ steps.wasm_checksums.outputs.js_sha256 }}"
-          EXPECTED_WASM_SHA="${{ steps.wasm_checksums.outputs.wasm_sha256 }}"
-          ACTIVE_JS="$NEXT_DIR/dist/wasm_text_engine/text_engine.js"
-          ACTIVE_WASM="$NEXT_DIR/dist/wasm_text_engine/text_engine.wasm"
+          EXPECTED_TEXT_JS_SHA="${{ steps.wasm_checksums.outputs.text_js_sha256 }}"
+          EXPECTED_TEXT_WASM_SHA="${{ steps.wasm_checksums.outputs.text_wasm_sha256 }}"
+          EXPECTED_IMAGE_JS_SHA="${{ steps.wasm_checksums.outputs.image_js_sha256 }}"
+          EXPECTED_IMAGE_WASM_SHA="${{ steps.wasm_checksums.outputs.image_wasm_sha256 }}"
+          ACTIVE_TEXT_JS="$NEXT_DIR/dist/wasm_text_engine/text_engine.js"
+          ACTIVE_TEXT_WASM="$NEXT_DIR/dist/wasm_text_engine/text_engine.wasm"
+          ACTIVE_IMAGE_JS="$NEXT_DIR/dist/wasm_text_engine/image_compressor.js"
+          ACTIVE_IMAGE_WASM="$NEXT_DIR/dist/wasm_text_engine/image_compressor.wasm"
 
-          if [ ! -f "$ACTIVE_JS" ] || [ ! -f "$ACTIVE_WASM" ]; then
-            echo "错误: 部署目录中缺少 WASM 产物"
+          if [ ! -f "$ACTIVE_TEXT_JS" ] || [ ! -f "$ACTIVE_TEXT_WASM" ]; then
+            echo "错误: 部署目录中缺少 text_engine WASM 产物"
             ls -la "$NEXT_DIR/dist/wasm_text_engine" || true
             exit 1
           fi
 
-          ACTUAL_JS_SHA=$(sha256sum "$ACTIVE_JS" | awk '{print $1}')
-          ACTUAL_WASM_SHA=$(sha256sum "$ACTIVE_WASM" | awk '{print $1}')
-          if [ "$ACTUAL_JS_SHA" != "$EXPECTED_JS_SHA" ] || [ "$ACTUAL_WASM_SHA" != "$EXPECTED_WASM_SHA" ]; then
-            echo "错误: 部署目录 WASM 校验失败"
-            echo "expected js:   $EXPECTED_JS_SHA"
-            echo "actual js:     $ACTUAL_JS_SHA"
-            echo "expected wasm: $EXPECTED_WASM_SHA"
-            echo "actual wasm:   $ACTUAL_WASM_SHA"
+          if [ ! -f "$ACTIVE_IMAGE_JS" ] || [ ! -f "$ACTIVE_IMAGE_WASM" ]; then
+            echo "错误: 部署目录中缺少 image_compressor WASM 产物"
+            ls -la "$NEXT_DIR/dist/wasm_text_engine" || true
+            exit 1
+          fi
+
+          ACTUAL_TEXT_JS_SHA=$(sha256sum "$ACTIVE_TEXT_JS" | awk '{print $1}')
+          ACTUAL_TEXT_WASM_SHA=$(sha256sum "$ACTIVE_TEXT_WASM" | awk '{print $1}')
+          if [ "$ACTUAL_TEXT_JS_SHA" != "$EXPECTED_TEXT_JS_SHA" ] || [ "$ACTUAL_TEXT_WASM_SHA" != "$EXPECTED_TEXT_WASM_SHA" ]; then
+            echo "错误: 部署目录 text_engine WASM 校验失败"
+            echo "expected js:   $EXPECTED_TEXT_JS_SHA"
+            echo "actual js:     $ACTUAL_TEXT_JS_SHA"
+            echo "expected wasm: $EXPECTED_TEXT_WASM_SHA"
+            echo "actual wasm:   $ACTUAL_TEXT_WASM_SHA"
+            exit 1
+          fi
+
+          ACTUAL_IMAGE_JS_SHA=$(sha256sum "$ACTIVE_IMAGE_JS" | awk '{print $1}')
+          ACTUAL_IMAGE_WASM_SHA=$(sha256sum "$ACTIVE_IMAGE_WASM" | awk '{print $1}')
+          if [ "$ACTUAL_IMAGE_JS_SHA" != "$EXPECTED_IMAGE_JS_SHA" ] || [ "$ACTUAL_IMAGE_WASM_SHA" != "$EXPECTED_IMAGE_WASM_SHA" ]; then
+            echo "错误: 部署目录 image_compressor WASM 校验失败"
+            echo "expected js:   $EXPECTED_IMAGE_JS_SHA"
+            echo "actual js:     $ACTUAL_IMAGE_JS_SHA"
+            echo "expected wasm: $EXPECTED_IMAGE_WASM_SHA"
+            echo "actual wasm:   $ACTUAL_IMAGE_WASM_SHA"
             exit 1
           fi
           echo "✓ 部署目录 WASM 校验通过"
@@ -416,15 +445,21 @@ jobs:
           mkdir -p "$TMP_WASM_DIR"
           curl -fsS "http://127.0.0.1:$NEXT_PORT/wasm_text_engine/text_engine.js" -o "$TMP_WASM_DIR/text_engine.js"
           curl -fsS "http://127.0.0.1:$NEXT_PORT/wasm_text_engine/text_engine.wasm" -o "$TMP_WASM_DIR/text_engine.wasm"
+          curl -fsS "http://127.0.0.1:$NEXT_PORT/wasm_text_engine/image_compressor.js" -o "$TMP_WASM_DIR/image_compressor.js"
+          curl -fsS "http://127.0.0.1:$NEXT_PORT/wasm_text_engine/image_compressor.wasm" -o "$TMP_WASM_DIR/image_compressor.wasm"
 
-          SERVED_JS_SHA=$(sha256sum "$TMP_WASM_DIR/text_engine.js" | awk '{print $1}')
-          SERVED_WASM_SHA=$(sha256sum "$TMP_WASM_DIR/text_engine.wasm" | awk '{print $1}')
-          if [ "$SERVED_JS_SHA" != "$EXPECTED_JS_SHA" ] || [ "$SERVED_WASM_SHA" != "$EXPECTED_WASM_SHA" ]; then
-            echo "错误: HTTP 实际返回的 WASM 产物与构建版本不一致"
-            echo "served js:     $SERVED_JS_SHA"
-            echo "served wasm:   $SERVED_WASM_SHA"
-            echo "expected js:   $EXPECTED_JS_SHA"
-            echo "expected wasm: $EXPECTED_WASM_SHA"
+          SERVED_TEXT_JS_SHA=$(sha256sum "$TMP_WASM_DIR/text_engine.js" | awk '{print $1}')
+          SERVED_TEXT_WASM_SHA=$(sha256sum "$TMP_WASM_DIR/text_engine.wasm" | awk '{print $1}')
+          SERVED_IMAGE_JS_SHA=$(sha256sum "$TMP_WASM_DIR/image_compressor.js" | awk '{print $1}')
+          SERVED_IMAGE_WASM_SHA=$(sha256sum "$TMP_WASM_DIR/image_compressor.wasm" | awk '{print $1}')
+
+          if [ "$SERVED_TEXT_JS_SHA" != "$EXPECTED_TEXT_JS_SHA" ] || [ "$SERVED_TEXT_WASM_SHA" != "$EXPECTED_TEXT_WASM_SHA" ]; then
+            echo "错误: HTTP 实际返回的 text_engine WASM 产物与构建版本不一致"
+            exit 1
+          fi
+
+          if [ "$SERVED_IMAGE_JS_SHA" != "$EXPECTED_IMAGE_JS_SHA" ] || [ "$SERVED_IMAGE_WASM_SHA" != "$EXPECTED_IMAGE_WASM_SHA" ]; then
+            echo "错误: HTTP 实际返回的 image_compressor WASM 产物与构建版本不一致"
             exit 1
           fi
 
