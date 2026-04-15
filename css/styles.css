@@ -1365,6 +1365,10 @@ body.night-mode #settingsModalOverlay .modal-actions {
     display: flex;
 }
 
+body.ui-mode-mobile .file-list-sidebar {
+    max-height: calc(100vh - var(--top-toolbar-offset) - var(--top-toolbar-height) - var(--mobile-bottom-bar-height) - 20px);
+}
+
 .file-list-header {
     display: flex;
     justify-content: space-between;
