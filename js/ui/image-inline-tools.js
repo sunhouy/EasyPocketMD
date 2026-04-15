@@ -534,7 +534,7 @@ import CropperModule from 'cropperjs';
         }
 
         modal.innerHTML = `
-            <div style="display:flex;align-items:center;justify-content:space-between;padding:calc(10px + env(safe-area-inset-top, 0px)) 16px 10px;border-bottom:1px solid ${border};background:${panel};flex:none;">
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:calc(10px + var(--safe-area-top, 0px)) 16px 10px;border-bottom:1px solid ${border};background:${panel};flex:none;">
                 <div style="font-size:16px;font-weight:600;">全屏裁剪</div>
                 <button class="epmd-fs-crop-close" style="padding:6px 10px;background:${nightMode ? '#2d2d2d' : '#efefef'};color:${textColor};border:1px solid ${border};border-radius:6px;cursor:pointer;">关闭</button>
             </div>
@@ -543,7 +543,7 @@ import CropperModule from 'cropperjs';
                     <img class="epmd-fs-crop-target" alt="crop-target" style="display:block;width:100%;height:100%;object-fit:contain;">
                 </div>
             </div>
-            <div style="padding:12px 16px calc(12px + env(safe-area-inset-bottom, 0px));border-top:1px solid ${border};background:${panel};flex:none;">
+            <div style="padding:12px 16px calc(12px + var(--safe-area-bottom, 0px));border-top:1px solid ${border};background:${panel};flex:none;">
                 <div class="epmd-fs-crop-status" style="font-size:12px;min-height:18px;color:${nightMode ? '#cccccc' : '#555'};margin-bottom:10px;"></div>
                 <div style="display:flex;gap:10px;">
                     <button class="epmd-fs-crop-cancel" style="flex:1;padding:10px;background:${nightMode ? '#3a3a3a' : '#e9e9e9'};color:${textColor};border:1px solid ${border};border-radius:6px;cursor:pointer;">取消</button>
