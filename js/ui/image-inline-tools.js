@@ -1092,7 +1092,7 @@ import CropperModule from 'cropperjs';
                 var wasmResult = null;
                 if (width > maxWidth) {
                     try {
-                        var { compressImage } = await import(new URL('../../wasm_text_engine/js/image_compressor_client.js', window.location.href).href);
+                        var { compressImage } = await import(new URL('../wasm_text_engine/image_compressor_client.js', window.location.href).href);
                         var imageData = ctx.getImageData(0, 0, width, height);
                         wasmResult = await compressImage(imageData.data, width, height, { quality: Math.round(quality * 100), maxWidth: maxWidth });
                     } catch (wasmErr) {
