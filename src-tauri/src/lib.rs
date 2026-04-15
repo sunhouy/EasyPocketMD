@@ -442,6 +442,29 @@ pub fn run() {
                 }
                 emit_open_file_event(&app.app_handle(), path);
             }
+            
+            let handle = app.handle().clone();
+            std::thread::spawn(move || {
+                if let Ok(cache_dir) = handle.path().cache_dir() {
+                    let intent_file = cache_dir.join("startup_intent.txt");
+                    loop {
+                        if let Ok(content) = fs::read_to_string(&intent_file) {
+                            if !content.trim().is_empty() {
+                                let target_path = PathBuf::from(content.trim().to_string());
+                                // Only emit if it actually changed or just trust it?
+                                // Let's just emit. consume_pending_open_file_path can be used.
+                                if let Ok(mut guard) = handle.state::<PendingOpenFilePath>().0.lock() {
+                                    *guard = Some(path_to_string(&target_path));
+                                }
+                                emit_open_file_event(&handle, target_path);
+                            }
+                            let _ = fs::remove_file(&intent_file);
+                        }
+                        std::thread::sleep(std::time::Duration::from_millis(500));
+                    }
+                }
+            });
+
             Ok(())
         })
         .plugin(tauri_plugin_dialog::init())

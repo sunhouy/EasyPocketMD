@@ -56,6 +56,26 @@
         return null;
     }
 
+    function resolveAndroidURI(uri) {
+        if (typeof uri !== 'string') return uri;
+        if (uri.startsWith('content://com.android.externalstorage.documents/document/')) {
+            var docId = uri.substring('content://com.android.externalstorage.documents/document/'.length);
+            docId = decodeURIComponent(docId);
+            var colonIdx = docId.indexOf(':');
+            if (colonIdx !== -1) {
+                var volumeId = docId.substring(0, colonIdx);
+                var path = docId.substring(colonIdx + 1);
+                if (volumeId === 'primary') {
+                    return '/storage/emulated/0/' + path;
+                } else {
+                    return '/storage/' + volumeId + '/' + path;
+                }
+            }
+        }
+        // Fallback for url-encoded file:// paths or other schemes if needed
+        return uri;
+    }
+
     function shouldUseInvokeForPath(filePath) {
         var path = String(filePath || '');
         if (!path) return true;
@@ -165,6 +185,7 @@
             return invokeCommand('save_local_file', { name: name, content: content });
         },
         getLocalFilePath: function(name) {
+            name = resolveAndroidURI(name);
             return invokeCommand('get_local_file_path', { name: name });
         },
         openLocalFileDialog: function() {
@@ -192,7 +213,7 @@
                     };
                 }
 
-                var path = Array.isArray(selectedPath) ? selectedPath[0] : selectedPath;
+                var path = resolveAndroidURI(Array.isArray(selectedPath) ? selectedPath[0] : selectedPath);
                 if (fs && typeof fs.readTextFile === 'function') {
                     return fs.readTextFile(String(path)).then(function(content) {
                         return buildFileResponse(path, content);
@@ -261,6 +282,7 @@
             });
         },
         readLocalFile: function(filePath) {
+            filePath = resolveAndroidURI(filePath);
             var fs = getFsApi();
             if (shouldUseInvokeForPath(filePath)) {
                 return invokeCommand('read_local_file', { filePath: filePath });
@@ -275,6 +297,7 @@
             return invokeCommand('read_local_file', { filePath: filePath });
         },
         writeLocalFile: function(filePath, content) {
+            filePath = resolveAndroidURI(filePath);
             var fs = getFsApi();
             if (fs && typeof fs.writeTextFile === 'function') {
                 return ensureParentDirectory(fs, filePath).then(function() {

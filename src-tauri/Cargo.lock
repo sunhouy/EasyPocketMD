@@ -835,8 +835,6 @@ name = "easypocketmd_tauri"
 version = "2.4.2"
 dependencies = [
  "base64 0.22.1",
- "jni",
- "ndk-context",
  "serde",
  "serde_json",
  "tauri",
