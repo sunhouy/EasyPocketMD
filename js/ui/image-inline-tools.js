@@ -1107,7 +1107,15 @@ import CropperModule from 'cropperjs';
                     newHeight = wasmResult.data.height;
                     canvas.width = newWidth;
                     canvas.height = newHeight;
-                    var wasmImgData = new ImageData(new Uint8ClampedArray(wasmResult.data.data.buffer), newWidth, newHeight);
+                    var wasmData = wasmResult.data.data;
+                    var rgbaData = new Uint8ClampedArray(newWidth * newHeight * 4);
+                    for (var i = 0; i < newWidth * newHeight; i++) {
+                        rgbaData[i * 4] = wasmData[i * 3];
+                        rgbaData[i * 4 + 1] = wasmData[i * 3 + 1];
+                        rgbaData[i * 4 + 2] = wasmData[i * 3 + 2];
+                        rgbaData[i * 4 + 3] = 255;
+                    }
+                    var wasmImgData = new ImageData(rgbaData, newWidth, newHeight);
                     ctx.putImageData(wasmImgData, 0, 0);
                     if (statusEl) statusEl.textContent = 'WASM压缩 ' + (wasmResult.data.originalSize / 1024).toFixed(1) + 'KB → ' + (wasmResult.data.compressedSize / 1024).toFixed(1) + 'KB';
                 } else {
