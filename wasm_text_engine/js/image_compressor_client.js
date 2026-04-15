@@ -33,8 +33,7 @@ export async function loadImageCompressor(options) {
     imageCompressorLoadPromise = (async () => {
         try {
             var candidates = [
-                new URL('./wasm_text_engine/image_compressor.js', window.location.href).href,
-                new URL('./wasm_text_engine/dist/image_compressor.js', window.location.href).href
+                new URL('./wasm_text_engine/image_compressor_client.js', window.location.href).href
             ];
 
             var modulePath = await pickAvailableModulePath(candidates);
