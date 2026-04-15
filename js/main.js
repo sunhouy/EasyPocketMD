@@ -16,6 +16,35 @@ document.addEventListener('DOMContentLoaded', function() {
     var isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
     window.isMobileEditorEnvironment = isMobileDevice;
     window.editorInterfaceMode = window.isMobileEditorEnvironment ? 'mobile' : 'desktop';
+    window.isTauriMobileEnvironment = false;
+
+    function isTauriRuntime() {
+        return !!(
+            (window.desktopRuntime && window.desktopRuntime.type === 'tauri') ||
+            window.__TAURI__
+        );
+    }
+
+    function isTauriMobileRuntime() {
+        if (!isTauriRuntime()) return false;
+        return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || '');
+    }
+
+    function ensureTauriMobileSafeArea() {
+        if (!isTauriMobileRuntime() || !document.body) return;
+
+        document.body.classList.add('tauri-mobile-safe-area');
+        window.isTauriMobileEnvironment = true;
+
+        if (!document.querySelector('.status-bar-placeholder')) {
+            var placeholder = document.createElement('div');
+            placeholder.className = 'status-bar-placeholder';
+            placeholder.setAttribute('aria-hidden', 'true');
+            document.body.insertBefore(placeholder, document.body.firstChild);
+        }
+    }
+
+    ensureTauriMobileSafeArea();
 
     function isAndroidClient() {
         return /Android/i.test(navigator.userAgent || '');
@@ -33,9 +62,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function applySafeAreaToOverlay(overlay) {
         if (!overlay) return;
+        if (!window.isTauriMobileEnvironment) return;
         if (!overlay.classList.contains('modal-overlay') && !overlay.classList.contains('mobile-action-sheet-overlay')) return;
 
-        overlay.style.setProperty('padding-top', 'calc(env(safe-area-inset-top, 0px) + 10px)', 'important');
+        overlay.style.setProperty('padding-top', 'calc(var(--safe-area-top, 0px) + 10px)', 'important');
         overlay.style.setProperty('padding-bottom', '10px', 'important');
 
         if (!overlay.classList.contains('mobile-action-sheet-overlay')) {
@@ -46,11 +76,11 @@ document.addEventListener('DOMContentLoaded', function() {
         var modal = overlay.querySelector('.modal');
         if (!modal) return;
 
-        var fullHeight = 'calc(100vh - env(safe-area-inset-top, 0px) - 20px)';
+        var fullHeight = 'calc(100vh - var(--safe-area-top, 0px) - 20px)';
         modal.style.setProperty('max-height', fullHeight, 'important');
 
         if (modal.classList.contains('conflict-modal') || modal.classList.contains('diff-modal') || modal.classList.contains('history-modal')) {
-            modal.style.setProperty('height', 'calc(100vh - env(safe-area-inset-top, 0px))', 'important');
+            modal.style.setProperty('height', 'calc(100vh - var(--safe-area-top, 0px))', 'important');
         }
     }
 

@@ -10,8 +10,10 @@ html {
 :root {
     --top-toolbar-height: 46px;
     --top-toolbar-padding-x: 10px;
-    --top-toolbar-offset: env(safe-area-inset-top, 0px);
-    --top-toolbar-notice-offset: 40px;
+    --safe-area-top: 0px;
+    --safe-area-bottom: 0px;
+    --top-toolbar-offset: var(--safe-area-top);
+    --top-toolbar-notice-offset: calc(var(--safe-area-top) + 40px);
     --top-toolbar-btn-size: 32px;
     --top-toolbar-btn-gap: 6px;
     --top-toolbar-btn-top: calc(var(--top-toolbar-offset) + (var(--top-toolbar-height) - var(--top-toolbar-btn-size)) / 2);
@@ -32,7 +34,7 @@ body.night-mode {
 body {
     margin: 0;
     padding: 0;
-    padding-top: env(safe-area-inset-top);
+    padding-top: 0;
     height: var(--app-viewport-height);
     min-height: 100%;
     width: 100%;
@@ -42,6 +44,29 @@ body {
     transition: background 0.3s ease;
     overflow: hidden;
     position: relative;
+}
+
+body.tauri-mobile-safe-area {
+    --safe-area-top: env(safe-area-inset-top, 0px);
+    --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+    padding-top: var(--safe-area-top);
+}
+
+body.tauri-mobile-safe-area .status-bar-placeholder {
+    display: block;
+}
+
+.status-bar-placeholder {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: var(--safe-area-top);
+    background: var(--toolbar-surface-color);
+    border-bottom: 1px solid var(--toolbar-border-color);
+    z-index: 1001;
+    pointer-events: none;
 }
 
 /* 移动端默认禁止界面文本被选中，减少误触带来的体验干扰。 */
@@ -161,7 +186,7 @@ body.night-mode .file-switch-loading-card {
 .file-management-fab {
     position: fixed;
     right: 16px;
-    bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+    bottom: calc(16px + var(--safe-area-bottom));
     width: 56px;
     height: 56px;
     border: none;
@@ -183,7 +208,7 @@ body.night-mode .file-switch-loading-card {
 .file-management-fab-ring {
     position: fixed;
     right: 16px;
-    bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+    bottom: calc(16px + var(--safe-area-bottom));
     width: 56px;
     height: 56px;
     z-index: 1049;
@@ -823,7 +848,7 @@ body.mobile-fullscreen .editor-container {
     display: none;
     align-items: center;
     justify-content: center;
-    padding: calc(env(safe-area-inset-top, 0px) + 10px) 10px 10px;
+    padding: calc(var(--safe-area-top, 0px) + 10px) 10px 10px;
 }
 
 .modal-overlay.show {
@@ -836,7 +861,7 @@ body.mobile-fullscreen .editor-container {
     padding: 30px;
     width: 90%;
     max-width: 400px;
-    max-height: calc(100vh - env(safe-area-inset-top, 0px) - 20px);
+    max-height: calc(100vh - var(--safe-area-top, 0px) - 20px);
     overflow: auto;
     box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
     animation: modalFadeIn 0.3s ease;
@@ -1030,7 +1055,7 @@ body.mobile-fullscreen .editor-container {
 
 /* Settings modal: robust layout for scroll/click across mobile browsers and WebView */
 #settingsModalOverlay {
-    padding: calc(env(safe-area-inset-top, 0px) + 12px) 12px 12px;
+    padding: calc(var(--safe-area-top, 0px) + 12px) 12px 12px;
     align-items: center;
     justify-content: center;
 }
@@ -1038,8 +1063,8 @@ body.mobile-fullscreen .editor-container {
 #settingsModalOverlay .modal {
     width: min(920px, calc(100vw - 24px));
     max-width: 920px;
-    height: calc(100vh - env(safe-area-inset-top, 0px) - 24px);
-    max-height: calc(100vh - env(safe-area-inset-top, 0px) - 24px) !important;
+    height: calc(100vh - var(--safe-area-top, 0px) - 24px);
+    max-height: calc(100vh - var(--safe-area-top, 0px) - 24px) !important;
     display: grid !important;
     grid-template-rows: auto minmax(0, 1fr);
     overflow: hidden !important;
@@ -1095,7 +1120,7 @@ body.night-mode #settingsModalOverlay .modal-actions {
 
 @media (max-width: 768px) {
     #settingsModalOverlay {
-        padding: env(safe-area-inset-top, 0px) 0 0;
+        padding: var(--safe-area-top, 0px) 0 0;
         align-items: stretch;
         justify-content: stretch;
     }
@@ -1104,8 +1129,8 @@ body.night-mode #settingsModalOverlay .modal-actions {
         width: 100vw;
         max-width: none;
         border-radius: 0;
-        height: calc(100vh - env(safe-area-inset-top, 0px));
-        max-height: calc(100vh - env(safe-area-inset-top, 0px)) !important;
+        height: calc(100vh - var(--safe-area-top, 0px));
+        max-height: calc(100vh - var(--safe-area-top, 0px)) !important;
         padding: 16px;
     }
 
@@ -1681,10 +1706,10 @@ body.night-mode #settingsModalOverlay .modal-actions {
 
 .knowledge-graph-panel.knowledge-graph-fullscreen {
     position: fixed;
-    top: calc(var(--top-toolbar-offset) + var(--top-toolbar-height) + env(safe-area-inset-top, 0px) + 8px);
+    top: calc(var(--top-toolbar-offset) + var(--top-toolbar-height) + var(--safe-area-top, 0px) + 8px);
     left: 12px;
     right: 12px;
-    bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+    bottom: calc(12px + var(--safe-area-bottom, 0px));
     z-index: 12000;
     margin: 0;
     border-radius: 14px;
@@ -1694,7 +1719,7 @@ body.night-mode #settingsModalOverlay .modal-actions {
 }
 
 .knowledge-graph-panel.knowledge-graph-fullscreen .knowledge-graph-chart {
-    height: calc(100vh - var(--top-toolbar-offset) - var(--top-toolbar-height) - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 120px);
+    height: calc(100vh - var(--top-toolbar-offset) - var(--top-toolbar-height) - var(--safe-area-top, 0px) - var(--safe-area-bottom, 0px) - 120px);
     min-height: 360px;
 }
 
@@ -1845,8 +1870,8 @@ body.night-mode #settingsModalOverlay .modal-actions {
 .conflict-modal {
     max-width: 100vw !important;
     width: 100vw !important;
-    max-height: calc(100vh - env(safe-area-inset-top, 0px)) !important;
-    height: calc(100vh - env(safe-area-inset-top, 0px)) !important;
+    max-height: calc(100vh - var(--safe-area-top, 0px)) !important;
+    height: calc(100vh - var(--safe-area-top, 0px)) !important;
     border-radius: 0 !important;
     padding: 15px;
     margin: 0;
@@ -2105,8 +2130,8 @@ body.night-mode #settingsModalOverlay .modal-actions {
 .diff-modal {
     max-width: 100vw !important;
     width: 100vw !important;
-    max-height: calc(100vh - env(safe-area-inset-top, 0px)) !important;
-    height: calc(100vh - env(safe-area-inset-top, 0px)) !important;
+    max-height: calc(100vh - var(--safe-area-top, 0px)) !important;
+    height: calc(100vh - var(--safe-area-top, 0px)) !important;
     border-radius: 0 !important;
     padding: 15px;
     margin: 0;
@@ -2662,15 +2687,15 @@ body.night-mode .long-file-preview {
 .history-modal {
     max-width: 100vw !important;
     width: min(100vw, 960px);
-    max-height: calc(100vh - env(safe-area-inset-top, 0px) - 12px) !important;
-    height: min(calc(100vh - env(safe-area-inset-top, 0px) - 12px), 92vh);
+    max-height: calc(100vh - var(--safe-area-top, 0px) - 12px) !important;
+    height: min(calc(100vh - var(--safe-area-top, 0px) - 12px), 92vh);
 }
 
 @media (max-width: 768px) {
     .history-modal {
         width: 100vw !important;
-        height: calc(100vh - env(safe-area-inset-top, 0px)) !important;
-        max-height: calc(100vh - env(safe-area-inset-top, 0px)) !important;
+        height: calc(100vh - var(--safe-area-top, 0px)) !important;
+        max-height: calc(100vh - var(--safe-area-top, 0px)) !important;
         border-radius: 0;
         margin: 0;
     }
