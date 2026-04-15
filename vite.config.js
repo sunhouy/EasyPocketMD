@@ -8,6 +8,9 @@ const packageJsonPath = join(__dirname, 'package.json');
 const wasmJsPath = join(__dirname, 'wasm_text_engine', 'dist', 'text_engine.js');
 const wasmBinPath = join(__dirname, 'wasm_text_engine', 'dist', 'text_engine.wasm');
 const hasWasmTextEngineDist = existsSync(wasmJsPath) && existsSync(wasmBinPath);
+const imageCompressorJsPath = join(__dirname, 'wasm_text_engine', 'dist', 'image_compressor.js');
+const imageCompressorBinPath = join(__dirname, 'wasm_text_engine', 'dist', 'image_compressor.wasm');
+const hasImageCompressorDist = existsSync(imageCompressorJsPath) && existsSync(imageCompressorBinPath);
 let cacheVersion = 'v1';
 let appPackageVersion = '0.0.0';
 if (existsSync(versionPath)) {
@@ -204,7 +207,11 @@ export default defineConfig({
           dest: 'assets'
         },
         ...(hasWasmTextEngineDist ? [{
-          src: 'wasm_text_engine/dist/*',
+          src: 'wasm_text_engine/dist/text_engine*',
+          dest: 'wasm_text_engine'
+        }] : []),
+        ...(hasImageCompressorDist ? [{
+          src: 'wasm_text_engine/dist/image_compressor*',
           dest: 'wasm_text_engine'
         }] : [])
       ]

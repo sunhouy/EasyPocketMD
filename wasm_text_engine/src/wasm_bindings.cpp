@@ -32,4 +32,3 @@ EMSCRIPTEN_BINDINGS(text_engine_module) {
 }
 
 #endif
-
