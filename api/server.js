@@ -30,6 +30,13 @@ app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
+// 跨源隔离头 - 用于 Web Worker 和 WebAssembly (SharedArrayBuffer)
+app.use((req, res, next) => {
+    res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+    res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');
+    next();
+});
+
 // Static files for uploads
 // Note: __dirname is api/, so we need to go up one level to root
 const uploadsPath = path.join(__dirname, '../uploads');
@@ -68,6 +75,42 @@ app.get('/manifest.webmanifest', (req, res) => {
 app.get('/icon.png', (req, res) => {
     res.type('image/png');
     res.sendFile(path.join(rootPath, 'icon.png'));
+});
+
+// WASM 文件服务 - 带正确的 MIME 类型和跨源头
+app.get('/vips.wasm', (req, res) => {
+    const wasmPath = path.join(rootPath, 'public', 'vips.wasm');
+    if (fs.existsSync(wasmPath)) {
+        res.setHeader('Content-Type', 'application/wasm');
+        res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+        res.sendFile(wasmPath);
+    } else {
+        res.status(404).send('vips.wasm not found');
+    }
+});
+
+// vips.js 胶水代码 - 带正确的 MIME 类型
+app.get('/vips.js', (req, res) => {
+    const jsPath = path.join(rootPath, 'public', 'vips.js');
+    if (fs.existsSync(jsPath)) {
+        res.setHeader('Content-Type', 'application/javascript');
+        res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+        res.sendFile(jsPath);
+    } else {
+        res.status(404).send('vips.js not found');
+    }
+});
+
+// Worker JS 服务 - 带正确的 MIME 类型
+app.get('/js/vips-worker.js', (req, res) => {
+    const workerPath = path.join(rootPath, 'js', 'vips-worker.js');
+    if (fs.existsSync(workerPath)) {
+        res.setHeader('Content-Type', 'application/javascript');
+        res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+        res.sendFile(workerPath);
+    } else {
+        res.status(404).send('vips-worker.js not found');
+    }
 });
 
 // Import routes first
@@ -149,9 +192,21 @@ for (const p of potentialDistPaths) {
 
 if (distPath) {
     app.use(express.static(distPath, {
-        setHeaders: (res, path) => {
-            if (path.endsWith('.mjs')) {
+        setHeaders: (res, filePath) => {
+            if (filePath.endsWith('.mjs')) {
                 res.setHeader('Content-Type', 'text/javascript');
+            }
+            if (filePath.endsWith('.wasm')) {
+                res.setHeader('Content-Type', 'application/wasm');
+            }
+            if (filePath.endsWith('.worker.js')) {
+                res.setHeader('Content-Type', 'application/javascript');
+            }
+            if (filePath.endsWith('.js')) {
+                res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+            }
+            if (filePath.endsWith('.wasm')) {
+                res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
             }
         }
     }));
@@ -165,9 +220,21 @@ if (distPath) {
 } else {
     if (!isTest) console.log('Frontend build (dist) not found. Serving from root directory.');
     app.use(express.static(rootPath, {
-        setHeaders: (res, path) => {
-            if (path.endsWith('.mjs')) {
+        setHeaders: (res, filePath) => {
+            if (filePath.endsWith('.mjs')) {
                 res.setHeader('Content-Type', 'text/javascript');
+            }
+            if (filePath.endsWith('.wasm')) {
+                res.setHeader('Content-Type', 'application/wasm');
+            }
+            if (filePath.endsWith('.worker.js')) {
+                res.setHeader('Content-Type', 'application/javascript');
+            }
+            if (filePath.endsWith('.js')) {
+                res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+            }
+            if (filePath.endsWith('.wasm')) {
+                res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
             }
         }
     }));

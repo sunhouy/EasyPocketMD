@@ -1,24 +1,46 @@
-importScripts('/wasm-vips/vips.js');
+// vips-worker.js - 使用 importScripts 加载独立的 vips.js
 
 let vips = null;
+let initPromise = null;
+let vipsResolve = null;
+let vipsReject = null;
+
+const autoInitPromise = new Promise((resolve, reject) => {
+  vipsResolve = resolve;
+  vipsReject = reject;
+});
+
+self.Vips = null;
+self._vipsReadyResolve = vipsResolve;
 
 const initVips = async () => {
-  if (vips) return vips;
+  if (initPromise) return initPromise;
 
-  if (typeof self.Vips !== 'function') {
-    throw new Error('Failed to load wasm-vips: Vips is not defined');
-  }
-
-  vips = await self.Vips({
-    locateFile: (path) => {
-      if (path.endsWith('.wasm')) {
-        return '/wasm-vips/vips.wasm';
+  initPromise = (async () => {
+    if (typeof self.Vips !== 'function') {
+      importScripts('/vips.js');
+      if (typeof self.Vips !== 'function') {
+        throw new Error('Vips 未定义，vips.js 加载失败');
       }
-      return path;
     }
+
+    vips = await self.Vips({
+      mainScriptUrlOrBlob: '/vips.js',
+      locateFile: (path) => {
+        if (path.endsWith('.wasm')) {
+          return '/vips.wasm';
+        }
+        return path;
+      }
+    });
+
+    return vips;
+  })().catch((err) => {
+    initPromise = null;
+    throw err;
   });
 
-  return vips;
+  return initPromise;
 };
 
 self.onmessage = async (e) => {
@@ -35,7 +57,7 @@ self.onmessage = async (e) => {
   }
 
   const { fileBuffer, fileName, quality = 75, maxDimension = 4096 } = data;
-  
+
   try {
     const vipsInstance = await initVips();
 
@@ -60,7 +82,6 @@ self.onmessage = async (e) => {
 
     image.delete();
   } catch (err) {
-    console.error('Vips 处理失败:', err);
     self.postMessage({ error: err.message });
   }
 };
