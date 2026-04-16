@@ -2,23 +2,17 @@
 
 let vips = null;
 let initPromise = null;
-let vipsResolve = null;
-let vipsReject = null;
-
-const autoInitPromise = new Promise((resolve, reject) => {
-  vipsResolve = resolve;
-  vipsReject = reject;
-});
-
-self.Vips = null;
-self._vipsReadyResolve = vipsResolve;
+let initialized = false;
 
 const initVips = async () => {
+  if (initialized && vips) return vips;
   if (initPromise) return initPromise;
 
   initPromise = (async () => {
-    if (typeof self.Vips !== 'function') {
+    if (typeof self.Vips === 'undefined') {
+      self.name = '';
       importScripts('/vips.js');
+
       if (typeof self.Vips !== 'function') {
         throw new Error('Vips 未定义，vips.js 加载失败');
       }
@@ -34,6 +28,7 @@ const initVips = async () => {
       }
     });
 
+    initialized = true;
     return vips;
   })().catch((err) => {
     initPromise = null;

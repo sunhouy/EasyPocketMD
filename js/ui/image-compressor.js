@@ -15,9 +15,8 @@
         }
 
         // 使用经典 worker (不是 module)，因为 vips-worker.js 使用 importScripts
-        // 设置 name 不为 em-pthread，防止 vips.js 自动初始化
         const workerUrl = '/js/vips-worker.js';
-        workerInstance = new Worker(workerUrl, { name: 'vips-compressor' });
+        workerInstance = new Worker(workerUrl);
 
         workerInstance.onerror = (error) => {
             console.error('Vips Worker error:', error);
