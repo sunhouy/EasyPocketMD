@@ -172,6 +172,9 @@ export default defineConfig({
       transformMixedEsModules: true
     }
   },
+  worker: {
+    format: 'es'
+  },
   optimizeDeps: {
     include: ['docx']
   },
@@ -213,7 +216,19 @@ export default defineConfig({
         ...(hasImageCompressorDist ? [{
           src: 'wasm_text_engine/dist/image_compressor*',
           dest: 'wasm_text_engine'
-        }] : [])
+        }] : []),
+        {
+          src: 'node_modules/wasm-vips/lib/vips.wasm',
+          dest: 'wasm-vips'
+        },
+        {
+          src: 'node_modules/wasm-vips/lib/vips.js',
+          dest: 'wasm-vips'
+        },
+        {
+          src: 'js/vips-worker.js',
+          dest: 'js'
+        }
       ]
     }),
     {

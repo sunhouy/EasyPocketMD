@@ -760,7 +760,13 @@
             passwordStrengthWeak: '弱',
             passwordStrengthFair: '一般',
             passwordStrengthStrong: '强',
-            passwordStrengthVeryStrong: '非常强'
+            passwordStrengthVeryStrong: '非常强',
+
+            // 图片压缩
+            compressLargeImageTitle: '图片较大',
+            compressLargeImageMessage: '该图片超过 10MB，建议压缩以提升编辑和加载性能。',
+            compressSkip: '跳过压缩',
+            compressConfirm: '压缩并上传'
         },
         en: {
             // Page title and header
@@ -1514,7 +1520,13 @@
             passwordStrengthWeak: 'Weak',
             passwordStrengthFair: 'Fair',
             passwordStrengthStrong: 'Strong',
-            passwordStrengthVeryStrong: 'Very Strong'
+            passwordStrengthVeryStrong: 'Very Strong',
+
+            // Image Compression
+            compressLargeImageTitle: 'Large Image',
+            compressLargeImageMessage: 'This image is over 10MB. Compressing is recommended to improve editing and loading performance.',
+            compressSkip: 'Skip Compression',
+            compressConfirm: 'Compress & Upload'
         }
     };
 
