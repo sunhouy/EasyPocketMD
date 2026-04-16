@@ -14,9 +14,10 @@
             return workerInstance;
         }
 
-        // Use relative path to worker file
+        // 使用经典 worker (不是 module)，因为 vips-worker.js 使用 importScripts
+        // 设置 name 不为 em-pthread，防止 vips.js 自动初始化
         const workerUrl = '/js/vips-worker.js';
-        workerInstance = new Worker(workerUrl);
+        workerInstance = new Worker(workerUrl, { name: 'vips-compressor' });
 
         workerInstance.onerror = (error) => {
             console.error('Vips Worker error:', error);
@@ -35,14 +36,17 @@
             const worker = getWorker();
             workerInitializationPromise = new Promise((resolve, reject) => {
                 const timeout = setTimeout(() => {
-                    reject(new Error('Worker initialization timeout'));
-                }, 15000);
+                    console.warn('Worker warmup timeout, will retry on next use');
+                    workerInitializationPromise = null;
+                    resolve(null);
+                }, 30000);
 
                 worker.addEventListener('message', function onInitMessage(e) {
                     if (e.data && (e.data.processedBuffer || e.data.error || e.data.ready)) {
                         clearTimeout(timeout);
                         worker.removeEventListener('message', onInitMessage);
                         if (e.data.error) {
+                            console.warn('Worker warmup error:', e.data.error);
                             resolve(null);
                         } else {
                             resolve(e.data);
@@ -51,9 +55,6 @@
                 });
 
                 worker.postMessage({ warmup: true });
-            }).catch((err) => {
-                console.warn('Worker warmup failed, will retry on next use:', err);
-                workerInitializationPromise = null;
             });
         } catch (err) {
             console.warn('Worker warmup failed, will retry on next use:', err);
@@ -110,7 +111,16 @@
                     };
 
                     worker.onerror = (error) => {
-                        reject(new Error('Worker processing failed: ' + (error.message || 'Unknown error')));
+                        const errorMsg = error.message || error.toString() || 'Unknown error';
+                        const errorDetails = {
+                            message: errorMsg,
+                            filename: error.filename,
+                            lineno: error.lineno,
+                            colno: error.colno,
+                            error: error.error ? error.error.message : null
+                        };
+                        console.error('Worker error details:', errorDetails);
+                        reject(new Error('Worker processing failed: ' + errorMsg));
                     };
                 } catch (err) {
                     reject(err);
