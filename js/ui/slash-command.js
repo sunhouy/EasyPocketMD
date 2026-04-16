@@ -959,11 +959,18 @@ async function executeCommand(item, context) {
     if (!actionHandled && insertText) {
         insertTextAtCursor(insertText);
         await saveCurrentFileSilently();
-        return;
     }
 
     if (!actionHandled && !insertText) {
         notify(isEnglish() ? 'Command is not available yet' : '该操作暂未开放', 'warning');
+    }
+
+    // Record usage in IndexedDB for history-based ordering
+    var actionId = item.id || action || '';
+    var titleZh = item.titleZh || '';
+    var titleEn = item.titleEn || '';
+    if (actionId && window.IndexedDBManager && typeof window.IndexedDBManager.incrementSlashUsage === 'function') {
+        window.IndexedDBManager.incrementSlashUsage(actionId, titleZh, titleEn).catch(function() {});
     }
 }
 
