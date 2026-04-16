@@ -66,9 +66,20 @@
             return await saveFilesLocally(filesArray, autoInsert);
         }
 
-        var formData = new FormData();
+        const processedFiles = [];
         for (var i = 0; i < filesArray.length; i++) {
-            formData.append('files[]', filesArray[i]);
+            const file = filesArray[i];
+            if (global.handleLargeImageUpload && file.type && file.type.startsWith('image/')) {
+                const result = await global.handleLargeImageUpload(file);
+                processedFiles.push(result.file);
+            } else {
+                processedFiles.push(file);
+            }
+        }
+
+        var formData = new FormData();
+        for (var i = 0; i < processedFiles.length; i++) {
+            formData.append('files[]', processedFiles[i]);
         }
         
         // Add user info if available
