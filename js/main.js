@@ -149,6 +149,31 @@ document.addEventListener('DOMContentLoaded', function() {
         return computed.display === 'none' || !overlay.classList.contains('show');
     }
 
+    // 双击返回键退出（Tauri/浏览器通用）
+    var lastBackPressTime = 0;
+    var backPressTimeout = 2000; // 2秒
+    var backPressToastTimer = null;
+    function showBackPressToast() {
+        if (window.showMessage) {
+            window.showMessage(window.i18n ? window.i18n.t('pressAgainToExit') : '再按一次返回键退出', 'info');
+        } else {
+            alert('再按一次返回键退出');
+        }
+    }
+    function exitApp() {
+        if (window.isTauriMobileEnvironment && window.__TAURI__ && window.__TAURI__.app && window.__TAURI__.app.exit) {
+            window.__TAURI__.app.exit();
+        } else {
+            // 浏览器环境
+            window.close();
+        }
+    }
+    function isMainScreen() {
+        // 可根据实际主界面判断逻辑调整
+        // 这里只判断没有modal和文件管理模式为主界面
+        var overlays = getVisibleModalOverlays();
+        return (!overlays.length && !window.isFileManagementMode);
+    }
     function initAndroidBackModalBehavior() {
         if (!isAndroidClient() || !window.history || typeof window.history.pushState !== 'function') return;
 
@@ -160,11 +185,29 @@ document.addEventListener('DOMContentLoaded', function() {
 
         window.addEventListener('popstate', function() {
             var overlays = getVisibleModalOverlays();
-            if (!overlays.length) return;
-
-            var topOverlay = overlays[overlays.length - 1];
-            var closed = closeOverlayByBackPress(topOverlay);
-            if (closed) {
+            if (overlays.length) {
+                var topOverlay = overlays[overlays.length - 1];
+                var closed = closeOverlayByBackPress(topOverlay);
+                if (closed) {
+                    window.history.pushState(guardState, document.title, window.location.href);
+                }
+                return;
+            }
+            // 主界面返回逻辑
+            if (isMainScreen()) {
+                var now = Date.now();
+                if (now - lastBackPressTime < backPressTimeout) {
+                    exitApp();
+                } else {
+                    lastBackPressTime = now;
+                    showBackPressToast();
+                    // 2秒后自动重置
+                    if (backPressToastTimer) clearTimeout(backPressToastTimer);
+                    backPressToastTimer = setTimeout(function() {
+                        lastBackPressTime = 0;
+                    }, backPressTimeout);
+                }
+                // 再次pushState防止直接退出
                 window.history.pushState(guardState, document.title, window.location.href);
             }
         });
@@ -201,6 +244,10 @@ document.addEventListener('DOMContentLoaded', function() {
     var loading = document.getElementById('loading');
     if (loading) loading.style.display = 'block';
 
+    // 国际化：增加 pressAgainToExit
+    if (window.i18n && window.i18n.translations && !window.i18n.translations['pressAgainToExit']) {
+        window.i18n.translations['pressAgainToExit'] = '再按一次返回键退出';
+    }
     // 全局状态
     window.nightMode = localStorage.getItem('vditor_night_mode') === 'true';
     window.currentUser = JSON.parse(localStorage.getItem('vditor_user') || 'null');

@@ -1735,20 +1735,12 @@ import {
             '<button type="button" class="modal-close-btn" style="position:absolute;top:14px;right:14px;background:none;border:none;font-size:20px;cursor:pointer;color:' + (nightMode ? '#eee' : '#333') + ';">&times;</button>' +
             '<div style="font-size:18px;font-weight:700;margin-bottom:8px;">' + (isEn() ? 'Save Conflict Detected' : '检测到保存冲突') + '</div>' +
             '<div style="font-size:14px;opacity:0.82;margin-bottom:18px;">' + escapeHtml(currentFile.name || conflict.fileName || '') + '</div>' +
-            '<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:18px;">' +
-                '<div style="flex:1;min-width:260px;padding:12px;border:1px solid ' + (nightMode ? '#444' : '#e5e7eb') + ';border-radius:10px;">' +
-                    '<div style="font-weight:700;margin-bottom:8px;">' + (isEn() ? 'Local Version' : '本地版本') + '</div>' +
-                    '<div style="font-size:12px;color:' + (nightMode ? '#bbb' : '#666') + ';margin-bottom:8px;">' + (isEn() ? 'Modified:' : '修改时间：') + ' ' + formatConflictTime(conflict.localModified) + '</div>' +
-                    '<pre class="save-conflict-preview" style="white-space:pre-wrap;word-break:break-word;max-height:220px;overflow:auto;margin:0;">' + escapeHtml(conflict.localContent || '') + '</pre>' +
-                '</div>' +
-                '<div style="flex:1;min-width:260px;padding:12px;border:1px solid ' + (nightMode ? '#444' : '#e5e7eb') + ';border-radius:10px;">' +
-                    '<div style="font-weight:700;margin-bottom:8px;">' + (isEn() ? 'Server Version' : '服务器版本') + '</div>' +
-                    '<div style="font-size:12px;color:' + (nightMode ? '#bbb' : '#666') + ';margin-bottom:8px;">' + (isEn() ? 'Modified:' : '修改时间：') + ' ' + formatConflictTime(conflict.serverModified) + '</div>' +
-                    '<pre class="save-conflict-preview" style="white-space:pre-wrap;word-break:break-word;max-height:220px;overflow:auto;margin:0;">' + escapeHtml(conflict.serverContent || '') + '</pre>' +
-                '</div>' +
+            '<div style="margin-bottom:12px;padding:10px 12px;border:1px solid ' + (nightMode ? '#444' : '#e5e7eb') + ';border-radius:10px;font-size:12px;color:' + (nightMode ? '#bbb' : '#666') + ';display:flex;gap:16px;flex-wrap:wrap;">' +
+                '<span><strong style="color:' + (nightMode ? '#ddd' : '#374151') + ';">' + (isEn() ? 'Local modified:' : '本地修改时间：') + '</strong> ' + formatConflictTime(conflict.localModified) + '</span>' +
+                '<span><strong style="color:' + (nightMode ? '#ddd' : '#374151') + ';">' + (isEn() ? 'Server modified:' : '服务器修改时间：') + '</strong> ' + formatConflictTime(conflict.serverModified) + '</span>' +
             '</div>' +
+            '<div class="save-conflict-diff" style="margin-bottom:18px;border:1px solid ' + (nightMode ? '#444' : '#e5e7eb') + ';border-radius:10px;overflow:auto;max-height:320px;"></div>' +
             '<div style="display:flex;flex-wrap:wrap;gap:10px;justify-content:flex-end;">' +
-                '<button type="button" class="save-conflict-btn view-diff" style="padding:10px 16px;border:none;border-radius:8px;background:' + (nightMode ? '#374151' : '#475569') + ';color:#fff;cursor:pointer;">' + (isEn() ? 'View differences' : '查看差异对比') + '</button>' +
                 '<button type="button" class="save-conflict-btn use-server" style="padding:10px 16px;border:none;border-radius:8px;background:' + (nightMode ? '#4b5563' : '#64748b') + ';color:#fff;cursor:pointer;">' + (isEn() ? 'Use server version' : '使用服务器版本') + '</button>' +
                 '<button type="button" class="save-conflict-btn merge-version" style="padding:10px 16px;border:none;border-radius:8px;background:' + (nightMode ? '#0f766e' : '#14b8a6') + ';color:#fff;cursor:pointer;">' + (isEn() ? 'Merge and save' : '合并并保存') + '</button>' +
                 '<button type="button" class="save-conflict-btn use-local" style="padding:10px 16px;border:none;border-radius:8px;background:' + (nightMode ? '#2563eb' : '#3b82f6') + ';color:#fff;cursor:pointer;">' + (isEn() ? 'Keep local version' : '保留本地版本') + '</button>' +
@@ -1756,6 +1748,13 @@ import {
 
         overlay.appendChild(panel);
         document.body.appendChild(overlay);
+
+        const saveConflictDiff = panel.querySelector('.save-conflict-diff');
+        if (saveConflictDiff) {
+            const saveConflictDiffResult = computeDiff(conflict.localContent || '', conflict.serverContent || '');
+            saveConflictDiff.innerHTML = renderDiffView(saveConflictDiffResult, { collapseSame: true });
+            bindCollapsedDiffInteractions(saveConflictDiff);
+        }
 
         const closeDialog = function() {
             global.lastSaveConflictPending = false;
@@ -1820,21 +1819,6 @@ import {
         overlay.onclick = function(event) {
             if (event.target === overlay) closeDialog();
         };
-
-        var viewDiffBtn = panel.querySelector('.view-diff');
-        if (viewDiffBtn) {
-            viewDiffBtn.onclick = function() {
-                if (typeof global.showDiffModal === 'function') {
-                    global.showDiffModal({
-                        filename: currentFile.name || conflict.fileName || '',
-                        localContent: conflict.localContent || '',
-                        serverContent: conflict.serverContent || '',
-                        localModified: conflict.localModified || null,
-                        serverModified: conflict.serverModified || conflict.serverLastModified || null
-                    });
-                }
-            };
-        }
 
         panel.querySelector('.use-server').onclick = function() {
             const localFileIndex = files.findIndex(function(file) {
