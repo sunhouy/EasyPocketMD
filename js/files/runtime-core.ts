@@ -1748,6 +1748,7 @@ import {
                 '</div>' +
             '</div>' +
             '<div style="display:flex;flex-wrap:wrap;gap:10px;justify-content:flex-end;">' +
+                '<button type="button" class="save-conflict-btn view-diff" style="padding:10px 16px;border:none;border-radius:8px;background:' + (nightMode ? '#374151' : '#475569') + ';color:#fff;cursor:pointer;">' + (isEn() ? 'View differences' : '查看差异对比') + '</button>' +
                 '<button type="button" class="save-conflict-btn use-server" style="padding:10px 16px;border:none;border-radius:8px;background:' + (nightMode ? '#4b5563' : '#64748b') + ';color:#fff;cursor:pointer;">' + (isEn() ? 'Use server version' : '使用服务器版本') + '</button>' +
                 '<button type="button" class="save-conflict-btn merge-version" style="padding:10px 16px;border:none;border-radius:8px;background:' + (nightMode ? '#0f766e' : '#14b8a6') + ';color:#fff;cursor:pointer;">' + (isEn() ? 'Merge and save' : '合并并保存') + '</button>' +
                 '<button type="button" class="save-conflict-btn use-local" style="padding:10px 16px;border:none;border-radius:8px;background:' + (nightMode ? '#2563eb' : '#3b82f6') + ';color:#fff;cursor:pointer;">' + (isEn() ? 'Keep local version' : '保留本地版本') + '</button>' +
@@ -1819,6 +1820,21 @@ import {
         overlay.onclick = function(event) {
             if (event.target === overlay) closeDialog();
         };
+
+        var viewDiffBtn = panel.querySelector('.view-diff');
+        if (viewDiffBtn) {
+            viewDiffBtn.onclick = function() {
+                if (typeof global.showDiffModal === 'function') {
+                    global.showDiffModal({
+                        filename: currentFile.name || conflict.fileName || '',
+                        localContent: conflict.localContent || '',
+                        serverContent: conflict.serverContent || '',
+                        localModified: conflict.localModified || null,
+                        serverModified: conflict.serverModified || conflict.serverLastModified || null
+                    });
+                }
+            };
+        }
 
         panel.querySelector('.use-server').onclick = function() {
             const localFileIndex = files.findIndex(function(file) {
