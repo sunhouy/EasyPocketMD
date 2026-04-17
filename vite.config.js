@@ -143,10 +143,6 @@ export default defineConfig({
   },
   server: {
     port: 8080,
-    headers: {
-      'Cross-Origin-Opener-Policy': 'same-origin',
-      'Cross-Origin-Embedder-Policy': 'require-corp',
-    },
     proxy: {
       '/api': {
         target: 'http://localhost:3000',
@@ -159,12 +155,7 @@ export default defineConfig({
       }
     }
   },
-  preview: {
-    headers: {
-      'Cross-Origin-Opener-Policy': 'same-origin',
-      'Cross-Origin-Embedder-Policy': 'require-corp',
-    }
-  },
+  preview: {},
   build: {
     outDir: 'dist',
     assetsDir: 'assets',
@@ -227,11 +218,7 @@ export default defineConfig({
         ...(hasImageCompressorDist ? [{
           src: 'wasm_text_engine/dist/image_compressor*',
           dest: 'wasm_text_engine'
-        }] : []),
-        {
-          src: 'js/vips-worker.js',
-          dest: 'js'
-        }
+        }] : [])
       ]
     }),
     {
@@ -292,44 +279,6 @@ export default defineConfig({
         const path = require('path');
         const swPath = path.join(options.dir || 'dist', 'sw.js');
         fs.writeFileSync(swPath, swContent);
-      }
-    },
-    {
-      name: 'generate-headers-config',
-      writeBundle(options, bundle) {
-        const fs = require('fs');
-        const path = require('path');
-        const distDir = options.dir || 'dist';
-
-        const nginxHeaders = `# 跨源隔离配置 - 用于 Web Worker 和 WebAssembly
-# 将此配置添加到 nginx server 块中
-add_header Cross-Origin-Opener-Policy same-origin always;
-add_header Cross-Origin-Embedder-Policy require-corp always;
-`;
-        const htaccess = `# 跨源隔离配置 - 用于 Apache
-# 将此内容添加到 .htaccess 文件中
-<IfModule mod_headers.c>
-  Header set Cross-Origin-Opener-Policy "same-origin"
-  Header set Cross-Origin-Embedder-Policy "require-corp"
-</IfModule>
-`;
-        const caddyConfig = `# 跨源隔离配置 - 用于 Caddy
-# 将此配置添加到 Caddyfile 中
-header {
-  Cross-Origin-Opener-Policy "same-origin"
-  Cross-Origin-Embedder-Policy "require-corp"
-}
-`;
-
-        fs.writeFileSync(path.join(distDir, 'headers-nginx.conf'), nginxHeaders);
-        fs.writeFileSync(path.join(distDir, '.htaccess'), htaccess);
-        fs.writeFileSync(path.join(distDir, 'headers-caddy.conf'), caddyConfig);
-
-        console.log('\n✅ 已生成跨源隔离配置文件:');
-        console.log('   - headers-nginx.conf');
-        console.log('   - .htaccess');
-        console.log('   - headers-caddy.conf');
-        console.log('\n⚠️  请将这些配置应用到你的生产环境服务器中');
       }
     }
   ]
