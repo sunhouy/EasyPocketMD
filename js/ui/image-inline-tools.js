@@ -754,7 +754,7 @@ import CropperModule from 'cropperjs';
         if (status) {
             status.textContent = text || '';
         }
-        var buttons = panel.querySelectorAll('.epmd-image-tool-btn, .epmd-image-tool-lang');
+        var buttons = panel.querySelectorAll('.epmd-image-tool-btn, .epmd-image-tool-lang, .epmd-modal-btn, .epmd-ocr-lang, .epmd-compress-quality, .epmd-compress-maxwidth, .epmd-convert-format, .epmd-rename-input');
         buttons.forEach(function(btn) {
             btn.disabled = !!busy;
         });
@@ -771,6 +771,141 @@ import CropperModule from 'cropperjs';
         } catch (e) {
             return blob;
         }
+    }
+
+    function splitFileNameParts(name) {
+        var raw = String(name || '').trim();
+        if (!raw) {
+            return { base: '', ext: '' };
+        }
+        var lastDot = raw.lastIndexOf('.');
+        if (lastDot <= 0 || lastDot === raw.length - 1) {
+            return { base: raw, ext: '' };
+        }
+        return {
+            base: raw.slice(0, lastDot),
+            ext: raw.slice(lastDot + 1).toLowerCase()
+        };
+    }
+
+    function sanitizeFileBaseName(name) {
+        var base = String(name || '').trim();
+        if (!base) return '';
+        base = base.replace(/\.[a-zA-Z0-9]+$/, '');
+        base = base.replace(/[\\/:*?"<>|]+/g, '_');
+        base = base.replace(/\s+/g, '_');
+        base = base.replace(/^\.+/, '');
+        base = base.replace(/\.+$/, '');
+        return base.slice(0, 120);
+    }
+
+    function extFromMimeType(mimeType) {
+        var mime = String(mimeType || '').toLowerCase();
+        if (mime === 'image/jpeg' || mime === 'image/jpg') return 'jpg';
+        if (mime === 'image/png') return 'png';
+        if (mime === 'image/webp') return 'webp';
+        if (mime === 'image/gif') return 'gif';
+        if (mime === 'image/bmp') return 'bmp';
+        if (mime === 'image/svg+xml') return 'svg';
+        return '';
+    }
+
+    function guessExtFromSrc(src) {
+        var info = toComparableUrl(src);
+        var file = String(info.file || '');
+        var parts = splitFileNameParts(file);
+        return parts.ext || '';
+    }
+
+    function guessBaseNameFromSrc(src) {
+        var info = toComparableUrl(src);
+        var file = String(info.file || '').trim();
+        var parts = splitFileNameParts(file || 'image');
+        return sanitizeFileBaseName(parts.base || 'image') || 'image';
+    }
+
+    function buildTargetFileName(baseName, preferredExt, fallbackExt) {
+        var safeBase = sanitizeFileBaseName(baseName) || 'image';
+        var ext = String(preferredExt || fallbackExt || 'png').toLowerCase().replace(/[^a-z0-9]/g, '');
+        if (!ext) ext = 'png';
+        return safeBase + '.' + ext;
+    }
+
+    async function fetchImageBlobBySrc(src) {
+        var candidates = [];
+        function pushCandidate(url) {
+            if (!url) return;
+            var normalized = String(url).trim();
+            if (!normalized) return;
+            if (candidates.indexOf(normalized) === -1) {
+                candidates.push(normalized);
+            }
+        }
+
+        pushCandidate(src);
+        if (typeof global.resolveResourceUrl === 'function') {
+            pushCandidate(global.resolveResourceUrl(src, getNativeAwareResolveBase()));
+        }
+
+        if (global.ResourceLoader && typeof global.ResourceLoader.getLocalBlobUrl === 'function') {
+            for (var i = 0; i < candidates.length; i++) {
+                var candidate = candidates[i];
+                try {
+                    var localBlobUrl = await global.ResourceLoader.getLocalBlobUrl(candidate);
+                    pushCandidate(localBlobUrl);
+                } catch (e) {
+                    // ignore and continue with other candidates
+                }
+            }
+        }
+
+        var lastError = null;
+        for (var j = 0; j < candidates.length; j++) {
+            var current = candidates[j];
+            try {
+                var response = await fetch(current, { mode: 'cors' });
+                if (!response.ok) {
+                    throw new Error('HTTP ' + response.status);
+                }
+                return await response.blob();
+            } catch (err) {
+                lastError = err;
+            }
+        }
+
+        throw lastError || new Error('无法读取图片内容');
+    }
+
+    function resetCompressDebugLog(modal) {
+        if (!modal) return;
+        var logEl = modal.querySelector('.epmd-compress-debug-log');
+        if (logEl) {
+            logEl.textContent = '等待压缩...';
+        }
+    }
+
+    function appendCompressDebugLog(modal, step, details) {
+        var time = new Date().toISOString().slice(11, 19);
+        var line = '[' + time + '] ' + step;
+        if (details !== undefined) {
+            try {
+                line += ' | ' + (typeof details === 'string' ? details : JSON.stringify(details));
+            } catch (e) {
+                line += ' | [details-unserializable]';
+            }
+        }
+
+        console.info('[ImageToolsCompress]', step, details || '');
+
+        if (!modal) return;
+        var logEl = modal.querySelector('.epmd-compress-debug-log');
+        if (!logEl) return;
+        if (logEl.textContent === '等待压缩...') {
+            logEl.textContent = line;
+        } else {
+            logEl.textContent += '\n' + line;
+        }
+        logEl.scrollTop = logEl.scrollHeight;
     }
 
     function createModal() {
@@ -866,6 +1001,10 @@ import CropperModule from 'cropperjs';
                         </div>
                         <button class="epmd-modal-btn epmd-compress-run" style="padding: 8px 12px; background: #4CAF50; color: white; border: none; border-radius: 6px; cursor: pointer; width: 100%;">压缩并替换</button>
                         <div class="epmd-compress-status" style="margin-top: 8px; font-size: 12px; color: ${nightMode ? '#cccccc' : '#666'};"></div>
+                        <div style="margin-top: 10px; border: 1px solid ${borderColor}; border-radius: 6px; background: ${nightMode ? '#171717' : '#fafafa'}; overflow: hidden;">
+                            <div style="padding: 6px 8px; font-size: 12px; color: ${nightMode ? '#d8d8d8' : '#555'}; border-bottom: 1px solid ${borderColor};">调试日志</div>
+                            <pre class="epmd-compress-debug-log" style="margin: 0; padding: 8px; max-height: 140px; overflow: auto; font-size: 11px; line-height: 1.45; color: ${nightMode ? '#d0d0d0' : '#444'}; white-space: pre-wrap; word-break: break-word;">等待压缩...</pre>
+                        </div>
                     </div>
                 </div>
 
@@ -899,6 +1038,19 @@ import CropperModule from 'cropperjs';
                     </select>
                     <button class="epmd-modal-btn epmd-ocr-run" style="padding: 8px 12px; background: ${btnBg}; color: ${btnTextColor}; border: 1px solid ${borderColor}; border-radius: 6px; cursor: pointer; width: 100%;">运行 OCR</button>
                     <div class="epmd-ocr-status" style="margin-top: 10px; font-size: 12px; color: ${nightMode ? '#cccccc' : '#666'};"></div>
+                </div>
+
+                <div style="margin-bottom: 16px; border: 1px solid ${borderColor}; border-radius: 8px; overflow: hidden;">
+                    <div class="epmd-rename-toggle" style="padding: 10px 12px; background: ${nightMode ? '#2a2a2a' : '#f5f5f5'}; cursor: pointer; display: flex; justify-content: space-between; align-items: center;">
+                        <span style="font-size: 14px;">图片重命名</span>
+                        <span class="epmd-rename-arrow" style="transition: transform 0.2s;">▼</span>
+                    </div>
+                    <div class="epmd-rename-content" style="display: none; padding: 12px;">
+                        <div style="margin-bottom: 8px; font-size: 12px; color: ${nightMode ? '#cfcfcf' : '#666'};">将当前图片另存为新文件名并替换链接（不会改动原文件）。</div>
+                        <input type="text" class="epmd-rename-input" placeholder="输入新文件名，例如 meeting-cover" style="width: 100%; padding: 8px; margin-bottom: 10px; border: 1px solid ${borderColor}; border-radius: 6px; background: ${btnBg}; color: ${textColor};">
+                        <button class="epmd-modal-btn epmd-rename-run" style="padding: 8px 12px; background: #4CAF50; color: white; border: none; border-radius: 6px; cursor: pointer; width: 100%;">重命名并替换链接</button>
+                        <div class="epmd-rename-status" style="margin-top: 8px; font-size: 12px; color: ${nightMode ? '#cccccc' : '#666'};"></div>
+                    </div>
                 </div>
 
                 <div style="margin-bottom: 0; padding-top: 16px; border-top: 1px solid ${borderColor};">
@@ -935,6 +1087,12 @@ import CropperModule from 'cropperjs';
         currentEditingImage = img;
         var modal = createModal();
         modal.style.display = 'flex';
+
+        var renameInput = modal.querySelector('.epmd-rename-input');
+        if (renameInput) {
+            renameInput.value = guessBaseNameFromSrc(currentEditingImage.getAttribute('src') || '');
+        }
+        resetCompressDebugLog(modal);
 
         // 绑定按钮事件
         modal.querySelector('.epmd-size-minus').onclick = function() {
@@ -1070,34 +1228,72 @@ import CropperModule from 'cropperjs';
             setPanelBusy(modal, true, '正在压缩...');
             var statusEl = modal.querySelector('.epmd-compress-status');
             if (statusEl) statusEl.textContent = '';
+            resetCompressDebugLog(modal);
 
             try {
-                var quality = parseInt(modal.querySelector('.epmd-compress-quality').value, 10) / 100;
+                var qualityPercent = parseInt(modal.querySelector('.epmd-compress-quality').value, 10);
+                var quality = qualityPercent / 100;
                 var maxWidth = parseInt(modal.querySelector('.epmd-compress-maxwidth').value, 10) || 1920;
+                var oldSrc = currentEditingImage.getAttribute('src') || '';
+                appendCompressDebugLog(modal, 'START', {
+                    src: oldSrc,
+                    qualityPercent: qualityPercent,
+                    maxWidth: maxWidth
+                });
 
                 var canvas = document.createElement('canvas');
                 var ctx = canvas.getContext('2d');
+                if (!ctx) {
+                    throw new Error('Canvas 2D 上下文不可用');
+                }
                 var img = new Image();
                 img.crossOrigin = 'anonymous';
 
                 await new Promise(function(resolve, reject) {
                     img.onload = resolve;
-                    img.onerror = reject;
-                    img.src = currentEditingImage.getAttribute('src') || '';
+                    img.onerror = function() { reject(new Error('图片加载失败: ' + oldSrc)); };
+                    img.src = oldSrc;
                 });
 
                 var width = img.width;
                 var height = img.height;
+                appendCompressDebugLog(modal, 'IMAGE_LOADED', { width: width, height: height });
+
+                // 先绘制原图再读取像素，避免将空像素传入 WASM 导致黑图。
+                canvas.width = width;
+                canvas.height = height;
+                ctx.drawImage(img, 0, 0, width, height);
+
+                var imageData = ctx.getImageData(0, 0, width, height);
+                appendCompressDebugLog(modal, 'PIXEL_BUFFER_READY', {
+                    length: imageData.data.length,
+                    sampleRGBA: Array.prototype.slice.call(imageData.data, 0, 16)
+                });
 
                 var wasmResult = null;
                 if (width > maxWidth) {
                     try {
-                        var { compressImage } = await import(new URL('../wasm_text_engine/image_compressor_client.js', window.location.href).href);
-                        var imageData = ctx.getImageData(0, 0, width, height);
+                        var wasmClientUrl = new URL('/wasm_text_engine/js/image_compressor_client.js', getNativeAwareResolveBase()).href;
+                        appendCompressDebugLog(modal, 'WASM_IMPORT', { url: wasmClientUrl });
+                        var wasmClient = await import(wasmClientUrl);
+                        var compressImage = wasmClient.compressImage;
+                        if (typeof compressImage !== 'function') {
+                            throw new Error('compressImage 导出不可用');
+                        }
                         wasmResult = await compressImage(imageData.data, width, height, { quality: Math.round(quality * 100), maxWidth: maxWidth });
+                        appendCompressDebugLog(modal, 'WASM_RESULT', {
+                            code: wasmResult && wasmResult.code,
+                            message: wasmResult && wasmResult.message,
+                            outWidth: wasmResult && wasmResult.data ? wasmResult.data.width : null,
+                            outHeight: wasmResult && wasmResult.data ? wasmResult.data.height : null,
+                            compressedSize: wasmResult && wasmResult.data ? wasmResult.data.compressedSize : null
+                        });
                     } catch (wasmErr) {
+                        appendCompressDebugLog(modal, 'WASM_FALLBACK', wasmErr && wasmErr.message ? wasmErr.message : String(wasmErr));
                         console.warn('WASM compression not available, using canvas:', wasmErr);
                     }
+                } else {
+                    appendCompressDebugLog(modal, 'WASM_SKIPPED', { reason: 'width <= maxWidth' });
                 }
 
                 var newWidth = width;
@@ -1108,6 +1304,10 @@ import CropperModule from 'cropperjs';
                     canvas.width = newWidth;
                     canvas.height = newHeight;
                     var wasmData = wasmResult.data.data;
+                    var expectedLength = newWidth * newHeight * 3;
+                    if (!wasmData || wasmData.length !== expectedLength) {
+                        throw new Error('WASM 输出长度异常: expected=' + expectedLength + ', actual=' + (wasmData ? wasmData.length : 0));
+                    }
                     var rgbaData = new Uint8ClampedArray(newWidth * newHeight * 4);
                     for (var i = 0; i < newWidth * newHeight; i++) {
                         rgbaData[i * 4] = wasmData[i * 3];
@@ -1117,6 +1317,11 @@ import CropperModule from 'cropperjs';
                     }
                     var wasmImgData = new ImageData(rgbaData, newWidth, newHeight);
                     ctx.putImageData(wasmImgData, 0, 0);
+                    appendCompressDebugLog(modal, 'WASM_DRAWN', {
+                        newWidth: newWidth,
+                        newHeight: newHeight,
+                        sampleRGB: Array.prototype.slice.call(wasmData, 0, 12)
+                    });
                     if (statusEl) statusEl.textContent = 'WASM压缩 ' + (wasmResult.data.originalSize / 1024).toFixed(1) + 'KB → ' + (wasmResult.data.compressedSize / 1024).toFixed(1) + 'KB';
                 } else {
                     if (width > maxWidth) {
@@ -1126,15 +1331,26 @@ import CropperModule from 'cropperjs';
                     canvas.width = newWidth;
                     canvas.height = newHeight;
                     ctx.drawImage(img, 0, 0, newWidth, newHeight);
+                    appendCompressDebugLog(modal, 'CANVAS_FALLBACK_DRAWN', {
+                        newWidth: newWidth,
+                        newHeight: newHeight
+                    });
                     if (statusEl) statusEl.textContent = 'Canvas压缩';
                 }
 
                 var meta = getImageMeta(currentEditingImage);
-                var oldSrc = currentEditingImage.getAttribute('src') || '';
                 var isLocal = oldSrc.startsWith('local://') || oldSrc.startsWith('blob:') || oldSrc.startsWith('data:image');
 
                 var blob = await new Promise(function(resolve) {
                     canvas.toBlob(resolve, 'image/jpeg', quality);
+                });
+                if (!blob) {
+                    throw new Error('canvas.toBlob 返回空结果');
+                }
+                appendCompressDebugLog(modal, 'BLOB_READY', {
+                    mime: blob.type,
+                    size: blob.size,
+                    isLocal: isLocal
                 });
 
                 var newSrc;
@@ -1145,12 +1361,15 @@ import CropperModule from 'cropperjs';
                     if (global.LocalImageManager && global.LocalImageManager.registerUrlPair) {
                         global.LocalImageManager.registerUrlPair(fileUrl, newSrc);
                     }
+                    appendCompressDebugLog(modal, 'LOCAL_STORED', { fileUrl: fileUrl, newSrc: newSrc });
                 } else {
                     newSrc = await uploadBlobImage(blob, 'compressed.jpg');
+                    appendCompressDebugLog(modal, 'REMOTE_UPLOADED', { newSrc: newSrc });
                 }
 
                 applyImageStyle(currentEditingImage, meta.width, meta.rotate);
                 var replaced = replaceImageSourceInEditor(oldSrc, newSrc, meta.width, meta.rotate, currentEditingImage.getAttribute('alt'));
+                appendCompressDebugLog(modal, 'REPLACE_RESULT', { replaced: replaced });
                 if (replaced) {
                     global.showMessage ? global.showMessage('图片已压缩', 'success') : alert('图片已压缩');
                 } else {
@@ -1159,6 +1378,7 @@ import CropperModule from 'cropperjs';
                 }
             } catch (err) {
                 console.error('Compress error:', err);
+                appendCompressDebugLog(modal, 'ERROR', err && err.message ? err.message : String(err));
                 if (statusEl) statusEl.textContent = '压缩失败';
                 global.showMessage ? global.showMessage('图片压缩失败', 'error') : alert('图片压缩失败');
             } finally {
@@ -1238,6 +1458,79 @@ import CropperModule from 'cropperjs';
                 console.error('Convert error:', err);
                 if (statusEl) statusEl.textContent = '转换失败';
                 global.showMessage ? global.showMessage('图片转换失败', 'error') : alert('图片转换失败');
+            } finally {
+                setPanelBusy(modal, false, '');
+            }
+        };
+
+        modal.querySelector('.epmd-rename-toggle').onclick = function() {
+            var content = modal.querySelector('.epmd-rename-content');
+            var arrow = modal.querySelector('.epmd-rename-arrow');
+            if (content.style.display === 'none') {
+                content.style.display = 'block';
+                arrow.style.transform = 'rotate(180deg)';
+            } else {
+                content.style.display = 'none';
+                arrow.style.transform = 'rotate(0deg)';
+            }
+        };
+
+        modal.querySelector('.epmd-rename-run').onclick = async function() {
+            if (!currentEditingImage) return;
+
+            var statusEl = modal.querySelector('.epmd-rename-status');
+            if (statusEl) statusEl.textContent = '';
+            setPanelBusy(modal, true, '正在重命名...');
+
+            try {
+                var oldSrc = currentEditingImage.getAttribute('src') || '';
+                if (!oldSrc) {
+                    throw new Error('图片地址为空');
+                }
+
+                var inputEl = modal.querySelector('.epmd-rename-input');
+                var requestedName = inputEl ? inputEl.value : '';
+                var sanitizedBase = sanitizeFileBaseName(requestedName);
+                if (!sanitizedBase) {
+                    throw new Error('请输入有效文件名');
+                }
+
+                var imageBlob = await fetchImageBlobBySrc(oldSrc);
+                var preferredExt = guessExtFromSrc(oldSrc);
+                var mimeExt = extFromMimeType(imageBlob.type);
+                var newFilename = buildTargetFileName(sanitizedBase, preferredExt, mimeExt);
+                var targetMime = imageBlob.type || (mimeExt ? 'image/' + mimeExt : 'image/png');
+                var imageFile = fileFromBlob(imageBlob, newFilename);
+
+                var meta = getImageMeta(currentEditingImage);
+                var isLocal = oldSrc.startsWith('local://') || oldSrc.startsWith('blob:') || oldSrc.startsWith('data:image');
+                var newSrc;
+
+                if (isLocal) {
+                    if (!(imageFile instanceof File)) {
+                        imageFile = new File([imageBlob], newFilename, { type: targetMime });
+                    }
+                    var localUrl = await global.ResourceLoader.storeLocalFile(imageFile);
+                    newSrc = await global.ResourceLoader.getLocalBlobUrl(localUrl);
+                    if (global.LocalImageManager && global.LocalImageManager.registerUrlPair) {
+                        global.LocalImageManager.registerUrlPair(localUrl, newSrc);
+                    }
+                } else {
+                    newSrc = await uploadBlobImage(imageBlob, newFilename);
+                }
+
+                applyImageStyle(currentEditingImage, meta.width, meta.rotate);
+                var replaced = replaceImageSourceInEditor(oldSrc, newSrc, meta.width, meta.rotate, currentEditingImage.getAttribute('alt'));
+                if (!replaced) {
+                    currentEditingImage.setAttribute('src', newSrc);
+                }
+
+                if (statusEl) statusEl.textContent = '重命名成功: ' + newFilename;
+                global.showMessage ? global.showMessage('图片已重命名', 'success') : alert('图片已重命名');
+            } catch (err) {
+                console.error('Rename image error:', err);
+                if (statusEl) statusEl.textContent = '重命名失败: ' + (err && err.message ? err.message : '未知错误');
+                global.showMessage ? global.showMessage('图片重命名失败', 'error') : alert('图片重命名失败');
             } finally {
                 setPanelBusy(modal, false, '');
             }
