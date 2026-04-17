@@ -1016,6 +1016,11 @@ async function fetchPaletteItems(query) {
     var localItems = await searchBuiltinEntries(normalizedQuery, 80);
     if (!remoteItems.length) return localItems;
     if (!localItems.length) return remoteItems;
+    if (normalizedQuery) {
+        // Prefer local builtin ranking for typed queries so pinyin/alias matches
+        // (e.g. /tp, /tupian) are not pushed out by remote result limits.
+        return mergePaletteItems(localItems, remoteItems, 80);
+    }
     return mergePaletteItems(remoteItems, localItems, 80);
 }
 

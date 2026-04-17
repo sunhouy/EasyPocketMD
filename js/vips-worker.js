@@ -44,7 +44,13 @@ self.onmessage = async (e) => {
   if (data.warmup) {
     try {
       await initVips();
-      self.postMessage({ ready: true });
+      self.postMessage({
+        ready: true,
+        runtime: {
+          crossOriginIsolated: self.crossOriginIsolated === true,
+          hasSharedArrayBuffer: typeof SharedArrayBuffer !== 'undefined'
+        }
+      });
     } catch (err) {
       self.postMessage({ error: 'Warmup failed: ' + err.message });
     }
@@ -72,7 +78,9 @@ self.onmessage = async (e) => {
       processedBuffer: compressedBuffer,
       fileName: fileName.replace(/\.[^/.]+$/, '') + '.jpg',
       originalWidth: origWidth,
-      originalHeight: origHeight
+      originalHeight: origHeight,
+      outputWidth: image.width,
+      outputHeight: image.height
     }, [compressedBuffer.buffer]);
 
     image.delete();

@@ -3,7 +3,7 @@
 
 **AI powered · Superfast · Cross Platform**
 
-<p align="center"><a href="README.md">中文入口</a> &nbsp;|&nbsp; <a href="README_zh_CN.md">中文完整版</a> &nbsp;|&nbsp; <a href="https://md.yhsun.cn/">Demo</a></p>
+<p align="center"><a href="README.md">中文</a>  &nbsp;|&nbsp; <a href="https://md.yhsun.cn/">Demo</a></p>
 
 A Markdown editor that removes the learning curve — insert formatted text, LaTeX formulas, and diagrams without memorizing any syntax. With intelligent search and AI assistance, everything is just a few clicks away.
 
