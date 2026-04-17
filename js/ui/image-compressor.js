@@ -2,6 +2,7 @@
     'use strict';
 
     const IMAGE_COMPRESS_THRESHOLD = 10 * 1024 * 1024;
+    const MAX_CANVAS_PIXELS = 4096 * 4096;
     let workerInstance = null;
     let workerInitializationPromise = null;
     let vipsUnsupportedWarned = false;
@@ -114,6 +115,117 @@
         });
     }
 
+    function calculateTargetDimensions(width, height, maxDimension) {
+        if (!width || !height) {
+            return { width: maxDimension, height: maxDimension };
+        }
+
+        const edgeRatio = Math.min(1, maxDimension / Math.max(width, height));
+        const pixelRatio = Math.min(1, Math.sqrt(MAX_CANVAS_PIXELS / (width * height)));
+        const ratio = Math.min(edgeRatio, pixelRatio);
+
+        return {
+            width: Math.max(1, Math.round(width * ratio)),
+            height: Math.max(1, Math.round(height * ratio))
+        };
+    }
+
+    function createRenderSurface(width, height) {
+        if (typeof OffscreenCanvas !== 'undefined') {
+            return new OffscreenCanvas(width, height);
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        return canvas;
+    }
+
+    function get2dContext(surface) {
+        const ctx = surface.getContext('2d', {
+            alpha: false,
+            desynchronized: true,
+            willReadFrequently: false
+        });
+        if (!ctx) {
+            throw new Error('Canvas 2D context unavailable');
+        }
+
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        return ctx;
+    }
+
+    async function surfaceToBlob(surface, quality) {
+        const normalizedQuality = Math.min(1, Math.max(0.1, quality / 100));
+        if (typeof surface.convertToBlob === 'function') {
+            return surface.convertToBlob({
+                type: 'image/jpeg',
+                quality: normalizedQuality
+            });
+        }
+
+        return new Promise((resolve, reject) => {
+            surface.toBlob((result) => {
+                if (result) {
+                    resolve(result);
+                } else {
+                    reject(new Error('Canvas compression failed'));
+                }
+            }, 'image/jpeg', normalizedQuality);
+        });
+    }
+
+    async function decodeImageForCompression(file, targetWidth, targetHeight) {
+        if (typeof createImageBitmap === 'function') {
+            try {
+                return await createImageBitmap(file, {
+                    resizeWidth: targetWidth,
+                    resizeHeight: targetHeight,
+                    resizeQuality: 'high'
+                });
+            } catch (err) {
+                console.warn('[ImageCompressor] createImageBitmap 缩放解码失败，回退到 Image:', err);
+            }
+        }
+
+        return decodeImageFromFile(file);
+    }
+
+    async function drawScaledImage(source, sourceWidth, sourceHeight, targetWidth, targetHeight) {
+        let currentSurface = source;
+        let currentWidth = sourceWidth;
+        let currentHeight = sourceHeight;
+
+        while (currentWidth / 2 > targetWidth && currentHeight / 2 > targetHeight) {
+            const nextWidth = Math.max(targetWidth, Math.round(currentWidth / 2));
+            const nextHeight = Math.max(targetHeight, Math.round(currentHeight / 2));
+            const nextSurface = createRenderSurface(nextWidth, nextHeight);
+            const nextCtx = get2dContext(nextSurface);
+            nextCtx.drawImage(currentSurface, 0, 0, nextWidth, nextHeight);
+
+            if (currentSurface && typeof currentSurface.close === 'function') {
+                currentSurface.close();
+            }
+
+            currentSurface = nextSurface;
+            currentWidth = nextWidth;
+            currentHeight = nextHeight;
+        }
+
+        const outputSurface = createRenderSurface(targetWidth, targetHeight);
+        const outputCtx = get2dContext(outputSurface);
+        outputCtx.fillStyle = '#ffffff';
+        outputCtx.fillRect(0, 0, targetWidth, targetHeight);
+        outputCtx.drawImage(currentSurface, 0, 0, targetWidth, targetHeight);
+
+        if (currentSurface && currentSurface !== source && typeof currentSurface.close === 'function') {
+            currentSurface.close();
+        }
+
+        return outputSurface;
+    }
+
     async function compressImageWithCanvas(file, options = {}) {
         const quality = options.quality || 75;
         const maxDimension = options.maxDimension || 4096;
@@ -123,32 +235,25 @@
             quality,
             maxDimension
         });
-        const img = await decodeImageFromFile(file);
+        const probe = await decodeImageFromFile(file);
+        const originalWidth = probe.naturalWidth || probe.width;
+        const originalHeight = probe.naturalHeight || probe.height;
+        const targetSize = calculateTargetDimensions(originalWidth, originalHeight, maxDimension);
+        const decoded = await decodeImageForCompression(file, targetSize.width, targetSize.height);
+        const decodedWidth = decoded.width || originalWidth;
+        const decodedHeight = decoded.height || originalHeight;
+        const surface = await drawScaledImage(
+            decoded,
+            decodedWidth,
+            decodedHeight,
+            targetSize.width,
+            targetSize.height
+        );
+        const blob = await surfaceToBlob(surface, quality);
 
-        const ratio = Math.min(1, maxDimension / Math.max(img.width, img.height));
-        const targetWidth = Math.max(1, Math.round(img.width * ratio));
-        const targetHeight = Math.max(1, Math.round(img.height * ratio));
-
-        const canvas = document.createElement('canvas');
-        canvas.width = targetWidth;
-        canvas.height = targetHeight;
-
-        const ctx = canvas.getContext('2d');
-        if (!ctx) {
-            throw new Error('Canvas 2D context unavailable');
+        if (decoded && typeof decoded.close === 'function') {
+            decoded.close();
         }
-
-        ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
-
-        const blob = await new Promise((resolve, reject) => {
-            canvas.toBlob((result) => {
-                if (result) {
-                    resolve(result);
-                } else {
-                    reject(new Error('Canvas compression failed'));
-                }
-            }, 'image/jpeg', Math.min(1, Math.max(0.1, quality / 100)));
-        });
 
         const fileName = file.name.replace(/\.[^/.]+$/, '') + '.jpg';
         const compressedFile = new File([blob], fileName, { type: 'image/jpeg' });
