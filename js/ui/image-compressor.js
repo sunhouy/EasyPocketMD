@@ -4,6 +4,29 @@
     const IMAGE_COMPRESS_THRESHOLD = 10 * 1024 * 1024;
     let workerInstance = null;
     let workerInitializationPromise = null;
+    let vipsUnsupportedWarned = false;
+
+    function canUseWorkerCompression() {
+        return typeof Worker !== 'undefined' && global.crossOriginIsolated === true;
+    }
+
+    function getVipsUnavailableReason() {
+        if (typeof Worker === 'undefined') {
+            return 'Worker API 不可用';
+        }
+        if (global.crossOriginIsolated !== true) {
+            return 'crossOriginIsolated=false (缺少 COOP/COEP 响应头)';
+        }
+        return '未知原因';
+    }
+
+    function logVipsUnavailableOnce() {
+        if (vipsUnsupportedWarned) {
+            return;
+        }
+        vipsUnsupportedWarned = true;
+        console.warn('[ImageCompressor] VIPS 压缩不可用，将使用 Canvas 降级。原因:', getVipsUnavailableReason());
+    }
 
     function shouldCompress(file) {
         return file && file.type && file.type.startsWith('image/') && file.size > IMAGE_COMPRESS_THRESHOLD;
@@ -27,6 +50,11 @@
     }
 
     function warmupWorker() {
+        if (!canUseWorkerCompression()) {
+            logVipsUnavailableOnce();
+            return Promise.resolve(null);
+        }
+
         if (workerInitializationPromise) {
             return workerInitializationPromise;
         }
@@ -48,6 +76,10 @@
                             console.warn('Worker warmup error:', e.data.error);
                             resolve(null);
                         } else {
+                            console.info('[ImageCompressor] VIPS worker warmup ready:', e.data.runtime || {
+                                crossOriginIsolated: global.crossOriginIsolated === true,
+                                hasSharedArrayBuffer: typeof SharedArrayBuffer !== 'undefined'
+                            });
                             resolve(e.data);
                         }
                     }
@@ -63,9 +95,82 @@
         return workerInitializationPromise;
     }
 
+    function decodeImageFromFile(file) {
+        return new Promise((resolve, reject) => {
+            const url = URL.createObjectURL(file);
+            const img = new Image();
+
+            img.onload = () => {
+                URL.revokeObjectURL(url);
+                resolve(img);
+            };
+
+            img.onerror = () => {
+                URL.revokeObjectURL(url);
+                reject(new Error('Failed to decode image'));
+            };
+
+            img.src = url;
+        });
+    }
+
+    async function compressImageWithCanvas(file, options = {}) {
+        const quality = options.quality || 75;
+        const maxDimension = options.maxDimension || 4096;
+        console.warn('[ImageCompressor] 使用 Canvas 降级压缩:', {
+            fileName: file.name,
+            reason: getVipsUnavailableReason(),
+            quality,
+            maxDimension
+        });
+        const img = await decodeImageFromFile(file);
+
+        const ratio = Math.min(1, maxDimension / Math.max(img.width, img.height));
+        const targetWidth = Math.max(1, Math.round(img.width * ratio));
+        const targetHeight = Math.max(1, Math.round(img.height * ratio));
+
+        const canvas = document.createElement('canvas');
+        canvas.width = targetWidth;
+        canvas.height = targetHeight;
+
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+            throw new Error('Canvas 2D context unavailable');
+        }
+
+        ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
+
+        const blob = await new Promise((resolve, reject) => {
+            canvas.toBlob((result) => {
+                if (result) {
+                    resolve(result);
+                } else {
+                    reject(new Error('Canvas compression failed'));
+                }
+            }, 'image/jpeg', Math.min(1, Math.max(0.1, quality / 100)));
+        });
+
+        const fileName = file.name.replace(/\.[^/.]+$/, '') + '.jpg';
+        const compressedFile = new File([blob], fileName, { type: 'image/jpeg' });
+
+        return {
+            file: compressedFile,
+            originalSize: file.size,
+            compressedSize: blob.size,
+            originalFileName: file.name,
+            compressedFileName: fileName,
+            compressionRatio: (1 - blob.size / file.size) * 100
+        };
+    }
+
     function compressImage(file, options = {}) {
         if (!shouldCompress(file)) {
             return Promise.resolve(null);
+        }
+
+        if (!canUseWorkerCompression()) {
+            logVipsUnavailableOnce();
+            return compressImageWithCanvas(file, options);
         }
 
         return new Promise((resolve, reject) => {
@@ -80,6 +185,12 @@
                     warmupWorker();
 
                     const worker = getWorker();
+                    console.info('[ImageCompressor] 使用 VIPS worker 压缩:', {
+                        fileName: file.name,
+                        originalSize: file.size,
+                        quality,
+                        maxDimension
+                    });
                     worker.postMessage(
                         {
                             fileBuffer: buffer,
@@ -92,12 +203,25 @@
 
                     worker.onmessage = (msg) => {
                         if (msg.data.error) {
-                            reject(new Error(msg.data.error));
+                            console.warn('[ImageCompressor] VIPS 压缩失败，降级 Canvas:', msg.data.error);
+                            compressImageWithCanvas(file, options)
+                                .then(resolve)
+                                .catch(() => reject(new Error(msg.data.error)));
                             return;
                         }
 
                         const blob = new Blob([msg.data.processedBuffer], { type: 'image/jpeg' });
                         const compressedFile = new File([blob], msg.data.fileName, { type: 'image/jpeg' });
+
+                        console.info('[ImageCompressor] VIPS 压缩成功:', {
+                            fileName: msg.data.fileName,
+                            originalSize: file.size,
+                            compressedSize: blob.size,
+                            originalWidth: msg.data.originalWidth,
+                            originalHeight: msg.data.originalHeight,
+                            outputWidth: msg.data.outputWidth,
+                            outputHeight: msg.data.outputHeight
+                        });
 
                         resolve({
                             file: compressedFile,
@@ -119,10 +243,16 @@
                             error: error.error ? error.error.message : null
                         };
                         console.error('Worker error details:', errorDetails);
-                        reject(new Error('Worker processing failed: ' + errorMsg));
+                        console.warn('[ImageCompressor] VIPS worker error，降级 Canvas');
+                        compressImageWithCanvas(file, options)
+                            .then(resolve)
+                            .catch(() => reject(new Error('Worker processing failed: ' + errorMsg)));
                     };
                 } catch (err) {
-                    reject(err);
+                    console.warn('[ImageCompressor] VIPS 初始化异常，降级 Canvas:', err);
+                    compressImageWithCanvas(file, options)
+                        .then(resolve)
+                        .catch(() => reject(err));
                 }
             };
 
