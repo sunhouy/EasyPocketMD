@@ -1355,17 +1355,54 @@ import {
                     const pendingServerSync = g('pendingServerSync') || {};
                     const pendingFileIds = Object.keys(pendingServerSync).filter(id => pendingServerSync[id]);
                     if (pendingFileIds.length > 0) {
-                        setTimeout(() => {
-                            (async () => {
-                                for (const fileId of pendingFileIds) {
-                                    try {
-                                        await global.syncFileToServer(fileId);
-                                    } catch (e) {
-                                        console.warn('自动同步文件失败:', fileId, e);
+                        const startupPendingConflicts = [];
+                        const mergedFiles = g('files') || [];
+
+                        pendingFileIds.forEach(function(fileId) {
+                            const localFile = mergedFiles.find(function(f) { return f && String(f.id) === String(fileId); });
+                            if (!localFile || localFile.type !== 'file' || isExternalLocalFile(localFile)) return;
+
+                            const serverFile = serverFiles.find(function(sf) {
+                                return sf && sf.type === 'file' && sf.name === localFile.name;
+                            });
+                            if (!serverFile) return;
+
+                            const localContent = localFile.content || '';
+                            const serverContent = serverFile.content || '';
+                            if (localContent === serverContent) return;
+
+                            startupPendingConflicts.push({
+                                type: 'content',
+                                filename: localFile.name,
+                                localContent: localContent,
+                                serverContent: serverContent,
+                                localModified: localFile.lastModified || null,
+                                serverModified: serverFile.serverLastModified || serverFile.lastModified || null,
+                                serverLastModified: serverFile.serverLastModified || serverFile.lastModified || null,
+                                localContentVersion: Number(localFile.contentVersion || 0),
+                                serverContentVersion: Number(serverFile.contentVersion || serverFile.content_version || 0)
+                            });
+                        });
+
+                        if (startupPendingConflicts.length > 0) {
+                            if (typeof global.showConflictResolution === 'function') {
+                                global.showConflictResolution(startupPendingConflicts, serverFiles, preserveFileName);
+                            } else {
+                                showConflictResolution(startupPendingConflicts, serverFiles, preserveFileName);
+                            }
+                        } else {
+                            setTimeout(() => {
+                                (async () => {
+                                    for (const fileId of pendingFileIds) {
+                                        try {
+                                            await global.syncFileToServer(fileId);
+                                        } catch (e) {
+                                            console.warn('自动同步文件失败:', fileId, e);
+                                        }
                                     }
-                                }
-                            })();
-                        }, 1000);
+                                })();
+                            }, 1000);
+                        }
                     }
                 }
             } else {
