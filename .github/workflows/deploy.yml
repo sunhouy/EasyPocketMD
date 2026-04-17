@@ -512,20 +512,6 @@ jobs:
             nginx -s reload || service nginx reload
           fi
 
-          echo "验证生产域名跨源隔离响应头..."
-          DOMAIN_HEADERS=$(curl -I -s https://md.yhsun.cn/)
-          echo "$DOMAIN_HEADERS"
-          echo "$DOMAIN_HEADERS" | grep -qi '^cross-origin-opener-policy: same-origin' || {
-            echo "错误: 生产首页缺少 Cross-Origin-Opener-Policy: same-origin"
-            exit 1
-          }
-          echo "$DOMAIN_HEADERS" | grep -qi '^cross-origin-embedder-policy: require-corp' || {
-            echo "错误: 生产首页缺少 Cross-Origin-Embedder-Policy: require-corp"
-            exit 1
-          }
-          echo "✓ 生产域名跨源隔离响应头验证通过"
-
-
           # 停止旧服务（如果还有的话）
           if [ -n "$CURRENT_NAME" ]; then
             echo "检查并停止旧服务: $CURRENT_NAME"

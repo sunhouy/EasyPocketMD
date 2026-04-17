@@ -1273,7 +1273,7 @@ import CropperModule from 'cropperjs';
                 var wasmResult = null;
                 if (width > maxWidth) {
                     try {
-                        var wasmClientUrl = new URL('/wasm_text_engine/js/image_compressor_client.js', getNativeAwareResolveBase()).href;
+                        var wasmClientUrl = new URL('/wasm_text_engine/image_compressor_client.js', getNativeAwareResolveBase()).href;
                         appendCompressDebugLog(modal, 'WASM_IMPORT', { url: wasmClientUrl });
                         var wasmClient = await import(wasmClientUrl);
                         var compressImage = wasmClient.compressImage;
