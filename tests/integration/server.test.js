@@ -49,4 +49,14 @@ describe('Server Integration', () => {
         // Depending on whether index.html exists, it returns 200, 404, or 500 (if dist not found)
         expect([200, 404, 500]).toContain(res.status);
     });
+
+    it('should serve wasm assets with cross-origin isolation headers', async () => {
+        const res = await request(app).get('/vips.wasm');
+
+        expect(res.status).toBe(200);
+        expect(res.headers['cross-origin-opener-policy']).toBe('same-origin');
+        expect(res.headers['cross-origin-embedder-policy']).toBe('require-corp');
+        expect(res.headers['cross-origin-resource-policy']).toBe('cross-origin');
+        expect(res.headers['content-type']).toMatch(/application\/wasm/);
+    });
 });
