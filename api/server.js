@@ -83,6 +83,7 @@ const convertRoutes = require('./routes/convert');
 const aiRoutes = require('./routes/ai');
 const userFilesRoutes = require('./routes/user_files');
 const pptExportRoutes = require('./routes/ppt-export');
+const pexelsRoutes = require('./routes/pexels');
 const gatusRoutes = require('./routes/gatus');
 const shareManager = require('./models/ShareManager');
 const { initShareCollabServer } = require('./realtime/shareCollabServer');
@@ -121,6 +122,9 @@ app.use('/api/convert', convertLimiter, convertRoutes);
 
 // PPT Export routes - rate limiting for PPT export
 app.use('/api/ppt-export', convertLimiter, pptExportRoutes);
+
+// Pexels routes - rate limiting for image search
+app.use('/api/pexels', aiLimiter, pexelsRoutes);
 
 // Legacy routes - general API rate limiting
 app.use('/api', apiLimiter, legacyRoutes);
