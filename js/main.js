@@ -50,6 +50,10 @@ document.addEventListener('DOMContentLoaded', function() {
         return /Android/i.test(navigator.userAgent || '');
     }
 
+    function isMobileClient() {
+        return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent || '');
+    }
+
     function getVisibleModalOverlays() {
         return Array.from(document.querySelectorAll('.modal-overlay, .mobile-action-sheet-overlay')).filter(function(el) {
             if (!el) return false;
@@ -174,8 +178,8 @@ document.addEventListener('DOMContentLoaded', function() {
         var overlays = getVisibleModalOverlays();
         return (!overlays.length && !window.isFileManagementMode);
     }
-    function initAndroidBackModalBehavior() {
-        if (!isAndroidClient() || !window.history || typeof window.history.pushState !== 'function') return;
+    function initMobileBackModalBehavior() {
+        if (!isMobileClient() || !window.history || typeof window.history.pushState !== 'function') return;
 
         var guardState = { epmBackGuard: true };
         var currentState = window.history.state || {};
@@ -3338,7 +3342,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     initializeAppShellOnce();
-    initAndroidBackModalBehavior();
+    initMobileBackModalBehavior();
     ensureWasmRuntimeBootstrapped();
 
     if (window.startInFileManagementMode) {
