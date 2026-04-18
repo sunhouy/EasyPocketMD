@@ -694,6 +694,15 @@ import CropperModule from 'cropperjs';
         });
     }
 
+    function blobFromBinaryData(data, mimeType) {
+        if (!data || typeof data.length !== 'number') {
+            return null;
+        }
+
+        var bytes = data instanceof Uint8Array ? data : new Uint8Array(data);
+        return new Blob([bytes], { type: mimeType || 'application/octet-stream' });
+    }
+
     function persistImageChange(img, width, rotate) {
         if (!global.vditor || typeof global.vditor.getValue !== 'function' || typeof global.vditor.setValue !== 'function') {
             return false;
@@ -1298,29 +1307,20 @@ import CropperModule from 'cropperjs';
 
                 var newWidth = width;
                 var newHeight = height;
+                var outputBlob = null;
                 if (wasmResult && wasmResult.code === 200 && wasmResult.data) {
                     newWidth = wasmResult.data.width;
                     newHeight = wasmResult.data.height;
-                    canvas.width = newWidth;
-                    canvas.height = newHeight;
                     var wasmData = wasmResult.data.data;
-                    var expectedLength = newWidth * newHeight * 3;
-                    if (!wasmData || wasmData.length !== expectedLength) {
-                        throw new Error('WASM 输出长度异常: expected=' + expectedLength + ', actual=' + (wasmData ? wasmData.length : 0));
+                    outputBlob = blobFromBinaryData(wasmData, 'image/jpeg');
+                    if (!outputBlob || !outputBlob.size) {
+                        throw new Error('WASM 输出数据为空');
                     }
-                    var rgbaData = new Uint8ClampedArray(newWidth * newHeight * 4);
-                    for (var i = 0; i < newWidth * newHeight; i++) {
-                        rgbaData[i * 4] = wasmData[i * 3];
-                        rgbaData[i * 4 + 1] = wasmData[i * 3 + 1];
-                        rgbaData[i * 4 + 2] = wasmData[i * 3 + 2];
-                        rgbaData[i * 4 + 3] = 255;
-                    }
-                    var wasmImgData = new ImageData(rgbaData, newWidth, newHeight);
-                    ctx.putImageData(wasmImgData, 0, 0);
-                    appendCompressDebugLog(modal, 'WASM_DRAWN', {
+                    appendCompressDebugLog(modal, 'WASM_BLOB_READY', {
                         newWidth: newWidth,
                         newHeight: newHeight,
-                        sampleRGB: Array.prototype.slice.call(wasmData, 0, 12)
+                        bytes: wasmData.length,
+                        sampleBytes: Array.prototype.slice.call(wasmData, 0, 12)
                     });
                     if (statusEl) statusEl.textContent = 'WASM压缩 ' + (wasmResult.data.originalSize / 1024).toFixed(1) + 'KB → ' + (wasmResult.data.compressedSize / 1024).toFixed(1) + 'KB';
                 } else {
@@ -1336,26 +1336,26 @@ import CropperModule from 'cropperjs';
                         newHeight: newHeight
                     });
                     if (statusEl) statusEl.textContent = 'Canvas压缩';
+                    outputBlob = await new Promise(function(resolve) {
+                        canvas.toBlob(resolve, 'image/jpeg', quality);
+                    });
                 }
 
                 var meta = getImageMeta(currentEditingImage);
                 var isLocal = oldSrc.startsWith('local://') || oldSrc.startsWith('blob:') || oldSrc.startsWith('data:image');
 
-                var blob = await new Promise(function(resolve) {
-                    canvas.toBlob(resolve, 'image/jpeg', quality);
-                });
-                if (!blob) {
-                    throw new Error('canvas.toBlob 返回空结果');
+                if (!outputBlob) {
+                    throw new Error('压缩结果为空');
                 }
                 appendCompressDebugLog(modal, 'BLOB_READY', {
-                    mime: blob.type,
-                    size: blob.size,
+                    mime: outputBlob.type,
+                    size: outputBlob.size,
                     isLocal: isLocal
                 });
 
                 var newSrc;
                 if (isLocal) {
-                    var file = new File([blob], 'compressed.jpg', { type: 'image/jpeg' });
+                    var file = new File([outputBlob], 'compressed.jpg', { type: 'image/jpeg' });
                     var fileUrl = await global.ResourceLoader.storeLocalFile(file);
                     newSrc = await global.ResourceLoader.getLocalBlobUrl(fileUrl);
                     if (global.LocalImageManager && global.LocalImageManager.registerUrlPair) {
@@ -1363,7 +1363,7 @@ import CropperModule from 'cropperjs';
                     }
                     appendCompressDebugLog(modal, 'LOCAL_STORED', { fileUrl: fileUrl, newSrc: newSrc });
                 } else {
-                    newSrc = await uploadBlobImage(blob, 'compressed.jpg');
+                    newSrc = await uploadBlobImage(outputBlob, 'compressed.jpg');
                     appendCompressDebugLog(modal, 'REMOTE_UPLOADED', { newSrc: newSrc });
                 }
 
