@@ -565,6 +565,11 @@ async function runPandocDocx(inputContent, options = {}) {
             }
         }
 
+        // 对于HTML输入，添加额外的Pandoc参数来更好地保留样式
+        if (inputFormat === 'html') {
+            args.push('--wrap=preserve');
+        }
+
         await new Promise((resolve, reject) => {
             const child = spawn('pandoc', args, {
                 windowsHide: true
@@ -589,9 +594,88 @@ async function runPandocDocx(inputContent, options = {}) {
             });
         });
 
-        return await fsp.readFile(outputPath);
+        const docxBuffer = await fsp.readFile(outputPath);
+
+        // 如果是HTML输入且指定了字体，需要后处理DOCX以确保字体正确应用
+        if (inputFormat === 'html' && (titleFont || bodyFont)) {
+            return await postProcessDocxFonts(docxBuffer, titleFont, bodyFont);
+        }
+
+        return docxBuffer;
     } finally {
         await fsp.rm(tempDir, { recursive: true, force: true }).catch(() => {});
+    }
+}
+
+async function postProcessDocxFonts(docxBuffer, titleFont, bodyFont) {
+    try {
+        const JSZip = require('jszip');
+        const zip = await JSZip.loadAsync(docxBuffer);
+
+        // 提取并修改 word/styles.xml
+        const stylesFile = zip.file('word/styles.xml');
+        if (!stylesFile) {
+            console.log('[DOCX] No styles.xml found, skipping font post-processing');
+            return docxBuffer;
+        }
+
+        let stylesXml = await stylesFile.async('string');
+        let modified = false;
+
+        // 修改标题样式的字体 (Heading 1-6)
+        if (titleFont) {
+            for (let i = 1; i <= 6; i++) {
+                const headingPattern = new RegExp(
+                    `(<w:style[^>]*w:styleId="Heading${i}"[^>]*>[\\s\\S]*?<w:rPr>)([\\s\\S]*?)(<\\/w:rPr>)`,
+                    'g'
+                );
+                stylesXml = stylesXml.replace(headingPattern, (match, before, content, after) => {
+                    // 移除现有的 w:rFonts 标签
+                    const cleanedContent = content.replace(/<w:rFonts[^>]*\/>|<w:rFonts[^>]*>[\s\S]*?<\/w:rFonts>/g, '');
+                    // 添加新的字体设置
+                    const newFonts = `<w:rFonts w:ascii="${titleFont}" w:hAnsi="${titleFont}" w:eastAsia="${titleFont}" w:cs="${titleFont}"/>`;
+                    modified = true;
+                    return `${before}${newFonts}${cleanedContent}${after}`;
+                });
+            }
+        }
+
+        // 修改正文样式的字体
+        if (bodyFont) {
+            // 修改Normal样式
+            const normalPattern = /(<w:style[^>]*w:styleId="Normal"[^>]*>[\s\S]*?<w:rPr>)([\s\S]*?)(<\/w:rPr>)/g;
+            stylesXml = stylesXml.replace(normalPattern, (match, before, content, after) => {
+                const cleanedContent = content.replace(/<w:rFonts[^>]*\/>|<w:rFonts[^>]*>[\s\S]*?<\/w:rFonts>/g, '');
+                const newFonts = `<w:rFonts w:ascii="${bodyFont}" w:hAnsi="${bodyFont}" w:eastAsia="${bodyFont}" w:cs="${bodyFont}"/>`;
+                modified = true;
+                return `${before}${newFonts}${cleanedContent}${after}`;
+            });
+
+            // 修改其他段落样式
+            ['BodyText', 'ListParagraph', 'TableNormal'].forEach(styleId => {
+                const pattern = new RegExp(
+                    `(<w:style[^>]*w:styleId="${styleId}"[^>]*>[\\s\\S]*?<w:rPr>)([\\s\\S]*?)(<\\/w:rPr>)`,
+                    'g'
+                );
+                stylesXml = stylesXml.replace(pattern, (match, before, content, after) => {
+                    const cleanedContent = content.replace(/<w:rFonts[^>]*\/>|<w:rFonts[^>]*>[\s\S]*?<\/w:rFonts>/g, '');
+                    const newFonts = `<w:rFonts w:ascii="${bodyFont}" w:hAnsi="${bodyFont}" w:eastAsia="${bodyFont}" w:cs="${bodyFont}"/>`;
+                    modified = true;
+                    return `${before}${newFonts}${cleanedContent}${after}`;
+                });
+            });
+        }
+
+        if (modified) {
+            console.log(`[DOCX] Applied font post-processing: titleFont=${titleFont}, bodyFont=${bodyFont}`);
+            zip.file('word/styles.xml', stylesXml);
+            return await zip.generateAsync({ type: 'nodebuffer' });
+        }
+
+        return docxBuffer;
+    } catch (error) {
+        console.error('[DOCX] Error post-processing fonts:', error);
+        return docxBuffer;
     }
 }
 
