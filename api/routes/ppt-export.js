@@ -60,13 +60,32 @@ router.post('/', async (req, res) => {
                 const imageUrl = pages[i].image.url;
                 if (imageUrl.startsWith('data:image/')) {
                     // 验证base64图片数据完整性
-                    const base64Data = imageUrl.split(',')[1];
-                    if (!base64Data || base64Data.length < 100) {
-                        console.warn(`Page ${i + 1}: Image data seems incomplete (${base64Data ? base64Data.length : 0} bytes)`);
-                        // 移除不完整的图片
+                    const parts = imageUrl.split(',');
+                    if (parts.length !== 2) {
+                        console.warn(`Page ${i + 1}: Invalid image format (missing comma separator)`);
                         pages[i].image = null;
-                    } else {
-                        console.log(`Page ${i + 1}: Image validated (${Math.round(base64Data.length / 1024)}KB)`);
+                        continue;
+                    }
+
+                    const base64Data = parts[1];
+                    if (!base64Data || base64Data.length < 100) {
+                        console.warn(`Page ${i + 1}: Image data too short (${base64Data ? base64Data.length : 0} bytes)`);
+                        pages[i].image = null;
+                        continue;
+                    }
+
+                    // 验证 base64 编码是否有效
+                    try {
+                        const buffer = Buffer.from(base64Data, 'base64');
+                        if (buffer.length < 100) {
+                            console.warn(`Page ${i + 1}: Decoded image too small (${buffer.length} bytes)`);
+                            pages[i].image = null;
+                            continue;
+                        }
+                        console.log(`Page ${i + 1}: Image validated (base64: ${Math.round(base64Data.length / 1024)}KB, decoded: ${Math.round(buffer.length / 1024)}KB)`);
+                    } catch (err) {
+                        console.warn(`Page ${i + 1}: Invalid base64 encoding:`, err.message);
+                        pages[i].image = null;
                     }
                 }
             }
