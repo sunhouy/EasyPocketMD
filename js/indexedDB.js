@@ -3,9 +3,10 @@
     'use strict';
 
     const DB_NAME = 'MarkdownEditorFiles';
-    const DB_VERSION = 2;
+    const DB_VERSION = 3;
     const STORE_NAME = 'files';
     const DRAFT_STORE_NAME = 'drafts';
+    const SLASH_HISTORY_STORE_NAME = 'slash_history';
 
     let db = null;
 
@@ -35,6 +36,13 @@
                     draftStore.createIndex('fileId', 'fileId', { unique: true });
                     draftStore.createIndex('timestamp', 'timestamp', { unique: false });
                     draftStore.createIndex('sessionId', 'sessionId', { unique: false });
+                }
+
+                if (!database.objectStoreNames.contains(SLASH_HISTORY_STORE_NAME)) {
+                    const slashStore = database.createObjectStore(SLASH_HISTORY_STORE_NAME, { keyPath: 'actionId' });
+                    slashStore.createIndex('actionId', 'actionId', { unique: true });
+                    slashStore.createIndex('count', 'count', { unique: false });
+                    slashStore.createIndex('lastUsed', 'lastUsed', { unique: false });
                 }
             };
         });
@@ -185,6 +193,89 @@
         });
     }
 
+    // Slash command history management
+    async function incrementSlashUsage(actionId, titleZh, titleEn) {
+        await initDB();
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction([SLASH_HISTORY_STORE_NAME], 'readwrite');
+            const store = transaction.objectStore(SLASH_HISTORY_STORE_NAME);
+            const request = store.get(String(actionId));
+
+            request.onsuccess = () => {
+                const existing = request.result;
+                if (existing) {
+                    existing.count = (existing.count || 1) + 1;
+                    existing.lastUsed = Date.now();
+                    existing.titleZh = titleZh || existing.titleZh;
+                    existing.titleEn = titleEn || existing.titleEn;
+                    const updateReq = store.put(existing);
+                    updateReq.onsuccess = () => resolve(existing);
+                    updateReq.onerror = () => reject(updateReq.error);
+                } else {
+                    const newData = {
+                        actionId: String(actionId),
+                        titleZh: titleZh || '',
+                        titleEn: titleEn || '',
+                        count: 1,
+                        lastUsed: Date.now(),
+                        firstUsed: Date.now()
+                    };
+                    const addReq = store.add(newData);
+                    addReq.onsuccess = () => resolve(newData);
+                    addReq.onerror = () => reject(addReq.error);
+                }
+            };
+            request.onerror = () => reject(request.error);
+        });
+    }
+
+    async function getSlashUsageHistory() {
+        await initDB();
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction([SLASH_HISTORY_STORE_NAME], 'readonly');
+            const store = transaction.objectStore(SLASH_HISTORY_STORE_NAME);
+            const request = store.getAll();
+
+            request.onsuccess = () => {
+                const results = request.result || [];
+                // Sort by count descending, then by lastUsed descending
+                results.sort(function(a, b) {
+                    if ((b.count || 0) !== (a.count || 0)) return (b.count || 0) - (a.count || 0);
+                    return (b.lastUsed || 0) - (a.lastUsed || 0);
+                });
+                resolve(results);
+            };
+            request.onerror = () => reject(request.error);
+        });
+    }
+
+    async function getSlashUsageCount(actionId) {
+        await initDB();
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction([SLASH_HISTORY_STORE_NAME], 'readonly');
+            const store = transaction.objectStore(SLASH_HISTORY_STORE_NAME);
+            const request = store.get(String(actionId));
+
+            request.onsuccess = () => {
+                const result = request.result;
+                resolve(result ? (result.count || 0) : 0);
+            };
+            request.onerror = () => reject(request.error);
+        });
+    }
+
+    async function clearSlashHistory() {
+        await initDB();
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction([SLASH_HISTORY_STORE_NAME], 'readwrite');
+            const store = transaction.objectStore(SLASH_HISTORY_STORE_NAME);
+            const request = store.clear();
+
+            request.onsuccess = () => resolve();
+            request.onerror = () => reject(request.error);
+        });
+    }
+
     function createBlobURL(data, contentType) {
         const blob = new Blob([data], { type: contentType });
         return URL.createObjectURL(blob);
@@ -206,6 +297,10 @@
         deleteDraft,
         getAllDrafts,
         clearDrafts,
+        incrementSlashUsage,
+        getSlashUsageHistory,
+        getSlashUsageCount,
+        clearSlashHistory,
         createBlobURL,
         revokeBlobURL
     };
