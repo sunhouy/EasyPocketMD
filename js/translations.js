@@ -287,6 +287,9 @@
             cookieMessage: '本网站使用 Cookies 以提升您的体验，我们仅会使用必要cookies使网站正常运行。继续使用即表示您同意我们的隐私政策。',
             accept: '接受',
 
+            // 返回键退出
+            pressAgainToExit: '再按一次返回键退出',
+
             // 分享链接
             shareLinkExpired: '分享链接已过期，无法编辑',
             getShareFailed: '获取分享内容失败: ',
@@ -1047,6 +1050,9 @@
             // Cookie notice
             cookieMessage: '🍪 This website uses cookies to enhance your experience. By continuing to use this site, you agree to our privacy policy.',
             accept: 'Accept',
+
+            // Back button to exit
+            pressAgainToExit: 'Press back again to exit',
 
             // Share link
             shareLinkExpired: 'Share link has expired, cannot edit',
