@@ -331,6 +331,22 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
                         </div>
                     </div>
                     <div>
+                        <label style="display:block;margin-bottom:5px;font-size:14px;">${isEn() ? 'Title Font' : '标题字体'}</label>
+                        <select id="titleFont" style="width:100%;padding:8px;border:1px solid ` + borderColor + `;border-radius:6px;background:` + (nightMode ? '#3d3d3d' : 'white') + `;color:` + textColor + `;">
+                            <option value="SimHei">${isEn() ? 'SimHei (Bold)' : '黑体'}</option>
+                            <option value="SimSun">${isEn() ? 'SimSun (Serif)' : '宋体'}</option>
+                            <option value="SimKai">${isEn() ? 'SimKai (Cursive)' : '楷体'}</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="display:block;margin-bottom:5px;font-size:14px;">${isEn() ? 'Body Font' : '正文字体'}</label>
+                        <select id="bodyFont" style="width:100%;padding:8px;border:1px solid ` + borderColor + `;border-radius:6px;background:` + (nightMode ? '#3d3d3d' : 'white') + `;color:` + textColor + `;">
+                            <option value="SimHei">${isEn() ? 'SimHei (Bold)' : '黑体'}</option>
+                            <option value="SimSun" selected>${isEn() ? 'SimSun (Serif)' : '宋体'}</option>
+                            <option value="SimKai">${isEn() ? 'SimKai (Cursive)' : '楷体'}</option>
+                        </select>
+                    </div>
+                    <div>
                         <label style="display:block;margin-bottom:5px;font-size:14px;">${isEn() ? 'Page Margin' : '页边距'}</label>
                         <select id="pageMargin" style="width:100%;padding:8px;border:1px solid ` + borderColor + `;border-radius:6px;background:` + (nightMode ? '#3d3d3d' : 'white') + `;color:` + textColor + `;">
                             <option value="10">10mm (${isEn() ? 'Small' : '小'})</option>
@@ -1115,6 +1131,8 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
         return {
             titleFontSize: modalContent.querySelector('#titleFontSize').value,
             bodyFontSize: modalContent.querySelector('#bodyFontSize').value,
+            titleFont: modalContent.querySelector('#titleFont') ? modalContent.querySelector('#titleFont').value : 'SimHei',
+            bodyFont: modalContent.querySelector('#bodyFont') ? modalContent.querySelector('#bodyFont').value : 'SimSun',
             pageMargin: modalContent.querySelector('#pageMargin').value,
             lineHeight: modalContent.querySelector('#lineHeight').value,
             paragraphSpacing: modalContent.querySelector('#paragraphSpacing').value,
