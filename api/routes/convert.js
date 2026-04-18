@@ -45,7 +45,7 @@ function cleanMathJaxContent(html) {
         
         cleaned = cleaned.replace(/<mjx-assistive-mml[^>]*>[\s\S]*?<\/mjx-assistive-mml>/gi, '');
         
-        cleaned = cleaned.replace(/<mjx-container([^>]*)>([\s\S]*?)<\/mjx-container>/gi, (match, attrs, content) => {
+        cleaned = cleaned.replace(/<mjx-container([^>]*)>([\s\S]*?)<\/mjx-container>/gi, (_match, attrs, content) => {
             // Extract SVG from the content
             const svgMatch = content.match(/<svg[\s\S]*?<\/svg>/i);
             if (svgMatch) {
@@ -373,7 +373,7 @@ function buildDocxStyledHtml(markdown, settings = {}) {
         h6: useCustomHeadingSizes ? toFiniteNumber(settings.h6Size, 16) : Math.max(14, titleFontSize * 0.9)
     };
 
-    const processedMarkdown = String(markdown || '').replace(/```mermaid\n([\s\S]*?)```/g, (match, content) => {
+    const processedMarkdown = String(markdown || '').replace(/```mermaid\n([\s\S]*?)```/g, (_match, content) => {
         return `\n> [Mermaid Diagram]\n>\n> ${String(content || '').trim().split('\n').join('\n> ')}\n`;
     });
 
@@ -386,21 +386,29 @@ function buildDocxStyledHtml(markdown, settings = {}) {
     <meta charset="utf-8" />
     <style>
         @page { margin: ${pageMargin}mm; }
+        * {
+            color: #000000 !important;
+        }
         body {
             font-family: "${bodyFont}", "Noto Serif CJK SC", "SimSun", "Microsoft YaHei", serif;
             font-size: ${bodyFontSize}pt;
             line-height: ${lineHeight};
             text-align: ${bodyAlignment};
             word-break: break-word;
+            color: #000000;
         }
         p {
             margin: 0 0 ${paragraphSpacing}em 0;
+            font-family: "${bodyFont}", "Noto Serif CJK SC", "SimSun", "Microsoft YaHei", serif;
+            font-size: ${bodyFontSize}pt;
+            color: #000000;
         }
         h1, h2, h3, h4, h5, h6 {
             font-family: "${titleFont}", "SimHei", "Microsoft YaHei", sans-serif;
             text-align: ${headingAlignment};
             margin: 1em 0 0.6em 0;
             font-weight: 700;
+            color: #000000 !important;
         }
         h1 { font-size: ${headingSizes.h1}pt; }
         h2 { font-size: ${headingSizes.h2}pt; }
@@ -414,9 +422,11 @@ function buildDocxStyledHtml(markdown, settings = {}) {
             border-radius: 4px;
             padding: 10px;
             white-space: pre-wrap;
+            font-family: "Consolas", "Courier New", monospace;
         }
         code {
             font-family: "Consolas", "Courier New", monospace;
+            color: #000000;
         }
         blockquote {
             border-left: 3px solid #d0d0d0;
@@ -432,9 +442,18 @@ function buildDocxStyledHtml(markdown, settings = {}) {
         th, td {
             border: 1px solid #333;
             padding: 6px 8px;
+            font-family: "${bodyFont}", "Noto Serif CJK SC", "SimSun", "Microsoft YaHei", serif;
+            font-size: ${bodyFontSize}pt;
+            color: #000000;
         }
         th {
             background: #f0f0f0;
+            font-weight: 700;
+        }
+        li {
+            font-family: "${bodyFont}", "Noto Serif CJK SC", "SimSun", "Microsoft YaHei", serif;
+            font-size: ${bodyFontSize}pt;
+            color: #000000;
         }
         img {
             display: block;
@@ -462,6 +481,10 @@ function buildDocxStyledHtml(markdown, settings = {}) {
             height: auto;
             max-width: ${imgWidth};
         }
+        a {
+            color: #0066cc;
+            text-decoration: underline;
+        }
     </style>
 </head>
 <body>
@@ -473,7 +496,7 @@ ${html}
 function normalizeDocxMarkdown(markdown) {
     let normalized = String(markdown || '');
 
-    normalized = normalized.replace(/```mermaid\n([\s\S]*?)```/g, (match, content) => {
+    normalized = normalized.replace(/```mermaid\n([\s\S]*?)```/g, (_match, content) => {
         return `\n> [Mermaid Diagram]\n>\n> ${String(content || '').trim().split('\n').join('\n> ')}\n`;
     });
 
