@@ -1158,27 +1158,72 @@ JSON 结构：
     // 下载图片并转换为 base64
     async function downloadImageAsBase64(imageUrl) {
         try {
-            var response = await fetch(imageUrl);
+            // 设置超时时间为 30 秒
+            var controller = new AbortController();
+            var timeoutId = setTimeout(function() {
+                controller.abort();
+            }, 30000);
+
+            var response = await fetch(imageUrl, {
+                signal: controller.signal,
+                mode: 'cors'
+            });
+
+            clearTimeout(timeoutId);
+
             if (!response.ok) {
                 throw new Error('Failed to fetch image: ' + response.status);
             }
+
             var blob = await response.blob();
 
-            // 等待图片完全加载
+            // 验证 blob 大小
+            if (blob.size < 100) {
+                throw new Error('Image data too small: ' + blob.size + ' bytes');
+            }
+
+            console.log('Image downloaded:', Math.round(blob.size / 1024) + 'KB');
+
+            // 等待图片完全加载并验证
             return new Promise(function(resolve, reject) {
                 var reader = new FileReader();
                 reader.onloadend = function() {
-                    // 验证图片是否有效
+                    var base64Data = reader.result;
+
+                    // 验证 base64 数据完整性
+                    if (!base64Data || !base64Data.startsWith('data:image/')) {
+                        reject(new Error('Invalid base64 format'));
+                        return;
+                    }
+
+                    var base64Content = base64Data.split(',')[1];
+                    if (!base64Content || base64Content.length < 100) {
+                        reject(new Error('Base64 data too short'));
+                        return;
+                    }
+
+                    // 验证图片是否可以被浏览器解码
                     var img = new Image();
                     img.onload = function() {
-                        // 图片加载成功，返回base64
-                        resolve(reader.result);
+                        // 图片加载成功，验证尺寸
+                        if (img.width > 0 && img.height > 0) {
+                            console.log('Image validated:', img.width + 'x' + img.height, Math.round(base64Content.length / 1024) + 'KB');
+                            resolve(base64Data);
+                        } else {
+                            reject(new Error('Invalid image dimensions'));
+                        }
                     };
                     img.onerror = function() {
                         console.error('Image validation failed');
                         reject(new Error('Invalid image data'));
                     };
-                    img.src = reader.result;
+                    // 设置图片加载超时
+                    setTimeout(function() {
+                        if (!img.complete) {
+                            reject(new Error('Image decode timeout'));
+                        }
+                    }, 10000);
+                    img.src = base64Data;
                 };
                 reader.onerror = function() {
                     reject(new Error('FileReader error'));
@@ -1186,7 +1231,7 @@ JSON 结构：
                 reader.readAsDataURL(blob);
             });
         } catch (error) {
-            console.error('Failed to download image:', error);
+            console.error('Failed to download image:', error.message);
             return null;
         }
     }
