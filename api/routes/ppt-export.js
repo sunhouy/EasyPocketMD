@@ -53,6 +53,25 @@ router.post('/', async (req, res) => {
             });
         }
 
+        // 预验证所有图片数据
+        console.log('Validating images in pages...');
+        for (let i = 0; i < pages.length; i++) {
+            if (pages[i] && pages[i].image && pages[i].image.url) {
+                const imageUrl = pages[i].image.url;
+                if (imageUrl.startsWith('data:image/')) {
+                    // 验证base64图片数据完整性
+                    const base64Data = imageUrl.split(',')[1];
+                    if (!base64Data || base64Data.length < 100) {
+                        console.warn(`Page ${i + 1}: Image data seems incomplete (${base64Data ? base64Data.length : 0} bytes)`);
+                        // 移除不完整的图片
+                        pages[i].image = null;
+                    } else {
+                        console.log(`Page ${i + 1}: Image validated (${Math.round(base64Data.length / 1024)}KB)`);
+                    }
+                }
+            }
+        }
+
         const pptx = new PptxGenJS();
         pptx.title = topic || 'PPT演示';
         pptx.author = 'EasyPocketMD';
@@ -719,8 +738,11 @@ function renderContentWithOptionalImage(slide, spec, palette, ratio) {
             sizing: {
                 type: spec.image.fit === 'cover' ? 'cover' : 'contain',
                 w: imageWidth,
-                h: bodyHeight
-            }
+                h: bodyHeight,
+                align: 'center',
+                valign: 'middle'
+            },
+            rounding: false
         });
 
         addImageFrame(slide, { x: imageX, y: topY, w: imageWidth, h: bodyHeight }, palette);
