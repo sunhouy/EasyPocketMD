@@ -2,6 +2,25 @@ const express = require('express');
 const router = express.Router();
 const PptxGenJS = require('pptxgenjs');
 
+// 引入共享模块
+const {
+    LENGTH_LIMITS,
+    COUNT_LIMITS,
+    sanitizeText,
+    normalizeBullets,
+    normalizeStats,
+    normalizeSections,
+    normalizeHighlights,
+    normalizeQuote,
+    normalizeImage
+} = require('../../shared/ppt-data-normalizer');
+
+const {
+    fitFontByLength,
+    getFontSize,
+    getSlideSize
+} = require('../../shared/ppt-style-calculator');
+
 const THEME_MAP = {
     'white-black': { bg: 'FFFFFF', text: '2C3E50', sub: '34495E', accent: '4A90E2' },
     'black-white': { bg: '1A1A1A', text: 'FFFFFF', sub: 'E0E0E0', accent: '4A90E2' },
@@ -10,16 +29,17 @@ const THEME_MAP = {
     'business': { bg: '34495E', text: 'ECF0F1', sub: 'BDC3C7', accent: '3498DB' }
 };
 
-const MAX_TITLE_LEN = 56;
-const MAX_SUBTITLE_LEN = 88;
-const MAX_BULLET_LEN = 42;
-const MAX_SUB_BULLET_LEN = 30;
-const MAX_IMAGE_CAPTION_LEN = 46;
-const MAX_BULLETS_PER_SLIDE = 5;
-const MAX_SUB_BULLETS_PER_BULLET = 2;
-const MAX_SECTIONS_PER_SLIDE = 8;
-const MAX_STATS_PER_SLIDE = 6;
-const MAX_HIGHLIGHTS = 4;
+// 使用共享模块的限制常量
+const MAX_TITLE_LEN = LENGTH_LIMITS.title;
+const MAX_SUBTITLE_LEN = LENGTH_LIMITS.subtitle;
+const MAX_BULLET_LEN = LENGTH_LIMITS.bullet;
+const MAX_SUB_BULLET_LEN = LENGTH_LIMITS.subBullet;
+const MAX_IMAGE_CAPTION_LEN = LENGTH_LIMITS.imageCaption;
+const MAX_BULLETS_PER_SLIDE = COUNT_LIMITS.bullets;
+const MAX_SUB_BULLETS_PER_BULLET = COUNT_LIMITS.subBulletsPerBullet;
+const MAX_SECTIONS_PER_SLIDE = COUNT_LIMITS.sections;
+const MAX_STATS_PER_SLIDE = COUNT_LIMITS.stats;
+const MAX_HIGHLIGHTS = COUNT_LIMITS.highlights;
 
 // POST /api/ppt-export - 导出可编辑 PPT
 router.post('/', async (req, res) => {
@@ -157,90 +177,9 @@ function resolveThemeToken(token) {
     return THEME_MAP[key] ? key : 'white-black';
 }
 
-function normalizeBullets(rawBullets) {
-    if (!Array.isArray(rawBullets)) return [];
-
-    return rawBullets
-        .map(item => {
-            if (typeof item === 'string') {
-                return {
-                    text: sanitizeText(item, MAX_BULLET_LEN),
-                    subBullets: []
-                };
-            }
-            if (!item || typeof item !== 'object') return null;
-            const text = sanitizeText(item.text || item.title || item.label || '', MAX_BULLET_LEN);
-            const subBullets = Array.isArray(item.subBullets)
-                ? item.subBullets.map(sub => sanitizeText(sub, MAX_SUB_BULLET_LEN)).filter(Boolean).slice(0, MAX_SUB_BULLETS_PER_BULLET)
-                : [];
-            if (!text) return null;
-            return { text, subBullets };
-        })
-        .filter(Boolean)
-        .slice(0, 30);
-}
-
-function normalizeImage(rawImage) {
-    if (!rawImage || typeof rawImage !== 'object') return null;
-    const url = sanitizeText(rawImage.url || rawImage.data || '', 3000);
-    if (!url) return null;
-    return {
-        url,
-        caption: sanitizeText(rawImage.caption || '', MAX_IMAGE_CAPTION_LEN),
-        fit: String(rawImage.fit || 'contain').toLowerCase() === 'cover' ? 'cover' : 'contain'
-    };
-}
-
-function normalizeSections(rawSections) {
-    if (!Array.isArray(rawSections)) return [];
-    return rawSections.map(section => {
-        if (!section || typeof section !== 'object') {
-            const line = sanitizeText(section, MAX_BULLET_LEN);
-            if (!line) return null;
-            return { title: line, items: [] };
-        }
-
-        const title = sanitizeText(section.title || section.header || section.name || '', MAX_BULLET_LEN);
-        const items = Array.isArray(section.items)
-            ? section.items.map(item => sanitizeText(item, MAX_BULLET_LEN)).filter(Boolean).slice(0, 6)
-            : [];
-
-        if (!title && !items.length) return null;
-        return {
-            title: title || (items[0] || '章节'),
-            items
-        };
-    }).filter(Boolean).slice(0, 16);
-}
-
-function normalizeStats(rawStats) {
-    if (!Array.isArray(rawStats)) return [];
-    return rawStats.map(item => {
-        if (!item || typeof item !== 'object') return null;
-        const label = sanitizeText(item.label || item.name || item.title || '', 18);
-        const value = sanitizeText(item.value || item.data || '', 20);
-        const note = sanitizeText(item.note || item.desc || item.description || '', 28);
-        if (!label && !value) return null;
-        return {
-            label: label || '指标',
-            value: value || '--',
-            note
-        };
-    }).filter(Boolean).slice(0, 18);
-}
-
-function normalizeQuote(rawQuote) {
-    if (!rawQuote) return null;
-    if (typeof rawQuote === 'string') {
-        const text = sanitizeText(rawQuote, 160);
-        return text ? { text, author: '' } : null;
-    }
-    if (typeof rawQuote !== 'object') return null;
-    const text = sanitizeText(rawQuote.text || rawQuote.quote || '', 160);
-    const author = sanitizeText(rawQuote.author || rawQuote.from || '', 36);
-    if (!text) return null;
-    return { text, author };
-}
+// 删除重复的规范化函数，使用共享模块中的函数
+// normalizeBullets, normalizeImage, normalizeSections, normalizeStats, normalizeQuote
+// 已从 shared/ppt-data-normalizer.js 导入
 
 function normalizeTextItems(items, maxCount, maxLen) {
     if (!Array.isArray(items)) return [];
@@ -248,21 +187,6 @@ function normalizeTextItems(items, maxCount, maxLen) {
         .map(item => sanitizeText(item, maxLen))
         .filter(Boolean)
         .slice(0, maxCount);
-}
-
-function sanitizeText(text, maxLen) {
-    if (!text) return '';
-    let value = String(text)
-        .replace(/\s+/g, ' ')
-        .replace(/第\s*\d+\s*页[：:]?/gi, '')
-        .replace(/page\s*\d+[：:]?/gi, '')
-        .trim();
-
-    if (!value) return '';
-    if (value.length > maxLen) {
-        value = value.slice(0, Math.max(1, maxLen - 1)).trim() + '…';
-    }
-    return value;
 }
 
 function paginateSlideSpec(spec) {
@@ -1015,21 +939,11 @@ function getEllipseShapeType() {
     return PptxGenJS.ShapeType ? PptxGenJS.ShapeType.ellipse : 'ellipse';
 }
 
-function fitFontByLength(base, min, length) {
-    if (!length || length <= 14) return base;
-    if (length >= 70) return min;
-    const ratio = (length - 14) / (70 - 14);
-    return Math.max(min, Math.round(base - (base - min) * ratio));
-}
+// 删除重复的函数定义，使用共享模块中的函数
+// fitFontByLength, getSlideSize 已从 shared/ppt-style-calculator.js 导入
 
 function isDataImage(url) {
     return typeof url === 'string' && /^data:image\//i.test(url);
-}
-
-function getSlideSize(ratio) {
-    return ratio === '16:9'
-        ? { width: 10, height: 5.625 }
-        : { width: 10, height: 7.5 };
 }
 
 module.exports = router;
