@@ -532,13 +532,36 @@ async function runPandocDocx(inputContent, options = {}) {
             '--standalone'
         ];
 
-        const configuredReference = (options.referenceDocx || process.env.PANDOC_REFERENCE_DOCX || '').trim();
-        if (configuredReference) {
-            const referencePath = path.isAbsolute(configuredReference)
-                ? configuredReference
-                : path.join(process.cwd(), configuredReference);
-            if (fs.existsSync(referencePath)) {
-                args.push('--reference-doc', referencePath);
+        // 根据字体选择reference文档
+        const titleFont = options.titleFont || 'SimHei';
+        const bodyFont = options.bodyFont || 'SimSun';
+
+        // 构建reference文档路径
+        const referenceDir = path.join(__dirname, '../../reference-docs');
+        const fontKey = `${titleFont.toLowerCase()}-${bodyFont.toLowerCase()}`;
+        const referenceMap = {
+            'simhei-simsun': 'reference-simhei-simsun.docx',
+            'simhei-simkai': 'reference-simhei-simkai.docx',
+            'simsun-simsun': 'reference-simsun-simsun.docx',
+            'simkai-simsun': 'reference-simkai-simsun.docx',
+        };
+
+        const referenceFile = referenceMap[fontKey] || 'reference.docx';
+        const referencePath = path.join(referenceDir, referenceFile);
+
+        // 优先使用字体对应的reference文档
+        if (fs.existsSync(referencePath)) {
+            args.push('--reference-doc', referencePath);
+        } else {
+            // 如果没有找到，尝试使用配置的reference文档
+            const configuredReference = (options.referenceDocx || process.env.PANDOC_REFERENCE_DOCX || '').trim();
+            if (configuredReference) {
+                const configPath = path.isAbsolute(configuredReference)
+                    ? configuredReference
+                    : path.join(process.cwd(), configuredReference);
+                if (fs.existsSync(configPath)) {
+                    args.push('--reference-doc', configPath);
+                }
             }
         }
 
@@ -588,15 +611,19 @@ router.post('/docx', async (req, res) => {
         const docxMathMode = String(docxSettings.docxMathMode || '').toLowerCase();
         const useNativeMath = docxMathMode !== 'svg' && docxMathMode !== 'html';
 
+        const pandocOptions = {
+            referenceDocx,
+            titleFont: docxSettings.titleFont || 'SimHei',
+            bodyFont: docxSettings.bodyFont || 'SimSun',
+            inputFormat: useNativeMath
+                ? 'markdown+task_lists+tex_math_dollars+tex_math_single_backslash+tex_math_double_backslash+fenced_code_blocks+pipe_tables'
+                : 'html'
+        };
+
         const docxBuffer = useNativeMath
-            ? await runPandocDocx(normalizeDocxMarkdown(markdown), {
-                referenceDocx,
-                inputFormat: 'markdown+task_lists+tex_math_dollars+tex_math_single_backslash+tex_math_double_backslash+fenced_code_blocks+pipe_tables'
-            })
-            : await runPandocDocx(buildDocxStyledHtml(markdown, docxSettings), {
-                referenceDocx,
-                inputFormat: 'html'
-            });
+            ? await runPandocDocx(normalizeDocxMarkdown(markdown), pandocOptions)
+            : await runPandocDocx(buildDocxStyledHtml(markdown, docxSettings), pandocOptions);
+
         const filename = `document_${new Date().toISOString().slice(0, 10)}.docx`;
 
         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
