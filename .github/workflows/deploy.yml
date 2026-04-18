@@ -165,6 +165,15 @@ jobs:
       run: |
         mkdir -p deploy_tmp
         cp -r dist api print shared package.json package-lock.json nginx.conf sw.js manifest.webmanifest icon.png .env ssl deploy_tmp/
+
+        # 复制 reference-docs 和 scripts
+        if [ -d "reference-docs" ]; then
+          cp -r reference-docs deploy_tmp/
+        fi
+        if [ -d "scripts" ]; then
+          cp -r scripts deploy_tmp/
+        fi
+
         tar -czf deploy.tar.gz -C deploy_tmp .
 
     - name: Prepare and execute zero-downtime deployment
@@ -594,8 +603,8 @@ jobs:
 
           # 创建并激活虚拟环境
           echo "创建虚拟环境..."
-          $PYTHON_CMD -m venv venv
-          source venv/bin/activate
+          $PYTHON_CMD -m venv .venv
+          source .venv/bin/activate
 
           # 安装依赖
           if [ -f "requirements.txt" ]; then
@@ -604,8 +613,20 @@ jobs:
             pip install -r requirements.txt -q
           fi
 
+          # 安装 python-docx 用于创建 reference.docx
+          echo "安装 python-docx..."
+          pip install python-docx -q
+
+          # 创建 reference.docx 模板
+          if [ -f "../scripts/create-reference-docx.py" ]; then
+            echo "创建 Pandoc reference.docx 模板..."
+            cd ..
+            $PYTHON_CMD scripts/create-reference-docx.py || echo "警告: reference.docx 创建失败，将使用默认样式"
+            cd print
+          fi
+
           # 获取虚拟环境中的 Python 解释器路径
-          VENV_PYTHON="$(pwd)/venv/bin/python"
+          VENV_PYTHON="$(pwd)/.venv/bin/python"
 
           # 零停机重启打印服务器
           echo "零停机重启打印服务器..."
