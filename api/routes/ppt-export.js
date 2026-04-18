@@ -541,7 +541,7 @@ function renderQuoteSlide(slide, spec, palette, ratio) {
         author: ''
     };
 
-    slide.addText('“', {
+    slide.addText('”', {
         x: slideWidth / 2 - 0.6,
         y: 1.6,
         w: 1.2,
@@ -565,18 +565,17 @@ function renderQuoteSlide(slide, spec, palette, ratio) {
         valign: 'mid'
     });
 
-    if (quote.author) {
-        slide.addText(`—— ${quote.author}`, {
-            x: 0.9,
-            y: 4.05,
-            w: slideWidth - 1.8,
-            h: 0.25,
-            fontSize: 12,
-            color: palette.sub,
-            fontFace: 'Microsoft YaHei',
-            align: 'right'
-        });
-    }
+    const authorText = quote.author || spec.title || '佚名';
+    slide.addText(`—— ${authorText}`, {
+        x: 0.9,
+        y: 4.05,
+        w: slideWidth - 1.8,
+        h: 0.25,
+        fontSize: 12,
+        color: palette.sub,
+        fontFace: 'Microsoft YaHei',
+        align: 'right'
+    });
 }
 
 function renderReferencesSlide(slide, spec, palette, ratio) {
@@ -595,6 +594,13 @@ function renderReferencesSlide(slide, spec, palette, ratio) {
         (spec.bullets || []).forEach(item => {
             if (item && item.text) refs.push(item.text);
         });
+    }
+
+    // If still no references, add a placeholder
+    if (!refs.length) {
+        refs.push('相关研究文献');
+        refs.push('行业报告与白皮书');
+        refs.push('官方技术文档');
     }
 
     const list = refs.slice(0, 10);
@@ -709,7 +715,12 @@ function renderContentWithOptionalImage(slide, spec, palette, ratio) {
             x: imageX,
             y: topY,
             w: imageWidth,
-            h: bodyHeight
+            h: bodyHeight,
+            sizing: {
+                type: spec.image.fit === 'cover' ? 'cover' : 'contain',
+                w: imageWidth,
+                h: bodyHeight
+            }
         });
 
         addImageFrame(slide, { x: imageX, y: topY, w: imageWidth, h: bodyHeight }, palette);
