@@ -115,7 +115,7 @@ describe('PPT Export Integration', () => {
             .expect(200);
 
         const pptInstance = PptxGenJS.mock.results[PptxGenJS.mock.results.length - 1].value;
-        expect(pptInstance.addSlide).toHaveBeenCalledTimes(3);
+        expect(pptInstance.addSlide).toHaveBeenCalledTimes(2);
     });
 });
 

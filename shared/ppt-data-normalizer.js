@@ -93,8 +93,7 @@ function normalizeBullets(rawBullets) {
 
             return { text, subBullets };
         })
-        .filter(Boolean)
-        .slice(0, COUNT_LIMITS.bullets);
+        .filter(Boolean);
 }
 
 /**
