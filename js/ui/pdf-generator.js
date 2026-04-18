@@ -64,6 +64,24 @@ async function initPdfMakeWithChineseFonts() {
             bold: 'fzhei-jt.TTF',
             italics: 'fzhei-jt.TTF',
             bolditalics: 'fzhei-jt.TTF'
+        },
+        SimHei: {
+            normal: 'fzhei-jt.TTF',
+            bold: 'fzhei-jt.TTF',
+            italics: 'fzhei-jt.TTF',
+            bolditalics: 'fzhei-jt.TTF'
+        },
+        SimSun: {
+            normal: 'fzhei-jt.TTF',
+            bold: 'fzhei-jt.TTF',
+            italics: 'fzhei-jt.TTF',
+            bolditalics: 'fzhei-jt.TTF'
+        },
+        SimKai: {
+            normal: 'fzhei-jt.TTF',
+            bold: 'fzhei-jt.TTF',
+            italics: 'fzhei-jt.TTF',
+            bolditalics: 'fzhei-jt.TTF'
         }
     };
 
@@ -80,6 +98,10 @@ async function initPdfMakeWithChineseFonts() {
  */
 async function generatePDFLocal(htmlContent, settings) {
     const currentPdfMake = await initPdfMakeWithChineseFonts();
+
+    // 获取字体设置
+    const titleFont = settings.titleFont || 'fangzhen';
+    const bodyFont = settings.bodyFont || 'fangzhen';
 
     let processedContent = htmlContent;
 
@@ -178,11 +200,11 @@ async function generatePDFLocal(htmlContent, settings) {
 
     const pdfMakeContent = htmlToPdfmake(fullHtml, {
         defaultStyles: {
-            p: { fontSize: 12, lineHeight: 1.2, font: 'fangzhen' },
-            h1: { fontSize: 24, bold: true, margin: [0, 0, 0, 10], font: 'fangzhen' },
-            h2: { fontSize: 20, bold: true, margin: [0, 0, 0, 8], font: 'fangzhen' },
-            h3: { fontSize: 16, bold: true, margin: [0, 0, 0, 6], font: 'fangzhen' },
-            h4: { fontSize: 14, bold: true, margin: [0, 0, 0, 4], font: 'fangzhen' },
+            p: { fontSize: 12, lineHeight: 1.2, font: bodyFont },
+            h1: { fontSize: 24, bold: true, margin: [0, 0, 0, 10], font: titleFont },
+            h2: { fontSize: 20, bold: true, margin: [0, 0, 0, 8], font: titleFont },
+            h3: { fontSize: 16, bold: true, margin: [0, 0, 0, 6], font: titleFont },
+            h4: { fontSize: 14, bold: true, margin: [0, 0, 0, 4], font: titleFont },
             img: { maxWidth: 500 } // 500pt 大约是 A4 页面去掉边距的宽度
         }
     });
@@ -220,7 +242,7 @@ async function generatePDFLocal(htmlContent, settings) {
     const docDefinition = {
         content: pdfMakeContent,
         defaultStyle: {
-            font: 'fangzhen',
+            font: bodyFont,
             fontSize: 12
         },
         pageMargins: [
@@ -324,13 +346,19 @@ export async function generatePDF(htmlContent, settings, filename) {
     }
 
     const cleanedHtmlContent = cleanMathJaxContent(htmlContent);
+
+    // 获取字体设置
+    const titleFont = settings?.titleFont || 'SimHei';
+    const bodyFont = settings?.bodyFont || 'SimSun';
+
     const fullHtml = `
         <!DOCTYPE html>
         <html>
         <head>
             <meta charset="UTF-8">
             <style>
-                body { font-family: "SimSun", "宋体", serif; }
+                body { font-family: "${bodyFont}", "宋体", serif; }
+                h1, h2, h3, h4, h5, h6 { font-family: "${titleFont}", "黑体", sans-serif; }
                 img { max-width: 100%; height: auto; page-break-inside: avoid; display: block; margin: 10px auto; }
                 table { border-collapse: collapse; width: 100%; page-break-inside: avoid; }
                 tr { page-break-inside: avoid; page-break-after: auto; }

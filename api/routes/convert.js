@@ -100,26 +100,39 @@ router.post('/markdown', (req, res) => {
 router.post('/pdf', (req, res) => {
     let writeStream = null;
     let pdfStream = null;
-    
+
     try {
         let { html, settings } = req.body;
-        
+
         if (!html) {
-            return res.status(400).json({ 
-                code: 400, 
-                message: 'HTML content is required' 
+            return res.status(400).json({
+                code: 400,
+                message: 'HTML content is required'
             });
         }
-        
+
         html = cleanMathJaxContent(html);
+
+        // 处理字体设置
+        const titleFont = settings?.titleFont || 'SimHei';
+        const bodyFont = settings?.bodyFont || 'SimSun';
+
+        // 注入字体样式到HTML
+        html = html.replace(
+            /<style>/i,
+            `<style>
+                h1, h2, h3, h4, h5, h6 { font-family: "${titleFont}", sans-serif !important; }
+                body, p, li, td, th { font-family: "${bodyFont}", serif !important; }
+            `
+        );
 
         const filename = `${uuidv4()}.pdf`;
         const uploadDir = path.join(__dirname, '../../uploads');
-        
+
         if (!fs.existsSync(uploadDir)) {
             fs.mkdirSync(uploadDir, { recursive: true });
         }
-        
+
         const filePath = path.join(uploadDir, filename);
         const fileUrl = `/uploads/${filename}`;
 
@@ -347,6 +360,10 @@ function buildDocxStyledHtml(markdown, settings = {}) {
     const imgWidth = settings.imgWidth || '100%';
     const imgHeight = settings.imgHeight || 'auto';
 
+    // 获取字体设置
+    const titleFont = settings.titleFont || 'SimHei';
+    const bodyFont = settings.bodyFont || 'SimSun';
+
     const headingSizes = {
         h1: useCustomHeadingSizes ? toFiniteNumber(settings.h1Size, 32) : titleFontSize * 2,
         h2: useCustomHeadingSizes ? toFiniteNumber(settings.h2Size, 28) : titleFontSize * 1.6,
@@ -370,7 +387,7 @@ function buildDocxStyledHtml(markdown, settings = {}) {
     <style>
         @page { margin: ${pageMargin}mm; }
         body {
-            font-family: "Noto Serif CJK SC", "SimSun", "Microsoft YaHei", serif;
+            font-family: "${bodyFont}", "Noto Serif CJK SC", "SimSun", "Microsoft YaHei", serif;
             font-size: ${bodyFontSize}pt;
             line-height: ${lineHeight};
             text-align: ${bodyAlignment};
@@ -380,6 +397,7 @@ function buildDocxStyledHtml(markdown, settings = {}) {
             margin: 0 0 ${paragraphSpacing}em 0;
         }
         h1, h2, h3, h4, h5, h6 {
+            font-family: "${titleFont}", "SimHei", "Microsoft YaHei", sans-serif;
             text-align: ${headingAlignment};
             margin: 1em 0 0.6em 0;
             font-weight: 700;
