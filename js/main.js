@@ -153,69 +153,7 @@ document.addEventListener('DOMContentLoaded', function() {
         return computed.display === 'none' || !overlay.classList.contains('show');
     }
 
-    // 双击返回键退出（Tauri/浏览器通用）
-    var lastBackPressTime = 0;
-    var backPressTimeout = 2000; // 2秒
-    var backPressToastTimer = null;
-    function showBackPressToast() {
-        if (window.showMessage) {
-            window.showMessage(window.i18n ? window.i18n.t('pressAgainToExit') : '再按一次返回键退出', 'info');
-        } else {
-            alert('再按一次返回键退出');
-        }
-    }
-    function exitApp() {
-        if (window.isTauriMobileEnvironment && window.__TAURI__ && window.__TAURI__.app && window.__TAURI__.app.exit) {
-            window.__TAURI__.app.exit();
-        } else {
-            // 浏览器环境
-            window.close();
-        }
-    }
-    function isMainScreen() {
-        // 可根据实际主界面判断逻辑调整
-        // 这里只判断没有modal和文件管理模式为主界面
-        var overlays = getVisibleModalOverlays();
-        return (!overlays.length && !window.isFileManagementMode);
-    }
-    function initMobileBackModalBehavior() {
-        if (!isMobileClient() || !window.history || typeof window.history.pushState !== 'function') return;
 
-        var guardState = { epmBackGuard: true };
-        var currentState = window.history.state || {};
-        if (!currentState.epmBackGuard) {
-            window.history.pushState(guardState, document.title, window.location.href);
-        }
-
-        window.addEventListener('popstate', function() {
-            var overlays = getVisibleModalOverlays();
-            if (overlays.length) {
-                var topOverlay = overlays[overlays.length - 1];
-                var closed = closeOverlayByBackPress(topOverlay);
-                if (closed) {
-                    window.history.pushState(guardState, document.title, window.location.href);
-                }
-                return;
-            }
-            // 主界面返回逻辑
-            if (isMainScreen()) {
-                var now = Date.now();
-                if (now - lastBackPressTime < backPressTimeout) {
-                    exitApp();
-                } else {
-                    lastBackPressTime = now;
-                    showBackPressToast();
-                    // 2秒后自动重置
-                    if (backPressToastTimer) clearTimeout(backPressToastTimer);
-                    backPressToastTimer = setTimeout(function() {
-                        lastBackPressTime = 0;
-                    }, backPressTimeout);
-                }
-                // 再次pushState防止直接退出
-                window.history.pushState(guardState, document.title, window.location.href);
-            }
-        });
-    }
 
     function getTargetElement(target) {
         if (!target) return null;
@@ -3342,7 +3280,63 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     initializeAppShellOnce();
-    initMobileBackModalBehavior();
+    
+    // 初始化返回键处理逻辑（非 Tauri mobile 环境）
+    if (!window.isTauriMobileEnvironment) {
+        (function() {
+            let lastBackTime = 0;
+
+            // 1. 核心函数：往历史记录里推入一个桩
+            function pushHistory() {
+                window.history.pushState({ title: "prevent" }, "", "");
+            }
+
+            // 初始化时，先推入一次
+            pushHistory();
+
+            // 2. 监听 popstate 事件（用户点击返回键时触发）
+            window.addEventListener("popstate", function() {
+                // 优先关闭可见的 overlay
+                var overlays = getVisibleModalOverlays();
+                if (overlays.length) {
+                    var topOverlay = overlays[overlays.length - 1];
+                    var closed = closeOverlayByBackPress(topOverlay);
+                    if (closed) {
+                        pushHistory();
+                    }
+                    return;
+                }
+
+                // 主界面返回逻辑
+                var isMainScreen = (!overlays.length && !window.isFileManagementMode);
+                if (isMainScreen) {
+                    const currentTime = Date.now();
+
+                    if (currentTime - lastBackTime < 2000) {
+                        history.back();
+                    } else {
+                        lastBackTime = currentTime;
+                        showToast("再按一次离开本站");
+                        pushHistory();
+                    }
+                }
+            }, false);
+
+            // 简单的 UI 提示
+            function showToast(msg) {
+                const div = document.createElement('div');
+                div.innerHTML = msg;
+                div.style = `
+                    position: fixed; bottom: 15%; left: 50%; transform: translateX(-50%);
+                    background: rgba(0,0,0,0.8); color: white; padding: 10px 20px;
+                    border-radius: 25px; z-index: 9999; font-size: 14px; white-space: nowrap;
+                `;
+                document.body.appendChild(div);
+                setTimeout(() => document.body.removeChild(div), 2000);
+            }
+        })();
+    }
+
     ensureWasmRuntimeBootstrapped();
 
     if (window.startInFileManagementMode) {

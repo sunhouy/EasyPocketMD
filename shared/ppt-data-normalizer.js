@@ -5,15 +5,15 @@
 
 // 统一的长度限制
 const LENGTH_LIMITS = {
-    title: 56,
-    subtitle: 88,
-    bullet: 42,
-    subBullet: 30,
-    statLabel: 18,
-    statValue: 20,
-    statNote: 28,
-    sectionTitle: 42,
-    imageCaption: 46
+    title: 80,
+    subtitle: 120,
+    bullet: 60,
+    subBullet: 45,
+    statLabel: 24,
+    statValue: 30,
+    statNote: 40,
+    sectionTitle: 60,
+    imageCaption: 60
 };
 
 // 统一的数量限制
