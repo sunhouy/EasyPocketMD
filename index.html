@@ -916,7 +916,27 @@
                             <label style="color:inherit;"><input type="radio" name="pptRatio" value="4:3"> 4:3</label>
                         </div>
                     </div>
-                    
+
+                    <!-- 页数范围选择 -->
+                    <div style="margin-bottom:15px;padding:12px;background:#f0f4f8;border-radius:8px;">
+                        <label style="display:block;margin-bottom:10px;font-size:13px;font-weight:500;color:#555;">
+                            <i class="fas fa-file-powerpoint" style="margin-right:6px;color:#4a90e2;"></i>设置页数范围（5-50页）
+                        </label>
+                        <div style="display:flex;gap:10px;align-items:center;">
+                            <div style="flex:1;">
+                                <label style="font-size:12px;color:#666;display:block;margin-bottom:4px;">最少页数</label>
+                                <input type="number" id="pptStartPage" min="5" max="50" value="5" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:14px;">
+                            </div>
+                            <div style="flex:1;">
+                                <label style="font-size:12px;color:#666;display:block;margin-bottom:4px;">最多页数</label>
+                                <input type="number" id="pptEndPage" min="5" max="50" value="30" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:14px;">
+                            </div>
+                        </div>
+                        <div style="margin-top:6px;font-size:11px;color:#999;">
+                            <i class="fas fa-info-circle"></i> AI 将根据此范围生成大纲
+                        </div>
+                    </div>
+
                     <div class="ai-input-area">
                         <textarea id="aiPPTInput" placeholder="输入大纲（可选，留空由AI自动生成）..." data-i18n-placeholder="aiPPTPlaceholder" style="min-height:120px;background:inherit;color:inherit;"></textarea>
                         <button class="ai-generate-btn" id="aiPPTGenerateOutline"><i class="fas fa-magic"></i> <span data-i18n="generateOutline">生成大纲</span></button>
@@ -935,19 +955,19 @@
                         <!-- 大纲内容 -->
                     </div>
 
-                    <!-- 页数范围选择 -->
+                    <!-- 导出页数范围选择 -->
                     <div style="margin-bottom:15px;padding:12px;background:#f0f4f8;border-radius:8px;">
                         <label style="display:block;margin-bottom:10px;font-size:13px;font-weight:500;color:#555;">
-                            <i class="fas fa-file-powerpoint" style="margin-right:6px;color:#4a90e2;"></i>选择导出页数范围（最多30页）
+                            <i class="fas fa-file-export" style="margin-right:6px;color:#4a90e2;"></i>选择导出页数范围（最多30页）
                         </label>
                         <div style="display:flex;gap:10px;align-items:center;">
                             <div style="flex:1;">
                                 <label style="font-size:12px;color:#666;display:block;margin-bottom:4px;">起始页</label>
-                                <input type="number" id="pptStartPage" min="1" value="1" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:14px;">
+                                <input type="number" id="pptExportStartPage" min="1" value="1" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:14px;">
                             </div>
                             <div style="flex:1;">
                                 <label style="font-size:12px;color:#666;display:block;margin-bottom:4px;">结束页</label>
-                                <input type="number" id="pptEndPage" min="1" value="30" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:14px;">
+                                <input type="number" id="pptExportEndPage" min="1" value="30" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:14px;">
                             </div>
                             <div style="flex:1;">
                                 <label style="font-size:12px;color:#666;display:block;margin-bottom:4px;">总页数</label>

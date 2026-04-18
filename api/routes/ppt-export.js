@@ -391,19 +391,6 @@ function addCoverBullets(slide, spec, palette, slideWidth, slideHeight, margin) 
             align: 'center'
         });
     });
-
-    if (spec.image && spec.image.caption) {
-        slide.addText(spec.image.caption, {
-            x: margin,
-            y: slideHeight - margin - 0.65,
-            w: slideWidth - margin * 2,
-            h: 0.4,
-            fontSize: 11,
-            color: palette.sub,
-            fontFace: 'Microsoft YaHei',
-            align: 'center'
-        });
-    }
 }
 
 function renderTocSlide(slide, spec, palette, ratio) {
@@ -748,23 +735,51 @@ function renderContentWithOptionalImage(slide, spec, palette, ratio) {
         const imageX = imageOnLeft ? margin : slideWidth - margin - imageWidth;
         const textX = imageOnLeft ? imageX + imageWidth + 0.3 : margin;
 
-        slide.addImage({
-            data: spec.image.url,
-            x: imageX,
-            y: topY,
-            w: imageWidth,
-            h: bodyHeight,
-            sizing: {
-                type: spec.image.fit === 'cover' ? 'cover' : 'contain',
+        try {
+            // 验证图片数据完整性
+            const imageData = spec.image.url;
+            const parts = imageData.split(',');
+            if (parts.length !== 2) {
+                console.error('Invalid image data format');
+                throw new Error('Invalid image format');
+            }
+
+            const base64Data = parts[1];
+            if (!base64Data || base64Data.length < 1000) {
+                console.error('Image data too short:', base64Data ? base64Data.length : 0);
+                throw new Error('Image data too short');
+            }
+
+            // 验证 base64 可以解码
+            const buffer = Buffer.from(base64Data, 'base64');
+            if (buffer.length < 1000) {
+                console.error('Decoded image too small:', buffer.length);
+                throw new Error('Decoded image too small');
+            }
+
+            console.log('Adding image to slide:', Math.round(buffer.length / 1024) + 'KB');
+
+            slide.addImage({
+                data: imageData,
+                x: imageX,
+                y: topY,
                 w: imageWidth,
                 h: bodyHeight,
-                align: 'center',
-                valign: 'middle'
-            },
-            rounding: false
-        });
+                sizing: {
+                    type: spec.image.fit === 'cover' ? 'cover' : 'contain',
+                    w: imageWidth,
+                    h: bodyHeight,
+                    align: 'center',
+                    valign: 'middle'
+                },
+                rounding: false
+            });
 
-        addImageFrame(slide, { x: imageX, y: topY, w: imageWidth, h: bodyHeight }, palette);
+            addImageFrame(slide, { x: imageX, y: topY, w: imageWidth, h: bodyHeight }, palette);
+        } catch (error) {
+            console.error('Failed to add image to slide:', error.message);
+            // 图片添加失败，继续处理文本内容
+        }
 
         addBulletBlock(slide, spec.bullets, {
             x: textX,
@@ -772,19 +787,6 @@ function renderContentWithOptionalImage(slide, spec, palette, ratio) {
             w: textWidth,
             h: bodyHeight
         }, palette);
-
-        if (spec.image.caption) {
-            slide.addText(spec.image.caption, {
-                x: imageX,
-                y: slideHeight - 0.95,
-                w: imageWidth,
-                h: 0.3,
-                fontSize: 10,
-                color: palette.sub,
-                fontFace: 'Microsoft YaHei',
-                align: 'center'
-            });
-        }
 
         return;
     }
