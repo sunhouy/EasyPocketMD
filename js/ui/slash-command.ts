@@ -23,16 +23,16 @@ const state = {
 };
 
 const moduleLoaders = {
-    insertPicker: function() { return import('./insert-picker.js'); },
-    formulaPicker: function() { return import('../formula-picker.js'); },
-    chartPicker: function() { return import('./chart.js'); },
-    emojiPicker: function() { return import('../emoji-picker.js'); },
-    exportPanel: function() { return import('./export.js'); },
-    sharePanel: function() { return import('./share.js'); },
-    printPanel: function() { return import('./print.js'); },
-    aiAssistant: function() { return import('./ai-assistant.js'); },
-    fileManager: function() { return import('./file-manager.js'); },
-    uncertaintyCalculator: function() { return import('../uncertainty-calculator.js'); }
+    insertPicker: function() { return import('./insert-picker.ts'); },
+    formulaPicker: function() { return import('../formula-picker.ts'); },
+    chartPicker: function() { return import('./chart.ts'); },
+    emojiPicker: function() { return import('../emoji-picker.ts'); },
+    exportPanel: function() { return import('./export.ts'); },
+    sharePanel: function() { return import('./share.ts'); },
+    printPanel: function() { return import('./print.ts'); },
+    aiAssistant: function() { return import('./ai-assistant.ts'); },
+    fileManager: function() { return import('./file-manager.ts'); },
+    uncertaintyCalculator: function() { return import('../uncertainty-calculator.ts'); }
 };
 
 const loadedModules = {};
@@ -1028,7 +1028,7 @@ async function loadBuiltinSlashEntries() {
     if (Array.isArray(builtinSlashEntries)) return builtinSlashEntries;
 
     if (!builtinSlashLoadPromise) {
-        builtinSlashLoadPromise = import('./slash-builtin-index.js').then(function(mod) {
+        builtinSlashLoadPromise = import('./slash-builtin-index.ts').then(function(mod) {
             if (mod && typeof mod.getBuiltinSlashEntries === 'function') {
                 builtinSlashEntries = mod.getBuiltinSlashEntries();
             }
@@ -1087,7 +1087,7 @@ var chinesePinyinMap = {
     '管': 'guan', '理': 'li', '相': 'xiang',
     '集': 'ji', '画': 'hua', '库': 'ku', '廊': 'lang',
     '展': 'zhan', '橱': 'chu', '窗': 'chuang',
-    '广': 'guang', '推': 'tui', '营': 'ying', '销': 'xiao',
+
     '荐': 'jian', '精': 'jing', '品': 'pin', '热': 're', '门': 'men',
     '榜': 'bang', '单': 'dan', '次': 'ci',
     '顺': 'shun', '逆': 'ni', '正': 'zheng', '倒': 'dao', '随': 'sui',
@@ -1097,24 +1097,20 @@ var chinesePinyinMap = {
     '人': 'ren', '们': 'men', '中': 'zhong', '来': 'lai', '到': 'dao', '说': 'shuo',
     '会': 'hui', '和': 'he', '也': 'ye', '后': 'hou', '过': 'guo', '自': 'zi',
     '而': 'er', '前': 'qian', '他': 'ta', '这': 'zhe', '那': 'na', '里': 'li',
-    '看': 'kan', '听': 'ting', '写': 'xie', '读': 'du', '学': 'xue', '做': 'zuo',
-    '想': 'xiang', '知': 'zhi', '道': 'dao', '见': 'jian', '问': 'wen', '答': 'da',
+
     '买': 'mai', '卖': 'mai', '吃': 'chi', '喝': 'he', '睡': 'shui', '走': 'zou',
     '跑': 'pao', '飞': 'fei', '坐': 'zuo', '站': 'zhan', '停': 'ting', '等': 'deng',
-    '给': 'gei', '送': 'song', '拿': 'na', '放': 'fang', '找': 'zhao', '用': 'yong',
-    '开': 'kai', '关': 'guan', '闭': 'bi', '始': 'shi', '终': 'zhong',
+
     '高': 'gao', '低': 'di', '大': 'da', '小': 'xiao', '多': 'duo', '少': 'shao',
-    '长': 'chang', '短': 'duan', '远': 'yuan', '近': 'jin', '新': 'xin', '旧': 'jiu',
+
     '老': 'lao', '男': 'nan', '女': 'nv', '父': 'fu', '母': 'mu',
     '子': 'zi', '儿': 'er', '兄': 'xiong', '弟': 'di', '姐': 'jie',
     '妹': 'mei', '家': 'jia', '国': 'guo', '城': 'cheng', '市': 'shi', '村': 'cun',
-    '校': 'xiao', '公': 'gong', '司': 'si', '店': 'dian', '厂': 'chang',
-    '医': 'yi', '院': 'yuan', '银': 'yin', '行': 'xing', '餐': 'can', '馆': 'guan',
+
     '酒': 'jiu', '宾': 'bin', '旅': 'lv', '游': 'you',
     '景': 'jing', '区': 'qu', '园': 'yuan', '博': 'bo', '物': 'wu',
     '书': 'shu', '电': 'dian', '影': 'ying',
-    '乐': 'yue', '体': 'ti', '育': 'yu', '场': 'chang', '健': 'jian',
-    '身': 'shen', '房': 'fang', '美': 'mei', '容': 'rong', '理': 'li',
+
     '发': 'fa', '超': 'chao', '商': 'shang',
     '百': 'bai', '货': 'huo', '楼': 'lou', '菜': 'cai',
     '花': 'hua', '鸟': 'niao', '鱼': 'yu', '虫': 'chong', '猫': 'mao', '狗': 'gou',
@@ -1129,10 +1125,10 @@ var chinesePinyinMap = {
     '蛙': 'wa', '蟾': 'chan', '蝌': 'ke', '蚪': 'dou', '蚯': 'qiu', '蚓': 'yin',
     '蛆': 'qu', '蛾': 'e', '萤': 'ying',
     '天': 'tian', '日': 'ri', '月': 'yue', '星': 'xing', '辰': 'chen',
-    '云': 'yun', '雨': 'yu', '雪': 'xue', '风': 'feng', '雷': 'lei', '电': 'dian',
+
     '雾': 'wu', '露': 'lu', '霜': 'shuang', '冰': 'bing', '雹': 'bao', '虹': 'hong',
     '霞': 'xia', '晴': 'qing', '阴': 'yin', '阳': 'yang', '光': 'guang', '明': 'ming',
-    '暗': 'an', '黑': 'hei', '白': 'bai', '红': 'hong', '绿': 'lv',
+
     '蓝': 'lan', '黄': 'huang', '紫': 'zi', '橙': 'cheng', '粉': 'fen', '灰': 'hui',
     '金': 'jin', '银': 'yin', '铜': 'tong', '铁': 'tie', '钢': 'gang', '铝': 'lv',
     '锡': 'xi', '铅': 'qian', '锌': 'xin', '汞': 'gong', '硫': 'liu', '磷': 'lin',
@@ -1142,11 +1138,11 @@ var chinesePinyinMap = {
     '泉': 'quan', '瀑': 'pu', '潭': 'tan', '池': 'chi', '塘': 'tang', '沼': 'zhao',
     '泽': 'ze', '洋': 'yang', '湾': 'wan', '港': 'gang', '岛': 'dao', '屿': 'yu',
     '礁': 'jiao', '岩': 'yan', '石': 'shi', '土': 'tu', '沙': 'sha', '泥': 'ni',
-    '尘': 'chen', '埃': 'ai', '灰': 'hui', '炭': 'tan', '煤': 'mei', '柴': 'chai',
+
     '草': 'cao', '木': 'mu', '树': 'shu', '林': 'lin', '森': 'sen',
     '松': 'song', '柏': 'bai', '柳': 'liu', '杨': 'yang', '桃': 'tao', '李': 'li',
     '杏': 'xing', '梅': 'mei', '梨': 'li', '枣': 'zao', '橘': 'ju', '柑': 'gan',
-    '橙': 'cheng', '柚': 'you', '檬': 'meng', '樱': 'ying', '蕉': 'jiao', '椰': 'ye',
+
     '棕': 'zong', '榈': 'lv', '藤': 'teng', '蔓': 'man', '竹': 'zhu', '竿': 'gan',
     '笋': 'sun', '芦': 'lu', '苇': 'wei', '蒲': 'pu', '蒿': 'hao', '艾': 'ai',
     '莲': 'lian', '藕': 'ou', '菱': 'ling', '荷': 'he', '菊': 'ju',
@@ -1158,26 +1154,21 @@ var chinesePinyinMap = {
     '柠': 'ning', '枇': 'pi', '杷': 'pa', '荔': 'li', '枝': 'zhi', '芒': 'mang', '果': 'guo',
     '榴': 'liu', '蓬': 'peng',
     '蔗': 'zhe', '棉': 'mian', '麻': 'ma', '丝': 'si', '绸': 'chou', '缎': 'duan',
-    '纱': 'sha', '布': 'bu', '帛': 'bo', '锦': 'jin', '绣': 'xiu', '线': 'xian',
-    '针': 'zhen', '缝': 'feng', '纫': 'ren', '织': 'zhi', '编': 'bian', '结': 'jie',
-    '网': 'wang', '绳': 'sheng', '索': 'suo', '缆': 'lan', '弦': 'xian', '琴': 'qin',
+
     '瑟': 'se', '琵': 'pi', '琶': 'pa', '筝': 'zheng', '笛': 'di', '箫': 'xiao',
-    '笙': 'sheng', '管': 'guan', '号': 'hao', '角': 'jiao', '鼓': 'gu', '锣': 'luo',
+
     '钹': 'bo', '钟': 'zhong', '铃': 'ling', '铛': 'dang', '铎': 'duo', '磬': 'qing',
     '革': 'ge',
-    '画': 'hua', '棋': 'qi', '牌': 'pai', '球': 'qiu', '棒': 'bang',
+
     '杆': 'gan', '拍': 'pai', '篮': 'lan', '框': 'kuang', '桌': 'zhuo',
     '椅': 'yi', '凳': 'deng', '床': 'chuang', '柜': 'gui', '箱': 'xiang', '盒': 'he',
     '包': 'bao', '袋': 'dai', '瓶': 'ping', '罐': 'guan', '桶': 'tong', '盆': 'pen',
     '碗': 'wan', '盘': 'pan', '碟': 'die', '杯': 'bei', '壶': 'hu', '锅': 'guo',
     '勺': 'shao', '筷': 'kuai', '叉': 'cha', '刀': 'dao', '剑': 'jian', '枪': 'qiang',
     '炮': 'pao', '弹': 'dan', '药': 'yao',
-    '纸': 'zhi', '笔': 'bi', '墨': 'mo', '砚': 'yan', '印': 'yin', '刷': 'shua',
+
     '漆': 'qi', '胶': 'jiao', '蜡': 'la', '烛': 'zhu', '灯': 'deng', '火': 'huo',
-    '水': 'shui', '冰': 'bing', '油': 'you', '盐': 'yan', '酱': 'jiang', '醋': 'cu',
-    '茶': 'cha', '酒': 'jiu', '奶': 'nai', '糖': 'tang',
-    '米': 'mi', '面': 'mian', '粉': 'fen', '粥': 'zhou', '饭': 'fan',
-    '菜': 'cai', '汤': 'tang', '羹': 'geng', '糕': 'gao', '饼': 'bing', '饺': 'jiao',
+
     '馒': 'man', '粽': 'zong', '元': 'yuan',
     '宵': 'xiao', '蛋': 'dan', '肉': 'rou',
     '禽': 'qin', '畜': 'chu', '兽': 'shou'

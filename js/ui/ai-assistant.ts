@@ -324,7 +324,7 @@
                     // 如果是PPT菜单，懒加载并初始化PPT生成器
                     if (action === 'ppt') {
                         if (typeof global.initPPTGenerator !== 'function') {
-                            import('./ppt-generator.js').then(function() {
+                            import('./ppt-generator.ts').then(function() {
                                 if (typeof global.initPPTGenerator === 'function') {
                                     global.initPPTGenerator();
                                 }
