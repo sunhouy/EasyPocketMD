@@ -177,11 +177,72 @@
 
     function sendCursorPosition(position, selection) {
         if (!window.sharedDocState || !window.sharedDocState.canEdit) return;
+
+        // 使用文本偏移量而不是像素坐标
+        const textOffset = getTextOffset();
+        if (textOffset === null) return;
+
         sendShareWsPayload({
             type: 'cursor_position',
-            position: position,
-            selection: selection
+            textOffset: textOffset,
+            selection: selection,
+            position: position  // 保留像素位置用于本地渲染
         });
+    }
+
+    function getTextOffset() {
+        try {
+            const selection = window.getSelection();
+            if (!selection || selection.rangeCount === 0) return null;
+
+            const range = selection.getRangeAt(0);
+            const contentElement = document.querySelector('.vditor-ir__preview, .vditor-wysiwyg, .vditor-sv');
+            if (!contentElement) return null;
+
+            // 计算从内容开始到光标位置的文本偏移量
+            const preRange = document.createRange();
+            preRange.selectNodeContents(contentElement);
+            preRange.setEnd(range.startContainer, range.startOffset);
+
+            return preRange.toString().length;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    function setTextOffset(offset) {
+        try {
+            const contentElement = document.querySelector('.vditor-ir__preview, .vditor-wysiwyg, .vditor-sv');
+            if (!contentElement) return false;
+
+            const walker = document.createTreeWalker(
+                contentElement,
+                NodeFilter.SHOW_TEXT,
+                null,
+                false
+            );
+
+            let currentOffset = 0;
+            let node;
+
+            while (node = walker.nextNode()) {
+                const nodeLength = node.textContent.length;
+                if (currentOffset + nodeLength >= offset) {
+                    const range = document.createRange();
+                    range.setStart(node, offset - currentOffset);
+                    range.collapse(true);
+
+                    const selection = window.getSelection();
+                    selection.removeAllRanges();
+                    selection.addRange(range);
+                    return true;
+                }
+                currentOffset += nodeLength;
+            }
+            return false;
+        } catch (e) {
+            return false;
+        }
     }
 
     function initCursorTracking() {
@@ -253,7 +314,15 @@
 
         // 渲染其他用户的光标
         window.sharedDocState.remoteCursors = window.sharedDocState.remoteCursors || {};
-        Object.values(window.sharedDocState.remoteCursors).forEach(cursor => {
+        const now = Date.now();
+
+        Object.entries(window.sharedDocState.remoteCursors).forEach(([viewerId, cursor]) => {
+            // 清理超过10秒未更新的光标
+            if (now - cursor.lastUpdate > 10000) {
+                delete window.sharedDocState.remoteCursors[viewerId];
+                return;
+            }
+
             if (cursor.viewerId === window.sharedDocState.viewerId) return;
             if (!cursor.position || cursor.position.height === 0) return;
 
@@ -305,6 +374,45 @@
             }
         `;
         document.head.appendChild(style);
+    }
+
+    function getPixelPositionFromOffset(textOffset) {
+        try {
+            const contentElement = document.querySelector('.vditor-ir__preview, .vditor-wysiwyg, .vditor-sv');
+            if (!contentElement) return null;
+
+            const walker = document.createTreeWalker(
+                contentElement,
+                NodeFilter.SHOW_TEXT,
+                null,
+                false
+            );
+
+            let currentOffset = 0;
+            let node;
+
+            while (node = walker.nextNode()) {
+                const nodeLength = node.textContent.length;
+                if (currentOffset + nodeLength >= textOffset) {
+                    const range = document.createRange();
+                    range.setStart(node, Math.min(textOffset - currentOffset, nodeLength));
+                    range.collapse(true);
+
+                    const rect = range.getBoundingClientRect();
+                    const editorRect = contentElement.getBoundingClientRect();
+
+                    return {
+                        x: rect.left - editorRect.left + contentElement.scrollLeft,
+                        y: rect.top - editorRect.top + contentElement.scrollTop,
+                        height: rect.height || 20
+                    };
+                }
+                currentOffset += nodeLength;
+            }
+            return null;
+        } catch (e) {
+            return null;
+        }
     }
 
     function getCursorColor(viewerId) {
@@ -1408,6 +1516,14 @@
         startSharedDocRealtime();
         // 初始化光标跟踪
         initCursorTracking();
+        // 监听编辑器输入事件，更新最后编辑时间
+        if (window.vditor && window.sharedDocState.canEdit) {
+            window.vditor.options.input = function() {
+                if (window.sharedDocState) {
+                    window.sharedDocState.lastLocalEditAt = Date.now();
+                }
+            };
+        }
     }
 
     async function handleShareLink(shareId, password) {
@@ -1641,8 +1757,15 @@
 
             var remoteContent = result.data.content || '';
             var localContent = window.vditor ? window.vditor.getValue() : '';
-            var localRecentlyEdited = Date.now() - window.sharedDocState.lastLocalEditAt < 1500;
-            if (!localRecentlyEdited && window.vditor && remoteContent !== localContent) {
+            var localRecentlyEdited = Date.now() - window.sharedDocState.lastLocalEditAt < 3000;
+
+            // 如果正在编辑，不要用轮询结果覆盖本地内容
+            if (localRecentlyEdited) {
+                console.log('跳过轮询更新：用户正在编辑');
+                return;
+            }
+
+            if (window.vditor && remoteContent !== localContent) {
                 // 保存光标位置
                 var selection = window.getSelection();
                 var cursorPosition = null;
@@ -1809,9 +1932,16 @@
                     window.sharedDocState.contentVersion = payload.content_version;
                 }
 
-                var localRecentlyEdited = Date.now() - window.sharedDocState.lastLocalEditAt < 1200;
+                var localRecentlyEdited = Date.now() - window.sharedDocState.lastLocalEditAt < 3000;
                 var isSelfUpdate = payload.updated_by && payload.updated_by === window.sharedDocState.viewerId;
-                if ((isSelfUpdate || !localRecentlyEdited) && typeof payload.content === 'string') {
+
+                // 如果正在编辑且不是自己的更新，不要覆盖本地内容
+                if (localRecentlyEdited && !isSelfUpdate) {
+                    console.log('跳过远程更新：用户正在编辑');
+                    return;
+                }
+
+                if (typeof payload.content === 'string') {
                     if (window.vditor && window.vditor.getValue() !== payload.content) {
                         // 保存光标位置
                         var selection = window.getSelection();
@@ -1894,14 +2024,22 @@
                 if (!window.sharedDocState) return;
                 
                 window.sharedDocState.remoteCursors = window.sharedDocState.remoteCursors || {};
+
+                // 如果有文本偏移量，使用它来计算准确位置
+                let cursorPosition = payload.position;
+                if (payload.textOffset !== undefined && payload.textOffset !== null) {
+                    cursorPosition = getPixelPositionFromOffset(payload.textOffset);
+                }
+
                 window.sharedDocState.remoteCursors[payload.viewer_id] = {
                     viewerId: payload.viewer_id,
                     viewerName: payload.viewer_name,
-                    position: payload.position,
+                    position: cursorPosition || payload.position,
                     selection: payload.selection,
-                    color: getCursorColor(payload.viewer_id)
+                    color: getCursorColor(payload.viewer_id),
+                    lastUpdate: Date.now()
                 };
-                
+
                 // 渲染远程光标
                 renderRemoteCursors();
                 return;
