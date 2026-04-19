@@ -1,13 +1,7 @@
-interface ShareData {
-    filename: string;
-    content: string;
-    mode: string;
-    expires_at?: string;
-    is_expired: boolean;
-    share_id: string;
-}
+const fs = require('fs');
+const path = require('path');
 
-function generatePasswordForm(shareId: string): string {
+function generatePasswordForm(shareId) {
     return `
 <!DOCTYPE html>
 <html lang="zh-CN">
@@ -135,7 +129,7 @@ function generatePasswordForm(shareId: string): string {
     `;
 }
 
-function generateShareViewPage(shareData: ShareData): string {
+function generateShareViewPage(shareData) {
     const filename = escapeHtml(shareData.filename);
     const content = shareData.content;
     const mode = shareData.mode;
@@ -584,7 +578,7 @@ function generateShareViewPage(shareData: ShareData): string {
     `;
 }
 
-function escapeHtml(text: string): string {
+function escapeHtml(text) {
     if (!text) return '';
     return text
         .replace(/&/g, "&amp;")
@@ -594,7 +588,7 @@ function escapeHtml(text: string): string {
         .replace(/'/g, "&#039;");
 }
 
-export {
+module.exports = {
     generatePasswordForm,
     generateShareViewPage
 };

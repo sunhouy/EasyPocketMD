@@ -3,56 +3,31 @@ const historyManager = require('./HistoryManager');
 const Cache = require('../utils/cache');
 const crypto = require('crypto');
 
-interface FileData {
-    name: string;
-    content: string;
-    content_version: number;
-    last_modified: string;
-}
-
-interface UserFilesResult {
-    username: string;
-    files: FileData[];
-    count: number;
-}
-
-interface OptimisticLock {
-    base_content_version?: number | string | null;
-    base_last_modified?: string | number | null;
-    base_hash?: string | null;
-}
-
-interface ApiResponse<T = unknown> {
-    code: number;
-    message: string;
-    data?: T;
-}
-
 class FileManager {
-    computeContentHash(content = ''): string {
+    computeContentHash(content = '') {
         return crypto.createHash('sha256').update(String(content), 'utf8').digest('hex');
     }
 
-    toTimestampMillis(value: unknown): number | null {
+    toTimestampMillis(value) {
         if (value === undefined || value === null || value === '') return null;
         if (typeof value === 'number') return Number.isFinite(value) ? value : null;
-        const parsed = Date.parse(String(value));
+        const parsed = Date.parse(value);
         return Number.isNaN(parsed) ? null : parsed;
     }
 
-    normalizeDbLastModified(value: unknown): string | null {
+    normalizeDbLastModified(value) {
         const ms = this.toTimestampMillis(value);
         return ms === null ? null : new Date(ms).toISOString();
     }
 
     // Get user files
-    async getUserFiles(username: string): Promise<ApiResponse<UserFilesResult>> {
+    async getUserFiles(username) {
         try {
             // Try to get from cache first
             const cached = await Cache.getUserFiles(username);
             const isCachedVersionShapeValid = !!(
                 cached &&
-                (!Array.isArray(cached.files) || cached.files.every((file: FileData) => {
+                (!Array.isArray(cached.files) || cached.files.every(file => {
                     if (!file) return false;
                     if (!Object.prototype.hasOwnProperty.call(file, 'content_version')) return false;
                     const v = Number(file.content_version);
@@ -63,7 +38,7 @@ class FileManager {
                 return {
                     code: 200,
                     message: '获取文件列表成功 (缓存)',
-                    data: cached as UserFilesResult
+                    data: cached
                 };
             }
 
@@ -76,14 +51,14 @@ class FileManager {
                 [username]
             );
 
-            const files = (rows as Array<{ filename: string; content: string; content_version: number; last_modified: string }>).map(row => ({
+            const files = rows.map(row => ({
                 name: row.filename,
                 content: row.content,
                 content_version: row.content_version,
                 last_modified: row.last_modified
             }));
 
-            const result: UserFilesResult = {
+            const result = {
                 username,
                 files,
                 count: files.length
@@ -98,12 +73,12 @@ class FileManager {
                 data: result
             };
         } catch (error) {
-            return { code: 500, message: '获取文件列表失败: ' + (error as Error).message };
+            return { code: 500, message: '获取文件列表失败: ' + error.message };
         }
     }
 
     // Get file content
-    async getFileContent(username: string, filename: string): Promise<ApiResponse<FileData>> {
+    async getFileContent(username, filename) {
         try {
             // Try to get from cache first
             const cached = await Cache.getFileContent(username, filename);
@@ -111,7 +86,7 @@ class FileManager {
                 return {
                     code: 200,
                     message: '获取文件内容成功 (缓存)',
-                    data: cached as FileData
+                    data: cached
                 };
             }
 
@@ -120,12 +95,12 @@ class FileManager {
                 [username, filename]
             );
 
-            if ((rows as Array<unknown>).length === 0) {
+            if (rows.length === 0) {
                 return { code: 404, message: '文件不存在' };
             }
 
-            const row = (rows as Array<{ filename: string; content: string; content_version: number; last_modified: string }>)[0];
-            const result: FileData = {
+            const row = rows[0];
+            const result = {
                 filename: row.filename,
                 content: row.content,
                 content_version: row.content_version,
@@ -141,12 +116,12 @@ class FileManager {
                 data: result
             };
         } catch (error) {
-            return { code: 500, message: '获取文件内容失败: ' + (error as Error).message };
+            return { code: 500, message: '获取文件内容失败: ' + error.message };
         }
     }
 
     // Save file
-    async saveFile(username: string, filename: string, content = '', optimisticLock: OptimisticLock = {}): Promise<ApiResponse> {
+    async saveFile(username, filename, content = '', optimisticLock = {}) {
         try {
             const connection = await db.getConnection();
             try {
@@ -174,12 +149,12 @@ class FileManager {
                 const hasBaseHash = typeof optimisticLock.base_hash === 'string' && optimisticLock.base_hash.trim() !== '';
                 const shouldCheckOptimisticLock = hasBaseVersion || hasBaseLastModified || hasBaseHash;
 
-                if ((rows as Array<unknown>).length > 0 && shouldCheckOptimisticLock) {
-                    const existing = (rows as Array<{ content: string; last_modified: string; content_version: number }>)[0];
+                if (rows.length > 0 && shouldCheckOptimisticLock) {
+                    const existing = rows[0];
                     const serverLastModifiedMs = this.toTimestampMillis(existing.last_modified);
                     const baseLastModifiedMs = this.toTimestampMillis(optimisticLock.base_last_modified);
                     const serverHash = this.computeContentHash(existing.content || '');
-                    const baseHash = hasBaseHash ? optimisticLock.base_hash!.trim() : null;
+                    const baseHash = hasBaseHash ? optimisticLock.base_hash.trim() : null;
                     const baseVersion = hasBaseVersion ? Number(optimisticLock.base_content_version) : null;
 
                     const versionMismatch = hasBaseVersion && Number.isFinite(baseVersion) && Number(existing.content_version || 0) !== baseVersion;
@@ -205,13 +180,13 @@ class FileManager {
                     }
                 }
 
-                let message: string;
-                if ((rows as Array<unknown>).length > 0) {
+                let message;
+                if (rows.length > 0) {
                     await connection.execute(
                         'UPDATE user_files SET content = ?, last_modified = NOW(), content_version = content_version + 1 WHERE username = ? AND filename = ?',
                         [content, username, filename]
                     );
-                    const nextVersion = Number((rows as Array<{ content_version: number }>)[0].content_version || 0) + 1;
+                    const nextVersion = Number(rows[0].content_version || 0) + 1;
                     message = '文件更新成功';
                     if (commit) {
                         await commit();
@@ -262,12 +237,12 @@ class FileManager {
                 connection.release();
             }
         } catch (error) {
-            return { code: 500, message: '保存文件失败: ' + (error as Error).message };
+            return { code: 500, message: '保存文件失败: ' + error.message };
         }
     }
 
     // Save file with history
-    async saveFileWithHistory(username: string, filename: string, content: string, createHistory = false, optimisticLock: OptimisticLock = {}): Promise<ApiResponse> {
+    async saveFileWithHistory(username, filename, content, createHistory = false, optimisticLock = {}) {
         try {
             const result = await this.saveFile(username, filename, content, optimisticLock);
 
@@ -288,12 +263,12 @@ class FileManager {
 
             return result;
         } catch (error) {
-            return { code: 500, message: '保存文件失败: ' + (error as Error).message };
+            return { code: 500, message: '保存文件失败: ' + error.message };
         }
     }
 
     // Delete file
-    async deleteFile(username: string, filename: string): Promise<ApiResponse> {
+    async deleteFile(username, filename) {
         const connection = await db.getConnection();
         try {
             await connection.beginTransaction();
@@ -304,7 +279,7 @@ class FileManager {
                 [username, filename]
             );
 
-            if ((rows as Array<unknown>).length === 0) {
+            if (rows.length === 0) {
                 await connection.rollback();
                 return { code: 404, message: '文件不存在' };
             }
@@ -324,8 +299,8 @@ class FileManager {
             
             // Get user ID for history deletion
             const [userRows] = await connection.execute('SELECT id FROM users WHERE username = ?', [username]);
-            if ((userRows as Array<unknown>).length > 0) {
-                const userId = (userRows as Array<{ id: number }>)[0].id;
+            if (userRows.length > 0) {
+                const userId = userRows[0].id;
                 
                 // Delete content
                 await connection.execute(`
@@ -352,23 +327,23 @@ class FileManager {
                 message: '文件删除成功',
                 data: {
                     filename,
-                    affected_rows: (deleteResult as { affectedRows: number }).affectedRows
+                    affected_rows: deleteResult.affectedRows
                 }
             };
 
         } catch (error) {
             await connection.rollback();
-            return { code: 500, message: '删除文件失败: ' + (error as Error).message };
+            return { code: 500, message: '删除文件失败: ' + error.message };
         } finally {
             connection.release();
         }
     }
 
     // Sync files
-    async syncFiles(username: string, files: Array<{ name?: string; content?: string }>): Promise<ApiResponse> {
+    async syncFiles(username, files) {
         const connection = await db.getConnection();
         let successCount = 0;
-        const errorFiles: Array<{ filename: string; error: string }> = [];
+        const errorFiles = [];
 
         try {
             await connection.beginTransaction();
@@ -388,7 +363,7 @@ class FileManager {
                         [username, filename]
                     );
 
-                    if ((rows as Array<unknown>).length > 0) {
+                    if (rows.length > 0) {
                         await connection.execute(
                             'UPDATE user_files SET content = ?, last_modified = NOW() WHERE username = ? AND filename = ?',
                             [content, username, filename]
@@ -401,7 +376,7 @@ class FileManager {
                     }
                     successCount++;
                 } catch (err) {
-                    errorFiles.push({ filename, error: (err as Error).message });
+                    errorFiles.push({ filename, error: err.message });
                 }
             }
 
@@ -424,11 +399,11 @@ class FileManager {
 
         } catch (error) {
             await connection.rollback();
-            return { code: 500, message: '同步文件失败: ' + (error as Error).message };
+            return { code: 500, message: '同步文件失败: ' + error.message };
         } finally {
             connection.release();
         }
     }
 }
 
-export = new FileManager();
+module.exports = new FileManager();

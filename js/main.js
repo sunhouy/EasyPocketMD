@@ -1,7 +1,7 @@
 /**
  * Vditor 初始化、界面与功能绑定
  */
-import { initSlashCommandRuntime } from './ui/slash-command.ts';
+import { initSlashCommandRuntime } from './ui/slash-command.js';
 
 document.addEventListener('DOMContentLoaded', function() {
     'use strict';
@@ -554,7 +554,7 @@ document.addEventListener('DOMContentLoaded', function() {
         case 'openAIAssistant':
             if (clickElementById('desktopAIBtn')) return;
             if (typeof window.showAIPanel !== 'function') {
-                import('./ui/ai-assistant.ts').then(function() {
+                import('./ui/ai-assistant.js').then(function() {
                     if (typeof window.showAIPanel === 'function') {
                         window.showAIPanel();
                     }
@@ -925,14 +925,14 @@ document.addEventListener('DOMContentLoaded', function() {
 
     async function handleBottomExport() {
         if (typeof window.exportContent !== 'function') {
-            await import('./ui/export.ts');
+            await import('./ui/export.js');
         }
         window.exportContent();
     }
 
     async function handleBottomShare() {
         if (typeof window.showShareDialog !== 'function') {
-            await import('./ui/share.ts');
+            await import('./ui/share.js');
         }
         window.showShareDialog();
     }
@@ -997,19 +997,19 @@ document.addEventListener('DOMContentLoaded', function() {
         { id: 'mobileBottomFileListBtn', icon: 'fas fa-folder-open', textKey: 'fileListTitle', fn: handleBottomFileList },
         { id: 'mobileFormulaBtn', icon: 'fas fa-superscript', textKey: 'formula', fn: async function() {
             if (typeof window.showFormulaPicker !== 'function') {
-                await import('./formula-picker.ts');
+                await import('./formula-picker.js');
             }
             if (typeof window.showFormulaPicker === 'function') window.showFormulaPicker();
         } },
         { id: 'mobileChartBtn', icon: 'fas fa-chart-bar', textKey: 'chart', fn: async function() {
             if (typeof window.showChartPicker !== 'function') {
-                await import('./ui/chart.ts');
+                await import('./ui/chart.js');
             }
             if (typeof window.showChartPicker === 'function') window.showChartPicker();
         } },
         { id: 'mobileUncertaintyBtn', icon: 'fas fa-calculator', textKey: 'uncertainty', isEasterEgg: true, fn: async function() {
             if (typeof window.showUncertaintyCalculator !== 'function') {
-                await import('./uncertainty-calculator.ts');
+                await import('./uncertainty-calculator.js');
             }
             if (typeof window.showUncertaintyCalculator === 'function') window.showUncertaintyCalculator();
         } },
@@ -1018,7 +1018,7 @@ document.addEventListener('DOMContentLoaded', function() {
         { id: 'mobileAIBtn', icon: 'fas fa-robot', textKey: 'aiAssistant', fn: async function() {
             if (typeof window.showAIPanel !== 'function') {
                 // 懒加载 AI 助手模块
-                await import('./ui/ai-assistant.ts');
+                await import('./ui/ai-assistant.js');
             }
             if (typeof window.showAIPanel === 'function') window.showAIPanel();
         } }
@@ -1399,7 +1399,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             // 懒加载代码运行器模块
-            import('./code-runner.ts').then(function() {
+            import('./code-runner.js').then(function() {
                 console.log('Code runner module loaded successfully');
                 // 为现有代码块添加运行按钮
                 if (window.addRunButtons) {
@@ -1662,7 +1662,7 @@ document.addEventListener('DOMContentLoaded', function() {
         var mobileShareBtn = document.getElementById('mobileShareBtn');
         if (mobileShareBtn) mobileShareBtn.addEventListener('click', async function() {
             if (typeof window.showShareDialog !== 'function') {
-                await import('./ui/share.ts');
+                await import('./ui/share.js');
             }
             window.showShareDialog();
             closeDrop();
@@ -1691,7 +1691,7 @@ document.addEventListener('DOMContentLoaded', function() {
         var mobilePrintBtn = document.getElementById('mobilePrintBtn');
         if (mobilePrintBtn) mobilePrintBtn.addEventListener('click', async function() {
             if (typeof window.showPrintDialog !== 'function') {
-                await import('./ui/print.ts');
+                await import('./ui/print.js');
             }
             window.showPrintDialog();
             closeDrop();
@@ -1716,7 +1716,7 @@ document.addEventListener('DOMContentLoaded', function() {
         var mobileExportBtn = document.getElementById('mobileExportBtn');
         if (mobileExportBtn) mobileExportBtn.addEventListener('click', async function() {
             if (typeof window.exportContent !== 'function') {
-                await import('./ui/export.ts');
+                await import('./ui/export.js');
             }
             window.exportContent();
             closeDrop();
@@ -1725,7 +1725,7 @@ document.addEventListener('DOMContentLoaded', function() {
         var mobileUncertaintyBtn = document.getElementById('mobileUncertaintyBtn');
         if (mobileUncertaintyBtn) mobileUncertaintyBtn.addEventListener('click', async function() {
             if (typeof window.showUncertaintyCalculator !== 'function') {
-                await import('./uncertainty-calculator.ts');
+                await import('./uncertainty-calculator.js');
             }
             if (typeof window.showUncertaintyCalculator === 'function') window.showUncertaintyCalculator();
             closeDrop();
@@ -1784,7 +1784,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         bindDesktopButton('desktopAIBtn', async function() {
             if (typeof window.showAIPanel !== 'function') {
-                await import('./ui/ai-assistant.ts');
+                await import('./ui/ai-assistant.js');
             }
             if (typeof window.showAIPanel === 'function') {
                 window.showAIPanel();
@@ -1849,7 +1849,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         bindDesktopButton('desktopShareBtn', async function() {
             if (typeof window.showShareDialog !== 'function') {
-                await import('./ui/share.ts');
+                await import('./ui/share.js');
             }
             window.showShareDialog();
             closeDesktopDrop();
@@ -1869,7 +1869,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         bindDesktopButton('desktopPrintBtn', async function() {
             if (typeof window.showPrintDialog !== 'function') {
-                await import('./ui/print.ts');
+                await import('./ui/print.js');
             }
             window.showPrintDialog();
             closeDesktopDrop();
@@ -1887,7 +1887,7 @@ document.addEventListener('DOMContentLoaded', function() {
         bindDesktopButton('desktopImportBtn', function() { window.importFiles(); closeDesktopDrop(); });
         bindDesktopButton('desktopExportBtn', async function() {
             if (typeof window.exportContent !== 'function') {
-                await import('./ui/export.ts');
+                await import('./ui/export.js');
             }
             window.exportContent();
             closeDesktopDrop();
@@ -1988,7 +1988,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         // 重新加载代码运行器模块，为新代码块添加运行按钮
-        import('./code-runner.ts').then(function() {
+        import('./code-runner.js').then(function() {
             if (window.addRunButtons) {
                 window.addRunButtons();
             }
@@ -2007,7 +2007,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
             { id: 'mobileShareBtn', fn: async function() {
                 if (typeof window.showShareDialog !== 'function') {
-                    await import('./ui/share.ts');
+                    await import('./ui/share.js');
                 }
                 window.showShareDialog();
                 closeDrop();
@@ -2017,7 +2017,7 @@ document.addEventListener('DOMContentLoaded', function() {
             { id: 'mobileFindBtn', fn: function() { if (typeof window.showFindDialog === 'function') window.showFindDialog(); closeDrop(); } },
             { id: 'mobilePrintBtn', fn: async function() {
                 if (typeof window.showPrintDialog !== 'function') {
-                    await import('./ui/print.ts');
+                    await import('./ui/print.js');
                 }
                 window.showPrintDialog();
                 closeDrop();
@@ -2033,14 +2033,14 @@ document.addEventListener('DOMContentLoaded', function() {
             } },
             { id: 'mobileExportBtn', fn: async function() {
                 if (typeof window.exportContent !== 'function') {
-                    await import('./ui/export.ts');
+                    await import('./ui/export.js');
                 }
                 window.exportContent();
                 closeDrop();
             } },
             { id: 'mobileUncertaintyBtn', fn: async function() {
                 if (typeof window.showUncertaintyCalculator !== 'function') {
-                    await import('./uncertainty-calculator.ts');
+                    await import('./uncertainty-calculator.js');
                 }
                 if (typeof window.showUncertaintyCalculator === 'function') window.showUncertaintyCalculator();
                 closeDrop();

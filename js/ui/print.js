@@ -9,7 +9,7 @@ function t(key) { return window.i18n ? window.i18n.t(key) : key; }
 // 懒加载 PDF 生成器
 async function getPDFGenerator() {
     if (!global.generatePDF) {
-        const module = await import('./pdf-generator.ts');
+        const module = await import('./pdf-generator.js');
         global.generatePDF = module.generatePDF;
         global.renderPDF = module.renderPDF;
     }
@@ -1111,7 +1111,7 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
                     try {
                         aiLayoutBtn.disabled = true;
                         aiLayoutBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ' + (isEn() ? 'Loading...' : '加载中...');
-                        await import('./ai.ts');
+                        await import('./ai.js');
                         if (global.showAILayoutDialog) {
                             global.showAILayoutDialog(modalContent, cleanup, printModal);
                         }

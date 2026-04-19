@@ -680,7 +680,7 @@
 
             // 图表通用标签
             chartTitle: '图表标题',
-            chartPreview: '预览：',
+            preview: '预览：',
             flowSteps: '流程步骤（每行一个）',
             direction: '方向',
             topToBottom: '从上到下',
@@ -1448,7 +1448,7 @@
 
             // Chart common labels
             chartTitle: 'Chart Title',
-            chartPreview: 'Preview:',
+            preview: 'Preview:',
             flowSteps: 'Flow Steps (one per line)',
             direction: 'Direction',
             topToBottom: 'Top to Bottom',

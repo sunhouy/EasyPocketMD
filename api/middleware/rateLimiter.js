@@ -1,8 +1,7 @@
-import rateLimit from 'express-rate-limit';
-import { Request, Response } from 'express';
+const rateLimit = require('express-rate-limit');
 
 // 检查用户是否已登录的辅助函数
-const isAuthenticated = (req: Request): boolean => {
+const isAuthenticated = (req) => {
     // 检查请求头中的认证信息
     const authHeader = req.headers.authorization;
     if (authHeader && authHeader.startsWith('Bearer ')) {
@@ -20,18 +19,18 @@ const isAuthenticated = (req: Request): boolean => {
 };
 
 // 获取客户端IP地址（兼容IPv6）
-const getClientIp = (req: Request): string => {
+const getClientIp = (req) => {
     // 优先获取真实IP（通过代理）
     const forwarded = req.headers['x-forwarded-for'];
     if (forwarded) {
-        return (forwarded as string).split(',')[0].trim();
+        return forwarded.split(',')[0].trim();
     }
     // 获取直接连接的IP
-    return req.ip || req.socket.remoteAddress || 'unknown';
+    return req.ip || req.connection.remoteAddress || 'unknown';
 };
 
 // 获取用户标识（用于限流的key）
-const getKeyGenerator = (req: Request): string => {
+const getKeyGenerator = (req) => {
     // 优先使用用户标识
     if (req.body && req.body.username) {
         return req.body.username;
@@ -40,29 +39,21 @@ const getKeyGenerator = (req: Request): string => {
     return getClientIp(req);
 };
 
-interface LimiterOptions {
-    windowMs?: number;
-    max?: number | ((req: Request) => number);
-    message?: { code: number; message: string };
-    keyGenerator?: (req: Request) => string;
-    skip?: (req: Request) => boolean;
-}
-
 // 创建限流器的通用配置
-const createLimiter = (options: LimiterOptions) => {
+const createLimiter = (options) => {
     return rateLimit({
         windowMs: options.windowMs || 15 * 60 * 1000, // 默认15分钟
         max: options.max || 100, // 默认最多100次
         message: {
             code: 429,
-            message: options.message?.message || '请求过于频繁，请稍后再试'
+            message: options.message || '请求过于频繁，请稍后再试'
         },
         standardHeaders: true, // 返回 RateLimit-* 头
         legacyHeaders: false, // 禁用 X-RateLimit-* 头
         keyGenerator: options.keyGenerator || getKeyGenerator,
         skip: options.skip || (() => false),
-        handler: (_req: Request, res: Response) => {
-            res.status(429).json(options.message || { code: 429, message: '请求过于频繁，请稍后再试' });
+        handler: (req, res, next, options) => {
+            res.status(429).json(options.message);
         }
     });
 };
@@ -70,7 +61,7 @@ const createLimiter = (options: LimiterOptions) => {
 // AI接口限流 - 对未登录用户更严格
 const aiLimiter = createLimiter({
     windowMs: 60 * 60 * 1000, // 1小时窗口
-    max: (req: Request) => isAuthenticated(req) ? 500 : 50, // 登录用户500次/小时，未登录50次/小时
+    max: (req) => isAuthenticated(req) ? 500 : 50, // 登录用户500次/小时，未登录50次/小时
     message: {
         code: 429,
         message: 'AI功能调用次数已达上限，请登录以获取更多次数或稍后再试'
@@ -85,7 +76,7 @@ const authLimiter = createLimiter({
         code: 429,
         message: '登录尝试次数过多，请15分钟后再试'
     },
-    keyGenerator: (req: Request) => {
+    keyGenerator: (req) => {
         // 优先使用username
         if (req.body && req.body.username) {
             return req.body.username;
@@ -107,7 +98,7 @@ const registerLimiter = createLimiter({
 // 文件上传限流
 const uploadLimiter = createLimiter({
     windowMs: 15 * 60 * 1000, // 15分钟窗口
-    max: (req: Request) => isAuthenticated(req) ? 1000 : 300, // 登录用户1000次，未登录300次
+    max: (req) => isAuthenticated(req) ? 1000 : 300, // 登录用户1000次，未登录300次
     message: {
         code: 429,
         message: '上传次数已达上限，请稍后再试'
@@ -117,7 +108,7 @@ const uploadLimiter = createLimiter({
 // 通用API限流
 const apiLimiter = createLimiter({
     windowMs: 15 * 60 * 1000, // 15分钟窗口
-    max: (req: Request) => isAuthenticated(req) ? 50000 : 10000, // 登录用户50000次，未登录10000次
+    max: (req) => isAuthenticated(req) ? 50000 : 10000, // 登录用户50000次，未登录10000次
     message: {
         code: 429,
         message: '请求过于频繁，请稍后再试'
@@ -127,7 +118,7 @@ const apiLimiter = createLimiter({
 // 文件操作限流 - 放宽限制
 const fileLimiter = createLimiter({
     windowMs: 15 * 60 * 1000, // 15分钟窗口
-    max: (req: Request) => isAuthenticated(req) ? 30000 : 6000, // 登录用户3000次，未登录6000次
+    max: (req) => isAuthenticated(req) ? 30000 : 6000, // 登录用户3000次，未登录6000次
     message: {
         code: 429,
         message: '文件操作过于频繁，请稍后再试'
@@ -137,7 +128,7 @@ const fileLimiter = createLimiter({
 // 转换接口限流（HTML/PDF导出等）- 放宽限制
 const convertLimiter = createLimiter({
     windowMs: 60 * 60 * 1000, // 1小时窗口
-    max: (req: Request) => isAuthenticated(req) ? 6000 : 1500, // 登录用户6000次，未登录1500次
+    max: (req) => isAuthenticated(req) ? 6000 : 1500, // 登录用户6000次，未登录1500次
     message: {
         code: 429,
         message: '转换次数已达上限，请稍后再试'
@@ -154,7 +145,7 @@ const strictLimiter = createLimiter({
     }
 });
 
-export {
+module.exports = {
     aiLimiter,
     authLimiter,
     registerLimiter,

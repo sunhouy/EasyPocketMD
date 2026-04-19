@@ -1,26 +1,25 @@
-import fs from 'fs';
-import path from 'path';
-import { Request, Response, NextFunction } from 'express';
+const fs = require('fs');
+const path = require('path');
 
 // 敏感词文件路径
 const SENSITIVE_WORDS_PATH = '/www/wwwroot/static/sensitive.txt';
 
 // 使用 Map 存储敏感词字典树
-let sensitiveWordMap = new Map<string, Map<string, unknown>>();
+let sensitiveWordMap = new Map();
 let isLoaded = false;
-let sensitiveWordsList: string[] = [];
+let sensitiveWordsList = [];
 
 // 构建敏感词字典树
-function buildSensitiveWordMap(words: string[]): Map<string, Map<string, unknown>> {
-  const map = new Map<string, Map<string, unknown>>();
+function buildSensitiveWordMap(words) {
+  const map = new Map();
   for (const word of words) {
     if (!word || word.length === 0) continue;
     let current = map;
     for (const char of word) {
       if (!current.has(char)) {
-        current.set(char, new Map<string, unknown>());
+        current.set(char, new Map());
       }
-      current = current.get(char) as Map<string, unknown>;
+      current = current.get(char);
     }
     current.set('isEnd', true);
   }
@@ -28,7 +27,7 @@ function buildSensitiveWordMap(words: string[]): Map<string, Map<string, unknown
 }
 
 // 加载敏感词库
-function loadSensitiveWords(): void {
+function loadSensitiveWords() {
   if (isLoaded) return;
 
   try {
@@ -47,18 +46,13 @@ function loadSensitiveWords(): void {
     sensitiveWordMap = buildSensitiveWordMap(sensitiveWordsList);
     isLoaded = true;
   } catch (error) {
-    console.error('❌ 加载敏感词库失败:', (error as Error).message);
+    console.error('❌ 加载敏感词库失败:', error.message);
   }
-}
-
-interface CheckResult {
-  hasSensitive: boolean;
-  words: string[];
 }
 
 // 检查文本是否包含敏感词，并返回所有匹配的敏感词
 // 返回 { hasSensitive: boolean, words: string[] }
-function checkSensitiveWords(text: string): CheckResult {
+function checkSensitiveWords(text) {
   if (!text || typeof text !== 'string') {
     return { hasSensitive: false, words: [] };
   }
@@ -73,7 +67,7 @@ function checkSensitiveWords(text: string): CheckResult {
     return { hasSensitive: false, words: [] };
   }
 
-  const foundWords = new Set<string>();
+  const foundWords = new Set();
   const textLength = text.length;
 
   // 遍历文本的每个位置
@@ -87,7 +81,7 @@ function checkSensitiveWords(text: string): CheckResult {
         break;
       }
       match += char;
-      current = current.get(char) as Map<string, unknown>;
+      current = current.get(char);
 
       // 如果到达词尾，说明匹配到一个敏感词
       if (current.has('isEnd')) {
@@ -104,7 +98,7 @@ function checkSensitiveWords(text: string): CheckResult {
 }
 
 // 过滤敏感词，将敏感词替换为 ***
-function filterSensitiveWords(text: string, replacement = '***'): string {
+function filterSensitiveWords(text, replacement = '***') {
   if (!text || typeof text !== 'string') {
     return text;
   }
@@ -123,22 +117,16 @@ function filterSensitiveWords(text: string, replacement = '***'): string {
   return filteredText;
 }
 
-interface ObjectCheckResult {
-  hasSensitive: boolean;
-  words: string[];
-  field?: string;
-}
-
 // 检查对象中的指定字段是否包含敏感词
 // 返回 { hasSensitive: boolean, words: string[], field: string }
-function checkObjectFields(obj: Record<string, unknown>, fieldsToCheck = ['title', 'content', 'comment', 'nickname', 'filename']): ObjectCheckResult {
+function checkObjectFields(obj, fieldsToCheck = ['title', 'content', 'comment', 'nickname', 'filename']) {
   if (!obj || typeof obj !== 'object') {
     return { hasSensitive: false, words: [] };
   }
 
   for (const key of fieldsToCheck) {
     if (obj[key] && typeof obj[key] === 'string') {
-      const checkResult = checkSensitiveWords(obj[key] as string);
+      const checkResult = checkSensitiveWords(obj[key]);
       if (checkResult.hasSensitive) {
         return {
           hasSensitive: true,
@@ -153,32 +141,32 @@ function checkObjectFields(obj: Record<string, unknown>, fieldsToCheck = ['title
 }
 
 // 中间件：自动过滤请求中的敏感词（替换为***）
-function sensitiveMiddleware(req: Request, res: Response, next: NextFunction): void {
+function sensitiveMiddleware(req, res, next) {
   const fieldsToCheck = ['title', 'content', 'comment', 'nickname', 'filename'];
 
-  function filterText(text: string): string {
+  function filterText(text) {
     if (!text || typeof text !== 'string') return text;
     return filterSensitiveWords(text, '***');
   }
 
   // 递归处理 req.body / req.query / req.params
-  const sanitize = (obj: Record<string, unknown>): void => {
+  const sanitize = (obj) => {
     if (!obj || typeof obj !== 'object') return;
     Object.keys(obj).forEach(key => {
       if (fieldsToCheck.includes(key)) {
-        obj[key] = filterText(obj[key] as string);
+        obj[key] = filterText(obj[key]);
       } else if (typeof obj[key] === 'object') {
-        sanitize(obj[key] as Record<string, unknown>);
+        sanitize(obj[key]);
       }
     });
   };
 
-  sanitize(req.body as Record<string, unknown>);
-  sanitize(req.query as Record<string, unknown>);
+  sanitize(req.body);
+  sanitize(req.query);
   next();
 }
 
-export {
+module.exports = {
   loadSensitiveWords,
   checkSensitiveWords,
   filterSensitiveWords,

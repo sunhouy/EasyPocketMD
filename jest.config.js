@@ -6,18 +6,14 @@ module.exports = {
   clearMocks: true,
   restoreMocks: true,
   detectOpenHandles: true,
-  setupFiles: ['<rootDir>/tests/setup.ts'],
-  testMatch: ['**/tests/**/*.test.ts'],
+  setupFiles: ['<rootDir>/tests/setup.js'],
+  testMatch: ['**/tests/**/*.test.js'],
   collectCoverage: true,
   collectCoverageFrom: [
-    'api/models/**/*.ts',
-    'api/utils/**/*.ts',
+    'api/models/**/*.js',
+    'api/utils/**/*.js',
     '!**/node_modules/**',
   ],
   coverageDirectory: 'coverage',
   coverageReporters: ['text', 'lcov', 'html'],
-  transform: {
-    '^.+\\.ts$': 'ts-jest',
-  },
-  moduleFileExtensions: ['ts', 'js', 'json'],
 };

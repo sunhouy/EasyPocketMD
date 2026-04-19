@@ -1,11 +1,11 @@
-import Redis from 'ioredis';
+const Redis = require('ioredis');
 
 const redisConfig = {
     host: process.env.REDIS_HOST || 'localhost',
-    port: parseInt(process.env.REDIS_PORT || '6379', 10),
+    port: parseInt(process.env.REDIS_PORT) || 6379,
     password: process.env.REDIS_PASSWORD || undefined,
-    db: parseInt(process.env.REDIS_DB || '0', 10),
-    retryStrategy: (times: number): number | null => {
+    db: parseInt(process.env.REDIS_DB) || 0,
+    retryStrategy: (times) => {
         if (times > 5) {
             return null;
         }
@@ -19,7 +19,9 @@ const redisConfig = {
     commandTimeout: 5000
 };
 
-let redis: Redis | null = null;
+
+
+let redis = null;
 let redisAvailable = false;
 
 try {
@@ -33,7 +35,7 @@ try {
         redisAvailable = true;
     });
 
-    redis.on('error', (err: Error) => {
+    redis.on('error', (err) => {
         console.error('Redis: error occurred -', err.message);
         redisAvailable = false;
     });
@@ -43,65 +45,82 @@ try {
     });
 
     redis.on('reconnecting', () => {
-        // reconnecting event
     });
 
 } catch (err) {
-    console.error('Redis: failed to initialize -', (err as Error).message);
+    console.error('Redis: failed to initialize -', err.message);
     redis = null;
     redisAvailable = false;
 }
 
-export = {
-    get: async (key: string): Promise<string | null> => {
+async function ensureConnection() {
+    if (!redis) {
+        return false;
+    }
+    if (redisAvailable && redis.status === 'ready') {
+        return true;
+    }
+    try {
+        if (redis.status === 'wait' || redis.status === 'end') {
+            await redis.connect();
+        }
+        return redisAvailable;
+    } catch (err) {
+        console.error('Redis: ensureConnection failed -', err.message);
+        return false;
+    }
+}
+
+module.exports = {
+    get: async (...args) => {
         if (!redis) return null;
         try {
-            return await redis.get(key);
+            return await redis.get(...args);
         } catch (err) {
-            console.error('Redis get error:', (err as Error).message);
+            console.error('Redis get error:', err.message);
             return null;
         }
     },
-    setex: async (key: string, seconds: number, value: string): Promise<boolean> => {
+    setex: async (...args) => {
         if (!redis) return false;
         try {
-            await redis.setex(key, seconds, value);
+            await redis.setex(...args);
             return true;
         } catch (err) {
-            console.error('Redis setex error:', (err as Error).message);
+            console.error('Redis setex error:', err.message);
             return false;
         }
     },
-    del: async (...keys: string[]): Promise<boolean> => {
+    del: async (...args) => {
         if (!redis) return false;
         try {
-            await redis.del(...keys);
+            await redis.del(...args);
             return true;
         } catch (err) {
-            console.error('Redis del error:', (err as Error).message);
+            console.error('Redis del error:', err.message);
             return false;
         }
     },
-    keys: async (pattern: string): Promise<string[]> => {
+    keys: async (...args) => {
         if (!redis) return [];
         try {
-            return await redis.keys(pattern);
+            return await redis.keys(...args);
         } catch (err) {
-            console.error('Redis keys error:', (err as Error).message);
+            console.error('Redis keys error:', err.message);
             return [];
         }
     },
-    ttl: async (key: string): Promise<number> => {
+    ttl: async (...args) => {
         if (!redis) return -1;
         try {
-            return await redis.ttl(key);
+            return await redis.ttl(...args);
         } catch (err) {
-            console.error('Redis ttl error:', (err as Error).message);
+            console.error('Redis ttl error:', err.message);
             return -1;
         }
     },
-    isAvailable: (): boolean => redisAvailable && redis !== null && redis.status === 'ready',
-    getStatus: (): { available: boolean; status: string } => ({
+    isAvailable: () => redisAvailable && redis && redis.status === 'ready',
+    getStatus: () => ({
         available: redisAvailable,
         status: redis ? redis.status : 'not_initialized'
     })

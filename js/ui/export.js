@@ -59,7 +59,7 @@ function markdownToPlainText(markdown) {
 // 懒加载 PDF 生成器
 async function getPDFGenerator() {
     if (!global.generatePDF) {
-        const module = await import('./pdf-generator.ts');
+        const module = await import('./pdf-generator.js');
         global.generatePDF = module.generatePDF;
         global.renderPDF = module.renderPDF;
     }
@@ -272,7 +272,7 @@ async function exportFile(content, ext) {
     if (ext === 'pdf') {
         // 懒加载打印模块
         if (typeof global.showPrintDialog !== 'function') {
-            await import('./print.ts');
+            await import('./print.js');
         }
         global.hideMobileActionSheet();
         global.showPrintDialog('export-pdf', async function(settings) {
@@ -339,7 +339,7 @@ async function exportFile(content, ext) {
     if (ext === 'html') {
         // 懒加载打印模块
         if (typeof global.showPrintDialog !== 'function') {
-            await import('./print.ts');
+            await import('./print.js');
         }
         global.hideMobileActionSheet();
         global.showPrintDialog('export-html', async function(settings) {
@@ -411,14 +411,14 @@ async function exportFile(content, ext) {
     if (ext === 'docx') {
         // 懒加载打印模块（如果未加载）
         if (typeof global.showPrintDialog !== 'function') {
-            await import('./print.ts');
+            await import('./print.js');
         }
         global.hideMobileActionSheet();
         // 显示打印设置对话框，让用户配置导出选项
         global.showPrintDialog('export-docx', async function(settings) {
             // 懒加载 DOCX 生成器
             if (typeof global.exportDOCX !== 'function') {
-                await import('./docx-generator.ts');
+                await import('./docx-generator.js');
             }
             // 显示文件名输入对话框，然后导出
             showFilenameDialog(defaultFileName, 'docx', async function(filename) {
