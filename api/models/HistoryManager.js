@@ -9,7 +9,7 @@ class HistoryManager {
     }
 
     // Create history
-    async createHistory(username, filename, content) {
+    async createHistory(username, filename, content, modifiedBy = null) {
         try {
             const user = await this.getUserByUsername(username);
             if (!user) return { code: 404, message: '用户不存在' };
@@ -31,8 +31,8 @@ class HistoryManager {
                 const nextVersion = recentVersion ? recentVersion.version_id + 1 : 1;
 
                 const [result] = await connection.execute(
-                    'INSERT INTO file_history (user_id, filename, version_id, content_hash, content_length, created_at) VALUES (?, ?, ?, ?, ?, NOW())',
-                    [userId, filename, nextVersion, contentHash, contentLength]
+                    'INSERT INTO file_history (user_id, filename, version_id, content_hash, content_length, modified_by, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())',
+                    [userId, filename, nextVersion, contentHash, contentLength, modifiedBy]
                 );
 
                 const historyId = result.insertId;
@@ -84,7 +84,7 @@ class HistoryManager {
             const userId = user.id;
 
             const [rows] = await db.execute(`
-                SELECT h.id, h.version_id, h.content_hash, h.content_length, h.created_at, c.content_type, c.base_version_id
+                SELECT h.id, h.version_id, h.content_hash, h.content_length, h.modified_by, h.created_at, c.content_type, c.base_version_id
                 FROM file_history h
                 LEFT JOIN file_content c ON h.id = c.history_id
                 WHERE h.user_id = ? AND h.filename = ?
@@ -106,6 +106,7 @@ class HistoryManager {
                     content_hash: row.content_hash,
                     content_length: row.content_length,
                     content_type: row.content_type,
+                    modified_by: row.modified_by,
                     timestamp: row.created_at,
                     is_current: isCurrent
                 });
