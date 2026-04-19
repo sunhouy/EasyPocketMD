@@ -9,7 +9,6 @@ SET time_zone = "+00:00";
 /*!40101 SET NAMES utf8mb4 */;
 
 
-
 -- --------------------------------------------------------
 
 --
@@ -120,7 +119,8 @@ CREATE TABLE `file_history` (
   `version_id` int(11) NOT NULL,
   `content_hash` varchar(64) NOT NULL,
   `content_length` int(11) NOT NULL,
-  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `modified_by` varchar(255) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- --------------------------------------------------------
@@ -142,6 +142,23 @@ CREATE TABLE `file_shares` (
   `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='文档分享表';
+
+-- --------------------------------------------------------
+
+--
+-- 表的结构 `member_records`
+--
+
+CREATE TABLE `member_records` (
+  `id` int(11) NOT NULL,
+  `username` varchar(50) NOT NULL COMMENT '用户名',
+  `type` varchar(20) NOT NULL COMMENT '开通类型: auth_code, invite',
+  `source` varchar(50) NOT NULL COMMENT '开通来源: 授权码或邀请码',
+  `added_days` int(11) NOT NULL COMMENT '添加的会员天数',
+  `start_date` date NOT NULL COMMENT '开始时间',
+  `end_date` date NOT NULL COMMENT '结束时间',
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- --------------------------------------------------------
 
@@ -172,23 +189,6 @@ CREATE TABLE `share_live_sessions` (
   `last_seen` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='分享文档在线会话状态';
-
--- --------------------------------------------------------
-
---
--- 表的结构 `member_records`
---
-
-CREATE TABLE `member_records` (
-  `id` int(11) NOT NULL,
-  `username` varchar(50) NOT NULL COMMENT '用户名',
-  `type` varchar(20) NOT NULL COMMENT '开通类型: auth_code, invite',
-  `source` varchar(50) NOT NULL COMMENT '开通来源: 授权码或邀请码',
-  `added_days` int(11) NOT NULL COMMENT '添加的会员天数',
-  `start_date` date NOT NULL COMMENT '开始时间',
-  `end_date` date NOT NULL COMMENT '结束时间',
-  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- --------------------------------------------------------
 
@@ -300,6 +300,14 @@ ALTER TABLE `file_shares`
   ADD KEY `idx_share_id` (`share_id`);
 
 --
+-- 表的索引 `member_records`
+--
+ALTER TABLE `member_records`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_username` (`username`),
+  ADD KEY `idx_type` (`type`);
+
+--
 -- 表的索引 `share_editors`
 --
 ALTER TABLE `share_editors`
@@ -314,14 +322,6 @@ ALTER TABLE `share_live_sessions`
   ADD PRIMARY KEY (`id`),
   ADD UNIQUE KEY `uniq_share_viewer` (`share_id`,`viewer_id`),
   ADD KEY `idx_share_last_seen` (`share_id`,`last_seen`);
-
---
--- 表的索引 `member_records`
---
-ALTER TABLE `member_records`
-  ADD PRIMARY KEY (`id`),
-  ADD KEY `idx_username` (`username`),
-  ADD KEY `idx_type` (`type`);
 
 --
 -- 表的索引 `users`
@@ -392,6 +392,12 @@ ALTER TABLE `file_shares`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
+-- 使用表AUTO_INCREMENT `member_records`
+--
+ALTER TABLE `member_records`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
 -- 使用表AUTO_INCREMENT `share_editors`
 --
 ALTER TABLE `share_editors`
@@ -401,12 +407,6 @@ ALTER TABLE `share_editors`
 -- 使用表AUTO_INCREMENT `share_live_sessions`
 --
 ALTER TABLE `share_live_sessions`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
-
---
--- 使用表AUTO_INCREMENT `member_records`
---
-ALTER TABLE `member_records`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
@@ -447,8 +447,7 @@ ALTER TABLE `file_shares`
 -- 限制表 `share_editors`
 --
 ALTER TABLE `share_editors`
-  ADD CONSTRAINT `fk_share_editors_share` FOREIGN KEY (`share_id`) REFERENCES `file_shares` (`share_id`) ON DELETE CASCADE ON UPDATE CASCADE,
-  ADD CONSTRAINT `fk_share_editors_user` FOREIGN KEY (`editor_username`) REFERENCES `users` (`username`) ON DELETE CASCADE ON UPDATE CASCADE;
+  ADD CONSTRAINT `fk_share_editors_share` FOREIGN KEY (`share_id`) REFERENCES `file_shares` (`share_id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 --
 -- 限制表 `share_live_sessions`
