@@ -15,7 +15,7 @@
     // 懒加载 PDF 生成器
     async function getPDFGenerator() {
         if (!global.generatePDF) {
-            const module = await import('./pdf-generator.js');
+            const module = await import('./pdf-generator.ts');
             global.generatePDF = module.generatePDF;
             global.renderPDF = module.renderPDF;
         }

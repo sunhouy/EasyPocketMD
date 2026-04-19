@@ -2,19 +2,34 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 
+interface ApiConfig {
+    base_url: string;
+    api_key: string;
+    products: string[];
+}
+
+interface ApiInfo {
+    config: Record<string, ApiConfig>;
+    preferred_product: string | null;
+}
+
 class ApiManager {
+    private apiFile: string;
+    private encryptionKey: string;
+    private algorithm: string;
+
     constructor() {
         this.apiFile = path.join(__dirname, '../api_info.json');
         this.encryptionKey = 'educoder_api_encryption_key_2025';
         this.algorithm = 'aes-256-cbc';
     }
 
-    encrypt(data) {
+    encrypt(data: unknown): string {
         const iv = crypto.randomBytes(16);
         const cipher = crypto.createCipheriv(this.algorithm, Buffer.from(this.encryptionKey), iv);
         
         // Encrypt to Buffer first
-        let encryptedBuffer = Buffer.concat([cipher.update(JSON.stringify(data)), cipher.final()]);
+        const encryptedBuffer = Buffer.concat([cipher.update(JSON.stringify(data)), cipher.final()]);
         
         // Convert encrypted data to base64 string (as PHP openssl_encrypt does by default)
         const encryptedBase64 = encryptedBuffer.toString('base64');
@@ -25,7 +40,7 @@ class ApiManager {
         return combined.toString('base64');
     }
 
-    decrypt(encryptedData) {
+    decrypt(encryptedData: string): unknown {
         try {
             // Decode the outer base64
             const buffer = Buffer.from(encryptedData, 'base64');
@@ -49,7 +64,7 @@ class ApiManager {
         }
     }
 
-    getAllApiInfo() {
+    getAllApiInfo(): ApiInfo {
         if (!fs.existsSync(this.apiFile)) {
             return { config: {}, preferred_product: null };
         }
@@ -58,7 +73,7 @@ class ApiManager {
         if (!content) return { config: {}, preferred_product: null };
         
         try {
-            const decrypted = this.decrypt(content);
+            const decrypted = this.decrypt(content) as ApiInfo & { preferred_model?: string };
             if (decrypted.config) {
                 if (decrypted.preferred_model && !decrypted.preferred_product) {
                     decrypted.preferred_product = decrypted.preferred_model;
@@ -66,7 +81,7 @@ class ApiManager {
                 }
                 return decrypted;
             } else {
-                return { config: decrypted, preferred_product: null };
+                return { config: decrypted as Record<string, ApiConfig>, preferred_product: null };
             }
         } catch (error) {
             console.error('Failed to load API info:', error);
@@ -74,7 +89,7 @@ class ApiManager {
         }
     }
 
-    saveApiInfo(apiInfo) {
+    saveApiInfo(apiInfo: ApiInfo): boolean {
         try {
             const encryptedData = this.encrypt(apiInfo);
             fs.writeFileSync(this.apiFile, encryptedData);
@@ -85,7 +100,7 @@ class ApiManager {
         }
     }
 
-    addProductInfo(product, baseUrl, apiKey) {
+    addProductInfo(product: string, baseUrl: string, apiKey: string): boolean {
         const apiInfo = this.getAllApiInfo();
         const config = apiInfo.config || {};
         
@@ -107,7 +122,7 @@ class ApiManager {
         return this.saveApiInfo(apiInfo);
     }
 
-    deleteApiInfo(baseUrl, apiKey) {
+    deleteApiInfo(baseUrl: string, apiKey: string): boolean {
         const apiInfo = this.getAllApiInfo();
         const config = apiInfo.config || {};
         const baseUrlKey = crypto.createHash('md5').update(baseUrl + apiKey).digest('hex');
@@ -120,7 +135,7 @@ class ApiManager {
         return false;
     }
 
-    removeProduct(baseUrl, apiKey, product) {
+    removeProduct(baseUrl: string, apiKey: string, product: string): boolean {
         const apiInfo = this.getAllApiInfo();
         const config = apiInfo.config || {};
         const baseUrlKey = crypto.createHash('md5').update(baseUrl + apiKey).digest('hex');
@@ -146,19 +161,19 @@ class ApiManager {
         return false;
     }
 
-    getAllProducts() {
+    getAllProducts(): string[] {
         const apiInfo = this.getAllApiInfo();
         const config = apiInfo.config || {};
-        let products = [];
+        const products: string[] = [];
         
         for (const key in config) {
-            products = products.concat(config[key].products);
+            products.push(...config[key].products);
         }
         
         return [...new Set(products)].sort();
     }
 
-    getProductConfig(product) {
+    getProductConfig(product: string): { base_url: string; api_key: string } | null {
         const apiInfo = this.getAllApiInfo();
         const config = apiInfo.config || {};
         
@@ -173,14 +188,14 @@ class ApiManager {
         return null;
     }
 
-    searchProducts(keyword) {
+    searchProducts(keyword: string): string[] {
         const allProducts = this.getAllProducts();
         return allProducts.filter(p => p.toLowerCase().includes(keyword.toLowerCase()));
     }
 
-    getPreferredProduct() {
+    getPreferredProduct(): string | null {
         return this.getAllApiInfo().preferred_product;
     }
 }
 
-module.exports = new ApiManager();
+export = new ApiManager();
