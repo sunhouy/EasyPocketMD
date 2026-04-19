@@ -185,56 +185,78 @@
     }
 
     function initCursorTracking() {
-        if (!window.vditor || !window.vditor.editor || !window.sharedDocState) return;
-        
-        const editorElement = window.vditor.editor.element;
-        if (!editorElement) return;
-        
-        // 监听光标移动和选择事件
-        editorElement.addEventListener('mousemove', handleCursorMove);
-        editorElement.addEventListener('click', handleCursorMove);
-        editorElement.addEventListener('keyup', handleCursorMove);
-        editorElement.addEventListener('select', handleCursorMove);
-    }
+        if (!window.vditor || !window.sharedDocState || !window.sharedDocState.canEdit) return;
 
-    function handleCursorMove() {
-        if (!window.vditor || !window.vditor.editor || !window.sharedDocState) return;
-        
-        const selection = window.getSelection();
-        if (!selection) return;
-        
-        const range = selection.getRangeAt(0);
-        const rect = range.getBoundingClientRect();
-        const editorRect = window.vditor.editor.element.getBoundingClientRect();
-        
-        const position = {
-            x: rect.left - editorRect.left,
-            y: rect.top - editorRect.top,
-            height: rect.height
+        // 使用 Vditor 的内容区域
+        const contentElement = document.querySelector('.vditor-ir__preview, .vditor-wysiwyg, .vditor-sv');
+        if (!contentElement) return;
+
+        // 防抖发送光标位置
+        let cursorTimer = null;
+        const debouncedSend = () => {
+            if (cursorTimer) clearTimeout(cursorTimer);
+            cursorTimer = setTimeout(() => {
+                const selection = window.getSelection();
+                if (!selection || selection.rangeCount === 0) return;
+
+                try {
+                    const range = selection.getRangeAt(0);
+                    const rect = range.getBoundingClientRect();
+                    const editorRect = contentElement.getBoundingClientRect();
+
+                    if (rect.height === 0) return; // 无效光标
+
+                    const position = {
+                        x: rect.left - editorRect.left + contentElement.scrollLeft,
+                        y: rect.top - editorRect.top + contentElement.scrollTop,
+                        height: rect.height || 20
+                    };
+
+                    const selectionText = selection.toString();
+                    sendCursorPosition(position, {
+                        text: selectionText,
+                        length: selectionText.length
+                    });
+                } catch (e) {
+                    // 忽略错误
+                }
+            }, 150);
         };
-        
-        const selectionText = selection.toString();
-        
-        sendCursorPosition(position, {
-            text: selectionText,
-            length: selectionText.length
-        });
+
+        // 监听光标移动和选择事件
+        contentElement.addEventListener('click', debouncedSend);
+        contentElement.addEventListener('keyup', debouncedSend);
+        document.addEventListener('selectionchange', debouncedSend);
     }
 
     function renderRemoteCursors() {
         // 清除旧的光标
         document.querySelectorAll('.remote-cursor').forEach(el => el.remove());
-        
-        if (!window.sharedDocState || !window.vditor || !window.vditor.editor) return;
-        
-        const editorElement = window.vditor.editor.element;
-        if (!editorElement) return;
-        
+
+        if (!window.sharedDocState || !window.vditor) return;
+
+        // 尝试多个可能的内容容器
+        const contentElement = document.querySelector('.vditor-ir__preview') ||
+                              document.querySelector('.vditor-wysiwyg') ||
+                              document.querySelector('.vditor-sv') ||
+                              document.querySelector('.vditor-content');
+
+        if (!contentElement) {
+            console.warn('未找到编辑器内容容器，无法渲染光标');
+            return;
+        }
+
+        // 确保容器有相对定位
+        if (window.getComputedStyle(contentElement).position === 'static') {
+            contentElement.style.position = 'relative';
+        }
+
         // 渲染其他用户的光标
         window.sharedDocState.remoteCursors = window.sharedDocState.remoteCursors || {};
         Object.values(window.sharedDocState.remoteCursors).forEach(cursor => {
             if (cursor.viewerId === window.sharedDocState.viewerId) return;
-            
+            if (!cursor.position || cursor.position.height === 0) return;
+
             const cursorElement = document.createElement('div');
             cursorElement.className = 'remote-cursor';
             cursorElement.style.cssText = `
@@ -244,30 +266,45 @@
                 height: ${cursor.position.height}px;
                 width: 2px;
                 background-color: ${cursor.color};
-                z-index: 1000;
+                z-index: 9999;
                 pointer-events: none;
+                animation: blink 1s infinite;
             `;
-            
+
             const labelElement = document.createElement('div');
             labelElement.className = 'remote-cursor-label';
             labelElement.style.cssText = `
                 position: absolute;
                 left: 0;
-                top: -20px;
+                top: -22px;
                 background-color: ${cursor.color};
                 color: white;
                 padding: 2px 6px;
-                border-radius: 4px;
-                font-size: 12px;
+                border-radius: 3px;
+                font-size: 11px;
                 white-space: nowrap;
-                z-index: 1001;
+                z-index: 10000;
                 pointer-events: none;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.2);
             `;
             labelElement.textContent = cursor.viewerName;
-            
+
             cursorElement.appendChild(labelElement);
-            editorElement.appendChild(cursorElement);
+            contentElement.appendChild(cursorElement);
         });
+    }
+
+    // 添加光标闪烁动画样式
+    if (!document.getElementById('remoteCursorStyle')) {
+        const style = document.createElement('style');
+        style.id = 'remoteCursorStyle';
+        style.textContent = `
+            @keyframes blink {
+                0%, 49% { opacity: 1; }
+                50%, 100% { opacity: 0.3; }
+            }
+        `;
+        document.head.appendChild(style);
     }
 
     function getCursorColor(viewerId) {
@@ -275,6 +312,228 @@
         const colors = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899'];
         const hash = viewerId.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
         return colors[hash % colors.length];
+    }
+
+    async function showHistoryModal() {
+        if (!window.sharedDocState || !window.currentUser) return;
+
+        const modal = document.createElement('div');
+        modal.id = 'shareHistoryModal';
+        modal.style.cssText = 'position:fixed;inset:0;z-index:10007;background:rgba(0,0,0,0.75);display:flex;align-items:center;justify-content:center;padding:16px;';
+
+        modal.innerHTML = `
+            <div style="width:min(900px,95vw);max-height:90vh;background:#1f2937;color:#f3f4f6;border-radius:12px;display:flex;flex-direction:column;">
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:16px;border-bottom:1px solid #374151;">
+                    <h3 style="margin:0;font-size:18px;font-weight:600;">📜 文档修改历史</h3>
+                    <button id="closeHistoryModal" style="border:none;background:transparent;color:#9ca3af;font-size:24px;cursor:pointer;padding:0;width:32px;height:32px;line-height:1;">&times;</button>
+                </div>
+                <div id="historyContent" style="flex:1;overflow-y:auto;padding:16px;">
+                    <div style="text-align:center;padding:40px;color:#9ca3af;">
+                        <div style="font-size:14px;">加载中...</div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        document.getElementById('closeHistoryModal').onclick = () => modal.remove();
+        modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+
+        // 加载历史记录
+        await loadHistoryList(modal);
+    }
+
+    async function loadHistoryList(modal) {
+        if (!window.sharedDocState || !window.currentUser) return;
+
+        try {
+            const apiUrl = (window.getApiBaseUrl ? window.getApiBaseUrl() : 'api') + '/files/history/list';
+            const response = await fetch(apiUrl + '?' + new URLSearchParams({
+                username: window.sharedDocState.ownerUsername,
+                filename: window.sharedDocState.filename
+            }), {
+                method: 'GET',
+                headers: {
+                    'Authorization': 'Bearer ' + window.currentUser.token
+                }
+            });
+
+            const result = await response.json();
+            const contentDiv = modal.querySelector('#historyContent');
+
+            if (result.code !== 200 || !result.data || !result.data.history) {
+                contentDiv.innerHTML = '<div style="text-align:center;padding:40px;color:#9ca3af;">加载失败或无历史记录</div>';
+                return;
+            }
+
+            const history = result.data.history;
+            if (history.length === 0) {
+                contentDiv.innerHTML = '<div style="text-align:center;padding:40px;color:#9ca3af;">暂无历史记录</div>';
+                return;
+            }
+
+            let html = '<div style="display:flex;flex-direction:column;gap:12px;">';
+            history.forEach((item, index) => {
+                const date = new Date(item.timestamp);
+                const dateStr = date.toLocaleString('zh-CN', {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit'
+                });
+                const modifiedBy = item.modified_by || '未知';
+                const isCurrent = item.is_current;
+                const sizeKB = (item.content_length / 1024).toFixed(2);
+
+                html += `
+                    <div style="background:#374151;border-radius:8px;padding:12px;${isCurrent ? 'border:2px solid #10b981;' : ''}">
+                        <div style="display:flex;justify-content:space-between;align-items:start;gap:12px;">
+                            <div style="flex:1;">
+                                <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+                                    <span style="font-weight:600;font-size:14px;">版本 ${item.version_id}</span>
+                                    ${isCurrent ? '<span style="background:#10b981;color:white;padding:2px 8px;border-radius:12px;font-size:11px;">当前版本</span>' : ''}
+                                </div>
+                                <div style="font-size:12px;color:#9ca3af;margin-bottom:4px;">
+                                    <span>📅 ${dateStr}</span>
+                                    <span style="margin-left:12px;">👤 ${escapeShareHtml(modifiedBy)}</span>
+                                    <span style="margin-left:12px;">📦 ${sizeKB} KB</span>
+                                </div>
+                            </div>
+                            <div style="display:flex;gap:8px;">
+                                <button class="viewHistoryBtn" data-version="${item.version_id}" style="border:none;background:#3b82f6;color:white;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:12px;">预览</button>
+                                ${!isCurrent ? `<button class="restoreHistoryBtn" data-version="${item.version_id}" style="border:none;background:#10b981;color:white;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:12px;">回滚</button>` : ''}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            html += '</div>';
+
+            contentDiv.innerHTML = html;
+
+            // 绑定预览按钮
+            contentDiv.querySelectorAll('.viewHistoryBtn').forEach(btn => {
+                btn.onclick = async () => {
+                    const versionId = parseInt(btn.getAttribute('data-version'));
+                    await previewHistoryVersion(versionId);
+                };
+            });
+
+            // 绑定回滚按钮
+            contentDiv.querySelectorAll('.restoreHistoryBtn').forEach(btn => {
+                btn.onclick = async () => {
+                    const versionId = parseInt(btn.getAttribute('data-version'));
+                    if (confirm(`确定要回滚到版本 ${versionId} 吗？这将创建一个新版本。`)) {
+                        await restoreHistoryVersion(versionId);
+                        modal.remove();
+                    }
+                };
+            });
+
+        } catch (error) {
+            console.error('加载历史记录失败:', error);
+            const contentDiv = modal.querySelector('#historyContent');
+            contentDiv.innerHTML = '<div style="text-align:center;padding:40px;color:#ef4444;">加载失败: ' + error.message + '</div>';
+        }
+    }
+
+    async function previewHistoryVersion(versionId) {
+        if (!window.sharedDocState || !window.currentUser) return;
+
+        try {
+            const apiUrl = (window.getApiBaseUrl ? window.getApiBaseUrl() : 'api') + '/files/history/restore';
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + window.currentUser.token
+                },
+                body: JSON.stringify({
+                    username: window.sharedDocState.ownerUsername,
+                    filename: window.sharedDocState.filename,
+                    version_id: versionId
+                })
+            });
+
+            const result = await response.json();
+
+            if (result.code !== 200 || !result.data) {
+                showToast('预览失败: ' + (result.message || '未知错误'), 'error');
+                return;
+            }
+
+            // 显示预览模态框
+            const previewModal = document.createElement('div');
+            previewModal.style.cssText = 'position:fixed;inset:0;z-index:10008;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;padding:16px;';
+
+            previewModal.innerHTML = `
+                <div style="width:min(1000px,95vw);max-height:90vh;background:#1f2937;color:#f3f4f6;border-radius:12px;display:flex;flex-direction:column;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;padding:16px;border-bottom:1px solid #374151;">
+                        <h3 style="margin:0;font-size:16px;">预览版本 ${versionId}</h3>
+                        <button id="closePreviewModal" style="border:none;background:transparent;color:#9ca3af;font-size:24px;cursor:pointer;padding:0;width:32px;height:32px;line-height:1;">&times;</button>
+                    </div>
+                    <div style="flex:1;overflow-y:auto;padding:16px;background:#111827;font-family:monospace;font-size:13px;line-height:1.6;white-space:pre-wrap;word-wrap:break-word;">${escapeShareHtml(result.data.content)}</div>
+                </div>
+            `;
+
+            document.body.appendChild(previewModal);
+
+            document.getElementById('closePreviewModal').onclick = () => previewModal.remove();
+            previewModal.onclick = (e) => { if (e.target === previewModal) previewModal.remove(); };
+
+        } catch (error) {
+            console.error('预览历史版本失败:', error);
+            showToast('预览失败: ' + error.message, 'error');
+        }
+    }
+
+    async function restoreHistoryVersion(versionId) {
+        if (!window.sharedDocState || !window.currentUser) return;
+
+        try {
+            // 1. 获取历史版本内容
+            const apiUrl = (window.getApiBaseUrl ? window.getApiBaseUrl() : 'api') + '/files/history/restore';
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + window.currentUser.token
+                },
+                body: JSON.stringify({
+                    username: window.sharedDocState.ownerUsername,
+                    filename: window.sharedDocState.filename,
+                    version_id: versionId
+                })
+            });
+
+            const result = await response.json();
+
+            if (result.code !== 200 || !result.data) {
+                showToast('回滚失败: ' + (result.message || '未知错误'), 'error');
+                return;
+            }
+
+            // 2. 更新编辑器内容
+            if (window.vditor) {
+                window.vditor.setValue(result.data.content);
+            }
+
+            // 3. 保存到分享文档（创建新版本）
+            const saved = await scheduleSharedDocSync({ manualSave: true });
+
+            if (saved) {
+                showToast(`已回滚到版本 ${versionId}`, 'success');
+            } else {
+                showToast('回滚成功但保存失败，请手动保存', 'error');
+            }
+
+        } catch (error) {
+            console.error('回滚历史版本失败:', error);
+            showToast('回滚失败: ' + error.message, 'error');
+        }
     }
 
     function removeShareVideoUi() {
@@ -1083,6 +1342,8 @@
             window.sharedDocState.canEdit = !!options.canEdit;
             window.sharedDocState.viewerId = options.viewerId || window.sharedDocState.viewerId;
             window.sharedDocState.viewerName = options.viewerName || window.sharedDocState.viewerName;
+            window.sharedDocState.ownerUsername = shareData.username || window.sharedDocState.ownerUsername;
+            window.sharedDocState.filename = shareData.filename || window.sharedDocState.filename;
             window.sharedDocState.lastModified = shareData.last_modified || window.sharedDocState.lastModified;
             window.sharedDocState.contentVersion = shareData.content_version || window.sharedDocState.contentVersion;
             if (typeof shareData.content === 'string') {
@@ -1109,6 +1370,8 @@
             lastLocalEditAt: 0,
             viewerId: options.viewerId || getSharedViewerId(),
             viewerName: options.viewerName || getSharedViewerName(),
+            ownerUsername: shareData.username || '',
+            filename: shareData.filename || '',
             ownerFileId: targetOwnerFileId,
             isSaving: false,
             saveTimer: null,
@@ -1297,7 +1560,33 @@
                 window.sharedDocState.lastModified = result.data.last_modified || window.sharedDocState.lastModified;
                 window.sharedDocState.contentVersion = result.data.content_version || window.sharedDocState.contentVersion;
                 if (window.vditor) {
+                    // 保存光标位置
+                    var selection = window.getSelection();
+                    var cursorPosition = null;
+                    if (selection && selection.rangeCount > 0) {
+                        var range = selection.getRangeAt(0);
+                        cursorPosition = {
+                            startContainer: range.startContainer,
+                            startOffset: range.startOffset,
+                            endContainer: range.endContainer,
+                            endOffset: range.endOffset
+                        };
+                    }
+
                     window.vditor.setValue(window.sharedDocState.lastKnownContent);
+
+                    // 恢复光标位置
+                    if (cursorPosition) {
+                        try {
+                            var newRange = document.createRange();
+                            newRange.setStart(cursorPosition.startContainer, cursorPosition.startOffset);
+                            newRange.setEnd(cursorPosition.endContainer, cursorPosition.endOffset);
+                            selection.removeAllRanges();
+                            selection.addRange(newRange);
+                        } catch (e) {
+                            // 如果恢复失败，忽略错误
+                        }
+                    }
                 }
                 showToast(window.i18n ? '检测到并发冲突，已刷新为最新内容' : 'Conflict detected. Loaded latest content.', 'error');
                 return false;
@@ -1354,8 +1643,34 @@
             var localContent = window.vditor ? window.vditor.getValue() : '';
             var localRecentlyEdited = Date.now() - window.sharedDocState.lastLocalEditAt < 1500;
             if (!localRecentlyEdited && window.vditor && remoteContent !== localContent) {
+                // 保存光标位置
+                var selection = window.getSelection();
+                var cursorPosition = null;
+                if (selection && selection.rangeCount > 0) {
+                    var range = selection.getRangeAt(0);
+                    cursorPosition = {
+                        startContainer: range.startContainer,
+                        startOffset: range.startOffset,
+                        endContainer: range.endContainer,
+                        endOffset: range.endOffset
+                    };
+                }
+
                 window.vditor.setValue(remoteContent);
                 window.sharedDocState.lastKnownContent = remoteContent;
+
+                // 恢复光标位置
+                if (cursorPosition) {
+                    try {
+                        var newRange = document.createRange();
+                        newRange.setStart(cursorPosition.startContainer, cursorPosition.startOffset);
+                        newRange.setEnd(cursorPosition.endContainer, cursorPosition.endOffset);
+                        selection.removeAllRanges();
+                        selection.addRange(newRange);
+                    } catch (e) {
+                        // 如果恢复失败，忽略错误
+                    }
+                }
             }
         } catch (err) {
             console.error('共享文档轮询失败:', err);
@@ -1498,7 +1813,33 @@
                 var isSelfUpdate = payload.updated_by && payload.updated_by === window.sharedDocState.viewerId;
                 if ((isSelfUpdate || !localRecentlyEdited) && typeof payload.content === 'string') {
                     if (window.vditor && window.vditor.getValue() !== payload.content) {
+                        // 保存光标位置
+                        var selection = window.getSelection();
+                        var cursorPosition = null;
+                        if (selection && selection.rangeCount > 0 && !isSelfUpdate) {
+                            var range = selection.getRangeAt(0);
+                            cursorPosition = {
+                                startContainer: range.startContainer,
+                                startOffset: range.startOffset,
+                                endContainer: range.endContainer,
+                                endOffset: range.endOffset
+                            };
+                        }
+
                         window.vditor.setValue(payload.content);
+
+                        // 恢复光标位置（仅在非自己更新时）
+                        if (cursorPosition && !isSelfUpdate) {
+                            try {
+                                var newRange = document.createRange();
+                                newRange.setStart(cursorPosition.startContainer, cursorPosition.startOffset);
+                                newRange.setEnd(cursorPosition.endContainer, cursorPosition.endOffset);
+                                selection.removeAllRanges();
+                                selection.addRange(newRange);
+                            } catch (e) {
+                                // 如果恢复失败，忽略错误
+                            }
+                        }
                     }
                     window.sharedDocState.lastKnownContent = payload.content;
                 }
@@ -1514,7 +1855,33 @@
                 window.sharedDocState.lastModified = payload.latest.last_modified || window.sharedDocState.lastModified;
                 window.sharedDocState.contentVersion = payload.latest.content_version || window.sharedDocState.contentVersion;
                 if (window.vditor) {
+                    // 保存光标位置
+                    var selection = window.getSelection();
+                    var cursorPosition = null;
+                    if (selection && selection.rangeCount > 0) {
+                        var range = selection.getRangeAt(0);
+                        cursorPosition = {
+                            startContainer: range.startContainer,
+                            startOffset: range.startOffset,
+                            endContainer: range.endContainer,
+                            endOffset: range.endOffset
+                        };
+                    }
+
                     window.vditor.setValue(window.sharedDocState.lastKnownContent);
+
+                    // 恢复光标位置
+                    if (cursorPosition) {
+                        try {
+                            var newRange = document.createRange();
+                            newRange.setStart(cursorPosition.startContainer, cursorPosition.startOffset);
+                            newRange.setEnd(cursorPosition.endContainer, cursorPosition.endOffset);
+                            selection.removeAllRanges();
+                            selection.addRange(newRange);
+                        } catch (e) {
+                            // 如果恢复失败，忽略错误
+                        }
+                    }
                 }
                 window.sharedDocState.isSaving = false;
                 resolveSharedManualSave(false);
@@ -1569,14 +1936,7 @@
     }
 
     function renderSharePresence(onlineUsers) {
-        // 仅查看模式下不显示在线状态栏
-        if (window.sharedDocState && !window.sharedDocState.canEdit) {
-            var bar = document.getElementById('sharePresenceBar');
-            if (bar) bar.remove();
-            var panel = document.getElementById('shareVideoUserPanel');
-            if (panel) panel.remove();
-            return;
-        }
+        // 所有用户都显示在线状态栏（包括查看者）
 
         var bar = document.getElementById('sharePresenceBar');
         if (!bar) {
@@ -1612,22 +1972,28 @@
         }
 
         var editableUsers = getShareEditableUsers();
+        var isOwner = window.sharedDocState && window.currentUser && window.currentUser.username === window.sharedDocState.ownerUsername;
+        var canEdit = window.sharedDocState && window.sharedDocState.canEdit;
+
         bar.innerHTML =
             '<div style="display:flex;align-items:center;gap:8px;background:rgba(36,41,46,0.92);color:#fff;padding:6px 10px;border-radius:20px;font-size:12px;max-width:min(94vw,620px);box-shadow:0 8px 20px rgba(0,0,0,0.2);">' +
             '<span style="display:inline-flex;align-items:center;gap:6px;">' +
             '<span style="width:8px;height:8px;border-radius:50%;background:' + statusInfo.color + ';display:inline-block;"></span>' +
-            '<span>' + statusInfo.text + '</span>' +
+            '<span style="font-weight:500;">' + statusInfo.text + '</span>' +
             '</span>' +
-            '<span>' + (window.i18n ? window.i18n.t('onlineUsers') : '在线用户') + ': ' + (names.length ? names.join(', ') : '-') + '</span>' +
-            '<button id="toggleShareVideoUsers" style="margin-left:10px;border:none;background:#2563eb;color:#fff;padding:2px 8px;border-radius:999px;cursor:pointer;font-size:12px;">' +
-            (window.i18n ? window.i18n.t('videoCall') : '视频通话') + ' (' + editableUsers.length + ')' +
-            '</button>' +
-            '<button id="toggleShareVideoRoom" style="margin-left:6px;border:none;background:#7c3aed;color:#fff;padding:2px 8px;border-radius:999px;cursor:pointer;font-size:12px;">' +
+            '<span style="opacity:0.8;">|</span>' +
+            '<span title="' + names.join(', ') + '" style="display:flex;align-items:center;gap:4px;">' +
+            '<span>👥 ' + (onlineUsers.length || 0) + ' 在线</span>' +
+            (names.length > 0 ? '<span style="opacity:0.7;font-size:11px;">(' + names.slice(0, 3).join(', ') + (names.length > 3 ? '...' : '') + ')</span>' : '') +
+            '</span>' +
+            (canEdit && editableUsers.length > 0 ? '<button id="toggleShareVideoUsers" style="border:none;background:#2563eb;color:#fff;padding:2px 8px;border-radius:999px;cursor:pointer;font-size:12px;">📹 通话 (' + editableUsers.length + ')</button>' : '') +
+            (canEdit ? '<button id="toggleShareVideoRoom" style="border:none;background:#7c3aed;color:#fff;padding:2px 8px;border-radius:999px;cursor:pointer;font-size:12px;">' +
             (window.sharedDocState && window.sharedDocState.videoRoom && window.sharedDocState.videoRoom.joined
-                ? (window.i18n ? window.i18n.t('videoRoomInCall') : '多人通话中')
-                : (window.i18n ? window.i18n.t('videoRoomJoin') : '加入多人通话')) +
-            '</button>' +
-            '<button id="minimizeSharePresenceBtn" title="最小化" style="margin-left:2px;border:none;background:transparent;color:#fff;padding:0 4px;line-height:1;cursor:pointer;font-size:16px;opacity:0.85;">-</button>' +
+                ? '🎥 多人通话中'
+                : '🎥 多人通话') +
+            '</button>' : '') +
+            (isOwner ? '<button id="showHistoryBtn" style="border:none;background:#f59e0b;color:#fff;padding:2px 8px;border-radius:999px;cursor:pointer;font-size:12px;">📜 历史</button>' : '') +
+            '<button id="minimizeSharePresenceBtn" title="最小化" style="border:none;background:transparent;color:#fff;padding:0 4px;line-height:1;cursor:pointer;font-size:16px;opacity:0.85;">-</button>' +
             '</div>';
 
         var minimizeBtn = document.getElementById('minimizeSharePresenceBtn');
@@ -1636,6 +2002,13 @@
                 if (!window.sharedDocState) return;
                 window.sharedDocState.connectionHintMinimized = true;
                 renderSharePresence(window.sharedDocState.onlineUsers || []);
+            };
+        }
+
+        var historyBtn = document.getElementById('showHistoryBtn');
+        if (historyBtn) {
+            historyBtn.onclick = function() {
+                showHistoryModal();
             };
         }
 
