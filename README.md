@@ -15,7 +15,7 @@ EasyPocketMD 是一款几乎零学习成本的智能 Markdown 编辑器，无需
 - ✨ **`/` 斜杠命令**直达任意操作，告别菜单查找和鼠标切换
 - 🔍 **智能文件搜索**同时支持标题和全文检索，毫秒级定位知识
 - 🖥️ **轻量级桌面端**基于 Tauri 构建，安装包仅十几 MB，秒级启动
-- 🧠 **内置知识图谱**，用 WebAssembly 高性能计算把分散笔记串成可视化网络
+- 🧠 **与其他格式文件无缝支持**，支持导入本地 Markdown、DOCX 等，导出为 TXT、DOC、PDF、PPT 等格式，完美支持公式和图表，支持自定义字体字号段落等导出样式
 - 📁 **完美兼容本地文件**，延续你已有的文件组织方式
 
 实时协作、AI 辅助写作与流畅编辑体验，全部整合在美观的 Material Design 界面中。支持 Windows、Linux、macOS、Android 与 Web，全平台覆盖。
@@ -273,14 +273,7 @@ npm run wasm:image:build
 ---
 
 ## 📧 联系方式
-
-- **作者**：sunhouyun
-- **邮箱**：sunhouyun@emails.bjut.edu.cn
-- **GitHub Issues**：<https://github.com/sunhouy/EasyPocketMD/issues>
-- **官方网站**：<https://yhsun.cn/>
-- **ICP 备案号**：京ICP备2025154249号-1
-
----
+`sunhouyun@emails.bjut.edu.cn`
 
 ## 📄 许可证
 

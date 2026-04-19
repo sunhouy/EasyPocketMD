@@ -21,6 +21,6 @@ em++ \
   -s ERROR_ON_UNDEFINED_SYMBOLS=0 \
   -o "$OUT_DIR/image_compressor.js"
 
-cp "$ROOT_DIR/js/image_compressor_client.ts" "$OUT_DIR/image_compressor_client.ts"
+cp "$ROOT_DIR/js/image_compressor_client.js" "$OUT_DIR/image_compressor_client.js"
 
 echo "Built image compressor wasm module at $OUT_DIR/image_compressor.js and $OUT_DIR/image_compressor.wasm"

@@ -272,16 +272,8 @@ Try it online now: <https://md.yhsun.cn/>
 
 ---
 
-## 📧 Contact
-
-- **Author**: sunhouyun
-- **Email**: sunhouyun@emails.bjut.edu.cn
-- **GitHub Issues**: <https://github.com/sunhouy/EasyPocketMD/issues>
-- **Official Site**: <https://yhsun.cn/>
-
----
-
-## 📄 License
+## Contact
+`sunhouyun@emails.bjut.edu.cn`
 
 This project is licensed under the MIT License.
 
