@@ -585,12 +585,6 @@ async function runPandocDocx(inputContent, options = {}) {
                 timeout: 15000
             });
 
-            console.log(`[DOCX] Python script result:`, {
-                status: result.status,
-                stdout: result.stdout,
-                stderr: result.stderr
-            });
-
             if (result.status === 0 && result.stdout) {
                 referencePath = result.stdout.trim();
                 console.log(`[DOCX] ✅ Generated dynamic template: ${referencePath}`);
