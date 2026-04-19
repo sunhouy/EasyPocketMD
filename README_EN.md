@@ -146,7 +146,7 @@ tests/   Test scripts
 <https://md.yhsun.cn/>
 
 ## Contact
-18763177732@139.com
+`sunhouyun@emails.bjut.edu.cn`
 
 ## License
 This project is licensed under the MIT License.

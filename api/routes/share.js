@@ -143,7 +143,7 @@ router.post('/get', async (req, res) => {
 
 // Update shared file
 router.post('/update', async (req, res) => {
-    const { share_id, content, password, edit_password, viewer_id, viewer_name, base_version } = req.body;
+    const { share_id, content, password, edit_password, viewer_id, viewer_name, base_version, manual_save, create_history } = req.body;
     if (!share_id || typeof content !== 'string') return res.json({ code: 400, message: '缺少必要参数' });
 
     const verifiedEditorUsername = await verifyOptionalEditor(req);
@@ -164,7 +164,8 @@ router.post('/update', async (req, res) => {
         editPassword: edit_password,
         viewerId: viewer_id,
         viewerName: viewer_name,
-        baseVersion: Number.isInteger(base_version) ? base_version : (Number.isFinite(Number(base_version)) ? Number(base_version) : undefined)
+        baseVersion: Number.isInteger(base_version) ? base_version : (Number.isFinite(Number(base_version)) ? Number(base_version) : undefined),
+        manualSave: manual_save === true || create_history === true
     }));
 });
 

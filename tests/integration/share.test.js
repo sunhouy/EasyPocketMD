@@ -1,5 +1,6 @@
 
 const bcrypt = require('bcryptjs');
+const historyManager = require('../../api/models/HistoryManager');
 const app = require('../../api/server');
 
 const request = require('supertest');
@@ -8,6 +9,9 @@ const db = require('../../api/config/db');
 jest.setTimeout(10000);
 
 jest.mock('bcryptjs');
+jest.mock('../../api/models/HistoryManager', () => ({
+    createHistory: jest.fn()
+}));
 
 // Mock auth utils to bypass verification
 jest.mock('../../api/utils/auth', () => ({
@@ -17,6 +21,7 @@ jest.mock('../../api/utils/auth', () => ({
 describe('Share API Integration', () => {
     beforeEach(() => {
         jest.clearAllMocks();
+        historyManager.createHistory.mockResolvedValue({ code: 200, data: { version_id: 1, history_id: 1 } });
     });
 
     describe('POST /api/share/create', () => {
@@ -104,6 +109,25 @@ describe('Share API Integration', () => {
             expect(res.status).toBe(200);
             expect(res.body.code).toBe(200);
         });
+
+        it('should pass manual save flag through share update route', async () => {
+            db.execute
+                .mockResolvedValueOnce([[
+                    { share_id: 'sid', username: 'u', filename: 'f.md', mode: 'edit', password: null, content_version: 1 }
+                ]])
+                .mockResolvedValueOnce([{ affectedRows: 1 }])
+                .mockResolvedValueOnce([[{ content: 'new content', last_modified: '2026-01-01 00:00:00', content_version: 2 }]]);
+
+            const res = await request(app)
+                .post('/api/share/update')
+                .send({ share_id: 'sid', content: 'new content', base_version: 1, manual_save: true });
+
+            expect(res.status).toBe(200);
+            expect(res.body.code).toBe(200);
+            expect(historyManager.createHistory).toHaveBeenCalledWith('u', 'f.md', 'new content');
+            expect(res.body.data.history).toBeTruthy();
+        });
+
 
         it('should return conflict when base_version is stale', async () => {
             db.execute

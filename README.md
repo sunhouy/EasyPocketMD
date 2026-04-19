@@ -162,7 +162,7 @@ tests/   测试脚本
 <https://md.yhsun.cn/>
 
 ## 📧 联系方式
-`18763177732@139.com`
+`sunhouyun@emails.bjut.edu.cn`
 
 ## 📄 许可证
 本项目基于 MIT License 开源。
