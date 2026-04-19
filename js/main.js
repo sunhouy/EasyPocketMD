@@ -1643,6 +1643,27 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    // 全屏功能
+    function toggleFullscreen() {
+        if (!document.fullscreenElement) {
+            if (document.documentElement.requestFullscreen) {
+                document.documentElement.requestFullscreen();
+            } else if (document.documentElement.webkitRequestFullscreen) {
+                document.documentElement.webkitRequestFullscreen();
+            } else if (document.documentElement.msRequestFullscreen) {
+                document.documentElement.msRequestFullscreen();
+            }
+        } else {
+            if (document.exitFullscreen) {
+                document.exitFullscreen();
+            } else if (document.webkitExitFullscreen) {
+                document.webkitExitFullscreen();
+            } else if (document.msExitFullscreen) {
+                document.msExitFullscreen();
+            }
+        }
+    }
+
     function initMobileFeatures() {
         var dropdown = document.getElementById('mobileDropdown');
         function closeDrop() { if (dropdown) dropdown.classList.remove('show'); }
@@ -1699,6 +1720,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
         var mobilePresentationBtn = document.getElementById('mobilePresentationBtn');
         if (mobilePresentationBtn) mobilePresentationBtn.addEventListener('click', function() { enterPresentationMode(); closeDrop(); });
+
+        var mobileFullscreenBtn = document.getElementById('mobileFullscreenBtn');
+        if (mobileFullscreenBtn) mobileFullscreenBtn.addEventListener('click', function() { toggleFullscreen(); closeDrop(); });
 
         var mobileMenuBtn = document.getElementById('mobileMenuBtn');
         if (mobileMenuBtn) mobileMenuBtn.addEventListener('click', function(e) { e.stopPropagation(); if (dropdown) dropdown.classList.toggle('show'); });
@@ -1875,6 +1899,7 @@ document.addEventListener('DOMContentLoaded', function() {
             closeDesktopDrop();
         });
         bindDesktopButton('desktopPresentationBtn', function() { enterPresentationMode(); closeDesktopDrop(); });
+        bindDesktopButton('desktopFullscreenBtn', function() { toggleFullscreen(); closeDesktopDrop(); });
         bindDesktopButton('desktopModeBtn', function() { showModeSelection(); closeDesktopDrop(); });
         bindDesktopButton('desktopOpenLocalFileBtn', async function() {
             if (typeof window.openExternalLocalFileByDialog === 'function') {
@@ -2023,6 +2048,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 closeDrop();
             } },
             { id: 'mobilePresentationBtn', fn: function() { enterPresentationMode(); closeDrop(); } },
+            { id: 'mobileFullscreenBtn', fn: function() { toggleFullscreen(); closeDrop(); } },
             { id: 'mobileMenuBtn', fn: function(e) { e.stopPropagation(); if (dropdown) dropdown.classList.toggle('show'); } },
             { id: 'mobileModeBtn', fn: function() { showModeSelection(); closeDrop(); } },
             { id: 'mobileOpenLocalFileBtn', fn: async function() {
