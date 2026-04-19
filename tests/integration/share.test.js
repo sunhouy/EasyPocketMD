@@ -124,7 +124,7 @@ describe('Share API Integration', () => {
 
             expect(res.status).toBe(200);
             expect(res.body.code).toBe(200);
-            expect(historyManager.createHistory).toHaveBeenCalledWith('u', 'f.md', 'new content');
+            expect(historyManager.createHistory).toHaveBeenCalledWith('u', 'f.md', 'new content', 'Guest');
             expect(res.body.data.history).toBeTruthy();
         });
 

@@ -127,7 +127,7 @@ describe('ShareManager', () => {
             const result = await shareManager.updateSharedFile('sid', 'new content', null, { baseVersion: 1, manualSave: true });
 
             expect(result.code).toBe(200);
-            expect(historyManager.createHistory).toHaveBeenCalledWith('u', 'f.md', 'new content');
+            expect(historyManager.createHistory).toHaveBeenCalledWith('u', 'f.md', 'new content', 'Guest');
             expect(result.data.history).toEqual({ version_id: 2, history_id: 9 });
         });
 
