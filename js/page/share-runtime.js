@@ -229,18 +229,42 @@
                 const nodeLength = node.textContent.length;
                 if (currentOffset + nodeLength >= offset) {
                     const range = document.createRange();
-                    range.setStart(node, offset - currentOffset);
+                    const nodeOffset = offset - currentOffset;
+
+                    // 确保偏移量在有效范围内
+                    const safeOffset = Math.min(nodeOffset, node.textContent.length);
+                    range.setStart(node, safeOffset);
                     range.collapse(true);
 
                     const selection = window.getSelection();
+                    if (!selection) return false;
+
                     selection.removeAllRanges();
-                    selection.addRange(range);
+
+                    // 验证 range 是否在文档中，避免 addRange 错误
+                    if (range.startContainer && range.startContainer.ownerDocument === document) {
+                        selection.addRange(range);
+
+                        // 移动端兼容：滚动到光标位置，防止跳到文件开头
+                        if (/Mobi|Android|iPhone/i.test(navigator.userAgent)) {
+                            setTimeout(() => {
+                                const rect = range.getBoundingClientRect();
+                                if (rect.top < 0 || rect.bottom > window.innerHeight) {
+                                    range.startContainer.parentElement?.scrollIntoView({
+                                        behavior: 'smooth',
+                                        block: 'center'
+                                    });
+                                }
+                            }, 100);
+                        }
+                    }
                     return true;
                 }
                 currentOffset += nodeLength;
             }
             return false;
         } catch (e) {
+            console.warn('设置光标位置失败:', e);
             return false;
         }
     }
@@ -1517,7 +1541,7 @@
         // 初始化光标跟踪
         initCursorTracking();
         // 监听编辑器输入事件，更新最后编辑时间
-        if (window.vditor && window.sharedDocState.canEdit) {
+        if (window.vditor && window.vditor.options && window.sharedDocState.canEdit) {
             window.vditor.options.input = function() {
                 if (window.sharedDocState) {
                     window.sharedDocState.lastLocalEditAt = Date.now();
@@ -1698,7 +1722,9 @@
                             newRange.setStart(cursorPosition.startContainer, cursorPosition.startOffset);
                             newRange.setEnd(cursorPosition.endContainer, cursorPosition.endOffset);
                             selection.removeAllRanges();
-                            selection.addRange(newRange);
+                            if (newRange.startContainer && newRange.startContainer.ownerDocument === document) {
+                                selection.addRange(newRange);
+                            }
                         } catch (e) {
                             // 如果恢复失败，忽略错误
                         }
@@ -2007,7 +2033,9 @@
                             newRange.setStart(cursorPosition.startContainer, cursorPosition.startOffset);
                             newRange.setEnd(cursorPosition.endContainer, cursorPosition.endOffset);
                             selection.removeAllRanges();
-                            selection.addRange(newRange);
+                            if (newRange.startContainer && newRange.startContainer.ownerDocument === document) {
+                                selection.addRange(newRange);
+                            }
                         } catch (e) {
                             // 如果恢复失败，忽略错误
                         }
