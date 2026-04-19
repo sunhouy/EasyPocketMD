@@ -201,6 +201,19 @@ function initShareCollabServer(httpServer, shareManager) {
                 return;
             }
 
+            if (payload.type === 'cursor_position') {
+                // 广播光标位置给其他用户
+                broadcast(socket.ctx.shareId, {
+                    type: 'cursor_position',
+                    share_id: socket.ctx.shareId,
+                    viewer_id: socket.ctx.viewerId,
+                    viewer_name: socket.ctx.viewerName,
+                    position: payload.position,
+                    selection: payload.selection
+                });
+                return;
+            }
+
             if (
                 payload.type === 'video_call_invite' ||
                 payload.type === 'video_call_response' ||

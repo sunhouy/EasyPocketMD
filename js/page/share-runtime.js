@@ -175,6 +175,108 @@
         return true;
     }
 
+    function sendCursorPosition(position, selection) {
+        if (!window.sharedDocState || !window.sharedDocState.canEdit) return;
+        sendShareWsPayload({
+            type: 'cursor_position',
+            position: position,
+            selection: selection
+        });
+    }
+
+    function initCursorTracking() {
+        if (!window.vditor || !window.vditor.editor || !window.sharedDocState) return;
+        
+        const editorElement = window.vditor.editor.element;
+        if (!editorElement) return;
+        
+        // 监听光标移动和选择事件
+        editorElement.addEventListener('mousemove', handleCursorMove);
+        editorElement.addEventListener('click', handleCursorMove);
+        editorElement.addEventListener('keyup', handleCursorMove);
+        editorElement.addEventListener('select', handleCursorMove);
+    }
+
+    function handleCursorMove() {
+        if (!window.vditor || !window.vditor.editor || !window.sharedDocState) return;
+        
+        const selection = window.getSelection();
+        if (!selection) return;
+        
+        const range = selection.getRangeAt(0);
+        const rect = range.getBoundingClientRect();
+        const editorRect = window.vditor.editor.element.getBoundingClientRect();
+        
+        const position = {
+            x: rect.left - editorRect.left,
+            y: rect.top - editorRect.top,
+            height: rect.height
+        };
+        
+        const selectionText = selection.toString();
+        
+        sendCursorPosition(position, {
+            text: selectionText,
+            length: selectionText.length
+        });
+    }
+
+    function renderRemoteCursors() {
+        // 清除旧的光标
+        document.querySelectorAll('.remote-cursor').forEach(el => el.remove());
+        
+        if (!window.sharedDocState || !window.vditor || !window.vditor.editor) return;
+        
+        const editorElement = window.vditor.editor.element;
+        if (!editorElement) return;
+        
+        // 渲染其他用户的光标
+        window.sharedDocState.remoteCursors = window.sharedDocState.remoteCursors || {};
+        Object.values(window.sharedDocState.remoteCursors).forEach(cursor => {
+            if (cursor.viewerId === window.sharedDocState.viewerId) return;
+            
+            const cursorElement = document.createElement('div');
+            cursorElement.className = 'remote-cursor';
+            cursorElement.style.cssText = `
+                position: absolute;
+                left: ${cursor.position.x}px;
+                top: ${cursor.position.y}px;
+                height: ${cursor.position.height}px;
+                width: 2px;
+                background-color: ${cursor.color};
+                z-index: 1000;
+                pointer-events: none;
+            `;
+            
+            const labelElement = document.createElement('div');
+            labelElement.className = 'remote-cursor-label';
+            labelElement.style.cssText = `
+                position: absolute;
+                left: 0;
+                top: -20px;
+                background-color: ${cursor.color};
+                color: white;
+                padding: 2px 6px;
+                border-radius: 4px;
+                font-size: 12px;
+                white-space: nowrap;
+                z-index: 1001;
+                pointer-events: none;
+            `;
+            labelElement.textContent = cursor.viewerName;
+            
+            cursorElement.appendChild(labelElement);
+            editorElement.appendChild(cursorElement);
+        });
+    }
+
+    function getCursorColor(viewerId) {
+        // 为每个用户生成唯一的颜色
+        const colors = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899'];
+        const hash = viewerId.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+        return colors[hash % colors.length];
+    }
+
     function removeShareVideoUi() {
         var panel = document.getElementById('shareVideoUserPanel');
         if (panel) panel.remove();
@@ -990,6 +1092,8 @@
             if (!window.sharedDocState.wsConnected) {
                 connectShareWebSocket();
             }
+            // 初始化光标跟踪
+            initCursorTracking();
             return;
         }
 
@@ -1019,6 +1123,7 @@
             connectionStatus: 'connecting',
             connectionHintMinimized: false,
             onlineUsers: [],
+            remoteCursors: {},
             videoCall: {
                 callId: '',
                 peerViewerId: '',
@@ -1038,6 +1143,8 @@
         };
         setSharedEditorLocked(!window.sharedDocState.canEdit);
         startSharedDocRealtime();
+        // 初始化光标跟踪
+        initCursorTracking();
     }
 
     async function handleShareLink(shareId, password) {
@@ -1412,6 +1519,24 @@
                 window.sharedDocState.isSaving = false;
                 resolveSharedManualSave(false);
                 showToast(window.i18n ? '检测到并发冲突，已刷新为最新版本' : 'Conflict detected. Loaded latest version.', 'error');
+                return;
+            }
+
+            if (payload.type === 'cursor_position') {
+                // 处理其他用户的光标位置
+                if (!window.sharedDocState) return;
+                
+                window.sharedDocState.remoteCursors = window.sharedDocState.remoteCursors || {};
+                window.sharedDocState.remoteCursors[payload.viewer_id] = {
+                    viewerId: payload.viewer_id,
+                    viewerName: payload.viewer_name,
+                    position: payload.position,
+                    selection: payload.selection,
+                    color: getCursorColor(payload.viewer_id)
+                };
+                
+                // 渲染远程光标
+                renderRemoteCursors();
                 return;
             }
 
