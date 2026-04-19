@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>DOCX导出测试</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 50px auto; padding: 20px; }
+        .form-group { margin: 15px 0; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input, select { width: 300px; padding: 8px; border: 1px solid #ddd; border-radius: 4px; }
+        button { background: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-size: 16px; }
+        button:hover { background: #0056b3; }
+        #result { margin-top: 20px; padding: 10px; border-radius: 4px; }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+    </style>
+</head>
+<body>
+    <h1>DOCX导出功能测试</h1>
+    
+    <div class="form-group">
+        <label>Markdown内容：</label>
+        <textarea id="markdownContent" rows="10" style="width: 100%;">
+# 一级标题测试
+
+这是一段测试正文，用于验证字体和字号设置是否正确应用。
+
+## 二级标题测试
+
+- 列表项1
+- 列表项2
+- 列表项3
+
+### 三级标题测试
+
+**加粗文本** 和 *斜体文本* 测试。
+
+这是另一段正文，用于测试。
+        </textarea>
+    </div>
+    
+    <div class="form-group">
+        <label>标题字体：</label>
+        <select id="titleFont">
+            <option value="SimHei" selected>SimHei (黑体)</option>
+            <option value="SimSun">SimSun (宋体)</option>
+            <option value="SimKai">SimKai (楷体)</option>
+        </select>
+    </div>
+    
+    <div class="form-group">
+        <label>正文字体：</label>
+        <select id="bodyFont">
+            <option value="SimSun" selected>SimSun (宋体)</option>
+            <option value="SimHei">SimHei (黑体)</option>
+            <option value="SimKai">SimKai (楷体)</option>
+        </select>
+    </div>
+    
+    <div class="form-group">
+        <label>标题字号：</label>
+        <input type="number" id="titleFontSize" value="24" min="10" max="72">
+    </div>
+    
+    <div class="form-group">
+        <label>正文字号：</label>
+        <input type="number" id="bodyFontSize" value="12" min="8" max="48">
+    </div>
+    
+    <button onclick="testExport()">测试导出DOCX</button>
+    
+    <div id="result"></div>
+    
+    <script>
+        async function testExport() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = '正在生成文档...';
+            resultDiv.className = '';
+            
+            try {
+                const settings = {
+                    titleFont: document.getElementById('titleFont').value,
+                    bodyFont: document.getElementById('bodyFont').value,
+                    titleFontSize: parseInt(document.getElementById('titleFontSize').value),
+                    bodyFontSize: parseInt(document.getElementById('bodyFontSize').value),
+                    h1Size: 32,
+                    h2Size: 28,
+                    h3Size: 24,
+                    h4Size: 20,
+                    h5Size: 18,
+                    h6Size: 16
+                };
+                
+                console.log('发送到服务器的settings:', settings);
+                
+                const response = await fetch('/api/convert/docx', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        markdown: document.getElementById('markdownContent').value,
+                        settings: settings
+                    })
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(errorData.message || 'Server error: ' + response.status);
+                }
+                
+                const blob = await response.blob();
+                
+                // 下载文件
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'test-' + new Date().toISOString().slice(0, 10) + '.docx';
+                document.body.appendChild(a);
+                a.click();
+                
+                setTimeout(() => {
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                }, 100);
+                
+                resultDiv.innerHTML = '✅ 测试成功！文档已下载，请在浏览器控制台和服务器终端查看详细日志。';
+                resultDiv.className = 'success';
+                
+            } catch (error) {
+                console.error('测试失败:', error);
+                resultDiv.innerHTML = '❌ 测试失败: ' + error.message;
+                resultDiv.className = 'error';
+            }
+        }
+    </script>
+</body>
+</html>

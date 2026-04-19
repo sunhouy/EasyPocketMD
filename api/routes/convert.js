@@ -518,6 +518,27 @@ async function runPandocDocx(inputContent, options = {}) {
     const inputPath = path.join(tempDir, `input.${inputExt}`);
     const outputPath = path.join(tempDir, 'output.docx');
 
+    // 在函数开头定义所有需要的变量，确保作用域正确
+    const titleFont = options.titleFont || 'SimHei';
+    const bodyFont = options.bodyFont || 'SimSun';
+    const titleFontSize = options.titleFontSize;
+    const bodyFontSize = options.bodyFontSize;
+    const h1Size = options.h1Size;
+    const h2Size = options.h2Size;
+    const h3Size = options.h3Size;
+    const h4Size = options.h4Size;
+    const h5Size = options.h5Size;
+    const h6Size = options.h6Size;
+
+    console.log(`[DOCX] Starting conversion with settings:`, {
+        titleFont,
+        bodyFont,
+        titleFontSize,
+        bodyFontSize,
+        h1Size, h2Size, h3Size, h4Size, h5Size, h6Size,
+        inputFormat
+    });
+
     try {
         await fsp.writeFile(inputPath, inputContent, 'utf8');
 
@@ -535,12 +556,10 @@ async function runPandocDocx(inputContent, options = {}) {
         // 生成动态模板文档
         let referencePath = null;
         try {
-            const { titleFont, bodyFont, titleFontSize, bodyFontSize, h1Size, h2Size, h3Size, h4Size, h5Size, h6Size } = options;
-            
             // 构建配置JSON
             const config = JSON.stringify({
-                titleFont: titleFont || 'SimHei',
-                bodyFont: bodyFont || 'SimSun',
+                titleFont,
+                bodyFont,
                 titleFontSize: titleFontSize || 24,
                 bodyFontSize: bodyFontSize || 12,
                 h1Size: h1Size || (titleFontSize ? titleFontSize * 2 : 32),
@@ -550,6 +569,8 @@ async function runPandocDocx(inputContent, options = {}) {
                 h5Size: h5Size || (titleFontSize || 18),
                 h6Size: h6Size || (titleFontSize ? Math.max(14, titleFontSize * 0.9) : 16)
             });
+
+            console.log(`[DOCX] Generating template with config:`, config);
 
             // 调用Python脚本生成模板
             const { spawnSync } = require('child_process');
@@ -562,21 +583,21 @@ async function runPandocDocx(inputContent, options = {}) {
 
             if (result.status === 0 && result.stdout) {
                 referencePath = result.stdout.trim();
-                console.log(`[DOCX] Generated dynamic template: ${referencePath}`);
+                console.log(`[DOCX] ✅ Generated dynamic template: ${referencePath}`);
+                console.log(`[DOCX] Template file exists: ${fs.existsSync(referencePath)}`);
             } else {
-                console.log('[DOCX] Failed to generate dynamic template, falling back to static templates');
+                console.log('[DOCX] ❌ Failed to generate dynamic template, falling back to static templates');
                 console.log(`[DOCX] Python script error: ${result.stderr || 'no error output'}`);
+                console.log(`[DOCX] Python script stdout: ${result.stdout || 'no stdout'}`);
+                console.log(`[DOCX] Python script exit code: ${result.status}`);
             }
         } catch (error) {
-            console.log('[DOCX] Error generating dynamic template:', error);
+            console.log('[DOCX] ❌ Error generating dynamic template:', error);
         }
 
         // 如果动态模板生成失败，使用静态模板
         if (!referencePath) {
-            // 根据字体选择reference文档
-            const titleFont = options.titleFont || 'SimHei';
-            const bodyFont = options.bodyFont || 'SimSun';
-
+            console.log('[DOCX] Falling back to static templates');
             // 构建reference文档路径
             const referenceDir = path.join(__dirname, '../../reference-docs');
             const fontKey = `${titleFont.toLowerCase()}-${bodyFont.toLowerCase()}`;
@@ -590,8 +611,11 @@ async function runPandocDocx(inputContent, options = {}) {
             const referenceFile = referenceMap[fontKey] || 'reference.docx';
             referencePath = path.join(referenceDir, referenceFile);
 
+            console.log(`[DOCX] Trying static template: ${referencePath}`);
+
             // 检查静态模板是否存在
             if (!fs.existsSync(referencePath)) {
+                console.log(`[DOCX] Static template not found: ${referencePath}`);
                 // 如果没有找到，尝试使用配置的reference文档
                 const configuredReference = (options.referenceDocx || process.env.PANDOC_REFERENCE_DOCX || '').trim();
                 if (configuredReference) {
@@ -600,18 +624,27 @@ async function runPandocDocx(inputContent, options = {}) {
                         : path.join(process.cwd(), configuredReference);
                     if (fs.existsSync(configPath)) {
                         referencePath = configPath;
+                        console.log(`[DOCX] Using configured template: ${referencePath}`);
                     } else {
                         referencePath = null;
+                        console.log(`[DOCX] Configured template not found: ${configPath}`);
                     }
                 } else {
                     referencePath = null;
+                    console.log(`[DOCX] No template configured`);
                 }
+            } else {
+                console.log(`[DOCX] Using static template: ${referencePath}`);
             }
         }
 
         // 添加reference-doc参数
         if (referencePath && fs.existsSync(referencePath)) {
             args.push('--reference-doc', referencePath);
+            console.log(`[DOCX] ✅ Added --reference-doc: ${referencePath}`);
+            console.log(`[DOCX] Final pandoc args:`, args);
+        } else {
+            console.log(`[DOCX] ❌ No reference-doc added, referencePath: ${referencePath}`);
         }
 
         // 对于HTML输入，添加额外的Pandoc参数来更好地保留样式
