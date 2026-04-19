@@ -36,9 +36,18 @@ async function exportDOCX(content, settings, customFilename) {
         // Pandoc 路径下设置参数暂未直连使用，保留兼容字段
         if (!settings) settings = {};
 
+        // 打印调试信息到控制台
+        console.log('DOCX Export Debug:', {
+            contentLength: content.length,
+            settings: settings,
+            customFilename: customFilename
+        });
+
         // 调用后端 API 生成 Word 文档
         var api = global.getApiBaseUrl ? global.getApiBaseUrl() : 'api';
         var apiUrl = api.startsWith('http') ? api + '/convert/docx' : 'api/convert/docx';
+
+        console.log('DOCX Export: Calling API:', apiUrl);
 
         var response = await fetch(apiUrl, {
             method: 'POST',
@@ -51,13 +60,17 @@ async function exportDOCX(content, settings, customFilename) {
             })
         });
 
+        console.log('DOCX Export: API Response Status:', response.status);
+
         if (!response.ok) {
             var errorData = await response.json().catch(function() { return {}; });
+            console.error('DOCX Export: API Error:', errorData);
             throw new Error(errorData.message || 'Server error: ' + response.status);
         }
 
         // 获取 Blob 数据
         var blob = await response.blob();
+        console.log('DOCX Export: Blob received, size:', blob.size);
 
         // 生成文件名
         var filename;
@@ -78,14 +91,18 @@ async function exportDOCX(content, settings, customFilename) {
             filename = filename + '_' + new Date().toISOString().slice(0, 10) + '.docx';
         }
 
+        console.log('DOCX Export: Generated filename:', filename);
+
         // 下载文件
         if (window.nativeFileOps && window.nativeFileOps.isTauriRuntime()) {
+            console.log('DOCX Export: Using native file operations');
             await window.nativeFileOps.saveFile(blob, {
                 filename: filename,
                 mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
             });
         } else {
             // 普通浏览器环境
+            console.log('DOCX Export: Using browser download');
             var url = URL.createObjectURL(blob);
             var a = document.createElement('a');
             a.href = url;
@@ -113,6 +130,7 @@ async function exportDOCX(content, settings, customFilename) {
             global.showMessage(isEn() ? 'Document exported as .docx' : '文档已导出为 .docx 格式');
         }
 
+        console.log('DOCX Export: Completed successfully');
         return true;
     } catch (error) {
         // 清除超时
