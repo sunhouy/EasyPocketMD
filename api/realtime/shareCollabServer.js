@@ -422,7 +422,8 @@ function initShareCollabServer(httpServer, shareManager) {
                         editPassword: socket.ctx.editPassword,
                         viewerId: socket.ctx.viewerId,
                         viewerName: socket.ctx.viewerName,
-                        baseVersion: Number.isInteger(payload.base_version) ? payload.base_version : Number(payload.base_version)
+                        baseVersion: Number.isInteger(payload.base_version) ? payload.base_version : Number(payload.base_version),
+                        manualSave: payload.manual_save === true || payload.create_history === true
                     }
                 );
 

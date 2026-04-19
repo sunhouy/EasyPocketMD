@@ -1,9 +1,13 @@
 const shareManager = require('../../api/models/ShareManager');
+const historyManager = require('../../api/models/HistoryManager');
 const db = require('../../api/config/db');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 
 jest.mock('../../api/config/db');
+jest.mock('../../api/models/HistoryManager', () => ({
+    createHistory: jest.fn()
+}));
 jest.mock('bcryptjs');
 
 describe('ShareManager', () => {
@@ -93,8 +97,7 @@ describe('ShareManager', () => {
 
     describe('updateSharedFile', () => {
         it('should update file content if mode is edit', async () => {
-            // Mock getSharedFile (internal call via `this.getSharedFile`)
-            // Actually getSharedFile calls db.execute, so we mock that.
+            historyManager.createHistory.mockResolvedValue({ code: 200, data: { version_id: 1 } });
             db.execute
                 .mockResolvedValueOnce([[
                     { share_id: 'sid', username: 'u', filename: 'f.md', mode: 'edit', password: null }
@@ -109,6 +112,23 @@ describe('ShareManager', () => {
                 expect.stringContaining('UPDATE user_files'),
                 ['new content', 'u', 'f.md']
             );
+            expect(historyManager.createHistory).not.toHaveBeenCalled();
+        });
+
+        it('should create history for manual shared saves', async () => {
+            historyManager.createHistory.mockResolvedValue({ code: 200, data: { version_id: 2, history_id: 9 } });
+            db.execute
+                .mockResolvedValueOnce([[
+                    { share_id: 'sid', username: 'u', filename: 'f.md', mode: 'edit', password: null, content_version: 1 }
+                ]])
+                .mockResolvedValueOnce([{ affectedRows: 1 }])
+                .mockResolvedValueOnce([[{ content: 'new content', last_modified: '2026-01-01 00:00:00', content_version: 2 }]]);
+
+            const result = await shareManager.updateSharedFile('sid', 'new content', null, { baseVersion: 1, manualSave: true });
+
+            expect(result.code).toBe(200);
+            expect(historyManager.createHistory).toHaveBeenCalledWith('u', 'f.md', 'new content');
+            expect(result.data.history).toEqual({ version_id: 2, history_id: 9 });
         });
 
         it('should return 403 if mode is view', async () => {
@@ -123,6 +143,7 @@ describe('ShareManager', () => {
         });
 
         it('should return 409 when optimistic version check fails', async () => {
+            historyManager.createHistory.mockResolvedValue({ code: 200, data: { version_id: 1 } });
             db.execute
                 .mockResolvedValueOnce([[
                     { share_id: 'sid', username: 'u', filename: 'f.md', mode: 'edit', password: null, content_version: 2 }
@@ -130,10 +151,11 @@ describe('ShareManager', () => {
                 .mockResolvedValueOnce([{ affectedRows: 0 }])
                 .mockResolvedValueOnce([[{ content: 'latest', last_modified: '2026-01-01 00:00:00', content_version: 3 }]]);
 
-            const result = await shareManager.updateSharedFile('sid', 'new content', null, { baseVersion: 2 });
+            const result = await shareManager.updateSharedFile('sid', 'new content', null, { baseVersion: 2, manualSave: true });
 
             expect(result.code).toBe(409);
             expect(result.data.content_version).toBe(3);
+            expect(historyManager.createHistory).not.toHaveBeenCalled();
         });
     });
 });

@@ -1,6 +1,7 @@
 const db = require('../config/db');
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
+const historyManager = require('./HistoryManager');
 
 class ShareManager {
     constructor() {
@@ -326,6 +327,13 @@ class ShareManager {
 
             const [updatedRows] = await db.execute('SELECT content, last_modified, content_version FROM user_files WHERE username = ? AND filename = ? LIMIT 1', [share.username, share.filename]);
             const updated = updatedRows[0] || {};
+            let historyResult = null;
+            if (options.manualSave) {
+                historyResult = await historyManager.createHistory(share.username, share.filename, updated.content || '');
+                if (historyResult.code !== 200 && historyResult.code !== 304) {
+                    return historyResult;
+                }
+            }
 
             return {
                 code: 200,
@@ -337,7 +345,8 @@ class ShareManager {
                     mode: share.mode,
                     content: updated.content,
                     last_modified: updated.last_modified,
-                    content_version: updated.content_version || (share.content_version || 1)
+                    content_version: updated.content_version || (share.content_version || 1),
+                    history: historyResult && historyResult.data ? historyResult.data : null
                 }
             };
         } catch (error) {

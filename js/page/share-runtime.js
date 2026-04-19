@@ -945,6 +945,10 @@
     function deactivateSharedDocumentSession() {
         if (!window.sharedDocState) return;
         if (window.sharedDocState.saveTimer) clearTimeout(window.sharedDocState.saveTimer);
+        if (window.sharedDocState.pendingManualSave) {
+            if (window.sharedDocState.pendingManualSave.timer) clearTimeout(window.sharedDocState.pendingManualSave.timer);
+            window.sharedDocState.pendingManualSave.resolve(false);
+        }
         if (window.sharedDocState.pollTimer) clearInterval(window.sharedDocState.pollTimer);
         if (window.sharedDocState.presenceTimer) clearInterval(window.sharedDocState.presenceTimer);
         if (window.sharedDocState.localWatchTimer) clearInterval(window.sharedDocState.localWatchTimer);
@@ -1004,6 +1008,7 @@
             ownerFileId: targetOwnerFileId,
             isSaving: false,
             saveTimer: null,
+            pendingManualSave: null,
             pollTimer: null,
             presenceTimer: null,
             localWatchTimer: null,
@@ -1099,22 +1104,58 @@
         }
     }
 
-    async function syncSharedDocContent() {
-        if (!window.sharedDocState || !window.sharedDocState.canEdit || !window.vditor) return;
-        if (window.sharedDocState.isSaving) return;
+    function resolveSharedManualSave(result) {
+        if (!window.sharedDocState || !window.sharedDocState.pendingManualSave) return;
+        var pending = window.sharedDocState.pendingManualSave;
+        window.sharedDocState.pendingManualSave = null;
+        if (pending.timer) {
+            clearTimeout(pending.timer);
+        }
+        pending.resolve(result);
+    }
 
-        var currentContent = window.vditor.getValue();
-        if (currentContent === window.sharedDocState.lastKnownContent) return;
+    async function syncSharedDocContent(options) {
+        options = options || {};
+        if (!window.sharedDocState || !window.sharedDocState.canEdit || !window.vditor) return false;
+        if (window.sharedDocState.isSaving) return false;
+
+        var manualSave = options.manualSave === true;
+        if (currentContent === window.sharedDocState.lastKnownContent && !manualSave) {
+            return true;
+        }
 
         // WebSocket online path
         if (window.sharedDocState.ws && window.sharedDocState.wsConnected && window.sharedDocState.ws.readyState === WebSocket.OPEN) {
             window.sharedDocState.isSaving = true;
+            if (manualSave) {
+                if (window.sharedDocState.pendingManualSave && window.sharedDocState.pendingManualSave.timer) {
+                    clearTimeout(window.sharedDocState.pendingManualSave.timer);
+                }
+                return await new Promise(function(resolve) {
+                    window.sharedDocState.pendingManualSave = {
+                        resolve: resolve,
+                        timer: setTimeout(function() {
+                            if (!window.sharedDocState || !window.sharedDocState.pendingManualSave) return;
+                            window.sharedDocState.pendingManualSave = null;
+                            window.sharedDocState.isSaving = false;
+                            resolve(false);
+                        }, 10000)
+                    };
+                    window.sharedDocState.ws.send(JSON.stringify({
+                        type: 'update_content',
+                        content: currentContent,
+                        base_version: window.sharedDocState.contentVersion,
+                        manual_save: true,
+                        create_history: true
+                    }));
+                });
+            }
             window.sharedDocState.ws.send(JSON.stringify({
                 type: 'update_content',
                 content: currentContent,
                 base_version: window.sharedDocState.contentVersion
             }));
-            return;
+            return true;
         }
 
         window.sharedDocState.isSaving = true;
@@ -1131,6 +1172,8 @@
                     viewer_id: window.sharedDocState.viewerId,
                     viewer_name: window.sharedDocState.viewerName,
                     base_version: window.sharedDocState.contentVersion,
+                    manual_save: manualSave,
+                    create_history: manualSave,
                     ...getEditorIdentityPayload()
                 })
             });
@@ -1139,7 +1182,9 @@
                 window.sharedDocState.lastKnownContent = result.data.content || currentContent;
                 window.sharedDocState.lastModified = result.data.last_modified || window.sharedDocState.lastModified;
                 window.sharedDocState.contentVersion = result.data.content_version || window.sharedDocState.contentVersion;
-            } else if (result.code === 409 && result.data) {
+                return true;
+            }
+            if (result.code === 409 && result.data) {
                 window.sharedDocState.lastKnownContent = result.data.content || window.sharedDocState.lastKnownContent;
                 window.sharedDocState.lastModified = result.data.last_modified || window.sharedDocState.lastModified;
                 window.sharedDocState.contentVersion = result.data.content_version || window.sharedDocState.contentVersion;
@@ -1147,21 +1192,32 @@
                     window.vditor.setValue(window.sharedDocState.lastKnownContent);
                 }
                 showToast(window.i18n ? '检测到并发冲突，已刷新为最新内容' : 'Conflict detected. Loaded latest content.', 'error');
+                return false;
             }
+            return false;
         } catch (err) {
             console.error('共享文档同步失败:', err);
+            return false;
         } finally {
             window.sharedDocState.isSaving = false;
         }
     }
 
-    function scheduleSharedDocSync() {
-        if (!window.sharedDocState || !window.sharedDocState.canEdit) return;
+    function scheduleSharedDocSync(options) {
+        options = options || {};
+        if (!window.sharedDocState || !window.sharedDocState.canEdit) return options.manualSave ? Promise.resolve(false) : undefined;
         window.sharedDocState.lastLocalEditAt = Date.now();
         if (window.sharedDocState.saveTimer) {
             clearTimeout(window.sharedDocState.saveTimer);
+            window.sharedDocState.saveTimer = null;
         }
-        window.sharedDocState.saveTimer = setTimeout(syncSharedDocContent, 1000);
+        if (options.manualSave) {
+            return syncSharedDocContent({ manualSave: true });
+        }
+        window.sharedDocState.saveTimer = setTimeout(function() {
+            syncSharedDocContent();
+        }, 1000);
+        return true;
     }
 
     async function pollSharedDocContent() {
@@ -1339,6 +1395,9 @@
                     window.sharedDocState.lastKnownContent = payload.content;
                 }
                 window.sharedDocState.isSaving = false;
+                if (isSelfUpdate) {
+                    resolveSharedManualSave(true);
+                }
                 return;
             }
 
@@ -1350,7 +1409,14 @@
                     window.vditor.setValue(window.sharedDocState.lastKnownContent);
                 }
                 window.sharedDocState.isSaving = false;
+                resolveSharedManualSave(false);
                 showToast(window.i18n ? '检测到并发冲突，已刷新为最新版本' : 'Conflict detected. Loaded latest version.', 'error');
+                return;
+            }
+
+            if (payload.type === 'error') {
+                window.sharedDocState.isSaving = false;
+                resolveSharedManualSave(false);
             }
         };
 

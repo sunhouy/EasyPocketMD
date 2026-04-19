@@ -4365,9 +4365,14 @@ import {
             global.sharedDocState.ownerFileId === currentFileId &&
             typeof global.scheduleSharedDocSync === 'function'
         ) {
-            global.scheduleSharedDocSync();
-            if (isManual) {
-                showSaveStatus('saved');
+            const sharedSaveResult = await global.scheduleSharedDocSync({ manualSave: isManual });
+            if (sharedSaveResult !== false) {
+                g('unsavedChanges')[currentFileId] = false;
+                if (isManual) {
+                    showSaveStatus('saved');
+                }
+            } else if (isManual) {
+                showSaveStatus('failed');
             }
             return;
         }
