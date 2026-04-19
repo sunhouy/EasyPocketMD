@@ -176,18 +176,8 @@
     }
 
     function sendCursorPosition(position, selection) {
-        if (!window.sharedDocState || !window.sharedDocState.canEdit) return;
-
-        // 使用文本偏移量而不是像素坐标
-        const textOffset = getTextOffset();
-        if (textOffset === null) return;
-
-        sendShareWsPayload({
-            type: 'cursor_position',
-            textOffset: textOffset,
-            selection: selection,
-            position: position  // 保留像素位置用于本地渲染
-        });
+        // 禁用光标位置广播
+        return;
     }
 
     function getTextOffset() {
@@ -270,121 +260,13 @@
     }
 
     function initCursorTracking() {
-        if (!window.vditor || !window.sharedDocState || !window.sharedDocState.canEdit) return;
-
-        // 使用 Vditor 的内容区域
-        const contentElement = document.querySelector('.vditor-ir__preview, .vditor-wysiwyg, .vditor-sv');
-        if (!contentElement) return;
-
-        // 防抖发送光标位置
-        let cursorTimer = null;
-        const debouncedSend = () => {
-            if (cursorTimer) clearTimeout(cursorTimer);
-            cursorTimer = setTimeout(() => {
-                const selection = window.getSelection();
-                if (!selection || selection.rangeCount === 0) return;
-
-                try {
-                    const range = selection.getRangeAt(0);
-                    const rect = range.getBoundingClientRect();
-                    const editorRect = contentElement.getBoundingClientRect();
-
-                    if (rect.height === 0) return; // 无效光标
-
-                    const position = {
-                        x: rect.left - editorRect.left + contentElement.scrollLeft,
-                        y: rect.top - editorRect.top + contentElement.scrollTop,
-                        height: rect.height || 20
-                    };
-
-                    const selectionText = selection.toString();
-                    sendCursorPosition(position, {
-                        text: selectionText,
-                        length: selectionText.length
-                    });
-                } catch (e) {
-                    // 忽略错误
-                }
-            }, 150);
-        };
-
-        // 监听光标移动和选择事件
-        contentElement.addEventListener('click', debouncedSend);
-        contentElement.addEventListener('keyup', debouncedSend);
-        document.addEventListener('selectionchange', debouncedSend);
+        // 禁用光标追踪
+        return;
     }
 
     function renderRemoteCursors() {
-        // 清除旧的光标
-        document.querySelectorAll('.remote-cursor').forEach(el => el.remove());
-
-        if (!window.sharedDocState || !window.vditor) return;
-
-        // 尝试多个可能的内容容器
-        const contentElement = document.querySelector('.vditor-ir__preview') ||
-                              document.querySelector('.vditor-wysiwyg') ||
-                              document.querySelector('.vditor-sv') ||
-                              document.querySelector('.vditor-content');
-
-        if (!contentElement) {
-            console.warn('未找到编辑器内容容器，无法渲染光标');
-            return;
-        }
-
-        // 确保容器有相对定位
-        if (window.getComputedStyle(contentElement).position === 'static') {
-            contentElement.style.position = 'relative';
-        }
-
-        // 渲染其他用户的光标
-        window.sharedDocState.remoteCursors = window.sharedDocState.remoteCursors || {};
-        const now = Date.now();
-
-        Object.entries(window.sharedDocState.remoteCursors).forEach(([viewerId, cursor]) => {
-            // 清理超过10秒未更新的光标
-            if (now - cursor.lastUpdate > 10000) {
-                delete window.sharedDocState.remoteCursors[viewerId];
-                return;
-            }
-
-            if (cursor.viewerId === window.sharedDocState.viewerId) return;
-            if (!cursor.position || cursor.position.height === 0) return;
-
-            const cursorElement = document.createElement('div');
-            cursorElement.className = 'remote-cursor';
-            cursorElement.style.cssText = `
-                position: absolute;
-                left: ${cursor.position.x}px;
-                top: ${cursor.position.y}px;
-                height: ${cursor.position.height}px;
-                width: 2px;
-                background-color: ${cursor.color};
-                z-index: 9999;
-                pointer-events: none;
-                animation: blink 1s infinite;
-            `;
-
-            const labelElement = document.createElement('div');
-            labelElement.className = 'remote-cursor-label';
-            labelElement.style.cssText = `
-                position: absolute;
-                left: 0;
-                top: -22px;
-                background-color: ${cursor.color};
-                color: white;
-                padding: 2px 6px;
-                border-radius: 3px;
-                font-size: 11px;
-                white-space: nowrap;
-                z-index: 10000;
-                pointer-events: none;
-                box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-            `;
-            labelElement.textContent = cursor.viewerName;
-
-            cursorElement.appendChild(labelElement);
-            contentElement.appendChild(cursorElement);
-        });
+        // 禁用远程光标渲染
+        return;
     }
 
     // 添加光标闪烁动画样式
@@ -1706,17 +1588,22 @@
 
                     // 只有当本地内容和远程内容真的不同时才更新
                     if (currentContent !== remoteContent) {
-                        // 保存当前光标的文本偏移量
-                        const textOffset = getTextOffset();
+                        // 使用 Vditor 原生方法保持光标位置
+                        const cursorPosition = window.vditor.vditor.ir?.element.selectionStart ||
+                                              window.vditor.vditor.wysiwyg?.element.selectionStart || 0;
 
                         window.vditor.setValue(remoteContent);
 
-                        // 使用文本偏移量恢复光标位置
-                        if (textOffset !== null) {
-                            setTimeout(() => {
-                                setTextOffset(textOffset);
-                            }, 50);
-                        }
+                        // 恢复光标位置
+                        setTimeout(() => {
+                            if (window.vditor.vditor.ir?.element) {
+                                window.vditor.vditor.ir.element.selectionStart = cursorPosition;
+                                window.vditor.vditor.ir.element.selectionEnd = cursorPosition;
+                            } else if (window.vditor.vditor.wysiwyg?.element) {
+                                window.vditor.vditor.wysiwyg.element.selectionStart = cursorPosition;
+                                window.vditor.vditor.wysiwyg.element.selectionEnd = cursorPosition;
+                            }
+                        }, 0);
                     }
                 }
                 return false;
@@ -1780,18 +1667,23 @@
             }
 
             if (window.vditor && remoteContent !== localContent) {
-                // 保存当前光标的文本偏移量
-                const textOffset = getTextOffset();
+                // 使用 Vditor 原生方法保持光标位置
+                const cursorPosition = window.vditor.vditor.ir?.element.selectionStart ||
+                                      window.vditor.vditor.wysiwyg?.element.selectionStart || 0;
 
                 window.vditor.setValue(remoteContent);
                 window.sharedDocState.lastKnownContent = remoteContent;
 
-                // 使用文本偏移量恢复光标位置
-                if (textOffset !== null) {
-                    setTimeout(() => {
-                        setTextOffset(textOffset);
-                    }, 50);
-                }
+                // 恢复光标位置
+                setTimeout(() => {
+                    if (window.vditor.vditor.ir?.element) {
+                        window.vditor.vditor.ir.element.selectionStart = cursorPosition;
+                        window.vditor.vditor.ir.element.selectionEnd = cursorPosition;
+                    } else if (window.vditor.vditor.wysiwyg?.element) {
+                        window.vditor.vditor.wysiwyg.element.selectionStart = cursorPosition;
+                        window.vditor.vditor.wysiwyg.element.selectionEnd = cursorPosition;
+                    }
+                }, 0);
             }
         } catch (err) {
             console.error('共享文档轮询失败:', err);
@@ -1941,19 +1833,26 @@
 
                 if (typeof payload.content === 'string') {
                     if (window.vditor && window.vditor.getValue() !== payload.content) {
-                        // 保存当前光标的文本偏移量（仅在非自己更新时）
-                        let textOffset = null;
+                        // 保存当前光标位置（仅在非自己更新时）
+                        let cursorPosition = 0;
                         if (!isSelfUpdate) {
-                            textOffset = getTextOffset();
+                            cursorPosition = window.vditor.vditor.ir?.element.selectionStart ||
+                                           window.vditor.vditor.wysiwyg?.element.selectionStart || 0;
                         }
 
                         window.vditor.setValue(payload.content);
 
                         // 恢复光标位置（仅在非自己更新时）
-                        if (textOffset !== null && !isSelfUpdate) {
+                        if (!isSelfUpdate) {
                             setTimeout(() => {
-                                setTextOffset(textOffset);
-                            }, 50);
+                                if (window.vditor.vditor.ir?.element) {
+                                    window.vditor.vditor.ir.element.selectionStart = cursorPosition;
+                                    window.vditor.vditor.ir.element.selectionEnd = cursorPosition;
+                                } else if (window.vditor.vditor.wysiwyg?.element) {
+                                    window.vditor.vditor.wysiwyg.element.selectionStart = cursorPosition;
+                                    window.vditor.vditor.wysiwyg.element.selectionEnd = cursorPosition;
+                                }
+                            }, 0);
                         }
                     }
                     window.sharedDocState.lastKnownContent = payload.content;
@@ -1976,47 +1875,26 @@
 
                     // 只有当本地内容和远程内容真的不同时才更新
                     if (currentContent !== remoteContent) {
-                        // 保存当前光标的文本偏移量
-                        const textOffset = getTextOffset();
+                        // 使用 Vditor 原生方法保持光标位置
+                        const cursorPosition = window.vditor.vditor.ir?.element.selectionStart ||
+                                              window.vditor.vditor.wysiwyg?.element.selectionStart || 0;
 
                         window.vditor.setValue(remoteContent);
 
-                        // 使用文本偏移量恢复光标位置
-                        if (textOffset !== null) {
-                            setTimeout(() => {
-                                setTextOffset(textOffset);
-                            }, 50);
-                        }
+                        // 恢复光标位置
+                        setTimeout(() => {
+                            if (window.vditor.vditor.ir?.element) {
+                                window.vditor.vditor.ir.element.selectionStart = cursorPosition;
+                                window.vditor.vditor.ir.element.selectionEnd = cursorPosition;
+                            } else if (window.vditor.vditor.wysiwyg?.element) {
+                                window.vditor.vditor.wysiwyg.element.selectionStart = cursorPosition;
+                                window.vditor.vditor.wysiwyg.element.selectionEnd = cursorPosition;
+                            }
+                        }, 0);
                     }
                 }
                 window.sharedDocState.isSaving = false;
                 resolveSharedManualSave(false);
-                return;
-            }
-
-            if (payload.type === 'cursor_position') {
-                // 处理其他用户的光标位置
-                if (!window.sharedDocState) return;
-                
-                window.sharedDocState.remoteCursors = window.sharedDocState.remoteCursors || {};
-
-                // 如果有文本偏移量，使用它来计算准确位置
-                let cursorPosition = payload.position;
-                if (payload.textOffset !== undefined && payload.textOffset !== null) {
-                    cursorPosition = getPixelPositionFromOffset(payload.textOffset);
-                }
-
-                window.sharedDocState.remoteCursors[payload.viewer_id] = {
-                    viewerId: payload.viewer_id,
-                    viewerName: payload.viewer_name,
-                    position: cursorPosition || payload.position,
-                    selection: payload.selection,
-                    color: getCursorColor(payload.viewer_id),
-                    lastUpdate: Date.now()
-                };
-
-                // 渲染远程光标
-                renderRemoteCursors();
                 return;
             }
 
