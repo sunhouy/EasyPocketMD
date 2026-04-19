@@ -1119,6 +1119,7 @@
         if (!window.sharedDocState || !window.sharedDocState.canEdit || !window.vditor) return false;
         if (window.sharedDocState.isSaving) return false;
 
+        var currentContent = window.vditor.getValue();
         var manualSave = options.manualSave === true;
         if (currentContent === window.sharedDocState.lastKnownContent && !manualSave) {
             return true;
