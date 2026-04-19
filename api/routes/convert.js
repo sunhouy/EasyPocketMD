@@ -574,7 +574,11 @@ async function runPandocDocx(inputContent, options = {}) {
 
             // 调用Python脚本生成模板
             const { spawnSync } = require('child_process');
-            const pythonScript = path.join(__dirname, '../../scripts/generate-docx-template.py');
+            // 使用process.cwd()获取当前工作目录，确保在生产环境中也能正确找到脚本
+            const pythonScript = path.join(process.cwd(), 'scripts', 'generate-docx-template.py');
+            
+            console.log(`[DOCX] Using Python script at: ${pythonScript}`);
+            console.log(`[DOCX] Script exists: ${fs.existsSync(pythonScript)}`);
             
             const result = spawnSync('python3', [pythonScript, config], {
                 encoding: 'utf8',
@@ -795,18 +799,28 @@ router.post('/docx', async (req, res) => {
         const docxMathMode = String(docxSettings.docxMathMode || '').toLowerCase();
         const useNativeMath = docxMathMode !== 'svg' && docxMathMode !== 'html';
 
+        // 转换设置值为正确的类型
+        const titleFontSize = parseFloat(docxSettings.titleFontSize) || 24;
+        const bodyFontSize = parseFloat(docxSettings.bodyFontSize) || 12;
+        const h1Size = parseFloat(docxSettings.h1Size) || (titleFontSize * 2);
+        const h2Size = parseFloat(docxSettings.h2Size) || (titleFontSize * 1.6);
+        const h3Size = parseFloat(docxSettings.h3Size) || (titleFontSize * 1.35);
+        const h4Size = parseFloat(docxSettings.h4Size) || (titleFontSize * 1.2);
+        const h5Size = parseFloat(docxSettings.h5Size) || titleFontSize;
+        const h6Size = parseFloat(docxSettings.h6Size) || Math.max(14, titleFontSize * 0.9);
+
         const pandocOptions = {
             referenceDocx,
             titleFont: docxSettings.titleFont || 'SimHei',
             bodyFont: docxSettings.bodyFont || 'SimSun',
-            titleFontSize: docxSettings.titleFontSize,
-            bodyFontSize: docxSettings.bodyFontSize,
-            h1Size: docxSettings.h1Size,
-            h2Size: docxSettings.h2Size,
-            h3Size: docxSettings.h3Size,
-            h4Size: docxSettings.h4Size,
-            h5Size: docxSettings.h5Size,
-            h6Size: docxSettings.h6Size,
+            titleFontSize: titleFontSize,
+            bodyFontSize: bodyFontSize,
+            h1Size: h1Size,
+            h2Size: h2Size,
+            h3Size: h3Size,
+            h4Size: h4Size,
+            h5Size: h5Size,
+            h6Size: h6Size,
             inputFormat: useNativeMath
                 ? 'markdown+task_lists+tex_math_dollars+tex_math_single_backslash+tex_math_double_backslash+fenced_code_blocks+pipe_tables'
                 : 'html'
