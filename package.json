@@ -73,6 +73,7 @@
     "marked": "^12.0.2",
     "multer": "^2.1.1",
     "mysql2": "^3.6.5",
+    "node-fetch": "^3.3.2",
     "pdfjs-dist": "^4.4.168",
     "pdfmake": "^0.3.7",
     "pdfmake-support-chinese-fonts": "^1.0.3",

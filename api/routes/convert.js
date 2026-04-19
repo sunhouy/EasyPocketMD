@@ -532,37 +532,86 @@ async function runPandocDocx(inputContent, options = {}) {
             '--standalone'
         ];
 
-        // 根据字体选择reference文档
-        const titleFont = options.titleFont || 'SimHei';
-        const bodyFont = options.bodyFont || 'SimSun';
+        // 生成动态模板文档
+        let referencePath = null;
+        try {
+            const { titleFont, bodyFont, titleFontSize, bodyFontSize, h1Size, h2Size, h3Size, h4Size, h5Size, h6Size } = options;
+            
+            // 构建配置JSON
+            const config = JSON.stringify({
+                titleFont: titleFont || 'SimHei',
+                bodyFont: bodyFont || 'SimSun',
+                titleFontSize: titleFontSize || 24,
+                bodyFontSize: bodyFontSize || 12,
+                h1Size: h1Size || (titleFontSize ? titleFontSize * 2 : 32),
+                h2Size: h2Size || (titleFontSize ? titleFontSize * 1.6 : 28),
+                h3Size: h3Size || (titleFontSize ? titleFontSize * 1.35 : 24),
+                h4Size: h4Size || (titleFontSize ? titleFontSize * 1.2 : 20),
+                h5Size: h5Size || (titleFontSize || 18),
+                h6Size: h6Size || (titleFontSize ? Math.max(14, titleFontSize * 0.9) : 16)
+            });
 
-        // 构建reference文档路径
-        const referenceDir = path.join(__dirname, '../../reference-docs');
-        const fontKey = `${titleFont.toLowerCase()}-${bodyFont.toLowerCase()}`;
-        const referenceMap = {
-            'simhei-simsun': 'reference-simhei-simsun.docx',
-            'simhei-simkai': 'reference-simhei-simkai.docx',
-            'simsun-simsun': 'reference-simsun-simsun.docx',
-            'simkai-simsun': 'reference-simkai-simsun.docx',
-        };
+            // 调用Python脚本生成模板
+            const { spawnSync } = require('child_process');
+            const pythonScript = path.join(__dirname, '../../scripts/generate-docx-template.py');
+            
+            const result = spawnSync('python3', [pythonScript, config], {
+                encoding: 'utf8',
+                timeout: 10000
+            });
 
-        const referenceFile = referenceMap[fontKey] || 'reference.docx';
-        const referencePath = path.join(referenceDir, referenceFile);
+            if (result.status === 0 && result.stdout) {
+                referencePath = result.stdout.trim();
+                console.log(`[DOCX] Generated dynamic template: ${referencePath}`);
+            } else {
+                console.log('[DOCX] Failed to generate dynamic template, falling back to static templates');
+                console.log(`[DOCX] Python script error: ${result.stderr || 'no error output'}`);
+            }
+        } catch (error) {
+            console.log('[DOCX] Error generating dynamic template:', error);
+        }
 
-        // 优先使用字体对应的reference文档
-        if (fs.existsSync(referencePath)) {
-            args.push('--reference-doc', referencePath);
-        } else {
-            // 如果没有找到，尝试使用配置的reference文档
-            const configuredReference = (options.referenceDocx || process.env.PANDOC_REFERENCE_DOCX || '').trim();
-            if (configuredReference) {
-                const configPath = path.isAbsolute(configuredReference)
-                    ? configuredReference
-                    : path.join(process.cwd(), configuredReference);
-                if (fs.existsSync(configPath)) {
-                    args.push('--reference-doc', configPath);
+        // 如果动态模板生成失败，使用静态模板
+        if (!referencePath) {
+            // 根据字体选择reference文档
+            const titleFont = options.titleFont || 'SimHei';
+            const bodyFont = options.bodyFont || 'SimSun';
+
+            // 构建reference文档路径
+            const referenceDir = path.join(__dirname, '../../reference-docs');
+            const fontKey = `${titleFont.toLowerCase()}-${bodyFont.toLowerCase()}`;
+            const referenceMap = {
+                'simhei-simsun': 'reference-simhei-simsun.docx',
+                'simhei-simkai': 'reference-simhei-simkai.docx',
+                'simsun-simsun': 'reference-simsun-simsun.docx',
+                'simkai-simsun': 'reference-simkai-simsun.docx',
+            };
+
+            const referenceFile = referenceMap[fontKey] || 'reference.docx';
+            referencePath = path.join(referenceDir, referenceFile);
+
+            // 检查静态模板是否存在
+            if (!fs.existsSync(referencePath)) {
+                // 如果没有找到，尝试使用配置的reference文档
+                const configuredReference = (options.referenceDocx || process.env.PANDOC_REFERENCE_DOCX || '').trim();
+                if (configuredReference) {
+                    const configPath = path.isAbsolute(configuredReference)
+                        ? configuredReference
+                        : path.join(process.cwd(), configuredReference);
+                    if (fs.existsSync(configPath)) {
+                        referencePath = configPath;
+                    } else {
+                        referencePath = null;
+                    }
+                } else {
+                    referencePath = null;
                 }
             }
+        }
+
+        // 添加reference-doc参数
+        if (referencePath && fs.existsSync(referencePath)) {
+            args.push('--reference-doc', referencePath);
         }
 
         // 对于HTML输入，添加额外的Pandoc参数来更好地保留样式
@@ -598,7 +647,25 @@ async function runPandocDocx(inputContent, options = {}) {
 
         // 如果是HTML输入且指定了字体，需要后处理DOCX以确保字体正确应用
         if (inputFormat === 'html' && (titleFont || bodyFont)) {
-            return await postProcessDocxFonts(docxBuffer, titleFont, bodyFont);
+            const result = await postProcessDocxFonts(docxBuffer, titleFont, bodyFont);
+            // 清理临时模板文件
+            if (referencePath && referencePath.includes('/tmp/')) {
+                try {
+                    await fsp.unlink(referencePath).catch(() => {});
+                } catch (error) {
+                    console.log('[DOCX] Error cleaning up temporary template:', error);
+                }
+            }
+            return result;
+        }
+
+        // 清理临时模板文件
+        if (referencePath && referencePath.includes('/tmp/')) {
+            try {
+                await fsp.unlink(referencePath).catch(() => {});
+            } catch (error) {
+                console.log('[DOCX] Error cleaning up temporary template:', error);
+            }
         }
 
         return docxBuffer;
@@ -699,6 +766,14 @@ router.post('/docx', async (req, res) => {
             referenceDocx,
             titleFont: docxSettings.titleFont || 'SimHei',
             bodyFont: docxSettings.bodyFont || 'SimSun',
+            titleFontSize: docxSettings.titleFontSize,
+            bodyFontSize: docxSettings.bodyFontSize,
+            h1Size: docxSettings.h1Size,
+            h2Size: docxSettings.h2Size,
+            h3Size: docxSettings.h3Size,
+            h4Size: docxSettings.h4Size,
+            h5Size: docxSettings.h5Size,
+            h6Size: docxSettings.h6Size,
             inputFormat: useNativeMath
                 ? 'markdown+task_lists+tex_math_dollars+tex_math_single_backslash+tex_math_double_backslash+fenced_code_blocks+pipe_tables'
                 : 'html'
