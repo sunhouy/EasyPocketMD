@@ -329,7 +329,8 @@ class ShareManager {
             const updated = updatedRows[0] || {};
             let historyResult = null;
             if (options.manualSave) {
-                historyResult = await historyManager.createHistory(share.username, share.filename, updated.content || '');
+                const modifiedBy = options.viewerName || options.editorUsername || 'Guest';
+                historyResult = await historyManager.createHistory(share.username, share.filename, updated.content || '', modifiedBy);
                 if (historyResult.code !== 200 && historyResult.code !== 304) {
                     return historyResult;
                 }
