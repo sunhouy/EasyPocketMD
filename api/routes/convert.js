@@ -578,7 +578,7 @@ async function runPandocDocx(inputContent, options = {}) {
             
             const result = spawnSync('python3', [pythonScript, config], {
                 encoding: 'utf8',
-                timeout: 10000
+                timeout: 15000
             });
 
             if (result.status === 0 && result.stdout) {
