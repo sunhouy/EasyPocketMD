@@ -1,157 +1,298 @@
 # EasyPocketMD
+
 ![EasyPocketMD](assets/readme/logo.png)
 
-**AI powered · Superfast · Cross Platform**
+**🤖 AI powered · ⚡ Blazing fast · 📱 Cross Platform · ✨ Zero Learning Curve**
 
-<p align="center"><a href="README.md">中文</a>  &nbsp;|&nbsp; <a href="https://md.yhsun.cn/">Demo</a></p>
+<p align="center"><a href="README.md">中文</a> &nbsp;|&nbsp; <a href="https://md.yhsun.cn/">Demo</a> &nbsp;|&nbsp; <a href="CODE_WIKI.md">📖 Code Wiki</a></p>
 
-A Markdown editor that removes the learning curve — insert formatted text, LaTeX formulas, and diagrams without memorizing any syntax. With intelligent search and AI assistance, everything is just a few clicks away.
+## 🚀 Make Markdown Writing Easier Than Ever!
 
-Real-time collaboration, AI-assisted writing, and a smooth editing experience — all wrapped in a beautiful Material Design interface.
-The Android client is built with Tauri mobile and shipped as an APK.
+EasyPocketMD is an intelligent Markdown editor with almost zero learning curve. Forget about syntax memorization—insert formatted text, LaTeX formulas, and beautiful diagrams with just a `/` slash command! With full-text search and powerful AI assistance, complex tasks are just a few clicks away!
 
-If you find this useful, please star the repo.
+From personal writing, real-time collaboration, to multi-format publishing, EasyPocketMD compresses tedious workflows into a seamless creative experience. Think of it as your smarter Markdown workstation:
 
-[![Build and Deploy](https://github.com/sunhouy/EasyPocketMD/actions/workflows/deploy.yml/badge.svg)](https://github.com/sunhouy/EasyPocketMD/actions/workflows/deploy.yml)
-[![Build Android App](https://github.com/sunhouy/EasyPocketMD/actions/workflows/build-android.yml/badge.svg)](https://github.com/sunhouy/EasyPocketMD/actions/workflows/build-android.yml)
-[![Build Tauri App](https://github.com/sunhouy/EasyPocketMD/actions/workflows/build-tauri.yml/badge.svg)](https://github.com/sunhouy/EasyPocketMD/actions/workflows/build-tauri.yml)
+- ✨ **`/` Slash commands** for instant access to any operation, goodbye to menu hunting and mouse switching
+- 🔍 **Smart file search** supports both title and full-text search for knowledge retrieval in milliseconds
+- 🖥️ **Lightweight desktop client** built with Tauri, just tens of MB in size and launches in seconds
+- 🧠 **Built-in knowledge graph** powered by WebAssembly high-performance computing to connect scattered notes into visual networks
+- 📁 **Perfect compatibility** for local files, continuing your existing file organization
+
+Real-time collaboration, AI-assisted writing, and a smooth editing experience—all wrapped in a beautiful Material Design interface. Supports Windows, Linux, macOS, Android, and the web—full platform coverage.
+
+---
+
+### ⭐ Support This Project
+
+If you find EasyPocketMD useful, please give us a Star ⭐—it means a lot to me!
+
+[![Build and Deploy](https://github.com/sunhouy/EasyPocketMD/actions/workflows/deploy.yml/badge.svg)
+[![Build Android App](https://github.com/sunhouy/EasyPocketMD/actions/workflows/build-android.yml/badge.svg)
+[![Build Tauri App](https://github.com/sunhouy/EasyPocketMD/actions/workflows/build-tauri.yml/badge.svg)
 [![codecov](https://codecov.io/gh/sunhouy/EasyPocketMD/graph/badge.svg?token=8E02GDKIKQ)](https://codecov.io/gh/sunhouy/EasyPocketMD)
 ![NPM Downloads](https://img.shields.io/npm/dw/easypocketmd)
+[![GitHub stars](https://img.shields.io/github/stars/sunhouy/EasyPocketMD?style=social)](https://github.com/sunhouy/EasyPocketMD)
 
+---
 
-[![Python 3.6+](https://img.shields.io/badge/python-3.6+-blue.svg)](https://www.python.org/downloads/)
-[![Node.js](https://img.shields.io/badge/node.js-%3E%3D18.0.0-brightgreen.svg)](https://nodejs.org/)
+## 📖 Table of Contents
 
-## Table of Contents
-- [Features](#features)
-- [Quick Start](#quick-start)
-- [Comparison](#how-we-compare)
-- [Architecture](#project-architecture)
-- [Demo](#demo)
-- [License](#license)
+- [✨ Features](#-features)
+- [🚀 Quick Start](#-quick-start)
+- [📊 Comparison](#-how-we-compare)
+- [🏗️ Architecture](#-project-architecture)
+- [💻 Development Guide](#-development-guide)
+- [🎬 Demo](#-demo)
+- [📧 Contact](#-contact)
 
-## Features
+---
 
-### AI Integration
+## ✨ Features
 
-- AI Writing Assistant: Help write, rewrite, auto-format, and even generate PPT slides from your document.
+### 🤖 AI Integration - Make Writing Smarter
+
+- **AI Writing Assistant**: Help write, rewrite, auto-format, and even generate beautiful PPT slides from your document!
 ![AI Writing Assistant](assets/readme/aigenppt.gif)
-- Smart Charts and Formulas: Generate LaTeX formulas and diagrams with AI prompts.
+- **Smart Charts & Formulas**: Generate LaTeX formulas and diagrams with AI prompts, no manual coding required!
 ![AI Charts & Formulas](assets/readme/aigenformula.gif)
+- **AI PPT Generation**: Automatically analyze structure and generate professional presentations from document content
 
-### Collaboration
+### 👥 Collaboration & Communication
 
-- Real-time Collaboration: Share documents and work together seamlessly.
+- **Real-time Collaboration**: Share document links and invite multiple collaborators to work together seamlessly
 ![Real-time Collaboration](assets/readme/share.gif)
-- Encrypted Video Call: Built-in two-person encrypted video call with dual-stack IPv6 support.
+- **End-to-end Encrypted Video Call**: Built-in two-person video call with dual-stack IPv6 support
 ![Encrypted Video Call](assets/readme/videocall.gif)
+- **Online Presence**: Real-time collaborator status display for efficient communication
 
-### Editing Experience
-- Three Preview Modes: WYSIWYG, live rendering, and split-screen preview.
-- Efficient Editing: Quick insertion of Markdown, LaTeX formulas, and charts. Full-text search and file diff support.
+### ✍️ Editing Experience
+
+- **Three Preview Modes**: WYSIWYG, Instant Render, Split Preview
+- **Efficient Quick Editing**: Quick insertion of Markdown, LaTeX formulas, and charts; full-text search and file diff support
 ![Editing Experience](assets/readme/insert.gif)
-- Version Control: Browse history and compare differences between versions.
+- **Complete Version Control**: Browse history and compare differences between versions, supports batch history management
 ![Version Control](assets/readme/history.gif)
+- **Auto-save & Conflict Resolution**: Local auto-save support and intelligent conflict resolution for multi-device sync
 
-### Compatibility and Design
-- Cross Platform: Works seamlessly across devices.
+### 🔗 Compatibility & Design
+
+- **Cross-platform Seamless Experience**: Web, Windows, Linux, macOS, Android — five-platform coverage
 ![Cross Platform](assets/readme/1_1.png)
-- File Import and Export: Import local documents; export to TXT, DOC, PDF, and more.
-- Cloud Print: Print remotely via the cloud print client.
+- **Powerful Import/Export**: Import local Markdown, DOCX, etc., export to TXT, DOC, PDF, PPT formats
+- **Cloud Printing**: Remote printing via cloud print client
 ![Cloud Print](assets/readme/cloudprint.gif)
-- Available on Windows, Linux, Android and the web.
-- Modern UI: Clean Material Design with day/night mode support.
+- **Modern UI**: Clean Material Design with perfect day/night mode support, elegant and beautiful
 
-## Quick Start
+---
+
+## 🚀 Quick Start
+
 ### Prerequisites
-- Node.js >= 18.0
-- Python >= 3.6
-- MySQL >= 5.7
-- Redis >= 6.0
-- npm >= 9.0
+
+- **Node.js** ≥ 18.0
+- **Python** ≥ 3.6 (Cloud printing service
+- **MySQL** ≥ 5.7 (Data persistence
+- **Redis** ≥ 6.0 (Caching & collaboration
+- **npm** ≥ 9.0
 
 ### Installation
 
-1. Clone the repository
+1. **Clone the repository**
 ```bash
 git clone https://github.com/sunhouy/EasyPocketMD.git
-cd md
+cd easypocketmd
+```
+Or install via npm:
+```bash
+npm i easypocketmd
 ```
 
-2. Install Node.js dependencies
+2. **Install dependencies**
 ```bash
 npm install
 ```
 
-3. Copy the example configuration file and edit it with your own values:
-```
+3. **Configure environment**
+```bash
 cp .env.example .env
+# Edit the .env file to configure database, Redis, ports, etc.
 ```
 
-4. Set up databases
-Create the MySQL database and tables. You can find the schema in db.sql. Ensure Redis is running.
+4. **Initialize databases**
+Create MySQL database and tables (schema in [db.sql](file:///workspace/db.sql)), and ensure Redis is running.
 
-5. Build the frontend
+5. **Build frontend**
 ```bash
 npm run build
 ```
 
-6. Start the application
+6. **Start the application**
 ```bash
 npm start
 ```
-For production (using PM2):
+
+For production, PM2 is recommended:
 ```bash
 npm install -g pm2
-pm2 start api/server.js --name "easypocketmd"
+pm2 start api/server.ts --name "easypocketmd"
 ```
 
-### Tauri Android Build
+### 📱 Tauri Desktop App Development & Building
 
-After installing the Tauri mobile prerequisites, build the Android APK with:
+Once Tauri dependencies are installed, you can develop and build apps for all platforms:
+
+**Desktop Development:**
 ```bash
+# Windows/macOS/Linux
+npm run tauri:dev
+
+# Build desktop apps
+npm run build:tauri:win   # Windows
+npm run build:tauri:linux  # Linux
+npm run build:tauri:mac    # macOS
+```
+
+**Android Development & Building:**
+```bash
+# Initialize Android project
 npm run tauri:android:init
+
+# Android development mode
+npm run tauri:android:dev
+
+# Build Android APK
 npm run tauri:android:build
 ```
 
-## How We Compare
+### 🎯 Dev Mode Quick Start
 
-| Feature                     | Ours | Typora | Obsidian | Notion | VS Code | Joplin                 |
-|----------------------------|------|--------|----------|--------|---------|------------------------|
-| Data Privacy               | Local + Cloud | Local | Local | Cloud-only | Local | Local + Cloud optional |
-| AI Writing Assistant       | Yes  | No     | No (plugin) | No   | No (plugin) | No                  |
-| AI Charts and Formulas     | Yes  | No     | No       | No     | No      | No                     |
-| AI PPT Generation          | Yes  | No     | No       | No     | No      | No                     |
-| Mobile Experience          | First-class | Basic | Basic | Good | None    | Basic                  |
-| Real-time Collaboration    | Yes (E2EE) | No | No     | Yes    | Yes (Live Share) | No             |
-| Encrypted Video Call       | Yes  | No     | No       | No     | No      | No                     |
-| Cloud Print                | Yes  | No     | No       | No     | No      | No                     |
-| Price                      | Free / Open Source | 15 USD one-time | Free / 50 USD yearly sync | Free tier | Free | Free |
-
-## Project Architecture
-
-The project uses a JavaScript + Python architecture. The backend is implemented with Node.js, while the cloud printing server and client are implemented with Python. The frontend is developed with native JavaScript.
-```
-api/     Backend API interfaces
-assets/  Static application resources
-css/     Frontend CSS styles
-js/      Frontend JavaScript scripts
-print/   Cloud printing server and client code
-scripts/ Deployment scripts
-tests/   Test scripts
+If you just want to quickly experience the frontend:
+```bash
+npm run dev
 ```
 
-## Demo
+---
 
-<https://md.yhsun.cn/>
+## 📊 How We Compare
 
-## Contact
-18763177732@139.com
+| Feature                     | **EasyPocketMD** | Typora | Obsidian | Notion | VS Code | Joplin                 |
+|----------------------------|-----------------|--------|----------|--------|---------|------------------------|
+| **Data Privacy**           | 🔒 Local + Cloud | Local | Local | Cloud-only | Local | Local + Cloud optional |
+| **AI Writing Assistant**   | ✅ Native | ❌ | ❌ (plugin) | ❌ | ❌ (plugin) | ❌                  |
+| **AI Charts & Formulas** | ✅ Native | ❌ | ❌ | ❌ | ❌ | ❌                     |
+| **AI PPT Generation** | ✅ Native | ❌ | ❌ | ❌ | ❌ | ❌                     |
+| **Mobile Experience** | 📱 First-class | Basic | Basic | Good | None    | Basic                  |
+| **Real-time Collaboration** | ✅ E2EE | ❌ | ❌ | ✅ | ✅ (Live Share) | ❌             |
+| **Encrypted Video Call** | ✅ Built-in | ❌ | ❌ | ❌ | ❌ | ❌                     |
+| **Cloud Printing** | ✅ Native | ❌ | ❌ | ❌ | ❌ | ❌                     |
+| **Knowledge Graph** | ✅ WebAssembly | ❌ | ❌ | ❌ | ❌ | ❌                     |
+| **Price** | 🆓 Free / MIT | One-time $15 | Free / $50/year | Free tier | Free | Free                   |
 
-## License
+---
+
+## 🏗️ Project Architecture
+
+The project uses a **modern TypeScript + Python architecture:
+
+- **Frontend**: TypeScript + Vite + Vditor + WebAssembly (C/C++)
+- **Backend**: Node.js + Express + MySQL + Redis
+- **Real-time Collaboration**: WebSocket
+- **Cross Platform**: Tauri (Desktop/Android)
+- **Cloud Printing**: Python
+
+```
+api/                    # Backend API services
+├── config/             # Database/cache configuration
+├── middleware/       # Middleware (rate limiting, auth, etc.)
+├── models/           # Core business models
+├── realtime/        # WebSocket real-time collaboration
+├── routes/           # API routes
+└── utils/            # Utility functions
+
+js/                     # Frontend source
+├── files/            # File management
+├── ui/               # UI components
+└── page/             # Page logic
+
+wasm_text_engine/      # WebAssembly high-performance modules
+
+src-tauri/          # Tauri cross-platform apps
+
+tests/                  # Tests
+```
+
+For detailed architecture and development docs see [CODE_WIKI.md](file:///workspace/CODE_WIKI.md)
+
+---
+
+## 💻 Development Guide
+
+### Core Tech Stack
+
+- **Frontend Builder**: Vite
+- **Markdown Editor**: Vditor
+- **Charting Library**: ECharts
+- **WebAssembly**: High-performance computing in C/C++
+- **Backend Framework**: Express.js
+- **Databases**: MySQL (persistence) + Redis (caching)
+- **Real-time Communication**: WebSocket (ws)
+- **Cross Platform**: Tauri
+- **Testing**: Jest + Supertest
+
+### Useful Commands
+
+```bash
+# Frontend development
+npm run dev
+
+# Build frontend
+npm run build:web
+
+# Full build (including WASM
+npm run build
+
+# Run backend service
+npm start
+
+# Run tests
+npm test
+
+# WASM text engine build
+npm run wasm:text:build
+
+# WASM image compression build
+npm run wasm:image:build
+```
+
+---
+
+## 🎬 Demo
+
+Try it online now: <https://md.yhsun.cn/>
+
+---
+
+## 📧 Contact
+
+- **Author**: sunhouyun
+- **Email**: sunhouyun@emails.bjut.edu.cn
+- **GitHub Issues**: <https://github.com/sunhouy/EasyPocketMD/issues>
+- **Official Site**: <https://yhsun.cn/>
+
+---
+
+## 📄 License
+
 This project is licensed under the MIT License.
 
-## Acknowledgements
-Built with modern web technologies and open source tools.
+---
 
-See [DEPENDENCIES.md](./DEPENDENCIES.md) for the complete list of dependencies and licenses.
+## 🙌 Acknowledgements
+
+Built with modern web technologies and open source tools. Salute to all contributors!
+
+For full dependency and license list see [DEPENDENCIES.md](file:///workspace/DEPENDENCIES.md)
+
+---
+
+> 💡 **Pro Tip: If you like this project, don't forget to Star ⭐!
