@@ -1,51 +1,31 @@
-import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 
 // JWT 密钥，从环境变量获取或使用默认值
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 
 // Hash password
-const hashPassword = async (password: string): Promise<string> => {
+const hashPassword = async (password) => {
     const salt = await bcrypt.genSalt(10);
     return await bcrypt.hash(password, salt);
 };
 
 // Verify password
-const verifyPassword = async (password: string, hashedPassword: string): Promise<boolean> => {
+const verifyPassword = async (password, hashedPassword) => {
     return await bcrypt.compare(password, hashedPassword);
 };
 
-interface JwtPayload {
-    username: string;
-    [key: string]: unknown;
-}
-
 // Verify JWT token
-const verifyJwtToken = (token: string): JwtPayload | null => {
+const verifyJwtToken = (token) => {
     try {
-        return jwt.verify(token, JWT_SECRET) as JwtPayload;
+        return jwt.verify(token, JWT_SECRET);
     } catch (error) {
         return null;
     }
 };
 
-interface VerifyData {
-    username?: string;
-    token?: string;
-    password?: string;
-}
-
-interface VerifyResult {
-    code: number;
-    message?: string;
-}
-
-interface UserModel {
-    login: (username: string, password: string) => Promise<VerifyResult>;
-}
-
 // Verify token or password (from PHP verifyTokenOrPassword)
-const verifyTokenOrPassword = async (userModel: UserModel, data: VerifyData): Promise<VerifyResult> => {
+const verifyTokenOrPassword = async (userModel, data) => {
     const username = data.username || '';
     const token = data.token || '';
     const password = data.password || '';
@@ -87,7 +67,7 @@ const verifyTokenOrPassword = async (userModel: UserModel, data: VerifyData): Pr
     };
 };
 
-export {
+module.exports = {
     hashPassword,
     verifyPassword,
     verifyTokenOrPassword,

@@ -125,7 +125,7 @@
 
         state.initPromise = (async function() {
             try {
-                const mod = await import('../wasm_text_engine/js/text-engine-client.ts');
+                const mod = await import('../wasm_text_engine/js/text-engine-client.js');
                 const Client = mod.WasmTextEngineClient;
                 state.client = new Client();
                 const cacheTag = getBuildTag();
