@@ -4,7 +4,7 @@
 
 **🤖 AI 驱动 · ⚡ 极速启动 · 📱 全平台 · ✨ 零学习成本**
 
-<p align="center"><a href="README_EN.md">English</a> &nbsp;|&nbsp; <a href="https://md.yhsun.cn/">DEMO</a> &nbsp;|&nbsp; <a href="CODE_WIKI.md">📖 Code Wiki</a></p>
+<p align="center"><a href="README_EN.md">English</a> &nbsp;|&nbsp; <a href="https://md.yhsun.cn/">DEMO</a> </p>
 
 ## 🚀 让 Markdown 创作从未如此简单！
 
@@ -26,12 +26,12 @@ EasyPocketMD 是一款几乎零学习成本的智能 Markdown 编辑器，无需
 
 如果 EasyPocketMD 对你有帮助，欢迎点一个 Star，这是对我最大的鼓励！
 
-[![Build and Deploy](https://github.com/sunhouy/EasyPocketMD/actions/workflows/deploy.yml/badge.svg)
-[![Build Android App](https://github.com/sunhouy/EasyPocketMD/actions/workflows/build-android.yml/badge.svg)
-[![Build Tauri App](https://github.com/sunhouy/EasyPocketMD/actions/workflows/build-tauri.yml/badge.svg)
-[![codecov](https://codecov.io/gh/sunhouy/EasyPocketMD/graph/badge.svg?token=8E02GDKIKQ)](https://codecov.io/gh/sunhouy/EasyPocketMD)
+![Build and Deploy](https://github.com/sunhouy/EasyPocketMD/actions/workflows/deploy.yml/badge.svg)
+![Build Android App](https://github.com/sunhouy/EasyPocketMD/actions/workflows/build-android.yml/badge.svg)
+![Build Tauri App](https://github.com/sunhouy/EasyPocketMD/actions/workflows/build-tauri.yml/badge.svg)
+![codecov](https://codecov.io/gh/sunhouy/EasyPocketMD/graph/badge.svg?token=8E02GDKIKQ)
 ![NPM Downloads](https://img.shields.io/npm/dw/easypocketmd)
-[![GitHub stars](https://img.shields.io/github/stars/sunhouy/EasyPocketMD?style=social)](https://github.com/sunhouy/EasyPocketMD)
+![GitHub stars](https://img.shields.io/github/stars/sunhouy/EasyPocketMD?style=social)
 
 ---
 

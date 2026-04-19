@@ -26,12 +26,13 @@ Real-time collaboration, AI-assisted writing, and a smooth editing experience—
 
 If you find EasyPocketMD useful, please give us a Star ⭐—it means a lot to me!
 
-[![Build and Deploy](https://github.com/sunhouy/EasyPocketMD/actions/workflows/deploy.yml/badge.svg)
-[![Build Android App](https://github.com/sunhouy/EasyPocketMD/actions/workflows/build-android.yml/badge.svg)
-[![Build Tauri App](https://github.com/sunhouy/EasyPocketMD/actions/workflows/build-tauri.yml/badge.svg)
-[![codecov](https://codecov.io/gh/sunhouy/EasyPocketMD/graph/badge.svg?token=8E02GDKIKQ)](https://codecov.io/gh/sunhouy/EasyPocketMD)
+
+![Build and Deploy](https://github.com/sunhouy/EasyPocketMD/actions/workflows/deploy.yml/badge.svg)
+![Build Android App](https://github.com/sunhouy/EasyPocketMD/actions/workflows/build-android.yml/badge.svg)
+![Build Tauri App](https://github.com/sunhouy/EasyPocketMD/actions/workflows/build-tauri.yml/badge.svg)
+![codecov](https://codecov.io/gh/sunhouy/EasyPocketMD/graph/badge.svg?token=8E02GDKIKQ)
 ![NPM Downloads](https://img.shields.io/npm/dw/easypocketmd)
-[![GitHub stars](https://img.shields.io/github/stars/sunhouy/EasyPocketMD?style=social)](https://github.com/sunhouy/EasyPocketMD)
+![GitHub stars](https://img.shields.io/github/stars/sunhouy/EasyPocketMD?style=social)
 
 ---
 
