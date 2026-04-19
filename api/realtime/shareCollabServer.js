@@ -201,19 +201,6 @@ function initShareCollabServer(httpServer, shareManager) {
                 return;
             }
 
-            if (payload.type === 'cursor_position') {
-                // 广播光标位置给其他用户
-                broadcast(socket.ctx.shareId, {
-                    type: 'cursor_position',
-                    share_id: socket.ctx.shareId,
-                    viewer_id: socket.ctx.viewerId,
-                    viewer_name: socket.ctx.viewerName,
-                    position: payload.position,
-                    selection: payload.selection
-                });
-                return;
-            }
-
             if (
                 payload.type === 'video_call_invite' ||
                 payload.type === 'video_call_response' ||
@@ -454,11 +441,15 @@ function initShareCollabServer(httpServer, shareManager) {
                 }
 
                 if (updateResult.code === 409) {
+                    // 协作文档不显示冲突提示，静默使用最新版本
+                    socket.ctx.contentVersion = updateResult.data.content_version || socket.ctx.contentVersion;
                     socket.send(JSON.stringify({
-                        type: 'conflict',
-                        code: 409,
-                        message: updateResult.message,
-                        latest: updateResult.data
+                        type: 'doc_updated',
+                        share_id: socket.ctx.shareId,
+                        content: updateResult.data.content,
+                        last_modified: updateResult.data.last_modified,
+                        content_version: updateResult.data.content_version,
+                        updated_by: 'server'
                     }));
                     return;
                 }
