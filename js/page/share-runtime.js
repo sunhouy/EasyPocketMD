@@ -1700,37 +1700,25 @@
                 window.sharedDocState.lastModified = result.data.last_modified || window.sharedDocState.lastModified;
                 window.sharedDocState.contentVersion = result.data.content_version || window.sharedDocState.contentVersion;
                 if (window.vditor) {
-                    // 保存光标位置
-                    var selection = window.getSelection();
-                    var cursorPosition = null;
-                    if (selection && selection.rangeCount > 0) {
-                        var range = selection.getRangeAt(0);
-                        cursorPosition = {
-                            startContainer: range.startContainer,
-                            startOffset: range.startOffset,
-                            endContainer: range.endContainer,
-                            endOffset: range.endOffset
-                        };
-                    }
+                    // 静默拉取最新内容，不显示冲突提示
+                    const currentContent = window.vditor.getValue();
+                    const remoteContent = window.sharedDocState.lastKnownContent;
 
-                    window.vditor.setValue(window.sharedDocState.lastKnownContent);
+                    // 只有当本地内容和远程内容真的不同时才更新
+                    if (currentContent !== remoteContent) {
+                        // 保存当前光标的文本偏移量
+                        const textOffset = getTextOffset();
 
-                    // 恢复光标位置
-                    if (cursorPosition) {
-                        try {
-                            var newRange = document.createRange();
-                            newRange.setStart(cursorPosition.startContainer, cursorPosition.startOffset);
-                            newRange.setEnd(cursorPosition.endContainer, cursorPosition.endOffset);
-                            selection.removeAllRanges();
-                            if (newRange.startContainer && newRange.startContainer.ownerDocument === document) {
-                                selection.addRange(newRange);
-                            }
-                        } catch (e) {
-                            // 如果恢复失败，忽略错误
+                        window.vditor.setValue(remoteContent);
+
+                        // 使用文本偏移量恢复光标位置
+                        if (textOffset !== null) {
+                            setTimeout(() => {
+                                setTextOffset(textOffset);
+                            }, 50);
                         }
                     }
                 }
-                showToast(window.i18n ? '检测到并发冲突，已刷新为最新内容' : 'Conflict detected. Loaded latest content.', 'error');
                 return false;
             }
             return false;
@@ -1792,33 +1780,17 @@
             }
 
             if (window.vditor && remoteContent !== localContent) {
-                // 保存光标位置
-                var selection = window.getSelection();
-                var cursorPosition = null;
-                if (selection && selection.rangeCount > 0) {
-                    var range = selection.getRangeAt(0);
-                    cursorPosition = {
-                        startContainer: range.startContainer,
-                        startOffset: range.startOffset,
-                        endContainer: range.endContainer,
-                        endOffset: range.endOffset
-                    };
-                }
+                // 保存当前光标的文本偏移量
+                const textOffset = getTextOffset();
 
                 window.vditor.setValue(remoteContent);
                 window.sharedDocState.lastKnownContent = remoteContent;
 
-                // 恢复光标位置
-                if (cursorPosition) {
-                    try {
-                        var newRange = document.createRange();
-                        newRange.setStart(cursorPosition.startContainer, cursorPosition.startOffset);
-                        newRange.setEnd(cursorPosition.endContainer, cursorPosition.endOffset);
-                        selection.removeAllRanges();
-                        selection.addRange(newRange);
-                    } catch (e) {
-                        // 如果恢复失败，忽略错误
-                    }
+                // 使用文本偏移量恢复光标位置
+                if (textOffset !== null) {
+                    setTimeout(() => {
+                        setTextOffset(textOffset);
+                    }, 50);
                 }
             }
         } catch (err) {
@@ -1969,32 +1941,19 @@
 
                 if (typeof payload.content === 'string') {
                     if (window.vditor && window.vditor.getValue() !== payload.content) {
-                        // 保存光标位置
-                        var selection = window.getSelection();
-                        var cursorPosition = null;
-                        if (selection && selection.rangeCount > 0 && !isSelfUpdate) {
-                            var range = selection.getRangeAt(0);
-                            cursorPosition = {
-                                startContainer: range.startContainer,
-                                startOffset: range.startOffset,
-                                endContainer: range.endContainer,
-                                endOffset: range.endOffset
-                            };
+                        // 保存当前光标的文本偏移量（仅在非自己更新时）
+                        let textOffset = null;
+                        if (!isSelfUpdate) {
+                            textOffset = getTextOffset();
                         }
 
                         window.vditor.setValue(payload.content);
 
                         // 恢复光标位置（仅在非自己更新时）
-                        if (cursorPosition && !isSelfUpdate) {
-                            try {
-                                var newRange = document.createRange();
-                                newRange.setStart(cursorPosition.startContainer, cursorPosition.startOffset);
-                                newRange.setEnd(cursorPosition.endContainer, cursorPosition.endOffset);
-                                selection.removeAllRanges();
-                                selection.addRange(newRange);
-                            } catch (e) {
-                                // 如果恢复失败，忽略错误
-                            }
+                        if (textOffset !== null && !isSelfUpdate) {
+                            setTimeout(() => {
+                                setTextOffset(textOffset);
+                            }, 50);
                         }
                     }
                     window.sharedDocState.lastKnownContent = payload.content;
@@ -2011,39 +1970,27 @@
                 window.sharedDocState.lastModified = payload.latest.last_modified || window.sharedDocState.lastModified;
                 window.sharedDocState.contentVersion = payload.latest.content_version || window.sharedDocState.contentVersion;
                 if (window.vditor) {
-                    // 保存光标位置
-                    var selection = window.getSelection();
-                    var cursorPosition = null;
-                    if (selection && selection.rangeCount > 0) {
-                        var range = selection.getRangeAt(0);
-                        cursorPosition = {
-                            startContainer: range.startContainer,
-                            startOffset: range.startOffset,
-                            endContainer: range.endContainer,
-                            endOffset: range.endOffset
-                        };
-                    }
+                    // 静默拉取最新内容，不显示冲突提示
+                    const currentContent = window.vditor.getValue();
+                    const remoteContent = window.sharedDocState.lastKnownContent;
 
-                    window.vditor.setValue(window.sharedDocState.lastKnownContent);
+                    // 只有当本地内容和远程内容真的不同时才更新
+                    if (currentContent !== remoteContent) {
+                        // 保存当前光标的文本偏移量
+                        const textOffset = getTextOffset();
 
-                    // 恢复光标位置
-                    if (cursorPosition) {
-                        try {
-                            var newRange = document.createRange();
-                            newRange.setStart(cursorPosition.startContainer, cursorPosition.startOffset);
-                            newRange.setEnd(cursorPosition.endContainer, cursorPosition.endOffset);
-                            selection.removeAllRanges();
-                            if (newRange.startContainer && newRange.startContainer.ownerDocument === document) {
-                                selection.addRange(newRange);
-                            }
-                        } catch (e) {
-                            // 如果恢复失败，忽略错误
+                        window.vditor.setValue(remoteContent);
+
+                        // 使用文本偏移量恢复光标位置
+                        if (textOffset !== null) {
+                            setTimeout(() => {
+                                setTextOffset(textOffset);
+                            }, 50);
                         }
                     }
                 }
                 window.sharedDocState.isSaving = false;
                 resolveSharedManualSave(false);
-                showToast(window.i18n ? '检测到并发冲突，已刷新为最新版本' : 'Conflict detected. Loaded latest version.', 'error');
                 return;
             }
 
