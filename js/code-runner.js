@@ -6,8 +6,8 @@
     var SUPPORTED_LANGUAGES = new Set(['python', 'py', 'javascript', 'js', 'typescript', 'ts', 'html', 'htm', 'c', 'cpp', 'c++']);
     var PYODIDE_VERSION = '0.25.1';
     var PYODIDE_CDN_BASES = [
-        '/static/cdn/pyodide/v' + PYODIDE_VERSION + '/full/',
-        'https://static.yhsun.cn/cdn/pyodide/v' + PYODIDE_VERSION + '/full/'
+        'https://static.yhsun.cn/cdn/pyodide/v' + PYODIDE_VERSION + '/full/',
+        '/static/cdn/pyodide/v' + PYODIDE_VERSION + '/full/'
     ];
 
     // 代码运行器类
@@ -46,17 +46,10 @@
                         
                         // 自动加载常用第三方库
                         try {
-                            // 确保numpy等核心库加载成功
+                            // 尝试加载numpy
                             await self.pyodide.loadPackage('numpy');
-                            // 尝试加载其他可选库
-                            try {
-                                await self.pyodide.loadPackage(['pandas', 'matplotlib']);
-                            } catch (e) {
-                                console.warn('Failed to load optional packages (pandas, matplotlib):', e);
-                            }
                         } catch (e) {
-                            console.error('Failed to load essential packages (numpy):', e);
-                            throw e; // 核心库加载失败，抛出错误
+                            console.warn('Failed to load numpy, will try without preloading:', e);
                         }
                         
                         return self.pyodide;
@@ -99,7 +92,30 @@
                     });
                 }
 
-                var result = pyodide.runPython(code);
+                // 尝试运行代码，如果模块未找到则动态加载
+                try {
+                    var result = pyodide.runPython(code);
+                } catch (error) {
+                    var errorStr = String(error);
+                    if (errorStr.includes('ModuleNotFoundError')) {
+                        // 尝试解析错误信息中的模块名
+                        var moduleMatch = errorStr.match(/No module named ['"](\w+)['"]/);
+                        if (moduleMatch) {
+                            var moduleName = moduleMatch[1];
+                            try {
+                                await pyodide.loadPackage(moduleName);
+                                result = pyodide.runPython(code);
+                            } catch (loadError) {
+                                throw error; // 如果加载失败，返回原始错误
+                            }
+                        } else {
+                            throw error;
+                        }
+                    } else {
+                        throw error;
+                    }
+                }
+
                 var outputParts = [];
                 if (stdoutChunks.length) outputParts.push(stdoutChunks.join(''));
                 if (stderrChunks.length) outputParts.push(stderrChunks.join(''));
@@ -109,7 +125,6 @@
 
                 return { success: true, output: outputParts.join('') || 'Execution completed successfully' };
             } catch (error) {
-                // 直接返回完整的错误信息给用户
                 return { success: false, error: error && error.stack ? error.stack : (error && error.message ? error.message : String(error)) };
             }
         }
