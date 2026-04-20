@@ -1391,6 +1391,39 @@ document.addEventListener('DOMContentLoaded', function() {
                         }
                     }, 300);
                 });
+
+                // 添加粘贴事件监听器，限制粘贴文本长度
+                window.vditor.vditor.ir.element.addEventListener('paste', function(e) {
+                    var clipboardData = e.clipboardData || window.clipboardData;
+                    var pastedText = clipboardData.getData('text');
+                    if (pastedText.length > 10000) {
+                        e.preventDefault();
+                        window.showMessage(window.i18n ? window.i18n.t('pasteTextTooLong') : '粘贴文本过长，请减少粘贴内容后重试', 'error');
+                    }
+                });
+            }
+
+            // 为其他编辑模式添加粘贴事件监听器
+            if (window.vditor && window.vditor.vditor && window.vditor.vditor.wysiwyg) {
+                window.vditor.vditor.wysiwyg.element.addEventListener('paste', function(e) {
+                    var clipboardData = e.clipboardData || window.clipboardData;
+                    var pastedText = clipboardData.getData('text');
+                    if (pastedText.length > 10000) {
+                        e.preventDefault();
+                        window.showMessage(window.i18n ? window.i18n.t('pasteTextTooLong') : '粘贴文本过长，请减少粘贴内容后重试', 'error');
+                    }
+                });
+            }
+
+            if (window.vditor && window.vditor.vditor && window.vditor.vditor.sv) {
+                window.vditor.vditor.sv.element.addEventListener('paste', function(e) {
+                    var clipboardData = e.clipboardData || window.clipboardData;
+                    var pastedText = clipboardData.getData('text');
+                    if (pastedText.length > 10000) {
+                        e.preventDefault();
+                        window.showMessage(window.i18n ? window.i18n.t('pasteTextTooLong') : '粘贴文本过长，请减少粘贴内容后重试', 'error');
+                    }
+                });
             }
 
             // 初始化应用生命周期管理（草稿恢复等）

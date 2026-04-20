@@ -5157,7 +5157,28 @@ import {
 
             for (const file of files) {
                 try {
-                    const content = await convertImportedFileToMarkdown(file);
+                    let content;
+                    // 检查文件大小，如果是大文档，使用上传接口
+                    if (file.size > 100000 && /\.(md|markdown|txt)$/i.test(file.name)) { // 100KB 作为大文档的标准
+                        if (typeof global.uploadFiles === 'function') {
+                            try {
+                                // 上传文件并获取链接
+                                const markdownLink = await global.uploadFiles([file], false);
+                                // 返回一个特殊标记，指示这是一个上传的大文档
+                                content = `[${file.name}](${markdownLink})`;
+                            } catch (error) {
+                                console.error('上传大文档失败:', error);
+                                // 上传失败时，回退到直接读取
+                                content = await convertImportedFileToMarkdown(file);
+                            }
+                        } else {
+                            // 如果 uploadFiles 函数不可用，回退到直接读取
+                            content = await convertImportedFileToMarkdown(file);
+                        }
+                    } else {
+                        // 小文档直接读取
+                        content = await convertImportedFileToMarkdown(file);
+                    }
                     const importName = buildImportedFilePath(file.name, targetFolder, existingNames);
 
                     const newFile = {
