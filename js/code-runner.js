@@ -100,7 +100,8 @@
 
                 return { success: true, output: outputParts.join('') || 'Execution completed successfully' };
             } catch (error) {
-                return { success: false, error: error && error.message ? error.message : String(error) };
+                // 直接返回完整的错误信息给用户
+                return { success: false, error: error && error.stack ? error.stack : (error && error.message ? error.message : String(error)) };
             }
         }
 
