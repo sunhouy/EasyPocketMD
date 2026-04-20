@@ -6,6 +6,7 @@
     var SUPPORTED_LANGUAGES = new Set(['python', 'py', 'javascript', 'js', 'typescript', 'ts', 'html', 'htm', 'c', 'cpp', 'c++']);
     var PYODIDE_VERSION = '0.25.1';
     var PYODIDE_CDN_BASES = [
+        '/static/cdn/pyodide/v' + PYODIDE_VERSION + '/full/',
         'https://static.yhsun.cn/cdn/pyodide/v' + PYODIDE_VERSION + '/full/'
     ];
 
@@ -45,9 +46,17 @@
                         
                         // 自动加载常用第三方库
                         try {
-                            await self.pyodide.loadPackage(['numpy', 'pandas', 'matplotlib']);
+                            // 确保numpy等核心库加载成功
+                            await self.pyodide.loadPackage('numpy');
+                            // 尝试加载其他可选库
+                            try {
+                                await self.pyodide.loadPackage(['pandas', 'matplotlib']);
+                            } catch (e) {
+                                console.warn('Failed to load optional packages (pandas, matplotlib):', e);
+                            }
                         } catch (e) {
-                            console.warn('Failed to load optional packages:', e);
+                            console.error('Failed to load essential packages (numpy):', e);
+                            throw e; // 核心库加载失败，抛出错误
                         }
                         
                         return self.pyodide;

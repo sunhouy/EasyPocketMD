@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pyodide Numpy 测试</title>
+    <script src="/js/code-runner.js"></script>
+</head>
+<body>
+    <h1>Pyodide Numpy 测试</h1>
+    <pre><code class="language-python">import numpy as np
+
+# 创建一个简单的numpy数组
+arr = np.array([1, 2, 3, 4, 5])
+print("numpy数组:", arr)
+
+# 测试numpy的基本操作
+print("数组平方:", np.square(arr))
+print("数组和:", np.sum(arr))
+
+print("numpy测试成功!")
+</code></pre>
+    <script>
+        // 页面加载完成后初始化代码运行器
+        window.addEventListener('DOMContentLoaded', function() {
+            console.log('页面加载完成，初始化代码运行器');
+            // 手动触发代码运行器初始化
+            if (window.addRunButtons) {
+                window.addRunButtons();
+            }
+        });
+    </script>
+</body>
+</html>
