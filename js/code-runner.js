@@ -42,6 +42,14 @@
                         });
                         self.pyodideLoaded = true;
                         self.pyodideCdnBase = baseUrl;
+                        
+                        // 自动加载常用第三方库
+                        try {
+                            await self.pyodide.loadPackage(['numpy', 'pandas', 'matplotlib']);
+                        } catch (e) {
+                            console.warn('Failed to load optional packages:', e);
+                        }
+                        
                         return self.pyodide;
                     } catch (error) {
                         lastError = error;
