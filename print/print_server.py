@@ -380,8 +380,7 @@ def main():
     server.local_client_url = f"ws://localhost:{args.local_port}"
 
     try:
-        loop = asyncio.get_event_loop()
-        loop.run_until_complete(server.start_server())
+        asyncio.run(server.start_server())
     except (KeyboardInterrupt, EOFError):
         pass
     except Exception as e:
