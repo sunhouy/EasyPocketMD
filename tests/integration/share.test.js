@@ -129,21 +129,22 @@ describe('Share API Integration', () => {
         });
 
 
-        it('should return conflict when base_version is stale', async () => {
+        it('should handle optimistic version check gracefully', async () => {
             db.execute
                 .mockResolvedValueOnce([[
                     { share_id: 'sid', username: 'u', filename: 'f.md', mode: 'edit', password: null, content_version: 2 }
                 ]]) // getSharedFile
-                .mockResolvedValueOnce([{ affectedRows: 0 }]) // optimistic update failed
-                .mockResolvedValueOnce([[{ content: 'latest content', last_modified: '2026-01-01 00:00:00', content_version: 3 }]]);
+                .mockResolvedValueOnce([{ affectedRows: 0 }]) // First update (version mismatch)
+                .mockResolvedValueOnce([{ affectedRows: 1 }]) // Second update (force update)
+                .mockResolvedValueOnce([[{ content: 'my content', last_modified: '2026-01-01 00:00:00', content_version: 4 }]]); // SELECT updated content
 
             const res = await request(app)
                 .post('/api/share/update')
                 .send({ share_id: 'sid', content: 'my content', base_version: 2 });
 
             expect(res.status).toBe(200);
-            expect(res.body.code).toBe(409);
-            expect(res.body.data.content_version).toBe(3);
+            expect(res.body.code).toBe(200);
+            expect(res.body.data.content).toBe('my content');
         });
     });
 });

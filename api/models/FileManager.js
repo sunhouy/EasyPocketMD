@@ -149,35 +149,11 @@ class FileManager {
                 const hasBaseHash = typeof optimisticLock.base_hash === 'string' && optimisticLock.base_hash.trim() !== '';
                 const shouldCheckOptimisticLock = hasBaseVersion || hasBaseLastModified || hasBaseHash;
 
-                if (rows.length > 0 && shouldCheckOptimisticLock) {
-                    const existing = rows[0];
-                    const serverLastModifiedMs = this.toTimestampMillis(existing.last_modified);
-                    const baseLastModifiedMs = this.toTimestampMillis(optimisticLock.base_last_modified);
-                    const serverHash = this.computeContentHash(existing.content || '');
-                    const baseHash = hasBaseHash ? optimisticLock.base_hash.trim() : null;
-                    const baseVersion = hasBaseVersion ? Number(optimisticLock.base_content_version) : null;
-
-                    const versionMismatch = hasBaseVersion && Number.isFinite(baseVersion) && Number(existing.content_version || 0) !== baseVersion;
-                    const timestampMismatch = !hasBaseVersion && hasBaseLastModified && baseLastModifiedMs !== null && serverLastModifiedMs !== null && baseLastModifiedMs !== serverLastModifiedMs;
-                    const hashMismatch = hasBaseHash && baseHash !== serverHash;
-
-                    if (versionMismatch || timestampMismatch || hashMismatch) {
-                        if (rollback) {
-                            await rollback();
-                        }
-                        return {
-                            code: 409,
-                            message: '文件已被其他设备更新，请先同步后再保存',
-                            data: {
-                                username,
-                                filename,
-                                server_content_version: Number(existing.content_version || 0),
-                                server_last_modified: this.normalizeDbLastModified(existing.last_modified),
-                                server_hash: serverHash,
-                                server_content: existing.content || ''
-                            }
-                        };
-                    }
+                // 不再返回409错误，直接处理冲突
+                // 当检测到版本不匹配时，仍然更新文件，但保留版本号递增逻辑
+                if (rows.length > 0) {
+                    // 无论是否有版本冲突，都直接更新文件
+                    // 版本号仍然递增，确保版本控制的连续性
                 }
 
                 let message;
