@@ -192,13 +192,13 @@ npm run dev
 
 ## 🏗️ 项目架构
 
-项目采用 **TypeScript + Python 现代架构：
+项目采用混合架构：
 
-- **前端：TypeScript + Vite + Vditor + WebAssembly (C/C++)
-- **后端：Node.js + Express + MySQL + Redis**
-- **实时协作：WebSocket**
-- **跨平台：Tauri (桌面/Android)
-- **云打印：Python**
+- 前端：JavaScript + Vite + WebAssembly (C/C++)
+- 后端：Node.js + Express + MySQL + Redis
+- 实时协作：WebSocket
+- 跨平台：Tauri (桌面/Android)
+- 云打印：Python
 
 ```
 api/                    # 后端 API 服务
@@ -289,4 +289,4 @@ npm run wasm:image:build
 
 ---
 
-> 💡 **小提示：如果你喜欢这个项目，别忘了 Star ⭐ 哦！
+> 💡 如果你喜欢这个项目，别忘了 Star ⭐ 哦！
