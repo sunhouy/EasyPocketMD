@@ -144,7 +144,9 @@ router.post('/pdf', (req, res) => {
             marginRight: settings?.pageMargin ? `${settings.pageMargin}mm` : '15mm',
             printMediaType: true,
             enableLocalFileAccess: true,
-            encoding: 'UTF-8'
+            encoding: 'UTF-8',
+            imageQuality: 75,
+            imageDpi: 150
         };
 
         writeStream = fs.createWriteStream(filePath);
