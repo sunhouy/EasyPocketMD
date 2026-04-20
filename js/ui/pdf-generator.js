@@ -146,7 +146,9 @@ async function generatePDFLocal(htmlContent, settings) {
                     canvas.height = tempImg.naturalHeight || tempImg.height;
                     ctx.drawImage(tempImg, 0, 0);
                     try {
-                        const dataUrl = canvas.toDataURL('image/png');
+                        // Check if the image is a JPEG
+                        const isJpeg = img.src.toLowerCase().endsWith('.jpg') || img.src.toLowerCase().endsWith('.jpeg');
+                        const dataUrl = canvas.toDataURL(isJpeg ? 'image/jpeg' : 'image/png', isJpeg ? 0.8 : 1.0);
                         img.src = dataUrl;
                     } catch (e) {
                         console.warn('[PDF Debug] Failed to convert image', index, ':', e);
