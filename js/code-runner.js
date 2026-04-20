@@ -45,9 +45,18 @@
                         
                         // 自动加载常用第三方库
                         try {
+                            // 直接使用loadPackage加载，因为这些库包含在Pyodide发行版中
                             await self.pyodide.loadPackage(['numpy', 'pandas', 'matplotlib']);
                         } catch (e) {
                             console.warn('Failed to load optional packages:', e);
+                            // 如果loadPackage失败，尝试使用micropip安装
+                            try {
+                                await self.pyodide.loadPackage('micropip');
+                                const micropip = self.pyodide.pyimport('micropip');
+                                await micropip.install(['numpy', 'pandas', 'matplotlib'], { indexURL: baseUrl });
+                            } catch (micropipError) {
+                                console.warn('Failed to install packages via micropip:', micropipError);
+                            }
                         }
                         
                         return self.pyodide;
