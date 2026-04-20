@@ -6,7 +6,6 @@
     var SUPPORTED_LANGUAGES = new Set(['python', 'py', 'javascript', 'js', 'typescript', 'ts', 'html', 'htm', 'c', 'cpp', 'c++']);
     var PYODIDE_VERSION = '0.25.1';
     var PYODIDE_CDN_BASES = [
-        '/static/cdn/pyodide/v' + PYODIDE_VERSION + '/full/',
         'https://static.yhsun.cn/cdn/pyodide/v' + PYODIDE_VERSION + '/full/'
     ];
 
@@ -99,7 +98,30 @@
                     });
                 }
 
-                var result = pyodide.runPython(code);
+                // 尝试运行代码，如果模块未找到则动态加载
+                try {
+                    var result = pyodide.runPython(code);
+                } catch (error) {
+                    var errorStr = String(error);
+                    if (errorStr.includes('ModuleNotFoundError')) {
+                        // 尝试解析错误信息中的模块名
+                        var moduleMatch = errorStr.match(/No module named ['"](\w+)['"]/);
+                        if (moduleMatch) {
+                            var moduleName = moduleMatch[1];
+                            try {
+                                await pyodide.loadPackage(moduleName);
+                                result = pyodide.runPython(code);
+                            } catch (loadError) {
+                                throw error; // 如果加载失败，返回原始错误
+                            }
+                        } else {
+                            throw error;
+                        }
+                    } else {
+                        throw error;
+                    }
+                }
+
                 var outputParts = [];
                 if (stdoutChunks.length) outputParts.push(stdoutChunks.join(''));
                 if (stderrChunks.length) outputParts.push(stderrChunks.join(''));
@@ -109,7 +131,6 @@
 
                 return { success: true, output: outputParts.join('') || 'Execution completed successfully' };
             } catch (error) {
-                // 直接返回完整的错误信息给用户
                 return { success: false, error: error && error.stack ? error.stack : (error && error.message ? error.message : String(error)) };
             }
         }
