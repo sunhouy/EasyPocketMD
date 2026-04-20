@@ -228,13 +228,16 @@ describe('FileManager', () => {
             );
         });
 
-        it('should return 409 when base_last_modified is stale', async () => {
+        it('should handle stale base_last_modified gracefully', async () => {
             const mockConnection = {
-                execute: jest.fn().mockResolvedValueOnce([[{
-                    id: 1,
-                    content: 'server content',
-                    last_modified: '2024-01-02T00:00:00.000Z'
-                }]]),
+                execute: jest.fn()
+                    .mockResolvedValueOnce([[{
+                        id: 1,
+                        content: 'server content',
+                        last_modified: '2024-01-02T00:00:00.000Z',
+                        content_version: 1
+                    }]])
+                    .mockResolvedValueOnce([]), // Update
                 release: jest.fn()
             };
             db.getConnection.mockResolvedValue(mockConnection);
@@ -246,21 +249,23 @@ describe('FileManager', () => {
                 { base_last_modified: '2024-01-01T00:00:00.000Z' }
             );
 
-            expect(result.code).toBe(409);
-            expect(result.data.filename).toBe('test.md');
-            expect(result.data.server_last_modified).toBe('2024-01-02T00:00:00.000Z');
-            expect(mockConnection.execute).toHaveBeenCalledTimes(1);
+            expect(result.code).toBe(200);
+            expect(result.message).toBe('文件更新成功');
+            expect(mockConnection.execute).toHaveBeenCalledTimes(2);
         });
 
-        it('should return 409 when base_hash does not match', async () => {
+        it('should handle mismatched base_hash gracefully', async () => {
             const currentContent = 'server content';
             const wrongHash = 'wronghash';
             const mockConnection = {
-                execute: jest.fn().mockResolvedValueOnce([[{
-                    id: 1,
-                    content: currentContent,
-                    last_modified: '2024-01-02T00:00:00.000Z'
-                }]]),
+                execute: jest.fn()
+                    .mockResolvedValueOnce([[{
+                        id: 1,
+                        content: currentContent,
+                        last_modified: '2024-01-02T00:00:00.000Z',
+                        content_version: 1
+                    }]])
+                    .mockResolvedValueOnce([]), // Update
                 release: jest.fn()
             };
             db.getConnection.mockResolvedValue(mockConnection);
@@ -272,7 +277,9 @@ describe('FileManager', () => {
                 { base_hash: wrongHash }
             );
 
-            expect(result.code).toBe(409);
+            expect(result.code).toBe(200);
+            expect(result.message).toBe('文件更新成功');
+            expect(mockConnection.execute).toHaveBeenCalledTimes(2);
         });
 
         it('should allow update when base_hash matches current server content', async () => {

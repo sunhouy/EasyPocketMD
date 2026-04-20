@@ -55,8 +55,8 @@ import {
     const LONG_FILE_MODE_CHAR_THRESHOLD = 220000;
     const LONG_FILE_MODE_LINE_THRESHOLD = 6000;
     const LONG_FILE_MODE_PREVIEW_DEBOUNCE = 180;
-    const AUTO_SAVE_DEBOUNCE_MS = 1500;
-    const AUTO_SAVE_FORCE_MS = 30000;
+    const AUTO_SAVE_DEBOUNCE_MS = 500;
+    const AUTO_SAVE_FORCE_MS = 5000;
 
     let markedParserPromise = null;
     let longFilePreviewTimer = null;
@@ -2101,10 +2101,27 @@ import {
                     !localFile.serverLastModified &&
                     localFile.content !== mergedServerFile.content;
 
-                const shouldPreferLocal =
-                    shouldPreferUnsyncedLocal ||
-                    (hasPendingLocalSync && localFile.content !== mergedServerFile.content) ||
-                    serverUnchangedSinceLastSync;
+                // 比较本地和服务器的修改时间，保留较新的版本
+                let shouldPreferLocal = false;
+                let shouldPreferServer = false;
+                
+                if (localFile.type === 'file' && mergedServerFile.type === 'file') {
+                    const localModified = localFile.lastModified || 0;
+                    const serverModified = new Date(mergedServerFile.lastModified || 0).getTime();
+                    
+                    if (localModified > serverModified) {
+                        shouldPreferLocal = true;
+                    } else if (serverModified > localModified) {
+                        shouldPreferServer = true;
+                    }
+                }
+
+                if (!shouldPreferLocal && !shouldPreferServer) {
+                    shouldPreferLocal =
+                        shouldPreferUnsyncedLocal ||
+                        (hasPendingLocalSync && localFile.content !== mergedServerFile.content) ||
+                        serverUnchangedSinceLastSync;
+                }
 
                 if (shouldPreferLocal) {
                     mergedServerFile.id = localFile.id || mergedServerFile.id;
@@ -2118,6 +2135,18 @@ import {
                     mergedServerFile.isSynced = false;
                     mergedServerFile.preferLocalOnNextSync = true;
                     markPendingServerSync(mergedServerFile.id, true);
+                } else if (shouldPreferServer) {
+                    // 服务器版本较新，使用服务器版本
+                    mergedServerFile.id = localFile.id || mergedServerFile.id;
+                    mergedServerFile.content = mergedServerFile.content;
+                    mergedServerFile.lastModified = mergedServerFile.lastModified;
+                    mergedServerFile.serverLastModified = mergedServerFile.serverLastModified;
+                    mergedServerFile.contentVersion = mergedServerFile.contentVersion;
+                    mergedServerFile.isSynced = true;
+                    // 如果是当前正在编辑的文件，更新编辑器内容
+                    if (localFile.id === g('currentFileId')) {
+                        setEditorContentForFile(localFile.id, mergedServerFile.content);
+                    }
                 }
                 return;
             }

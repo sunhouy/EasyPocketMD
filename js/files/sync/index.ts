@@ -123,7 +123,7 @@ export function createSyncRuntimeApi(ctx: any) {
     if (globalRef.syncInterval) clearInterval(globalRef.syncInterval);
     globalRef.syncInterval = setInterval(function () {
       if (g('currentUser')) globalRef.syncAllFiles();
-    }, 30000);
+    }, 5000);
   }
 
   function stopAutoSync() {
@@ -338,24 +338,61 @@ export function createSyncRuntimeApi(ctx: any) {
               return true;
             }
 
-            markPendingServerSync(fileId, true);
+            const serverContent = (result.data && result.data.server_content) || '';
+            const serverModified = (result.data && result.data.server_last_modified) || null;
+            const serverContentVersion = Number(
+              result.data && result.data.server_content_version ? result.data.server_content_version : 0,
+            );
+
             if (backgroundSync) {
+              // 后台同步时，检查本地是否有未保存的更改
+              const baseContent = (g('lastSyncedContent') || {})[fileId];
+              if (content === baseContent) {
+                // 本地没有更改，直接同步服务器版本
+                file.content = serverContent;
+                file.lastModified = serverModified || file.lastModified || Date.now();
+                file.serverLastModified = serverModified || file.serverLastModified || file.lastModified;
+                file.contentVersion = serverContentVersion;
+                file.isSynced = true;
+                localStorage.setItem('vditor_files', JSON.stringify(files));
+                g('lastSyncedContent')[fileId] = serverContent;
+                g('unsavedChanges')[fileId] = false;
+                markPendingServerSync(fileId, false);
+                globalRef.lastSaveConflictPending = false;
+                return true;
+              }
               return false;
             }
-            globalRef.lastSaveConflictPending = true;
-            if (typeof globalRef.showSaveConflictDialog === 'function') {
-              globalRef.showSaveConflictDialog({
-                fileId: fileId,
-                fileName: file.name,
-                localContent: content,
-                serverContent: (result.data && result.data.server_content) || '',
-                serverContentVersion: Number(
-                  result.data && result.data.server_content_version ? result.data.server_content_version : 0,
-                ),
-                serverModified: (result.data && result.data.server_last_modified) || null,
-                localModified: file.lastModified || null,
-                serverLastModified: (result.data && result.data.server_last_modified) || null,
-                baseContentVersion: Number(file.contentVersion || 0),
+
+            // 显示提示，询问用户是否拉取服务器版本
+            if (typeof globalRef.customConfirm === 'function') {
+              globalRef.customConfirm(
+                isEn() ? 'Cloud has a newer version, do you want to pull it to local?' : '云端有新版本，是否拉取到本地？'
+              ).then((confirm) => {
+                if (confirm) {
+                  // 用户确认拉取，更新本地文件
+                  file.content = serverContent;
+                  file.lastModified = serverModified || file.lastModified || Date.now();
+                  file.serverLastModified = serverModified || file.serverLastModified || file.lastModified;
+                  file.contentVersion = serverContentVersion;
+                  file.isSynced = true;
+                  if (file.id === g('currentFileId')) {
+                    setEditorContentForFile(file.id, serverContent);
+                  }
+                  localStorage.setItem('vditor_files', JSON.stringify(files));
+                  g('lastSyncedContent')[fileId] = serverContent;
+                  g('unsavedChanges')[fileId] = false;
+                  markPendingServerSync(fileId, false);
+                  globalRef.lastSaveConflictPending = false;
+                  globalRef.showMessage(
+                    isEn() ? 'Successfully pulled latest version from cloud' : '成功从云端拉取最新版本',
+                    'success'
+                  );
+                } else {
+                  // 用户拒绝拉取，保持本地版本
+                  markPendingServerSync(fileId, true);
+                  globalRef.lastSaveConflictPending = true;
+                }
               });
             }
             return false;

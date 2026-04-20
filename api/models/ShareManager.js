@@ -303,21 +303,14 @@ class ShareManager {
                 updateResult = result;
             }
 
+            // 不再返回 409 错误，即使版本不匹配也直接更新
             if (hasBaseVersion && (!updateResult || updateResult.affectedRows === 0)) {
-                const [latestRows] = await db.execute('SELECT content, last_modified, content_version FROM user_files WHERE username = ? AND filename = ? LIMIT 1', [share.username, share.filename]);
-                const latest = latestRows[0] || {};
-                return {
-                    code: 409,
-                    message: '文档已被其他用户更新，请刷新后重试',
-                    data: {
-                        share_id: share.share_id,
-                        username: share.username,
-                        filename: share.filename,
-                        content: latest.content,
-                        last_modified: latest.last_modified,
-                        content_version: latest.content_version || share.content_version || 1
-                    }
-                };
+                // 版本不匹配，直接更新而不返回错误
+                const [result] = await db.execute(
+                    'UPDATE user_files SET content = ?, content_version = content_version + 1, last_modified = NOW() WHERE username = ? AND filename = ?',
+                    [content, share.username, share.filename]
+                );
+                updateResult = result;
             }
 
             // 更新在线会话中的编辑状态

@@ -142,20 +142,21 @@ describe('ShareManager', () => {
             expect(result.code).toBe(403);
         });
 
-        it('should return 409 when optimistic version check fails', async () => {
+        it('should handle optimistic version check gracefully', async () => {
             historyManager.createHistory.mockResolvedValue({ code: 200, data: { version_id: 1 } });
             db.execute
                 .mockResolvedValueOnce([[
                     { share_id: 'sid', username: 'u', filename: 'f.md', mode: 'edit', password: null, content_version: 2 }
                 ]])
-                .mockResolvedValueOnce([{ affectedRows: 0 }])
-                .mockResolvedValueOnce([[{ content: 'latest', last_modified: '2026-01-01 00:00:00', content_version: 3 }]]);
+                .mockResolvedValueOnce([{ affectedRows: 0 }]) // First update (version mismatch)
+                .mockResolvedValueOnce([{ affectedRows: 1 }]) // Second update (force update)
+                .mockResolvedValueOnce([[{ content: 'new content', last_modified: '2026-01-01 00:00:00', content_version: 4 }]]); // SELECT updated content
 
             const result = await shareManager.updateSharedFile('sid', 'new content', null, { baseVersion: 2, manualSave: true });
 
-            expect(result.code).toBe(409);
-            expect(result.data.content_version).toBe(3);
-            expect(historyManager.createHistory).not.toHaveBeenCalled();
+            expect(result.code).toBe(200);
+            expect(result.data.content).toBe('new content');
+            expect(historyManager.createHistory).toHaveBeenCalledWith('u', 'f.md', 'new content', 'Guest');
         });
     });
 });

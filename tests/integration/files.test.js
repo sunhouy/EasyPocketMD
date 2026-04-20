@@ -61,13 +61,16 @@ describe('Files API Integration', () => {
             expect(res.body.message).toBe('文件保存成功');
         });
 
-        it('should return 409 on optimistic lock conflict', async () => {
+        it('should handle optimistic lock conflict gracefully', async () => {
             const mockConnection = {
-                execute: jest.fn().mockResolvedValueOnce([[{
-                    id: 1,
-                    content: 'server latest',
-                    last_modified: '2024-01-02T00:00:00.000Z'
-                }]]),
+                execute: jest.fn()
+                    .mockResolvedValueOnce([[{
+                        id: 1,
+                        content: 'server latest',
+                        last_modified: '2024-01-02T00:00:00.000Z',
+                        content_version: 2
+                    }]])
+                    .mockResolvedValueOnce([]), // Update
                 release: jest.fn()
             };
             db.getConnection.mockResolvedValueOnce(mockConnection);
@@ -81,10 +84,10 @@ describe('Files API Integration', () => {
                     base_last_modified: '2024-01-01T00:00:00.000Z'
                 });
 
-            expect(res.status).toBe(409);
-            expect(res.body.code).toBe(409);
-            expect(res.body.data.server_last_modified).toBe('2024-01-02T00:00:00.000Z');
-            expect(mockConnection.execute).toHaveBeenCalledTimes(1);
+            expect(res.status).toBe(200);
+            expect(res.body.code).toBe(200);
+            expect(res.body.message).toBe('文件更新成功');
+            expect(mockConnection.execute).toHaveBeenCalledTimes(2);
         });
 
         it('should keep backward compatibility when base fields are omitted', async () => {
