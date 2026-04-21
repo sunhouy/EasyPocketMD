@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>测试Matplotlib中文字体</title>
+    <script src="js/code-runner.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <h1>测试Matplotlib中文字体支持</h1>
+    
+    <pre><code class="language-python">
+import matplotlib.pyplot as plt
+
+# 测试中文字体显示
+plt.figure(figsize=(10, 6))
+plt.plot([1, 2, 3, 4, 5], [1, 4, 9, 16, 25])
+plt.title('测试中文字体标题')
+plt.xlabel('横轴标签')
+plt.ylabel('纵轴标签')
+plt.text(2, 15, '测试中文文本')
+plt.legend(['测试曲线'])
+
+# 尝试指定其他字体，应该被强制覆盖
+plt.rcParams['font.family'] = 'Arial'
+plt.title('测试Arial字体标题（应该显示为中文字体）')
+
+# 保存图像
+plt.savefig('test_chinese_font.png')
+
+# 显示图像
+import base64
+from io import BytesIO
+
+buf = BytesIO()
+plt.savefig(buf, format='png')
+buf.seek(0)
+img_str = base64.b64encode(buf.read()).decode('utf-8')
+print('\n图像预览:')
+print(f'<img src="data:image/png;base64,{img_str}" width="600">')
+
+print('\n测试完成，图像已保存为 test_chinese_font.png')
+    </code></pre>
+
+    <script>
+        // 初始化代码运行器
+        window.addEventListener('DOMContentLoaded', function() {
+            addRunButtons(document.body);
+        });
+    </script>
+</body>
+</html>
