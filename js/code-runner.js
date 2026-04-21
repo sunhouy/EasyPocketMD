@@ -38,7 +38,9 @@
                         var moduleUrl = baseUrl + 'pyodide.mjs';
                         var pyodideModule = await import(moduleUrl);
                         self.pyodide = await pyodideModule.loadPyodide({
-                            indexURL: baseUrl
+                            indexURL: baseUrl,
+                            lockFileURL: baseUrl + 'pyodide-lock.json?version=' + Date.now(),
+                            packageCacheDir: 'pyodide-' + Date.now()
                         });
                         self.pyodideLoaded = true;
                         self.pyodideCdnBase = baseUrl;
