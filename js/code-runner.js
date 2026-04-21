@@ -50,8 +50,46 @@
                             // 尝试加载其他可选库
                             try {
                                 await self.pyodide.loadPackage(['pandas', 'matplotlib']);
+                                
+                                // 添加中文字体支持
+                                await self.pyodide.runPython(`
+import matplotlib
+import matplotlib.font_manager as fm
+import urllib.request
+import os
+
+# 下载中文字体
+font_url = 'https://static.yhsun.cn/cdn/pyodide/chinese.ttf'
+font_path = os.path.join(os.path.dirname(matplotlib.__file__), 'mpl-data', 'fonts', 'ttf', 'chinese.ttf')
+
+# 下载字体文件
+urllib.request.urlretrieve(font_url, font_path)
+
+# 清除字体缓存
+fm._rebuild()
+
+# 强制设置matplotlib使用中文字体
+matplotlib.rcParams['font.family'] = ['sans-serif']
+matplotlib.rcParams['font.sans-serif'] = ['chinese'] + matplotlib.rcParams['font.sans-serif']
+matplotlib.rcParams['axes.unicode_minus'] = False  # 解决负号显示问题
+
+# 重写字体获取方法，强制使用指定字体
+original_fontManager = fm.FontManager
+
+class ForcedFontManager(original_fontManager):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+    
+    def findfont(self, prop, fontext='ttf', directory=None, fallback_to_default=True, rebuild_if_missing=True):
+        # 无论请求什么字体，都返回我们的中文字体
+        return font_path
+
+fm.FontManager = ForcedFontManager
+# 重新创建字体管理器实例
+fm.fontManager = ForcedFontManager()
+                                `);
                             } catch (e) {
-                                console.warn('Failed to load optional packages (pandas, matplotlib):', e);
+                                console.warn('Failed to load optional packages (pandas, matplotlib) or set up Chinese font:', e);
                             }
                         } catch (e) {
                             console.error('Failed to load essential packages (numpy):', e);
