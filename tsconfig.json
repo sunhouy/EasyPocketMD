@@ -15,10 +15,15 @@
     "sourceMap": true,
     "allowJs": true,
     "checkJs": false,
-    "noEmit": true
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "paths": {
+      "@/*": ["./src/*"]
+    }
   },
   "include": [
-    "js/**/*"
+    "js/**/*",
+    "src/**/*"
   ],
   "exclude": [
     "node_modules",

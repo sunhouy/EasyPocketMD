@@ -1,4 +1,5 @@
 import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
 import { viteStaticCopy } from 'vite-plugin-static-copy';
 import { readFileSync, existsSync, writeFileSync, readFile, cpSync } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -181,6 +182,7 @@ export default defineConfig({
     include: ['docx']
   },
   plugins: [
+    react(),
     viteStaticCopy({
       targets: [
         {
