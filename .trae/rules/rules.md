@@ -127,7 +127,7 @@ Step 4 → 判定测试结果（见 1.4）
 
 | 阶段 | 门禁条件 |
 |------|----------|
-| **阶段一 → 二** | `npm run build & npm start` 正常；React DevTools 可检测到根节点；旧功能 100% 可用 |
+| **阶段一 → 二** | `npm run dev` 正常；React DevTools 可检测到根节点；旧功能 100% 可用 |
 | **阶段二 → 三** | 所有 `window.*` 关键全局变量已接入双向同步桥；无死循环风险 |
 | **阶段三 → 四** | P0 组件（`VditorWrapper`、`FileList`）已 React 化且测试通过 |
 | **阶段四完成** | `npm run build:web` 无报错；WASM 文件正确复制到 `dist/`；`npm test` 通过 |
