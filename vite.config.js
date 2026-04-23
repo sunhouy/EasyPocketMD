@@ -150,10 +150,10 @@ export default defineConfig({
         changeOrigin: true,
         secure: false
       },
-      '/vditor': {
-        target: 'http://localhost:3000',
-        changeOrigin: true
-      }
+      // '/vditor': {
+      //   target: 'http://localhost:3000',
+      //   changeOrigin: true
+      // }
     }
   },
   preview: {},
