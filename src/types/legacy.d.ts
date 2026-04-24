@@ -13,6 +13,7 @@ interface Window {
   userSettings: UserSettings;
   pendingServerSync: boolean;
   isFileSwitchLoading: boolean;
+  appSessionId: string;
   autoSaveTimer: ReturnType<typeof setTimeout> | null;
   syncInterval: ReturnType<typeof setInterval> | null;
   lastSyncedContent: Record<string, string>;

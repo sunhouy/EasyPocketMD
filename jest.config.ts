@@ -23,6 +23,13 @@ module.exports = {
   transform: {
     '^.+\\.(ts|tsx)$': ['ts-jest', {
       useESM: false,
+      tsconfig: {
+        target: 'ES2022',
+        module: 'CommonJS',
+        moduleResolution: 'bundler',
+        esModuleInterop: true,
+        ignoreDeprecations: '6.0',
+      },
     }],
   },
 };

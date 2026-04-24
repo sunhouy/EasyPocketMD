@@ -51,3 +51,75 @@
   - 首先创建 `src/store/useAppStore.ts`、`src/store/useEditorStore.ts`、`src/store/useUIStore.ts`
   - 然后实现 `src/legacy/globalBridge.ts` 双向同步桥（注意防死循环）
   - **警告**：在双向同步桥完成之前，不要删除任何 `window.*` 赋值语句
+
+---
+
+# Handover — Phase 2 全局状态迁移 — 2026-04-23
+
+## 本次修改文件列表
+
+| 文件路径 | 变更类型 | 变更说明 |
+|----------|----------|----------|
+| `src/store/useAppStore.ts` | 新增 | 核心应用状态 store（currentUser、files、currentFileId、unsavedChanges 等） |
+| `src/store/useEditorStore.ts` | 新增 | 编辑器状态 store（vditorReady、vditor 实例引用） |
+| `src/store/useUIStore.ts` | 新增 | UI 状态 store（nightMode、userSettings、isFileManagementMode 等） |
+| `src/store/index.ts` | 新增 | 统一导出三个 store |
+| `src/legacy/globalBridge.ts` | 新增 | window.* ↔ Zustand 双向同步桥（含 isSyncing 防死循环标志位） |
+| `src/main.tsx` | 修改 | 在应用入口调用 `initGlobalBridge()` |
+| `src/types/legacy.d.ts` | 修改 | 新增 `appSessionId` 全局变量声明，修复类型错误 |
+
+## 引入的新依赖
+
+无新依赖，所有包已在 Phase 1 中安装。
+
+## 已知技术债务
+
+- [低] `js/files/sync/index.ts:371` 存在 `Parameter 'confirm' implicitly has an 'any' type`，为既有 TypeScript 问题，与本次迁移无关
+- [中] `src/legacy/globalBridge.ts` 中的 `createWindowProxy` 函数目前未被使用（预留接口），后续可根据需要启用
+
+## 双向同步桥接的全局变量
+
+| 全局变量 | 方向 | Store |
+|----------|------|-------|
+| `window.currentUser` | ↔ | useAppStore |
+| `window.files` | ↔ | useAppStore |
+| `window.currentFileId` | ↔ | useAppStore |
+| `window.unsavedChanges` | ↔ | useAppStore |
+| `window.lastSyncedContent` | ↔ | useAppStore |
+| `window.appSessionId` | ↔ | useAppStore |
+| `window.vditorReady` | ↔ | useEditorStore |
+| `window.nightMode` | ↔ | useUIStore |
+| `window.userSettings` | ↔ | useUIStore |
+| `window.isFileManagementMode` | ↔ | useUIStore |
+| `window.isFileSwitchLoading` | ↔ | useUIStore |
+| `window.toolbarUncertaintyUnlocked` | ↔ | useUIStore |
+| `window.startInFileManagementMode` | ↔ | useUIStore |
+| `window.deferInitialFileOpen` | ↔ | useUIStore |
+| `window.isTauriMobileEnvironment` | ↔ | useUIStore |
+
+> 注意：`window.vditor` 实例本身不存入 Zustand（不可序列化），仅通过 `useEditorStore._vditorInstance` 持有引用，vditorReady 状态同步至 `window.vditorReady`
+
+## 防死循环机制
+
+- `isSyncing` 模块级标志位，在双向 setter 中检查
+- 值比较保护：`newValue === oldValue` 时直接 return
+- `try/finally` 确保 `isSyncing` 始终被重置
+
+## 测试状态
+
+- **最终测试结果**：通过
+- **验证方法**：
+  - `npx tsc --noEmit` — 仅 1 个既有 TS 错误（`js/files/sync/index.ts`），无新增错误
+  - `npm run dev` — Vite 启动正常（localhost:8080）
+  - Chrome DevTools 验证：
+    - 页面正常加载，旧编辑器功能完整
+    - 控制台无 error 级别错误
+    - Zustand DevTools 可检测到三个 store
+
+## 下一步迁移建议
+
+- **对应 implementation_plan.md 阶段三**：UI 组件化
+  - 首先迁移 P0 优先级组件：`VditorWrapper` 和 `FileList`
+  - `VditorWrapper` 使用 `useRef` + `useEffect` 封装 Vditor 实例
+  - 通过 `useEditorStore` 同步 `vditorReady` 状态
+  - 旧代码 `js/ui/file-manager.js` 中的文件列表逻辑可直接 import 调用
