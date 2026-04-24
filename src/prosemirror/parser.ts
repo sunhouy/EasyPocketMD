@@ -3,6 +3,7 @@ import type { default as Token } from 'markdown-it/lib/token.mjs';
 import type { Attrs } from 'prosemirror-model';
 import { MarkdownParser, MarkdownSerializer } from 'prosemirror-markdown';
 import { markdownSchema } from './schema';
+import taskLists from 'markdown-it-task-lists'
 
 const md = new MarkdownIt({ html: false, linkify: true, typographer: false });
 
@@ -11,7 +12,7 @@ md.enable('table');
 // Enable strikethrough (needed for ~~strike~~)
 md.enable('strikethrough');
 
-md.use(require('markdown-it-task-lists'));
+md.use(taskLists, { label: true, labelAfter: true });
 
 // Custom plugin: detect task-list-item class on list_item tokens
 // and emit a separate token type so the parser can map it to task_item node
