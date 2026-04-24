@@ -22,6 +22,8 @@ interface Window {
   isFileManagementMode: boolean;
   isTauriMobileEnvironment: boolean;
   toolbarUncertaintyUnlocked: boolean;
+  editorType: 'vditor' | 'prosemirror';
+  prosemirrorContent: string | null;
   enterFileManagementMode: (options?: any) => void;
   enterEditorMode: () => void;
   ensureWasmTextEngineReady: () => Promise<any>;
@@ -35,6 +37,7 @@ interface Window {
   __rejectVditorInit: ((err: any) => void) | null;
   wasmTextEngineReadyPromise: Promise<any> | null;
   _hmt: any[];
+  applyOutline: () => void;
 }
 
 interface UserSettings {

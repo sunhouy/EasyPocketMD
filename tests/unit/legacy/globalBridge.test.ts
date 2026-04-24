@@ -24,6 +24,8 @@ describe('globalBridge', () => {
     useEditorStore.setState({
       vditorReady: false,
       _vditorInstance: null,
+      editorType: 'vditor',
+      prosemirrorContent: null,
     });
     useUIStore.setState({
       nightMode: false,
@@ -115,6 +117,26 @@ describe('globalBridge', () => {
     it('should sync vditorReady from window to store', () => {
       window.vditorReady = true;
       expect(useEditorStore.getState().vditorReady).toBe(true);
+    });
+
+    it('should sync editorType from store to window', () => {
+      useEditorStore.getState().setEditorType('prosemirror');
+      expect(window.editorType).toBe('prosemirror');
+    });
+
+    it('should sync editorType from window to store', () => {
+      window.editorType = 'prosemirror';
+      expect(useEditorStore.getState().editorType).toBe('prosemirror');
+    });
+
+    it('should sync prosemirrorContent from store to window', () => {
+      useEditorStore.getState().setProsemirrorContent('# Test');
+      expect(window.prosemirrorContent).toBe('# Test');
+    });
+
+    it('should sync prosemirrorContent from window to store', () => {
+      window.prosemirrorContent = '# Window test';
+      expect(useEditorStore.getState().prosemirrorContent).toBe('# Window test');
     });
   });
 
@@ -243,3 +265,4 @@ describe('globalBridge', () => {
     });
   });
 });
+

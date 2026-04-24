@@ -123,3 +123,73 @@
   - `VditorWrapper` 使用 `useRef` + `useEffect` 封装 Vditor 实例
   - 通过 `useEditorStore` 同步 `vditorReady` 状态
   - 旧代码 `js/ui/file-manager.js` 中的文件列表逻辑可直接 import 调用
+
+---
+
+# Handover — 阶段三 ProseMirror 迁移 Phase 1-3 实现 — 2026-04-24
+
+## 本次修改文件列表
+
+| 文件路径 | 变更类型 | 变更说明 |
+|----------|----------|----------|
+| `package.json` | 修改 | 新增 prosemirror-model/state/view/commands/keymap/inputrules/markdown/tables/schema-basic/schema-list/history/gapcursor/dropcursor 及 highlight.js 共 14 个依赖 |
+| `src/prosemirror/schema.ts` | 新增 | Markdown schema 定义（table/task_item/frontmatter 扩展节点 + 完整 marks） |
+| `src/prosemirror/parser.ts` | 新增 | 自定义 markdown-it parser/serializer（GFM tables/task lists/strikethrough 支持 + token 映射 + 序列化器） |
+| `src/prosemirror/keymap.ts` | 新增 | 快捷键声明（Mod-b/i/d/` 标记切换、Tab/Shift-Tab 缩进、Mod-z/y 历史、Enter 分裂列表项） |
+| `src/prosemirror/inputrules.ts` | 新增 | Markdown 快捷输入规则（#/##... 标题、-/*/+ 无序列表、1. 有序列表、> 引用、代码块、- [ ] 任务列表） |
+| `src/prosemirror/syntaxHighlight.ts` | 新增 | highlight.js 懒加载代码块高亮插件（Decoration 实现，支持 7 种语言） |
+| `src/prosemirror/plugins.ts` | 新增 | 插件组装工厂（history + gapCursor + dropCursor + baseKeymap + custom keymap + inputRules + syntaxHighlight） |
+| `src/types/markdown-it-task-lists.d.ts` | 新增 | markdown-it-task-lists 模块类型声明 |
+| `src/hooks/useEditor.ts` | 新增 | EditorContext 定义（暴露 EditorView、Schema、execCommand、isReady） |
+| `src/components/ProseMirrorEditor.tsx` | 新增 | ProseMirror React 封装组件（fileId 依赖重建实例、dispatchTransaction 回调） |
+| `src/components/EditorAdapter.tsx` | 新增 | Vditor → ProseMirror 适配器（window.vditor API 桥接到 ProseMirror EditorView） |
+| `src/components/EditorLayout.tsx` | 新增 | 双编辑器布局组件（含 Vditor/ProseMirror 切换按钮，Feature Flag 控制） |
+| `src/store/useEditorStore.ts` | 修改 | 新增 editorType/prosemirrorContent 字段及 setter，支持双编辑器状态管理 |
+| `src/legacy/globalBridge.ts` | 修改 | 新增 editorType/prosemirrorContent 的 Zustand ↔ window 双向同步 |
+| `src/types/legacy.d.ts` | 修改 | 新增 editorType/prosemirrorContent/applyOutline 全局类型声明 |
+| `src/App.tsx` | 修改 | 挂载 EditorLayout 组件替代空壳 |
+| `tests/setup.ts` | 修改 | 初始化 editorType/prosemirrorContent/applyOutline 测试默认值 |
+| `tests/unit/prosemirror/parser.test.ts` | 新增 | Schema 幂等性测试 28 例（parse→serialize→parse 结构等价验证） |
+| `tests/unit/prosemirror/plugins.test.ts` | 新增 | 插件系统测试 6 例（buildPlugins/buildKeymap/buildInputRules 功能验证） |
+| `tests/unit/components/ProseMirrorEditor.test.tsx` | 新增 | ProseMirrorEditor 组件测试 3 例 |
+| `tests/unit/store/useEditorStore.test.ts` | 修改 | 补充 editorType/prosemirrorContent 测试用例 |
+| `tests/unit/legacy/globalBridge.test.ts` | 修改 | 补充 editorType/prosemirrorContent 双向同步及防死循环测试 |
+
+## 引入的新依赖
+
+| 包名 | 版本 | 用途 |
+|------|------|------|
+| prosemirror-model | ~1.25 | ProseMirror 文档模型（Schema/Node/Mark） |
+| prosemirror-state | ~1.4 | EditorState/Transaction 状态管理 |
+| prosemirror-view | ~1.40 | EditorView 视图层/DOM 渲染 |
+| prosemirror-commands | ~1.7 | 基础编辑命令 |
+| prosemirror-keymap | ~1.2 | 快捷键绑定插件 |
+| prosemirror-inputrules | ~1.5 | Markdown 快捷输入规则 |
+| prosemirror-markdown | ~1.13 | Markdown ↔ ProseMirror 解析/序列化 |
+| prosemirror-tables | ~1.7 | 表格节点定义与编辑命令 |
+| prosemirror-schema-basic | ~1.2 | 基础 Schema（参考用） |
+| prosemirror-schema-list | ~1.6 | 列表节点定义与命令 |
+| prosemirror-history | ~1.4 | 撤销/重做历史管理 |
+| prosemirror-gapcursor | ~1.4 | 块级元素间光标定位 |
+| prosemirror-dropcursor | ~1.8 | 拖放光标指示 |
+| highlight.js | ~11.11 | 代码块语法高亮 |
+
+## 已知技术债务
+
+- [ ] 表格序列化未完整实现（parser 可解析表格，serializer 仅产出空壳） — 风险等级：中
+- [ ] Frontmatter 解析需自定义 markdown-it 插件（当前被默认解析为 heading） — 风险等级：中
+- [ ] highlight.js 语言包一次性全加载，可按需拆分 — 风险等级：低
+- [ ] EditorAdapter 暴露的 window.vditor 为最小兼容 API，若遗留代码依赖更多属性需扩展 — 风险等级：中
+
+## 测试状态
+
+- 最终测试结果：通过
+- TypeScript 编译：仅预存 js/files/sync/index.ts 有隐式 any，新增代码零类型错误
+- 测试统计：10 suites, 130 tests, 0 failures
+
+## 下一步迁移建议
+
+- **阶段 3 后续**：在 index.html 中增加 Vditor 侧的切换按钮入口
+- **阶段 4**：将 js/files/runtime-core.ts 中的 window.vditor 引用逐步迁移至 useEditor() hook
+- **完善表格序列化**：实现 GFM table 格式的完整 round-trip
+- **Frontmatter 解析**：添加自定义 markdown-it 插件识别 YAML 前置区块

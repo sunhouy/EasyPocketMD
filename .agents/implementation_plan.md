@@ -248,7 +248,7 @@ export function initGlobalBridge() {
 
 | 优先级 | 模块 | 对应旧文件 | 说明 |
 |--------|------|------------|------|
-| P0 | `<VditorWrapper />` | Vditor 初始化（`main.js`）| 核心编辑器桥接 |
+| P0 | `<ProseMirrorEditor />` | Vditor 初始化（`main.js`）| 核心编辑器替换为 ProseMirror |
 | P0 | `<FileList />` | `js/ui/file-manager.js` | 侧边栏文件树 |
 | P1 | `<Toolbar />` | `main.js` toolbar 部分 | 顶部工具栏 |
 | P1 | `<AIAssistant />` | `js/ui/ai-assistant.js` | AI 侧边板 |
@@ -258,49 +258,14 @@ export function initGlobalBridge() {
 | P3 | `<InsertPicker />` | `js/ui/insert-picker.js` | 插入选择器 |
 | P3 | `<ChartEditor />` | `js/ui/chart.js` | 图表编辑 |
 
-#### 3.2 Vditor 桥接（最关键组件）
+#### 3.2 编辑器升级：ProseMirror（最关键组件）
 
-Vditor 是非 React 库，使用 `useRef` + `useEffect` 模式封装，并加入 Strict Mode 保护：
+由于 Vditor 存在架构限制且 React 生态融合度不高，将在阶段三将核心编辑器升级为 **ProseMirror**。ProseMirror 具有极高的可定制性和更好的 React/协作编辑支持。
 
-```tsx
-// src/components/editor/VditorWrapper.tsx
-import { useRef, useEffect } from 'react';
-import Vditor from 'vditor';
-import { useEditorStore } from '../../store/useEditorStore';
+由于 ProseMirror 的引入涉及到底层数据结构（Markdown -> ProseMirror Document）及事件体系的大幅重构，此部分被拆分为独立的详细子计划。
 
-export function VditorWrapper({ fileContent }: { fileContent: string }) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const vditorRef = useRef<Vditor | null>(null);
-  const isInitializing = useRef(false); // 防止 React Strict Mode 双重初始化
-  const { setVditorReady } = useEditorStore();
-
-  useEffect(() => {
-    if (!containerRef.current || vditorRef.current || isInitializing.current) return;
-
-    isInitializing.current = true;
-    vditorRef.current = new Vditor(containerRef.current, {
-      after() {
-        setVditorReady(true);
-        window.vditor = vditorRef.current;
-        window.vditorReady = true;
-        isInitializing.current = false;
-      },
-      ...window._legacyEditorConfig,
-    });
-
-    return () => {
-      vditorRef.current?.destroy();
-      vditorRef.current = null;
-      window.vditor = null;
-      window.vditorReady = false;
-      setVditorReady(false);
-      isInitializing.current = false;
-    };
-  }, []);
-
-  return <div ref={containerRef} id="vditor" />;
-}
-```
+> [!IMPORTANT]
+> **详细方案请参考**：[`prosemirror_migration_plan.md`](./prosemirror_migration_plan.md)
 
 #### 3.3 遗留模块直接引入模式
 
@@ -372,7 +337,7 @@ src/
 ├── App.tsx
 ├── components/
 │   ├── editor/
-│   │   ├── VditorWrapper.tsx       # 编辑器桥接
+│   │   ├── ProseMirrorEditor.tsx   # ProseMirror 编辑器组件
 │   │   └── LongFileEditor.tsx      # 超长文件模式
 │   ├── sidebar/
 │   │   ├── FileList.tsx

@@ -43,3 +43,6 @@ window.__resolveVditorInit = null;
 window.__rejectVditorInit = null;
 window.wasmTextEngineReadyPromise = null;
 window._hmt = [];
+window.editorType = 'vditor';
+window.prosemirrorContent = null;
+window.applyOutline = jest.fn();

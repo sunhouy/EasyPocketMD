@@ -161,13 +161,22 @@ function initEditorStoreBridge() {
   useEditorStore.subscribe((state, prevState) => {
     if (isSyncing) return;
 
-    if (state.vditorReady !== prevState.vditorReady) {
-      try {
-        isSyncing = true;
+    try {
+      isSyncing = true;
+
+      if (state.vditorReady !== prevState.vditorReady) {
         window.vditorReady = state.vditorReady;
-      } finally {
-        isSyncing = false;
       }
+
+      if (state.editorType !== prevState.editorType) {
+        window.editorType = state.editorType;
+      }
+
+      if (state.prosemirrorContent !== prevState.prosemirrorContent) {
+        window.prosemirrorContent = state.prosemirrorContent;
+      }
+    } finally {
+      isSyncing = false;
     }
   });
 
@@ -183,6 +192,36 @@ function initEditorStoreBridge() {
       }
     },
     get() { return useEditorStore.getState().vditorReady; },
+    configurable: true,
+  });
+
+  Object.defineProperty(window, 'editorType', {
+    set(value) {
+      if (isSyncing) return;
+      if (useEditorStore.getState().editorType === value) return;
+      try {
+        isSyncing = true;
+        useEditorStore.getState().setEditorType(value);
+      } finally {
+        isSyncing = false;
+      }
+    },
+    get() { return useEditorStore.getState().editorType; },
+    configurable: true,
+  });
+
+  Object.defineProperty(window, 'prosemirrorContent', {
+    set(value) {
+      if (isSyncing) return;
+      if (useEditorStore.getState().prosemirrorContent === value) return;
+      try {
+        isSyncing = true;
+        useEditorStore.getState().setProsemirrorContent(value);
+      } finally {
+        isSyncing = false;
+      }
+    },
+    get() { return useEditorStore.getState().prosemirrorContent; },
     configurable: true,
   });
 }
