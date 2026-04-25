@@ -12,7 +12,7 @@ export default function EditorLayout() {
 
   return (
     <>
-      {/* Always render toggle for switching editor */}
+      {/* Always render toggle for switching editor
       <div className="editor-toggle-bar" style={{
         position: 'fixed',
         top: 8,
@@ -51,9 +51,8 @@ export default function EditorLayout() {
         >
           Switch to {editorType === 'prosemirror' ? 'Vditor' : 'ProseMirror'}
         </button>
-      </div>
+      </div> */}
 
-      {editorType === 'prosemirror' && (
         <ProseMirrorEditor
           fileId={currentFileId}
           initialContent={prosemirrorContent ?? ''}
@@ -62,7 +61,6 @@ export default function EditorLayout() {
         >
           <EditorAdapter />
         </ProseMirrorEditor>
-      )}
     </>
   );
 }
