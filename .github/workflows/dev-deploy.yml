@@ -502,6 +502,19 @@ jobs:
           if [ -f "$NEXT_DIR/nginx.conf" ]; then
             echo "更新 Nginx 配置..."
             cp "$NEXT_DIR/nginx.conf" /www/server/panel/vhost/nginx/dev.yhsun.cn.conf
+            # 替换 server_name 为 dev.yhsun.cn
+            sed -i "s/server_name md.yhsun.cn www.md.yhsun.cn;/server_name dev.yhsun.cn www.dev.yhsun.cn;/g" /www/server/panel/vhost/nginx/dev.yhsun.cn.conf
+            # 替换 SSL 证书路径
+            sed -i "s/ssl_certificate    \/www\/server\/panel\/vhost\/cert\/md.yhsun.cn\/fullchain.pem;/ssl_certificate    \/www\/server\/panel\/vhost\/cert\/dev.yhsun.cn\/fullchain.pem;/g" /www/server/panel/vhost/nginx/dev.yhsun.cn.conf
+            sed -i "s/ssl_certificate_key    \/www\/server\/panel\/vhost\/cert\/md.yhsun.cn\/privkey.pem;/ssl_certificate_key    \/www\/server\/panel\/vhost\/cert\/dev.yhsun.cn\/privkey.pem;/g" /www/server/panel/vhost/nginx/dev.yhsun.cn.conf
+            # 替换静态文件根目录
+            sed -i "s/root \/www\/wwwroot\/js\/dist;/root \/www\/wwwroot\/js_dev\/dist;/g" /www/server/panel/vhost/nginx/dev.yhsun.cn.conf
+            # 替换上传文件目录路径
+            sed -i "s/alias \/www\/wwwroot\/js\/uploads\//alias \/www\/wwwroot\/js_dev\/uploads\//g" /www/server/panel/vhost/nginx/dev.yhsun.cn.conf
+            sed -i "s/alias \/www\/wwwroot\/js\/avatars\//alias \/www\/wwwroot\/js_dev\/avatars\//g" /www/server/panel/vhost/nginx/dev.yhsun.cn.conf
+            sed -i "s/alias \/www\/wwwroot\/js\/screenshots\//alias \/www\/wwwroot\/js_dev\/screenshots\//g" /www/server/panel/vhost/nginx/dev.yhsun.cn.conf
+            sed -i "s/alias \/www\/wwwroot\/js\/user_files\//alias \/www\/wwwroot\/js_dev\/user_files\//g" /www/server/panel/vhost/nginx/dev.yhsun.cn.conf
+            sed -i "s/alias \/www\/wwwroot\/js\/shared\//alias \/www\/wwwroot\/js_dev\/shared\//g" /www/server/panel/vhost/nginx/dev.yhsun.cn.conf
             # 确保 Nginx 配置指向正确的端口（使用当前活动的端口）
             # 同时替换 localhost 和 127.0.0.1 的端口
             sed -i "s/proxy_pass http:\/\/localhost:[0-9]*/proxy_pass http:\/\/localhost:$NEXT_PORT/" /www/server/panel/vhost/nginx/dev.yhsun.cn.conf
