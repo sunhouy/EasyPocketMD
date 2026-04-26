@@ -1,0 +1,647 @@
+name: CI/CD for Dev
+
+on:
+  push:
+    branches: [ dev ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  NODE_VERSION: '24'
+  REMOTE_NODE_BIN: '/www/server/nodejs/v24.14.1/bin'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout source
+      uses: actions/checkout@v6
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v6
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+
+    - name: Setup Emscripten
+      run: |
+        if [ ! -d "$HOME/emsdk" ]; then
+          git clone https://github.com/emscripten-core/emsdk.git "$HOME/emsdk"
+        fi
+        cd "$HOME/emsdk"
+        ./emsdk install 3.1.57
+        ./emsdk activate 3.1.57
+        echo "$HOME/emsdk" >> "$GITHUB_PATH"
+        echo "$HOME/emsdk/upstream/emscripten" >> "$GITHUB_PATH"
+
+    - name: Install dependencies
+      run: npm install --no-audit --no-fund
+
+    - name: Build WASM text engine
+      run: npm run wasm:text:build
+
+    - name: Build WASM image compressor
+      run: npm run wasm:image:build
+
+    - name: Verify WASM source artifacts
+      run: npm run wasm:text:verify && npm run wasm:image:verify
+
+    - name: Run tests
+      run: npm test && npx jest --coverage
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+    - name: Checkout source
+      uses: actions/checkout@v6
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v6
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+
+    - name: Extract package version
+      id: app_version
+      run: |
+        APP_VERSION=$(node -p "require('./package.json').version")
+        echo "version=$APP_VERSION" >> "$GITHUB_OUTPUT"
+        echo "Deploying app version: $APP_VERSION"
+
+
+    - name: Setup Emscripten
+      run: |
+        if [ ! -d "$HOME/emsdk" ]; then
+          git clone https://github.com/emscripten-core/emsdk.git "$HOME/emsdk"
+        fi
+        cd "$HOME/emsdk"
+        ./emsdk install 3.1.57
+        ./emsdk activate 3.1.57
+        echo "$HOME/emsdk" >> "$GITHUB_PATH"
+        echo "$HOME/emsdk/upstream/emscripten" >> "$GITHUB_PATH"
+
+    - name: Clean workspace (node_modules)
+      run: |
+        rm -rf node_modules
+        rm -rf **/node_modules || true
+
+    - name: Install dependencies
+      run: npm install --no-audit --no-fund
+
+    - name: Build WASM text engine
+      run: npm run wasm:text:build
+
+    - name: Build WASM image compressor
+      run: npm run wasm:image:build
+
+    - name: Verify WASM source artifacts
+      run: npm run wasm:text:verify && npm run wasm:image:verify
+
+    - name: Create .env file
+      run: |
+        cat > .env << EOF
+        PORT=${{ secrets.PORT }}
+        DB_HOST=${{ secrets.DB_HOST }}
+        DB_PORT=${{ secrets.DB_PORT }}
+        DB_USER=${{ secrets.DB_USER }}
+        DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+        DB_NAME=${{ secrets.DB_NAME }}
+        REDIS_HOST=${{ secrets.REDIS_HOST }}
+        REDIS_PORT=${{ secrets.REDIS_PORT }}
+        REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}
+        REDIS_DB=${{ secrets.REDIS_DB }}
+        JWT_SECRET=${{ secrets.JWT_SECRET }}
+        JWT_EXPIRES_IN=${{ secrets.JWT_EXPIRES_IN }}
+        ADMIN_USER=${{ secrets.ADMIN_USER }}
+        ADMIN_PASSWORD=${{ secrets.ADMIN_PASSWORD }}
+        BASE_URL=${{ secrets.BASE_URL }}
+        DASHSCOPE_API_KEY=${{ secrets.DASHSCOPE_API_KEY }}
+        EOF
+
+    - name: Create self-signed SSL certificates
+      run: |
+        mkdir -p ssl
+        openssl req -x509 -newkey rsa:4096 -keyout ssl/dev.yhsun.cn.key -out ssl/dev.yhsun.cn.pem -days 365 -nodes -subj "/CN=dev.yhsun.cn"
+
+    - name: Build frontend
+      run: npm run build
+
+    - name: Verify WASM packaged in dist
+      run: npm run wasm:text:verify:dist && npm run wasm:image:verify:dist
+
+    - name: Capture WASM checksums
+      id: wasm_checksums
+      run: |
+        echo "text_js_sha256=$(sha256sum dist/wasm_text_engine/text_engine.js | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+        echo "text_wasm_sha256=$(sha256sum dist/wasm_text_engine/text_engine.wasm | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+        echo "image_js_sha256=$(sha256sum dist/wasm_text_engine/image_compressor.js | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+        echo "image_wasm_sha256=$(sha256sum dist/wasm_text_engine/image_compressor.wasm | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+
+    - name: Create deployment tarball
+      run: |
+        mkdir -p deploy_tmp
+        cp -r dist api print shared package.json package-lock.json nginx.conf sw.js manifest.webmanifest icon.png .env ssl deploy_tmp/
+
+        # 复制 reference-docs 和 scripts
+        if [ -d "reference-docs" ]; then
+          cp -r reference-docs deploy_tmp/
+        fi
+        if [ -d "scripts" ]; then
+          cp -r scripts deploy_tmp/
+        fi
+
+        tar -czf deploy.tar.gz -C deploy_tmp .
+
+    - name: Prepare and execute zero-downtime deployment
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.SERVER_HOST }}
+        username: ${{ secrets.SERVER_USER }}
+        password: ${{ secrets.SERVER_PASSWORD }}
+        timeout: 120s
+        script: |
+          set -e
+          export PATH="$PATH:${{ env.REMOTE_NODE_BIN }}"
+
+          # 定义目录
+          GREEN_DIR="/www/wwwroot/js_dev_green"
+          BLUE_DIR="/www/wwwroot/js_dev_blue"
+          SHARED_DIR="/www/wwwroot/js_dev_shared"
+          LINK_PATH="/www/wwwroot/js_dev"
+
+          # 创建必要的目录
+          mkdir -p "$GREEN_DIR" "$BLUE_DIR" "$SHARED_DIR/uploads" "$SHARED_DIR/user_uploads" "$SHARED_DIR/user_files"
+
+          # 确定当前和下一个部署目录
+          if [ -L "$LINK_PATH" ]; then
+            CURRENT_TARGET=$(readlink -f "$LINK_PATH")
+            if [ "$CURRENT_TARGET" = "$GREEN_DIR" ]; then
+              NEXT_DIR="$BLUE_DIR"
+              NEXT_NAME="md-dev-server-blue"
+              CURRENT_NAME="md-dev-server-green"
+              echo "当前: green -> 切换到: blue"
+            else
+              NEXT_DIR="$GREEN_DIR"
+              NEXT_NAME="md-dev-server-green"
+              CURRENT_NAME="md-dev-server-blue"
+              echo "当前: blue -> 切换到: green"
+            fi
+          else
+            NEXT_DIR="$GREEN_DIR"
+            NEXT_NAME="md-dev-server-green"
+            CURRENT_NAME=""
+            echo "首次部署到: green"
+          fi
+
+          # 清理下一个部署目录
+          echo "清理 $NEXT_DIR..."
+          rm -rf "${NEXT_DIR:?}/"*
+
+          # 等待上传文件（文件会通过 SCP 上传到临时位置）
+          echo "等待部署包..."
+
+    - name: Upload deployment tarball
+      uses: appleboy/scp-action@master
+      with:
+        host: ${{ secrets.SERVER_HOST }}
+        username: ${{ secrets.SERVER_USER }}
+        password: ${{ secrets.SERVER_PASSWORD }}
+        source: "deploy.tar.gz"
+        target: "/tmp"
+        strip_components: 0
+
+    - name: Extract and setup deployment
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.SERVER_HOST }}
+        username: ${{ secrets.SERVER_USER }}
+        password: ${{ secrets.SERVER_PASSWORD }}
+        timeout: 600s
+        script: |
+          set -e
+          export PATH="$PATH:${{ env.REMOTE_NODE_BIN }}"
+
+          GREEN_DIR="/www/wwwroot/js_dev_green"
+          BLUE_DIR="/www/wwwroot/js_dev_blue"
+          SHARED_DIR="/www/wwwroot/js_dev_shared"
+          LINK_PATH="/www/wwwroot/js_dev"
+
+          # 确定目标目录
+          if [ -L "$LINK_PATH" ]; then
+            CURRENT_TARGET=$(readlink -f "$LINK_PATH")
+            if [ "$CURRENT_TARGET" = "$GREEN_DIR" ]; then
+              NEXT_DIR="$BLUE_DIR"
+            else
+              NEXT_DIR="$GREEN_DIR"
+            fi
+          else
+            NEXT_DIR="$GREEN_DIR"
+          fi
+
+          echo "[1/4] 解压部署包到 $NEXT_DIR..."
+          # 使用超时机制解压，避免卡死
+          timeout 120 tar -xzf /tmp/deploy.tar.gz -C "$NEXT_DIR" || {
+            echo "错误: 解压超时或失败"
+            exit 1
+          }
+          echo "✓ 解压完成"
+
+          # 设置共享目录符号链接
+          echo "[2/4] 设置共享目录符号链接..."
+          cd "$NEXT_DIR"
+          rm -rf uploads user_uploads user_files
+          ln -s "$SHARED_DIR/uploads" uploads
+          ln -s "$SHARED_DIR/user_uploads" user_uploads
+          ln -s "$SHARED_DIR/user_files" user_files
+          echo "✓ 符号链接创建完成"
+
+          # 安装依赖 - 使用更可靠的方式
+          echo "[3/4] 安装依赖..."
+          # 清理 npm 缓存，避免旧缓存问题
+          npm cache clean --force 2>/dev/null || true
+          
+          # 使用 npm ci 如果有 package-lock.json，否则使用 npm install
+          if [ -f "package-lock.json" ]; then
+            echo "使用 npm ci (基于 package-lock.json)..."
+            timeout 300 npm ci --omit=dev --prefer-offline --no-audit --no-fund || {
+              echo "npm ci 失败，尝试 npm install..."
+              timeout 300 npm install --omit=dev --prefer-offline --no-audit --no-fund
+            }
+          else
+            echo "使用 npm install..."
+            timeout 300 npm install --omit=dev --prefer-offline --no-audit --no-fund
+          fi
+
+          echo "✓ 依赖安装完成"
+
+          # 验证安装
+          echo "[4/4] 验证安装..."
+          if [ ! -d "node_modules" ]; then
+            echo "错误: node_modules 目录不存在"
+            exit 1
+          fi
+          
+          # 安装 python-docx 用于生成 DOCX 模板
+          echo "[5/5] 安装 Python 依赖..."
+          if command -v python3 &> /dev/null; then
+            PYTHON_CMD=python3
+          elif command -v python &> /dev/null; then
+            PYTHON_CMD=python
+          else
+            echo "警告: 未找到 Python，DOCX 模板生成功能可能受限"
+          fi
+          
+          if [ -n "$PYTHON_CMD" ]; then
+            echo "使用 Python: $PYTHON_CMD"
+            $PYTHON_CMD -m pip install --upgrade pip -q || echo "警告: pip 升级失败"
+            $PYTHON_CMD -m pip install python-docx -q || echo "警告: python-docx 安装失败"
+          fi
+          
+          echo "✓ 部署目录准备完成: $NEXT_DIR"
+
+    - name: Zero-downtime switch
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.SERVER_HOST }}
+        username: ${{ secrets.SERVER_USER }}
+        password: ${{ secrets.SERVER_PASSWORD }}
+        timeout: 300s
+        script: |
+          set -e
+          export PATH="$PATH:${{ env.REMOTE_NODE_BIN }}"
+          PM2_BIN="${{ env.REMOTE_NODE_BIN }}/pm2"
+
+          GREEN_DIR="/www/wwwroot/js_dev_green"
+          BLUE_DIR="/www/wwwroot/js_dev_blue"
+          LINK_PATH="/www/wwwroot/js_dev"
+
+          # 确定当前和下一个部署
+          if [ -L "$LINK_PATH" ]; then
+            CURRENT_TARGET=$(readlink -f "$LINK_PATH")
+            if [ "$CURRENT_TARGET" = "$GREEN_DIR" ]; then
+              NEXT_DIR="$BLUE_DIR"
+              NEXT_NAME="md-dev-server-blue"
+              CURRENT_NAME="md-dev-server-green"
+            else
+              NEXT_DIR="$GREEN_DIR"
+              NEXT_NAME="md-dev-server-green"
+              CURRENT_NAME="md-dev-server-blue"
+            fi
+          else
+            NEXT_DIR="$GREEN_DIR"
+            NEXT_NAME="md-dev-server-green"
+            CURRENT_NAME=""
+          fi
+
+          echo "在新目录启动服务: $NEXT_NAME"
+          cd "$NEXT_DIR"
+
+          # 根据服务名称设置端口
+          if [ "$NEXT_NAME" = "md-dev-server-green" ]; then
+            NEXT_PORT=3052
+          else
+            NEXT_PORT=3053
+          fi
+          echo "服务 $NEXT_NAME 将使用端口: $NEXT_PORT"
+
+          # 清理所有可能使用旧端口的 md-dev-server 服务
+          echo "清理所有旧的 md-dev-server 服务..."
+          "$PM2_BIN" stop md-dev-server-green 2>/dev/null || true
+          "$PM2_BIN" delete md-dev-server-green 2>/dev/null || true
+          "$PM2_BIN" stop md-dev-server-blue 2>/dev/null || true
+          "$PM2_BIN" delete md-dev-server-blue 2>/dev/null || true
+          sleep 3
+
+          # 检查敏感词文件是否存在
+          echo "检查敏感词文件..."
+          if [ ! -f "/www/wwwroot/static/sensitive.txt" ]; then
+            echo "⚠️ 警告: 敏感词文件不存在，敏感词检测功能将不可用"
+          else
+            echo "✓ 敏感词文件已存在"
+          fi
+
+          # 启动新服务
+          echo "启动新服务: $NEXT_NAME"
+          cd "$NEXT_DIR"
+
+          # 导出所有必需的环境变量
+          export PORT=$NEXT_PORT
+          export DB_HOST=${{ secrets.DB_HOST }}
+          export DB_PORT=${{ secrets.DB_PORT }}
+          export DB_USER=${{ secrets.DB_USER }}
+          export DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+          export DB_NAME=${{ secrets.DB_NAME }}
+          export REDIS_HOST=${{ secrets.REDIS_HOST }}
+          export REDIS_PORT=${{ secrets.REDIS_PORT }}
+          export REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}
+          export REDIS_DB=${{ secrets.REDIS_DB }}
+          export JWT_SECRET=${{ secrets.JWT_SECRET }}
+          export JWT_EXPIRES_IN=${{ secrets.JWT_EXPIRES_IN }}
+          export ADMIN_USER=${{ secrets.ADMIN_USER }}
+          export ADMIN_PASSWORD=${{ secrets.ADMIN_PASSWORD }}
+          export BASE_URL=${{ secrets.BASE_URL }}
+          export DASHSCOPE_API_KEY=${{ secrets.DASHSCOPE_API_KEY }}
+
+          "$PM2_BIN" start api/server.js --name "$NEXT_NAME" --env production
+
+          # 等待服务启动
+          echo "等待服务启动..."
+          sleep 5
+          
+          # 验证服务健康状态
+          echo "验证服务健康状态..."
+          for i in {1..10}; do
+            if curl -s http://localhost:$NEXT_PORT/api/health | grep -q '"code":200'; then
+              echo "✓ 服务健康检查通过"
+              break
+            fi
+            echo "等待服务就绪... ($i/10)"
+            sleep 2
+          done
+
+          # 校验 WASM 产物是否为本次构建版本，避免旧产物被错误复用
+          echo "校验 WASM 产物版本与完整性..."
+          EXPECTED_TEXT_JS_SHA="${{ steps.wasm_checksums.outputs.text_js_sha256 }}"
+          EXPECTED_TEXT_WASM_SHA="${{ steps.wasm_checksums.outputs.text_wasm_sha256 }}"
+          EXPECTED_IMAGE_JS_SHA="${{ steps.wasm_checksums.outputs.image_js_sha256 }}"
+          EXPECTED_IMAGE_WASM_SHA="${{ steps.wasm_checksums.outputs.image_wasm_sha256 }}"
+          ACTIVE_TEXT_JS="$NEXT_DIR/dist/wasm_text_engine/text_engine.js"
+          ACTIVE_TEXT_WASM="$NEXT_DIR/dist/wasm_text_engine/text_engine.wasm"
+          ACTIVE_IMAGE_JS="$NEXT_DIR/dist/wasm_text_engine/image_compressor.js"
+          ACTIVE_IMAGE_WASM="$NEXT_DIR/dist/wasm_text_engine/image_compressor.wasm"
+
+          if [ ! -f "$ACTIVE_TEXT_JS" ] || [ ! -f "$ACTIVE_TEXT_WASM" ]; then
+            echo "错误: 部署目录中缺少 text_engine WASM 产物"
+            ls -la "$NEXT_DIR/dist/wasm_text_engine" || true
+            exit 1
+          fi
+
+          if [ ! -f "$ACTIVE_IMAGE_JS" ] || [ ! -f "$ACTIVE_IMAGE_WASM" ]; then
+            echo "错误: 部署目录中缺少 image_compressor WASM 产物"
+            ls -la "$NEXT_DIR/dist/wasm_text_engine" || true
+            exit 1
+          fi
+
+          ACTUAL_TEXT_JS_SHA=$(sha256sum "$ACTIVE_TEXT_JS" | awk '{print $1}')
+          ACTUAL_TEXT_WASM_SHA=$(sha256sum "$ACTIVE_TEXT_WASM" | awk '{print $1}')
+          if [ "$ACTUAL_TEXT_JS_SHA" != "$EXPECTED_TEXT_JS_SHA" ] || [ "$ACTUAL_TEXT_WASM_SHA" != "$EXPECTED_TEXT_WASM_SHA" ]; then
+            echo "错误: 部署目录 text_engine WASM 校验失败"
+            echo "expected js:   $EXPECTED_TEXT_JS_SHA"
+            echo "actual js:     $ACTUAL_TEXT_JS_SHA"
+            echo "expected wasm: $EXPECTED_TEXT_WASM_SHA"
+            echo "actual wasm:   $ACTUAL_TEXT_WASM_SHA"
+            exit 1
+          fi
+
+          ACTUAL_IMAGE_JS_SHA=$(sha256sum "$ACTIVE_IMAGE_JS" | awk '{print $1}')
+          ACTUAL_IMAGE_WASM_SHA=$(sha256sum "$ACTIVE_IMAGE_WASM" | awk '{print $1}')
+          if [ "$ACTUAL_IMAGE_JS_SHA" != "$EXPECTED_IMAGE_JS_SHA" ] || [ "$ACTUAL_IMAGE_WASM_SHA" != "$EXPECTED_IMAGE_WASM_SHA" ]; then
+            echo "错误: 部署目录 image_compressor WASM 校验失败"
+            echo "expected js:   $EXPECTED_IMAGE_JS_SHA"
+            echo "actual js:     $ACTUAL_IMAGE_JS_SHA"
+            echo "expected wasm: $EXPECTED_IMAGE_WASM_SHA"
+            echo "actual wasm:   $ACTUAL_IMAGE_WASM_SHA"
+            exit 1
+          fi
+          echo "✓ 部署目录 WASM 校验通过"
+
+          TMP_WASM_DIR="/tmp/md_dev_wasm_probe"
+          rm -rf "$TMP_WASM_DIR"
+          mkdir -p "$TMP_WASM_DIR"
+          curl -fsS "http://127.0.0.1:$NEXT_PORT/wasm_text_engine/text_engine.js" -o "$TMP_WASM_DIR/text_engine.js"
+          curl -fsS "http://127.0.0.1:$NEXT_PORT/wasm_text_engine/text_engine.wasm" -o "$TMP_WASM_DIR/text_engine.wasm"
+          curl -fsS "http://127.0.0.1:$NEXT_PORT/wasm_text_engine/image_compressor.js" -o "$TMP_WASM_DIR/image_compressor.js"
+          curl -fsS "http://127.0.0.1:$NEXT_PORT/wasm_text_engine/image_compressor.wasm" -o "$TMP_WASM_DIR/image_compressor.wasm"
+
+          SERVED_TEXT_JS_SHA=$(sha256sum "$TMP_WASM_DIR/text_engine.js" | awk '{print $1}')
+          SERVED_TEXT_WASM_SHA=$(sha256sum "$TMP_WASM_DIR/text_engine.wasm" | awk '{print $1}')
+          SERVED_IMAGE_JS_SHA=$(sha256sum "$TMP_WASM_DIR/image_compressor.js" | awk '{print $1}')
+          SERVED_IMAGE_WASM_SHA=$(sha256sum "$TMP_WASM_DIR/image_compressor.wasm" | awk '{print $1}')
+
+          if [ "$SERVED_TEXT_JS_SHA" != "$EXPECTED_TEXT_JS_SHA" ] || [ "$SERVED_TEXT_WASM_SHA" != "$EXPECTED_TEXT_WASM_SHA" ]; then
+            echo "错误: HTTP 实际返回的 text_engine WASM 产物与构建版本不一致"
+            exit 1
+          fi
+
+          if [ "$SERVED_IMAGE_JS_SHA" != "$EXPECTED_IMAGE_JS_SHA" ] || [ "$SERVED_IMAGE_WASM_SHA" != "$EXPECTED_IMAGE_WASM_SHA" ]; then
+            echo "错误: HTTP 实际返回的 image_compressor WASM 产物与构建版本不一致"
+            exit 1
+          fi
+
+          # 二次确认方法完整性，避免出现"methods are incomplete"线上回退
+          export TMP_WASM_JS="$TMP_WASM_DIR/text_engine.js"
+          node --input-type=module -e "import { pathToFileURL } from 'node:url'; const mod = await import(pathToFileURL(process.env.TMP_WASM_JS).href); const inst = await mod.default({}); const engine = new inst.WasmTextEngine(); const required=['diff','merge3','findInText','normalizePath','parentPath','basenamePath','pathBasename','compareVersions','isHiddenCrossSearchFile','collectFolderPaths']; const missing=required.filter((m)=>typeof engine[m] !== 'function'); if (missing.length) { console.error('WASM 方法缺失:', missing.join(',')); process.exit(1); }"
+          echo "✓ HTTP WASM 完整性校验通过"
+
+          # 原子切换符号链接
+          echo "执行原子切换..."
+          # 如果 LINK_PATH 是目录或已存在的符号链接，先删除
+          if [ -e "$LINK_PATH" ] || [ -L "$LINK_PATH" ]; then
+            rm -rf "$LINK_PATH"
+          fi
+          ln -sfn "$NEXT_DIR" "$LINK_PATH"
+
+          # 配置 SSL 证书
+          echo "配置 SSL 证书..."
+          CERT_DIR="/www/server/panel/vhost/cert/dev.yhsun.cn"
+          mkdir -p "$CERT_DIR"
+          
+          if [ -f "$NEXT_DIR/ssl/dev.yhsun.cn.key" ] && [ -f "$NEXT_DIR/ssl/dev.yhsun.cn.pem" ]; then
+            cp "$NEXT_DIR/ssl/dev.yhsun.cn.key" "$CERT_DIR/privkey.pem"
+            cp "$NEXT_DIR/ssl/dev.yhsun.cn.pem" "$CERT_DIR/fullchain.pem"
+            chmod 600 "$CERT_DIR/privkey.pem"
+            chmod 644 "$CERT_DIR/fullchain.pem"
+            echo "✓ SSL 证书已更新"
+          else
+            echo "警告: 未找到 SSL 证书文件"
+          fi
+
+          # 更新 Nginx 配置
+          if [ -f "$NEXT_DIR/nginx.conf" ]; then
+            echo "更新 Nginx 配置..."
+            cp "$NEXT_DIR/nginx.conf" /www/server/panel/vhost/nginx/dev.yhsun.cn.conf
+            # 确保 Nginx 配置指向正确的端口（使用当前活动的端口）
+            # 同时替换 localhost 和 127.0.0.1 的端口
+            sed -i "s/proxy_pass http:\/\/localhost:[0-9]*/proxy_pass http:\/\/localhost:$NEXT_PORT/" /www/server/panel/vhost/nginx/dev.yhsun.cn.conf
+            sed -i "s/proxy_pass http:\/\/127.0.0.1:[0-9]*/proxy_pass http:\/\/127.0.0.1:$NEXT_PORT/" /www/server/panel/vhost/nginx/dev.yhsun.cn.conf
+            # 确保 API 路由配置正确
+            if ! grep -q "location /api/" /www/server/panel/vhost/nginx/dev.yhsun.cn.conf; then
+              echo "警告: Nginx 配置中缺少 /api/ 路由配置"
+            fi
+          fi
+
+          # 重载 Nginx
+          if [ -f /etc/init.d/nginx ]; then
+            /etc/init.d/nginx reload
+          else
+            nginx -s reload || service nginx reload
+          fi
+
+          # 停止旧服务（如果还有的话）
+          if [ -n "$CURRENT_NAME" ]; then
+            echo "检查并停止旧服务: $CURRENT_NAME"
+            "$PM2_BIN" stop "$CURRENT_NAME" 2>/dev/null || true
+            "$PM2_BIN" delete "$CURRENT_NAME" 2>/dev/null || true
+          fi
+
+          # 配置 PM2 开机自启（systemd）
+          echo "配置 PM2 开机自启..."
+          if command -v systemctl > /dev/null 2>&1; then
+            if [ "$(id -u)" -eq 0 ]; then
+              "$PM2_BIN" startup systemd -u "$USER" --hp "$HOME" || true
+            elif command -v sudo > /dev/null 2>&1; then
+              sudo env PATH="$PATH:${{ env.REMOTE_NODE_BIN }}" "$PM2_BIN" startup systemd -u "$USER" --hp "$HOME" || true
+            else
+              echo "⚠️ 非 root 且无 sudo，跳过 PM2 开机自启配置"
+            fi
+            "$PM2_BIN" save
+            echo "✓ PM2 进程列表已保存"
+          else
+            echo "⚠️ 未检测到 systemd，跳过 PM2 开机自启配置"
+          fi
+
+          echo "✓ 零停机部署完成！"
+          "$PM2_BIN" list
+
+    - name: Publish version.txt to static
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.SERVER_HOST }}
+        username: ${{ secrets.SERVER_USER }}
+        password: ${{ secrets.SERVER_PASSWORD }}
+        timeout: 60s
+        script: |
+          set -e
+          mkdir -p /www/wwwroot/static
+          printf '%s\n' "${{ steps.app_version.outputs.version }}" > /www/wwwroot/static/version_dev.txt
+          echo "Published /www/wwwroot/static/version_dev.txt"
+          cat /www/wwwroot/static/version_dev.txt
+
+    - name: Setup and start print server (zero-downtime)
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.SERVER_HOST }}
+        username: ${{ secrets.SERVER_USER }}
+        password: ${{ secrets.SERVER_PASSWORD }}
+        timeout: 300s
+        script: |
+          set -e
+          export PATH="$PATH:${{ env.REMOTE_NODE_BIN }}"
+          PM2_BIN="${{ env.REMOTE_NODE_BIN }}/pm2"
+
+          LINK_PATH="/www/wwwroot/js_dev"
+          if [ -L "$LINK_PATH" ]; then
+            CURRENT_TARGET=$(readlink -f "$LINK_PATH")
+            cd "$CURRENT_TARGET/print"
+          else
+            cd "/www/wwwroot/js_dev_green/print"
+          fi
+
+          # 检查 Python
+          if command -v python3 &> /dev/null; then
+            PYTHON_CMD=python3
+          elif command -v python &> /dev/null; then
+            PYTHON_CMD=python
+          else
+            echo "错误: 未找到 Python"
+            exit 1
+          fi
+
+          echo "使用 Python: $PYTHON_CMD"
+
+          # 创建并激活虚拟环境
+          echo "创建虚拟环境..."
+          $PYTHON_CMD -m venv .venv
+          source .venv/bin/activate
+
+          # 安装依赖
+          if [ -f "requirements.txt" ]; then
+            echo "安装 Python 依赖..."
+            pip install --upgrade pip -q
+            pip install -r requirements.txt -q
+          fi
+
+          # 安装 python-docx 用于创建 reference.docx
+          echo "安装 python-docx..."
+          pip install python-docx -q
+
+          # 创建 reference.docx 模板
+          if [ -f "../scripts/create-reference-docx.py" ]; then
+            echo "创建 Pandoc reference.docx 模板..."
+            cd ..
+            $PYTHON_CMD scripts/create-reference-docx.py || echo "警告: reference.docx 创建失败，将使用默认样式"
+            cd print
+          fi
+
+          # 获取虚拟环境中的 Python 解释器路径
+          VENV_PYTHON="$(pwd)/.venv/bin/python"
+
+          # 零停机重启打印服务器
+          echo "零停机重启打印服务器..."
+          if "$PM2_BIN" describe print-server-dev > /dev/null 2>&1; then
+            "$PM2_BIN" reload print-server-dev --update-env
+          else
+            "$PM2_BIN" start print_server.py --name "print-server-dev" --interpreter "$VENV_PYTHON" -- --host 0.0.0.0 --port 3061
+          fi
+
+          "$PM2_BIN" save
+          echo "✓ 打印服务器热更新完成！"
+
+    - name: Final cleanup
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.SERVER_HOST }}
+        username: ${{ secrets.SERVER_USER }}
+        password: ${{ secrets.SERVER_PASSWORD }}
+        timeout: 60s
+        script: |
+          # 清理临时文件
+          rm -f /tmp/deploy.tar.gz
+
+          echo ""
+          echo "=========================================="
+          echo "✓ 零停机部署成功完成！"
+          echo "=========================================="
+          "${{ env.REMOTE_NODE_BIN }}/pm2" list
