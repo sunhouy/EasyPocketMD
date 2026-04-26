@@ -37,4 +37,3 @@ coverage/            linguist-generated
 
 tests/               linguist-vendored
 
-dev/** linguist-generated=true
