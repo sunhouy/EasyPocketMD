@@ -1,0 +1,12 @@
+export { default as ArrowCounterclockwise } from '@/assets/icons/arrow-counterclockwise.svg';
+export { default as ArrowClockwise } from '@/assets/icons/arrow-clockwise.svg';
+export { default as TypeBold } from '@/assets/icons/type-bold.svg';
+export { default as TypeItalic } from '@/assets/icons/type-italic.svg';
+export { default as TypeUnderline } from '@/assets/icons/type-underline.svg';
+export { default as TypeStrikethrough } from '@/assets/icons/type-strikethrough.svg';
+export { default as TextLeft } from '@/assets/icons/text-left.svg';
+export { default as TextCenter } from '@/assets/icons/text-center.svg';
+export { default as TextRight } from '@/assets/icons/text-right.svg';
+export { default as Justify } from '@/assets/icons/justify.svg';
+export { default as JournalText } from '@/assets/icons/journal-text.svg';
+export { default as TextParagraph } from '@/assets/icons/text-paragraph.svg';

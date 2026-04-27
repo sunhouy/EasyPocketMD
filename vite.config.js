@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { viteStaticCopy } from 'vite-plugin-static-copy';
+import svgr from 'vite-plugin-svgr';
 import { readFileSync, existsSync, writeFileSync, readFile, cpSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
@@ -137,6 +138,11 @@ self.addEventListener('fetch', event => {
 export default defineConfig({
   base: '/',
   publicDir: 'public',
+  resolve: {
+    alias: {
+      '@': join(__dirname, 'src'),
+    },
+  },
   define: {
     __WASM_TEXT_ENGINE_PRESENT__: JSON.stringify(hasWasmTextEngineDist),
     __APP_BUILD_TAG__: JSON.stringify(cacheVersion),
@@ -183,6 +189,15 @@ export default defineConfig({
   },
   plugins: [
     react(),
+    svgr({
+      svgrOptions: {
+        icon: true,
+        titleProp: false,
+        dimensions: false,
+        plugins: ['@svgr/plugin-jsx'],
+      },
+      include: '**/*.svg',
+    }),
     viteStaticCopy({
       targets: [
         {
