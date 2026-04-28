@@ -101,9 +101,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/files', fileLimiter, fileRoutes);
 app.use('/api/user_files', fileLimiter, userFilesRoutes);
 
-// Upload routes - strict rate limiting
-app.use('/api/upload_screenshot', uploadLimiter);
-app.use('/api/upload', uploadLimiter);
+// Upload routes - mounted via /api/external, rate limiting applied there
 
 // Share routes
 app.use('/api/share', apiLimiter, shareRoutes);

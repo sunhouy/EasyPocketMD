@@ -427,17 +427,30 @@ export function createSyncRuntimeApi(ctx: any) {
 
   async function deleteFileFromServer(filename: string) {
     if (!g('currentUser')) return;
-    const api = globalRef.getApiBaseUrl ? globalRef.getApiBaseUrl() : 'api';
-    const response = await fetch(api + '/files/delete', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + g('currentUser').token },
-      body: JSON.stringify({ username: g('currentUser').username, filename: filename }),
-    });
-    const result = globalRef.parseJsonResponse ? await globalRef.parseJsonResponse(response) : await response.json();
-    if (result.code !== 200) {
-      throw new Error(result.message || (isEn() ? 'Delete failed' : '删除失败'));
+    try {
+      const api = globalRef.getApiBaseUrl ? globalRef.getApiBaseUrl() : 'api';
+      const response = await fetch(api + '/files/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + g('currentUser').token },
+        body: JSON.stringify({ username: g('currentUser').username, filename: filename }),
+      });
+      const result = globalRef.parseJsonResponse ? await globalRef.parseJsonResponse(response) : await response.json();
+
+      // 处理 Token 过期
+      if (result.code === 401 || (globalRef.isTokenError && globalRef.isTokenError(result))) {
+        if (await tryHandleTokenExpired(result)) {
+          return false;
+        }
+      }
+
+      if (result.code !== 200) {
+        throw new Error(result.message || (isEn() ? 'Delete failed' : '删除失败'));
+      }
+      return true;
+    } catch (error) {
+      await tryHandleTokenExpired(error);
+      throw error;
     }
-    return true;
   }
 
   function syncCurrentFileWithBeacon() {

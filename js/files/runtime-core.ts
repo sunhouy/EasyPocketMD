@@ -672,6 +672,14 @@ import {
                 headers: { 'Authorization': 'Bearer ' + g('currentUser').token }
             });
             const result = global.parseJsonResponse ? await global.parseJsonResponse(response) : await response.json();
+
+            // 处理 Token 过期
+            if (result.code === 401 || (global.isTokenError && global.isTokenError(result))) {
+                if (await tryHandleTokenExpired(result)) {
+                    return ownerShareCache.byFilename;
+                }
+            }
+
             const byFilename = {};
             if (result.code === 200 && result.data && Array.isArray(result.data.shares)) {
                 result.data.shares.forEach(function(share) {
@@ -683,6 +691,7 @@ import {
             ownerShareCache = { updatedAt: now, byFilename: byFilename };
             return byFilename;
         } catch (error) {
+            await tryHandleTokenExpired(error);
             console.warn('刷新共享缓存失败:', error);
             return ownerShareCache.byFilename;
         }
@@ -1217,6 +1226,14 @@ import {
                 headers: { 'Authorization': 'Bearer ' + g('currentUser').token }
             });
             const result = global.parseJsonResponse ? await global.parseJsonResponse(response) : await response.json();
+
+            // 处理 Token 过期
+            if (result.code === 401 || (global.isTokenError && global.isTokenError(result))) {
+                if (await tryHandleTokenExpired(result)) {
+                    return;
+                }
+            }
+
             if (result.code === 200 && result.data && result.data.files) {
                 // 对服务器返回的文件名进行标准化（去除开头的 /）
                 let serverFiles = result.data.files.map(f => {
@@ -4520,8 +4537,20 @@ import {
                 body: JSON.stringify({ username: g('currentUser').username, filename: filename, content: content, timestamp: Date.now() })
             });
             const result = global.parseJsonResponse ? await global.parseJsonResponse(response) : await response.json();
+
+            // 处理 Token 过期
+            if (result.code === 401 || (global.isTokenError && global.isTokenError(result))) {
+                if (await tryHandleTokenExpired(result)) {
+                    return false;
+                }
+            }
+
             return result.code === 200;
-        } catch (e) { console.error('创建历史版本失败', e); throw e; }
+        } catch (e) {
+            await tryHandleTokenExpired(e);
+            console.error('创建历史版本失败', e);
+            throw e;
+        }
     }
 
     async function getFileHistory(filename) {
@@ -4788,8 +4817,19 @@ import {
                 body: JSON.stringify({ username: g('currentUser').username, filename: filename, version_ids: versionIds })
             });
             var result = global.parseJsonResponse ? await global.parseJsonResponse(response) : await response.json();
+
+            // 处理 Token 过期
+            if (result.code === 401 || (global.isTokenError && global.isTokenError(result))) {
+                if (await tryHandleTokenExpired(result)) {
+                    return false;
+                }
+            }
+
             return result.code === 200;
-        } catch (e) { throw e; }
+        } catch (e) {
+            await tryHandleTokenExpired(e);
+            throw e;
+        }
     }
 
     function showClearAllConfirmModal(filename, fileId) {
@@ -4972,8 +5012,19 @@ import {
                 body: JSON.stringify({ username: g('currentUser').username, filename: filename, version_id: versionId })
             });
             var result = global.parseJsonResponse ? await global.parseJsonResponse(response) : await response.json();
+
+            // 处理 Token 过期
+            if (result.code === 401 || (global.isTokenError && global.isTokenError(result))) {
+                if (await tryHandleTokenExpired(result)) {
+                    return false;
+                }
+            }
+
             return result.code === 200;
-        } catch (e) { throw e; }
+        } catch (e) {
+            await tryHandleTokenExpired(e);
+            throw e;
+        }
     }
 
     function compareVersions(originalContent, newContent) {
@@ -5040,8 +5091,19 @@ import {
                 body: JSON.stringify({ username: g('currentUser').username, filename: filename, version_id: versionId })
             });
             var result = global.parseJsonResponse ? await global.parseJsonResponse(response) : await response.json();
+
+            // 处理 Token 过期
+            if (result.code === 401 || (global.isTokenError && global.isTokenError(result))) {
+                if (await tryHandleTokenExpired(result)) {
+                    return false;
+                }
+            }
+
             return result.code === 200;
-        } catch (e) { throw e; }
+        } catch (e) {
+            await tryHandleTokenExpired(e);
+            throw e;
+        }
     }
 
     function showDeleteConfirmModal(filename, versionId, historyId, fileId) {
