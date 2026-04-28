@@ -4696,8 +4696,8 @@ export function getBuiltinSlashEntries() {
             descriptionEn: 'Upload and insert image',
             action: 'uploadImage',
             icon: 'fas fa-image',
-            keywords: ['图片', 'image', 'upload', '上传', 'tp', 'tupian', 'img'],
-            aliases: ['图片', 'image', 'tp', 'tupian', 'img']
+            keywords: ['图片', 'image', 'upload', '上传', 'img'],
+            aliases: ['图片', 'image', 'img']
         },
         {
             id: 'insert-file',
