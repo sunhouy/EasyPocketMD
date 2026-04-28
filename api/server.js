@@ -36,8 +36,17 @@ const uploadsPath = path.join(__dirname, '../uploads');
 const avatarsPath = path.join(__dirname, '../avatars');
 const screenshotsPath = path.join(__dirname, '../screenshots');
 const userFilesPath = path.join(__dirname, '../user_files');
+const tempUploadsPath = path.join(__dirname, '../temp_uploads');
 
 if (!isTest) {
+    // Create upload directories if they don't exist
+    const directoriesToCreate = [uploadsPath, avatarsPath, screenshotsPath, userFilesPath, tempUploadsPath];
+    for (const dir of directoriesToCreate) {
+        if (!fs.existsSync(dir)) {
+            console.log(`Creating directory: ${dir}`);
+            fs.mkdirSync(dir, { recursive: true });
+        }
+    }
 }
 
 app.use('/uploads', express.static(uploadsPath));
