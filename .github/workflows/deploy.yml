@@ -194,7 +194,7 @@ jobs:
           LINK_PATH="/www/wwwroot/js"
 
           # 创建必要的目录
-          mkdir -p "$GREEN_DIR" "$BLUE_DIR" "$SHARED_DIR/uploads" "$SHARED_DIR/user_uploads" "$SHARED_DIR/user_files"
+          mkdir -p "$GREEN_DIR" "$BLUE_DIR" "$SHARED_DIR/uploads" "$SHARED_DIR/user_uploads" "$SHARED_DIR/user_files" "$SHARED_DIR/avatars" "$SHARED_DIR/screenshots"
 
           # 确定当前和下一个部署目录
           if [ -L "$LINK_PATH" ]; then
@@ -273,10 +273,12 @@ jobs:
           # 设置共享目录符号链接
           echo "[2/4] 设置共享目录符号链接..."
           cd "$NEXT_DIR"
-          rm -rf uploads user_uploads user_files
+          rm -rf uploads user_uploads user_files avatars screenshots
           ln -s "$SHARED_DIR/uploads" uploads
           ln -s "$SHARED_DIR/user_uploads" user_uploads
           ln -s "$SHARED_DIR/user_files" user_files
+          ln -s "$SHARED_DIR/avatars" avatars
+          ln -s "$SHARED_DIR/screenshots" screenshots
           echo "✓ 符号链接创建完成"
 
           # 安装依赖 - 使用更可靠的方式
