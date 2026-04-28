@@ -3,6 +3,8 @@
  * 实现测量数据的不确定度计算，包括平均值、合成不确定度、相对不确定度等
  */
 
+function g(name) { return window[name]; }
+
 /**
  * 计算平均值
  * @param {Array<number>} values - 测量值数组
