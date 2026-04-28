@@ -158,7 +158,7 @@ class FileManager {
                     const currentContent = String(currentRow.content || '');
                     const baseContentVersion = Number(optimisticLock.base_content_version);
                     const currentVersion = Number(currentRow.content_version || 0);
-                    const versionConflict = hasBaseVersion && Number.isFinite(baseContentVersion) && baseContentVersion > 0 && currentVersion !== baseContentVersion;
+                    const versionConflict = hasBaseVersion && Number.isFinite(baseContentVersion) && currentVersion !== baseContentVersion;
                     const baseLastModified = this.normalizeDbLastModified(optimisticLock.base_last_modified);
                     const currentLastModified = this.normalizeDbLastModified(currentRow.last_modified);
                     const modifiedConflict = hasBaseLastModified && baseLastModified && currentLastModified && baseLastModified !== currentLastModified;
@@ -361,12 +361,12 @@ class FileManager {
 
                     if (rows.length > 0) {
                         await connection.execute(
-                            'UPDATE user_files SET content = ?, last_modified = NOW() WHERE username = ? AND filename = ?',
+                            'UPDATE user_files SET content = ?, last_modified = NOW(), content_version = content_version + 1 WHERE username = ? AND filename = ?',
                             [content, username, filename]
                         );
                     } else {
                         await connection.execute(
-                            'INSERT INTO user_files (username, filename, content, last_modified) VALUES (?, ?, ?, NOW())',
+                            'INSERT INTO user_files (username, filename, content, content_version, last_modified) VALUES (?, ?, ?, 1, NOW())',
                             [username, filename, content]
                         );
                     }

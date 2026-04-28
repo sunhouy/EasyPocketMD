@@ -287,6 +287,36 @@ describe('FileManager', () => {
             );
         });
 
+        it('should merge with CRDT when base version is zero for unknown ancestry', async () => {
+            const mockConnection = {
+                execute: jest.fn()
+                    .mockResolvedValueOnce([[{
+                        id: 1,
+                        content: 'server only',
+                        last_modified: '2024-01-02T00:00:00.000Z',
+                        content_version: 3
+                    }]])
+                    .mockResolvedValueOnce([]),
+                release: jest.fn()
+            };
+            db.getConnection.mockResolvedValue(mockConnection);
+
+            const result = await fileManager.saveFile(
+                'testuser',
+                'test.md',
+                'local only',
+                {
+                    base_content_version: 0,
+                    base_content: ''
+                }
+            );
+
+            expect(result.code).toBe(200);
+            expect(result.data.content).toContain('local only');
+            expect(result.data.content).toContain('server only');
+            expect(result.data.merged_by_crdt).toBe(true);
+        });
+
         it('should handle mismatched base_hash gracefully', async () => {
             const currentContent = 'server content';
             const wrongHash = 'wronghash';
