@@ -20,7 +20,7 @@ function isEn() {
 	return window.i18n && window.i18n.getLanguage() === 'en';
 }
 
-function installConflictUi(globalRef) {
+function installDiffUi(globalRef) {
 	const core = globalRef.__filesCoreHandlers || {};
 
 	globalRef.showDiffModal = function(conflict) {
@@ -58,18 +58,6 @@ function installConflictUi(globalRef) {
 		return globalRef.showDiffModal(conflict);
 	};
 	globalRef.showMergePreview = globalRef.showMergePreviewModal;
-
-	globalRef.showConflictResolution = function(conflicts, serverFiles, preserveFileName) {
-		if (typeof core.showConflictResolution === 'function') {
-			return core.showConflictResolution(conflicts, serverFiles, preserveFileName);
-		}
-	};
-
-	globalRef.showSaveConflictDialog = function(conflict) {
-		if (typeof core.showSaveConflictDialog === 'function') {
-			return core.showSaveConflictDialog(conflict);
-		}
-	};
 }
 
 function installExternalUi(globalRef) {
@@ -87,7 +75,7 @@ function installExternalUi(globalRef) {
 	}
 }
 
-installConflictUi(window);
+installDiffUi(window);
 installExternalUi(window);
 
 export {};

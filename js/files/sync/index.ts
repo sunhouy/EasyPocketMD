@@ -24,23 +24,6 @@ export function normalizeServerFileRecord(f: any): any {
   };
 }
 
-export function detectConflicts(
-  localFiles: any[],
-  serverFiles: any[],
-  pendingServerSync: Record<string, boolean>,
-  editableSharedByFilename: Record<string, any>,
-  lastSyncedContent: Record<string, any>,
-  isExternalLocalFile: (f: any) => boolean,
-): any[] {
-  void localFiles;
-  void serverFiles;
-  void pendingServerSync;
-  void editableSharedByFilename;
-  void lastSyncedContent;
-  void isExternalLocalFile;
-  return [];
-}
-
 export function createSyncRuntimeApi(ctx: any) {
   const {
     globalRef,
@@ -133,8 +116,6 @@ export function createSyncRuntimeApi(ctx: any) {
                 ? getCurrentEditorContent(file.id, file.content)
                 : file.content;
 
-          file.manualConflictPending = false;
-          file.preferLocalOnNextSync = false;
         }
 
         try {
@@ -185,8 +166,6 @@ export function createSyncRuntimeApi(ctx: any) {
                 }
               }
               files[fileIndex].isSynced = true;
-              files[fileIndex].preferLocalOnNextSync = false;
-              files[fileIndex].manualConflictPending = false;
               delete files[fileIndex].crdtBaseContent;
               delete files[fileIndex].crdtBaseContentVersion;
               files[fileIndex].lastModified = result.data && result.data.last_modified ? result.data.last_modified : Date.now();
@@ -201,7 +180,6 @@ export function createSyncRuntimeApi(ctx: any) {
               g('lastSyncedContent')[fileId] = serverContent;
               g('unsavedChanges')[fileId] = false;
               markPendingServerSync(fileId, false);
-              globalRef.lastSaveConflictPending = false;
             }
             return true;
           }

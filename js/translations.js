@@ -42,11 +42,6 @@
             enterInviteCode: '请输入邀请码',
             cancel: '取消',
 
-            // 冲突解决
-            fileConflict: '发现文件冲突',
-            conflictSubtitle: '以下文件在本地和服务器上存在不同版本',
-            resolveConflictInfo: '请为每个冲突的文件选择保留哪个版本',
-            resolveConflicts: '确认解决冲突',
             viewDiff: '查看差异',
             localVersion: '本地版本',
             serverVersion: '服务器版本',
@@ -568,11 +563,6 @@
             noFilesOnServer: '服务器没有文件，使用本地文件',
             syncFailedUseLocal: '同步失败，使用本地文件',
             detectingLocalNewFiles: '检测到本地新文件，正在自动上传 {count} 个...',
-            conflictResolvedFilesSynced: '冲突已解决，文件已同步',
-            conflictResolutionCancelled: '冲突解决已取消，使用本地文件',
-            
-            // 冲突解决
-            fileConflictWarning: '⚠️ {filename}',
             fileDeletedOnServer: '该文件在服务器上已经删除',
             localModifiedTime: '本地修改时间',
             serverModifiedTime: '服务器修改时间',
@@ -827,11 +817,6 @@
             enterInviteCode: 'Enter invite code',
             cancel: 'Cancel',
 
-            // Conflict resolution
-            fileConflict: 'File Conflict Detected',
-            conflictSubtitle: 'The following files have different versions locally and on the server',
-            resolveConflictInfo: 'Please choose which version to keep for each conflicting file',
-            resolveConflicts: 'Resolve Conflicts',
             viewDiff: 'View Differences',
             localVersion: 'Local Version',
             serverVersion: 'Server Version',
@@ -1351,11 +1336,6 @@
             noFilesOnServer: '服务器没有文件，使用本地文件',
             syncFailedUseLocal: '同步失败，使用本地文件',
             detectingLocalNewFiles: '检测到本地新文件，正在自动上传 {count} 个...',
-            conflictResolvedFilesSynced: '冲突已解决，文件已同步',
-            conflictResolutionCancelled: '冲突解决已取消，使用本地文件',
-            
-            // Conflict resolution
-            fileConflictWarning: '⚠️ {filename}',
             fileDeletedOnServer: 'This file has been deleted on the server',
             localModifiedTime: 'Local modified time',
             serverModifiedTime: 'Server modified time',
