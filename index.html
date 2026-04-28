@@ -1123,6 +1123,13 @@
             <i class="fas fa-cog"></i>
         </button>
     </div>
+    <div class="dropdown-divider" style="height:1px;background:#eee;margin:4px 0;"></div>
+    <div class="dropdown-section-title" style="padding:8px 12px;font-size:12px;color:#999;font-weight:500;" data-i18n="switchAccount">切换账户</div>
+    <div id="accountListContainer">
+        <!-- 账户列表将在这里动态生成 -->
+    </div>
+    <button class="dropdown-item" id="addAccountItem" style="color:#4a90e2;"><i class="fas fa-plus-circle"></i> <span data-i18n="addAccount">添加账户</span></button>
+    <div class="dropdown-divider" style="height:1px;background:#eee;margin:4px 0;"></div>
     <button class="dropdown-item" id="logoutItem"><i class="fas fa-sign-out-alt"></i> <span data-i18n="logout">退出登录</span></button>
 </div>
 
@@ -1206,6 +1213,57 @@
             <div class="modal-actions">
                 <button class="modal-btn secondary" id="cancelDeleteAccountBtn" data-i18n="cancel">取消</button>
                 <button class="modal-btn" style="background:#dc3545;color:white;" id="deleteAccountBtn" data-i18n="deleteAccount">注销账户</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 添加账户模态窗口 -->
+<div class="modal-overlay" id="addAccountModalOverlay">
+    <div class="modal" style="position:relative;">
+        <button class="modal-close-btn" id="closeAddAccountBtn" style="position:absolute;top:15px;right:15px;background:none;border:none;font-size:20px;cursor:pointer;z-index:10;">
+            <i class="fas fa-times"></i>
+        </button>
+        <div class="modal-header" style="flex-shrink:0;">
+            <h2 data-i18n="addAccount">添加账户</h2>
+        </div>
+        <div class="modal-form" style="padding-right:5px;">
+            <div class="form-group">
+                <label for="addAccountUsername" data-i18n="username">用户名</label>
+                <input type="text" id="addAccountUsername" data-i18n-placeholder="enterUsername" placeholder="请输入用户名">
+            </div>
+            <div class="form-group">
+                <label for="addAccountPassword" data-i18n="password">密码</label>
+                <input type="password" id="addAccountPassword" data-i18n-placeholder="enterPassword" placeholder="请输入密码">
+            </div>
+            <div class="modal-message" id="addAccountMessage"></div>
+            <div class="modal-actions">
+                <button class="modal-btn secondary" id="cancelAddAccountBtn" data-i18n="cancel">取消</button>
+                <button class="modal-btn primary" id="confirmAddAccountBtn" data-i18n="confirm">确认</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 切换账户确认模态窗口 -->
+<div class="modal-overlay" id="switchAccountConfirmModalOverlay">
+    <div class="modal" style="position:relative;max-width:400px;">
+        <button class="modal-close-btn" id="closeSwitchAccountConfirmBtn" style="position:absolute;top:15px;right:15px;background:none;border:none;font-size:20px;cursor:pointer;z-index:10;">
+            <i class="fas fa-times"></i>
+        </button>
+        <div class="modal-header" style="flex-shrink:0;">
+            <h2 data-i18n="switchAccountConfirm">确认切换账户</h2>
+        </div>
+        <div class="modal-form" style="padding-right:5px;">
+            <div class="settings-section-hint" style="color:#f39c12;font-weight:500;margin-bottom:15px;" data-i18n="switchAccountWarning">
+                <i class="fas fa-exclamation-triangle"></i> 警告：切换账户将清除当前账户的所有本地文件数据！
+            </div>
+            <p style="margin:10px 0;color:#666;" data-i18n="switchAccountDesc">
+                您确定要切换到账户 <strong id="targetAccountName"></strong> 吗？
+            </p>
+            <div class="modal-actions">
+                <button class="modal-btn secondary" id="cancelSwitchAccountBtn" data-i18n="cancel">取消</button>
+                <button class="modal-btn primary" id="confirmSwitchAccountBtn" data-i18n="confirmSwitch">确认切换</button>
             </div>
         </div>
     </div>

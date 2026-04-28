@@ -282,6 +282,20 @@
 
             // 用户菜单
             logout: '退出登录',
+            switchAccount: '切换账户',
+            addAccount: '添加账户',
+            confirm: '确认',
+            confirmSwitch: '确认切换',
+            switchAccountConfirm: '确认切换账户',
+            switchAccountWarning: '⚠️ 警告：切换账户将清除当前账户的所有本地文件数据！',
+            switchAccountDesc: '您确定要切换到账户 <strong>{username}</strong> 吗？',
+            accountAddedSuccess: '账户添加成功',
+            accountAddFailed: '添加账户失败',
+            accountAlreadyExists: '该账户已存在',
+            accountSwitched: '已切换到账户: {username}',
+            removeAccount: '移除账户',
+            removeAccountConfirm: '确定要移除账户 {username} 吗？',
+            accountRemoved: '账户已移除',
 
             // Cookie提示
             cookieMessage: '本网站使用 Cookies 以提升您的体验，我们仅会使用必要cookies使网站正常运行。继续使用即表示您同意我们的隐私政策。',
@@ -1051,6 +1065,20 @@
 
             // User menu
             logout: 'Logout',
+            switchAccount: 'Switch Account',
+            addAccount: 'Add Account',
+            confirm: 'Confirm',
+            confirmSwitch: 'Confirm Switch',
+            switchAccountConfirm: 'Confirm Account Switch',
+            switchAccountWarning: '⚠️ Warning: Switching accounts will clear all local file data for the current account!',
+            switchAccountDesc: 'Are you sure you want to switch to account <strong>{username}</strong>?',
+            accountAddedSuccess: 'Account added successfully',
+            accountAddFailed: 'Failed to add account',
+            accountAlreadyExists: 'This account already exists',
+            accountSwitched: 'Switched to account: {username}',
+            removeAccount: 'Remove Account',
+            removeAccountConfirm: 'Are you sure you want to remove account {username}?',
+            accountRemoved: 'Account removed',
 
             // Cookie notice
             cookieMessage: '🍪 This website uses cookies to enhance your experience. By continuing to use this site, you agree to our privacy policy.',

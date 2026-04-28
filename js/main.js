@@ -1647,6 +1647,11 @@ document.addEventListener('DOMContentLoaded', function() {
         ensureWasmReadyBeforeWorkspaceBoot()
             .then(bootFileWorkspaceSafely)
             .catch(handleStartupFailure);
+
+        // 初始化账户管理模态窗口事件
+        if (window.bindAddAccountModalEvents) window.bindAddAccountModalEvents();
+        if (window.bindSwitchAccountConfirmModalEvents) window.bindSwitchAccountConfirmModalEvents();
+
         var fileListClose = document.getElementById('fileListClose');
         if (fileListClose) fileListClose.addEventListener('click', function() { document.getElementById('fileListSidebar').classList.remove('show'); });
 
@@ -3387,4 +3392,10 @@ document.addEventListener('DOMContentLoaded', function() {
             window.checkNativeAppVersionUpdate();
         }
     }, 1800);
+
+    // 导出存储管理函数到全局，供账户切换使用
+    window.clearAllCacheStorage = clearAllCacheStorage;
+    window.clearAllIndexedDB = clearAllIndexedDB;
+    window.clearAllCookies = clearAllCookies;
+    window.clearAllServiceWorkers = clearAllServiceWorkers;
 });
