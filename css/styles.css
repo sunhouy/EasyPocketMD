@@ -5635,14 +5635,118 @@ body.night-mode .password-strength-bar {
 }
 
 /* Ensure user settings modal has proper size */
-#userSettingsModalOverlay .modal {
-    min-width: 340px;
-    max-width: 440px;
-    width: 90vw;
+.account-modal {
+    width: min(90vw, 440px);
+    padding: 24px;
 }
 
-#userSettingsModalOverlay .modal-form {
-    padding: 8px 4px 8px 0;
+#userSettingsModalOverlay .modal {
+    min-width: 340px;
+}
+
+.account-modal .modal-header {
+    padding: 0 34px 16px;
+    border-bottom: 1px solid #edf2f8;
+    margin-bottom: 18px;
+}
+
+.account-modal .modal-header h2 {
+    font-size: 20px;
+    line-height: 1.3;
+}
+
+.account-modal-form {
+    gap: 16px;
+    padding: 0;
+}
+
+.account-modal-form .form-group {
+    gap: 6px;
+}
+
+.account-modal-form .form-group label {
+    margin: 0;
+}
+
+.account-modal-form .form-group input {
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.account-modal-form .modal-actions {
+    gap: 10px;
+    margin-top: 4px;
+}
+
+.account-modal-form .modal-actions .modal-btn {
+    flex: 1;
+    min-height: 42px;
+    padding: 10px 16px;
+}
+
+.account-settings-item {
+    width: 100%;
+    padding: 14px 2px;
+    border: none;
+    border-bottom: 1px solid #edf2f8;
+    background: transparent;
+    cursor: pointer;
+    text-align: left;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: #27364a;
+}
+
+.account-settings-item:last-child {
+    border-bottom: none;
+}
+
+.account-settings-item:hover {
+    background: #f7faff;
+}
+
+.account-settings-item-main {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+}
+
+.account-settings-item-arrow {
+    color: #9aa7b7;
+    margin-left: 16px;
+}
+
+.account-warning {
+    margin: 0;
+    padding: 10px 12px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.account-warning-danger {
+    color: #b42318;
+    background: #fff1f0;
+    border: 1px solid #ffd5d2;
+}
+
+.account-warning-caution {
+    color: #8a5a00;
+    background: #fff8e6;
+    border: 1px solid #ffe2a8;
+}
+
+.account-switch-desc {
+    margin: 0;
+    color: #4f5f72;
+    line-height: 1.6;
+}
+
+.account-switch-desc strong {
+    color: #1f2937;
+    font-weight: 700;
 }
 
 /* User settings button styles */
@@ -5682,42 +5786,58 @@ body.night-mode .settings-list-item:hover {
     background: rgba(255, 255, 255, 0.1);
 }
 
-/* 修改密码模态窗口夜间模式 */
-body.night-mode #changePasswordModalOverlay .modal {
-    background: #2d2d2d;
+body.night-mode .account-modal .modal-header {
+    border-bottom-color: #3f4f62;
+}
+
+body.night-mode .account-settings-item {
+    border-bottom-color: #3f4f62;
+    color: #eef5ff;
+}
+
+body.night-mode .account-settings-item:hover {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+body.night-mode .account-settings-item-arrow {
+    color: #9fb0c4;
+}
+
+body.night-mode .account-warning-danger {
+    color: #ffc9c5;
+    background: rgba(220, 53, 69, 0.16);
+    border-color: rgba(220, 53, 69, 0.38);
+}
+
+body.night-mode .account-warning-caution {
+    color: #ffd98a;
+    background: rgba(243, 156, 18, 0.16);
+    border-color: rgba(243, 156, 18, 0.38);
+}
+
+body.night-mode .account-switch-desc {
+    color: #cbd7e6;
+}
+
+body.night-mode .account-switch-desc strong {
     color: #ffffff;
 }
 
-body.night-mode #changePasswordModalOverlay .modal-header h2 {
-    color: #ffffff;
-}
+@media (max-width: 480px) {
+    .account-modal {
+        width: calc(100vw - 24px);
+        padding: 20px;
+    }
 
-body.night-mode #changePasswordModalOverlay .form-group label {
-    color: #ffffff;
-}
+    #userSettingsModalOverlay .modal {
+        min-width: 0;
+    }
 
-body.night-mode #changePasswordModalOverlay .form-group input {
-    background: #1e1e1e;
-    color: #ffffff;
-    border: 1px solid #444;
-}
+    .account-modal-form .modal-actions {
+        flex-direction: column-reverse;
+    }
 
-/* 注销账户模态窗口夜间模式 */
-body.night-mode #deleteAccountModalOverlay .modal {
-    background: #2d2d2d;
-    color: #ffffff;
-}
-
-body.night-mode #deleteAccountModalOverlay .modal-header h2 {
-    color: #ffffff;
-}
-
-body.night-mode #deleteAccountModalOverlay .form-group label {
-    color: #ffffff;
-}
-
-body.night-mode #deleteAccountModalOverlay .form-group input {
-    background: #1e1e1e;
-    color: #ffffff;
-    border: 1px solid #444;
+    .account-modal-form .modal-actions .modal-btn {
+        width: 100%;
+    }
 }

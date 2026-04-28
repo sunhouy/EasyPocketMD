@@ -1127,28 +1127,28 @@
 
 <!-- 用户设置模态窗口 -->
 <div class="modal-overlay" id="userSettingsModalOverlay">
-    <div class="modal" style="position:relative;">
+    <div class="modal account-modal" style="position:relative;">
         <button class="modal-close-btn" id="closeUserSettingsBtn" style="position:absolute;top:15px;right:15px;background:none;border:none;font-size:20px;cursor:pointer;z-index:10;">
             <i class="fas fa-times"></i>
         </button>
         <div class="modal-header" style="flex-shrink:0;">
             <h2 data-i18n="userSettings">账户设置</h2>
         </div>
-        <div class="modal-form" style="padding-right:5px;">
+        <div class="modal-form account-modal-form">
             <div class="settings-list" role="list">
-                <button class="settings-list-item" id="openChangePasswordBtn" style="width:100%;padding:16px;border:none;background:transparent;cursor:pointer;text-align:left;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center;">
-                    <span style="display:flex;align-items:center;gap:12px;">
+                <button class="settings-list-item account-settings-item" id="openChangePasswordBtn">
+                    <span class="account-settings-item-main">
                         <i class="fas fa-key" style="color:#4a90e2;"></i>
                         <span data-i18n="changePassword">修改密码</span>
                     </span>
-                    <i class="fas fa-chevron-right" style="color:#999;"></i>
+                    <i class="fas fa-chevron-right account-settings-item-arrow"></i>
                 </button>
-                <button class="settings-list-item" id="openDeleteAccountBtn" style="width:100%;padding:16px;border:none;background:transparent;cursor:pointer;text-align:left;display:flex;justify-content:space-between;align-items:center;">
-                    <span style="display:flex;align-items:center;gap:12px;">
+                <button class="settings-list-item account-settings-item" id="openDeleteAccountBtn">
+                    <span class="account-settings-item-main">
                         <i class="fas fa-user-slash" style="color:#dc3545;"></i>
                         <span data-i18n="deleteAccount">注销账户</span>
                     </span>
-                    <i class="fas fa-chevron-right" style="color:#999;"></i>
+                    <i class="fas fa-chevron-right account-settings-item-arrow"></i>
                 </button>
             </div>
         </div>
@@ -1157,14 +1157,14 @@
 
 <!-- 修改密码模态窗口 -->
 <div class="modal-overlay" id="changePasswordModalOverlay">
-    <div class="modal" style="position:relative;">
+    <div class="modal account-modal" style="position:relative;">
         <button class="modal-close-btn" id="closeChangePasswordBtn" style="position:absolute;top:15px;right:15px;background:none;border:none;font-size:20px;cursor:pointer;z-index:10;">
             <i class="fas fa-times"></i>
         </button>
         <div class="modal-header" style="flex-shrink:0;">
             <h2 data-i18n="changePassword">修改密码</h2>
         </div>
-        <div class="modal-form" style="padding-right:5px;">
+        <div class="modal-form account-modal-form">
             <div class="form-group">
                 <label for="currentPassword" data-i18n="currentPassword">当前密码</label>
                 <input type="password" id="currentPassword" data-i18n-placeholder="enterCurrentPassword" placeholder="请输入当前密码">
@@ -1188,15 +1188,15 @@
 
 <!-- 注销账户模态窗口 -->
 <div class="modal-overlay" id="deleteAccountModalOverlay">
-    <div class="modal" style="position:relative;">
+    <div class="modal account-modal" style="position:relative;">
         <button class="modal-close-btn" id="closeDeleteAccountBtn" style="position:absolute;top:15px;right:15px;background:none;border:none;font-size:20px;cursor:pointer;z-index:10;">
             <i class="fas fa-times"></i>
         </button>
         <div class="modal-header" style="flex-shrink:0;">
             <h2 data-i18n="deleteAccount">注销账户</h2>
         </div>
-        <div class="modal-form" style="padding-right:5px;">
-            <div class="settings-section-hint" style="color:#dc3545;font-weight:500;" data-i18n="deleteAccountWarning">警告：此操作不可撤销！将删除您的所有文件和历史记录。</div>
+        <div class="modal-form account-modal-form">
+            <div class="settings-section-hint account-warning account-warning-danger" data-i18n="deleteAccountWarning">警告：此操作不可撤销！将删除您的所有文件和历史记录。</div>
             <div class="form-group">
                 <label for="deleteAccountConfirmUsername" data-i18n="deleteAccountConfirmUsername">请输入您的用户名确认注销：</label>
                 <input type="text" id="deleteAccountConfirmUsername" data-i18n-placeholder="username" placeholder="用户名">
@@ -1212,14 +1212,14 @@
 
 <!-- 添加账户模态窗口 -->
 <div class="modal-overlay" id="addAccountModalOverlay">
-    <div class="modal" style="position:relative;">
+    <div class="modal account-modal" style="position:relative;">
         <button class="modal-close-btn" id="closeAddAccountBtn" style="position:absolute;top:15px;right:15px;background:none;border:none;font-size:20px;cursor:pointer;z-index:10;">
             <i class="fas fa-times"></i>
         </button>
         <div class="modal-header" style="flex-shrink:0;">
             <h2 data-i18n="addAccount">添加账户</h2>
         </div>
-        <div class="modal-form" style="padding-right:5px;">
+        <div class="modal-form account-modal-form">
             <div class="form-group">
                 <label for="addAccountUsername" data-i18n="username">用户名</label>
                 <input type="text" id="addAccountUsername" data-i18n-placeholder="enterUsername" placeholder="请输入用户名">
@@ -1239,20 +1239,18 @@
 
 <!-- 切换账户确认模态窗口 -->
 <div class="modal-overlay" id="switchAccountConfirmModalOverlay">
-    <div class="modal" style="position:relative;max-width:400px;">
+    <div class="modal account-modal" style="position:relative;max-width:400px;">
         <button class="modal-close-btn" id="closeSwitchAccountConfirmBtn" style="position:absolute;top:15px;right:15px;background:none;border:none;font-size:20px;cursor:pointer;z-index:10;">
             <i class="fas fa-times"></i>
         </button>
         <div class="modal-header" style="flex-shrink:0;">
             <h2 data-i18n="switchAccountConfirm">确认切换账户</h2>
         </div>
-        <div class="modal-form" style="padding-right:5px;">
-            <div class="settings-section-hint" style="color:#f39c12;font-weight:500;margin-bottom:15px;" data-i18n="switchAccountWarning">
+        <div class="modal-form account-modal-form">
+            <div class="settings-section-hint account-warning account-warning-caution" data-i18n="switchAccountWarning">
                 <i class="fas fa-exclamation-triangle"></i> 警告：切换账户将清除当前账户的所有本地文件数据！
             </div>
-            <p style="margin:10px 0;color:#666;" data-i18n="switchAccountDesc">
-                您确定要切换到账户 <strong id="targetAccountName"></strong> 吗？
-            </p>
+            <p class="account-switch-desc" id="switchAccountDescText"></p>
             <div class="modal-actions">
                 <button class="modal-btn secondary" id="cancelSwitchAccountBtn" data-i18n="cancel">取消</button>
                 <button class="modal-btn primary" id="confirmSwitchAccountBtn" data-i18n="confirmSwitch">确认切换</button>

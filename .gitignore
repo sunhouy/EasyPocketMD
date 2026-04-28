@@ -3,6 +3,7 @@
 .claude/
 cat-manager/
 .env
+.codex
 
 coverage/
 node_modules/

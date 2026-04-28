@@ -9,6 +9,7 @@
     // 防抖标志
     let _loginSubmitting = false;
     let _registerSubmitting = false;
+    let _accountSwitching = false;
 
     // 辅助函数：获取翻译
     function t(key) {
@@ -1113,12 +1114,83 @@
 
     // 显示切换账户确认对话框
     let pendingSwitchUsername = null;
-    function showSwitchAccountConfirm(username) {
-        pendingSwitchUsername = username;
-        const targetNameEl = document.getElementById('targetAccountName');
-        if (targetNameEl) {
-            targetNameEl.textContent = username;
+
+    function setSwitchAccountControlsLoading(loading) {
+        const confirmBtn = document.getElementById('confirmSwitchAccountBtn');
+        const cancelBtn = document.getElementById('cancelSwitchAccountBtn');
+        const closeBtn = document.getElementById('closeSwitchAccountConfirmBtn');
+
+        if (confirmBtn) {
+            if (loading) {
+                if (!confirmBtn.dataset.originalText) {
+                    confirmBtn.dataset.originalText = confirmBtn.textContent;
+                }
+                confirmBtn.textContent = t('accountSwitching');
+            } else if (confirmBtn.dataset.originalText) {
+                confirmBtn.textContent = confirmBtn.dataset.originalText;
+            }
+            confirmBtn.disabled = loading;
+            confirmBtn.classList.toggle('loading', loading);
         }
+
+        [cancelBtn, closeBtn].forEach(function(btn) {
+            if (!btn) return;
+            btn.disabled = loading;
+            btn.style.pointerEvents = loading ? 'none' : '';
+            btn.style.opacity = loading ? '0.6' : '';
+        });
+    }
+
+    function showAccountSwitchingIndicator() {
+        let overlay = document.getElementById('accountSwitchingOverlay');
+        if (!overlay) {
+            overlay = document.createElement('div');
+            overlay.id = 'accountSwitchingOverlay';
+            overlay.style.cssText = [
+                'position:fixed',
+                'inset:0',
+                'display:flex',
+                'align-items:center',
+                'justify-content:center',
+                'background:rgba(0,0,0,0.28)',
+                'z-index:1000000'
+            ].join(';');
+            overlay.innerHTML = '<div style="display:flex;align-items:center;gap:10px;padding:14px 18px;border-radius:8px;background:#fff;color:#333;box-shadow:0 8px 30px rgba(0,0,0,0.2);font-size:15px;"><i class="fas fa-spinner fa-spin"></i><span></span></div>';
+            document.body.appendChild(overlay);
+        }
+
+        const textEl = overlay.querySelector('span');
+        if (textEl) textEl.textContent = t('accountSwitching');
+        overlay.style.display = 'flex';
+    }
+
+    function hideAccountSwitchingIndicator() {
+        const overlay = document.getElementById('accountSwitchingOverlay');
+        if (overlay) overlay.style.display = 'none';
+    }
+
+    function renderSwitchAccountDescription(username) {
+        const descEl = document.getElementById('switchAccountDescText');
+        if (!descEl) return;
+
+        descEl.textContent = '';
+        const template = t('switchAccountDesc');
+        const parts = String(template).split('{username}');
+        descEl.appendChild(document.createTextNode(parts[0] || ''));
+
+        const nameEl = document.createElement('strong');
+        nameEl.id = 'targetAccountName';
+        nameEl.textContent = username;
+        descEl.appendChild(nameEl);
+
+        descEl.appendChild(document.createTextNode(parts.slice(1).join('{username}') || ''));
+    }
+
+    function showSwitchAccountConfirm(username) {
+        if (_accountSwitching) return;
+        pendingSwitchUsername = username;
+        setSwitchAccountControlsLoading(false);
+        renderSwitchAccountDescription(username);
 
         const modal = document.getElementById('switchAccountConfirmModalOverlay');
         if (modal) {
@@ -1128,6 +1200,7 @@
 
     // 隐藏切换账户确认对话框
     function hideSwitchAccountConfirm() {
+        if (_accountSwitching) return;
         const modal = document.getElementById('switchAccountConfirmModalOverlay');
         if (modal) {
             modal.classList.remove('show');
@@ -1137,88 +1210,96 @@
 
     // 确认切换账户
     async function confirmSwitchAccount() {
-        if (!pendingSwitchUsername) return;
+        if (_accountSwitching || !pendingSwitchUsername) return;
 
+        const switchUsername = pendingSwitchUsername;
         const accounts = getSavedAccounts();
-        const targetAccount = accounts.find(acc => acc.username === pendingSwitchUsername);
+        const targetAccount = accounts.find(acc => acc.username === switchUsername);
         if (!targetAccount) {
             global.showMessage(t('accountNotFound'), 'error');
             hideSwitchAccountConfirm();
             return;
         }
 
-        hideSwitchAccountConfirm();
+        _accountSwitching = true;
+        setSwitchAccountControlsLoading(true);
+        showAccountSwitchingIndicator();
 
-        // 1. 先保存当前正在编辑的文件
-        if (global.saveCurrentFile) {
-            try {
-                await global.saveCurrentFile(true);
-            } catch (e) {
-                console.warn('保存当前文件失败:', e);
-            }
+        const modal = document.getElementById('switchAccountConfirmModalOverlay');
+        if (modal) {
+            modal.classList.remove('show');
         }
 
-        // 2. 同步当前账户的所有未保存更改
-        const files = global.files || [];
-        const unsavedChanges = global.unsavedChanges || {};
-        let hasUnsaved = false;
-        files.forEach(function(file) {
-            if (unsavedChanges[file.id]) hasUnsaved = true;
-        });
-
-        if (hasUnsaved && global.syncAllFiles) {
-            try {
-                await global.syncAllFiles();
-            } catch (e) {
-                console.warn('同步当前账户文件失败:', e);
-            }
-        }
-
-        // 3. 停止自动同步
-        if (global.stopAutoSync) global.stopAutoSync();
-
-        // 4. 使用设置-存储空间的方式清空数据（保留 service worker）
-        // 清空 Cache Storage
-        if (global.clearAllCacheStorage) {
-            try {
-                await global.clearAllCacheStorage();
-            } catch (e) {
-                console.warn('清空 Cache Storage 失败:', e);
-            }
-        }
-
-        // 清空 IndexedDB
-        if (global.clearAllIndexedDB) {
-            try {
-                await global.clearAllIndexedDB();
-            } catch (e) {
-                console.warn('清空 IndexedDB 失败:', e);
-            }
-        }
-
-        // 清空 Cookies
-        if (global.clearAllCookies) {
-            try {
-                await global.clearAllCookies();
-            } catch (e) {
-                console.warn('清空 Cookies 失败:', e);
-            }
-        }
-
-        // 5. 清除 localStorage 中的文件相关数据
-        localStorage.removeItem('vditor_files');
-        localStorage.removeItem('vditor_last_synced_files');
-        localStorage.removeItem('vditor_folders_expanded');
-
-        // 6. 清除全局状态
-        global.files = [];
-        global.unsavedChanges = {};
-        global.lastSyncedContent = {};
-        global.pendingServerSync = {};
-        global.currentFileId = null;
-
-        // 7. 使用新账户登录
         try {
+            // 1. 先保存当前正在编辑的文件
+            if (global.saveCurrentFile) {
+                try {
+                    await global.saveCurrentFile(true);
+                } catch (e) {
+                    console.warn('保存当前文件失败:', e);
+                }
+            }
+
+            // 2. 同步当前账户的所有未保存更改
+            const files = global.files || [];
+            const unsavedChanges = global.unsavedChanges || {};
+            let hasUnsaved = false;
+            files.forEach(function(file) {
+                if (unsavedChanges[file.id]) hasUnsaved = true;
+            });
+
+            if (hasUnsaved && global.syncAllFiles) {
+                try {
+                    await global.syncAllFiles();
+                } catch (e) {
+                    console.warn('同步当前账户文件失败:', e);
+                }
+            }
+
+            // 3. 停止自动同步
+            if (global.stopAutoSync) global.stopAutoSync();
+
+            // 4. 使用设置-存储空间的方式清空数据（保留 service worker）
+            // 清空 Cache Storage
+            if (global.clearAllCacheStorage) {
+                try {
+                    await global.clearAllCacheStorage();
+                } catch (e) {
+                    console.warn('清空 Cache Storage 失败:', e);
+                }
+            }
+
+            // 清空 IndexedDB
+            if (global.clearAllIndexedDB) {
+                try {
+                    await global.clearAllIndexedDB();
+                } catch (e) {
+                    console.warn('清空 IndexedDB 失败:', e);
+                }
+            }
+
+            // 清空 Cookies
+            if (global.clearAllCookies) {
+                try {
+                    await global.clearAllCookies();
+                } catch (e) {
+                    console.warn('清空 Cookies 失败:', e);
+                }
+            }
+
+            // 5. 清除 localStorage 中的文件相关数据
+            localStorage.removeItem('vditor_files');
+            localStorage.removeItem('vditor_last_synced_files');
+            localStorage.removeItem('vditor_folders_expanded');
+
+            // 6. 清除全局状态
+            global.files = [];
+            global.unsavedChanges = {};
+            global.lastSyncedContent = {};
+            global.pendingServerSync = {};
+            global.currentFileId = null;
+
+            // 7. 使用新账户登录
             const result = await verifyAccountCredentials(targetAccount.username, targetAccount.password);
             if (result.code === 200) {
                 // 设置当前用户
@@ -1243,6 +1324,7 @@
 
                 // 10. 更新UI
                 showUserInfo();
+                renderAccountList();
                 if (global.loadFiles) global.loadFiles();
 
                 // 11. 关闭下拉菜单
@@ -1262,6 +1344,11 @@
         } catch (error) {
             console.error('切换账户失败:', error);
             global.showMessage(t('accountAddFailed'), 'error');
+        } finally {
+            pendingSwitchUsername = null;
+            _accountSwitching = false;
+            setSwitchAccountControlsLoading(false);
+            hideAccountSwitchingIndicator();
         }
     }
 
