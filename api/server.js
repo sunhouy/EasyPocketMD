@@ -124,6 +124,13 @@ app.use('/api/ppt-export', convertLimiter, pptExportRoutes);
 // Pexels routes - rate limiting for image search
 app.use('/api/pexels', aiLimiter, pexelsRoutes);
 
+// Upload compatibility routes:
+// - /api/upload
+// - /api/upload_screenshot
+// - /api/files/upload
+// Older clients and documentation use these paths instead of /api/external/*.
+app.use('/api', uploadLimiter, apiRoutes);
+
 // Legacy routes - general API rate limiting
 app.use('/api', apiLimiter, legacyRoutes);
 

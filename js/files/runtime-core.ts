@@ -417,6 +417,9 @@ import {
             }
 
             try {
+                if (isCurrentFile && typeof vditor.getValue === 'function' && vditor.getValue() === normalizedContent) {
+                    return;
+                }
                 vditor.setValue(normalizedContent);
             } catch (error) {
                 console.warn('设置编辑器内容失败，等待编辑器就绪后重试:', error);
@@ -2101,6 +2104,9 @@ import {
             }
             const mergedServerFile = fileMap[localFile.name];
             if (mergedServerFile) {
+                if (localFile.id) {
+                    mergedServerFile.id = localFile.id;
+                }
                 const localBaseContent = localFile && localFile.id ? lastSyncedContent[localFile.id] : undefined;
                 const hasPendingLocalSync = !!(localFile && localFile.id && pendingServerSync[localFile.id]);
                 const serverUnchangedSinceLastSync =
@@ -2141,7 +2147,6 @@ import {
                 }
 
                 if (shouldPreferLocal) {
-                    mergedServerFile.id = localFile.id || mergedServerFile.id;
                     mergedServerFile.content = localFile.content;
                     mergedServerFile.lastModified = localFile.lastModified || mergedServerFile.lastModified;
                     mergedServerFile.serverLastModified = localFile.serverLastModified || mergedServerFile.serverLastModified;
@@ -2154,7 +2159,6 @@ import {
                     markPendingServerSync(mergedServerFile.id, true);
                 } else if (shouldPreferServer) {
                     // 服务器版本较新，使用服务器版本
-                    mergedServerFile.id = localFile.id || mergedServerFile.id;
                     mergedServerFile.content = mergedServerFile.content;
                     mergedServerFile.lastModified = mergedServerFile.lastModified;
                     mergedServerFile.serverLastModified = mergedServerFile.serverLastModified;
@@ -2642,6 +2646,12 @@ import {
 
     // 打开第一个文件（忽略文件夹和系统文件）
     function openFirstFile() {
+        const currentFileId = g('currentFileId');
+        if (currentFileId) {
+            const activeFile = g('files').find(f => f.id === currentFileId && f.type === 'file' && f.name !== '.easypocketmd_orders');
+            if (activeFile) return;
+        }
+
         const defaultOpening = g('userSettings') && g('userSettings').defaultFileOpening || 'lastEdited';
 
         if (defaultOpening === 'fileList') {

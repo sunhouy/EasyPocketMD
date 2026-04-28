@@ -2,43 +2,130 @@ const express = require('express');
 const router = express.Router();
 const userModel = require('../models/User');
 const apiManager = require('../models/ApiManager');
+const { verifyTokenOrPassword } = require('../utils/auth');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const sharp = require('sharp');
 
+const PROJECT_ROOT = path.join(__dirname, '../..');
+
+function ensureDir(dir) {
+    if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+    }
+}
+
+function decodeOriginalName(originalname) {
+    if (!originalname) return 'file';
+    const decoded = Buffer.from(originalname, 'latin1').toString('utf8');
+    return decoded.includes('�') ? originalname : decoded;
+}
+
+function safeFileName(originalname, fallbackExt) {
+    const decoded = decodeOriginalName(originalname);
+    const ext = path.extname(decoded) || fallbackExt || '';
+    const base = path.basename(decoded, ext)
+        .replace(/[\\/:*?"<>|]/g, '_')
+        .replace(/\s+/g, '_')
+        .replace(/^\.+$/, '')
+        .slice(0, 120) || 'file';
+    return `${Date.now()}_${Math.random().toString(36).slice(2, 8)}_${base}${ext}`;
+}
+
+function getRequestBaseUrl(req) {
+    if (process.env.BASE_URL) {
+        return userModel.baseUrl;
+    }
+
+    const forwardedProto = String(req.headers['x-forwarded-proto'] || '').split(',')[0].trim();
+    const forwardedHost = String(req.headers['x-forwarded-host'] || '').split(',')[0].trim();
+    const proto = forwardedProto || req.protocol || 'http';
+    const host = forwardedHost || req.get('host');
+
+    if (host) {
+        return `${proto}://${host}`.replace(/\/$/, '');
+    }
+
+    return userModel.baseUrl;
+}
+
+function buildPublicUrl(req, publicPath) {
+    return `${getRequestBaseUrl(req)}/${publicPath.split('/').map(encodeURIComponent).join('/')}`;
+}
+
+function getBearerToken(req) {
+    const authHeader = req.headers.authorization || '';
+    return authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
+}
+
+async function verifyUploadUser(req) {
+    const username = req.body && req.body.username;
+    if (!username) return null;
+
+    const auth = await verifyTokenOrPassword(userModel, {
+        username,
+        password: req.body.password,
+        token: req.body.token || getBearerToken(req)
+    });
+
+    return auth.code === 200 ? { username } : null;
+}
+
+function collectUploadedFiles(req) {
+    if (Array.isArray(req.files)) return req.files;
+    if (!req.files || typeof req.files !== 'object') return [];
+    return Object.keys(req.files).reduce((all, key) => all.concat(req.files[key] || []), []);
+}
+
+function cleanupFile(file) {
+    if (file && file.path && fs.existsSync(file.path)) {
+        try {
+            fs.unlinkSync(file.path);
+        } catch (err) {
+            console.error('Failed to clean up uploaded file:', file.path, err);
+        }
+    }
+}
+
+function multerJson(middleware, handler) {
+    return function(req, res, next) {
+        middleware(req, res, function(err) {
+            if (err) {
+                const status = err.code === 'LIMIT_FILE_SIZE' ? 413 : 400;
+                return res.status(status).json({
+                    code: status,
+                    success: false,
+                    message: err.message || '上传失败'
+                });
+            }
+            return handler(req, res, next);
+        });
+    };
+}
+
 // Multer for screenshots
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
-        const dir = path.join(__dirname, '../../screenshots');
-        if (!fs.existsSync(dir)) {
-            fs.mkdirSync(dir, { recursive: true });
-        }
+        const dir = path.join(PROJECT_ROOT, 'screenshots');
+        ensureDir(dir);
         cb(null, dir);
     },
     filename: function (req, file, cb) {
-        // Fix for non-ASCII filenames
-        file.originalname = Buffer.from(file.originalname, 'latin1').toString('utf8');
-        const ext = path.extname(file.originalname);
-        const username = req.body.username || 'unknown';
-        cb(null, `${username}_${Date.now()}_${path.basename(file.originalname, ext)}${ext}`);
+        const username = (req.body.username || 'unknown').replace(/[^a-zA-Z0-9_-]/g, '_');
+        cb(null, `${username}_${safeFileName(file.originalname, '.png')}`);
     }
 });
 
 // Multer for general uploads
 const generalStorage = multer.diskStorage({
     destination: function (req, file, cb) {
-        const dir = path.join(__dirname, '../../uploads');
-        if (!fs.existsSync(dir)) {
-            fs.mkdirSync(dir, { recursive: true });
-        }
+        const dir = path.join(PROJECT_ROOT, 'uploads');
+        ensureDir(dir);
         cb(null, dir);
     },
     filename: function (req, file, cb) {
-        // Fix for non-ASCII filenames
-        file.originalname = Buffer.from(file.originalname, 'latin1').toString('utf8');
-        const ext = path.extname(file.originalname);
-        cb(null, `${Date.now()}_${path.basename(file.originalname, ext)}${ext}`);
+        cb(null, safeFileName(file.originalname));
     }
 });
 
@@ -60,6 +147,14 @@ const generalUpload = multer({
     // Allow more types for general upload
 });
 
+const generalUploadMiddleware = generalUpload.fields([
+    { name: 'files[]', maxCount: 50 },
+    { name: 'files', maxCount: 50 },
+    { name: 'file', maxCount: 50 },
+    { name: 'image', maxCount: 50 },
+    { name: 'upload', maxCount: 50 }
+]);
+
 // Check update
 router.post('/check_update', async (req, res) => {
     const { current_version } = req.body;
@@ -67,32 +162,25 @@ router.post('/check_update', async (req, res) => {
     res.json(await userModel.checkUpdate(current_version));
 });
 
-// Upload screenshot
-router.post('/upload_screenshot', upload.single('screenshot'), async (req, res) => {
+async function handleScreenshotUpload(req, res) {
     try {
-        const { username, password } = req.body;
-        if (!username || !password) {
-            // Clean up
-            if (req.file) fs.unlinkSync(req.file.path);
-            return res.json({ code: 400, message: '缺少必要参数' });
-        }
+        if (!req.file) return res.json({ code: 400, message: '缺少截图文件' });
 
-        const auth = await userModel.login(username, password);
-        if (auth.code !== 200) {
-            if (req.file) fs.unlinkSync(req.file.path);
+        const user = await verifyUploadUser(req);
+        if (!user) {
+            cleanupFile(req.file);
             return res.json({ code: 401, message: '用户身份验证失败' });
         }
 
-        if (!req.file) return res.json({ code: 400, message: '缺少截图文件' });
-
-        const fileUrl = `${userModel.baseUrl}/screenshots/${req.file.filename}`;
+        const publicPath = `screenshots/${req.file.filename}`;
+        const fileUrl = buildPublicUrl(req, publicPath);
 
         res.json({
             code: 200,
             message: '截图上传成功',
             data: {
                 file_name: req.file.filename,
-                file_path: '/screenshots/' + req.file.filename,
+                file_path: '/' + publicPath,
                 file_url: fileUrl,
                 file_size: req.file.size
             }
@@ -112,82 +200,95 @@ router.post('/upload_screenshot', upload.single('screenshot'), async (req, res) 
             message: '服务器内部错误: ' + error.message
         });
     }
-});
+}
 
-// General upload
-router.post('/upload', generalUpload.array('files[]'), async (req, res) => {
+// Upload screenshot
+router.post('/upload_screenshot', multerJson(upload.single('screenshot'), handleScreenshotUpload));
+
+async function handleGeneralUpload(req, res) {
     try {
-        if (!Array.isArray(req.files) || req.files.length === 0) {
-            return res.json({ success: false, message: '没有上传文件' });
+        const files = collectUploadedFiles(req);
+        if (files.length === 0) {
+            return res.json({ code: 400, success: false, message: '没有上传文件' });
         }
 
-        let urlPrefix = 'uploads';
-        const { username, password } = req.body;
+        const user = await verifyUploadUser(req);
+        const uploadedFiles = [];
 
-        // Check if user is authenticated
-        if (username && password) {
-            const auth = await userModel.login(username, password);
-            if (auth.code === 200) {
-                const targetDirName = path.join('user_files', username);
-                urlPrefix = `user_files/${username}`;
+        for (const file of files) {
+            let publicPath = `uploads/${file.filename}`;
 
-                // Create user directory if not exists
-                const fullTargetDir = path.join(__dirname, '../../', targetDirName);
-                if (!fs.existsSync(fullTargetDir)) {
-                    fs.mkdirSync(fullTargetDir, { recursive: true });
-                }
+            if (user) {
+                const userDir = path.join(PROJECT_ROOT, 'user_files', user.username);
+                const targetPath = path.join(userDir, file.filename);
 
-                // Move files
-                for (const file of req.files) {
+                try {
+                    ensureDir(userDir);
                     try {
-                        const oldPath = file.path;
-                        const newPath = path.join(fullTargetDir, file.filename);
-                        // Check if file exists in destination (edge case with same name)
-                        // Since filename includes timestamp, collision is unlikely but possible
-                        fs.renameSync(oldPath, newPath);
-
-                        // Update file.path to new location for consistency
-                        file.path = newPath;
-
-                        // Generate thumbnail if it's an image
-                        if (file.mimetype.startsWith('image/')) {
-                            try {
-                                const thumbPath = path.join(fullTargetDir, 'thumb_' + file.filename);
-                                await sharp(newPath)
-                                    .resize(200, 200, {
-                                        fit: 'contain',
-                                        background: { r: 255, g: 255, b: 255, alpha: 0 }
-                                    })
-                                    .toFile(thumbPath);
-                            } catch (err) {
-                                console.error('Failed to generate thumbnail for:', file.filename, err);
-                            }
-                        }
-                    } catch (fileErr) {
-                        console.error('Failed to move file:', file.filename, fileErr);
-                        // Continue with other files
+                        fs.renameSync(file.path, targetPath);
+                    } catch (renameErr) {
+                        fs.copyFileSync(file.path, targetPath);
+                        fs.unlinkSync(file.path);
                     }
+
+                    file.path = targetPath;
+                    publicPath = `user_files/${user.username}/${file.filename}`;
+
+                    if (file.mimetype && file.mimetype.startsWith('image/')) {
+                        try {
+                            const thumbPath = path.join(userDir, 'thumb_' + file.filename);
+                            await sharp(targetPath)
+                                .resize(200, 200, {
+                                    fit: 'contain',
+                                    background: { r: 255, g: 255, b: 255, alpha: 0 }
+                                })
+                                .toFile(thumbPath);
+                        } catch (err) {
+                            console.error('Failed to generate thumbnail for:', file.filename, err);
+                        }
+                    }
+                } catch (fileErr) {
+                    console.error('Failed to move uploaded file to user directory:', file.filename, fileErr);
                 }
             }
+
+            uploadedFiles.push({
+                name: decodeOriginalName(file.originalname),
+                filename: file.filename,
+                size: file.size,
+                mime_type: file.mimetype,
+                path: '/' + publicPath,
+                url: buildPublicUrl(req, publicPath)
+            });
         }
 
-        const urls = req.files.map(file => {
-            return `${userModel.baseUrl}/${urlPrefix}/${file.filename}`;
-        });
+        const urls = uploadedFiles.map(file => file.url);
 
         res.json({
+            code: 200,
+            message: '上传成功',
             success: true,
-            count: req.files.length,
-            urls: urls
+            count: uploadedFiles.length,
+            urls: urls,
+            data: {
+                count: uploadedFiles.length,
+                urls: urls,
+                files: uploadedFiles
+            }
         });
     } catch (error) {
         console.error('Upload error:', error);
         res.status(500).json({
+            code: 500,
             success: false,
             message: '服务器内部错误: ' + error.message
         });
     }
-});
+}
+
+// General upload. /files/upload keeps compatibility with clients documented against /api/files/upload.
+router.post('/upload', multerJson(generalUploadMiddleware, handleGeneralUpload));
+router.post('/files/upload', multerJson(generalUploadMiddleware, handleGeneralUpload));
 
 // Get available products
 router.post('/products/available', async (req, res) => {
