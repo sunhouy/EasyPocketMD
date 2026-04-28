@@ -101,6 +101,10 @@ jobs:
 
     - name: Create .env file
       run: |
+        DEV_BASE_URL="${{ secrets.DEV_BASE_URL }}"
+        if [ -z "$DEV_BASE_URL" ]; then
+          DEV_BASE_URL="https://dev.yhsun.cn"
+        fi
         cat > .env << EOF
         PORT=${{ secrets.PORT }}
         DB_HOST=${{ secrets.DB_HOST }}
@@ -116,7 +120,7 @@ jobs:
         JWT_EXPIRES_IN=${{ secrets.JWT_EXPIRES_IN }}
         ADMIN_USER=${{ secrets.ADMIN_USER }}
         ADMIN_PASSWORD=${{ secrets.ADMIN_PASSWORD }}
-        BASE_URL=${{ secrets.BASE_URL }}
+        BASE_URL=$DEV_BASE_URL
         DASHSCOPE_API_KEY=${{ secrets.DASHSCOPE_API_KEY }}
         EOF
 
@@ -142,7 +146,26 @@ jobs:
     - name: Create deployment tarball
       run: |
         mkdir -p deploy_tmp
-        cp -r dist api print shared package.json package-lock.json nginx.conf sw.js manifest.webmanifest icon.png .env ssl deploy_tmp/
+        cp -r dist api print shared package.json package-lock.json sw.js manifest.webmanifest icon.png .env ssl deploy_tmp/
+
+        # dev 部署必须使用 dev 域名和 dev 目录，不能把生产 md.yhsun.cn 配置写入 dev.yhsun.cn.conf。
+        sed \
+          -e 's/server_name md\.yhsun\.cn www\.md\.yhsun\.cn;/server_name dev.yhsun.cn;/g' \
+          -e 's#/www/server/panel/vhost/cert/md\.yhsun\.cn/#/www/server/panel/vhost/cert/dev.yhsun.cn/#g' \
+          -e 's#root /www/wwwroot/js/dist;#root /www/wwwroot/js_dev/dist;#g' \
+          -e 's#alias /www/wwwroot/js/#alias /www/wwwroot/js_dev/#g' \
+          nginx.conf > deploy_tmp/nginx.conf
+
+        if grep -q 'md\.yhsun\.cn' deploy_tmp/nginx.conf; then
+          echo "dev Nginx 配置仍包含生产域名 md.yhsun.cn，停止部署"
+          grep -n 'md\.yhsun\.cn' deploy_tmp/nginx.conf
+          exit 1
+        fi
+
+        if ! grep -q 'server_name dev.yhsun.cn;' deploy_tmp/nginx.conf; then
+          echo "dev Nginx 配置缺少 server_name dev.yhsun.cn"
+          exit 1
+        fi
 
         # 复制 reference-docs 和 scripts
         if [ -d "reference-docs" ]; then
@@ -381,7 +404,11 @@ jobs:
           export JWT_EXPIRES_IN=${{ secrets.JWT_EXPIRES_IN }}
           export ADMIN_USER=${{ secrets.ADMIN_USER }}
           export ADMIN_PASSWORD=${{ secrets.ADMIN_PASSWORD }}
-          export BASE_URL=${{ secrets.BASE_URL }}
+          DEV_BASE_URL="${{ secrets.DEV_BASE_URL }}"
+          if [ -z "$DEV_BASE_URL" ]; then
+            DEV_BASE_URL="https://dev.yhsun.cn"
+          fi
+          export BASE_URL="$DEV_BASE_URL"
           export DASHSCOPE_API_KEY=${{ secrets.DASHSCOPE_API_KEY }}
 
           "$PM2_BIN" start api/server.js --name "$NEXT_NAME" --env production
@@ -506,11 +533,22 @@ jobs:
             # 同时替换 localhost 和 127.0.0.1 的端口
             sed -i "s/proxy_pass http:\/\/localhost:[0-9]*/proxy_pass http:\/\/localhost:$NEXT_PORT/" /www/server/panel/vhost/nginx/dev.yhsun.cn.conf
             sed -i "s/proxy_pass http:\/\/127.0.0.1:[0-9]*/proxy_pass http:\/\/127.0.0.1:$NEXT_PORT/" /www/server/panel/vhost/nginx/dev.yhsun.cn.conf
+            if grep -q "md.yhsun.cn" /www/server/panel/vhost/nginx/dev.yhsun.cn.conf; then
+              echo "错误: dev Nginx 配置包含生产域名 md.yhsun.cn，停止部署以避免影响生产域名"
+              grep -n "md.yhsun.cn" /www/server/panel/vhost/nginx/dev.yhsun.cn.conf
+              exit 1
+            fi
+            if ! grep -q "server_name dev.yhsun.cn;" /www/server/panel/vhost/nginx/dev.yhsun.cn.conf; then
+              echo "错误: dev Nginx 配置缺少 server_name dev.yhsun.cn"
+              exit 1
+            fi
             # 确保 API 路由配置正确
             if ! grep -q "location /api/" /www/server/panel/vhost/nginx/dev.yhsun.cn.conf; then
               echo "警告: Nginx 配置中缺少 /api/ 路由配置"
             fi
           fi
+
+          nginx -t
 
           # 重载 Nginx
           if [ -f /etc/init.d/nginx ]; then
