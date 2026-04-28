@@ -15,6 +15,11 @@
         return global.i18n ? global.i18n.t(key) : key;
     }
 
+    // 辅助函数：判断是否为英文
+    function isEn() {
+        return global.i18n && global.i18n.getLanguage && global.i18n.getLanguage() === 'en';
+    }
+
     // 辅助函数：设置按钮加载状态
     function setButtonLoading(buttonId, loading, loadingTextKey) {
         const btn = document.getElementById(buttonId);
@@ -688,6 +693,10 @@
                         password: password
                     };
                     localStorage.setItem('vditor_user', JSON.stringify(global.currentUser));
+
+                    // 自动添加到账户列表
+                    addAccountToList(username, password);
+
                     message.textContent = t('loginSuccessSyncing');
                     message.className = 'modal-message success';
 
@@ -985,6 +994,378 @@
         if (global.showGuestNoticeBanner) global.showGuestNoticeBanner();
     }
 
+    // ========== 多账户管理功能 ==========
+
+    // 获取已保存的账户列表
+    function getSavedAccounts() {
+        try {
+            const accounts = localStorage.getItem('vditor_accounts');
+            return accounts ? JSON.parse(accounts) : [];
+        } catch (e) {
+            return [];
+        }
+    }
+
+    // 保存账户列表
+    function saveAccounts(accounts) {
+        localStorage.setItem('vditor_accounts', JSON.stringify(accounts));
+    }
+
+    // 添加账户到列表
+    function addAccountToList(username, password) {
+        const accounts = getSavedAccounts();
+        // 检查是否已存在
+        const existingIndex = accounts.findIndex(acc => acc.username === username);
+        if (existingIndex >= 0) {
+            // 更新密码
+            accounts[existingIndex].password = password;
+        } else {
+            // 添加新账户
+            accounts.push({ username, password });
+        }
+        saveAccounts(accounts);
+    }
+
+    // 从列表中移除账户
+    function removeAccountFromList(username) {
+        const accounts = getSavedAccounts();
+        const filtered = accounts.filter(acc => acc.username !== username);
+        saveAccounts(filtered);
+    }
+
+    // 渲染账户列表到下拉菜单
+    function renderAccountList() {
+        const container = document.getElementById('accountListContainer');
+        if (!container) return;
+
+        const accounts = getSavedAccounts();
+        const currentUsername = global.currentUser ? global.currentUser.username : null;
+
+        let html = '';
+        accounts.forEach(function(account) {
+            const isCurrent = account.username === currentUsername;
+            html += '<div class="dropdown-item account-item" data-username="' + account.username + '" style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;cursor:pointer;' + (isCurrent ? 'background:#f0f7ff;' : '') + '">';
+            html += '<span style="display:flex;align-items:center;gap:8px;">';
+            html += '<i class="fas fa-user-circle" style="color:#4a90e2;"></i> ';
+            html += '<span>' + account.username + '</span>';
+            if (isCurrent) {
+                html += '<span style="font-size:11px;color:#4a90e2;margin-left:4px;">(' + (isEn() ? 'Current' : '当前') + ')</span>';
+            }
+            html += '</span>';
+            if (!isCurrent) {
+                html += '<button class="remove-account-btn" data-username="' + account.username + '" style="background:none;border:none;cursor:pointer;padding:4px;color:#999;" title="' + t('removeAccount') + '">';
+                html += '<i class="fas fa-times"></i>';
+                html += '</button>';
+            }
+            html += '</div>';
+        });
+
+        container.innerHTML = html;
+
+        // 绑定点击事件
+        container.querySelectorAll('.account-item').forEach(function(item) {
+            item.onclick = function(e) {
+                // 如果点击的是移除按钮，不触发切换
+                if (e.target.closest('.remove-account-btn')) return;
+
+                const username = this.getAttribute('data-username');
+                if (username && username !== currentUsername) {
+                    showSwitchAccountConfirm(username);
+                }
+            };
+        });
+
+        // 绑定移除按钮事件
+        container.querySelectorAll('.remove-account-btn').forEach(function(btn) {
+            btn.onclick = function(e) {
+                e.stopPropagation();
+                const username = this.getAttribute('data-username');
+                confirmRemoveAccount(username);
+            };
+        });
+    }
+
+    // 显示切换账户确认对话框
+    let pendingSwitchUsername = null;
+    function showSwitchAccountConfirm(username) {
+        pendingSwitchUsername = username;
+        const targetNameEl = document.getElementById('targetAccountName');
+        if (targetNameEl) {
+            targetNameEl.textContent = username;
+        }
+
+        const modal = document.getElementById('switchAccountConfirmModalOverlay');
+        if (modal) {
+            modal.classList.add('show');
+        }
+    }
+
+    // 隐藏切换账户确认对话框
+    function hideSwitchAccountConfirm() {
+        const modal = document.getElementById('switchAccountConfirmModalOverlay');
+        if (modal) {
+            modal.classList.remove('show');
+        }
+        pendingSwitchUsername = null;
+    }
+
+    // 确认切换账户
+    async function confirmSwitchAccount() {
+        if (!pendingSwitchUsername) return;
+
+        const accounts = getSavedAccounts();
+        const targetAccount = accounts.find(acc => acc.username === pendingSwitchUsername);
+        if (!targetAccount) {
+            global.showMessage(t('accountNotFound'), 'error');
+            hideSwitchAccountConfirm();
+            return;
+        }
+
+        hideSwitchAccountConfirm();
+
+        // 1. 先保存当前正在编辑的文件
+        if (global.saveCurrentFile) {
+            try {
+                await global.saveCurrentFile(true);
+            } catch (e) {
+                console.warn('保存当前文件失败:', e);
+            }
+        }
+
+        // 2. 同步当前账户的所有未保存更改
+        const files = global.files || [];
+        const unsavedChanges = global.unsavedChanges || {};
+        let hasUnsaved = false;
+        files.forEach(function(file) {
+            if (unsavedChanges[file.id]) hasUnsaved = true;
+        });
+
+        if (hasUnsaved && global.syncAllFiles) {
+            try {
+                await global.syncAllFiles();
+            } catch (e) {
+                console.warn('同步当前账户文件失败:', e);
+            }
+        }
+
+        // 3. 停止自动同步
+        if (global.stopAutoSync) global.stopAutoSync();
+
+        // 4. 使用设置-存储空间的方式清空数据（保留 service worker）
+        // 清空 Cache Storage
+        if (global.clearAllCacheStorage) {
+            try {
+                await global.clearAllCacheStorage();
+            } catch (e) {
+                console.warn('清空 Cache Storage 失败:', e);
+            }
+        }
+
+        // 清空 IndexedDB
+        if (global.clearAllIndexedDB) {
+            try {
+                await global.clearAllIndexedDB();
+            } catch (e) {
+                console.warn('清空 IndexedDB 失败:', e);
+            }
+        }
+
+        // 清空 Cookies
+        if (global.clearAllCookies) {
+            try {
+                await global.clearAllCookies();
+            } catch (e) {
+                console.warn('清空 Cookies 失败:', e);
+            }
+        }
+
+        // 5. 清除 localStorage 中的文件相关数据
+        localStorage.removeItem('vditor_files');
+        localStorage.removeItem('vditor_last_synced_files');
+        localStorage.removeItem('vditor_folders_expanded');
+
+        // 6. 清除全局状态
+        global.files = [];
+        global.unsavedChanges = {};
+        global.lastSyncedContent = {};
+        global.pendingServerSync = {};
+        global.currentFileId = null;
+
+        // 7. 使用新账户登录
+        try {
+            const result = await login(targetAccount.username, targetAccount.password);
+            if (result.code === 200) {
+                global.showMessage(t('accountSwitched').replace('{username}', targetAccount.username), 'success');
+
+                // 8. 重新加载文件列表
+                if (global.loadFilesFromServer) {
+                    await global.loadFilesFromServer();
+                }
+
+                // 9. 启动自动同步
+                if (global.startAutoSync) {
+                    global.startAutoSync();
+                }
+
+                // 10. 更新UI
+                showUserInfo();
+                if (global.loadFiles) global.loadFiles();
+
+                // 11. 关闭下拉菜单
+                const dropdown = document.getElementById('userMenuDropdown');
+                if (dropdown) dropdown.classList.remove('show');
+            } else {
+                global.showMessage(t('accountAddFailed') + ': ' + result.message, 'error');
+            }
+        } catch (error) {
+            console.error('切换账户失败:', error);
+            global.showMessage(t('accountAddFailed'), 'error');
+        }
+    }
+
+    // 确认移除账户
+    async function confirmRemoveAccount(username) {
+        const confirmed = await g('customConfirm')(t('removeAccountConfirm').replace('{username}', username));
+        if (confirmed) {
+            removeAccountFromList(username);
+            renderAccountList();
+            global.showMessage(t('accountRemoved'), 'success');
+        }
+    }
+
+    // 显示添加账户模态窗口
+    function showAddAccountModal() {
+        const modal = document.getElementById('addAccountModalOverlay');
+        if (modal) {
+            modal.classList.add('show');
+            // 清空输入
+            const usernameInput = document.getElementById('addAccountUsername');
+            const passwordInput = document.getElementById('addAccountPassword');
+            const messageEl = document.getElementById('addAccountMessage');
+            if (usernameInput) usernameInput.value = '';
+            if (passwordInput) passwordInput.value = '';
+            if (messageEl) {
+                messageEl.textContent = '';
+                messageEl.className = 'modal-message';
+            }
+        }
+        // 关闭下拉菜单
+        const dropdown = document.getElementById('userMenuDropdown');
+        if (dropdown) dropdown.classList.remove('show');
+    }
+
+    // 隐藏添加账户模态窗口
+    function hideAddAccountModal() {
+        const modal = document.getElementById('addAccountModalOverlay');
+        if (modal) {
+            modal.classList.remove('show');
+        }
+    }
+
+    // 处理添加账户
+    async function handleAddAccount() {
+        const usernameInput = document.getElementById('addAccountUsername');
+        const passwordInput = document.getElementById('addAccountPassword');
+        const messageEl = document.getElementById('addAccountMessage');
+
+        const username = usernameInput ? usernameInput.value.trim() : '';
+        const password = passwordInput ? passwordInput.value.trim() : '';
+
+        if (!username || !password) {
+            if (messageEl) {
+                messageEl.textContent = t('enterUsernameAndPassword');
+                messageEl.className = 'modal-message error';
+            }
+            return;
+        }
+
+        // 检查是否已存在
+        const accounts = getSavedAccounts();
+        if (accounts.find(acc => acc.username === username)) {
+            if (messageEl) {
+                messageEl.textContent = t('accountAlreadyExists');
+                messageEl.className = 'modal-message error';
+            }
+            return;
+        }
+
+        // 验证账户
+        try {
+            const result = await login(username, password);
+            if (result.code === 200) {
+                // 添加账户到列表
+                addAccountToList(username, password);
+
+                // 如果当前没有登录用户，切换到新账户
+                if (!global.currentUser) {
+                    global.showMessage(t('accountAddedSuccess'), 'success');
+                    hideAddAccountModal();
+                    showUserInfo();
+                    if (global.loadFiles) global.loadFiles();
+                } else {
+                    // 如果已有登录用户，保持当前用户，只添加账户到列表
+                    global.showMessage(t('accountAddedSuccess'), 'success');
+                    hideAddAccountModal();
+                    // 恢复原来的用户状态
+                    const currentAccount = accounts.find(acc => acc.username === global.currentUser.username);
+                    if (currentAccount) {
+                        global.currentUser = {
+                            ...global.currentUser,
+                            password: currentAccount.password
+                        };
+                        localStorage.setItem('vditor_user', JSON.stringify(global.currentUser));
+                    }
+                }
+
+                // 刷新账户列表
+                renderAccountList();
+            } else {
+                if (messageEl) {
+                    messageEl.textContent = t('accountAddFailed') + ': ' + result.message;
+                    messageEl.className = 'modal-message error';
+                }
+            }
+        } catch (error) {
+            console.error('添加账户失败:', error);
+            if (messageEl) {
+                messageEl.textContent = t('accountAddFailed');
+                messageEl.className = 'modal-message error';
+            }
+        }
+    }
+
+    // 绑定添加账户模态窗口事件
+    function bindAddAccountModalEvents() {
+        const closeBtn = document.getElementById('closeAddAccountBtn');
+        const cancelBtn = document.getElementById('cancelAddAccountBtn');
+        const confirmBtn = document.getElementById('confirmAddAccountBtn');
+
+        if (closeBtn) closeBtn.onclick = hideAddAccountModal;
+        if (cancelBtn) cancelBtn.onclick = hideAddAccountModal;
+        if (confirmBtn) confirmBtn.onclick = handleAddAccount;
+
+        // 回车键提交
+        const passwordInput = document.getElementById('addAccountPassword');
+        if (passwordInput) {
+            passwordInput.onkeydown = function(e) {
+                if (e.key === 'Enter') {
+                    handleAddAccount();
+                }
+            };
+        }
+    }
+
+    // 绑定切换账户确认模态窗口事件
+    function bindSwitchAccountConfirmModalEvents() {
+        const closeBtn = document.getElementById('closeSwitchAccountConfirmBtn');
+        const cancelBtn = document.getElementById('cancelSwitchAccountBtn');
+        const confirmBtn = document.getElementById('confirmSwitchAccountBtn');
+
+        if (closeBtn) closeBtn.onclick = hideSwitchAccountConfirm;
+        if (cancelBtn) cancelBtn.onclick = hideSwitchAccountConfirm;
+        if (confirmBtn) confirmBtn.onclick = confirmSwitchAccount;
+    }
+
     function handleLoginButtonClick(e) {
         if (global.currentUser) {
             const dropdown = document.getElementById('userMenuDropdown');
@@ -1009,6 +1390,19 @@
                 if (logoutItem) {
                     logoutItem.onclick = logout;
                 }
+
+                // 绑定添加账户按钮
+                const addAccountItem = document.getElementById('addAccountItem');
+                if (addAccountItem) {
+                    addAccountItem.onclick = function(e) {
+                        e.stopPropagation();
+                        showAddAccountModal();
+                    };
+                }
+
+                // 渲染账户列表
+                renderAccountList();
+
                 dropdown.classList.toggle('show');
             }
         } else {
@@ -1031,5 +1425,20 @@
     global.authenticatedFetch = authenticatedFetch;
     global.showUserSettingsModal = showUserSettingsModal;
     global.hideUserSettingsModal = hideUserSettingsModal;
+
+    // 导出多账户管理功能
+    global.getSavedAccounts = getSavedAccounts;
+    global.saveAccounts = saveAccounts;
+    global.addAccountToList = addAccountToList;
+    global.removeAccountFromList = removeAccountFromList;
+    global.renderAccountList = renderAccountList;
+    global.showAddAccountModal = showAddAccountModal;
+    global.hideAddAccountModal = hideAddAccountModal;
+    global.handleAddAccount = handleAddAccount;
+    global.bindAddAccountModalEvents = bindAddAccountModalEvents;
+    global.bindSwitchAccountConfirmModalEvents = bindSwitchAccountConfirmModalEvents;
+    global.showSwitchAccountConfirm = showSwitchAccountConfirm;
+    global.hideSwitchAccountConfirm = hideSwitchAccountConfirm;
+    global.confirmSwitchAccount = confirmSwitchAccount;
 
 })(typeof window !== 'undefined' ? window : this);
