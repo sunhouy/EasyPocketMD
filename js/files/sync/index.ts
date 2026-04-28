@@ -115,6 +115,8 @@ export function createSyncRuntimeApi(ctx: any) {
     markPendingServerSync,
     tryHandleTokenExpired,
     pullServerUpdatesForCleanFiles,
+    autoMergeTextConflict,
+    hasMergeConflictMarkers,
     isEn,
   } = ctx;
   const fileSyncLocks = new Map<string, Promise<any>>();
@@ -150,6 +152,7 @@ export function createSyncRuntimeApi(ctx: any) {
       if (isExternalLocalFile(file)) return false;
       const currentContent =
         file.id === currentFileId ? getCurrentEditorContent(currentFileId, file.content) : file.content;
+      if (file.manualConflictPending && hasMergeConflictMarkers && hasMergeConflictMarkers(currentContent)) return false;
       return pendingServerSync[file.id] || !file.isSynced || currentContent !== lastSyncedContent[file.id];
     });
     if (filesToSync.length === 0) return;
@@ -199,8 +202,35 @@ export function createSyncRuntimeApi(ctx: any) {
                 : file.content;
 
           const baseContent = (g('lastSyncedContent') || {})[fileId];
-          const baseContentVersion =
-            forcedBaseContentVersion !== null ? forcedBaseContentVersion : Number(file.contentVersion || 0);
+
+          if (file.manualConflictPending) {
+            if (hasMergeConflictMarkers && hasMergeConflictMarkers(content)) {
+              file.content = content;
+              file.isSynced = false;
+              file.preferLocalOnNextSync = false;
+              localStorage.setItem('vditor_files', JSON.stringify(files));
+              g('unsavedChanges')[fileId] = true;
+              markPendingServerSync(fileId, false);
+              globalRef.lastSaveConflictPending = true;
+              if (!backgroundSync) {
+                globalRef.showMessage(
+                  isEn()
+                    ? 'Choose local or cloud content for each conflict before saving to cloud'
+                    : '请先为每处冲突选择本地或云端内容，再保存到云端',
+                  'warning',
+                );
+                if (typeof globalRef.showMergeConflictResolver === 'function') {
+                  globalRef.showMergeConflictResolver(fileId);
+                }
+              }
+              return false;
+            }
+
+            file.manualConflictPending = false;
+            file.preferLocalOnNextSync = true;
+            globalRef.lastSaveConflictPending = false;
+          }
+
           if (!skipConflictCheck && baseContent !== undefined && !file.preferLocalOnNextSync) {
             const serverSnapshot = await fetchServerFileSnapshot(file.name);
             if (serverSnapshot && serverSnapshot.content !== baseContent) {
@@ -219,47 +249,59 @@ export function createSyncRuntimeApi(ctx: any) {
               }
 
               if (content !== baseContent) {
-                markPendingServerSync(fileId, true);
-                if (backgroundSync) {
+                const mergeResult = autoMergeTextConflict
+                  ? autoMergeTextConflict(baseContent, content, serverSnapshot.content)
+                  : { mergedText: content, hasConflict: true };
+                content = mergeResult.mergedText || '';
+                file.content = content;
+                file.lastModified = Date.now();
+                file.serverLastModified = serverSnapshot.lastModified || file.serverLastModified || null;
+                file.contentVersion = Number(serverSnapshot.contentVersion || file.contentVersion || 0) || null;
+                file.isSynced = false;
+                file.manualConflictPending = mergeResult.hasConflict === true;
+                file.preferLocalOnNextSync = !file.manualConflictPending;
+
+                if (file.id === g('currentFileId')) {
+                  setEditorContentForFile(file.id, content);
+                }
+                localStorage.setItem('vditor_files', JSON.stringify(files));
+
+                if (file.manualConflictPending) {
+                  g('unsavedChanges')[fileId] = true;
+                  markPendingServerSync(fileId, false);
+                  globalRef.lastSaveConflictPending = true;
+                  if (!backgroundSync || String(file.id || '') === String(g('currentFileId') || '')) {
+                    globalRef.showMessage(
+                      isEn()
+                        ? 'Automatic merge still has conflicts. Choose local or cloud content for each conflict.'
+                        : '自动合并后仍有冲突，请为每处冲突选择本地或云端内容',
+                      'warning',
+                    );
+                    if (typeof globalRef.showMergeConflictResolver === 'function') {
+                      globalRef.showMergeConflictResolver(fileId);
+                    }
+                  }
                   return false;
                 }
-                globalRef.showMessage(
-                  isEn()
-                    ? 'Conflict detected: server has newer content, please resolve it first'
-                    : '检测到冲突：服务器有更新内容，请先处理冲突',
-                  'warning',
-                );
-                globalRef.lastSaveConflictPending = true;
-                if (typeof globalRef.showSaveConflictDialog === 'function') {
-                  globalRef.showSaveConflictDialog({
-                    fileId: fileId,
-                    fileName: file.name,
-                    localContent: content,
-                    serverContent: serverSnapshot.content,
-                    serverContentVersion: Number(serverSnapshot.contentVersion || 0),
-                    serverModified: serverSnapshot.lastModified || null,
-                    localModified: file.lastModified || null,
-                    serverLastModified: serverSnapshot.lastModified || null,
-                    baseContentVersion: baseContentVersion,
-                  });
-                }
-                return false;
-              }
 
-              file.content = serverSnapshot.content;
-              file.lastModified = serverSnapshot.lastModified || file.lastModified || null;
-              file.serverLastModified = serverSnapshot.lastModified || file.serverLastModified || null;
-              file.contentVersion = Number(serverSnapshot.contentVersion || 0);
-              file.isSynced = true;
-              if (file.id === g('currentFileId')) {
-                setEditorContentForFile(file.id, serverSnapshot.content);
+                markPendingServerSync(fileId, true);
+                globalRef.lastSaveConflictPending = false;
+              } else {
+                file.content = serverSnapshot.content;
+                file.lastModified = serverSnapshot.lastModified || file.lastModified || null;
+                file.serverLastModified = serverSnapshot.lastModified || file.serverLastModified || null;
+                file.contentVersion = Number(serverSnapshot.contentVersion || 0);
+                file.isSynced = true;
+                if (file.id === g('currentFileId')) {
+                  setEditorContentForFile(file.id, serverSnapshot.content);
+                }
+                localStorage.setItem('vditor_files', JSON.stringify(files));
+                g('lastSyncedContent')[fileId] = serverSnapshot.content;
+                g('unsavedChanges')[fileId] = false;
+                markPendingServerSync(fileId, false);
+                globalRef.lastSaveConflictPending = false;
+                return true;
               }
-              localStorage.setItem('vditor_files', JSON.stringify(files));
-              g('lastSyncedContent')[fileId] = serverSnapshot.content;
-              g('unsavedChanges')[fileId] = false;
-              markPendingServerSync(fileId, false);
-              globalRef.lastSaveConflictPending = false;
-              return true;
             }
           }
         }
@@ -344,57 +386,93 @@ export function createSyncRuntimeApi(ctx: any) {
               result.data && result.data.server_content_version ? result.data.server_content_version : 0,
             );
 
-            if (backgroundSync) {
-              // 后台同步时，检查本地是否有未保存的更改
-              const baseContent = (g('lastSyncedContent') || {})[fileId];
-              if (content === baseContent) {
-                // 本地没有更改，直接同步服务器版本
-                file.content = serverContent;
-                file.lastModified = serverModified || file.lastModified || Date.now();
-                file.serverLastModified = serverModified || file.serverLastModified || file.lastModified;
-                file.contentVersion = serverContentVersion;
-                file.isSynced = true;
-                localStorage.setItem('vditor_files', JSON.stringify(files));
-                g('lastSyncedContent')[fileId] = serverContent;
-                g('unsavedChanges')[fileId] = false;
-                markPendingServerSync(fileId, false);
-                globalRef.lastSaveConflictPending = false;
-                return true;
+            const baseContent = (g('lastSyncedContent') || {})[fileId];
+            if (content === baseContent) {
+              file.content = serverContent;
+              file.lastModified = serverModified || file.lastModified || Date.now();
+              file.serverLastModified = serverModified || file.serverLastModified || file.lastModified;
+              file.contentVersion = serverContentVersion;
+              file.isSynced = true;
+              localStorage.setItem('vditor_files', JSON.stringify(files));
+              g('lastSyncedContent')[fileId] = serverContent;
+              g('unsavedChanges')[fileId] = false;
+              markPendingServerSync(fileId, false);
+              globalRef.lastSaveConflictPending = false;
+              return true;
+            }
+
+            const mergeResult = autoMergeTextConflict
+              ? autoMergeTextConflict(baseContent || '', content, serverContent)
+              : { mergedText: content, hasConflict: true };
+            content = mergeResult.mergedText || '';
+            file.content = content;
+            file.lastModified = Date.now();
+            file.serverLastModified = serverModified || file.serverLastModified || null;
+            file.contentVersion = Number.isFinite(serverContentVersion) && serverContentVersion > 0
+              ? serverContentVersion
+              : Number(file.contentVersion || 0) || null;
+            file.isSynced = false;
+            file.manualConflictPending = mergeResult.hasConflict === true;
+            file.preferLocalOnNextSync = !file.manualConflictPending;
+            if (file.id === g('currentFileId')) {
+              setEditorContentForFile(file.id, content);
+            }
+            localStorage.setItem('vditor_files', JSON.stringify(files));
+
+            if (file.manualConflictPending) {
+              g('unsavedChanges')[fileId] = true;
+              markPendingServerSync(fileId, false);
+              globalRef.lastSaveConflictPending = true;
+              if (!backgroundSync || String(file.id || '') === String(g('currentFileId') || '')) {
+                globalRef.showMessage(
+                  isEn()
+                    ? 'Automatic merge still has conflicts. Choose local or cloud content for each conflict.'
+                    : '自动合并后仍有冲突，请为每处冲突选择本地或云端内容',
+                  'warning',
+                );
+                if (typeof globalRef.showMergeConflictResolver === 'function') {
+                  globalRef.showMergeConflictResolver(fileId);
+                }
               }
               return false;
             }
 
-            // 显示提示，询问用户是否拉取服务器版本
-            if (typeof globalRef.customConfirm === 'function') {
-              globalRef.customConfirm(
-                isEn() ? 'Cloud has a newer version, do you want to pull it to local?' : '云端有新版本，是否拉取到本地？'
-              ).then((confirm) => {
-                if (confirm) {
-                  // 用户确认拉取，更新本地文件
-                  file.content = serverContent;
-                  file.lastModified = serverModified || file.lastModified || Date.now();
-                  file.serverLastModified = serverModified || file.serverLastModified || file.lastModified;
-                  file.contentVersion = serverContentVersion;
-                  file.isSynced = true;
-                  if (file.id === g('currentFileId')) {
-                    setEditorContentForFile(file.id, serverContent);
-                  }
-                  localStorage.setItem('vditor_files', JSON.stringify(files));
-                  g('lastSyncedContent')[fileId] = serverContent;
-                  g('unsavedChanges')[fileId] = false;
-                  markPendingServerSync(fileId, false);
-                  globalRef.lastSaveConflictPending = false;
-                  globalRef.showMessage(
-                    isEn() ? 'Successfully pulled latest version from cloud' : '成功从云端拉取最新版本',
-                    'success'
-                  );
-                } else {
-                  // 用户拒绝拉取，保持本地版本
-                  markPendingServerSync(fileId, true);
-                  globalRef.lastSaveConflictPending = true;
-                }
-              });
+            const retryBody: any = {
+              username: g('currentUser').username,
+              filename: filenameToSend,
+              content: content,
+              base_last_modified: serverModified,
+            };
+            if (Number.isFinite(serverContentVersion) && serverContentVersion > 0) {
+              retryBody.base_content_version = serverContentVersion;
             }
+            const retryResponse = await fetch(api + '/files/save', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + g('currentUser').token },
+              body: JSON.stringify(retryBody),
+            });
+            const retryResult = globalRef.parseJsonResponse ? await globalRef.parseJsonResponse(retryResponse) : await retryResponse.json();
+            if (retryResult.code === 200) {
+              file.isSynced = true;
+              file.preferLocalOnNextSync = false;
+              file.manualConflictPending = false;
+              file.lastModified =
+                retryResult.data && retryResult.data.last_modified ? retryResult.data.last_modified : Date.now();
+              file.serverLastModified =
+                retryResult.data && retryResult.data.last_modified ? retryResult.data.last_modified : file.lastModified;
+              file.contentVersion = Number(
+                retryResult.data && retryResult.data.content_version
+                  ? retryResult.data.content_version
+                  : Number(file.contentVersion || 0) + 1,
+              );
+              localStorage.setItem('vditor_files', JSON.stringify(files));
+              g('lastSyncedContent')[fileId] = content;
+              g('unsavedChanges')[fileId] = false;
+              markPendingServerSync(fileId, false);
+              globalRef.lastSaveConflictPending = false;
+              return true;
+            }
+            if (await tryHandleTokenExpired(retryResult)) return false;
             return false;
           }
 

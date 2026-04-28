@@ -23,6 +23,29 @@ describe('Frontend Utils', () => {
         });
     });
 
+    describe('normalizeAppResourceUrl', () => {
+        afterEach(() => {
+            delete window.desktopRuntime;
+            delete window.APP_ORIGIN;
+            localStorage.removeItem('appOrigin');
+        });
+
+        it('maps server-managed relative paths to the configured app origin', () => {
+            window.APP_ORIGIN = 'https://md.example.test';
+
+            expect(window.normalizeAppResourceUrl('/uploads/image.png')).toBe('https://md.example.test/uploads/image.png');
+            expect(window.normalizeAppResourceUrl('screenshots/a b.png')).toBe('https://md.example.test/screenshots/a%20b.png');
+        });
+
+        it('repairs Tauri-local managed image URLs without touching external images', () => {
+            window.desktopRuntime = { type: 'tauri' };
+            const localManagedUrl = window.location.origin + '/uploads/image.png?x=1';
+
+            expect(window.normalizeAppResourceUrl(localManagedUrl)).toBe('https://md.yhsun.cn/uploads/image.png?x=1');
+            expect(window.normalizeAppResourceUrl('https://cdn.example.test/uploads/image.png')).toBe('https://cdn.example.test/uploads/image.png');
+        });
+    });
+
     describe('parseJsonResponse', () => {
         it('should parse valid JSON', async () => {
             const mockResponse = {

@@ -47,6 +47,86 @@ import {
         return date.toLocaleString();
     }
 
+    const MERGE_CONFLICT_MARKER_RE = /(^|\n)(<<<<<<< LOCAL|=======|>>>>>>> REMOTE)(\n|$)/;
+
+    function hasMergeConflictMarkers(content) {
+        return MERGE_CONFLICT_MARKER_RE.test(String(content || ''));
+    }
+
+    function parseMergeConflictBlocks(content) {
+        const text = String(content || '');
+        const pattern = /<<<<<<< LOCAL\n([\s\S]*?)\n=======\n([\s\S]*?)\n>>>>>>> REMOTE/g;
+        const blocks = [];
+        let match;
+        while ((match = pattern.exec(text)) !== null) {
+            const before = text.slice(0, match.index);
+            blocks.push({
+                index: blocks.length,
+                start: match.index,
+                end: pattern.lastIndex,
+                local: match[1] || '',
+                remote: match[2] || '',
+                line: before ? before.split('\n').length : 1
+            });
+        }
+        return blocks;
+    }
+
+    function applyMergeConflictDecisions(content, decisions) {
+        const text = String(content || '');
+        const blocks = parseMergeConflictBlocks(text);
+        let nextContent = '';
+        let cursor = 0;
+
+        blocks.forEach(function(block) {
+            nextContent += text.slice(cursor, block.start);
+            nextContent += decisions[block.index] === 'remote' ? block.remote : block.local;
+            cursor = block.end;
+        });
+
+        nextContent += text.slice(cursor);
+        return nextContent;
+    }
+
+    function buildManualMergeContent(localContent, serverContent) {
+        return '<<<<<<< LOCAL\n' + (localContent || '') + '\n=======\n' + (serverContent || '') + '\n>>>>>>> REMOTE';
+    }
+
+    function autoMergeTextConflict(baseContent, localContent, serverContent) {
+        const baseText = baseContent || '';
+        const localText = localContent || '';
+        const serverText = serverContent || '';
+
+        if (localText === serverText) {
+            return { mergedText: localText, hasConflict: false };
+        }
+        if (localText === baseText) {
+            return { mergedText: serverText, hasConflict: false };
+        }
+        if (serverText === baseText) {
+            return { mergedText: localText, hasConflict: false };
+        }
+
+        const gateway = global.wasmTextEngineGateway;
+        if (gateway && typeof gateway.merge3 === 'function') {
+            try {
+                const mergeRes = gateway.merge3(baseText, localText, serverText, 'manual');
+                if (mergeRes && mergeRes.code === 200 && mergeRes.data && typeof mergeRes.data.mergedText === 'string') {
+                    const mergedText = mergeRes.data.mergedText;
+                    return {
+                        mergedText: mergedText,
+                        hasConflict: mergeRes.data.hasConflict === true || hasMergeConflictMarkers(mergedText)
+                    };
+                }
+            } catch (error) {
+                console.warn('[Conflict] three-way merge failed:', error);
+            }
+        }
+
+        const mergedText = buildManualMergeContent(localText, serverText);
+        return { mergedText: mergedText, hasConflict: true };
+    }
+
     let tokenRecoveryInProgress = false;
     let lastTokenRecoveryAt = 0;
     const browserFileHandleMap = new Map();
@@ -978,6 +1058,28 @@ import {
             g('lastSyncedContent')[currentFileId] = content;
             return true;
         }
+
+        if (file.manualConflictPending && hasMergeConflictMarkers(content)) {
+            g('unsavedChanges')[currentFileId] = true;
+            markPendingServerSync(currentFileId, false);
+            global.lastSaveConflictPending = true;
+            if (isManual) {
+                global.showMessage(
+                    isEn()
+                        ? 'Choose local or cloud content for each conflict before saving to cloud'
+                        : '请先为每处冲突选择本地或云端内容，再保存到云端',
+                    'warning'
+                );
+                showMergeConflictResolver(currentFileId);
+            }
+            return false;
+        }
+
+        if (file.manualConflictPending && !hasMergeConflictMarkers(content)) {
+            file.manualConflictPending = false;
+            file.preferLocalOnNextSync = true;
+        }
+
         markPendingServerSync(currentFileId, true);
         try {
             const saveResult = await global.syncFileToServer(currentFileId, { background: !isManual });
@@ -1546,6 +1648,8 @@ import {
         markPendingServerSync,
         tryHandleTokenExpired,
         pullServerUpdatesForCleanFiles,
+        autoMergeTextConflict,
+        hasMergeConflictMarkers,
         isEn
     });
 
@@ -1747,325 +1851,344 @@ import {
         showDiffModal(conflict);
     }
 
-    function showSaveConflictDialog(conflict) {
-        const existing = document.getElementById('saveConflictModalOverlay');
+    function showMergeConflictResolver(fileId) {
+        const files = g('files') || [];
+        const file = files.find(function(item) {
+            return item && String(item.id) === String(fileId);
+        });
+        if (!file) return;
+
+        const content = String(file.id === g('currentFileId')
+            ? getCurrentEditorContent(file.id, file.content)
+            : file.content || '');
+        const blocks = parseMergeConflictBlocks(content);
+        if (blocks.length === 0) {
+            file.manualConflictPending = false;
+            file.preferLocalOnNextSync = true;
+            localStorage.setItem('vditor_files', JSON.stringify(files));
+            return;
+        }
+
+        const existing = document.getElementById('mergeConflictResolverOverlay');
         if (existing) existing.remove();
 
+        const nightMode = g('nightMode') === true;
+        const bgColor = nightMode ? '#242424' : '#fff';
+        const textColor = nightMode ? '#eee' : '#222';
+        const mutedColor = nightMode ? '#aaa' : '#666';
+        const borderColor = nightMode ? '#444' : '#e5e7eb';
+        const panelBg = nightMode ? '#2d2d2d' : '#f9fafb';
+        const codeBg = nightMode ? '#1f1f1f' : '#fff';
+        const selectedBg = nightMode ? 'rgba(59,130,246,0.24)' : 'rgba(59,130,246,0.12)';
+        const decisions = {};
+
+        const overlay = document.createElement('div');
+        overlay.id = 'mergeConflictResolverOverlay';
+        overlay.className = 'modal-overlay show';
+        overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.72);display:flex;align-items:center;justify-content:center;z-index:10010;padding:16px;';
+
+        const panel = document.createElement('div');
+        panel.style.cssText = 'width:min(96vw,1120px);height:min(90vh,840px);background:' + bgColor + ';color:' + textColor + ';border-radius:8px;box-shadow:0 24px 70px rgba(0,0,0,0.35);display:flex;flex-direction:column;overflow:hidden;';
+        panel.innerHTML =
+            '<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid ' + borderColor + ';">' +
+                '<div style="min-width:0;">' +
+                    '<div style="font-size:17px;font-weight:700;">' + (isEn() ? 'Resolve Merge Conflicts' : '处理合并冲突') + '</div>' +
+                    '<div style="font-size:12px;color:' + mutedColor + ';margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escapeHtml(file.name || '') + '</div>' +
+                '</div>' +
+                '<button type="button" class="merge-resolver-close" style="background:transparent;border:none;color:' + textColor + ';font-size:22px;cursor:pointer;padding:4px 8px;">&times;</button>' +
+            '</div>' +
+            '<div style="display:flex;gap:8px;align-items:center;justify-content:space-between;padding:10px 18px;border-bottom:1px solid ' + borderColor + ';flex-wrap:wrap;">' +
+                '<div style="font-size:13px;color:' + mutedColor + ';">' + (isEn() ? 'Choose local or cloud content for each conflict.' : '为每处冲突选择本地或云端内容。') + '</div>' +
+                '<div style="display:flex;gap:8px;flex-wrap:wrap;">' +
+                    '<button type="button" class="merge-resolver-all-local" style="padding:7px 10px;border:1px solid ' + borderColor + ';border-radius:6px;background:' + panelBg + ';color:' + textColor + ';cursor:pointer;">' + (isEn() ? 'Accept all local' : '全部接受本地') + '</button>' +
+                    '<button type="button" class="merge-resolver-all-remote" style="padding:7px 10px;border:1px solid ' + borderColor + ';border-radius:6px;background:' + panelBg + ';color:' + textColor + ';cursor:pointer;">' + (isEn() ? 'Accept all cloud' : '全部接受云端') + '</button>' +
+                    '<button type="button" class="merge-resolver-apply" disabled style="padding:7px 14px;border:none;border-radius:6px;background:#9ca3af;color:#fff;cursor:not-allowed;">' + (isEn() ? 'Apply' : '应用选择') + '</button>' +
+                '</div>' +
+            '</div>' +
+            '<div class="merge-resolver-list" style="flex:1;overflow:auto;padding:14px 18px;background:' + panelBg + ';"></div>';
+        overlay.appendChild(panel);
+        document.body.appendChild(overlay);
+
+        const list = panel.querySelector('.merge-resolver-list');
+        const applyBtn = panel.querySelector('.merge-resolver-apply');
+
+        function updateApplyState() {
+            const allSelected = blocks.every(function(block) { return decisions[block.index] === 'local' || decisions[block.index] === 'remote'; });
+            applyBtn.disabled = !allSelected;
+            applyBtn.style.background = allSelected ? '#2563eb' : '#9ca3af';
+            applyBtn.style.cursor = allSelected ? 'pointer' : 'not-allowed';
+        }
+
+        function updateBlockSelection(blockIndex) {
+            const card = list.querySelector('[data-conflict-index="' + blockIndex + '"]');
+            if (!card) return;
+            card.querySelectorAll('[data-choice]').forEach(function(btn) {
+                const selected = btn.getAttribute('data-choice') === decisions[blockIndex];
+                btn.style.background = selected ? '#2563eb' : codeBg;
+                btn.style.color = selected ? '#fff' : textColor;
+                btn.style.borderColor = selected ? '#2563eb' : borderColor;
+            });
+            card.style.boxShadow = decisions[blockIndex] ? ('inset 0 0 0 2px ' + selectedBg) : 'none';
+            updateApplyState();
+        }
+
+        list.innerHTML = blocks.map(function(block) {
+            return '<div data-conflict-index="' + block.index + '" style="background:' + bgColor + ';border:1px solid ' + borderColor + ';border-radius:8px;margin-bottom:12px;overflow:hidden;">' +
+                '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border-bottom:1px solid ' + borderColor + ';font-size:13px;">' +
+                    '<strong>' + (isEn() ? 'Conflict at line ' : '冲突行 ') + block.line + '</strong>' +
+                    '<div style="display:flex;gap:8px;flex-wrap:wrap;">' +
+                        '<button type="button" data-choice="local" style="padding:6px 10px;border:1px solid ' + borderColor + ';border-radius:6px;background:' + codeBg + ';color:' + textColor + ';cursor:pointer;">' + (isEn() ? 'Accept local' : '接受本地') + '</button>' +
+                        '<button type="button" data-choice="remote" style="padding:6px 10px;border:1px solid ' + borderColor + ';border-radius:6px;background:' + codeBg + ';color:' + textColor + ';cursor:pointer;">' + (isEn() ? 'Accept cloud' : '接受云端') + '</button>' +
+                    '</div>' +
+                '</div>' +
+                '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0;">' +
+                    '<div style="min-width:0;border-right:1px solid ' + borderColor + ';">' +
+                        '<div style="padding:7px 10px;font-size:12px;font-weight:700;color:' + mutedColor + ';border-bottom:1px solid ' + borderColor + ';">' + (isEn() ? 'Local' : '本地') + '</div>' +
+                        '<pre style="margin:0;min-height:64px;max-height:220px;overflow:auto;padding:10px;background:' + codeBg + ';white-space:pre-wrap;word-break:break-word;font-size:12px;line-height:1.5;">' + escapeHtml(block.local) + '</pre>' +
+                    '</div>' +
+                    '<div style="min-width:0;">' +
+                        '<div style="padding:7px 10px;font-size:12px;font-weight:700;color:' + mutedColor + ';border-bottom:1px solid ' + borderColor + ';">' + (isEn() ? 'Cloud' : '云端') + '</div>' +
+                        '<pre style="margin:0;min-height:64px;max-height:220px;overflow:auto;padding:10px;background:' + codeBg + ';white-space:pre-wrap;word-break:break-word;font-size:12px;line-height:1.5;">' + escapeHtml(block.remote) + '</pre>' +
+                    '</div>' +
+                '</div>' +
+            '</div>';
+        }).join('');
+
+        list.querySelectorAll('[data-choice]').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                const card = btn.closest('[data-conflict-index]');
+                if (!card) return;
+                const blockIndex = Number(card.getAttribute('data-conflict-index'));
+                decisions[blockIndex] = btn.getAttribute('data-choice');
+                updateBlockSelection(blockIndex);
+            });
+        });
+
+        function chooseAll(choice) {
+            blocks.forEach(function(block) {
+                decisions[block.index] = choice;
+                updateBlockSelection(block.index);
+            });
+        }
+
+        function closeResolver() {
+            if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+            document.removeEventListener('keydown', handleEsc);
+        }
+
+        function persistResolvedContent(resolvedContent) {
+            file.content = resolvedContent;
+            file.lastModified = Date.now();
+            file.manualConflictPending = hasMergeConflictMarkers(resolvedContent);
+            file.preferLocalOnNextSync = !file.manualConflictPending;
+            file.isSynced = false;
+            localStorage.setItem('vditor_files', JSON.stringify(files));
+            if (String(g('currentFileId') || '') === String(file.id || '')) {
+                setEditorContentForFile(file.id, resolvedContent);
+            }
+
+            if (file.manualConflictPending) {
+                g('unsavedChanges')[file.id] = true;
+                markPendingServerSync(file.id, false);
+                global.lastSaveConflictPending = true;
+                global.showMessage(isEn() ? 'Some conflict markers remain unresolved' : '仍有冲突标记未处理', 'warning');
+                return;
+            }
+
+            g('unsavedChanges')[file.id] = true;
+            markPendingServerSync(file.id, true);
+            global.lastSaveConflictPending = false;
+
+            if (g('currentUser')) {
+                showSaveStatus('saving');
+                Promise.resolve(syncFileToServer(file.id, {
+                    background: false,
+                    overrideContent: resolvedContent,
+                    skipConflictCheck: true,
+                    baseContentVersion: Number(file.contentVersion || 0) || null,
+                    baseLastModified: file.serverLastModified || null
+                })).then(function(saved) {
+                    if (saved) {
+                        g('unsavedChanges')[file.id] = false;
+                        showSaveStatus('saved');
+                        global.showMessage(isEn() ? 'Conflict choices applied and saved' : '冲突选择已应用并保存', 'success');
+                    } else {
+                        showSaveStatus('failed');
+                        global.showMessage(isEn() ? 'Conflict choices applied locally, cloud save failed' : '冲突选择已应用到本地，云端保存失败', 'warning');
+                    }
+                }).catch(function(error) {
+                    showSaveStatus('failed');
+                    console.error('[Conflict Resolver] Save failed:', error);
+                    global.showMessage(isEn() ? 'Conflict choices applied locally, cloud save failed' : '冲突选择已应用到本地，云端保存失败', 'warning');
+                });
+            } else {
+                global.showMessage(isEn() ? 'Conflict choices applied' : '冲突选择已应用', 'success');
+            }
+        }
+
+        panel.querySelector('.merge-resolver-close').onclick = closeResolver;
+        panel.querySelector('.merge-resolver-all-local').onclick = function() { chooseAll('local'); };
+        panel.querySelector('.merge-resolver-all-remote').onclick = function() { chooseAll('remote'); };
+        applyBtn.onclick = function() {
+            if (applyBtn.disabled) return;
+            const resolvedContent = applyMergeConflictDecisions(content, decisions);
+            closeResolver();
+            persistResolvedContent(resolvedContent);
+        };
+        overlay.onclick = function(event) {
+            if (event.target === overlay) closeResolver();
+        };
+        var handleEsc = function(event) {
+            if (event.key === 'Escape') closeResolver();
+        };
+        document.addEventListener('keydown', handleEsc);
+
+        updateApplyState();
+    }
+
+    function showSaveConflictDialog(conflict) {
         const files = g('files') || [];
         const currentFile = files.find(function(file) {
             return file && String(file.id) === String(conflict.fileId);
         });
         if (!currentFile) return;
 
-        const nightMode = g('nightMode') === true;
-        const overlay = document.createElement('div');
-        overlay.id = 'saveConflictModalOverlay';
-        overlay.className = 'modal-overlay show';
-        overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:10009;';
+        const baseText = typeof conflict.baseContent === 'string'
+            ? conflict.baseContent
+            : ((g('lastSyncedContent') || {})[conflict.fileId] || '');
+        const mergeResult = autoMergeTextConflict(baseText, conflict.localContent || '', conflict.serverContent || '');
+        const mergedText = mergeResult.mergedText || '';
+        const serverLastModified = conflict.serverLastModified || conflict.serverModified || null;
+        const serverContentVersionRaw = Number(conflict.serverContentVersion);
+        const serverContentVersion = Number.isFinite(serverContentVersionRaw) && serverContentVersionRaw > 0
+            ? serverContentVersionRaw
+            : null;
 
-        const panel = document.createElement('div');
-        panel.style.cssText = 'background:' + (nightMode ? '#2d2d2d' : 'white') + ';color:' + (nightMode ? '#eee' : '#333') + ';border-radius:12px;padding:24px;width:min(92vw,760px);max-height:86vh;overflow:auto;position:relative;box-shadow:0 20px 60px rgba(0,0,0,0.28);';
-        panel.innerHTML =
-            '<button type="button" class="modal-close-btn" style="position:absolute;top:14px;right:14px;background:none;border:none;font-size:20px;cursor:pointer;color:' + (nightMode ? '#eee' : '#333') + ';">&times;</button>' +
-            '<div style="font-size:18px;font-weight:700;margin-bottom:8px;">' + (isEn() ? 'Save Conflict Detected' : '检测到保存冲突') + '</div>' +
-            '<div style="font-size:14px;opacity:0.82;margin-bottom:18px;">' + escapeHtml(currentFile.name || conflict.fileName || '') + '</div>' +
-            '<div style="margin-bottom:12px;padding:10px 12px;border:1px solid ' + (nightMode ? '#444' : '#e5e7eb') + ';border-radius:10px;font-size:12px;color:' + (nightMode ? '#bbb' : '#666') + ';display:flex;gap:16px;flex-wrap:wrap;">' +
-                '<span><strong style="color:' + (nightMode ? '#ddd' : '#374151') + ';">' + (isEn() ? 'Local modified:' : '本地修改时间：') + '</strong> ' + formatConflictTime(conflict.localModified) + '</span>' +
-                '<span><strong style="color:' + (nightMode ? '#ddd' : '#374151') + ';">' + (isEn() ? 'Server modified:' : '服务器修改时间：') + '</strong> ' + formatConflictTime(conflict.serverModified) + '</span>' +
-            '</div>' +
-            '<div class="save-conflict-diff" style="margin-bottom:18px;border:1px solid ' + (nightMode ? '#444' : '#e5e7eb') + ';border-radius:10px;overflow:auto;max-height:320px;"></div>' +
-            '<div style="display:flex;flex-wrap:wrap;gap:10px;justify-content:flex-end;">' +
-                '<button type="button" class="save-conflict-btn use-server" style="padding:10px 16px;border:none;border-radius:8px;background:' + (nightMode ? '#4b5563' : '#64748b') + ';color:#fff;cursor:pointer;">' + (isEn() ? 'Use server version' : '使用服务器版本') + '</button>' +
-                '<button type="button" class="save-conflict-btn merge-version" style="padding:10px 16px;border:none;border-radius:8px;background:' + (nightMode ? '#0f766e' : '#14b8a6') + ';color:#fff;cursor:pointer;">' + (isEn() ? 'Merge and save' : '合并并保存') + '</button>' +
-                '<button type="button" class="save-conflict-btn use-local" style="padding:10px 16px;border:none;border-radius:8px;background:' + (nightMode ? '#2563eb' : '#3b82f6') + ';color:#fff;cursor:pointer;">' + (isEn() ? 'Keep local version' : '保留本地版本') + '</button>' +
-            '</div>';
+        currentFile.content = mergedText;
+        currentFile.lastModified = Date.now();
+        currentFile.serverLastModified = serverLastModified || currentFile.serverLastModified || null;
+        currentFile.contentVersion = serverContentVersion;
+        currentFile.isSynced = false;
+        currentFile.manualConflictPending = mergeResult.hasConflict === true;
+        currentFile.preferLocalOnNextSync = !currentFile.manualConflictPending;
+        localStorage.setItem('vditor_files', JSON.stringify(files));
 
-        overlay.appendChild(panel);
-        document.body.appendChild(overlay);
-
-        const saveConflictDiff = panel.querySelector('.save-conflict-diff');
-        if (saveConflictDiff) {
-            const saveConflictDiffResult = computeDiff(conflict.localContent || '', conflict.serverContent || '');
-            saveConflictDiff.innerHTML = renderDiffView(saveConflictDiffResult, { collapseSame: true });
-            bindCollapsedDiffInteractions(saveConflictDiff);
+        if (String(g('currentFileId') || '') === String(conflict.fileId || '')) {
+            setEditorContentForFile(conflict.fileId, mergedText);
         }
 
-        const closeDialog = function() {
-            global.lastSaveConflictPending = false;
-            if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
-        };
-
-        const persistContentAndRetry = async function(contentToSave) {
-            const localFileIndex = files.findIndex(function(file) {
-                return file && String(file.id) === String(conflict.fileId);
-            });
-            const retryBaseLastModified = conflict.serverLastModified || conflict.serverModified || null;
-            const retryBaseContentVersionRaw = Number(conflict.serverContentVersion);
-            const retryBaseContentVersion = Number.isFinite(retryBaseContentVersionRaw) && retryBaseContentVersionRaw > 0
-                ? retryBaseContentVersionRaw
-                : null;
-
-            if (localFileIndex !== -1) {
-                files[localFileIndex].content = contentToSave;
-                files[localFileIndex].lastModified = Date.now();
-                if (retryBaseLastModified) {
-                    files[localFileIndex].serverLastModified = retryBaseLastModified;
-                }
-                if (retryBaseContentVersion !== null) {
-                    files[localFileIndex].contentVersion = retryBaseContentVersion;
-                }
-                files[localFileIndex].isSynced = false;
-                localStorage.setItem('vditor_files', JSON.stringify(files));
-            }
-
-            if (String(g('currentFileId') || '') === String(conflict.fileId || '')) {
-                setEditorContentForFile(conflict.fileId, contentToSave);
-            }
-
-            global.lastSaveConflictPending = false;
-            try {
-                const saveResult = await syncFileToServer(conflict.fileId, {
-                    background: false,
-                    overrideContent: contentToSave,
-                    skipConflictCheck: true,
-                    baseContentVersion: retryBaseContentVersion,
-                    baseLastModified: retryBaseLastModified
-                });
-
-                if (saveResult) {
-                    if (localFileIndex !== -1) {
-                        files[localFileIndex].isSynced = true;
-                        localStorage.setItem('vditor_files', JSON.stringify(files));
-                    }
-                    g('unsavedChanges')[conflict.fileId] = false;
-                    showSaveStatus('saved');
-                    closeDialog();
-                }
-            } catch (error) {
-                if (!global.lastSaveConflictPending) {
-                    showSaveStatus('failed');
-                }
-                console.error('[Save Conflict] Retry save failed:', error);
-            }
-        };
-
-        panel.querySelector('.modal-close-btn').onclick = closeDialog;
-        overlay.onclick = function(event) {
-            if (event.target === overlay) closeDialog();
-        };
-
-        panel.querySelector('.use-server').onclick = function() {
-            const localFileIndex = files.findIndex(function(file) {
-                return file && String(file.id) === String(conflict.fileId);
-            });
-            if (localFileIndex !== -1) {
-                files[localFileIndex].content = conflict.serverContent || '';
-                files[localFileIndex].lastModified = Number(conflict.serverModified || Date.now());
-                files[localFileIndex].serverLastModified = conflict.serverLastModified || conflict.serverModified || files[localFileIndex].lastModified;
-                const serverContentVersionRaw = Number(conflict.serverContentVersion);
-                files[localFileIndex].contentVersion = Number.isFinite(serverContentVersionRaw) && serverContentVersionRaw > 0
-                    ? serverContentVersionRaw
-                    : null;
-                files[localFileIndex].isSynced = true;
-                localStorage.setItem('vditor_files', JSON.stringify(files));
-            }
-            if (String(g('currentFileId') || '') === String(conflict.fileId || '')) {
-                setEditorContentForFile(conflict.fileId, conflict.serverContent || '');
-            }
-            g('unsavedChanges')[conflict.fileId] = false;
-            g('lastSyncedContent')[conflict.fileId] = conflict.serverContent || '';
+        if (currentFile.manualConflictPending) {
+            g('unsavedChanges')[conflict.fileId] = true;
             markPendingServerSync(conflict.fileId, false);
-            global.lastSaveConflictPending = false;
-            showSaveStatus('saved');
-            closeDialog();
-        };
+            global.lastSaveConflictPending = true;
+            showSaveStatus('failed');
+            global.showMessage(
+                isEn()
+                    ? 'Automatic merge still has conflicts. Choose local or cloud content for each conflict.'
+                    : '自动合并后仍有冲突，请为每处冲突选择本地或云端内容',
+                'warning'
+            );
+            showMergeConflictResolver(conflict.fileId);
+            return;
+        }
 
-        panel.querySelector('.use-local').onclick = function() {
-            persistContentAndRetry(conflict.localContent || '');
-        };
-
-        panel.querySelector('.merge-version').onclick = function() {
-            const baseText = (g('lastSyncedContent') || {})[conflict.fileId] || '';
-            const gateway = global.wasmTextEngineGateway;
-            let mergedText = conflict.localContent || '';
-            if (gateway && typeof gateway.merge3 === 'function') {
-                const mergeRes = gateway.merge3(baseText, conflict.localContent || '', conflict.serverContent || '', 'manual');
-                if (mergeRes && mergeRes.code === 200 && mergeRes.data) {
-                    mergedText = mergeRes.data.mergedText || mergedText;
-                }
+        markPendingServerSync(conflict.fileId, true);
+        global.lastSaveConflictPending = false;
+        Promise.resolve(syncFileToServer(conflict.fileId, {
+            background: false,
+            overrideContent: mergedText,
+            skipConflictCheck: true,
+            baseContentVersion: serverContentVersion,
+            baseLastModified: serverLastModified
+        })).then(function(saveResult) {
+            if (saveResult) {
+                g('unsavedChanges')[conflict.fileId] = false;
+                showSaveStatus('saved');
+                global.showMessage(isEn() ? 'Conflict automatically merged and saved' : '冲突已自动合并并保存', 'success');
+            } else {
+                g('unsavedChanges')[conflict.fileId] = true;
+                markPendingServerSync(conflict.fileId, true);
+                showSaveStatus('failed');
             }
-            persistContentAndRetry(mergedText);
-        };
-
-        var handleEsc = function(event) {
-            if (event.key === 'Escape' && overlay.parentNode) {
-                closeDialog();
-                document.removeEventListener('keydown', handleEsc);
-            }
-        };
-        document.addEventListener('keydown', handleEsc);
+        }).catch(function(error) {
+            g('unsavedChanges')[conflict.fileId] = true;
+            markPendingServerSync(conflict.fileId, true);
+            showSaveStatus('failed');
+            console.error('[Save Conflict] Auto merge save failed:', error);
+        });
     }
 
     function showConflictResolution(conflicts, serverFiles, preserveFileName) {
-        const conflictModal = document.getElementById('conflictModalOverlay');
-        const conflictList = document.getElementById('conflictList');
-        if (!conflictModal || !conflictList) return;
-        conflictList.innerHTML = '';
-        conflicts.forEach(function(conflict, index) {
-            const conflictItem = document.createElement('div');
-            conflictItem.className = 'conflict-option';
-
-            // 当前编辑文件仅显示标识，不再使用强制高亮边框
-            const isCurrentFile = preserveFileName && conflict.filename === preserveFileName;
-            const currentFileClass = isCurrentFile ? ' is-current-file' : '';
-            const currentFileTag = isCurrentFile
-                ? '<span class="current-file-tag">' + (isEn() ? 'Currently editing' : '当前正在编辑') + '</span>'
-                : '';
-
-            if (conflict.type === 'delete') {
-                conflictItem.innerHTML = '<div class="conflict-main' + currentFileClass + '" style="flex:1; padding: 8px;"><strong style="color: #dc3545;">' + (isCurrentFile ? '📝 ' : '⚠️ ') + conflict.filename + '</strong>' + currentFileTag + '<div class="conflict-details"><div style="color: #dc3545;">' + (isEn() ? 'This file has been deleted on the server' : '该文件在服务器上已经删除') + '</div><div>' + (isEn() ? 'Local modified time: ' : '本地修改时间: ') + new Date(conflict.localModified).toLocaleString() + '</div></div><div style="margin-top: 8px;"><label style="margin-right: 15px;"><input type="radio" name="conflict-' + index + '" value="upload">' + (isEn() ? 'Re-upload to server' : '重新上传到服务器') + '</label><label><input type="radio" name="conflict-' + index + '" value="delete" checked>' + (isEn() ? 'Delete local file' : '删除本地文件') + '</label></div></div>';
-            } else {
-                conflictItem.innerHTML = '<div class="conflict-main' + currentFileClass + '" style="flex:1; padding: 8px;"><strong>' + (isCurrentFile ? '📝 ' : '') + conflict.filename + '</strong>' + currentFileTag + '<div class="conflict-details"><div>' + (isEn() ? 'Local modified time: ' : '本地修改时间: ') + new Date(conflict.localModified).toLocaleString() + '</div><div>' + (isEn() ? 'Server modified time: ' : '服务器修改时间: ') + new Date(conflict.serverModified).toLocaleString() + '</div></div><div style="margin-top: 8px;"><label style="margin-right: 15px;"><input type="radio" name="conflict-' + index + '" value="local"' + (isCurrentFile ? ' checked' : '') + '>' + (isEn() ? 'Use local version' : '使用本地版本') + '</label><label style="margin-right: 15px;"><input type="radio" name="conflict-' + index + '" value="server"' + (isCurrentFile ? '' : ' checked') + '>' + (isEn() ? 'Use server version' : '使用服务器版本') + '</label><label><input type="radio" name="conflict-' + index + '" value="merge">' + (isEn() ? 'Use smart merge' : '使用智能合并') + '</label></div></div><button class="diff-view-btn" data-index="' + index + '" title="' + (isEn() ? 'View differences' : '查看差异') + '"><i class="fas fa-columns"></i></button><button class="merge-preview-btn" data-index="' + index + '" title="' + (isEn() ? 'Smart merge preview' : '智能合并预览') + '"><i class="fas fa-code-branch"></i></button>';
-            }
-            conflictList.appendChild(conflictItem);
-        });
-
-        // 绑定查看差异按钮事件
-        conflictList.querySelectorAll('.diff-view-btn').forEach(function(btn) {
-            btn.addEventListener('click', function(e) {
-                e.stopPropagation();
-                const index = parseInt(this.getAttribute('data-index'));
-                showDiffModal(conflicts[index]);
-            });
-        });
-        conflictList.querySelectorAll('.merge-preview-btn').forEach(function(btn) {
-            btn.addEventListener('click', function(e) {
-                e.stopPropagation();
-                const index = parseInt(this.getAttribute('data-index'));
-                const mergeInput = document.querySelector('input[name="conflict-' + index + '"][value="merge"]');
-                if (mergeInput) mergeInput.checked = true;
-                showMergePreviewModal(conflicts[index]);
-            });
-        });
-        conflictModal.classList.add('show');
-        var resolveBtn = document.getElementById('resolveConflictsBtn');
-        var cancelBtn = document.getElementById('cancelConflictBtn');
-        var closeBtn = document.getElementById('closeConflictBtn');
-
-        var handleDefaultResolution = function() {
-            conflictModal.classList.remove('show');
-            document.removeEventListener('keydown', handleEsc);
-            // 默认全部设为服务器版本（或删除以同步服务器）
-            conflicts.forEach(function(conflict, index) {
-                var serverInput = document.querySelector('input[name="conflict-' + index + '"][value="server"]');
-                var deleteInput = document.querySelector('input[name="conflict-' + index + '"][value="delete"]');
-                if (serverInput) serverInput.checked = true;
-                if (deleteInput) deleteInput.checked = true;
-            });
-            resolveConflicts(conflicts, serverFiles, preserveFileName);
-            global.showMessage(isEn() ? 'Using server version by default' : '已默认使用服务器版本');
-        };
-
-        var handleEsc = function(e) {
-            if (e.key === 'Escape' && conflictModal.classList.contains('show')) {
-                handleDefaultResolution();
-            }
-        };
-
-        if (resolveBtn) resolveBtn.onclick = function() {
-            document.removeEventListener('keydown', handleEsc);
-            resolveConflicts(conflicts, serverFiles, preserveFileName);
-            conflictModal.classList.remove('show');
-        };
-        if (cancelBtn) cancelBtn.onclick = handleDefaultResolution;
-        if (closeBtn) closeBtn.onclick = handleDefaultResolution;
-
-        // 点击外部区域关闭
-        conflictModal.onclick = function(e) {
-            if (e.target === conflictModal) handleDefaultResolution();
-        };
-
-        // 监听 Esc 键
-        document.addEventListener('keydown', handleEsc);
-    }
-
-    function resolveConflicts(conflicts, serverFiles, preserveFileName) {
         const localFiles = JSON.parse(localStorage.getItem('vditor_files') || '[]');
-        const vditor = g('vditor');
         const currentFileId = g('currentFileId');
-        const filesToDelete = [];
+        const pendingSyncIds = [];
+        const manualConflictIds = [];
 
-        conflicts.forEach(function(conflict, index) {
-            const selection = document.querySelector('input[name="conflict-' + index + '"]:checked');
-            if (!selection) return;
+        conflicts.forEach(function(conflict) {
+            const localFile = localFiles.find(function(f) { return f.name === conflict.filename; });
+            if (!localFile) return;
 
             if (conflict.type === 'delete') {
-                const action = selection.value;
-                if (action === 'delete') {
-                    const localFileIndex = localFiles.findIndex(function(f) { return f.name === conflict.filename; });
-                    if (localFileIndex !== -1) {
-                        filesToDelete.push(localFiles[localFileIndex].id);
-                        localFiles.splice(localFileIndex, 1);
-                    }
-                } else {
-                    const localFile = localFiles.find(function(f) { return f.name === conflict.filename; });
-                    if (localFile) {
-                        serverFiles.push({
-                            name: localFile.name,
-                            content: localFile.content,
-                            lastModified: localFile.lastModified,
-                            contentVersion: Number(localFile.contentVersion || 0)
-                        });
-                    }
-                }
-            } else {
-                if (selection.value === 'local') {
-                    const serverFileIndex = serverFiles.findIndex(function(f) { return f.name === conflict.filename; });
-                    if (serverFileIndex !== -1) {
-                        serverFiles[serverFileIndex].content = conflict.localContent;
-                        serverFiles[serverFileIndex].contentVersion = Number(conflict.localContentVersion || conflict.serverContentVersion || serverFiles[serverFileIndex].contentVersion || 0);
-                    }
-                } else if (selection.value === 'server') {
-                    const localFileIndex = localFiles.findIndex(function(f) { return f.name === conflict.filename; });
-                    if (localFileIndex !== -1) {
-                        localFiles[localFileIndex].content = conflict.serverContent;
-                        localFiles[localFileIndex].lastModified = conflict.serverModified;
-                        localFiles[localFileIndex].contentVersion = Number(conflict.serverContentVersion || 0);
-                        if (currentFileId === localFiles[localFileIndex].id) {
-                            setEditorContentForFile(currentFileId, conflict.serverContent);
-                        }
-                    }
-                } else if (selection.value === 'merge') {
-                    const localFile = localFiles.find(function(f) { return f.name === conflict.filename; });
-                    const baseText = localFile && localFile.id ? (g('lastSyncedContent')[localFile.id] || '') : '';
-                    const mergeRes = global.wasmTextEngineGateway.merge3(baseText, conflict.localContent || '', conflict.serverContent || '', 'manual');
-                    const mergedText = mergeRes.data.mergedText || '';
+                localFile.isSynced = false;
+                localFile.preferLocalOnNextSync = true;
+                localFile.manualConflictPending = false;
+                if (localFile.id) pendingSyncIds.push(localFile.id);
+                return;
+            }
 
-                    const serverFileIndex = serverFiles.findIndex(function(f) { return f.name === conflict.filename; });
-                    if (serverFileIndex !== -1) {
-                        serverFiles[serverFileIndex].content = mergedText;
-                        serverFiles[serverFileIndex].lastModified = Date.now();
-                        serverFiles[serverFileIndex].contentVersion = Number(conflict.serverContentVersion || serverFiles[serverFileIndex].contentVersion || 0) + 1;
-                    }
-                    const localFileIndex = localFiles.findIndex(function(f) { return f.name === conflict.filename; });
-                    if (localFileIndex !== -1) {
-                        localFiles[localFileIndex].content = mergedText;
-                        localFiles[localFileIndex].lastModified = Date.now();
-                        localFiles[localFileIndex].contentVersion = Number(conflict.serverContentVersion || localFiles[localFileIndex].contentVersion || 0) + 1;
-                        if (currentFileId === localFiles[localFileIndex].id) {
-                            setEditorContentForFile(currentFileId, mergedText);
-                        }
-                    }
+            const baseText = localFile.id ? ((g('lastSyncedContent') || {})[localFile.id] || '') : '';
+            const mergeResult = autoMergeTextConflict(baseText, conflict.localContent || '', conflict.serverContent || '');
+            const serverContentVersionRaw = Number(conflict.serverContentVersion);
+
+            localFile.content = mergeResult.mergedText || '';
+            localFile.lastModified = Date.now();
+            localFile.serverLastModified = conflict.serverLastModified || conflict.serverModified || localFile.serverLastModified || null;
+            localFile.contentVersion = Number.isFinite(serverContentVersionRaw) && serverContentVersionRaw > 0
+                ? serverContentVersionRaw
+                : Number(localFile.contentVersion || 0) || null;
+            localFile.isSynced = false;
+            localFile.manualConflictPending = mergeResult.hasConflict === true;
+            localFile.preferLocalOnNextSync = !localFile.manualConflictPending;
+
+            if (String(currentFileId || '') === String(localFile.id || '')) {
+                setEditorContentForFile(currentFileId, localFile.content);
+            }
+
+            if (localFile.id) {
+                if (localFile.manualConflictPending) {
+                    manualConflictIds.push(localFile.id);
+                } else {
+                    pendingSyncIds.push(localFile.id);
                 }
             }
         });
 
         mergeFiles(localFiles, serverFiles);
 
-        filesToDelete.forEach(function(fileId) {
-            delete g('lastSyncedContent')[fileId];
-            delete g('unsavedChanges')[fileId];
+        const mergedFiles = g('files') || [];
+        manualConflictIds.forEach(function(fileId) {
+            const file = mergedFiles.find(function(f) { return f && String(f.id) === String(fileId); });
+            if (!file) return;
+            file.manualConflictPending = true;
+            file.preferLocalOnNextSync = false;
+            file.isSynced = false;
+            g('unsavedChanges')[fileId] = true;
+            markPendingServerSync(fileId, false);
+            if (String(currentFileId || '') === String(fileId)) {
+                setEditorContentForFile(fileId, file.content || '');
+            }
         });
+        pendingSyncIds.forEach(function(fileId) {
+            if (manualConflictIds.indexOf(fileId) !== -1) return;
+            const file = mergedFiles.find(function(f) { return f && String(f.id) === String(fileId); });
+            if (!file) return;
+            file.manualConflictPending = false;
+            file.preferLocalOnNextSync = true;
+            file.isSynced = false;
+            g('unsavedChanges')[fileId] = true;
+            markPendingServerSync(fileId, true);
+        });
+        localStorage.setItem('vditor_files', JSON.stringify(mergedFiles));
 
         loadFiles();
 
@@ -2084,7 +2207,33 @@ import {
                 if (g('files').length > 0) openFirstFile();
             }
         }
-        global.showMessage(isEn() ? 'Conflict resolved, files synced' : '冲突已解决，文件已同步');
+
+        const syncIds = pendingSyncIds.filter(function(fileId) {
+            return manualConflictIds.indexOf(fileId) === -1;
+        });
+        if (syncIds.length > 0) {
+            setTimeout(function() {
+                syncIds.forEach(function(fileId) {
+                    Promise.resolve(syncFileToServer(fileId, { background: true })).catch(function(error) {
+                        console.warn('自动同步合并后的文件失败:', fileId, error);
+                    });
+                });
+            }, 0);
+        }
+
+        if (manualConflictIds.length > 0) {
+            global.showMessage(
+                isEn()
+                    ? 'Automatic merge still has conflicts. Choose local or cloud content for each conflict.'
+                    : '自动合并后仍有冲突，请为每处冲突选择本地或云端内容',
+                'warning'
+            );
+            if (String(currentFileId || '') && manualConflictIds.indexOf(currentFileId) !== -1) {
+                setTimeout(function() { showMergeConflictResolver(currentFileId); }, 0);
+            }
+        } else {
+            global.showMessage(isEn() ? 'Conflicts automatically merged' : '冲突已自动合并');
+        }
     }
 
     function mergeFiles(localFiles, serverFiles) {
@@ -4329,6 +4478,13 @@ import {
             expandActiveFile();
             global.startAutoSave();
             global.showMessage(isEn() ? 'File opened: ' + file.name : '已打开文件: ' + file.name);
+            if (file.manualConflictPending && hasMergeConflictMarkers(content)) {
+                setTimeout(function() {
+                    if (String(g('currentFileId') || '') === String(fileId || '')) {
+                        showMergeConflictResolver(fileId);
+                    }
+                }, 0);
+            }
         } finally {
             if (requestToken === fileOpenRequestToken) {
                 setFileSwitchLoading(false);
@@ -6632,6 +6788,7 @@ import {
     // 导出文件对比和全文查找功能
     global.showFileDiffDialog = showFileDiffDialog;
     global.showFindDialog = showFindDialog;
+    global.showMergeConflictResolver = showMergeConflictResolver;
     global.setEditorContentForFile = setEditorContentForFile;
     global.getCurrentEditorContent = getCurrentEditorContent;
     global.syncCurrentEditorSnapshotIntoFiles = syncCurrentEditorSnapshotIntoFiles;

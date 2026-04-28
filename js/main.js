@@ -141,7 +141,7 @@ document.addEventListener('DOMContentLoaded', function() {
             return true;
         }
 
-        var closeBtn = overlay.querySelector('.modal-close-btn, #cancelConflictBtn, #closeDiffModalBtn, #closeHistoryBtn, #closeAboutBtn, #closeServiceStatusBtn, #cancelSettingsBtn');
+        var closeBtn = overlay.querySelector('.modal-close-btn, #closeDiffModalBtn, #closeHistoryBtn, #closeAboutBtn, #closeServiceStatusBtn, #cancelSettingsBtn');
         if (closeBtn) {
             closeBtn.click();
         } else {

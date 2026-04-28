@@ -20,9 +20,12 @@
 
     async function fetchResource(url, localData = null) {
         try {
-            const resolvedUrl = (typeof global.resolveResourceUrl === 'function')
-                ? global.resolveResourceUrl(url, typeof global.getAppOrigin === 'function' ? global.getAppOrigin() : undefined)
+            const normalizedUrl = (typeof global.normalizeAppResourceUrl === 'function')
+                ? global.normalizeAppResourceUrl(url)
                 : url;
+            const resolvedUrl = (typeof global.resolveResourceUrl === 'function')
+                ? global.resolveResourceUrl(normalizedUrl, typeof global.getAppOrigin === 'function' ? global.getAppOrigin() : undefined)
+                : normalizedUrl;
 
             if (!resolvedUrl || typeof resolvedUrl !== 'string') {
                 throw new Error('Invalid resource URL');

@@ -3,11 +3,23 @@
     'use strict';
 
     let initialized = false;
+    let observer = null;
+    let processTimer = null;
+
+    function scheduleProcessImages() {
+        if (processTimer) clearTimeout(processTimer);
+        processTimer = setTimeout(processAllImages, 80);
+    }
 
     async function processAllImages() {
         const images = document.querySelectorAll('img');
         for (const img of images) {
-            const src = img.src || img.getAttribute('data-original-src');
+            const rawSrc = img.getAttribute('src') || img.getAttribute('data-original-src') || img.src;
+            const src = global.normalizeAppResourceUrl ? global.normalizeAppResourceUrl(rawSrc) : rawSrc;
+            if (src && src !== rawSrc) {
+                img.setAttribute('data-original-src', rawSrc);
+                img.src = src;
+            }
             // 只处理本地图片，云端图片保持原链接
             if (!src || src.startsWith('blob:') || src.startsWith('data:') || src.startsWith('http://') || src.startsWith('https://')) {
                 continue;
@@ -44,6 +56,25 @@
             } else {
                 window.addEventListener('load', processImages);
             }
+
+            observer = new MutationObserver(function(mutations) {
+                for (const mutation of mutations) {
+                    if (mutation.type === 'childList' && mutation.addedNodes.length) {
+                        scheduleProcessImages();
+                        return;
+                    }
+                    if (mutation.type === 'attributes' && mutation.target && mutation.target.tagName === 'IMG') {
+                        scheduleProcessImages();
+                        return;
+                    }
+                }
+            });
+            observer.observe(document.body, {
+                childList: true,
+                subtree: true,
+                attributes: true,
+                attributeFilter: ['src']
+            });
         } catch (error) {
             console.error('Failed to initialize resource renderer:', error);
         }
