@@ -314,33 +314,6 @@
     </div>
 </div>
 
-<!-- 冲突解决模态窗口 -->
-<div class="modal-overlay" id="conflictModalOverlay">
-    <div class="modal conflict-modal" style="position:relative;width:100vw;height:100vh;max-width:100vw;max-height:100vh;border-radius:0;padding:10px;overflow:hidden;display:flex;flex-direction:column;">
-        <button class="modal-close-btn" id="closeConflictBtn" style="position:absolute;top:15px;right:15px;background:none;border:none;font-size:20px;cursor:pointer;z-index:10;">
-            <i class="fas fa-times"></i>
-        </button>
-        <div class="modal-header" style="flex-shrink:0;">
-            <h2 data-i18n="fileConflict">发现文件冲突</h2>
-            <p data-i18n="conflictSubtitle">以下文件在本地和服务器上存在不同版本</p>
-        </div>
-
-        <div class="conflict-info" style="flex-shrink:0;">
-            <i class="fas fa-exclamation-triangle"></i>
-            <span data-i18n="resolveConflictInfo">请为每个冲突的文件选择保留哪个版本</span>
-        </div>
-
-        <div id="conflictList" class="conflict-options" style="flex:1;overflow-y:auto;">
-            <!-- 冲突文件列表将动态生成 -->
-        </div>
-
-        <div class="modal-actions" style="flex-shrink:0;margin-top:10px;">
-            <button class="modal-btn primary" id="resolveConflictsBtn" data-i18n="resolveConflicts">确认解决冲突</button>
-            <button class="modal-btn secondary" id="cancelConflictBtn" data-i18n="cancel">取消</button>
-        </div>
-    </div>
-</div>
-
 <!-- 差异对比模态窗口 -->
 <div class="modal-overlay" id="diffModalOverlay">
     <div class="modal diff-modal" style="position:relative;width:100vw;height:100vh;max-width:100vw;max-height:100vh;border-radius:0;padding:10px;overflow:hidden;display:flex;flex-direction:column;">

@@ -91,6 +91,64 @@
         }
     }
 
+    function isManagedServerResourcePath(pathname) {
+        return /^\/(?:uploads|screenshots|avatars|user_files)\//i.test(pathname || '');
+    }
+
+    function buildAppOriginResourceUrl(pathname, search, hash) {
+        var origin = typeof getAppOrigin === 'function' ? getAppOrigin() : '';
+        if (!origin) return pathname + (search || '') + (hash || '');
+        return origin.replace(/\/$/, '') + pathname + (search || '') + (hash || '');
+    }
+
+    function normalizeAppResourceUrl(url) {
+        if (!url || typeof url !== 'string') {
+            return url;
+        }
+
+        var rawUrl = url.trim();
+        if (!rawUrl || isSpecialResourceUrl(rawUrl)) {
+            return url;
+        }
+
+        var rootRelativeMatch = rawUrl.match(/^(\/(?:uploads|screenshots|avatars|user_files)\/.*)$/i);
+        if (rootRelativeMatch) {
+            try {
+                var rootParsed = new URL(rawUrl, 'https://placeholder.local');
+                return buildAppOriginResourceUrl(rootParsed.pathname, rootParsed.search, rootParsed.hash);
+            } catch (error) {
+                return buildAppOriginResourceUrl(rootRelativeMatch[1], '', '');
+            }
+        }
+
+        var relativeManagedMatch = rawUrl.match(/^((?:uploads|screenshots|avatars|user_files)\/.*)$/i);
+        if (relativeManagedMatch) {
+            try {
+                var relativeParsed = new URL('/' + rawUrl, 'https://placeholder.local');
+                return buildAppOriginResourceUrl(relativeParsed.pathname, relativeParsed.search, relativeParsed.hash);
+            } catch (error) {
+                return buildAppOriginResourceUrl('/' + relativeManagedMatch[1], '', '');
+            }
+        }
+
+        try {
+            var parsed = new URL(rawUrl, window.location.href);
+            if (!isManagedServerResourcePath(parsed.pathname)) {
+                return url;
+            }
+
+            var currentOrigin = window.location && window.location.origin ? window.location.origin : '';
+            var appOrigin = typeof getAppOrigin === 'function' ? getAppOrigin() : '';
+            if (currentOrigin && parsed.origin === currentOrigin && appOrigin && appOrigin !== currentOrigin) {
+                return buildAppOriginResourceUrl(parsed.pathname, parsed.search, parsed.hash);
+            }
+        } catch (error) {
+            return url;
+        }
+
+        return url;
+    }
+
     function removeModal(modalElement) {
         if (modalElement && modalElement.parentNode) {
             if (modalElement.removeKeydownHandler) modalElement.removeKeydownHandler();
@@ -316,6 +374,7 @@
     global.formatFileSize = formatFileSize;
     global.escapeHtml = escapeHtml;
     global.resolveResourceUrl = resolveResourceUrl;
+    global.normalizeAppResourceUrl = normalizeAppResourceUrl;
     global.removeModal = removeModal;
     global.getApiBaseUrl = getApiBaseUrl;
     global.getAppOrigin = getAppOrigin;
