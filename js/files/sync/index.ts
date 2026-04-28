@@ -162,10 +162,12 @@ export function createSyncRuntimeApi(ctx: any) {
               if (file.type !== 'folder' && files[fileIndex].content !== serverContent) {
                 files[fileIndex].content = serverContent;
                 if (fileId === g('currentFileId')) {
-                  setEditorContentForFile(fileId, serverContent);
+                  setEditorContentForFile(fileId, serverContent, { preserveCursor: true });
                 }
               }
               files[fileIndex].isSynced = true;
+              delete files[fileIndex].serverDeleted;
+              delete files[fileIndex].serverDeletedNotified;
               delete files[fileIndex].crdtBaseContent;
               delete files[fileIndex].crdtBaseContentVersion;
               files[fileIndex].lastModified = result.data && result.data.last_modified ? result.data.last_modified : Date.now();

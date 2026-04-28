@@ -379,7 +379,156 @@ import {
         syncLongFileModeFlag();
     }
 
-    function setEditorContentForFile(fileId, content) {
+    function getVditorEditableElement(vditorInstance) {
+        const internal = vditorInstance && vditorInstance.vditor ? vditorInstance.vditor : {};
+        return (internal.ir && internal.ir.element) ||
+            (internal.sv && internal.sv.element) ||
+            (internal.wysiwyg && internal.wysiwyg.element) ||
+            null;
+    }
+
+    function getDomSelectionOffsets(root) {
+        const selection = document.getSelection ? document.getSelection() : null;
+        if (!selection || selection.rangeCount === 0 || !root || !root.contains(selection.anchorNode)) return null;
+
+        const range = selection.getRangeAt(0);
+        const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+        let offset = 0;
+        let start = 0;
+        let end = 0;
+        let foundStart = false;
+        let foundEnd = false;
+        let node;
+
+        while ((node = walker.nextNode())) {
+            const length = node.nodeValue ? node.nodeValue.length : 0;
+            if (node === range.startContainer) {
+                start = offset + range.startOffset;
+                foundStart = true;
+            }
+            if (node === range.endContainer) {
+                end = offset + range.endOffset;
+                foundEnd = true;
+            }
+            offset += length;
+        }
+
+        if (!foundStart || !foundEnd) return null;
+        return { start, end };
+    }
+
+    function setDomSelectionOffsets(root, start, end) {
+        if (!root || !document.createRange || !document.getSelection) return false;
+        const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+        const range = document.createRange();
+        let offset = 0;
+        let startSet = false;
+        let endSet = false;
+        let node;
+
+        while ((node = walker.nextNode())) {
+            const length = node.nodeValue ? node.nodeValue.length : 0;
+            const nextOffset = offset + length;
+            if (!startSet && start <= nextOffset) {
+                range.setStart(node, Math.max(0, Math.min(length, start - offset)));
+                startSet = true;
+            }
+            if (!endSet && end <= nextOffset) {
+                range.setEnd(node, Math.max(0, Math.min(length, end - offset)));
+                endSet = true;
+                break;
+            }
+            offset = nextOffset;
+        }
+
+        if (!startSet || !endSet) {
+            range.selectNodeContents(root);
+            range.collapse(false);
+        }
+
+        const selection = document.getSelection();
+        selection.removeAllRanges();
+        selection.addRange(range);
+        return true;
+    }
+
+    function captureVditorCursor(vditorInstance) {
+        const element = getVditorEditableElement(vditorInstance);
+        if (!element) return null;
+        const activeElement = document.activeElement;
+        const wasFocused = activeElement === element || (element.contains && element.contains(activeElement));
+        const snapshot = {
+            wasFocused,
+            scrollTop: typeof element.scrollTop === 'number' ? element.scrollTop : 0,
+            scrollLeft: typeof element.scrollLeft === 'number' ? element.scrollLeft : 0,
+            windowX: window.pageXOffset,
+            windowY: window.pageYOffset
+        };
+
+        if (typeof element.selectionStart === 'number' && typeof element.selectionEnd === 'number') {
+            snapshot.type = 'input';
+            snapshot.start = element.selectionStart;
+            snapshot.end = element.selectionEnd;
+            return snapshot;
+        }
+
+        const domOffsets = getDomSelectionOffsets(element);
+        if (domOffsets) {
+            snapshot.type = 'dom';
+            snapshot.start = domOffsets.start;
+            snapshot.end = domOffsets.end;
+            return snapshot;
+        }
+
+        return snapshot;
+    }
+
+    function restoreVditorCursor(vditorInstance, snapshot) {
+        if (!snapshot) return;
+        const restore = function() {
+            const element = getVditorEditableElement(vditorInstance);
+            if (!element) return;
+            const length = typeof element.value === 'string'
+                ? element.value.length
+                : String(element.textContent || '').length;
+            const start = Math.max(0, Math.min(length, Number(snapshot.start || 0)));
+            const end = Math.max(start, Math.min(length, Number(snapshot.end ?? start)));
+
+            try {
+                if (snapshot.type === 'input' && typeof element.setSelectionRange === 'function') {
+                    element.setSelectionRange(start, end);
+                } else if (snapshot.type === 'dom') {
+                    setDomSelectionOffsets(element, start, end);
+                }
+                if (snapshot.wasFocused && typeof element.focus === 'function') {
+                    try {
+                        element.focus({ preventScroll: true });
+                    } catch (e) {
+                        element.focus();
+                    }
+                }
+                if (typeof element.scrollTop === 'number') element.scrollTop = snapshot.scrollTop || 0;
+                if (typeof element.scrollLeft === 'number') element.scrollLeft = snapshot.scrollLeft || 0;
+                if (typeof window.scrollTo === 'function') {
+                    window.scrollTo(snapshot.windowX || 0, snapshot.windowY || 0);
+                }
+            } catch (error) {
+                console.warn('恢复编辑器光标失败:', error);
+            }
+        };
+
+        requestAnimationFrame(restore);
+        setTimeout(restore, 40);
+    }
+
+    function setVditorValuePreservingCursor(vditorInstance, content) {
+        const cursor = captureVditorCursor(vditorInstance);
+        vditorInstance.setValue(content);
+        restoreVditorCursor(vditorInstance, cursor);
+    }
+
+    function setEditorContentForFile(fileId, content, options) {
+        const opts = options || {};
         const normalizedContent = String(content || '');
         const currentFileId = g('currentFileId');
         const isCurrentFile = String(fileId || '') === String(currentFileId || '');
@@ -398,7 +547,17 @@ import {
         if (isLongFileEditorActiveFor(fileId)) {
             const textarea = getLongFileTextarea();
             if (textarea) {
+                const start = opts.preserveCursor && typeof textarea.selectionStart === 'number' ? textarea.selectionStart : null;
+                const end = opts.preserveCursor && typeof textarea.selectionEnd === 'number' ? textarea.selectionEnd : null;
+                const scrollTop = textarea.scrollTop || 0;
+                const scrollLeft = textarea.scrollLeft || 0;
                 textarea.value = normalizedContent;
+                if (start !== null && typeof textarea.setSelectionRange === 'function') {
+                    const length = normalizedContent.length;
+                    textarea.setSelectionRange(Math.min(start, length), Math.min(end ?? start, length));
+                    textarea.scrollTop = scrollTop;
+                    textarea.scrollLeft = scrollLeft;
+                }
                 scheduleLongFilePreviewRender();
             }
             return;
@@ -415,7 +574,11 @@ import {
                 if (isCurrentFile && typeof vditor.getValue === 'function' && vditor.getValue() === normalizedContent) {
                     return;
                 }
-                vditor.setValue(normalizedContent);
+                if (isCurrentFile && opts.preserveCursor) {
+                    setVditorValuePreservingCursor(vditor, normalizedContent);
+                } else {
+                    vditor.setValue(normalizedContent);
+                }
             } catch (error) {
                 console.warn('设置编辑器内容失败，等待编辑器就绪后重试:', error);
                 scheduleDeferredVditorValueApply(fileId, normalizedContent);
@@ -1364,6 +1527,46 @@ import {
         return normalizeServerFileRecordCore(f);
     }
 
+    function getServerDeletedEditingMessage(file) {
+        const name = file && file.name ? file.name : (isEn() ? 'Current file' : '当前文件');
+        return isEn()
+            ? `The server copy of "${name}" was deleted. Your local editing copy is kept; saving will upload it again.`
+            : `服务器上的“${name}”已被删除。本地正在编辑的副本已保留，保存后会重新上传。`;
+    }
+
+    function markOpenFileDeletedOnServer(file, editorContent) {
+        if (!file || String(file.id || '') !== String(g('currentFileId') || '') || file.type !== 'file') return false;
+
+        const wasDeleted = !!file.serverDeleted;
+        const shouldNotify = !file.serverDeletedNotified;
+        const previousContent = String(file.content || '');
+        file.content = String(editorContent ?? file.content ?? '');
+        file.lastModified = Date.now();
+        file.serverLastModified = null;
+        file.contentVersion = 0;
+        file.isSynced = false;
+        file.serverDeleted = true;
+        delete file.crdtBaseContent;
+        delete file.crdtBaseContentVersion;
+        const lastSynced = g('lastSyncedContent') || {};
+        const unsaved = g('unsavedChanges') || {};
+        global.lastSyncedContent = lastSynced;
+        global.unsavedChanges = unsaved;
+        delete lastSynced[file.id];
+        unsaved[file.id] = true;
+
+        if (shouldNotify) {
+            file.serverDeletedNotified = true;
+            if (typeof global.showMessage === 'function') {
+                global.showMessage(getServerDeletedEditingMessage(file), 'warning');
+            } else if (typeof global.showSyncStatus === 'function') {
+                global.showSyncStatus(getServerDeletedEditingMessage(file), 'warning');
+            }
+        }
+
+        return shouldNotify || !wasDeleted || previousContent !== file.content;
+    }
+
     async function pullServerUpdatesForCleanFiles() {
         if (!g('currentUser')) return;
 
@@ -1419,12 +1622,17 @@ import {
             const file = files[i];
             if (!file || !file.name) continue;
             if (isExternalLocalFile(file)) continue;
-            if (pendingServerSync[file.id]) continue;
             if (serverMap[file.name]) continue;
 
             const editorContent = file.id === currentFileId
                 ? getCurrentEditorContent(currentFileId, file.content)
                 : file.content;
+            if (String(file.id || '') === String(currentFileId || '') && file.type === 'file') {
+                hasLocalUpdate = markOpenFileDeletedOnServer(file, editorContent) || hasLocalUpdate;
+                continue;
+            }
+
+            if (pendingServerSync[file.id]) continue;
             const baseContent = lastSyncedContent[file.id];
             const hasLocalChanges = file.type === 'file'
                 ? (!file.isSynced || unsavedChanges[file.id] || editorContent !== baseContent)
@@ -1457,7 +1665,7 @@ import {
             const hasLocalChanges = !file.isSynced || unsavedChanges[file.id] || editorContent !== baseContent;
             if (hasLocalChanges) return;
 
-                if (serverFile.content !== editorContent) {
+            if (serverFile.content !== editorContent) {
                 file.content = serverFile.content;
                 file.lastModified = serverFile.lastModified || file.lastModified || null;
                 file.serverLastModified = serverFile.serverLastModified || serverFile.lastModified || file.serverLastModified || null;
@@ -1465,10 +1673,12 @@ import {
                     ? Number(serverFile.contentVersion)
                     : file.contentVersion;
                 file.isSynced = true;
+                delete file.serverDeleted;
+                delete file.serverDeletedNotified;
                 lastSyncedContent[file.id] = serverFile.content;
                 unsavedChanges[file.id] = false;
                 if (file.id === currentFileId) {
-                    setEditorContentForFile(currentFileId, serverFile.content);
+                    setEditorContentForFile(currentFileId, serverFile.content, { preserveCursor: true });
                 }
                 hasLocalUpdate = true;
             }
@@ -1746,6 +1956,13 @@ import {
             const hasLocalChanges = localFile.type === 'file'
                 ? (!localFile.isSynced || unsavedChanges[localFile.id] || localFile.content !== localBaseContent)
                 : (!localFile.isSynced || unsavedChanges[localFile.id]);
+
+            if (String(localFile.id || '') === String(g('currentFileId') || '') && localFile.type === 'file') {
+                const localCopy = Object.assign({}, localFile);
+                markOpenFileDeletedOnServer(localCopy, getCurrentEditorContent(localCopy.id, localCopy.content));
+                mergedFiles.push(localCopy);
+                return;
+            }
 
             if (localFile.isSynced && !hasPendingLocalSync && !hasLocalChanges) {
                 if (localFile.id) {
