@@ -423,6 +423,7 @@ function initShareCollabServer(httpServer, shareManager) {
                         viewerId: socket.ctx.viewerId,
                         viewerName: socket.ctx.viewerName,
                         baseVersion: Number.isInteger(payload.base_version) ? payload.base_version : Number(payload.base_version),
+                        baseContent: typeof payload.base_content === 'string' ? payload.base_content : undefined,
                         manualSave: payload.manual_save === true || payload.create_history === true
                     }
                 );
@@ -501,4 +502,3 @@ function initShareCollabServer(httpServer, shareManager) {
 module.exports = {
     initShareCollabServer
 };
-

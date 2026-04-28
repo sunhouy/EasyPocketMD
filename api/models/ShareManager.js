@@ -2,6 +2,7 @@ const db = require('../config/db');
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const historyManager = require('./HistoryManager');
+const { mergeTextWithCrdt } = require('../utils/textCrdt');
 
 class ShareManager {
     constructor() {
@@ -288,27 +289,33 @@ class ShareManager {
             }
 
             const hasBaseVersion = Number.isInteger(options.baseVersion);
+            const hasBaseContent = typeof options.baseContent === 'string';
+            let contentToSave = String(content || '');
+            let mergedByCrdt = false;
             let updateResult;
             if (hasBaseVersion) {
                 const [result] = await db.execute(
                     'UPDATE user_files SET content = ?, content_version = content_version + 1, last_modified = NOW() WHERE username = ? AND filename = ? AND content_version = ?',
-                    [content, share.username, share.filename, options.baseVersion]
+                    [contentToSave, share.username, share.filename, options.baseVersion]
                 );
                 updateResult = result;
             } else {
                 const [result] = await db.execute(
                     'UPDATE user_files SET content = ?, content_version = content_version + 1, last_modified = NOW() WHERE username = ? AND filename = ?',
-                    [content, share.username, share.filename]
+                    [contentToSave, share.username, share.filename]
                 );
                 updateResult = result;
             }
 
-            // 不再返回 409 错误，即使版本不匹配也直接更新
             if (hasBaseVersion && (!updateResult || updateResult.affectedRows === 0)) {
-                // 版本不匹配，直接更新而不返回错误
+                if (hasBaseContent) {
+                    const mergeResult = mergeTextWithCrdt(options.baseContent, contentToSave, share.content || '');
+                    contentToSave = mergeResult.content;
+                    mergedByCrdt = mergeResult.merged;
+                }
                 const [result] = await db.execute(
                     'UPDATE user_files SET content = ?, content_version = content_version + 1, last_modified = NOW() WHERE username = ? AND filename = ?',
-                    [content, share.username, share.filename]
+                    [contentToSave, share.username, share.filename]
                 );
                 updateResult = result;
             }
@@ -340,6 +347,7 @@ class ShareManager {
                     content: updated.content,
                     last_modified: updated.last_modified,
                     content_version: updated.content_version || (share.content_version || 1),
+                    merged_by_crdt: mergedByCrdt,
                     history: historyResult && historyResult.data ? historyResult.data : null
                 }
             };

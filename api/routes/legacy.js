@@ -73,7 +73,8 @@ router.all('/index.php', upload.any(), async (req, res) => {
                 var saveResult = await fileManager.saveFileWithHistory(data.username, data.filename, data.content, createHistory, {
                     base_last_modified: data.base_last_modified,
                     base_hash: data.base_hash,
-                    base_content_version: data.base_content_version
+                    base_content_version: data.base_content_version,
+                    base_content: data.base_content
                 });
                 if (saveResult && saveResult.code === 409) {
                     res.status(409).json(saveResult);

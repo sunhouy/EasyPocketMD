@@ -158,5 +158,30 @@ describe('ShareManager', () => {
             expect(result.data.content).toBe('new content');
             expect(historyManager.createHistory).toHaveBeenCalledWith('u', 'f.md', 'new content', 'Guest');
         });
+
+        it('should merge stale shared document updates with CRDT when base content is provided', async () => {
+            historyManager.createHistory.mockResolvedValue({ code: 200, data: { version_id: 1 } });
+            db.execute
+                .mockResolvedValueOnce([[
+                    { share_id: 'sid', username: 'u', filename: 'f.md', mode: 'edit', password: null, content: 'A\nB remote', content_version: 2 }
+                ]])
+                .mockResolvedValueOnce([{ affectedRows: 0 }])
+                .mockResolvedValueOnce([{ affectedRows: 1 }])
+                .mockResolvedValueOnce([[{ content: 'A local\nB remote', last_modified: '2026-01-01 00:00:00', content_version: 3 }]]);
+
+            const result = await shareManager.updateSharedFile('sid', 'A local\nB', null, {
+                baseVersion: 1,
+                baseContent: 'A\nB',
+                manualSave: true
+            });
+
+            expect(result.code).toBe(200);
+            expect(result.data.content).toBe('A local\nB remote');
+            expect(result.data.merged_by_crdt).toBe(true);
+            expect(db.execute).toHaveBeenCalledWith(
+                expect.stringContaining('UPDATE user_files SET content = ?, content_version = content_version + 1'),
+                ['A local\nB remote', 'u', 'f.md']
+            );
+        });
     });
 });

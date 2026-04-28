@@ -254,6 +254,39 @@ describe('FileManager', () => {
             expect(mockConnection.execute).toHaveBeenCalledTimes(2);
         });
 
+        it('should merge stale writes with CRDT when base content is provided', async () => {
+            const mockConnection = {
+                execute: jest.fn()
+                    .mockResolvedValueOnce([[{
+                        id: 1,
+                        content: 'A\nB remote',
+                        last_modified: '2024-01-02T00:00:00.000Z',
+                        content_version: 2
+                    }]])
+                    .mockResolvedValueOnce([]),
+                release: jest.fn()
+            };
+            db.getConnection.mockResolvedValue(mockConnection);
+
+            const result = await fileManager.saveFile(
+                'testuser',
+                'test.md',
+                'A local\nB',
+                {
+                    base_content_version: 1,
+                    base_content: 'A\nB'
+                }
+            );
+
+            expect(result.code).toBe(200);
+            expect(result.data.content).toBe('A local\nB remote');
+            expect(result.data.merged_by_crdt).toBe(true);
+            expect(mockConnection.execute).toHaveBeenCalledWith(
+                expect.stringContaining('UPDATE user_files SET content = ?, last_modified = NOW()'),
+                ['A local\nB remote', 'testuser', 'test.md']
+            );
+        });
+
         it('should handle mismatched base_hash gracefully', async () => {
             const currentContent = 'server content';
             const wrongHash = 'wronghash';

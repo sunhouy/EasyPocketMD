@@ -2,6 +2,7 @@ const db = require('../config/db');
 const historyManager = require('./HistoryManager');
 const Cache = require('../utils/cache');
 const crypto = require('crypto');
+const { mergeTextWithCrdt } = require('../utils/textCrdt');
 
 class FileManager {
     computeContentHash(content = '') {
@@ -148,19 +149,33 @@ class FileManager {
                 const hasBaseLastModified = optimisticLock.base_last_modified !== undefined && optimisticLock.base_last_modified !== null && optimisticLock.base_last_modified !== '';
                 const hasBaseHash = typeof optimisticLock.base_hash === 'string' && optimisticLock.base_hash.trim() !== '';
                 const shouldCheckOptimisticLock = hasBaseVersion || hasBaseLastModified || hasBaseHash;
+                const hasBaseContent = typeof optimisticLock.base_content === 'string';
+                let contentToSave = String(content || '');
+                let mergedByCrdt = false;
 
-                // 不再返回409错误，直接处理冲突
-                // 当检测到版本不匹配时，仍然更新文件，但保留版本号递增逻辑
-                if (rows.length > 0) {
-                    // 无论是否有版本冲突，都直接更新文件
-                    // 版本号仍然递增，确保版本控制的连续性
+                if (rows.length > 0 && shouldCheckOptimisticLock && hasBaseContent) {
+                    const currentRow = rows[0];
+                    const currentContent = String(currentRow.content || '');
+                    const baseContentVersion = Number(optimisticLock.base_content_version);
+                    const currentVersion = Number(currentRow.content_version || 0);
+                    const versionConflict = hasBaseVersion && Number.isFinite(baseContentVersion) && baseContentVersion > 0 && currentVersion !== baseContentVersion;
+                    const baseLastModified = this.normalizeDbLastModified(optimisticLock.base_last_modified);
+                    const currentLastModified = this.normalizeDbLastModified(currentRow.last_modified);
+                    const modifiedConflict = hasBaseLastModified && baseLastModified && currentLastModified && baseLastModified !== currentLastModified;
+                    const hashConflict = hasBaseHash && this.computeContentHash(currentContent) !== optimisticLock.base_hash.trim();
+
+                    if (versionConflict || modifiedConflict || hashConflict) {
+                        const mergeResult = mergeTextWithCrdt(optimisticLock.base_content, contentToSave, currentContent);
+                        contentToSave = mergeResult.content;
+                        mergedByCrdt = mergeResult.merged;
+                    }
                 }
 
                 let message;
                 if (rows.length > 0) {
                     await connection.execute(
                         'UPDATE user_files SET content = ?, last_modified = NOW(), content_version = content_version + 1 WHERE username = ? AND filename = ?',
-                        [content, username, filename]
+                        [contentToSave, username, filename]
                     );
                     const nextVersion = Number(rows[0].content_version || 0) + 1;
                     message = '文件更新成功';
@@ -178,15 +193,17 @@ class FileManager {
                         data: {
                             username,
                             filename,
-                            content_length: Buffer.byteLength(content, 'utf8'),
+                            content: contentToSave,
+                            content_length: Buffer.byteLength(contentToSave, 'utf8'),
                             content_version: nextVersion,
-                            last_modified: new Date().toISOString()
+                            last_modified: new Date().toISOString(),
+                            merged_by_crdt: mergedByCrdt
                         }
                     };
                 } else {
                     await connection.execute(
                         'INSERT INTO user_files (username, filename, content, content_version, last_modified) VALUES (?, ?, ?, 1, NOW())',
-                        [username, filename, content]
+                        [username, filename, contentToSave]
                     );
                     message = '文件保存成功';
                     if (commit) {
@@ -203,9 +220,11 @@ class FileManager {
                         data: {
                             username,
                             filename,
-                            content_length: Buffer.byteLength(content, 'utf8'),
+                            content: contentToSave,
+                            content_length: Buffer.byteLength(contentToSave, 'utf8'),
                             content_version: 1,
-                            last_modified: new Date().toISOString()
+                            last_modified: new Date().toISOString(),
+                            merged_by_crdt: false
                         }
                     };
                 }
@@ -231,7 +250,8 @@ class FileManager {
             await Cache.deleteFileContent(username, filename);
 
             if (createHistory) {
-                const historyResult = await historyManager.createHistory(username, filename, content);
+                const savedContent = result.data && typeof result.data.content === 'string' ? result.data.content : content;
+                const historyResult = await historyManager.createHistory(username, filename, savedContent);
                 if (historyResult.code !== 200 && historyResult.code !== 304) {
                     console.error(`History creation failed for ${username}/${filename}: ${historyResult.message}`);
                 }

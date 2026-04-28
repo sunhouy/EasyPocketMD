@@ -5336,7 +5336,7 @@ import {
     }
 
     /**
-     * 导入本地文件到文件列表（支持 markdown/ppt/doc/xls）
+     * 导入本地文件到文件列表（支持 markdown/pdf/word/excel/powerpoint）
      */
     global.importFiles = function() {
         var nightMode = g('nightMode') === true;
@@ -5369,9 +5369,9 @@ import {
         container.innerHTML =
             '<h3 style="margin:0 0 10px 0;">' + (isEn() ? 'Import Files' : '导入文件') + '</h3>' +
             '<div style="font-size:13px;color:' + subColor + ';margin-bottom:14px;">' +
-                (isEn() ? 'Supported: markdown, ppt, doc, xls' : '支持格式：markdown, ppt, doc, xls') +
+                (isEn() ? 'Supported: markdown, PDF, Word, Excel, PowerPoint' : '支持格式：Markdown、PDF、Word、Excel、PowerPoint') +
                 '<br>' +
-                (isEn() ? 'Legacy .doc/.ppt may have limited compatibility.' : '旧版 .doc/.ppt 兼容性可能受限。') +
+                (isEn() ? 'PDF and Office files are converted by the backend.' : 'PDF 与 Office 文件将通过后端转换为 Markdown。') +
             '</div>' +
             '<label style="display:block;margin-bottom:6px;font-weight:600;">' + (isEn() ? 'Save Path' : '保存路径') + '</label>' +
             '<select id="importTargetFolder" style="width:100%;padding:10px;border:1px solid ' + borderColor + ';border-radius:8px;background:' + (nightMode ? '#3d3d3d' : '#fff') + ';color:' + textColor + ';margin-bottom:16px;">' +
@@ -5410,7 +5410,7 @@ import {
         const fileInput = document.createElement('input');
         fileInput.type = 'file';
         fileInput.multiple = true;
-        fileInput.accept = '.md,.markdown,.txt,.doc,.docx,.ppt,.pptx,.xls,.xlsx,text/markdown,text/plain,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+        fileInput.accept = '.md,.markdown,.txt,.pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,text/markdown,text/plain,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 
         fileInput.addEventListener('change', async function(e) {
             const files = Array.from(e.target.files || []);
@@ -5507,7 +5507,7 @@ import {
 
     function stripKnownExtension(fileName) {
         return fileName
-            .replace(/\.(md|markdown|txt|doc|docx|ppt|pptx|xls|xlsx)$/i, '')
+            .replace(/\.(md|markdown|txt|pdf|doc|docx|ppt|pptx|xls|xlsx)$/i, '')
             .trim();
     }
 
@@ -5532,25 +5532,61 @@ import {
             return await readFileAsText(file);
         }
 
-        if (/\.docx$/i.test(lowerName)) {
-            return await convertDocxToMarkdown(file);
-        }
-        if (/\.doc$/i.test(lowerName)) {
-            throw new Error(isEn() ? 'Legacy .doc is not supported, please convert to .docx first' : '暂不支持旧版 .doc，请先转换为 .docx');
-        }
-
-        if (/\.pptx$/i.test(lowerName)) {
-            return await convertPptxToMarkdown(file);
-        }
-        if (/\.ppt$/i.test(lowerName)) {
-            throw new Error(isEn() ? 'Legacy .ppt is not supported, please convert to .pptx first' : '暂不支持旧版 .ppt，请先转换为 .pptx');
-        }
-
-        if (/\.(xls|xlsx)$/i.test(lowerName)) {
-            return await convertXlsToMarkdown(file);
+        if (/\.(pdf|doc|docx|ppt|pptx|xls|xlsx)$/i.test(lowerName)) {
+            return await convertImportedFileWithBackend(file);
         }
 
         throw new Error(isEn() ? 'Unsupported file type' : '不支持的文件类型');
+    }
+
+    async function convertImportedFileWithBackend(file) {
+        try {
+            return await requestBackendImport(file);
+        } catch (error) {
+            var lowerName = (file.name || '').toLowerCase();
+            if (/\.docx$/i.test(lowerName)) {
+                console.warn('后端 DOCX 导入失败，回退到本地解析:', error);
+                return await convertDocxToMarkdown(file);
+            }
+            if (/\.pptx$/i.test(lowerName)) {
+                console.warn('后端 PPTX 导入失败，回退到本地解析:', error);
+                return await convertPptxToMarkdown(file);
+            }
+            if (/\.(xls|xlsx)$/i.test(lowerName)) {
+                console.warn('后端 Excel 导入失败，回退到本地解析:', error);
+                return await convertXlsToMarkdown(file);
+            }
+            throw error;
+        }
+    }
+
+    async function requestBackendImport(file) {
+        const api = global.getApiBaseUrl ? global.getApiBaseUrl() : 'api';
+        const apiUrl = api.replace(/\/$/, '') + '/import/markitdown';
+        const formData = new FormData();
+        formData.append('file', file, file.name);
+
+        const user = g('currentUser');
+        if (user && user.username) {
+            formData.append('username', user.username);
+            if (user.token) formData.append('token', user.token);
+            if (user.password) formData.append('password', user.password);
+        }
+
+        const response = await fetch(apiUrl, {
+            method: 'POST',
+            body: formData
+        });
+        const result = global.parseJsonResponse ? await global.parseJsonResponse(response) : await response.json();
+        if (!response.ok || !result || result.code !== 200) {
+            throw new Error((result && result.message) || (isEn() ? 'Backend import failed' : '后端导入失败'));
+        }
+
+        const markdown = result.data && result.data.markdown;
+        if (!markdown || !String(markdown).trim()) {
+            throw new Error(isEn() ? 'No content extracted from file' : '未从文件中提取到内容');
+        }
+        return markdown;
     }
 
     async function convertDocxToMarkdown(file) {
