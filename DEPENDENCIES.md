@@ -31,7 +31,7 @@ This project would not have been possible without the incredible work of the ope
 - [sensitive-word-filter](https://github.com/leon-ai/sensitive-word-filter) – Content filtering
 - [sharp](https://sharp.pixelplumbing.com/) – High‑performance image processing
 - [uuid](https://github.com/uuidjs/uuid) – Unique identifiers
-- [vditor](https://github.com/Vanessa219/vditor) – Markdown editor
+- [@sunhouyun/vditor](https://www.npmjs.com/package/@sunhouyun/vditor) – Markdown editor
 - [ws](https://github.com/websockets/ws) – WebSocket client & server
 - [wkhtmltopdf](https://wkhtmltopdf.org/) – HTML to PDF conversion (LGPLv3)
 

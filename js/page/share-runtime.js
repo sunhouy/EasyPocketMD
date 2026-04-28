@@ -252,9 +252,7 @@
         if (!container) return;
 
         // 使用 Vditor 的禁用编辑方法（如果可用）
-        if (window.vditor && window.vditor.disabled) {
-            window.vditor.disabled(locked);
-        }
+        var nativeStateApplied = setVditorInteractionLocked(window.vditor, !!locked);
 
         // 设置 contenteditable 属性
         var editableNodes = container.querySelectorAll('[contenteditable]');
@@ -286,6 +284,42 @@
                 btn.style.opacity = '';
             });
         }
+
+        if (!nativeStateApplied && typeof window.ensureVditorInitialized === 'function') {
+            Promise.resolve(window.ensureVditorInitialized()).then(function(vditor) {
+                setVditorInteractionLocked(vditor, !!locked);
+            }).catch(function(error) {
+                console.warn('Failed to apply shared editor lock after Vditor init:', error);
+            });
+        }
+    }
+
+    function isVditorInteractionApiReady(vditorInstance) {
+        var internal = vditorInstance && vditorInstance.vditor;
+        if (!internal || !internal.toolbar || !internal.toolbar.elements || !internal.currentMode) {
+            return false;
+        }
+        return !!(internal[internal.currentMode] && internal[internal.currentMode].element);
+    }
+
+    function setVditorInteractionLocked(vditorInstance, locked) {
+        if (!isVditorInteractionApiReady(vditorInstance)) {
+            return false;
+        }
+
+        try {
+            if (locked && typeof vditorInstance.disabled === 'function') {
+                vditorInstance.disabled();
+                return true;
+            }
+            if (!locked && typeof vditorInstance.enable === 'function') {
+                vditorInstance.enable();
+                return true;
+            }
+        } catch (error) {
+            console.warn('Failed to update Vditor interaction state:', error);
+        }
+        return false;
     }
 
     function getShareConnectionStatusInfo(status) {
