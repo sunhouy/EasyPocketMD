@@ -14,4 +14,15 @@ describe('textCrdt', () => {
         expect(result.content).toBe('server edit');
         expect(result.merged).toBe(false);
     });
+
+    it('should not concatenate full snapshots when ancestry is unknown', () => {
+        const local = '# Doc\n\nline 1\nline 2\nlocal edit';
+        const remote = '# Doc\n\nline 1\nline 2\nremote edit';
+        const result = mergeTextWithCrdt('', local, remote);
+
+        expect(result.content).toBe(local);
+        expect(result.content).not.toBe(local + remote);
+        expect(result.content).not.toBe(remote + local);
+        expect(result.merged).toBe(false);
+    });
 });

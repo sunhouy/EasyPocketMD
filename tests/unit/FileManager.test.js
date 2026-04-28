@@ -287,7 +287,7 @@ describe('FileManager', () => {
             );
         });
 
-        it('should merge with CRDT when base version is zero for unknown ancestry', async () => {
+        it('should avoid full snapshot concatenation when base version is zero for unknown ancestry', async () => {
             const mockConnection = {
                 execute: jest.fn()
                     .mockResolvedValueOnce([[{
@@ -312,9 +312,10 @@ describe('FileManager', () => {
             );
 
             expect(result.code).toBe(200);
-            expect(result.data.content).toContain('local only');
-            expect(result.data.content).toContain('server only');
-            expect(result.data.merged_by_crdt).toBe(true);
+            expect(result.data.content).toBe('local only');
+            expect(result.data.content).not.toBe('local onlyserver only');
+            expect(result.data.content).not.toBe('server onlylocal only');
+            expect(result.data.merged_by_crdt).toBe(false);
         });
 
         it('should handle mismatched base_hash gracefully', async () => {

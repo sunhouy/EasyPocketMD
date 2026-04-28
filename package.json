@@ -50,6 +50,7 @@
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "cropperjs": "^1.6.2",
+    "diff-match-patch": "^1.0.5",
     "dom-to-image": "^2.6.0",
     "dotenv": "^16.3.1",
     "echarts": "^6.0.0",
@@ -86,7 +87,6 @@
     "wkhtmltopdf": "^0.4.0",
     "ws": "^8.18.0",
     "xlsx": "^0.18.5",
-    "yjs": "^13.6.30",
     "zxcvbn": "^4.4.2"
   },
   "devDependencies": {

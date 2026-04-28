@@ -10,7 +10,6 @@ import {
 } from './conflict/index';
 import {
     normalizeServerFileRecord as normalizeServerFileRecordCore,
-    detectConflicts as detectConflictsCore,
     createSyncRuntimeApi
 } from './sync/index';
 import {
@@ -36,7 +35,7 @@ import {
     function isEn() { return window.i18n && window.i18n.getLanguage() === 'en'; }
     function t(key) { return window.i18n ? window.i18n.t(key) : key; }
 
-    function formatConflictTime(value) {
+    function formatDiffTime(value) {
         if (value === undefined || value === null || value === '') {
             return isEn() ? 'Unknown time' : '未知时间';
         }
@@ -64,10 +63,6 @@ import {
     let autoSaveDebounceTimer = null;
     let autoSaveForceTimer = null;
     let autoSaveInFlight = false;
-    if (typeof global.lastSaveConflictPending === 'undefined') {
-        global.lastSaveConflictPending = false;
-    }
-
     function ensureFileSwitchLoadingOverlay() {
         let overlay = document.getElementById('fileSwitchLoadingOverlay');
         if (overlay) return overlay;
@@ -979,9 +974,6 @@ import {
             return true;
         }
 
-        file.manualConflictPending = false;
-        file.preferLocalOnNextSync = false;
-
         markPendingServerSync(currentFileId, true);
         try {
             const saveResult = await global.syncFileToServer(currentFileId, { background: !isManual });
@@ -1503,17 +1495,6 @@ import {
         isEn
     });
 
-    function detectConflicts(localFiles, serverFiles) {
-        return detectConflictsCore(
-            localFiles,
-            serverFiles,
-            g('pendingServerSync') || {},
-            ownerShareCache.byFilename || {},
-            g('lastSyncedContent') || {},
-            isExternalLocalFile
-        );
-    }
-
     async function uploadLocalOnlyFilesToServerIfNeeded(localFiles, serverFiles) {
         if (!g('currentUser')) return;
         const uploadUser = g('currentUser');
@@ -1675,8 +1656,8 @@ import {
         if (!diffModal || !diffContent) return;
 
         diffFileName.textContent = conflict.filename;
-        diffLocalTime.textContent = formatConflictTime(conflict.localModified);
-        diffServerTime.textContent = formatConflictTime(conflict.serverModified);
+        diffLocalTime.textContent = formatDiffTime(conflict.localModified);
+        diffServerTime.textContent = formatDiffTime(conflict.serverModified);
 
         const diffResult = computeDiff(conflict.localContent || '', conflict.serverContent || '');
         diffContent.innerHTML = renderDiffView(diffResult, { collapseSame: true });
@@ -1699,132 +1680,6 @@ import {
 
     function showMergePreviewModal(conflict) {
         showDiffModal(conflict);
-    }
-
-    function showSaveConflictDialog(conflict) {
-        const files = g('files') || [];
-        const currentFile = files.find(function(file) {
-            return file && String(file.id) === String(conflict.fileId);
-        });
-        if (!currentFile) return;
-
-        const baseText = typeof conflict.baseContent === 'string'
-            ? conflict.baseContent
-            : ((g('lastSyncedContent') || {})[conflict.fileId] || '');
-        const localText = typeof conflict.localContent === 'string' ? conflict.localContent : currentFile.content || '';
-        const serverLastModified = conflict.serverLastModified || conflict.serverModified || null;
-        const baseContentVersionRaw = Number(conflict.localContentVersion ?? currentFile.contentVersion);
-        const baseContentVersion = Number.isFinite(baseContentVersionRaw) ? baseContentVersionRaw : 0;
-
-        currentFile.content = localText;
-        currentFile.lastModified = Date.now();
-        currentFile.serverLastModified = serverLastModified || currentFile.serverLastModified || null;
-        currentFile.contentVersion = baseContentVersion;
-        currentFile.isSynced = false;
-        currentFile.manualConflictPending = false;
-        currentFile.preferLocalOnNextSync = false;
-        currentFile.crdtBaseContent = baseText;
-        currentFile.crdtBaseContentVersion = baseContentVersion;
-        localStorage.setItem('vditor_files', JSON.stringify(files));
-
-        if (String(g('currentFileId') || '') === String(conflict.fileId || '')) {
-            setEditorContentForFile(conflict.fileId, localText);
-        }
-
-        g('unsavedChanges')[conflict.fileId] = true;
-        markPendingServerSync(conflict.fileId, true);
-        global.lastSaveConflictPending = false;
-        Promise.resolve(syncFileToServer(conflict.fileId, {
-            background: false,
-            overrideContent: localText,
-            baseContentVersion: baseContentVersion,
-            baseLastModified: serverLastModified
-        })).then(function(saveResult) {
-            if (saveResult) {
-                g('unsavedChanges')[conflict.fileId] = false;
-                showSaveStatus('saved');
-                global.showMessage(isEn() ? 'Saved with CRDT merge' : '已通过 CRDT 合并并保存', 'success');
-            } else {
-                g('unsavedChanges')[conflict.fileId] = true;
-                markPendingServerSync(conflict.fileId, true);
-                showSaveStatus('failed');
-            }
-        }).catch(function(error) {
-            g('unsavedChanges')[conflict.fileId] = true;
-            markPendingServerSync(conflict.fileId, true);
-            showSaveStatus('failed');
-            console.error('[Save Conflict] Auto merge save failed:', error);
-        });
-    }
-
-    function showConflictResolution(conflicts, serverFiles, preserveFileName) {
-        const localFiles = JSON.parse(localStorage.getItem('vditor_files') || '[]');
-        const pendingSyncIds = [];
-
-        conflicts.forEach(function(conflict) {
-            const localFile = localFiles.find(function(f) { return f.name === conflict.filename; });
-            if (!localFile) return;
-
-            const baseText = localFile.id ? ((g('lastSyncedContent') || {})[localFile.id] || '') : '';
-            const baseContentVersionRaw = Number(conflict.localContentVersion ?? localFile.contentVersion);
-
-            localFile.content = typeof conflict.localContent === 'string' ? conflict.localContent : localFile.content || '';
-            localFile.lastModified = Date.now();
-            localFile.serverLastModified = conflict.serverLastModified || conflict.serverModified || localFile.serverLastModified || null;
-            localFile.contentVersion = Number.isFinite(baseContentVersionRaw) ? baseContentVersionRaw : 0;
-            localFile.isSynced = false;
-            localFile.manualConflictPending = false;
-            localFile.preferLocalOnNextSync = false;
-            localFile.crdtBaseContent = baseText;
-            localFile.crdtBaseContentVersion = localFile.contentVersion;
-            if (localFile.id) {
-                pendingSyncIds.push(localFile.id);
-            }
-        });
-
-        mergeFiles(localFiles, serverFiles);
-
-        const mergedFiles = g('files') || [];
-        pendingSyncIds.forEach(function(fileId) {
-            const file = mergedFiles.find(function(f) { return f && String(f.id) === String(fileId); });
-            if (!file) return;
-            file.manualConflictPending = false;
-            file.preferLocalOnNextSync = false;
-            file.isSynced = false;
-            g('unsavedChanges')[fileId] = true;
-            markPendingServerSync(fileId, true);
-        });
-        localStorage.setItem('vditor_files', JSON.stringify(mergedFiles));
-
-        loadFiles();
-
-        if (shouldAutoOpenInitialFile()) {
-            // 如果有指定要保留的文件，尝试打开它
-            if (preserveFileName) {
-                const preservedFile = g('files').find(f => f.name === preserveFileName && f.type === 'file');
-                if (preservedFile) {
-                    openFile(preservedFile.id);
-                } else if (g('files').length > 0) {
-                    openFirstFile();
-                } else {
-                    createDefaultFile();
-                }
-            } else {
-                if (g('files').length > 0) openFirstFile();
-            }
-        }
-
-        if (pendingSyncIds.length > 0) {
-            setTimeout(function() {
-                pendingSyncIds.forEach(function(fileId) {
-                    Promise.resolve(syncFileToServer(fileId, { background: true })).catch(function(error) {
-                        console.warn('CRDT 自动同步文件失败:', fileId, error);
-                    });
-                });
-            }, 0);
-        }
-
-        global.showMessage(isEn() ? 'Queued CRDT merge sync' : '已加入 CRDT 合并同步队列');
     }
 
     function mergeFiles(localFiles, serverFiles) {
@@ -1873,16 +1728,12 @@ import {
                         mergedServerFile.serverLastModified = mergedServerFile.serverLastModified || null;
                         mergedServerFile.contentVersion = Number.isFinite(baseVersionRaw) ? baseVersionRaw : 0;
                         mergedServerFile.isSynced = false;
-                        mergedServerFile.preferLocalOnNextSync = false;
-                        mergedServerFile.manualConflictPending = false;
                         mergedServerFile.crdtBaseContent = baseContent;
                         mergedServerFile.crdtBaseContentVersion = Number.isFinite(baseVersionRaw) ? baseVersionRaw : 0;
                         g('unsavedChanges')[mergedServerFile.id] = true;
                         markPendingServerSync(mergedServerFile.id, true);
                     } else {
                         mergedServerFile.isSynced = true;
-                        mergedServerFile.preferLocalOnNextSync = false;
-                        mergedServerFile.manualConflictPending = false;
                         delete mergedServerFile.crdtBaseContent;
                         delete mergedServerFile.crdtBaseContentVersion;
                     }
@@ -4188,7 +4039,7 @@ import {
         if (file.isExternalLocal && file.localFilePath && global.electron && typeof global.electron.writeLocalFile === 'function') {
             const writeResult = await global.electron.writeLocalFile(file.localFilePath, content);
             if (!writeResult || !writeResult.success) {
-                if (isManual && !global.lastSaveConflictPending) showSaveStatus('failed');
+                if (isManual) showSaveStatus('failed');
                 if (isManual) {
                     global.showMessage((isEn() ? 'Failed to save local file: ' : '保存本地文件失败：') + ((writeResult && writeResult.error) || ''), 'error');
                 }
@@ -4225,12 +4076,12 @@ import {
                     if (isManual) {
                         showSaveStatus('saved');
                     }
-                } else if (isManual && !global.lastSaveConflictPending) {
+                } else if (isManual) {
                     showSaveStatus('failed');
                 }
             } else {
                 if (writeResult && writeResult.error && !writeResult.canceled) {
-                    if (isManual && !global.lastSaveConflictPending) showSaveStatus('failed');
+                    if (isManual) showSaveStatus('failed');
                     if (isManual) {
                         global.showMessage((isEn() ? 'Failed to save local file: ' : '保存本地文件失败：') + (writeResult.error.message || ''), 'error');
                     }
@@ -4246,7 +4097,7 @@ import {
                     if (isManual) {
                         showSaveStatus('saved');
                     }
-                } else if (isManual && !global.lastSaveConflictPending) {
+                } else if (isManual) {
                     showSaveStatus('failed');
                 }
             }
@@ -4266,7 +4117,7 @@ import {
                 if (isManual) {
                     showSaveStatus('saved');
                 }
-            } else if (isManual && !global.lastSaveConflictPending) {
+            } else if (isManual) {
                 showSaveStatus('failed');
             }
             return;
@@ -4278,7 +4129,7 @@ import {
             if (isManual) {
                 showSaveStatus('saved');
             }
-        } else if (isManual && !global.lastSaveConflictPending) {
+        } else if (isManual) {
             showSaveStatus('failed');
         }
     }
@@ -6406,8 +6257,6 @@ import {
 
     // Core handlers exposed for index.ts composition layer.
     global.__filesCoreHandlers = {
-        showConflictResolution: showConflictResolution,
-        showSaveConflictDialog: showSaveConflictDialog,
         showDiffModal: showDiffModal,
         showMergePreviewModal: showMergePreviewModal,
         openExternalLocalFileByDialog: openExternalLocalFileByDialog,
