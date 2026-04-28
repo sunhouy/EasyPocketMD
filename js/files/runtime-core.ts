@@ -1219,16 +1219,24 @@ import {
     // ---------- 服务器同步相关 ----------
     async function loadFilesFromServer(preserveFileName) {
         if (!g('currentUser')) return;
+        const requestUsername = g('currentUser').username;
+        function isStillCurrentUser() {
+            return g('currentUser') && g('currentUser').username === requestUsername;
+        }
+
         try {
             if (typeof global.ensureWasmTextEngineReady === 'function') {
                 await global.ensureWasmTextEngineReady();
+                if (!isStillCurrentUser()) return;
             }
             await refreshOwnerShareCache(true);
+            if (!isStillCurrentUser()) return;
             var api = global.getApiBaseUrl ? global.getApiBaseUrl() : 'api';
             const response = await fetch(api + '/files?username=' + encodeURIComponent(g('currentUser').username), {
                 headers: { 'Authorization': 'Bearer ' + g('currentUser').token }
             });
             const result = global.parseJsonResponse ? await global.parseJsonResponse(response) : await response.json();
+            if (!isStillCurrentUser()) return;
 
             // 处理 Token 过期
             if (result.code === 401 || (global.isTokenError && global.isTokenError(result))) {
@@ -1308,6 +1316,7 @@ import {
                 // 当用户从未登录 -> 登录时，本地可能存在服务器从未见过的文件。
                 // 这些文件不应弹冲突窗口，应直接上传并保存到用户服务器上。
                 await uploadLocalOnlyFilesToServerIfNeeded(localFiles, serverFiles);
+                if (!isStillCurrentUser()) return;
 
                 // 检查是否需要保留当前编辑的文件（登录前正在编辑的文件）
                 // 如果服务器上有同名文件且内容不同，需要弹冲突处理
@@ -1553,6 +1562,10 @@ import {
 
     async function uploadLocalOnlyFilesToServerIfNeeded(localFiles, serverFiles) {
         if (!g('currentUser')) return;
+        const uploadUser = g('currentUser');
+        function isStillUploadUser() {
+            return g('currentUser') && g('currentUser').username === uploadUser.username;
+        }
 
         const serverFileMap = {};
         serverFiles.forEach(function(f) { serverFileMap[f.name] = f; });
@@ -1574,6 +1587,7 @@ import {
 
         // 逐个上传，确保顺序和稳定性
         for (let i = 0; i < toUpload.length; i++) {
+            if (!isStillUploadUser()) return;
             const f = toUpload[i];
             try {
                 // 如果当前文件正在编辑，用编辑器内容为准
@@ -1585,8 +1599,8 @@ import {
                 // 使用现有的保存接口（verifyUser 支持 body.token），避免依赖自定义 Header（sendBeacon 也可用）
                 const filenameToSend = f.type === 'folder' ? (f.name.endsWith('/') ? f.name : (f.name + '/')) : f.name;
                 const body = {
-                    username: g('currentUser').username,
-                    token: g('currentUser').token,
+                    username: uploadUser.username,
+                    token: uploadUser.token,
                     filename: filenameToSend,
                     content: f.type === 'folder' ? '{"meta":"folder"}' : content,
                     base_last_modified: f.serverLastModified || null
@@ -1608,7 +1622,7 @@ import {
                 // 检查 Token 错误
                 if (global.isTokenError && global.isTokenError(r)) {
                     const handled = await global.handleTokenExpired();
-                    if (handled) {
+                    if (handled && isStillUploadUser()) {
                         // 使用新 Token 重试
                         body.token = g('currentUser').token;
                         const retryResp = await fetch(api + '/files/save', {

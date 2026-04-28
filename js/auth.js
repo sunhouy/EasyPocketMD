@@ -21,6 +21,68 @@
         return global.i18n && global.i18n.getLanguage && global.i18n.getLanguage() === 'en';
     }
 
+    const ACCOUNT_SWITCH_STEP_TIMEOUT_MS = 15000;
+    const ACCOUNT_SWITCH_LOAD_TIMEOUT_MS = 20000;
+
+    function runWithTimeout(task, timeoutMs, label) {
+        let timeoutId = null;
+        const work = typeof task === 'function' ? Promise.resolve().then(task) : Promise.resolve(task);
+        const timeout = new Promise(function(_, reject) {
+            timeoutId = setTimeout(function() {
+                reject(new Error(label + ' timeout'));
+            }, timeoutMs);
+        });
+
+        return Promise.race([work, timeout]).finally(function() {
+            if (timeoutId) clearTimeout(timeoutId);
+        });
+    }
+
+    async function runAccountSwitchStep(label, task, timeoutMs) {
+        try {
+            return await runWithTimeout(task, timeoutMs || ACCOUNT_SWITCH_STEP_TIMEOUT_MS, label);
+        } catch (error) {
+            console.warn('[AccountSwitch] ' + label + ' failed or timed out:', error);
+            return null;
+        }
+    }
+
+    async function clearAccountLocalFileState() {
+        if (global.clearAutoSave) global.clearAutoSave();
+        if (global.draftRecovery && typeof global.draftRecovery.clearDraft === 'function') {
+            global.draftRecovery.clearDraft();
+        }
+
+        [
+            'vditor_files',
+            'vditor_last_synced_files',
+            'vditor_folders_expanded',
+            'vditor_last_opened_file',
+            'vditor_pending_server_sync',
+            'vditor_draft_backup',
+            'vditor_draft_meta'
+        ].forEach(function(key) {
+            localStorage.removeItem(key);
+        });
+
+        if (global.IndexedDBManager && typeof global.IndexedDBManager.clearAll === 'function') {
+            await runAccountSwitchStep('clear account IndexedDB file cache', function() {
+                return global.IndexedDBManager.clearAll();
+            }, 3000);
+        }
+        if (global.IndexedDBManager && typeof global.IndexedDBManager.clearDrafts === 'function') {
+            await runAccountSwitchStep('clear account IndexedDB drafts', function() {
+                return global.IndexedDBManager.clearDrafts();
+            }, 3000);
+        }
+
+        global.files = [];
+        global.unsavedChanges = {};
+        global.lastSyncedContent = {};
+        global.pendingServerSync = {};
+        global.currentFileId = null;
+    }
+
     // 辅助函数：设置按钮加载状态
     function setButtonLoading(buttonId, loading, loadingTextKey) {
         const btn = document.getElementById(buttonId);
@@ -1233,11 +1295,9 @@
         try {
             // 1. 先保存当前正在编辑的文件
             if (global.saveCurrentFile) {
-                try {
-                    await global.saveCurrentFile(true);
-                } catch (e) {
-                    console.warn('保存当前文件失败:', e);
-                }
+                await runAccountSwitchStep('save current file before account switch', function() {
+                    return global.saveCurrentFile(true);
+                });
             }
 
             // 2. 同步当前账户的所有未保存更改
@@ -1249,97 +1309,61 @@
             });
 
             if (hasUnsaved && global.syncAllFiles) {
-                try {
-                    await global.syncAllFiles();
-                } catch (e) {
-                    console.warn('同步当前账户文件失败:', e);
-                }
+                await runAccountSwitchStep('sync current account files before switch', function() {
+                    return global.syncAllFiles();
+                });
             }
 
-            // 3. 停止自动同步
+            // 3. 切换前先验证目标账户，避免凭据失效时清空当前本地状态
+            const result = await verifyAccountCredentials(targetAccount.username, targetAccount.password);
+            if (result.code !== 200) {
+                global.showMessage(t('accountAddFailed') + ': ' + result.message, 'error');
+                return;
+            }
+
+            // 4. 停止自动同步
             if (global.stopAutoSync) global.stopAutoSync();
 
-            // 4. 使用设置-存储空间的方式清空数据（保留 service worker）
-            // 清空 Cache Storage
-            if (global.clearAllCacheStorage) {
-                try {
-                    await global.clearAllCacheStorage();
-                } catch (e) {
-                    console.warn('清空 Cache Storage 失败:', e);
-                }
+            // 5. 只清理文件/草稿相关的本地状态，避免清 Cookie/Cache/整个 IndexedDB 影响后续切换
+            await clearAccountLocalFileState();
+
+            // 6. 使用新账户登录
+            global.currentUser = {
+                username: targetAccount.username,
+                token: result.data.token,
+                password: targetAccount.password
+            };
+            localStorage.setItem('vditor_user', JSON.stringify(global.currentUser));
+
+            global.showMessage(t('accountSwitched').replace('{username}', targetAccount.username), 'success');
+
+            // 7. 重新加载文件列表，加载异常或超时不应把界面永久卡在“切换中”
+            if (global.loadFilesFromServer) {
+                await runAccountSwitchStep('load files after account switch', function() {
+                    return global.loadFilesFromServer();
+                }, ACCOUNT_SWITCH_LOAD_TIMEOUT_MS);
             }
 
-            // 清空 IndexedDB
-            if (global.clearAllIndexedDB) {
-                try {
-                    await global.clearAllIndexedDB();
-                } catch (e) {
-                    console.warn('清空 IndexedDB 失败:', e);
-                }
+            // 8. 启动自动同步
+            if (global.startAutoSync) {
+                global.startAutoSync();
             }
 
-            // 清空 Cookies
-            if (global.clearAllCookies) {
-                try {
-                    await global.clearAllCookies();
-                } catch (e) {
-                    console.warn('清空 Cookies 失败:', e);
-                }
-            }
+            // 9. 更新UI
+            showUserInfo();
+            renderAccountList();
+            if (global.loadFiles) global.loadFiles();
 
-            // 5. 清除 localStorage 中的文件相关数据
-            localStorage.removeItem('vditor_files');
-            localStorage.removeItem('vditor_last_synced_files');
-            localStorage.removeItem('vditor_folders_expanded');
+            // 10. 关闭下拉菜单
+            const dropdown = document.getElementById('userMenuDropdown');
+            if (dropdown) dropdown.classList.remove('show');
 
-            // 6. 清除全局状态
-            global.files = [];
-            global.unsavedChanges = {};
-            global.lastSyncedContent = {};
-            global.pendingServerSync = {};
-            global.currentFileId = null;
-
-            // 7. 使用新账户登录
-            const result = await verifyAccountCredentials(targetAccount.username, targetAccount.password);
-            if (result.code === 200) {
-                // 设置当前用户
-                global.currentUser = {
-                    username: targetAccount.username,
-                    token: result.data.token,
-                    password: targetAccount.password
-                };
-                localStorage.setItem('vditor_user', JSON.stringify(global.currentUser));
-
-                global.showMessage(t('accountSwitched').replace('{username}', targetAccount.username), 'success');
-
-                // 8. 重新加载文件列表
-                if (global.loadFilesFromServer) {
-                    await global.loadFilesFromServer();
-                }
-
-                // 9. 启动自动同步
-                if (global.startAutoSync) {
-                    global.startAutoSync();
-                }
-
-                // 10. 更新UI
-                showUserInfo();
-                renderAccountList();
-                if (global.loadFiles) global.loadFiles();
-
-                // 11. 关闭下拉菜单
-                const dropdown = document.getElementById('userMenuDropdown');
-                if (dropdown) dropdown.classList.remove('show');
-
-                // 12. 如果需要，打开设置窗口
-                if (global._openSettingsAfterSwitch) {
-                    global._openSettingsAfterSwitch = false;
-                    setTimeout(function() {
-                        showUserSettingsModal();
-                    }, 300);
-                }
-            } else {
-                global.showMessage(t('accountAddFailed') + ': ' + result.message, 'error');
+            // 11. 如果需要，打开设置窗口
+            if (global._openSettingsAfterSwitch) {
+                global._openSettingsAfterSwitch = false;
+                setTimeout(function() {
+                    showUserSettingsModal();
+                }, 300);
             }
         } catch (error) {
             console.error('切换账户失败:', error);
@@ -1393,18 +1417,34 @@
 
     // 验证账户凭据（用于添加账户）
     async function verifyAccountCredentials(username, password) {
+        let timeoutId = null;
         try {
             const apiUrl = (global.getApiBaseUrl ? global.getApiBaseUrl() : 'api') + '/auth/login';
-            const response = await fetch(apiUrl, {
+            const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+            const options = {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ username: username, password: password })
+            };
+            if (controller) {
+                options.signal = controller.signal;
+                timeoutId = setTimeout(function() {
+                    controller.abort();
+                }, ACCOUNT_SWITCH_STEP_TIMEOUT_MS);
+            }
+            const response = await fetch(apiUrl, {
+                method: options.method,
+                headers: options.headers,
+                body: options.body,
+                signal: options.signal
             });
             const result = global.parseJsonResponse ? await global.parseJsonResponse(response) : await response.json();
             return result;
         } catch (error) {
             console.error('验证账户失败:', error);
             return { code: 500, message: t('networkErrorPleaseRetry') };
+        } finally {
+            if (timeoutId) clearTimeout(timeoutId);
         }
     }
 
