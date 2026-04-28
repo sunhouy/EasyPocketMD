@@ -86,9 +86,7 @@ import {
     function setEditorInteractionLocked(locked) {
         const vditorContainer = document.getElementById('vditor');
         if (vditorContainer) {
-            if (global.vditor && typeof global.vditor.disabled === 'function') {
-                global.vditor.disabled(!!locked);
-            }
+            setVditorInteractionLocked(global.vditor, !!locked);
 
             const editableNodes = vditorContainer.querySelectorAll('[contenteditable]');
             editableNodes.forEach(function(node) {
@@ -116,6 +114,34 @@ import {
         if (longPreviewToggle) {
             longPreviewToggle.disabled = !!locked;
         }
+    }
+
+    function isVditorInteractionApiReady(vditorInstance) {
+        const internal = vditorInstance && vditorInstance.vditor;
+        if (!internal || !internal.toolbar || !internal.toolbar.elements || !internal.currentMode) {
+            return false;
+        }
+        return !!(internal[internal.currentMode] && internal[internal.currentMode].element);
+    }
+
+    function setVditorInteractionLocked(vditorInstance, locked) {
+        if (!isVditorInteractionApiReady(vditorInstance)) {
+            return false;
+        }
+
+        try {
+            if (locked && typeof vditorInstance.disabled === 'function') {
+                vditorInstance.disabled();
+                return true;
+            }
+            if (!locked && typeof vditorInstance.enable === 'function') {
+                vditorInstance.enable();
+                return true;
+            }
+        } catch (error) {
+            console.warn('Failed to update Vditor interaction state:', error);
+        }
+        return false;
     }
 
     function setFileSwitchLoading(loading) {

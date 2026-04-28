@@ -1,5 +1,6 @@
-const fs = require('fs');
-const path = require('path');
+function getVditorAssetBase() {
+    return '/vditor/dist';
+}
 
 function generatePasswordForm(shareId) {
     return `
@@ -163,6 +164,7 @@ function generateShareViewPage(shareData) {
     const isEditableJS = isEditable ? 'true' : 'false';
     const isExpiredJS = isExpired ? 'true' : 'false';
     const contentJS = JSON.stringify(content);
+    const vditorAssetBase = getVditorAssetBase();
 
     return `
 <!DOCTYPE html>
@@ -172,7 +174,7 @@ function generateShareViewPage(shareData) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>${filename} - 文档分享</title>
     <link rel="stylesheet" href="../css/styles.css" />
-    <link rel="stylesheet" href="../vditor@3.11.2/dist/index.css" />
+    <link rel="stylesheet" href="${vditorAssetBase}/index.css" />
     <style>
         * {
             margin: 0;
@@ -369,7 +371,7 @@ function generateShareViewPage(shareData) {
     <div id="toast" class="toast"></div>
     
     <!-- 加载Vditor资源 -->
-    <script src="../vditor@3.11.2/dist/index.min.js"></script>
+    <script src="${vditorAssetBase}/index.min.js"></script>
     <script>
         // 初始化变量
         let originalContent = ${contentJS};
@@ -402,6 +404,7 @@ function generateShareViewPage(shareData) {
             try {
                 // 使用Vditor的HTML渲染能力（处理Promise返回值）
                 const html = await Vditor.md2html(content, {
+                    cdn: '/vditor',
                     mark: true,
                     footnotes: true,
                     toc: true,
@@ -463,6 +466,7 @@ function generateShareViewPage(shareData) {
                 vditor = new Vditor('vditor', {
                     height: '100%',
                     width: '100%',
+                    cdn: '/vditor',
                     placeholder: '开始编辑...支持 Markdown 语法',
                     toolbar: [],
                     customWysiwygToolbar: undefined,

@@ -1294,11 +1294,15 @@ document.addEventListener('DOMContentLoaded', function() {
         sv: { name: getModeName('sv'), icon: 'fas fa-columns' }
     };
 
+    function getVditorCdn() {
+        return window.electron ? './vditor' : (window.location.protocol === 'file:' ? './vditor' : '/vditor');
+    }
+
     var editorConfig = {
         height: '100%',
         width: '100%',
         placeholder: window.i18n ? window.i18n.t('startEditing') : '开始编辑...支持 Markdown 语法',
-        cdn: window.electron ? './vditor' : (window.location.protocol === 'file:' ? './vditor' : '/vditor'), // 兼容桌面壳与 Web 环境的本地目录
+        cdn: getVditorCdn(),
         lang: 'en_US', // 彻底禁用中文语言文件，使用默认英语
         toolbar: ['emoji', 'br', 'bold', 'italic', 'strike', '|', 'line', 'quote', 'list', 'ordered-list', 'check', 'outdent', 'indent', 'code', 'inline-code', 'insert-after', 'insert-before', 'upload', 'link', 'table', 'record', 'edit-mode', 'both', 'preview', 'fullscreen', 'outline', 'code-theme', 'content-theme', 'export', 'info', 'help', 'br'],
         customWysiwygToolbar: function() {}, // 修复报错
@@ -1977,7 +1981,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 height: editorConfig.height,
                 width: editorConfig.width,
                 placeholder: window.i18n ? window.i18n.t('startEditing') : '开始编辑...支持 Markdown 语法',
-                cdn: window.electron ? './vditor' : (window.location.protocol === 'file:' ? './vditor' : '/vditor'), // 兼容桌面壳与 Web 环境的本地目录
+                cdn: getVditorCdn(),
                 lang: 'en_US', // 彻底禁用中文语言文件，使用默认英语
                 toolbar: ['emoji', 'br', 'bold', 'italic', 'strike', '|', 'line', 'quote', 'list', 'ordered-list', 'check', 'outdent', 'indent', 'code', 'inline-code', 'insert-after', 'insert-before', 'upload', 'link', 'table', 'record', 'edit-mode', 'both', 'preview', 'fullscreen', 'outline', 'code-theme', 'content-theme', 'export', 'info', 'help', 'br'],
                 customWysiwygToolbar: function() {},
@@ -3232,7 +3236,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 height: editorConfig.height,
                 width: editorConfig.width,
                 placeholder: window.i18n ? window.i18n.t('startEditing') : '开始编辑...支持 Markdown 语法',
-                cdn: window.electron ? './vditor' : (window.location.protocol === 'file:' ? './vditor' : '/vditor'),
+                cdn: getVditorCdn(),
                 lang: 'en_US', // 彻底禁用中文语言文件，使用默认英语
                 toolbar: ['emoji', 'br', 'bold', 'italic', 'strike', '|', 'line', 'quote', 'list', 'ordered-list', 'check', 'outdent', 'indent', 'code', 'inline-code', 'insert-after', 'insert-before', 'upload', 'link', 'table', 'record', 'edit-mode', 'both', 'preview', 'fullscreen', 'outline', 'code-theme', 'content-theme', 'export', 'info', 'help', 'br'],
                 customWysiwygToolbar: function() {},

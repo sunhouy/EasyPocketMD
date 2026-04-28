@@ -11,8 +11,10 @@ const hasWasmTextEngineDist = existsSync(wasmJsPath) && existsSync(wasmBinPath);
 const imageCompressorJsPath = join(__dirname, 'wasm_text_engine', 'dist', 'image_compressor.js');
 const imageCompressorBinPath = join(__dirname, 'wasm_text_engine', 'dist', 'image_compressor.wasm');
 const hasImageCompressorDist = existsSync(imageCompressorJsPath) && existsSync(imageCompressorBinPath);
+const scopedVditorPackagePath = join(__dirname, 'node_modules', '@sunhouyun', 'vditor', 'package.json');
 let cacheVersion = 'v1';
 let appPackageVersion = '0.0.0';
+let scopedVditorVersion = '3.11.3';
 if (existsSync(versionPath)) {
   try {
     const versionData = JSON.parse(readFileSync(versionPath, 'utf8'));
@@ -28,6 +30,34 @@ if (existsSync(packageJsonPath)) {
   } catch (e) {
     console.warn('Failed to read package version:', e);
   }
+}
+if (existsSync(scopedVditorPackagePath)) {
+  try {
+    const scopedVditorPackageData = JSON.parse(readFileSync(scopedVditorPackagePath, 'utf8'));
+    scopedVditorVersion = scopedVditorPackageData.version || scopedVditorVersion;
+  } catch (e) {
+    console.warn('Failed to read @sunhouyun/vditor version:', e);
+  }
+}
+
+function localizeVditorAssets(code) {
+  return code
+    .replace(
+      /public static readonly CDN = `https:\/\/unpkg\.com\/vditor@\$\{VDITOR_VERSION\}`;/,
+      'public static readonly CDN = "/vditor";'
+    )
+    .replace(
+      /Constants\.CDN = "https:\/\/unpkg\.com\/vditor@"\.concat\("[^"]+"\);/g,
+      'Constants.CDN = "/vditor";'
+    )
+    .replace(
+      /([A-Za-z_$][\w$]*\.CDN=)"https:\/\/unpkg\.com\/vditor@"\.concat\("[^"]+"\)/g,
+      '$1"/vditor"'
+    )
+    .replace(
+      /https:\/\/unpkg\.com\/vditor\/dist\/images\/logo\.png/g,
+      '/vditor/dist/images/logo.png'
+    );
 }
 
 const swContent = `const CACHE_NAMESPACE = 'md-editor-cache';
@@ -139,7 +169,8 @@ export default defineConfig({
   define: {
     __WASM_TEXT_ENGINE_PRESENT__: JSON.stringify(hasWasmTextEngineDist),
     __APP_BUILD_TAG__: JSON.stringify(cacheVersion),
-    __APP_PACKAGE_VERSION__: JSON.stringify(appPackageVersion)
+    __APP_PACKAGE_VERSION__: JSON.stringify(appPackageVersion),
+    VDITOR_VERSION: JSON.stringify(scopedVditorVersion)
   },
   server: {
     port: 8080,
@@ -165,7 +196,7 @@ export default defineConfig({
         chunkFileNames: 'assets/[name]-[hash].js',
         assetFileNames: 'assets/[name]-[hash].[ext]',
         manualChunks: {
-          vditor: ['vditor']
+          vditor: ['@sunhouyun/vditor']
         }
       },
       external: ['node-fetch']
@@ -181,12 +212,21 @@ export default defineConfig({
     include: ['docx']
   },
   plugins: [
+    {
+      name: 'localize-scoped-vditor-assets',
+      enforce: 'pre',
+      transform(code, id) {
+        if (!id.includes('/node_modules/@sunhouyun/vditor/')) {
+          return null;
+        }
+
+        const localized = localizeVditorAssets(code);
+
+        return localized === code ? null : { code: localized, map: null };
+      }
+    },
     viteStaticCopy({
       targets: [
-        {
-          src: 'node_modules/vditor/dist',
-          dest: 'vditor'
-        },
         {
           src: 'node_modules/echarts/dist/echarts.min.js',
           dest: 'echarts'
@@ -226,8 +266,8 @@ export default defineConfig({
       writeBundle(options) {
         const fs = require('fs');
         const path = require('path');
-        const sourceDir = path.join(__dirname, 'node_modules', 'vditor', 'dist');
-        const targetDir = path.join(options.dir || 'dist', 'vditor');
+        const sourceDir = path.join(__dirname, 'node_modules', '@sunhouyun', 'vditor', 'dist');
+        const targetDir = path.join(options.dir || 'dist', 'vditor', 'dist');
         
         try {
           if (fs.existsSync(sourceDir)) {
@@ -246,7 +286,12 @@ export default defineConfig({
                   }
                   copyDir(srcPath, destPath);
                 } else {
-                  fs.copyFileSync(srcPath, destPath);
+                  if (srcPath.endsWith('.js')) {
+                    const content = fs.readFileSync(srcPath, 'utf8');
+                    fs.writeFileSync(destPath, localizeVditorAssets(content));
+                  } else {
+                    fs.copyFileSync(srcPath, destPath);
+                  }
                 }
               }
             }

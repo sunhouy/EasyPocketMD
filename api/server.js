@@ -46,7 +46,23 @@ app.use('/screenshots', express.static(screenshotsPath));
 app.use('/user_files', express.static(userFilesPath));
 
 // Serve static files from node_modules for Vditor
-app.use('/vditor', express.static(path.join(__dirname, '../node_modules/vditor/dist')));
+const vditorPackagePath = path.join(__dirname, '../node_modules/@sunhouyun/vditor');
+function localizeVditorAssets(content) {
+    return content
+        .replace(/Constants\.CDN = "https:\/\/unpkg\.com\/vditor@"\.concat\("[^"]+"\);/g, 'Constants.CDN = "/vditor";')
+        .replace(/([A-Za-z_$][\w$]*\.CDN=)"https:\/\/unpkg\.com\/vditor@"\.concat\("[^"]+"\)/g, '$1"/vditor"')
+        .replace(/https:\/\/unpkg\.com\/vditor\/dist\/images\/logo\.png/g, '/vditor/dist/images/logo.png');
+}
+app.get(/^\/vditor\/.*\.js$/, (req, res, next) => {
+    const relativePath = req.path.replace(/^\/vditor\//, '');
+    const filePath = path.join(vditorPackagePath, relativePath);
+    if (!filePath.startsWith(vditorPackagePath) || !fs.existsSync(filePath)) {
+        return next();
+    }
+    res.type('application/javascript');
+    res.send(localizeVditorAssets(fs.readFileSync(filePath, 'utf8')));
+});
+app.use('/vditor', express.static(vditorPackagePath));
 // Serve Font Awesome from node_modules
 app.use('/fa', express.static(path.join(__dirname, '../node_modules/@fortawesome/fontawesome-free')));
 

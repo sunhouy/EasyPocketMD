@@ -1,4 +1,4 @@
-import 'vditor/dist/index.css';
+import '@sunhouyun/vditor/dist/index.css';
 import '@fortawesome/fontawesome-free/css/all.min.css';
 import 'cropperjs/dist/cropper.css';
 import './css/styles.css';
@@ -9,7 +9,7 @@ import './js/native-file.js';
 import 'jstree/dist/themes/default/style.min.css';
 import 'jstree';
 
-import Vditor from 'vditor';
+import Vditor from '@sunhouyun/vditor';
 
 window.Vditor = Vditor;
 
@@ -60,4 +60,3 @@ import './js/ui/insert-picker.js';
 // import './js/code-runner.js';
 
 import './js/main.js';
-
