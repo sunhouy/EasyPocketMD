@@ -306,20 +306,28 @@ jobs:
             exit 1
           fi
           
-          # 安装 python-docx 用于生成 DOCX 模板
+          # 安装 Python 依赖：DOCX 模板生成 + MarkItDown 导入转换
           echo "[5/5] 安装 Python 依赖..."
           if command -v python3 &> /dev/null; then
             PYTHON_CMD=python3
           elif command -v python &> /dev/null; then
             PYTHON_CMD=python
           else
-            echo "警告: 未找到 Python，DOCX 模板生成功能可能受限"
+            echo "错误: 未找到 Python，文档导入转换功能无法使用"
+            exit 1
           fi
           
           if [ -n "$PYTHON_CMD" ]; then
             echo "使用 Python: $PYTHON_CMD"
-            $PYTHON_CMD -m pip install --upgrade pip -q || echo "警告: pip 升级失败"
-            $PYTHON_CMD -m pip install python-docx -q || echo "警告: python-docx 安装失败"
+            $PYTHON_CMD -m venv .venv
+            source .venv/bin/activate
+            python -m pip install --upgrade pip -q
+            if [ -f "requirements.txt" ]; then
+              python -m pip install -r requirements.txt -q
+            else
+              python -m pip install python-docx "markitdown[all]" -q
+            fi
+            python -c "from markitdown import MarkItDown; print('MarkItDown ready')"
           fi
           
           echo "✓ 部署目录准备完成: $NEXT_DIR"
@@ -410,6 +418,7 @@ jobs:
           fi
           export BASE_URL="$DEV_BASE_URL"
           export DASHSCOPE_API_KEY=${{ secrets.DASHSCOPE_API_KEY }}
+          export MARKITDOWN_PYTHON="$NEXT_DIR/.venv/bin/python"
 
           "$PM2_BIN" start api/server.js --name "$NEXT_NAME" --env production
 

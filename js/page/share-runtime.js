@@ -1538,6 +1538,7 @@
                         type: 'update_content',
                         content: currentContent,
                         base_version: window.sharedDocState.contentVersion,
+                        base_content: window.sharedDocState.lastKnownContent || '',
                         manual_save: true,
                         create_history: true
                     }));
@@ -1546,7 +1547,8 @@
             window.sharedDocState.ws.send(JSON.stringify({
                 type: 'update_content',
                 content: currentContent,
-                base_version: window.sharedDocState.contentVersion
+                base_version: window.sharedDocState.contentVersion,
+                base_content: window.sharedDocState.lastKnownContent || ''
             }));
             return true;
         }
@@ -1565,6 +1567,7 @@
                     viewer_id: window.sharedDocState.viewerId,
                     viewer_name: window.sharedDocState.viewerName,
                     base_version: window.sharedDocState.contentVersion,
+                    base_content: window.sharedDocState.lastKnownContent || '',
                     manual_save: manualSave,
                     create_history: manualSave,
                     ...getEditorIdentityPayload()
@@ -1575,6 +1578,20 @@
                 window.sharedDocState.lastKnownContent = result.data.content || currentContent;
                 window.sharedDocState.lastModified = result.data.last_modified || window.sharedDocState.lastModified;
                 window.sharedDocState.contentVersion = result.data.content_version || window.sharedDocState.contentVersion;
+                if (window.vditor && typeof result.data.content === 'string' && window.vditor.getValue() !== result.data.content) {
+                    const cursorPosition = window.vditor.vditor.ir?.element.selectionStart ||
+                                          window.vditor.vditor.wysiwyg?.element.selectionStart || 0;
+                    window.vditor.setValue(result.data.content);
+                    setTimeout(() => {
+                        if (window.vditor.vditor.ir?.element) {
+                            window.vditor.vditor.ir.element.selectionStart = cursorPosition;
+                            window.vditor.vditor.ir.element.selectionEnd = cursorPosition;
+                        } else if (window.vditor.vditor.wysiwyg?.element) {
+                            window.vditor.vditor.wysiwyg.element.selectionStart = cursorPosition;
+                            window.vditor.vditor.wysiwyg.element.selectionEnd = cursorPosition;
+                        }
+                    }, 0);
+                }
                 return true;
             }
             if (result.code === 409 && result.data) {

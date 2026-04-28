@@ -7,6 +7,11 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const sharp = require('sharp');
+const {
+    convertFileToMarkdown,
+    isSupportedImportFile,
+    SUPPORTED_EXTENSIONS
+} = require('../utils/markitdownImporter');
 
 const PROJECT_ROOT = path.join(__dirname, '../..');
 
@@ -83,6 +88,7 @@ function cleanupFile(file) {
         try {
             fs.unlinkSync(file.path);
         } catch (err) {
+            if (err && err.code === 'ENOENT') return;
             console.error('Failed to clean up uploaded file:', file.path, err);
         }
     }
@@ -155,6 +161,28 @@ const generalUploadMiddleware = generalUpload.fields([
     { name: 'upload', maxCount: 50 }
 ]);
 
+const importStorage = multer.diskStorage({
+    destination: function (req, file, cb) {
+        const dir = path.join(PROJECT_ROOT, 'temp_imports');
+        ensureDir(dir);
+        cb(null, dir);
+    },
+    filename: function (req, file, cb) {
+        cb(null, safeFileName(file.originalname));
+    }
+});
+
+const importUpload = multer({
+    storage: importStorage,
+    limits: { fileSize: 50 * 1024 * 1024 },
+    fileFilter: function (req, file, cb) {
+        if (!isSupportedImportFile(decodeOriginalName(file.originalname))) {
+            return cb(new Error('不支持的导入文件类型，支持 PDF、Word、Excel、PowerPoint'));
+        }
+        cb(null, true);
+    }
+});
+
 // Check update
 router.post('/check_update', async (req, res) => {
     const { current_version } = req.body;
@@ -204,6 +232,48 @@ async function handleScreenshotUpload(req, res) {
 
 // Upload screenshot
 router.post('/upload_screenshot', multerJson(upload.single('screenshot'), handleScreenshotUpload));
+
+async function handleDocumentImport(req, res) {
+    try {
+        if (!req.file) {
+            return res.json({ code: 400, message: '缺少导入文件' });
+        }
+
+        const originalName = decodeOriginalName(req.file.originalname);
+        if (!isSupportedImportFile(originalName)) {
+            return res.json({
+                code: 400,
+                message: `不支持的导入文件类型，支持: ${Array.from(SUPPORTED_EXTENSIONS).join(', ')}`
+            });
+        }
+
+        const result = await convertFileToMarkdown(req.file.path, { originalName });
+
+        res.json({
+            code: 200,
+            message: '导入转换成功',
+            data: {
+                name: originalName,
+                markdown: result.markdown,
+                size: req.file.size,
+                mime_type: req.file.mimetype
+            }
+        });
+    } catch (error) {
+        console.error('Document import error:', error);
+        const status = error.code === 'DEPENDENCY_MISSING' || error.code === 'PYTHON_NOT_FOUND' ? 503 : 500;
+        res.status(status).json({
+            code: status,
+            message: error.message || '导入转换失败'
+        });
+    } finally {
+        cleanupFile(req.file);
+    }
+}
+
+// Convert PDF / Office documents to Markdown using the backend MarkItDown pipeline.
+router.post('/import/markitdown', multerJson(importUpload.single('file'), handleDocumentImport));
+router.post('/files/import', multerJson(importUpload.single('file'), handleDocumentImport));
 
 async function handleGeneralUpload(req, res) {
     try {

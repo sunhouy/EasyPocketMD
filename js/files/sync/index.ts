@@ -314,6 +314,10 @@ export function createSyncRuntimeApi(ctx: any) {
             content: content,
             base_last_modified: baseLastModified,
           };
+          const baseContentForCrdt = (g('lastSyncedContent') || {})[fileId];
+          if (file.type !== 'folder' && typeof baseContentForCrdt === 'string') {
+            requestBody.base_content = baseContentForCrdt;
+          }
           if (forcedBaseContentVersion !== null) {
             requestBody.base_content_version = forcedBaseContentVersion;
           } else {
@@ -334,6 +338,18 @@ export function createSyncRuntimeApi(ctx: any) {
               return f.id === fileId;
             });
             if (fileIndex !== -1) {
+              const serverContent =
+                file.type === 'folder'
+                  ? ''
+                  : result.data && typeof result.data.content === 'string'
+                    ? result.data.content
+                    : content;
+              if (file.type !== 'folder' && files[fileIndex].content !== serverContent) {
+                files[fileIndex].content = serverContent;
+                if (fileId === g('currentFileId')) {
+                  setEditorContentForFile(fileId, serverContent);
+                }
+              }
               files[fileIndex].isSynced = true;
               files[fileIndex].preferLocalOnNextSync = false;
               files[fileIndex].lastModified = result.data && result.data.last_modified ? result.data.last_modified : Date.now();
@@ -345,7 +361,7 @@ export function createSyncRuntimeApi(ctx: any) {
                   : Number(file.contentVersion || 0) + 1,
               );
               localStorage.setItem('vditor_files', JSON.stringify(files));
-              g('lastSyncedContent')[fileId] = file.type === 'folder' ? '' : content;
+              g('lastSyncedContent')[fileId] = serverContent;
               g('unsavedChanges')[fileId] = false;
               markPendingServerSync(fileId, false);
               globalRef.lastSaveConflictPending = false;
@@ -559,6 +575,10 @@ export function createSyncRuntimeApi(ctx: any) {
       content: content,
       base_last_modified: file.serverLastModified || null,
     };
+    const beaconBaseContent = (g('lastSyncedContent') || {})[currentFileId];
+    if (typeof beaconBaseContent === 'string') {
+      body.base_content = beaconBaseContent;
+    }
 
     const beaconContentVersion = Number(file.contentVersion);
     if (Number.isFinite(beaconContentVersion) && beaconContentVersion > 0) {
