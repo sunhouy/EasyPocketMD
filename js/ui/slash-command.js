@@ -1,3 +1,5 @@
+import { pinyin } from 'pinyin-pro';
+
 const SLASH_PANEL_ID = 'slashCommandPanel';
 
 const state = {
@@ -1001,9 +1003,9 @@ async function fetchPaletteItems(query) {
     if (gateway) {
         var ready = await gateway.ensureReady();
         if (ready && ready.code === 200) {
-            var result = gateway.slashPalette(normalizedQuery, {
+            var result = gateway.slashPalette(normalizedQuery ? '' : normalizedQuery, {
                 language: currentLanguageCode(),
-                limit: 80,
+                limit: normalizedQuery ? 200 : 80,
                 includeHidden: false
             });
 
@@ -1013,14 +1015,14 @@ async function fetchPaletteItems(query) {
         }
     }
 
+    if (normalizedQuery) {
+        var localEntries = await loadBuiltinSlashEntries();
+        return searchSlashEntries(mergePaletteItems(remoteItems, localEntries, 300), normalizedQuery, 80);
+    }
+
     var localItems = await searchBuiltinEntries(normalizedQuery, 80);
     if (!remoteItems.length) return localItems;
     if (!localItems.length) return remoteItems;
-    if (normalizedQuery) {
-        // Prefer local builtin ranking for typed queries so pinyin/alias matches
-        // (e.g. /tp, /tupian) are not pushed out by remote result limits.
-        return mergePaletteItems(localItems, remoteItems, 80);
-    }
     return mergePaletteItems(remoteItems, localItems, 80);
 }
 
@@ -1047,308 +1049,145 @@ async function loadBuiltinSlashEntries() {
 }
 
 function normalizeForMatch(text) {
-    return String(text || '').toLowerCase();
+    return String(text || '').normalize('NFKC').toLowerCase().trim();
 }
 
-// 汉语转拼音映射（常用汉字）
-var chinesePinyinMap = {
-    '图': 'tu', '片': 'pian', '插': 'cha', '入': 'ru', '文': 'wen', '件': 'jian',
-    '上': 'shang', '传': 'chuan', '链': 'lian', '接': 'jie', '表': 'biao', '格': 'ge',
-    '无': 'wu', '序': 'xu', '列': 'lie', '有': 'you', '任': 'ren', '务': 'wu',
-    '分': 'fen', '隔': 'ge', '线': 'xian', '情': 'qing', '公': 'gong',
-    '式': 'shi', '脚': 'jiao', '注': 'zhu', '脑': 'nao',
-    '思': 'si', '维': 'wei', '导': 'dao', '新': 'xin', '建': 'jian',
-    '夹': 'jia', '打': 'da', '开': 'kai', '历': 'li',
-    '史': 'shi', '重': 'zhong', '命': 'ming', '名': 'ming', '移': 'yi', '动': 'dong',
-    '删': 'shan', '除': 'chu', '登': 'deng', '录': 'lu', '册': 'ce',
-    '退': 'tui', '出': 'chu', '设': 'she', '置': 'zhi', '模': 'mo',
-    '轻': 'qing', '暗': 'an', '主': 'zhu', '题': 'ti', '编': 'bian', '辑': 'ji',
-    '撤': 'che', '销': 'xiao', '做': 'zuo', '清': 'qing', '空': 'kong',
-    '内': 'nei', '容': 'rong', '享': 'xiang',
-    '印': 'yin', '帮': 'bang', '助': 'zhu', '关': 'guan', '于': 'yu',
-    '服': 'fu', '状': 'zhuang', '态': 'tai', '计': 'ji', '算': 'suan',
-    '器': 'qi', '演': 'yan', '示': 'shi',
-    '语': 'yu', '音': 'yin', '频': 'pin', '通': 'tong', '话': 'hua', '搜': 'sou',
-    '索': 'suo', '查': 'cha', '找': 'zhao', '替': 'ti', '换': 'huan', '保': 'bao',
-    '存': 'cun', '另': 'ling', '页': 'ye', '全': 'quan', '屏': 'ping', '预': 'yu',
-    '览': 'lan', '网': 'wang', '络': 'luo', '地': 'di',
-    '址': 'zhi', '描': 'miao', '述': 'shu', '代': 'dai', '码': 'ma',
-    '块': 'kuai', '行': 'xing', '引': 'yin', '用': 'yong', '粗': 'cu',
-    '体': 'ti', '斜': 'xie', '级': 'ji', '签': 'qian', '像': 'xiang',
-    '视': 'shi', '附': 'fu',
-    '加': 'jia', '载': 'zai', '卸': 'xie',
-    '点': 'dian', '赞': 'zan', '踩': 'cai', '好': 'hao', '评': 'ping',
-    '差': 'cha', '论': 'lun', '回': 'hui', '复': 'fu',
-    '留': 'liu', '言': 'yan', '价': 'jia',
-    '投': 'tou', '票': 'piao', '选': 'xuan',
-    '举': 'ju', '调': 'diao', '问': 'wen',
-    '卷': 'juan', '统': 'tong', '数': 'shu',
-    '据': 'ju', '析': 'xi', '报': 'bao', '告': 'gao',
-    '管': 'guan', '理': 'li', '相': 'xiang',
-    '集': 'ji', '画': 'hua', '库': 'ku', '廊': 'lang',
-    '展': 'zhan', '橱': 'chu', '窗': 'chuang',
-    '广': 'guang', '推': 'tui', '营': 'ying', '销': 'xiao',
-    '荐': 'jian', '精': 'jing', '品': 'pin', '热': 're', '门': 'men',
-    '榜': 'bang', '单': 'dan', '次': 'ci',
-    '顺': 'shun', '逆': 'ni', '正': 'zheng', '倒': 'dao', '随': 'sui',
-    '机': 'ji', '乱': 'luan', '混': 'hun',
-    '显': 'xian', '呈': 'cheng', '现': 'xian',
-    '的': 'de', '了': 'le', '在': 'zai', '是': 'shi', '我': 'wo', '不': 'bu',
-    '人': 'ren', '们': 'men', '中': 'zhong', '来': 'lai', '到': 'dao', '说': 'shuo',
-    '会': 'hui', '和': 'he', '也': 'ye', '后': 'hou', '过': 'guo', '自': 'zi',
-    '而': 'er', '前': 'qian', '他': 'ta', '这': 'zhe', '那': 'na', '里': 'li',
-    '看': 'kan', '听': 'ting', '写': 'xie', '读': 'du', '学': 'xue', '做': 'zuo',
-    '想': 'xiang', '知': 'zhi', '道': 'dao', '见': 'jian', '问': 'wen', '答': 'da',
-    '买': 'mai', '卖': 'mai', '吃': 'chi', '喝': 'he', '睡': 'shui', '走': 'zou',
-    '跑': 'pao', '飞': 'fei', '坐': 'zuo', '站': 'zhan', '停': 'ting', '等': 'deng',
-    '给': 'gei', '送': 'song', '拿': 'na', '放': 'fang', '找': 'zhao', '用': 'yong',
-    '开': 'kai', '关': 'guan', '闭': 'bi', '始': 'shi', '终': 'zhong',
-    '高': 'gao', '低': 'di', '大': 'da', '小': 'xiao', '多': 'duo', '少': 'shao',
-    '长': 'chang', '短': 'duan', '远': 'yuan', '近': 'jin', '新': 'xin', '旧': 'jiu',
-    '老': 'lao', '男': 'nan', '女': 'nv', '父': 'fu', '母': 'mu',
-    '子': 'zi', '儿': 'er', '兄': 'xiong', '弟': 'di', '姐': 'jie',
-    '妹': 'mei', '家': 'jia', '国': 'guo', '城': 'cheng', '市': 'shi', '村': 'cun',
-    '校': 'xiao', '公': 'gong', '司': 'si', '店': 'dian', '厂': 'chang',
-    '医': 'yi', '院': 'yuan', '银': 'yin', '行': 'xing', '餐': 'can', '馆': 'guan',
-    '酒': 'jiu', '宾': 'bin', '旅': 'lv', '游': 'you',
-    '景': 'jing', '区': 'qu', '园': 'yuan', '博': 'bo', '物': 'wu',
-    '书': 'shu', '电': 'dian', '影': 'ying',
-    '乐': 'yue', '体': 'ti', '育': 'yu', '场': 'chang', '健': 'jian',
-    '身': 'shen', '房': 'fang', '美': 'mei', '容': 'rong', '理': 'li',
-    '发': 'fa', '超': 'chao', '商': 'shang',
-    '百': 'bai', '货': 'huo', '楼': 'lou', '菜': 'cai',
-    '花': 'hua', '鸟': 'niao', '鱼': 'yu', '虫': 'chong', '猫': 'mao', '狗': 'gou',
-    '猪': 'zhu', '牛': 'niu', '羊': 'yang', '马': 'ma', '鸡': 'ji', '鸭': 'ya',
-    '鹅': 'e', '虎': 'hu', '狮': 'shi', '豹': 'bao', '熊': 'xiong', '狼': 'lang',
-    '狐': 'hu', '狸': 'li', '兔': 'tu', '鼠': 'shu', '蛇': 'she', '龙': 'long',
-    '凤': 'feng', '凰': 'huang', '鹤': 'he', '鹰': 'ying', '燕': 'yan', '雀': 'que',
-    '鸽': 'ge', '鹏': 'peng', '鸦': 'ya', '鹊': 'que', '莺': 'ying', '蝉': 'chan',
-    '蝶': 'die', '蜂': 'feng', '蚁': 'yi', '蚊': 'wen', '蝇': 'ying', '虾': 'xia',
-    '蟹': 'xie', '贝': 'bei', '鲸': 'jing', '鲨': 'sha', '豚': 'tun', '鳄': 'e',
-    '龟': 'gui', '鳖': 'bie', '螺': 'luo', '蚌': 'bang', '蚕': 'can', '蛹': 'yong',
-    '蛙': 'wa', '蟾': 'chan', '蝌': 'ke', '蚪': 'dou', '蚯': 'qiu', '蚓': 'yin',
-    '蛆': 'qu', '蛾': 'e', '萤': 'ying',
-    '天': 'tian', '日': 'ri', '月': 'yue', '星': 'xing', '辰': 'chen',
-    '云': 'yun', '雨': 'yu', '雪': 'xue', '风': 'feng', '雷': 'lei', '电': 'dian',
-    '雾': 'wu', '露': 'lu', '霜': 'shuang', '冰': 'bing', '雹': 'bao', '虹': 'hong',
-    '霞': 'xia', '晴': 'qing', '阴': 'yin', '阳': 'yang', '光': 'guang', '明': 'ming',
-    '暗': 'an', '黑': 'hei', '白': 'bai', '红': 'hong', '绿': 'lv',
-    '蓝': 'lan', '黄': 'huang', '紫': 'zi', '橙': 'cheng', '粉': 'fen', '灰': 'hui',
-    '金': 'jin', '银': 'yin', '铜': 'tong', '铁': 'tie', '钢': 'gang', '铝': 'lv',
-    '锡': 'xi', '铅': 'qian', '锌': 'xin', '汞': 'gong', '硫': 'liu', '磷': 'lin',
-    '硅': 'gui', '硼': 'peng', '碳': 'tan', '氮': 'dan', '氧': 'yang', '氢': 'qing',
-    '氦': 'hai', '锂': 'li', '铍': 'pi', '钠': 'na', '镁': 'mei', '钙': 'gai',
-    '山': 'shan', '河': 'he', '湖': 'hu', '海': 'hai', '江': 'jiang', '溪': 'xi',
-    '泉': 'quan', '瀑': 'pu', '潭': 'tan', '池': 'chi', '塘': 'tang', '沼': 'zhao',
-    '泽': 'ze', '洋': 'yang', '湾': 'wan', '港': 'gang', '岛': 'dao', '屿': 'yu',
-    '礁': 'jiao', '岩': 'yan', '石': 'shi', '土': 'tu', '沙': 'sha', '泥': 'ni',
-    '尘': 'chen', '埃': 'ai', '灰': 'hui', '炭': 'tan', '煤': 'mei', '柴': 'chai',
-    '草': 'cao', '木': 'mu', '树': 'shu', '林': 'lin', '森': 'sen',
-    '松': 'song', '柏': 'bai', '柳': 'liu', '杨': 'yang', '桃': 'tao', '李': 'li',
-    '杏': 'xing', '梅': 'mei', '梨': 'li', '枣': 'zao', '橘': 'ju', '柑': 'gan',
-    '橙': 'cheng', '柚': 'you', '檬': 'meng', '樱': 'ying', '蕉': 'jiao', '椰': 'ye',
-    '棕': 'zong', '榈': 'lv', '藤': 'teng', '蔓': 'man', '竹': 'zhu', '竿': 'gan',
-    '笋': 'sun', '芦': 'lu', '苇': 'wei', '蒲': 'pu', '蒿': 'hao', '艾': 'ai',
-    '莲': 'lian', '藕': 'ou', '菱': 'ling', '荷': 'he', '菊': 'ju',
-    '兰': 'lan', '桂': 'gui', '桐': 'tong',
-    '枫': 'feng', '橡': 'xiang', '樟': 'zhang', '楠': 'nan', '檀': 'tan', '槐': 'huai',
-    '榆': 'yu', '桑': 'sang', '椿': 'chun', '槿': 'jin', '榕': 'rong',
-    '杉': 'shan', '桦': 'hua',
-    '柿': 'shi', '栗': 'li',
-    '柠': 'ning', '枇': 'pi', '杷': 'pa', '荔': 'li', '枝': 'zhi', '芒': 'mang', '果': 'guo',
-    '榴': 'liu', '蓬': 'peng',
-    '蔗': 'zhe', '棉': 'mian', '麻': 'ma', '丝': 'si', '绸': 'chou', '缎': 'duan',
-    '纱': 'sha', '布': 'bu', '帛': 'bo', '锦': 'jin', '绣': 'xiu', '线': 'xian',
-    '针': 'zhen', '缝': 'feng', '纫': 'ren', '织': 'zhi', '编': 'bian', '结': 'jie',
-    '网': 'wang', '绳': 'sheng', '索': 'suo', '缆': 'lan', '弦': 'xian', '琴': 'qin',
-    '瑟': 'se', '琵': 'pi', '琶': 'pa', '筝': 'zheng', '笛': 'di', '箫': 'xiao',
-    '笙': 'sheng', '管': 'guan', '号': 'hao', '角': 'jiao', '鼓': 'gu', '锣': 'luo',
-    '钹': 'bo', '钟': 'zhong', '铃': 'ling', '铛': 'dang', '铎': 'duo', '磬': 'qing',
-    '革': 'ge',
-    '画': 'hua', '棋': 'qi', '牌': 'pai', '球': 'qiu', '棒': 'bang',
-    '杆': 'gan', '拍': 'pai', '篮': 'lan', '框': 'kuang', '桌': 'zhuo',
-    '椅': 'yi', '凳': 'deng', '床': 'chuang', '柜': 'gui', '箱': 'xiang', '盒': 'he',
-    '包': 'bao', '袋': 'dai', '瓶': 'ping', '罐': 'guan', '桶': 'tong', '盆': 'pen',
-    '碗': 'wan', '盘': 'pan', '碟': 'die', '杯': 'bei', '壶': 'hu', '锅': 'guo',
-    '勺': 'shao', '筷': 'kuai', '叉': 'cha', '刀': 'dao', '剑': 'jian', '枪': 'qiang',
-    '炮': 'pao', '弹': 'dan', '药': 'yao',
-    '纸': 'zhi', '笔': 'bi', '墨': 'mo', '砚': 'yan', '印': 'yin', '刷': 'shua',
-    '漆': 'qi', '胶': 'jiao', '蜡': 'la', '烛': 'zhu', '灯': 'deng', '火': 'huo',
-    '水': 'shui', '冰': 'bing', '油': 'you', '盐': 'yan', '酱': 'jiang', '醋': 'cu',
-    '茶': 'cha', '酒': 'jiu', '奶': 'nai', '糖': 'tang',
-    '米': 'mi', '面': 'mian', '粉': 'fen', '粥': 'zhou', '饭': 'fan',
-    '菜': 'cai', '汤': 'tang', '羹': 'geng', '糕': 'gao', '饼': 'bing', '饺': 'jiao',
-    '馒': 'man', '粽': 'zong', '元': 'yuan',
-    '宵': 'xiao', '蛋': 'dan', '肉': 'rou',
-    '禽': 'qin', '畜': 'chu', '兽': 'shou'
-};
-
-// 将中文字符串转换为完整拼音
-function textToPinyin(text) {
-    var result = '';
-    for (var i = 0; i < text.length; i++) {
-        var ch = text[i];
-        if (chinesePinyinMap[ch]) {
-            result += chinesePinyinMap[ch];
-        } else {
-            result += ch.toLowerCase();
-        }
-    }
-    return result;
+function compactForMatch(text) {
+    return normalizeForMatch(text).replace(/[\s\-_./\\:;'"`~!@#$%^&*+=|()[\]{}<>?，。；：、！？（）【】《》]+/g, '');
 }
 
-// 获取拼音首字母
-function textToPinyinInitials(text) {
-    var result = '';
-    for (var i = 0; i < text.length; i++) {
-        var ch = text[i];
-        if (chinesePinyinMap[ch]) {
-            result += chinesePinyinMap[ch][0];
-        } else {
-            result += ch.toLowerCase();
-        }
+var HAN_TEXT_RE = /[\u3400-\u9fff\uf900-\ufaff]/;
+var pinyinMatchCache = new Map();
+
+function hasHanText(text) {
+    return HAN_TEXT_RE.test(String(text || ''));
+}
+
+function pinyinParts(text) {
+    var key = String(text || '');
+    if (!key) return [];
+    if (pinyinMatchCache.has(key)) return pinyinMatchCache.get(key);
+
+    var parts = [];
+    try {
+        parts = pinyin(key, { toneType: 'none', type: 'array' }).map(function(part) {
+            return compactForMatch(part);
+        }).filter(Boolean);
+    } catch (error) {
+        parts = [];
     }
-    return result;
+
+    pinyinMatchCache.set(key, parts);
+    return parts;
+}
+
+function pinyinFull(text) {
+    return pinyinParts(text).join('');
+}
+
+function pinyinInitials(text) {
+    return pinyinParts(text).map(function(part) {
+        return part.charAt(0);
+    }).join('');
+}
+
+function queryInfo(query) {
+    var normalized = normalizeForMatch(query);
+    return {
+        raw: normalized,
+        compact: compactForMatch(normalized),
+        hasHan: hasHanText(normalized)
+    };
+}
+
+function scoreTextMatch(value, query, weights) {
+    if (!value || !query.compact) return -1;
+
+    var text = normalizeForMatch(value);
+    var compactText = compactForMatch(text);
+    if (!compactText) return -1;
+
+    if (text === query.raw || compactText === query.compact) {
+        return weights.exact;
+    }
+
+    if (compactText.indexOf(query.compact) === 0) {
+        return weights.prefix;
+    }
+
+    if (query.hasHan) {
+        if (compactText.indexOf(query.compact) !== -1) {
+            return weights.contains;
+        }
+        return -1;
+    }
+
+    if (!hasHanText(value)) return -1;
+
+    var full = pinyinFull(value);
+    if (full && full.indexOf(query.compact) === 0) {
+        return typeof weights.pinyin === 'number' ? weights.pinyin : weights.prefix;
+    }
+
+    var initials = pinyinInitials(value);
+    if (initials && initials.indexOf(query.compact) === 0) {
+        return typeof weights.initialPrefix === 'number' ? weights.initialPrefix : weights.prefix;
+    }
+    if (initials && initials.indexOf(query.compact) !== -1) {
+        return typeof weights.initialContains === 'number' ? weights.initialContains : Math.max(0, weights.prefix - 20);
+    }
+
+    return -1;
 }
 
 function scoreBuiltinItem(item, query) {
-    if (!query) return -1;
-
-    var q = normalizeForMatch(query);
-    var compactQ = q.replace(/\s+/g, '');
-    if (!compactQ) return -1;
+    var q = queryInfo(query);
+    if (!q.compact) return -1;
 
     var fields = [
-        { value: item.titleZh, exact: 280, prefix: 180 },
-        { value: item.titleEn, exact: 270, prefix: 170 },
-        { value: item.descriptionZh, exact: 90, prefix: 70 },
-        { value: item.descriptionEn, exact: 90, prefix: 70 },
-        { value: item.insertText, exact: 120, prefix: 90 }
+        { value: item.titleZh, exact: 520, prefix: 430, contains: 330, pinyin: 470, initialPrefix: 450, initialContains: 390 },
+        { value: item.titleEn, exact: 500, prefix: 410, contains: -1, pinyin: -1, initialPrefix: -1, initialContains: -1 },
+        { value: item.descriptionZh, exact: 230, prefix: 180, contains: 120, pinyin: 190, initialPrefix: 170, initialContains: 130 },
+        { value: item.descriptionEn, exact: 220, prefix: 170, contains: -1, pinyin: -1, initialPrefix: -1, initialContains: -1 },
+        { value: item.action, exact: 260, prefix: 210, contains: -1, pinyin: -1, initialPrefix: -1, initialContains: -1 },
+        { value: item.insertText, exact: 180, prefix: 140, contains: q.hasHan ? 90 : -1, pinyin: -1, initialPrefix: -1, initialContains: -1 }
     ];
 
     var best = -1;
 
     for (var i = 0; i < fields.length; i++) {
-        var fieldValue = fields[i].value;
-        if (!fieldValue) continue;
-        
-        var field = normalizeForMatch(fieldValue);
-        if (!field) continue;
-
-        var compactField = field.replace(/\s+/g, '');
-        
-        // 精确匹配
-        if (field === q || compactField === compactQ) {
-            best = Math.max(best, fields[i].exact);
-            continue;
-        }
-        
-        // 开头匹配（原文）
-        if (field.indexOf(q) === 0 || compactField.indexOf(compactQ) === 0) {
-            best = Math.max(best, fields[i].prefix);
-            continue;
-        }
-        
-        // 拼音开头匹配（对于中文文本）
-        if (/[一-龥]/.test(fieldValue)) {
-            // 完整拼音匹配标题时给非常高的加分
-            var pinyinFull = textToPinyin(fieldValue);
-            if (pinyinFull && pinyinFull.indexOf(compactQ) === 0) {
-                if (fields[i].value === item.titleZh) {
-                    best = Math.max(best, fields[i].prefix + 2000);
-                } else {
-                    best = Math.max(best, fields[i].prefix + 500);
-                }
-                continue;
-            }
-            // 拼音首字母匹配标题时给非常高的加分
-            var pinyinInitials = textToPinyinInitials(fieldValue);
-            if (pinyinInitials && pinyinInitials.indexOf(compactQ) === 0) {
-                if (fields[i].value === item.titleZh) {
-                    best = Math.max(best, fields[i].prefix + 1800);
-                } else {
-                    best = Math.max(best, fields[i].prefix + 400);
-                }
-                continue;
-            }
-        }
+        best = Math.max(best, scoreTextMatch(fields[i].value, q, fields[i]));
     }
 
     var aliases = Array.isArray(item.aliases) ? item.aliases : [];
     for (var j = 0; j < aliases.length; j++) {
-        var alias = normalizeForMatch(aliases[j]);
-        if (!alias) continue;
-
-        var compactAlias = alias.replace(/\s+/g, '');
-        
-        // 精确匹配
-        if (alias === q || compactAlias === compactQ) {
-            best = Math.max(best, 230);
-            continue;
-        }
-        
-        // 开头匹配
-        if (alias.indexOf(q) === 0 || compactAlias.indexOf(compactQ) === 0) {
-            best = Math.max(best, 170);
-            continue;
-        }
-        
-        // 拼音开头匹配（对于中文别名）
-        if (/[一-龥]/.test(aliases[j])) {
-            var pinyinFullAlias = textToPinyin(aliases[j]);
-            if (pinyinFullAlias && pinyinFullAlias.indexOf(compactQ) === 0) {
-                best = Math.max(best, 190);
-                continue;
-            }
-            var pinyinInitialsAlias = textToPinyinInitials(aliases[j]);
-            if (pinyinInitialsAlias && pinyinInitialsAlias.indexOf(compactQ) === 0) {
-                best = Math.max(best, 180);
-                continue;
-            }
-        }
+        best = Math.max(best, scoreTextMatch(aliases[j], q, {
+            exact: 420,
+            prefix: 340,
+            contains: 270,
+            pinyin: 360,
+            initialPrefix: 350,
+            initialContains: 310
+        }));
     }
 
     var keywords = Array.isArray(item.keywords) ? item.keywords : [];
     for (var k = 0; k < keywords.length; k++) {
-        var keyword = normalizeForMatch(keywords[k]);
-        if (!keyword) continue;
-
-        var compactKeyword = keyword.replace(/\s+/g, '');
-        
-        // 精确匹配
-        if (keyword === q || compactKeyword === compactQ) {
-            best = Math.max(best, 160);
-            continue;
-        }
-        
-        // 开头匹配
-        if (keyword.indexOf(q) === 0 || compactKeyword.indexOf(compactQ) === 0) {
-            best = Math.max(best, 120);
-            continue;
-        }
-        
-        // 拼音开头匹配（对于中文关键词）
-        if (/[一-龥]/.test(keywords[k])) {
-            var pinyinFullKw = textToPinyin(keywords[k]);
-            if (pinyinFullKw && pinyinFullKw.indexOf(compactQ) === 0) {
-                best = Math.max(best, 130);
-                continue;
-            }
-            var pinyinInitialsKw = textToPinyinInitials(keywords[k]);
-            if (pinyinInitialsKw && pinyinInitialsKw.indexOf(compactQ) === 0) {
-                best = Math.max(best, 120);
-                continue;
-            }
-        }
+        best = Math.max(best, scoreTextMatch(keywords[k], q, {
+            exact: 320,
+            prefix: 260,
+            contains: 190,
+            pinyin: 270,
+            initialPrefix: 250,
+            initialContains: 220
+        }));
     }
 
     return best;
 }
 
-async function searchBuiltinEntries(query, limit) {
+function searchSlashEntries(entries, query, limit) {
     if (!query) return [];
-
-    var entries = await loadBuiltinSlashEntries();
     if (!Array.isArray(entries) || !entries.length) return [];
 
     var matched = [];
@@ -1370,14 +1209,19 @@ async function searchBuiltinEntries(query, limit) {
     return matched.slice(0, typeof limit === 'number' ? limit : 80);
 }
 
+async function searchBuiltinEntries(query, limit) {
+    var entries = await loadBuiltinSlashEntries();
+    return searchSlashEntries(entries, query, limit);
+}
+
 function mergePaletteItems(primaryItems, secondaryItems, limit) {
     var merged = [];
     var seen = new Set();
 
     function keyOf(item) {
         if (!item) return '';
-        if (item.id) return 'id:' + item.id;
         if (item.action) return 'action:' + item.action + '|text:' + (item.insertText || '');
+        if (item.id) return 'id:' + item.id;
         return 'text:' + (item.title || item.titleZh || item.titleEn || '') + '|' + (item.insertText || '');
     }
 
