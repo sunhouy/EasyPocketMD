@@ -1040,37 +1040,63 @@
 
         const accounts = getSavedAccounts();
         const currentUsername = global.currentUser ? global.currentUser.username : null;
+        const isSingleAccount = accounts.length === 1;
 
         let html = '';
         accounts.forEach(function(account) {
             const isCurrent = account.username === currentUsername;
             html += '<div class="dropdown-item account-item" data-username="' + account.username + '" style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;cursor:pointer;' + (isCurrent ? 'background:#f0f7ff;' : '') + '">';
-            html += '<span style="display:flex;align-items:center;gap:8px;">';
+            html += '<span style="display:flex;align-items:center;gap:8px;flex:1;">';
             html += '<i class="fas fa-user-circle" style="color:#4a90e2;"></i> ';
             html += '<span>' + account.username + '</span>';
             if (isCurrent) {
                 html += '<span style="font-size:11px;color:#4a90e2;margin-left:4px;">(' + (isEn() ? 'Current' : '当前') + ')</span>';
             }
             html += '</span>';
-            if (!isCurrent) {
+            // 右侧按钮组
+            html += '<span style="display:flex;align-items:center;gap:4px;">';
+            // 设置按钮（所有账户都显示）
+            html += '<button class="account-settings-btn" data-username="' + account.username + '" style="background:none;border:none;cursor:pointer;padding:4px;color:#666;" title="' + t('userSettings') + '">';
+            html += '<i class="fas fa-cog"></i>';
+            html += '</button>';
+            // 移除按钮（只有一个账户时不显示）
+            if (!isSingleAccount) {
                 html += '<button class="remove-account-btn" data-username="' + account.username + '" style="background:none;border:none;cursor:pointer;padding:4px;color:#999;" title="' + t('removeAccount') + '">';
                 html += '<i class="fas fa-times"></i>';
                 html += '</button>';
             }
+            html += '</span>';
             html += '</div>';
         });
 
         container.innerHTML = html;
 
-        // 绑定点击事件
+        // 绑定点击事件（点击账户名切换账户）
         container.querySelectorAll('.account-item').forEach(function(item) {
             item.onclick = function(e) {
-                // 如果点击的是移除按钮，不触发切换
-                if (e.target.closest('.remove-account-btn')) return;
+                // 如果点击的是按钮，不触发切换
+                if (e.target.closest('.remove-account-btn') || e.target.closest('.account-settings-btn')) return;
 
                 const username = this.getAttribute('data-username');
                 if (username && username !== currentUsername) {
                     showSwitchAccountConfirm(username);
+                }
+            };
+        });
+
+        // 绑定设置按钮事件
+        container.querySelectorAll('.account-settings-btn').forEach(function(btn) {
+            btn.onclick = function(e) {
+                e.stopPropagation();
+                const username = this.getAttribute('data-username');
+                // 如果点击的是当前账户，直接打开设置
+                if (username === currentUsername) {
+                    showUserSettingsModal();
+                } else {
+                    // 切换到该账户后再打开设置
+                    showSwitchAccountConfirm(username);
+                    // 标记需要打开设置
+                    global._openSettingsAfterSwitch = true;
                 }
             };
         });
@@ -1193,8 +1219,16 @@
 
         // 7. 使用新账户登录
         try {
-            const result = await login(targetAccount.username, targetAccount.password);
+            const result = await verifyAccountCredentials(targetAccount.username, targetAccount.password);
             if (result.code === 200) {
+                // 设置当前用户
+                global.currentUser = {
+                    username: targetAccount.username,
+                    token: result.data.token,
+                    password: targetAccount.password
+                };
+                localStorage.setItem('vditor_user', JSON.stringify(global.currentUser));
+
                 global.showMessage(t('accountSwitched').replace('{username}', targetAccount.username), 'success');
 
                 // 8. 重新加载文件列表
@@ -1214,6 +1248,14 @@
                 // 11. 关闭下拉菜单
                 const dropdown = document.getElementById('userMenuDropdown');
                 if (dropdown) dropdown.classList.remove('show');
+
+                // 12. 如果需要，打开设置窗口
+                if (global._openSettingsAfterSwitch) {
+                    global._openSettingsAfterSwitch = false;
+                    setTimeout(function() {
+                        showUserSettingsModal();
+                    }, 300);
+                }
             } else {
                 global.showMessage(t('accountAddFailed') + ': ' + result.message, 'error');
             }
