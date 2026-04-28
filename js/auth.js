@@ -1262,6 +1262,23 @@
         }
     }
 
+    // 验证账户凭据（用于添加账户）
+    async function verifyAccountCredentials(username, password) {
+        try {
+            const apiUrl = (global.getApiBaseUrl ? global.getApiBaseUrl() : 'api') + '/auth/login';
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: username, password: password })
+            });
+            const result = global.parseJsonResponse ? await global.parseJsonResponse(response) : await response.json();
+            return result;
+        } catch (error) {
+            console.error('验证账户失败:', error);
+            return { code: 500, message: t('networkErrorPleaseRetry') };
+        }
+    }
+
     // 处理添加账户
     async function handleAddAccount() {
         const usernameInput = document.getElementById('addAccountUsername');
@@ -1291,13 +1308,21 @@
 
         // 验证账户
         try {
-            const result = await login(username, password);
+            const result = await verifyAccountCredentials(username, password);
             if (result.code === 200) {
                 // 添加账户到列表
                 addAccountToList(username, password);
 
                 // 如果当前没有登录用户，切换到新账户
                 if (!global.currentUser) {
+                    // 设置当前用户
+                    global.currentUser = {
+                        username: username,
+                        token: result.data.token,
+                        password: password
+                    };
+                    localStorage.setItem('vditor_user', JSON.stringify(global.currentUser));
+
                     global.showMessage(t('accountAddedSuccess'), 'success');
                     hideAddAccountModal();
                     showUserInfo();
@@ -1306,15 +1331,6 @@
                     // 如果已有登录用户，保持当前用户，只添加账户到列表
                     global.showMessage(t('accountAddedSuccess'), 'success');
                     hideAddAccountModal();
-                    // 恢复原来的用户状态
-                    const currentAccount = accounts.find(acc => acc.username === global.currentUser.username);
-                    if (currentAccount) {
-                        global.currentUser = {
-                            ...global.currentUser,
-                            password: currentAccount.password
-                        };
-                        localStorage.setItem('vditor_user', JSON.stringify(global.currentUser));
-                    }
                 }
 
                 // 刷新账户列表
