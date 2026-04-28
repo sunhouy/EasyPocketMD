@@ -11,7 +11,14 @@ import {LexicalComposer} from '@lexical/react/LexicalComposer';
 import {ContentEditable} from '@lexical/react/LexicalContentEditable';
 import {LexicalErrorBoundary} from '@lexical/react/LexicalErrorBoundary';
 import {HistoryPlugin} from '@lexical/react/LexicalHistoryPlugin';
+import {LinkPlugin} from '@lexical/react/LexicalLinkPlugin';
+import {ListPlugin} from '@lexical/react/LexicalListPlugin';
+import {MarkdownShortcutPlugin} from '@lexical/react/LexicalMarkdownShortcutPlugin';
 import {RichTextPlugin} from '@lexical/react/LexicalRichTextPlugin';
+import {CodeNode} from '@lexical/code';
+import {LinkNode} from '@lexical/link';
+import {ListItemNode, ListNode} from '@lexical/list';
+import {HeadingNode, QuoteNode} from '@lexical/rich-text';
 import {
   $isTextNode,
   DOMConversionMap,
@@ -29,6 +36,9 @@ import ExampleTheme from './ExampleTheme';
 import ToolbarPlugin from './plugins/ToolBarPlugin';
 import TreeViewPlugin from './plugins/TreeVIewPlugin';
 import {parseAllowedColor, parseAllowedFontSize} from './styleConfig';
+import {getMarkdownTransformers} from './markdown/transformers';
+
+import './style.css';
 
 const placeholder = 'Enter some rich text...';
 
@@ -61,8 +71,7 @@ const exportMap: DOMExportOutputMap = new Map<
 ]);
 
 const getExtraStyles = (element: HTMLElement): string => {
-  // Parse styles from pasted input, but only if they match exactly the
-  // sort of styles that would be produced by exportDOM
+  // 粘贴输入的样式，只有当它们完全匹配导出DOM时才会被解析
   let extraStyles = '';
   const fontSize = parseAllowedFontSize(element.style.fontSize);
   const backgroundColor = parseAllowedColor(element.style.backgroundColor);
@@ -82,18 +91,17 @@ const getExtraStyles = (element: HTMLElement): string => {
 const constructImportMap = (): DOMConversionMap => {
   const importMap: DOMConversionMap = {};
 
-  // Wrap all TextNode importers with a function that also imports
-  // the custom styles implemented by the playground
+  // 用一个函数包装所有TextNode导入器，这个函数也会导入自定义样式
   for (const [tag, fn] of Object.entries(TextNode.importDOM() || {})) {
     importMap[tag] = (importNode) => {
-      const importer = fn(importNode);
+      const importer = fn(importNode);// 导入节点
       if (!importer) {
         return null;
       }
       return {
         ...importer,
-        conversion: (element) => {
-          const output = importer.conversion(element);
+        conversion: (element) => {// 转换元素
+          const output = importer.conversion(element);// 转换输出
           if (
             output === null ||
             output.forChild === undefined ||
@@ -102,15 +110,15 @@ const constructImportMap = (): DOMConversionMap => {
           ) {
             return output;
           }
-          const extraStyles = getExtraStyles(element);
+          const extraStyles = getExtraStyles(element);// 获取额外样式
           if (extraStyles) {
             const {forChild} = output;
             return {
               ...output,
               forChild: (child, parent) => {
-                const textNode = forChild(child, parent);
+                const textNode = forChild(child, parent);// 获取文本节点
                 if ($isTextNode(textNode)) {
-                  textNode.setStyle(textNode.getStyle() + extraStyles);
+                  textNode.setStyle(textNode.getStyle() + extraStyles);// 设置文本节点样式
                 }
                 return textNode;
               },
@@ -131,14 +139,23 @@ const editorConfig = {
     import: constructImportMap(),
   },
   namespace: 'React.js Demo',
-  nodes: [ParagraphNode, TextNode],
+  nodes: [
+    ParagraphNode,
+    TextNode,
+    HeadingNode,
+    QuoteNode,
+    ListNode,
+    ListItemNode,
+    LinkNode,
+    CodeNode,
+  ],
   onError(error: Error) {
     throw error;
   },
   theme: ExampleTheme,
 };
 
-export default function App() {
+export default function Editor() {
   return (
     <LexicalComposer initialConfig={editorConfig}>
       <div className="editor-container">
@@ -157,6 +174,11 @@ export default function App() {
             ErrorBoundary={LexicalErrorBoundary}
           />
           <HistoryPlugin />
+          <ListPlugin />
+          <LinkPlugin />
+          <MarkdownShortcutPlugin
+            transformers={getMarkdownTransformers('basic')}
+          />
           <AutoFocusPlugin />
           <TreeViewPlugin />
         </div>
