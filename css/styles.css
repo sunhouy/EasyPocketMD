@@ -114,6 +114,12 @@ body.tauri-mobile-safe-area .status-bar-placeholder {
     background-color: #ffffff !important;
 }
 
+/* React 根节点占满编辑区（Vditor 挂载在 #react-root 内，需完整高度链） */
+#react-root {
+    width: 100%;
+    height: 100%;
+}
+
 body.ui-mode-mobile .editor-container {
     bottom: var(--mobile-bottom-bar-height);
 }
