@@ -88,7 +88,7 @@ describe('UserModel', () => {
             expect(result.message).toBe('注册成功');
             expect(mockConnection.execute).toHaveBeenCalledWith(
                 expect.stringContaining('INSERT INTO users'),
-                ['newuser', 'hashed_password', null]
+                ['newuser', 'hashed_password', null, 0]
             );
         });
 
