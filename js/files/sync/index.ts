@@ -120,10 +120,19 @@ export function createSyncRuntimeApi(ctx: any) {
 
         try {
           const api = globalRef.getApiBaseUrl ? globalRef.getApiBaseUrl() : 'api';
+          
+          let contentToSend = content;
+          if (globalRef.currentUser && globalRef.currentUser.e2e_enabled && contentToSend && file.type !== 'folder') {
+            try {
+              const e2e = await import('../../e2e.js');
+              contentToSend = await e2e.encrypt(contentToSend, globalRef.currentUser.password);
+            } catch(e) { console.error('E2E Encrypt Error', e); }
+          }
+
           const requestBody: any = {
             username: g('currentUser').username,
             filename: filenameToSend,
-            content: content,
+            content: contentToSend,
             base_last_modified: baseLastModified,
           };
           const baseContentForCrdt =
@@ -262,11 +271,21 @@ export function createSyncRuntimeApi(ctx: any) {
 
     markPendingServerSync(currentFileId, true);
 
+    let contentToSend = content;
+    if (g('currentUser') && g('currentUser').e2e_enabled && window.e2eEncryptSync) {
+      try {
+        const encrypted = window.e2eEncryptSync(contentToSend, g('currentUser').password);
+        if (encrypted && encrypted !== contentToSend) {
+          contentToSend = encrypted;
+        }
+      } catch(e) {}
+    }
+
     const body: any = {
       username: g('currentUser').username,
       token: g('currentUser').token,
       filename: file.name,
-      content: content,
+      content: contentToSend,
       base_last_modified: file.serverLastModified || null,
     };
     const beaconBaseContent =

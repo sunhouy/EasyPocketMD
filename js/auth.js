@@ -829,6 +829,7 @@
         const username = document.getElementById('registerUsername')?.value.trim();
         const password = document.getElementById('registerPassword')?.value.trim();
         const inviteCode = document.getElementById('registerInviteCode')?.value.trim();
+        const e2eEnabled = document.getElementById('registerEnableE2E')?.checked || false;
         const message = document.getElementById('registerMessage');
 
         if (!username || !password) {
@@ -863,7 +864,7 @@
         setButtonLoading('registerSubmitBtn', true, 'registerLoading');
 
         try {
-            const requestBody = { username: username, password: password };
+            const requestBody = { username: username, password: password, e2e_enabled: e2eEnabled };
             if (inviteCode) requestBody.invite_code = inviteCode;
 
             const apiUrl = (global.getApiBaseUrl ? global.getApiBaseUrl() : 'api') + '/auth/register';
@@ -1627,3 +1628,60 @@
     global.confirmSwitchAccount = confirmSwitchAccount;
 
 })(typeof window !== 'undefined' ? window : this);
+    
+    // 初始化时监听端到端加密设置更改
+    window.addEventListener('DOMContentLoaded', () => {
+        const e2eCheckbox = document.getElementById('settingsEnableE2E');
+        if (e2eCheckbox) {
+            e2eCheckbox.addEventListener('change', async function() {
+                if (!global.currentUser || !global.currentUser.token) {
+                    this.checked = false;
+                    global.showMessage('请先登录以设置端到端加密', 'error');
+                    return;
+                }
+                
+                const isEnabled = this.checked;
+                
+                // 弹窗确认密码或者直接用currentUser.password？
+                if (isEnabled && !global.currentUser.password) {
+                    global.showMessage('需要登录密码作为加密密钥，请重新登录', 'error');
+                    this.checked = false;
+                    return;
+                }
+                
+                try {
+                    const apiUrl = (global.getApiBaseUrl ? global.getApiBaseUrl() : 'api') + '/auth/update_e2e';
+                    const response = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            username: global.currentUser.username,
+                            token: global.currentUser.token,
+                            e2e_enabled: isEnabled
+                        })
+                    });
+                    
+                    const result = await response.json();
+                    if (result.code === 200) {
+                        global.currentUser.e2e_enabled = isEnabled ? 1 : 0;
+                        global.showMessage(isEnabled ? '端到端加密已开启' : '端到端加密已关闭', 'success');
+                    } else {
+                        throw new Error(result.message);
+                    }
+                } catch(e) {
+                    this.checked = !isEnabled;
+                    global.showMessage('设置端到端加密失败: ' + e.message, 'error');
+                }
+            });
+        }
+        
+        // 每次打开设置弹窗时同步状态
+        const settingsBtn = document.getElementById('desktopSettingsBtn');
+        if (settingsBtn) {
+            settingsBtn.addEventListener('click', () => {
+                if (e2eCheckbox && global.currentUser) {
+                    e2eCheckbox.checked = !!global.currentUser.e2e_enabled;
+                }
+            });
+        }
+    });

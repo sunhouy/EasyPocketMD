@@ -1432,10 +1432,18 @@ import {
 
             if (result.code === 200 && result.data && result.data.files) {
                 // 对服务器返回的文件名进行标准化（去除开头的 /）
-                let serverFiles = result.data.files.map(f => {
+                let serverFiles = await Promise.all(result.data.files.map(async f => {
                     let type = 'file';
                     let content = f.content;
                     let name = f.name.startsWith('/') ? f.name.substring(1) : f.name;
+
+                    if (window.currentUser && window.currentUser.e2e_enabled && content) {
+                        try {
+                            const e2e = await import('../e2e.js');
+                            const decrypted = await e2e.decrypt(content, window.currentUser.password);
+                            if (decrypted !== null) content = decrypted;
+                        } catch(e) { console.error('E2E Decrypt Error', e); }
+                    }
 
                     // 检查是否为文件夹：以 / 结尾，或者内容包含特定标记
                     if (name.endsWith('/') || content === '{"meta":"folder"}' || content === '{"type":"folder"}') {
@@ -1461,7 +1469,7 @@ import {
                         serverLastModified: serverLastModified,
                         contentVersion: hasServerContentVersion ? Number(f.content_version ?? f.contentVersion) : null
                     };
-                });
+                }));
 
                 // 第二遍扫描：如果一个项是其他项的父级，强制将其设为文件夹
                 const folderPaths = new Set();
@@ -1610,7 +1618,20 @@ import {
         const result = global.parseJsonResponse ? await global.parseJsonResponse(response) : await response.json();
         if (result.code !== 200 || !result.data || !Array.isArray(result.data.files)) return;
 
-        const serverFiles = result.data.files.map(normalizeServerFileRecord);
+        let initialServerFiles = result.data.files;
+        if (window.currentUser && window.currentUser.e2e_enabled) {
+            initialServerFiles = await Promise.all(initialServerFiles.map(async f => {
+                if (f.content) {
+                    try {
+                        const e2e = await import('../e2e.js');
+                        const decrypted = await e2e.decrypt(f.content, window.currentUser.password);
+                        if (decrypted !== null) f.content = decrypted;
+                    } catch(e) { console.error(e); }
+                }
+                return f;
+            }));
+        }
+        const serverFiles = initialServerFiles.map(normalizeServerFileRecord);
         const serverMap = {};
         serverFiles.forEach(function(sf) {
             serverMap[sf.name] = sf;
@@ -4437,7 +4458,21 @@ import {
                 }
             }
 
-            return (result.code === 200 && result.data && result.data.history) ? result.data.history : [];
+            let histories = (result.code === 200 && result.data && result.data.history) ? result.data.history : [];
+            
+            if (window.currentUser && window.currentUser.e2e_enabled && histories.length > 0) {
+                histories = await Promise.all(histories.map(async h => {
+                    if (h.content) {
+                        try {
+                            const e2e = await import('../e2e.js');
+                            const decrypted = await e2e.decrypt(h.content, window.currentUser.password);
+                            if (decrypted !== null) h.content = decrypted;
+                        } catch(e) {}
+                    }
+                    return h;
+                }));
+            }
+            return histories;
         } catch (e) {
             console.error('获取历史版本失败', e);
             // 如果是 Token 错误，显示友好提示

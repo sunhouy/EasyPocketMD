@@ -36,11 +36,11 @@ const upload = multer({
 
 // Register
 router.post('/register', async (req, res) => {
-    const { username, password, invite_code } = req.body;
+    const { username, password, invite_code, e2e_enabled } = req.body;
     if (!username || !password) {
         return res.json({ code: 400, message: '缺少必要参数' });
     }
-    const result = await userModel.register(username, password, invite_code);
+    const result = await userModel.register(username, password, invite_code, e2e_enabled ? 1 : 0);
     res.json(result);
 });
 
@@ -112,6 +112,20 @@ router.post('/verify', async (req, res) => {
         return res.json({ code: 400, message: '缺少必要参数' });
     }
     const result = await verifyTokenOrPassword(userModel, { username, token });
+    res.json(result);
+});
+
+// Update E2E
+router.post('/update_e2e', async (req, res) => {
+    const { username, token, e2e_enabled } = req.body;
+    if (!username || !token || e2e_enabled === undefined) {
+        return res.json({ code: 400, message: '缺少必要参数' });
+    }
+    const verified = await verifyTokenOrPassword(userModel, { username, token });
+    if (verified.code !== 200) {
+        return res.json({ code: 401, message: '身份验证失败' });
+    }
+    const result = await userModel.updateE2E(username, e2e_enabled ? 1 : 0);
     res.json(result);
 });
 
