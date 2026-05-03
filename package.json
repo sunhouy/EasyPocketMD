@@ -84,7 +84,7 @@
     "pptxgenjs": "^4.0.1",
     "sensitive-word-filter": "^1.0.2",
     "sharp": "^0.34.5",
-    "uuid": "^9.0.1",
+    "uuid": "^14.0.0",
     "wkhtmltopdf": "^0.4.0",
     "ws": "^8.18.0",
     "xlsx": "^0.18.5",
