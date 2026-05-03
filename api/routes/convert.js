@@ -259,7 +259,7 @@ router.post('/ocr', async (req, res) => {
         const imageUrl = String(req.body && req.body.imageUrl ? req.body.imageUrl : '').trim();
         const lang = String(req.body && req.body.lang ? req.body.lang : 'chi_tra+chi_sim+eng').trim();
         const fallbackOcrApi = String(req.body && req.body.fallbackOcrApi ? req.body.fallbackOcrApi : '').trim();
-        const ocrApi = process.env.OCR_API_URL || fallbackOcrApi || 'https://ocr.yhsun.cn/';
+        const ocrApi = 'https://ocr.yhsun.cn/';
 
         if (!imageUrl) {
             return res.status(400).json({
