@@ -26,6 +26,9 @@
 *.tar   binary
 *.gz    binary
 
+wasm_text_engine/js/text-engine-client.js linguist-language=C++
+wasm_text_engine/js/text-engine-client.js linguist-language=C++
+
 # 标记生成的文件
 package-lock.json    linguist-generated
 yarn.lock            linguist-generated

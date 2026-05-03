@@ -45,7 +45,7 @@ class User {
     }
 
     // Register user
-    async register(username, password, inviteCode = null) {
+    async register(username, password, inviteCode = null, e2eEnabled = 0) {
         // Validate username: 3-20 characters, only letters and numbers
         const usernameRegex = /^[a-zA-Z0-9]{3,20}$/;
         if (!usernameRegex.test(username)) {
@@ -79,7 +79,7 @@ class User {
             }
 
             // Insert user
-            await connection.execute('INSERT INTO users (username, password, inviter) VALUES (?, ?, ?)', [username, hashedPassword, inviteCode]);
+            await connection.execute('INSERT INTO users (username, password, inviter, e2e_enabled) VALUES (?, ?, ?, ?)', [username, hashedPassword, inviteCode, e2eEnabled]);
 
             const today = new Date().toISOString().split('T')[0];
 
@@ -131,7 +131,7 @@ class User {
     // Login
     async login(username, password) {
         try {
-            const [rows] = await db.execute('SELECT * FROM users WHERE username = ?', [username]);
+            const [rows] = await db.execute('SELECT id, username, password, is_member, expire_date, created_at, last_login, login_count, avatar, e2e_enabled FROM users WHERE username = ?', [username]);
             if (rows.length === 0) {
                 return { code: 401, message: '用户名不存在' };
             }
@@ -156,6 +156,7 @@ class User {
                     is_member: user.is_member,
                     last_login: user.last_login,
                     login_count: user.login_count + 1,
+                    e2e_enabled: user.e2e_enabled,
                     token: token
                 }
             };
@@ -167,7 +168,7 @@ class User {
     // Check member status
     async checkMemberStatus(username) {
         try {
-            const [rows] = await db.execute('SELECT is_member, expire_date, created_at, last_login FROM users WHERE username = ?', [username]);
+            const [rows] = await db.execute('SELECT is_member, expire_date, created_at, last_login, e2e_enabled FROM users WHERE username = ?', [username]);
             if (rows.length === 0) {
                 return { code: 404, message: '用户不存在' };
             }
@@ -181,7 +182,8 @@ class User {
                     is_member: user.is_member,
                     expire_date: user.expire_date,
                     created_at: user.created_at,
-                    last_login: user.last_login
+                    last_login: user.last_login,
+                    e2e_enabled: user.e2e_enabled
                 }
             };
         } catch (error) {
@@ -416,6 +418,16 @@ class User {
             };
         } catch (error) {
             return { code: 500, message: '获取头像失败: ' + error.message };
+        }
+    }
+
+    // Update e2e enabled status
+    async updateE2E(username, e2eEnabled) {
+        try {
+            await db.execute('UPDATE users SET e2e_enabled = ? WHERE username = ?', [e2eEnabled, username]);
+            return { code: 200, message: '端到端加密状态已更新', data: { e2e_enabled: e2eEnabled } };
+        } catch (error) {
+            return { code: 500, message: '更新失败: ' + error.message };
         }
     }
 

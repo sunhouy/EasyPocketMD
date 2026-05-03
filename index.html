@@ -281,6 +281,12 @@
                 <label for="registerInviteCode" data-i18n="inviteCode">邀请码 (可选)</label>
                 <input type="text" id="registerInviteCode" data-i18n-placeholder="enterInviteCode" placeholder="可选">
             </div>
+            <div class="form-group enable-e2e-group" style="display: flex; align-items: center; justify-content: flex-start; gap: 8px;">
+                <input type="checkbox" id="registerEnableE2E" name="registerEnableE2E" style="width: auto; margin: 0;">
+                <label for="registerEnableE2E" style="margin: 0; font-weight: normal; cursor: pointer;">
+                    启用端到端加密 <br><small style="color: #888;">(内容将被加密同步，提升隐私安全)</small>
+                </label>
+            </div>
             <div class="modal-message" id="registerMessage"></div>
             <div class="modal-actions">
                 <button class="modal-btn primary full-width" id="registerSubmitBtn">
@@ -561,6 +567,15 @@
                                 <label><input type="radio" name="storageLocation" value="cloud"> <span data-i18n="storageCloud">云端存储</span></label>
                                 <label><input type="radio" name="storageLocation" value="local"> <span data-i18n="storageLocal">本地存储</span></label>
                             </div>
+                        </div>
+                    </li>
+                    <li class="settings-list-item" id="e2eSettingContainer">
+                        <div class="form-group">
+                            <label>端到端加密设置</label>
+                            <div class="checkbox-group">
+                                <label><input type="checkbox" id="settingsEnableE2E"> <span>启用端到端加密 (当前客户端将在同步前对文件加密)</span></label>
+                            </div>
+                            <p style="font-size:12px;color:#666;margin-top:4px;">注意：开启后请保管好您的登录密码，一旦密码丢失将无法解密服务器上的文件内容。</p>
                         </div>
                     </li>
                     <li class="settings-list-item">

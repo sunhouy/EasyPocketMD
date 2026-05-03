@@ -206,7 +206,8 @@ CREATE TABLE `users` (
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `last_login` timestamp NULL DEFAULT NULL,
   `login_count` int(11) DEFAULT '0',
-  `avatar` varchar(255) DEFAULT NULL COMMENT '用户头像路径'
+  `avatar` varchar(255) DEFAULT NULL COMMENT '用户头像路径',
+  `e2e_enabled` tinyint(4) DEFAULT '0' COMMENT '0: 未开启端到端加密, 1: 已开启端到端加密'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- --------------------------------------------------------
