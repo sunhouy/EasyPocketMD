@@ -5237,7 +5237,19 @@ import {
             return await readFileAsText(file);
         }
 
-        if (/\.(pdf|doc|docx|ppt|pptx|xls|xlsx)$/i.test(lowerName)) {
+        // .doc / .ppt / .xls 保留本地转换（旧格式二进制文件，markitdown 支持不佳）
+        if (/\.doc$/i.test(lowerName)) {
+            return await convertDocToMarkdown(file);
+        }
+        if (/\.ppt$/i.test(lowerName)) {
+            return await convertPptToMarkdown(file);
+        }
+        if (/\.xls$/i.test(lowerName)) {
+            return await convertXlsToMarkdown(file);
+        }
+
+        // .pdf / .docx / .pptx / .xlsx 等使用后端 markitdown 转换
+        if (/\.(pdf|docx|pptx|xlsx)$/i.test(lowerName)) {
             return await convertImportedFileWithBackend(file);
         }
 
@@ -5257,7 +5269,7 @@ import {
                 console.warn('后端 PPTX 导入失败，回退到本地解析:', error);
                 return await convertPptxToMarkdown(file);
             }
-            if (/\.(xls|xlsx)$/i.test(lowerName)) {
+            if (/\.xlsx$/i.test(lowerName)) {
                 console.warn('后端 Excel 导入失败，回退到本地解析:', error);
                 return await convertXlsToMarkdown(file);
             }
@@ -5414,6 +5426,70 @@ import {
         });
 
         return mdParts.join('\n');
+    }
+
+    async function convertDocToMarkdown(file) {
+        const arrayBuffer = await file.arrayBuffer();
+        const bytes = new Uint8Array(arrayBuffer);
+        var text = extractTextFromBinary(bytes);
+        if (!text || !text.trim()) {
+            throw new Error(isEn() ? 'The DOC file appears to be empty or cannot be read' : 'DOC 文件内容为空或无法读取');
+        }
+        return '# ' + stripKnownExtension(file.name) + '\n\n' + text.trim();
+    }
+
+    async function convertPptToMarkdown(file) {
+        const arrayBuffer = await file.arrayBuffer();
+        const bytes = new Uint8Array(arrayBuffer);
+        var text = extractTextFromBinary(bytes);
+        if (!text || !text.trim()) {
+            throw new Error(isEn() ? 'The PPT file appears to be empty or cannot be read' : 'PPT 文件内容为空或无法读取');
+        }
+        var lines = text.split(/\r?\n/).filter(function(line) { return line.trim(); });
+        var result = ['# ' + stripKnownExtension(file.name)];
+        lines.forEach(function(line) {
+            result.push('- ' + line.trim());
+        });
+        return result.join('\n');
+    }
+
+    function extractTextFromBinary(bytes) {
+        var chunks = [];
+        var i = 0;
+        while (i < bytes.length) {
+            if (bytes[i] >= 32 && bytes[i] < 127) {
+                var start = i;
+                while (i < bytes.length && bytes[i] >= 32 && bytes[i] < 127) {
+                    i++;
+                }
+                if (i - start >= 3) {
+                    var str = '';
+                    for (var j = start; j < i; j++) {
+                        str += String.fromCharCode(bytes[j]);
+                    }
+                    chunks.push(str);
+                } else {
+                    i++;
+                }
+            } else if (bytes[i] === 0 && i + 1 < bytes.length) {
+                var start = i;
+                while (i + 1 < bytes.length && bytes[i] === 0 && bytes[i + 1] >= 32 && bytes[i + 1] < 127) {
+                    i += 2;
+                }
+                if ((i - start) / 2 >= 3) {
+                    var str = '';
+                    for (var j = start; j < i; j += 2) {
+                        str += String.fromCharCode(bytes[j + 1]);
+                    }
+                    chunks.push(str);
+                } else {
+                    i++;
+                }
+            } else {
+                i++;
+            }
+        }
+        return chunks.join(' ').replace(/\s+/g, ' ').trim();
     }
 
     function readFileAsText(file) {
