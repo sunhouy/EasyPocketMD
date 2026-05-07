@@ -101,7 +101,6 @@ const userFilesRoutes = require('./routes/user_files');
 const pptExportRoutes = require('./routes/ppt-export');
 const pexelsRoutes = require('./routes/pexels');
 const gatusRoutes = require('./routes/gatus');
-const notificationRoutes = require('./routes/notification');
 const shareManager = require('./models/ShareManager');
 const { initShareCollabServer } = require('./realtime/shareCollabServer');
 
@@ -154,9 +153,6 @@ app.use('/api', apiLimiter, legacyRoutes);
 // Gatus monitoring routes - no rate limiting for monitoring
 app.use('/api/v1', gatusRoutes);
 app.use('/api/gatus', gatusRoutes);
-
-// Notification routes - for task status and notifications
-app.use('/api/notifications', notificationRoutes);
 
 // Try to find the dist folder in multiple locations
 const potentialDistPaths = [

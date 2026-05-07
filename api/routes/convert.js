@@ -11,7 +11,6 @@ const fsp = require('fs/promises');
 const os = require('os');
 const { spawn } = require('child_process');
 const { v4: uuidv4 } = require('uuid');
-const notificationService = require('../services/notification');
 
 // Initialize markdown-it with common options
 const md = markdownIt({
@@ -98,12 +97,12 @@ router.post('/markdown', (req, res) => {
     }
 });
 
-router.post('/pdf', async (req, res) => {
+router.post('/pdf', (req, res) => {
     let writeStream = null;
     let pdfStream = null;
 
     try {
-        let { html, settings, background, userId, filename: customFilename } = req.body;
+        let { html, settings } = req.body;
 
         if (!html) {
             return res.status(400).json({
@@ -114,9 +113,11 @@ router.post('/pdf', async (req, res) => {
 
         html = cleanMathJaxContent(html);
 
+        // 处理字体设置
         const titleFont = settings?.titleFont || 'SimHei';
         const bodyFont = settings?.bodyFont || 'SimSun';
 
+        // 注入字体样式到HTML
         html = html.replace(
             /<style>/i,
             `<style>
@@ -125,73 +126,16 @@ router.post('/pdf', async (req, res) => {
             `
         );
 
-        const taskId = uuidv4();
-        const fileName = customFilename || `${taskId}.pdf`;
+        const filename = `${uuidv4()}.pdf`;
         const uploadDir = path.join(__dirname, '../../uploads');
 
         if (!fs.existsSync(uploadDir)) {
             fs.mkdirSync(uploadDir, { recursive: true });
         }
 
-        const filePath = path.join(uploadDir, fileName);
-        const fileUrl = `/uploads/${fileName}`;
+        const filePath = path.join(uploadDir, filename);
+        const fileUrl = `/uploads/${filename}`;
 
-        if (background && userId) {
-            notificationService.updateTask(taskId, {
-                status: 'processing',
-                progress: 10,
-                progressMessage: '正在生成PDF...',
-                metadata: { ...req.body, taskId, fileUrl, fileName }
-            });
-
-            setImmediate(async () => {
-                try {
-                    await generatePdfAsync(filePath, html, settings, taskId, userId, fileUrl, fileName);
-                } catch (error) {
-                    console.error('[PDF] Background generation error:', error);
-                    await notificationService.updateTask(taskId, {
-                        status: 'failed',
-                        progress: 0,
-                        progressMessage: error.message
-                    });
-                    await notificationService.notifyTaskFailed(userId, {
-                        id: taskId,
-                        type: 'pdf_export',
-                        error: error.message
-                    });
-                }
-            });
-
-            return res.json({
-                code: 202,
-                message: 'PDF generation started in background',
-                taskId: taskId,
-                statusUrl: `/api/notifications/tasks/${taskId}`
-            });
-        }
-
-        await generatePdfAsync(filePath, html, settings, null, null, fileUrl, fileName);
-        
-        return res.json({
-            code: 200,
-            message: 'PDF generated successfully',
-            url: fileUrl
-        });
-
-    } catch (error) {
-        console.error('PDF conversion endpoint error:', error);
-        if (writeStream) writeStream.destroy();
-        if (pdfStream) pdfStream.destroy();
-        return res.status(500).json({
-            code: 500,
-            message: 'Server error during PDF conversion',
-            error: error.message
-        });
-    }
-});
-
-async function generatePdfAsync(filePath, html, settings, taskId, userId, fileUrl, fileName) {
-    return new Promise((resolve, reject) => {
         const options = {
             pageSize: 'A4',
             marginTop: settings?.pageMargin ? `${settings.pageMargin}mm` : '15mm',
@@ -205,86 +149,110 @@ async function generatePdfAsync(filePath, html, settings, taskId, userId, fileUr
             imageDpi: 150
         };
 
-        const writeStream = fs.createWriteStream(filePath);
-        const pdfStream = wkhtmltopdf(html, options);
+        writeStream = fs.createWriteStream(filePath);
+        pdfStream = wkhtmltopdf(html, options);
+        
+        const cleanup = () => {
+            if (pdfStream) {
+                pdfStream.destroy();
+                pdfStream = null;
+            }
+            if (writeStream) {
+                writeStream.destroy();
+                writeStream = null;
+            }
+        };
 
         pdfStream.on('error', (err) => {
             console.error('[PDF Debug] wkhtmltopdf command error:', err);
-            writeStream.destroy();
-            reject(err);
+            cleanup();
+            if (!res.headersSent) {
+                res.status(500).json({
+                    code: 500,
+                    message: 'PDF generation failed (command error)',
+                    error: err.message
+                });
+            }
+            if (fs.existsSync(filePath)) {
+                fs.unlink(filePath, () => {});
+            }
         });
 
         writeStream.on('error', (err) => {
             console.error('[PDF Debug] writeStream error:', err);
-            pdfStream.destroy();
-            reject(err);
+            cleanup();
+            if (!res.headersSent) {
+                res.status(500).json({
+                    code: 500,
+                    message: 'PDF generation failed (stream error)',
+                    error: err.message
+                });
+            }
         });
 
         pdfStream.pipe(writeStream)
-            .on('finish', async () => {
+            .on('finish', () => {
                 if (fs.existsSync(filePath)) {
                     const stats = fs.statSync(filePath);
                     if (stats.size > 0) {
-                        if (taskId && userId) {
-                            await notificationService.updateTask(taskId, {
-                                status: 'completed',
-                                progress: 100,
-                                progressMessage: 'PDF生成完成',
-                                result: { url: fileUrl, filename: fileName }
-                            });
-                            await notificationService.notifyTaskComplete(userId, {
-                                id: taskId,
-                                type: 'pdf_export',
-                                result: { url: fileUrl, filename: fileName }
+                        if (!res.headersSent) {
+                            res.json({
+                                code: 200,
+                                message: 'PDF generated successfully',
+                                url: fileUrl
                             });
                         }
-                        resolve({ url: fileUrl });
                     } else {
-                        const error = new Error('PDF generation failed: file is empty');
-                        if (taskId && userId) {
-                            await notificationService.updateTask(taskId, {
-                                status: 'failed',
-                                progress: 0,
-                                progressMessage: error.message
-                            });
-                            await notificationService.notifyTaskFailed(userId, {
-                                id: taskId,
-                                type: 'pdf_export',
-                                error: error.message
+                        console.error('[PDF Debug] PDF generation failed: file is empty');
+                        cleanup();
+                        fs.unlink(filePath, () => {});
+                        if (!res.headersSent) {
+                            res.status(500).json({
+                                code: 500,
+                                message: 'PDF generation failed: file is empty'
                             });
                         }
-                        reject(error);
                     }
                 } else {
-                    const error = new Error('PDF generation failed: file not found');
-                    if (taskId && userId) {
-                        await notificationService.updateTask(taskId, {
-                            status: 'failed',
-                            progress: 0,
-                            progressMessage: error.message
+                    console.error('[PDF Debug] PDF generation failed: file not found');
+                    cleanup();
+                    if (!res.headersSent) {
+                        res.status(500).json({
+                            code: 500,
+                            message: 'PDF generation failed: file not found'
                         });
                     }
-                    reject(error);
                 }
             });
 
         const timeout = setTimeout(() => {
-            pdfStream.destroy();
-            writeStream.destroy();
-            const error = new Error('PDF generation timeout');
-            if (taskId && userId) {
-                notificationService.updateTask(taskId, {
-                    status: 'failed',
-                    progress: 0,
-                    progressMessage: error.message
+            if (!res.headersSent) {
+                cleanup();
+                if (fs.existsSync(filePath)) {
+                    fs.unlink(filePath, () => {});
+                }
+                res.status(504).json({
+                    code: 504,
+                    message: 'PDF generation timeout'
                 });
             }
-            reject(error);
         }, 120000);
 
-        writeStream.on('finish', () => clearTimeout(timeout));
-    });
-}
+        res.on('finish', () => {
+            clearTimeout(timeout);
+        });
+
+    } catch (error) {
+        console.error('PDF conversion endpoint error:', error);
+        if (writeStream) writeStream.destroy();
+        if (pdfStream) pdfStream.destroy();
+        return res.status(500).json({
+            code: 500,
+            message: 'Server error during PDF conversion',
+            error: error.message
+        });
+    }
+});
 
 router.post('/ocr', async (req, res) => {
     try {
@@ -820,7 +788,7 @@ async function postProcessDocxFonts(docxBuffer, titleFont, bodyFont) {
 // Word (DOCX) Conversion endpoint (Pandoc)
 router.post('/docx', async (req, res) => {
     try {
-        const { markdown, referenceDocx, settings, background, userId, filename: customFilename } = req.body || {};
+        const { markdown, referenceDocx, settings } = req.body || {};
 
         if (!markdown || typeof markdown !== 'string') {
             return res.status(400).json({
@@ -833,6 +801,7 @@ router.post('/docx', async (req, res) => {
         const docxMathMode = String(docxSettings.docxMathMode || '').toLowerCase();
         const useNativeMath = docxMathMode !== 'svg' && docxMathMode !== 'html';
 
+        // 转换设置值为正确的类型
         const titleFontSize = parseFloat(docxSettings.titleFontSize) || 24;
         const bodyFontSize = parseFloat(docxSettings.bodyFontSize) || 12;
         const h1Size = parseFloat(docxSettings.h1Size) || (titleFontSize * 2);
@@ -859,84 +828,14 @@ router.post('/docx', async (req, res) => {
                 : 'html'
         };
 
-        const taskId = uuidv4();
-        const fileName = customFilename || `document_${new Date().toISOString().slice(0, 10)}.docx`;
-
-        if (background && userId) {
-            notificationService.updateTask(taskId, {
-                status: 'processing',
-                progress: 10,
-                progressMessage: '正在生成Word文档...',
-                metadata: { ...req.body, taskId, fileName }
-            });
-
-            setImmediate(async () => {
-                try {
-                    await notificationService.updateTask(taskId, {
-                        progress: 30,
-                        progressMessage: '正在转换格式...'
-                    });
-
-                    const docxBuffer = useNativeMath
-                        ? await runPandocDocx(normalizeDocxMarkdown(markdown), pandocOptions)
-                        : await runPandocDocx(buildDocxStyledHtml(markdown, docxSettings), pandocOptions);
-
-                    await notificationService.updateTask(taskId, {
-                        progress: 80,
-                        progressMessage: '正在保存文件...'
-                    });
-
-                    const uploadDir = path.join(__dirname, '../../uploads');
-                    if (!fs.existsSync(uploadDir)) {
-                        fs.mkdirSync(uploadDir, { recursive: true });
-                    }
-
-                    const filePath = path.join(uploadDir, fileName);
-                    await fsp.writeFile(filePath, docxBuffer);
-                    const fileUrl = `/uploads/${fileName}`;
-
-                    await notificationService.updateTask(taskId, {
-                        status: 'completed',
-                        progress: 100,
-                        progressMessage: 'Word文档生成完成',
-                        result: { url: fileUrl, filename: fileName }
-                    });
-
-                    await notificationService.notifyTaskComplete(userId, {
-                        id: taskId,
-                        type: 'docx_export',
-                        result: { url: fileUrl, filename: fileName }
-                    });
-
-                } catch (error) {
-                    console.error('[DOCX] Background generation error:', error);
-                    await notificationService.updateTask(taskId, {
-                        status: 'failed',
-                        progress: 0,
-                        progressMessage: error.message
-                    });
-                    await notificationService.notifyTaskFailed(userId, {
-                        id: taskId,
-                        type: 'docx_export',
-                        error: error.message
-                    });
-                }
-            });
-
-            return res.json({
-                code: 202,
-                message: 'DOCX generation started in background',
-                taskId: taskId,
-                statusUrl: `/api/notifications/tasks/${taskId}`
-            });
-        }
-
         const docxBuffer = useNativeMath
             ? await runPandocDocx(normalizeDocxMarkdown(markdown), pandocOptions)
             : await runPandocDocx(buildDocxStyledHtml(markdown, docxSettings), pandocOptions);
 
+        const filename = `document_${new Date().toISOString().slice(0, 10)}.docx`;
+
         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
-        res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(fileName)}"`);
+        res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`);
         return res.status(200).send(docxBuffer);
     } catch (error) {
         console.error('DOCX conversion endpoint error:', error);
