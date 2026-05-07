@@ -85,7 +85,6 @@ async function exportContent() {
     var nightMode = g('nightMode') === true;
     var bg = nightMode ? '#2d2d2d' : 'white';
     var textColor = nightMode ? '#eee' : '#333';
-    var borderColor = nightMode ? '#444' : '#ddd';
 
     var modal = document.createElement('div');
     modal.className = 'modal-overlay';
@@ -464,67 +463,12 @@ async function exportFile(content, ext) {
 
     // PDF 处理逻辑
     if (ext === 'pdf') {
-        // 懒加载打印模块
         if (typeof global.showPrintDialog !== 'function') {
             await import('./print.js');
         }
         global.hideMobileActionSheet();
-        global.showPrintDialog('export-pdf', async function(settings) {
-            try {
-                var loadingModal = document.createElement('div');
-                loadingModal.className = 'modal-overlay';
-                loadingModal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.9);z-index:10001;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;';
-                loadingModal.innerHTML = '<div style="background:white;color:#333;border-radius:12px;padding:30px;text-align:center;"><div style="font-size:24px;margin-bottom:15px;"><i class="fas fa-spinner fa-spin"></i></div><div style="font-size:16px;">' + (isEn() ? 'Generating PDF...' : '生成PDF中...') + '</div></div>';
-                document.body.appendChild(loadingModal);
-
-                if (!global.preparePrintContent) {
-                    throw new Error(isEn() ? 'Print module not loaded' : '打印模块未加载');
-                }
-                var htmlContent = await global.preparePrintContent(content, settings);
-
-                // 懒加载 PDF 生成器并生成PDF
-                const { generatePDF } = await getPDFGenerator();
-                var pdfUrl = await generatePDF(htmlContent, settings);
-
-                loadingModal.remove();
-
-                // 显示文件名输入对话框
-                showFilenameDialog(defaultFileName, 'pdf', async function(filename) {
-                    var fullFilename = filename + '.pdf';
-
-                    if (window.nativeFileOps && window.nativeFileOps.isTauriRuntime()) {
-                        await window.nativeFileOps.saveFile({ url: pdfUrl }, {
-                            filename: fullFilename,
-                            mimeType: 'application/pdf'
-                        });
-                        global.showMessage(isEn() ? 'Document exported as .pdf' : '文档已导出为.pdf格式');
-                        return;
-                    }
-
-                    // 确保pdfUrl是完整且可下载的URL
-                    var fullPdfUrl = global.resolveResourceUrl
-                        ? global.resolveResourceUrl(pdfUrl, getResourceResolveBase())
-                        : pdfUrl;
-
-                    // 创建下载链接
-                    var a = document.createElement('a');
-                    a.href = fullPdfUrl;
-                    a.download = fullFilename;
-                    a.target = '_blank'; // 新窗口打开以防下载失败
-                    document.body.appendChild(a);
-                    a.click();
-
-                    setTimeout(function() {
-                        document.body.removeChild(a);
-                    }, 100);
-
-                    global.showMessage(isEn() ? 'Document exported as .pdf' : '文档已导出为.pdf格式');
-                });
-            } catch (error) {
-                console.error('PDF导出错误:', error);
-                global.showMessage((isEn() ? 'PDF export failed: ' : 'PDF导出失败: ') + error.message);
-                if (loadingModal) loadingModal.remove();
-            }
+        global.showPrintDialog('export-pdf', function(settings) {
+            showExportModeDialog(content, ext, 'PDF', settings);
         });
         return;
     }
@@ -603,21 +547,12 @@ async function exportFile(content, ext) {
 
     // DOCX 导出逻辑
     if (ext === 'docx') {
-        // 懒加载打印模块（如果未加载）
         if (typeof global.showPrintDialog !== 'function') {
             await import('./print.js');
         }
         global.hideMobileActionSheet();
-        // 显示打印设置对话框，让用户配置导出选项
-        global.showPrintDialog('export-docx', async function(settings) {
-            // 懒加载 DOCX 生成器
-            if (typeof global.exportDOCX !== 'function') {
-                await import('./docx-generator.js');
-            }
-            // 显示文件名输入对话框，然后导出
-            showFilenameDialog(defaultFileName, 'docx', async function(filename) {
-                await global.exportDOCX(content, settings, filename);
-            });
+        global.showPrintDialog('export-docx', function(settings) {
+            showExportModeDialog(content, ext, 'Word', settings);
         });
         return;
     }
