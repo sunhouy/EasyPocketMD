@@ -91,7 +91,7 @@ router.post('/layout', async (req, res) => {
         }
 
         const requestBody = JSON.stringify({
-            model: "qwen-turbo",
+            model: "deepseek-v4-pro",
             input: {
                 messages: [
                     {
@@ -182,7 +182,7 @@ Provide 5-10 most relevant formulas. Only return the formula list, no explanatio
             : `搜索与"${keyword}"相关的LaTeX公式`;
 
         const requestBody = JSON.stringify({
-            model: "qwen-turbo",
+            model: "deepseek-v4-pro",
             input: {
                 messages: [
                     {
@@ -273,7 +273,7 @@ emoji | english_name | chinese_name
             : `搜索与"${keyword}"相关的表情`;
 
         const requestBody = JSON.stringify({
-            model: 'qwen-turbo',
+            model: 'deepseek-v4-pro',
             input: {
                 messages: [
                     {
@@ -380,7 +380,7 @@ sequenceDiagram
             : `生成与"${keyword}"相关的Mermaid图表模板`;
 
         const requestBody = JSON.stringify({
-            model: "qwen-turbo",
+            model: "deepseek-v4-pro",
             input: {
                 messages: [
                     {
@@ -444,7 +444,7 @@ router.post('/generate', async (req, res) => {
         }
 
         const requestBody = JSON.stringify({
-            model: "qwen-turbo",
+            model: "deepseek-v4-pro",
             input: {
                 messages: [
                     {
@@ -546,7 +546,7 @@ Provide 5-10 most relevant Markdown examples. Only return the list, no explanati
             : `搜索与"${keyword}"相关的Markdown代码示例`;
 
         const requestBody = JSON.stringify({
-            model: "qwen-turbo",
+            model: "deepseek-v4-pro",
             input: {
                 messages: [
                     {
