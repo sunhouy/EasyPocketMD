@@ -144,17 +144,10 @@ async function exportContent() {
     document.addEventListener('keydown', handleKeydown);
 }
 
-function showExportModeDialog(content, ext, formatName) {
+function showExportModeDialog(content, ext, formatName, settings) {
     var nightMode = g('nightMode') === true;
     var bg = nightMode ? '#2d2d2d' : 'white';
     var textColor = nightMode ? '#eee' : '#333';
-
-    var isSlowExport = (ext === 'pdf' || ext === 'docx');
-
-    if (!isSlowExport) {
-        exportFile(content, ext);
-        return;
-    }
 
     var modal = document.createElement('div');
     modal.className = 'modal-overlay';
@@ -170,7 +163,7 @@ function showExportModeDialog(content, ext, formatName) {
     container.appendChild(closeBtn);
 
     var title = document.createElement('h2');
-    title.textContent = formatName;
+    title.textContent = formatName + ' ' + (isEn() ? 'Export' : '导出');
     title.style.cssText = 'text-align:center;margin-bottom:15px;margin-top:0;font-size:18px;font-weight:600;';
     container.appendChild(title);
 
@@ -216,9 +209,9 @@ function showExportModeDialog(content, ext, formatName) {
             modal.remove();
             setTimeout(function() {
                 if (opt.value === 'background') {
-                    exportFileBackground(content, ext);
+                    exportFileBackground(content, ext, settings);
                 } else {
-                    exportFile(content, ext);
+                    exportFileWithSettings(content, ext, settings);
                 }
             }, 50);
         };
@@ -236,7 +229,7 @@ function showExportModeDialog(content, ext, formatName) {
     });
 }
 
-async function exportFileBackground(content, ext) {
+async function exportFileBackground(content, ext, settings) {
     var nightMode = g('nightMode') === true;
     var loadingModal = document.createElement('div');
     loadingModal.className = 'modal-overlay';
@@ -245,7 +238,7 @@ async function exportFileBackground(content, ext) {
     document.body.appendChild(loadingModal);
 
     try {
-        await initExportBackground(content, ext);
+        await initExportBackground(content, ext, settings);
         loadingModal.remove();
         global.showMessage(isEn() ? 'Background export started. You\'ll be notified when done.' : '后台导出已启动，完成后会通知您。', 'success');
     } catch (error) {
@@ -255,7 +248,7 @@ async function exportFileBackground(content, ext) {
     }
 }
 
-async function initExportBackground(content, ext) {
+async function initExportBackground(content, ext, settings) {
     if (typeof global.notificationService === 'undefined') {
         await import('./notification.js');
     }
@@ -270,64 +263,16 @@ async function initExportBackground(content, ext) {
     var defaultFileName = getCurrentFileName();
     var fileName = defaultFileName + '.' + ext;
 
-    if (ext === 'pdf' || ext === 'docx') {
-        var settings = { pageMargin: 15 };
-        
-        if (ext === 'pdf') {
-            if (typeof global.showPrintDialog !== 'function') {
-                await import('./print.js');
-            }
-            global.hideMobileActionSheet();
+    if (ext === 'pdf') {
+        if (typeof global.preparePrintContent === 'function') {
+            var htmlContent = await global.preparePrintContent(content, settings);
             
-            await new Promise(function(resolve) {
-                global.showPrintDialog('export-pdf', function(printSettings) {
-                    Object.assign(settings, printSettings);
-                    resolve();
-                });
-            });
-
-            if (typeof global.preparePrintContent === 'function') {
-                var htmlContent = await global.preparePrintContent(content, settings);
-                
-                var apiUrl = (g('getApiBaseUrl') ? g('getApiBaseUrl')() : '/api');
-                var response = await fetch(apiUrl + '/convert/pdf', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        html: htmlContent,
-                        settings: settings,
-                        background: true,
-                        userId: userId,
-                        filename: fileName
-                    })
-                });
-
-                var result = await response.json();
-                if (result.code === 202) {
-                    global.notificationService.startPollingTask(result.taskId);
-                } else {
-                    throw new Error(result.message || 'Export failed');
-                }
-            }
-        } else if (ext === 'docx') {
-            if (typeof global.showPrintDialog !== 'function') {
-                await import('./print.js');
-            }
-            global.hideMobileActionSheet();
-            
-            await new Promise(function(resolve) {
-                global.showPrintDialog('export-docx', function(printSettings) {
-                    Object.assign(settings, printSettings);
-                    resolve();
-                });
-            });
-
             var apiUrl = (g('getApiBaseUrl') ? g('getApiBaseUrl')() : '/api');
-            var response = await fetch(apiUrl + '/convert/docx', {
+            var response = await fetch(apiUrl + '/convert/pdf', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    markdown: content,
+                    html: htmlContent,
                     settings: settings,
                     background: true,
                     userId: userId,
@@ -342,6 +287,86 @@ async function initExportBackground(content, ext) {
                 throw new Error(result.message || 'Export failed');
             }
         }
+    } else if (ext === 'docx') {
+        var apiUrl = (g('getApiBaseUrl') ? g('getApiBaseUrl')() : '/api');
+        var response = await fetch(apiUrl + '/convert/docx', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                markdown: content,
+                settings: settings,
+                background: true,
+                userId: userId,
+                filename: fileName
+            })
+        });
+
+        var result = await response.json();
+        if (result.code === 202) {
+            global.notificationService.startPollingTask(result.taskId);
+        } else {
+            throw new Error(result.message || 'Export failed');
+        }
+    }
+}
+
+async function exportFileWithSettings(content, ext, settings) {
+    var defaultFileName = getCurrentFileName();
+
+    if (ext === 'pdf') {
+        if (typeof global.preparePrintContent !== 'function') {
+            global.showMessage(isEn() ? 'Print module not loaded' : '打印模块未加载', 'error');
+            return;
+        }
+
+        var nightMode = g('nightMode') === true;
+        var loadingModal = document.createElement('div');
+        loadingModal.className = 'modal-overlay';
+        loadingModal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.9);z-index:10001;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;';
+        loadingModal.innerHTML = '<div style="background:' + (nightMode ? '#2d2d2d' : 'white') + ';color:' + (nightMode ? '#eee' : '#333') + ';border-radius:12px;padding:30px;text-align:center;"><div style="font-size:24px;margin-bottom:15px;"><i class="fas fa-spinner fa-spin"></i></div><div style="font-size:16px;">' + (isEn() ? 'Generating PDF...' : '生成PDF中...') + '</div></div>';
+        document.body.appendChild(loadingModal);
+
+        try {
+            var htmlContent = await global.preparePrintContent(content, settings);
+            const { generatePDF } = await getPDFGenerator();
+            var pdfUrl = await generatePDF(htmlContent, settings);
+            loadingModal.remove();
+
+            showFilenameDialog(defaultFileName, 'pdf', function(filename) {
+                var fullFilename = filename + '.pdf';
+                if (window.nativeFileOps && window.nativeFileOps.isTauriRuntime()) {
+                    window.nativeFileOps.saveFile({ url: pdfUrl }, {
+                        filename: fullFilename,
+                        mimeType: 'application/pdf'
+                    });
+                    global.showMessage(isEn() ? 'Document exported as .pdf' : '文档已导出为.pdf格式');
+                    return;
+                }
+
+                var fullPdfUrl = global.resolveResourceUrl
+                    ? global.resolveResourceUrl(pdfUrl, getResourceResolveBase())
+                    : pdfUrl;
+                var a = document.createElement('a');
+                a.href = fullPdfUrl;
+                a.download = fullFilename;
+                a.target = '_blank';
+                document.body.appendChild(a);
+                a.click();
+                setTimeout(function() { document.body.removeChild(a); }, 100);
+                global.showMessage(isEn() ? 'Document exported as .pdf' : '文档已导出为.pdf格式');
+            });
+        } catch (error) {
+            console.error('PDF export error:', error);
+            global.showMessage((isEn() ? 'PDF export failed: ' : 'PDF导出失败: ') + error.message);
+            loadingModal.remove();
+        }
+    } else if (ext === 'docx') {
+        if (typeof global.exportDOCX !== 'function') {
+            await import('./docx-generator.js');
+        }
+        showFilenameDialog(defaultFileName, 'docx', function(filename) {
+            global.exportDOCX(content, settings, filename);
+        });
     }
 }
 
@@ -461,67 +486,12 @@ async function exportFile(content, ext) {
 
     // PDF 处理逻辑
     if (ext === 'pdf') {
-        // 懒加载打印模块
         if (typeof global.showPrintDialog !== 'function') {
             await import('./print.js');
         }
         global.hideMobileActionSheet();
-        global.showPrintDialog('export-pdf', async function(settings) {
-            try {
-                var loadingModal = document.createElement('div');
-                loadingModal.className = 'modal-overlay';
-                loadingModal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.9);z-index:10001;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;';
-                loadingModal.innerHTML = '<div style="background:white;color:#333;border-radius:12px;padding:30px;text-align:center;"><div style="font-size:24px;margin-bottom:15px;"><i class="fas fa-spinner fa-spin"></i></div><div style="font-size:16px;">' + (isEn() ? 'Generating PDF...' : '生成PDF中...') + '</div></div>';
-                document.body.appendChild(loadingModal);
-
-                if (!global.preparePrintContent) {
-                    throw new Error(isEn() ? 'Print module not loaded' : '打印模块未加载');
-                }
-                var htmlContent = await global.preparePrintContent(content, settings);
-
-                // 懒加载 PDF 生成器并生成PDF
-                const { generatePDF } = await getPDFGenerator();
-                var pdfUrl = await generatePDF(htmlContent, settings);
-
-                loadingModal.remove();
-
-                // 显示文件名输入对话框
-                showFilenameDialog(defaultFileName, 'pdf', async function(filename) {
-                    var fullFilename = filename + '.pdf';
-
-                    if (window.nativeFileOps && window.nativeFileOps.isTauriRuntime()) {
-                        await window.nativeFileOps.saveFile({ url: pdfUrl }, {
-                            filename: fullFilename,
-                            mimeType: 'application/pdf'
-                        });
-                        global.showMessage(isEn() ? 'Document exported as .pdf' : '文档已导出为.pdf格式');
-                        return;
-                    }
-
-                    // 确保pdfUrl是完整且可下载的URL
-                    var fullPdfUrl = global.resolveResourceUrl
-                        ? global.resolveResourceUrl(pdfUrl, getResourceResolveBase())
-                        : pdfUrl;
-
-                    // 创建下载链接
-                    var a = document.createElement('a');
-                    a.href = fullPdfUrl;
-                    a.download = fullFilename;
-                    a.target = '_blank'; // 新窗口打开以防下载失败
-                    document.body.appendChild(a);
-                    a.click();
-
-                    setTimeout(function() {
-                        document.body.removeChild(a);
-                    }, 100);
-
-                    global.showMessage(isEn() ? 'Document exported as .pdf' : '文档已导出为.pdf格式');
-                });
-            } catch (error) {
-                console.error('PDF导出错误:', error);
-                global.showMessage((isEn() ? 'PDF export failed: ' : 'PDF导出失败: ') + error.message);
-                if (loadingModal) loadingModal.remove();
-            }
+        global.showPrintDialog('export-pdf', function(settings) {
+            showExportModeDialog(content, ext, 'PDF', settings);
         });
         return;
     }
@@ -600,21 +570,12 @@ async function exportFile(content, ext) {
 
     // DOCX 导出逻辑
     if (ext === 'docx') {
-        // 懒加载打印模块（如果未加载）
         if (typeof global.showPrintDialog !== 'function') {
             await import('./print.js');
         }
         global.hideMobileActionSheet();
-        // 显示打印设置对话框，让用户配置导出选项
-        global.showPrintDialog('export-docx', async function(settings) {
-            // 懒加载 DOCX 生成器
-            if (typeof global.exportDOCX !== 'function') {
-                await import('./docx-generator.js');
-            }
-            // 显示文件名输入对话框，然后导出
-            showFilenameDialog(defaultFileName, 'docx', async function(filename) {
-                await global.exportDOCX(content, settings, filename);
-            });
+        global.showPrintDialog('export-docx', function(settings) {
+            showExportModeDialog(content, ext, 'Word', settings);
         });
         return;
     }
