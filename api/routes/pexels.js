@@ -48,7 +48,7 @@ router.post('/extract-keywords', async (req, res) => {
 标题"数据分析" -> data analytics, dashboard, statistics`;
 
         const requestBody = JSON.stringify({
-            model: "qwen-turbo",
+            model: "deepseek-v4-pro",
             input: {
                 messages: [
                     {
