@@ -75,17 +75,16 @@ async function exportContent() {
 
     var content = g('vditor').getValue();
     var formats = [
-        { name: isEn() ? 'Markdown File (.md)' : 'Markdown文件 (.md)', ext: 'md', icon: '<i class="fas fa-file-code"></i>', slow: false },
-        { name: isEn() ? 'Plain Text File (.txt)' : '纯文本文件 (.txt)', ext: 'txt', icon: '<i class="fas fa-file-alt"></i>', slow: false },
-        { name: isEn() ? 'HTML File (.html)' : 'HTML文件 (.html)', ext: 'html', icon: '<i class="fab fa-html5"></i>', slow: false },
-        { name: isEn() ? 'Word File (.docx)' : 'Word文档 (.docx)', ext: 'docx', icon: '<i class="fas fa-file-word"></i>', slow: true },
-        { name: isEn() ? 'PDF File (.pdf)' : 'PDF文件 (.pdf)', ext: 'pdf', icon: '<i class="fas fa-file-pdf"></i>', slow: true }
+        { name: isEn() ? 'Markdown File (.md)' : 'Markdown文件 (.md)', ext: 'md', icon: '<i class="fas fa-file-code"></i>' },
+        { name: isEn() ? 'Plain Text File (.txt)' : '纯文本文件 (.txt)', ext: 'txt', icon: '<i class="fas fa-file-alt"></i>' },
+        { name: isEn() ? 'HTML File (.html)' : 'HTML文件 (.html)', ext: 'html', icon: '<i class="fab fa-html5"></i>' },
+        { name: isEn() ? 'Word File (.docx)' : 'Word文档 (.docx)', ext: 'docx', icon: '<i class="fas fa-file-word"></i>' },
+        { name: isEn() ? 'PDF File (.pdf)' : 'PDF文件 (.pdf)', ext: 'pdf', icon: '<i class="fas fa-file-pdf"></i>' }
     ];
 
     var nightMode = g('nightMode') === true;
     var bg = nightMode ? '#2d2d2d' : 'white';
     var textColor = nightMode ? '#eee' : '#333';
-    var borderColor = nightMode ? '#444' : '#ddd';
 
     var modal = document.createElement('div');
     modal.className = 'modal-overlay';
@@ -108,11 +107,7 @@ async function exportContent() {
     formats.forEach(function(f) {
         var optionBtn = document.createElement('button');
         optionBtn.style.cssText = 'display:flex;align-items:center;width:100%;padding:15px 20px;background:' + (nightMode ? '#3d3d3d' : '#f5f5f5') + ';border:none;border-radius:8px;margin-bottom:10px;text-align:left;font-size:16px;color:' + textColor + ';cursor:pointer;transition:background 0.2s;';
-        
-        var iconHtml = '<span style="font-size:20px;margin-right:15px;width:30px;text-align:center;color:#4a90e2;">' + f.icon + '</span>';
-        var nameHtml = '<span>' + f.name + '</span>';
-        var slowBadge = f.slow ? '<span style="margin-left:auto;font-size:11px;padding:3px 8px;background:#f39c12;color:white;border-radius:10px;">' + (isEn() ? 'Slow' : '耗时') + '</span>' : '';
-        optionBtn.innerHTML = iconHtml + nameHtml + slowBadge;
+        optionBtn.innerHTML = '<span style="font-size:20px;margin-right:15px;width:30px;text-align:center;color:#4a90e2;">' + f.icon + '</span><span>' + f.name + '</span>';
 
         optionBtn.onmouseenter = function() {
             this.style.background = nightMode ? '#4d4d4d' : '#e8e8e8';
@@ -123,13 +118,9 @@ async function exportContent() {
 
         optionBtn.onclick = function() {
             modal.remove();
-            if (f.slow) {
+            setTimeout(function() {
                 showExportModeDialog(content, f.ext, f.name);
-            } else {
-                setTimeout(function() {
-                    exportFile(content, f.ext);
-                }, 50);
-            }
+            }, 50);
         };
 
         container.appendChild(optionBtn);
@@ -157,14 +148,20 @@ function showExportModeDialog(content, ext, formatName) {
     var nightMode = g('nightMode') === true;
     var bg = nightMode ? '#2d2d2d' : 'white';
     var textColor = nightMode ? '#eee' : '#333';
-    var borderColor = nightMode ? '#444' : '#ddd';
+
+    var isSlowExport = (ext === 'pdf' || ext === 'docx');
+
+    if (!isSlowExport) {
+        exportFile(content, ext);
+        return;
+    }
 
     var modal = document.createElement('div');
     modal.className = 'modal-overlay';
     modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:100110;';
 
     var container = document.createElement('div');
-    container.style.cssText = 'background:' + bg + ';color:' + textColor + ';border-radius:12px;padding:25px;width:90%;max-width:450px;position:relative;';
+    container.style.cssText = 'background:' + bg + ';color:' + textColor + ';border-radius:12px;padding:25px;width:90%;max-width:400px;position:relative;';
 
     var closeBtn = document.createElement('button');
     closeBtn.innerHTML = '<i class="fas fa-times"></i>';
