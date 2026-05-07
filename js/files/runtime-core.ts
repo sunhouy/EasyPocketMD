@@ -5237,32 +5237,21 @@ import {
             return await readFileAsText(file);
         }
 
-        if (/\.(pdf|doc|docx|ppt|pptx|xls|xlsx)$/i.test(lowerName)) {
-            return await convertImportedFileWithBackend(file);
+        if (/\.docx$/i.test(lowerName)) {
+            return await convertDocxToMarkdown(file);
+        }
+        if (/\.pptx$/i.test(lowerName)) {
+            return await convertPptxToMarkdown(file);
+        }
+        if (/\.(xls|xlsx)$/i.test(lowerName)) {
+            return await convertXlsToMarkdown(file);
+        }
+
+        if (/\.(pdf|doc|ppt)$/i.test(lowerName)) {
+            return await requestBackendImport(file);
         }
 
         throw new Error(isEn() ? 'Unsupported file type' : '不支持的文件类型');
-    }
-
-    async function convertImportedFileWithBackend(file) {
-        try {
-            return await requestBackendImport(file);
-        } catch (error) {
-            var lowerName = (file.name || '').toLowerCase();
-            if (/\.docx$/i.test(lowerName)) {
-                console.warn('后端 DOCX 导入失败，回退到本地解析:', error);
-                return await convertDocxToMarkdown(file);
-            }
-            if (/\.pptx$/i.test(lowerName)) {
-                console.warn('后端 PPTX 导入失败，回退到本地解析:', error);
-                return await convertPptxToMarkdown(file);
-            }
-            if (/\.(xls|xlsx)$/i.test(lowerName)) {
-                console.warn('后端 Excel 导入失败，回退到本地解析:', error);
-                return await convertXlsToMarkdown(file);
-            }
-            throw error;
-        }
     }
 
     async function requestBackendImport(file) {
