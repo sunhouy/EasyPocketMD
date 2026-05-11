@@ -1730,6 +1730,13 @@ document.addEventListener('DOMContentLoaded', function() {
             closeDrop();
         });
 
+        // 字数统计按钮
+        var mobileWordCountBtn = document.getElementById('mobileWordCountBtn');
+        if (mobileWordCountBtn) mobileWordCountBtn.addEventListener('click', function() {
+            window.showWordCountDialog();
+            closeDrop();
+        });
+
         var mobilePrintBtn = document.getElementById('mobilePrintBtn');
         if (mobilePrintBtn) mobilePrintBtn.addEventListener('click', async function() {
             if (typeof window.showPrintDialog !== 'function') {
@@ -1907,6 +1914,10 @@ document.addEventListener('DOMContentLoaded', function() {
             if (typeof window.showFindDialog === 'function') {
                 window.showFindDialog();
             }
+            closeDesktopDrop();
+        });
+        bindDesktopButton('desktopWordCountBtn', function() {
+            window.showWordCountDialog();
             closeDesktopDrop();
         });
         bindDesktopButton('desktopPrintBtn', async function() {
@@ -2977,6 +2988,112 @@ document.addEventListener('DOMContentLoaded', function() {
             loadServiceStatus();
         }
     };
+
+    window.showWordCountDialog = function() {
+        var modal = document.getElementById('wordCountModalOverlay');
+        if (modal) {
+            modal.classList.add('show');
+            updateWordCount();
+        }
+    };
+
+    function updateWordCount() {
+        if (!window.vditor) return;
+        var text = window.vditor.getValue() || '';
+        
+        var includeFormatting = document.getElementById('wcIncludeFormatting').checked;
+        var includePunctuation = document.getElementById('wcIncludePunctuation').checked;
+        var includeSpaces = document.getElementById('wcIncludeSpaces').checked;
+        var includeEmptyLines = document.getElementById('wcIncludeEmptyLines').checked;
+
+        if (!includeFormatting) {
+            // Remove markdown formatting robustly
+            // 1. Remove images completely
+            text = text.replace(/!\[.*?\]\(.*?\)/g, '');
+            // 2. Remove links but keep text
+            text = text.replace(/\[(.*?)\]\(.*?\)/g, '$1');
+            // 3. Remove inline code and code blocks
+            text = text.replace(/`{3,}[\s\S]*?`{3,}/g, '');
+            text = text.replace(/`(.+?)`/g, '$1');
+            // 4. Remove bold, italic, strikethrough (keeping text)
+            text = text.replace(/(\*\*|__)(.*?)\1/g, '$2');
+            text = text.replace(/(\*|_)(.*?)\1/g, '$2');
+            text = text.replace(/~~(.*?)~~/g, '$1');
+            // 5. Remove headers, blockquotes, lists prefixes
+            text = text.replace(/^[ \t]*#{1,6}\s+/gm, '');
+            text = text.replace(/^[ \t]*>\s+/gm, '');
+            text = text.replace(/^[ \t]*[-*+]\s+/gm, '');
+            text = text.replace(/^[ \t]*\d+\.\s+/gm, '');
+            // 6. Remove HTML tags
+            text = text.replace(/<[^>]+>/g, '');
+        }
+
+        // Calculate lines (always count original or formatted lines depending on includeEmptyLines)
+        // Let's count them based on the text AFTER formatting is stripped, but BEFORE empty lines are removed, 
+        // to give a somewhat accurate view of the document structure.
+        var lineCount = 0;
+        if (text.length > 0) {
+            var tempLines = text.split(/\r\n|\r|\n/);
+            if (!includeEmptyLines) {
+                lineCount = tempLines.filter(function(line) { return line.trim().length > 0; }).length;
+            } else {
+                lineCount = tempLines.length;
+            }
+        }
+        
+        if (!includeEmptyLines) {
+            text = text.replace(/^\s*[\r\n]/gm, '');
+        }
+
+        // Calculate Chinese characters count
+        var chineseCharacters = (text.match(/[\u4e00-\u9fa5]/g) || []).length;
+        
+        // Calculate English words and numbers
+        // Split by non-word chars except standard english text chars, but easier to just extract alphanumerics.
+        // A simple word counter ignores punctuation
+        var englishWords = (text.match(/[a-zA-Z0-9]+/g) || []).length;
+
+        if (!includeSpaces) {
+            // Include spaces removes all whitespaces including tabs
+            text = text.replace(/[ \t]+/g, '');
+        }
+
+        if (!includePunctuation) {
+            // Basic punctuation removal (both english and chinese)
+            text = text.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()'"?。，、；：？！“”‘’（）《》【】\n\r]/g, '');
+        }
+
+        // Standardize newlines before length
+        text = text.replace(/\r\n/g, '\n');
+        
+        document.getElementById('wordCountTotal').textContent = text.length;
+        document.getElementById('wordCountChinese').textContent = chineseCharacters;
+        document.getElementById('wordCountLines').textContent = lineCount;
+        document.getElementById('wordCountWords').textContent = englishWords;
+    }
+
+    // Bind checkboxes to trigger update
+    ['wcIncludeFormatting', 'wcIncludePunctuation', 'wcIncludeSpaces', 'wcIncludeEmptyLines'].forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) {
+            el.addEventListener('change', updateWordCount);
+        }
+    });
+
+    var closeWordCountBtn = document.getElementById('closeWordCountBtn');
+    if (closeWordCountBtn) closeWordCountBtn.addEventListener('click', function() {
+        document.getElementById('wordCountModalOverlay').classList.remove('show');
+    });
+
+    var closeWordCountModalBtn = document.getElementById('closeWordCountModalBtn');
+    if (closeWordCountModalBtn) closeWordCountModalBtn.addEventListener('click', function() {
+        document.getElementById('wordCountModalOverlay').classList.remove('show');
+    });
+
+    var wordCountModalOverlay = document.getElementById('wordCountModalOverlay');
+    if (wordCountModalOverlay) wordCountModalOverlay.addEventListener('click', function(e) {
+        if (e.target === this) this.classList.remove('show');
+    });
 
     var closeServiceStatusBtn = document.getElementById('closeServiceStatusBtn');
     if (closeServiceStatusBtn) closeServiceStatusBtn.addEventListener('click', function() {

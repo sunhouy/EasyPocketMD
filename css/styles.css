@@ -615,6 +615,20 @@ body.night-mode .file-list-search-result {
     display: block;
 }
 
+.dropdown-category {
+    font-size: 12px;
+    color: #8fa0ad;
+    padding: 10px 16px 4px 16px;
+    margin-top: 4px;
+    font-weight: 500;
+    pointer-events: none;
+}
+
+.dropdown-category:first-child {
+    margin-top: 0;
+    padding-top: 8px;
+}
+
 .toolbar-left-actions,
 .toolbar-right-actions {
     display: flex;
@@ -3631,6 +3645,10 @@ body.night-mode .desktop-dropdown-content {
     background: #2d2d2d;
     border-color: #3f4659;
     box-shadow: 0 10px 26px rgba(0, 0, 0, 0.35);
+}
+
+body.night-mode .dropdown-category {
+    color: #8da2b5;
 }
 
 body.night-mode .mobile-action-btn {
