@@ -2997,9 +2997,20 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     };
 
-    function updateWordCount() {
+    async function updateWordCount() {
         if (!window.vditor) return;
-        var text = window.vditor.getValue() || '';
+        var rawText = window.vditor.getValue() || '';
+        var text = rawText;
+        
+        let tokens = 0;
+        try {
+            const { encode } = await import('gpt-tokenizer');
+            tokens = encode(rawText).length;
+        } catch (e) {
+            console.error('Failed to calculate exact tokens:', e);
+            // Fallback approximation if import fails
+            tokens = Math.ceil((rawText.match(/[\u4e00-\u9fa5]/g) || []).length * 1.5 + (rawText.match(/[a-zA-Z0-9]+/g) || []).length * 1.3);
+        }
         
         var includeFormatting = document.getElementById('wcIncludeFormatting').checked;
         var includePunctuation = document.getElementById('wcIncludePunctuation').checked;
@@ -3046,7 +3057,12 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         // Calculate Chinese characters count
-        var chineseCharacters = (text.match(/[\u4e00-\u9fa5]/g) || []).length;
+        var chineseCharRegex = /[\u4e00-\u9fa5]/g;
+        var chinesePunctuationRegex = /[，。！？、；：“”‘’（）《》〈〉【】『』「」〔〕…—～·￥\u3000-\u303f\uff00-\uffef]/g;
+        var chineseCharacters = (text.match(chineseCharRegex) || []).length;
+        if (includePunctuation) {
+            chineseCharacters += (text.match(chinesePunctuationRegex) || []).length;
+        }
         
         // Calculate English words and numbers
         // Split by non-word chars except standard english text chars, but easier to just extract alphanumerics.
@@ -3060,7 +3076,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         if (!includePunctuation) {
             // Basic punctuation removal (both english and chinese)
-            text = text.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()'"?。，、；：？！“”‘’（）《》【】\n\r]/g, '');
+            text = text.replace(/[^\p{L}\p{N}\s]/gu, '');
         }
 
         // Standardize newlines before length
@@ -3070,6 +3086,11 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('wordCountChinese').textContent = chineseCharacters;
         document.getElementById('wordCountLines').textContent = lineCount;
         document.getElementById('wordCountWords').textContent = englishWords;
+        
+        var tokensElement = document.getElementById('wordCountTokens');
+        if (tokensElement) {
+            tokensElement.textContent = tokens;
+        }
     }
 
     // Bind checkboxes to trigger update
