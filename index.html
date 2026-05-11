@@ -667,6 +667,69 @@
     </div>
 </div>
 
+<!-- 字数统计模态窗口 -->
+<div class="modal-overlay" id="wordCountModalOverlay">
+    <div class="modal word-count-modal" style="position:relative;max-height:85vh;overflow:hidden;display:flex;flex-direction:column;">
+        <button class="modal-close-btn" id="closeWordCountBtn" style="position:absolute;top:15px;right:15px;background:none;border:none;font-size:20px;cursor:pointer;z-index:10;">
+            <i class="fas fa-times"></i>
+        </button>
+        <div class="modal-header" style="flex-shrink:0;">
+            <h2 data-i18n="wordCountTitle">字数统计</h2>
+        </div>
+        <div class="modal-content word-count-content" style="flex:1;overflow-y:auto;padding-right:5px;">
+            <div class="word-count-results" style="margin-bottom: 20px; text-align: center;">
+                <div style="font-size: 32px; font-weight: bold; color: #4a90e2;" id="wordCountTotal">0</div>
+                <div style="color: #666; font-size: 14px;" data-i18n="totalCharacters">总字符数</div>
+                
+                <div style="display: flex; justify-content: space-around; margin-top: 15px; border-top: 1px solid #eee; padding-top: 15px;">
+                    <div>
+                        <div style="font-size: 20px; font-weight: bold; color: #333;" id="wordCountChinese">0</div>
+                        <div style="color: #888; font-size: 12px;" data-i18n="chineseCharacters">中文字符</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 20px; font-weight: bold; color: #333;" id="wordCountLines">0</div>
+                        <div style="color: #888; font-size: 12px;" data-i18n="lines">行数</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 20px; font-weight: bold; color: #333;" id="wordCountWords">0</div>
+                        <div style="color: #888; font-size: 12px;" data-i18n="words">词数 (英文/数字)</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="word-count-options">
+                <div class="form-group" style="margin-bottom: 10px;">
+                    <label style="display:flex;align-items:center;gap:8px;font-weight:normal;cursor:pointer;">
+                        <input type="checkbox" id="wcIncludeFormatting" checked>
+                        <span data-i18n="includeFormatting">包含 Markdown 标记</span>
+                    </label>
+                </div>
+                <div class="form-group" style="margin-bottom: 10px;">
+                    <label style="display:flex;align-items:center;gap:8px;font-weight:normal;cursor:pointer;">
+                        <input type="checkbox" id="wcIncludePunctuation" checked>
+                        <span data-i18n="includePunctuation">包含标点符号</span>
+                    </label>
+                </div>
+                <div class="form-group" style="margin-bottom: 10px;">
+                    <label style="display:flex;align-items:center;gap:8px;font-weight:normal;cursor:pointer;">
+                        <input type="checkbox" id="wcIncludeSpaces" checked>
+                        <span data-i18n="includeSpaces">包含空格</span>
+                    </label>
+                </div>
+                <div class="form-group" style="margin-bottom: 10px;">
+                    <label style="display:flex;align-items:center;gap:8px;font-weight:normal;cursor:pointer;">
+                        <input type="checkbox" id="wcIncludeEmptyLines">
+                        <span data-i18n="includeEmptyLines">包含空行</span>
+                    </label>
+                </div>
+            </div>
+        </div>
+        <div class="modal-actions" style="flex-shrink:0;margin-top:15px;">
+            <button class="modal-btn secondary" id="closeWordCountModalBtn" data-i18n="close">关闭</button>
+        </div>
+    </div>
+</div>
+
 <!-- 关于模态窗口 -->
 <div class="modal-overlay" id="aboutModalOverlay">
     <div class="modal about-modal" style="position:relative;max-height:85vh;overflow:hidden;display:flex;flex-direction:column;">
@@ -1024,15 +1087,21 @@
             <div class="desktop-dropdown">
                 <button class="desktop-toolbar-btn" id="desktopMoreBtn" data-i18n="more">更多</button>
                 <div class="desktop-dropdown-content" id="desktopMoreDropdown">
-                    <button class="dropdown-item" id="desktopShareBtn"><i class="fas fa-share-alt"></i><span data-i18n="share">分享</span></button>
+                    <div class="dropdown-category" data-i18n="fileManagement">文件管理</div>
                     <button class="dropdown-item" id="desktopFileManagerBtn"><i class="fas fa-folder"></i><span data-i18n="myFiles">我的文件</span></button>
-                    <button class="dropdown-item" id="desktopFileDiffBtn"><i class="fas fa-code-branch"></i><span data-i18n="fileDiff">文件对比</span></button>
-                    <button class="dropdown-item" id="desktopFindBtn"><i class="fas fa-search"></i><span data-i18n="findInFile">查找和替换</span></button>
-                    <button class="dropdown-item" id="desktopPrintBtn"><i class="fas fa-print"></i><span data-i18n="cloudPrint">云打印</span></button>
-                    <button class="dropdown-item" id="desktopPresentationBtn"><i class="fas fa-chalkboard-teacher"></i><span data-i18n="presentationMode">演示模式</span></button>
                     <button class="dropdown-item" id="desktopOpenLocalFileBtn"><i class="fas fa-folder-open"></i><span data-i18n="openLocalFile">打开本地文件</span></button>
                     <button class="dropdown-item" id="desktopImportBtn"><i class="fas fa-file-import"></i><span data-i18n="import">导入</span></button>
                     <button class="dropdown-item" id="desktopExportBtn"><i class="fas fa-file-export"></i><span data-i18n="export">导出</span></button>
+
+                    <div class="dropdown-category" data-i18n="documentTools">文档工具</div>
+                    <button class="dropdown-item" id="desktopFindBtn"><i class="fas fa-search"></i><span data-i18n="findInFile">查找和替换</span></button>
+                    <button class="dropdown-item" id="desktopWordCountBtn"><i class="fas fa-calculator"></i><span data-i18n="wordCount">字数统计</span></button>
+                    <button class="dropdown-item" id="desktopShareBtn"><i class="fas fa-share-alt"></i><span data-i18n="share">分享</span></button>
+                    <button class="dropdown-item" id="desktopFileDiffBtn"><i class="fas fa-code-branch"></i><span data-i18n="fileDiff">文件对比</span></button>
+                    <button class="dropdown-item" id="desktopPrintBtn"><i class="fas fa-print"></i><span data-i18n="cloudPrint">云打印</span></button>
+                    <button class="dropdown-item" id="desktopPresentationBtn"><i class="fas fa-chalkboard-teacher"></i><span data-i18n="presentationMode">演示模式</span></button>
+
+                    <div class="dropdown-category" data-i18n="others">其他</div>
                     <button class="dropdown-item" id="desktopClearBtn"><i class="fas fa-trash-alt"></i><span data-i18n="clear">清空</span></button>
                     <button class="dropdown-item" id="desktopAboutBtn"><i class="fas fa-info-circle"></i><span data-i18n="about">关于</span></button>
                 </div>
@@ -1068,23 +1137,22 @@
                     <i class="fas fa-ellipsis-v"></i>
                 </button>
                 <div class="mobile-dropdown-content" id="mobileDropdown">
-
-                    <button class="dropdown-item" id="mobileShareBtn"><i class="fas fa-share-alt"></i>  <span data-i18n="share">分享</span></button>
+                    <div class="dropdown-category" data-i18n="fileManagement">文件管理</div>
                     <button class="dropdown-item" id="mobileFileManagerBtn"><i class="fas fa-folder"></i>  <span data-i18n="myFiles">我的文件</span></button>
-                    <button class="dropdown-item" id="mobileFileDiffBtn"><i class="fas fa-code-branch"></i>  <span data-i18n="fileDiff">文件对比</span></button>
-                    <button class="dropdown-item" id="mobileFindBtn"><i class="fas fa-search"></i>  <span data-i18n="findInFile">查找和替换</span></button>
-                    <button class="dropdown-item" id="mobilePrintBtn"><i class="fas fa-print"></i>  <span data-i18n="cloudPrint">云打印</span></button>
-                    <button class="dropdown-item" id="mobilePresentationBtn"><i class="fas fa-chalkboard-teacher"></i>  <span data-i18n="presentationMode">演示模式</span></button>
                     <button class="dropdown-item" id="mobileOpenLocalFileBtn"><i class="fas fa-folder-open"></i>  <span data-i18n="openLocalFile">打开本地文件</span></button>
                     <button class="dropdown-item" id="mobileImportBtn"><i class="fas fa-file-import"></i>  <span data-i18n="import">导入</span></button>
                     <button class="dropdown-item" id="mobileExportBtn"><i class="fas fa-file-export"></i>  <span data-i18n="export">导出</span></button>
-                    <!--
-                    <button class="dropdown-item" id="mobileVideoCallBtn"><i class="fas fa-video"></i>  <span data-i18n="videoCall">视频通话</span></button>
-                -->
+
+                    <div class="dropdown-category" data-i18n="documentTools">文档工具</div>
+                    <button class="dropdown-item" id="mobileFindBtn"><i class="fas fa-search"></i>  <span data-i18n="findInFile">查找和替换</span></button>
+                    <button class="dropdown-item" id="mobileWordCountBtn"><i class="fas fa-calculator"></i>  <span data-i18n="wordCount">字数统计</span></button>
+                    <button class="dropdown-item" id="mobileShareBtn"><i class="fas fa-share-alt"></i>  <span data-i18n="share">分享</span></button>
+                    <button class="dropdown-item" id="mobileFileDiffBtn"><i class="fas fa-code-branch"></i>  <span data-i18n="fileDiff">文件对比</span></button>
+                    <button class="dropdown-item" id="mobilePrintBtn"><i class="fas fa-print"></i>  <span data-i18n="cloudPrint">云打印</span></button>
+                    <button class="dropdown-item" id="mobilePresentationBtn"><i class="fas fa-chalkboard-teacher"></i>  <span data-i18n="presentationMode">演示模式</span></button>
+
+                    <div class="dropdown-category" data-i18n="others">其他</div>
                     <button class="dropdown-item" id="mobileClearBtn"><i class="fas fa-trash-alt"></i>  <span data-i18n="clear">清空</span></button>
-                    <!--
-                    <button class="dropdown-item" id="serviceStatusBtn"><i class="fas fa-heartbeat"></i>  <span data-i18n="serviceStatus">服务状态</span></button>
-                    -->
                     <button class="dropdown-item" id="aboutBtn"><i class="fas fa-info-circle"></i>  <span data-i18n="about">关于</span></button>
                 </div>
             </div>
