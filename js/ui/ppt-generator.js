@@ -129,16 +129,18 @@
         var endPageInput = document.getElementById('pptEndPage');
         if (startPageInput) {
             startPageInput.addEventListener('input', function() {
-                var val = parseInt(this.value) || 5;
-                if (val < 5) this.value = 5;
-                if (val > 50) this.value = 50;
+                validateOutlinePageRange(false);
+            });
+            startPageInput.addEventListener('change', function() {
+                validateOutlinePageRange(false);
             });
         }
         if (endPageInput) {
             endPageInput.addEventListener('input', function() {
-                var val = parseInt(this.value) || 30;
-                if (val < 5) this.value = 5;
-                if (val > 50) this.value = 50;
+                validateOutlinePageRange(false);
+            });
+            endPageInput.addEventListener('change', function() {
+                validateOutlinePageRange(false);
             });
         }
 
@@ -326,15 +328,15 @@
         var topic = topicInput ? topicInput.value.trim() : '';
 
         // 获取页数范围
-        var startPageInput = document.getElementById('pptStartPage');
-        var endPageInput = document.getElementById('pptEndPage');
-        var startPage = startPageInput ? parseInt(startPageInput.value) || 5 : 5;
-        var endPage = endPageInput ? parseInt(endPageInput.value) || 30 : 30;
+        var range = getOutlinePageRange();
 
-        // 验证页数范围
-        if (startPage < 1) startPage = 1;
-        if (endPage < startPage) endPage = startPage;
-        if (endPage > 50) endPage = 50;
+        // 点击生成时再验证页数范围
+        if (!validateOutlinePageRange(true)) {
+            return;
+        }
+
+        var startPage = range.startPage;
+        var endPage = range.endPage;
 
         // 根据生成方式验证
         var fileContent = '';
@@ -400,6 +402,27 @@
             btn.disabled = false;
             btn.innerHTML = originalText;
         }
+    }
+
+    function getOutlinePageRange() {
+        var startPageInput = document.getElementById('pptStartPage');
+        var endPageInput = document.getElementById('pptEndPage');
+
+        return {
+            startPage: startPageInput ? parseInt(startPageInput.value, 10) : NaN,
+            endPage: endPageInput ? parseInt(endPageInput.value, 10) : NaN
+        };
+    }
+
+    function validateOutlinePageRange(showError) {
+        var range = getOutlinePageRange();
+        var isValid = Number.isInteger(range.startPage) && Number.isInteger(range.endPage) && range.startPage >= 5 && range.endPage <= 50 && range.startPage <= range.endPage;
+
+        if (showError && !isValid && global.showMessage) {
+            global.showMessage(isEn() ? 'Page count must be between 5 and 50' : '页数范围必须在5-50页之间', 'error');
+        }
+
+        return isValid;
     }
 
     // 构建大纲生成提示词
