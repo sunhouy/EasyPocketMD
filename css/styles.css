@@ -5503,3 +5503,7 @@ body.night-mode .account-switch-desc strong {
         width: 100%;
     }
 }
+.night-mode #tokenCountDetails { background: #2d2d2d \!important; border-color: rgba(255,255,255,0.1) \!important; }
+.night-mode #tokenCountDetails .token-model-label { color: #aaa \!important; }
+.night-mode #tokenCountDetails .token-model-value { color: #eee \!important; }
+\n.night-mode #wordCountChinese, .night-mode #wordCountLines, .night-mode #wordCountWords, .night-mode #wordCountTokens { color: #eee \!important; }

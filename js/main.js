@@ -3091,6 +3091,35 @@ document.addEventListener('DOMContentLoaded', function() {
         if (tokensElement) {
             tokensElement.textContent = tokens;
         }
+
+        // Setup detail tokens for models
+        var elGPT = document.getElementById('tokenCountGPT');
+        if (elGPT) elGPT.textContent = tokens;
+        
+        var elClaude = document.getElementById('tokenCountClaude');
+        if (elClaude) elClaude.textContent = Math.ceil(tokens * 1.05); // Claude typically 5% more overhead
+
+        var elDeepSeek = document.getElementById('tokenCountDeepSeek');
+        if (elDeepSeek) elDeepSeek.textContent = tokens; // DeepSeek v2/v3 very close to cl100k_base
+        
+        var elGemini = document.getElementById('tokenCountGemini');
+        if (elGemini) elGemini.textContent = Math.ceil(tokens * 1.02); // Gemini somewhat close
+    }
+
+    // Bind token details expander
+    var tokenCountHeader = document.getElementById('tokenCountHeader');
+    if (tokenCountHeader) {
+        tokenCountHeader.addEventListener('click', function() {
+            var details = document.getElementById('tokenCountDetails');
+            var icon = document.getElementById('tokenCountExpandIcon');
+            if (details.style.display === 'none') {
+                details.style.display = 'block';
+                if (icon) icon.style.transform = 'rotate(180deg)';
+            } else {
+                details.style.display = 'none';
+                if (icon) icon.style.transform = 'rotate(0deg)';
+            }
+        });
     }
 
     // Bind checkboxes to trigger update
@@ -3100,6 +3129,19 @@ document.addEventListener('DOMContentLoaded', function() {
             el.addEventListener('change', updateWordCount);
         }
     });
+
+    var tokenCountHelpIcon = document.getElementById('tokenCountHelpIcon');
+    if (tokenCountHelpIcon) {
+        tokenCountHelpIcon.addEventListener('click', function(e) {
+            e.stopPropagation();
+            var msg = window.i18n ? window.i18n.t('tokenCountHelp') : this.getAttribute('title');
+            if (typeof window.showMessage === 'function') {
+                window.showMessage(msg, 'info');
+            } else {
+                alert(msg);
+            }
+        });
+    }
 
     var closeWordCountBtn = document.getElementById('closeWordCountBtn');
     if (closeWordCountBtn) closeWordCountBtn.addEventListener('click', function() {

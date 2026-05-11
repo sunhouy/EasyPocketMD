@@ -694,9 +694,37 @@
                         <div style="font-size: 20px; font-weight: bold; color: #333;" id="wordCountWords">0</div>
                         <div style="color: #888; font-size: 12px;" data-i18n="words">词数 (英文/数字)</div>
                     </div>
-                    <div>
-                        <div style="font-size: 20px; font-weight: bold; color: #333;" id="wordCountTokens">0</div>
-                        <div style="color: #888; font-size: 12px;" data-i18n="wordCountTokens">估算Token数</div>
+                </div>
+
+                <div class="token-count-container" style="margin-top: 15px; border-top: 1px solid #eee; padding-top: 15px; text-align: left;">
+                    <div id="tokenCountHeader" style="display: flex; justify-content: space-between; align-items: center; cursor: pointer; padding: 5px 0;">
+                        <div style="display: flex; align-items: baseline; gap: 10px;">
+                            <span style="font-size: 20px; font-weight: bold; color: #333;" id="wordCountTokens">0</span>
+                            <div style="color: #888; font-size: 13px; display: flex; align-items: center; gap: 4px;">
+                                <span data-i18n="wordCountTokens">Token数</span>
+                                <i class="fas fa-question-circle" id="tokenCountHelpIcon" data-i18n-title="tokenCountHelp" title="基于 gpt-tokenizer (cl100k_base) 计算，反映主流大模型(如GPT-4)实际消耗的Token数，始终包含原始排版标记。" style="cursor: pointer;"></i>
+                            </div>
+                        </div>
+                        <i class="fas fa-chevron-down" id="tokenCountExpandIcon" style="color: #888; transition: transform 0.3s;"></i>
+                    </div>
+                    
+                    <div id="tokenCountDetails" style="display: none; margin-top: 10px; background: var(--toolbar-bg, #f8f9fa); padding: 12px 15px; border-radius: 8px; font-size: 13px; border: 1px solid rgba(0,0,0,0.05);">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                            <span style="color: #555;" class="token-model-label"><i class="fas fa-robot"></i> ChatGPT / OpenAI</span>
+                            <strong id="tokenCountGPT" style="color: #333;" class="token-model-value">0</strong>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                            <span style="color: #555;" class="token-model-label"><i class="fas fa-brain"></i> Claude (Anthropic) <span style="font-size:11px;color:#999;font-weight:normal;">(估算)</span></span>
+                            <strong id="tokenCountClaude" style="color: #333;" class="token-model-value">0</strong>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                            <span style="color: #555;" class="token-model-label"><i class="fas fa-water"></i> DeepSeek <span style="font-size:11px;color:#999;font-weight:normal;">(估算)</span></span>
+                            <strong id="tokenCountDeepSeek" style="color: #333;" class="token-model-value">0</strong>
+                        </div>
+                        <div style="display: flex; justify-content: space-between;">
+                            <span style="color: #555;" class="token-model-label"><i class="fas fa-meteor"></i> Gemini (Google) <span style="font-size:11px;color:#999;font-weight:normal;">(估算)</span></span>
+                            <strong id="tokenCountGemini" style="color: #333;" class="token-model-value">0</strong>
+                        </div>
                     </div>
                 </div>
             </div>
