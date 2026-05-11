@@ -223,7 +223,7 @@
     async function callQwenAPI(content, systemPrompt) {
         // 构建请求体
         var requestBody = {
-            model: "deepseek-v4-pro", // 使用deepseek模型
+            model: "deepseek-v4-flash", // 使用deepseek模型
             input: {
                 messages: [
                     {
