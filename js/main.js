@@ -923,6 +923,39 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    async function handleCreateHistoryVersionSnapshot() {
+        var t = function(key) { return window.i18n ? window.i18n.t(key) : key; };
+        if (!window.currentUser) {
+            window.showMessage(t('pleaseLoginFirst') || '请先登录', 'warning');
+            return;
+        }
+        var currentFileId = window.currentFileId;
+        var files = window.files || [];
+        var currentFile = files.find(function(file) { return file && file.id === currentFileId && file.type === 'file'; });
+        if (!currentFile) {
+            window.showMessage(t('noActiveFileForHistory') || '当前没有可创建历史版本的文件', 'warning');
+            return;
+        }
+        var content = currentFile.content || '';
+        if (typeof window.getCurrentEditorContent === 'function') {
+            content = window.getCurrentEditorContent(currentFileId, currentFile.content || '');
+        } else if (window.vditor && typeof window.vditor.getValue === 'function') {
+            content = window.vditor.getValue() || '';
+        }
+        try {
+            var resultCode = await window.createHistoryVersion(currentFile.name, content);
+            if (resultCode === 200) {
+                window.showMessage(t('createHistoryVersionSuccess') || '历史版本已创建', 'success');
+            } else if (resultCode === 304) {
+                window.showMessage(t('historyVersionNoChanges') || '内容无变化，未创建新历史版本', 'info');
+            } else {
+                window.showMessage(t('createHistoryVersionFailed') || '创建历史版本失败', 'error');
+            }
+        } catch (error) {
+            window.showMessage(t('createHistoryVersionFailed') || '创建历史版本失败', 'error');
+        }
+    }
+
     async function handleBottomExport() {
         if (typeof window.exportContent !== 'function') {
             await import('./ui/export.js');
@@ -1743,6 +1776,11 @@ document.addEventListener('DOMContentLoaded', function() {
             window.showWordCountDialog();
             closeDrop();
         });
+        var mobileCreateHistoryVersionBtn = document.getElementById('mobileCreateHistoryVersionBtn');
+        if (mobileCreateHistoryVersionBtn) mobileCreateHistoryVersionBtn.addEventListener('click', async function() {
+            await handleCreateHistoryVersionSnapshot();
+            closeDrop();
+        });
 
         var mobilePrintBtn = document.getElementById('mobilePrintBtn');
         if (mobilePrintBtn) mobilePrintBtn.addEventListener('click', async function() {
@@ -1925,6 +1963,10 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         bindDesktopButton('desktopWordCountBtn', function() {
             window.showWordCountDialog();
+            closeDesktopDrop();
+        });
+        bindDesktopButton('desktopCreateHistoryVersionBtn', async function() {
+            await handleCreateHistoryVersionSnapshot();
             closeDesktopDrop();
         });
         bindDesktopButton('desktopPrintBtn', async function() {

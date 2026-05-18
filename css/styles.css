@@ -5503,7 +5503,27 @@ body.night-mode .account-switch-desc strong {
         width: 100%;
     }
 }
-.night-mode #tokenCountDetails { background: #2d2d2d \!important; border-color: rgba(255,255,255,0.1) \!important; }
-.night-mode #tokenCountDetails .token-model-label { color: #aaa \!important; }
-.night-mode #tokenCountDetails .token-model-value { color: #eee \!important; }
-\n.night-mode #wordCountChinese, .night-mode #wordCountLines, .night-mode #wordCountWords, .night-mode #wordCountTokens { color: #eee \!important; }
+body.night-mode #wordCountModalOverlay .word-count-modal,
+body.night-mode #wordCountModalOverlay .word-count-modal .modal-content,
+body.night-mode #wordCountModalOverlay .word-count-modal .word-count-options,
+body.night-mode #wordCountModalOverlay .word-count-modal #tokenCountDetails {
+    background: #000 !important;
+    color: #fff !important;
+}
+
+body.night-mode #wordCountModalOverlay .word-count-modal *,
+body.night-mode #wordCountModalOverlay .word-count-modal h2,
+body.night-mode #wordCountModalOverlay .word-count-modal label,
+body.night-mode #wordCountModalOverlay .word-count-modal span,
+body.night-mode #wordCountModalOverlay .word-count-modal strong,
+body.night-mode #wordCountModalOverlay .word-count-modal i {
+    color: #fff !important;
+}
+
+body.night-mode #wordCountModalOverlay .word-count-modal .modal-header {
+    border-bottom-color: #2a2a2a !important;
+}
+
+body.night-mode #wordCountModalOverlay .word-count-modal div {
+    border-color: #2a2a2a !important;
+}
