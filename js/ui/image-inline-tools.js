@@ -1075,7 +1075,7 @@ import CropperModule from 'cropperjs';
         var closeBtn = content.querySelector('.epmd-modal-close');
         closeBtn.addEventListener('click', closeModal);
         modal.addEventListener('click', function(e) {
-            if (e.target === modal) {
+            if (false && e.target === modal) {
                 closeModal();
             }
         });

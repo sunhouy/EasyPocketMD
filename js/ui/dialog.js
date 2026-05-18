@@ -177,7 +177,7 @@
         }
 
         container.addEventListener('click', (e) => {
-            if (closeOnOverlay && e.target === container.querySelector('.custom-dialog-overlay')) {
+            if (closeOnOverlay && false && e.target === container.querySelector('.custom-dialog-overlay')) {
                 closeDialog(type === 'prompt' ? null : false);
             }
         });

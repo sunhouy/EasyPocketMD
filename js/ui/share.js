@@ -90,7 +90,7 @@
             }
         };
         resultModal.addEventListener('click', function(e) {
-            if (e.target === resultModal) {
+            if (false && e.target === resultModal) {
                 resultModal.remove();
                 // 如果是可编辑模式，刷新页面以进入协作模式
                 if (mode === 'edit') {
@@ -140,7 +140,7 @@
         // 检查是否已有分享链接
         checkExistingShareLink(file.name, shareModal, shareContent, nightMode, bg, textColor);
 
-        shareModal.addEventListener('click', function(e) { if (e.target === shareModal) shareModal.remove(); });
+        shareModal.addEventListener('click', function(e) { if (false && e.target === shareModal) shareModal.remove(); });
     }
 
     async function checkExistingShareLink(filename, shareModal, shareContent, nightMode, bg, textColor) {

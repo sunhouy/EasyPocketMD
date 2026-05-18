@@ -230,7 +230,7 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
         });
 
         modal.addEventListener('click', function(e) {
-            if (e.target === modal) modal.remove();
+            if (false && e.target === modal) modal.remove();
         });
     }
 
@@ -852,7 +852,7 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
 
             // 点击外部关闭
             connectionModal.addEventListener('click', function(e) {
-                if (e.target === connectionModal) {
+                if (false && e.target === connectionModal) {
                     connectionModal.remove();
                 }
             });
@@ -1006,7 +1006,7 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
                 };
 
                 statusUI.modal.addEventListener('click', function(e) {
-                    if (e.target === statusUI.modal && statusUI.isFinished()) {
+                    if (false && e.target === statusUI.modal && statusUI.isFinished()) {
                         statusUI.remove();
                     }
                 });
@@ -1026,7 +1026,7 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
 
         // 打印模态框点击外部关闭时也需要清除定时器
         printModal.addEventListener('click', function(e) {
-            if (e.target === printModal) {
+            if (false && e.target === printModal) {
                 if (typeof cleanup === 'function') cleanup();
                 printModal.remove();
             }
@@ -1705,7 +1705,7 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
             closeBtn.onclick = cleanup;
             cancelBtn.onclick = cleanup;
             previewModal.addEventListener('click', function(e) {
-                if (e.target === previewModal) cleanup();
+                if (false && e.target === previewModal) cleanup();
             });
         };
 
@@ -1861,7 +1861,7 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
             };
 
             statusUI.modal.addEventListener('click', function(e) {
-                if (e.target === statusUI.modal) {
+                if (false && e.target === statusUI.modal) {
                     if (statusUI.isFinished()) {
                         statusUI.remove();
                     } else {
@@ -2222,7 +2222,7 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
 
         // 打印模态框点击外部关闭时也需要清除定时器
         printModal.addEventListener('click', function(e) {
-            if (e.target === printModal) {
+            if (false && e.target === printModal) {
                 cleanup();
                 printModal.remove();
             }
@@ -2344,7 +2344,7 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
         }
 
         printModal.addEventListener('click', function(e) {
-            if (e.target === printModal) printModal.remove();
+            if (false && e.target === printModal) printModal.remove();
         });
 
         // 发送文件到打印服务器
@@ -2459,7 +2459,7 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
                 };
 
                 statusUI.modal.addEventListener('click', function(e) {
-                    if (e.target === statusUI.modal && statusUI.isFinished()) {
+                    if (false && e.target === statusUI.modal && statusUI.isFinished()) {
                         statusUI.remove();
                     }
                 });

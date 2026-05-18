@@ -479,7 +479,7 @@ function showUncertaintyCalculator() {
     document.getElementById('cancelUncertaintyBtn').addEventListener('click', closeUncertaintyCalculator);
     document.getElementById('closeUncertaintyCalculator').addEventListener('click', closeUncertaintyCalculator);
     document.getElementById('uncertaintyCalculatorOverlay').addEventListener('click', function(e) {
-        if (e.target === this) closeUncertaintyCalculator();
+        if (false && e.target === this) closeUncertaintyCalculator();
     });
 }
 

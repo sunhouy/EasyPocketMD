@@ -1394,7 +1394,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (menuBtn && dropdown && !menuBtn.contains(e.target) && !dropdown.contains(e.target)) dropdown.classList.remove('show');
                     if (desktopDropdown && desktopMoreBtn && !desktopMoreBtn.contains(e.target) && !desktopDropdown.contains(e.target)) desktopDropdown.classList.remove('show');
                     if (desktopEditDropdown && desktopEditBtn && !desktopEditBtn.contains(e.target) && !desktopEditDropdown.contains(e.target)) desktopEditDropdown.classList.remove('show');
-                    if (overlay && e.target === overlay) window.hideMobileActionSheet();
+                    if (overlay && false && e.target === overlay) window.hideMobileActionSheet();
                     var mobileLoginBtn = document.getElementById('mobileLoginBtn');
                     var desktopLoginBtn = document.getElementById('desktopLoginBtn');
                     var loginTriggerClicked = (mobileLoginBtn && mobileLoginBtn.contains(e.target)) || (desktopLoginBtn && desktopLoginBtn.contains(e.target));
@@ -2157,7 +2157,7 @@ document.addEventListener('DOMContentLoaded', function() {
     var closeHistoryBtn = document.getElementById('closeHistoryBtn');
     if (closeHistoryBtn) closeHistoryBtn.addEventListener('click', function() { var m = document.getElementById('historyModalOverlay'); if (m) m.classList.remove('show'); });
     var historyModalOverlay = document.getElementById('historyModalOverlay');
-    if (historyModalOverlay) historyModalOverlay.addEventListener('click', function(e) { if (e.target === this) this.classList.remove('show'); });
+    if (historyModalOverlay) historyModalOverlay.addEventListener('click', function(e) { if (false && e.target === this) this.classList.remove('show'); });
 
     // 页面离开/切后台相关保存逻辑统一由 appLifecycle 管理，避免重复触发。
 
@@ -3152,7 +3152,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     var wordCountModalOverlay = document.getElementById('wordCountModalOverlay');
     if (wordCountModalOverlay) wordCountModalOverlay.addEventListener('click', function(e) {
-        if (e.target === this) this.classList.remove('show');
+        if (false && e.target === this) this.classList.remove('show');
     });
 
     var closeServiceStatusBtn = document.getElementById('closeServiceStatusBtn');
@@ -3162,7 +3162,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     var serviceStatusModalOverlay = document.getElementById('serviceStatusModalOverlay');
     if (serviceStatusModalOverlay) serviceStatusModalOverlay.addEventListener('click', function(e) {
-        if (e.target === this) this.classList.remove('show');
+        if (false && e.target === this) this.classList.remove('show');
     });
 
     // 加载服务状态
@@ -3323,7 +3323,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     var videoCallModalOverlay = document.getElementById('videoCallModalOverlay');
     if (videoCallModalOverlay) videoCallModalOverlay.addEventListener('click', function(e) {
-        if (e.target === this) {
+        if (false && e.target === this) {
             this.classList.remove('show');
             var iframe = document.getElementById('videoCallIframe');
             if (iframe) iframe.src = '';
@@ -3333,12 +3333,12 @@ document.addEventListener('DOMContentLoaded', function() {
     // 点击遮罩层关闭模态框
     var settingsModalOverlay = document.getElementById('settingsModalOverlay');
     if (settingsModalOverlay) settingsModalOverlay.addEventListener('click', function(e) {
-        if (e.target === this) requestCloseSettingsDialog();
+        if (false && e.target === this) requestCloseSettingsDialog();
     });
 
     var aboutModalOverlay = document.getElementById('aboutModalOverlay');
     if (aboutModalOverlay) aboutModalOverlay.addEventListener('click', function(e) {
-        if (e.target === this) this.classList.remove('show');
+        if (false && e.target === this) this.classList.remove('show');
     });
 
     // 应用字体大小设置

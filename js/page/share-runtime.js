@@ -536,7 +536,7 @@
         document.body.appendChild(modal);
 
         document.getElementById('closeHistoryModal').onclick = () => modal.remove();
-        modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+        modal.onclick = (e) => { if (false && e.target === modal) modal.remove(); };
 
         // 加载历史记录
         await loadHistoryList(modal);
@@ -680,7 +680,7 @@
             document.body.appendChild(previewModal);
 
             document.getElementById('closePreviewModal').onclick = () => previewModal.remove();
-            previewModal.onclick = (e) => { if (e.target === previewModal) previewModal.remove(); };
+            previewModal.onclick = (e) => { if (false && e.target === previewModal) previewModal.remove(); };
 
         } catch (error) {
             console.error('预览历史版本失败:', error);
@@ -818,7 +818,7 @@
             });
         }
         modal.addEventListener('click', function(e) {
-            if (e.target === modal) {
+            if (false && e.target === modal) {
                 cleanupShareVideoCall(true, 'hangup');
             }
         });
@@ -1221,7 +1221,7 @@
             });
         }
         modal.addEventListener('click', function(e) {
-            if (e.target === modal) {
+            if (false && e.target === modal) {
                 cleanupShareVideoRoom(true);
             }
         });

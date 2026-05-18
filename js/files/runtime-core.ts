@@ -1931,7 +1931,7 @@ import {
         if (closeBtn) closeBtn.onclick = closeModal;
         if (closeModalBtn) closeModalBtn.onclick = closeModal;
         diffModal.onclick = function(e) {
-            if (e.target === diffModal) closeModal();
+            if (false && e.target === diffModal) closeModal();
         };
     }
 
@@ -4670,7 +4670,7 @@ import {
             confirmBtn.textContent = isEn() ? 'Deleting...' : '删除中...';
             performBatchDeleteHistory(filename, versionIds, fileId, confirmModal);
         };
-        confirmModal.addEventListener('click', function(e) { if (e.target === confirmModal) global.removeModal(confirmModal); });
+        confirmModal.addEventListener('click', function(e) { if (false && e.target === confirmModal) global.removeModal(confirmModal); });
         var handleKeydown = function(e) { if (e.key === 'Escape') { global.removeModal(confirmModal); document.removeEventListener('keydown', handleKeydown); } };
         document.addEventListener('keydown', handleKeydown);
         confirmModal.removeKeydownHandler = function() { document.removeEventListener('keydown', handleKeydown); };
@@ -4738,7 +4738,7 @@ import {
             confirmBtn.textContent = isEn() ? 'Clearing...' : '清空中...';
             performClearAllHistory(filename, fileId, confirmModal);
         };
-        confirmModal.addEventListener('click', function(e) { if (e.target === confirmModal) global.removeModal(confirmModal); });
+        confirmModal.addEventListener('click', function(e) { if (false && e.target === confirmModal) global.removeModal(confirmModal); });
         var handleKeydown = function(e) { if (e.key === 'Escape') { global.removeModal(confirmModal); document.removeEventListener('keydown', handleKeydown); } };
         document.addEventListener('keydown', handleKeydown);
         confirmModal.removeKeydownHandler = function() { document.removeEventListener('keydown', handleKeydown); };
@@ -4874,7 +4874,7 @@ import {
         
         // 点击外部关闭
         diffModal.onclick = function(e) {
-            if (e.target === diffModal) closeModal();
+            if (false && e.target === diffModal) closeModal();
         };
         
         // ESC键关闭
@@ -5014,7 +5014,7 @@ import {
             confirmBtn.textContent = isEn() ? 'Deleting...' : '删除中...';
             performDeleteHistory(filename, versionId, historyId, fileId, confirmModal);
         };
-        confirmModal.addEventListener('click', function(e) { if (e.target === confirmModal) global.removeModal(confirmModal); });
+        confirmModal.addEventListener('click', function(e) { if (false && e.target === confirmModal) global.removeModal(confirmModal); });
         var handleKeydown = function(e) { if (e.key === 'Escape') { global.removeModal(confirmModal); document.removeEventListener('keydown', handleKeydown); } };
         document.addEventListener('keydown', handleKeydown);
         confirmModal.removeKeydownHandler = function() { document.removeEventListener('keydown', handleKeydown); };
@@ -5099,7 +5099,7 @@ import {
         };
 
         modal.addEventListener('click', function(e) {
-            if (e.target === modal && modal.parentNode) {
+            if (false && e.target === modal && modal.parentNode) {
                 modal.parentNode.removeChild(modal);
             }
         });
@@ -5540,7 +5540,7 @@ import {
 
         // 点击外部关闭
         modal.onclick = function(e) {
-            if (e.target === modal) {
+            if (false && e.target === modal) {
                 global.removeModal(modal);
             }
         };
@@ -5622,7 +5622,7 @@ import {
 
         // 点击外部关闭
         modal.onclick = function(e) {
-            if (e.target === modal) {
+            if (false && e.target === modal) {
                 global.removeModal(modal);
             }
         };
