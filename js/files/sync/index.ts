@@ -168,9 +168,13 @@ export function createSyncRuntimeApi(ctx: any) {
                   : result.data && typeof result.data.content === 'string'
                     ? result.data.content
                     : content;
-              if (file.type !== 'folder' && files[fileIndex].content !== serverContent) {
-                files[fileIndex].content = serverContent;
-                if (fileId === g('currentFileId')) {
+              const isActiveFile = fileId === g('currentFileId') && file.type !== 'folder';
+              const liveEditorContent = isActiveFile ? getCurrentEditorContent(fileId, files[fileIndex].content) : null;
+              const hasNewerActiveEditorContent = isActiveFile && liveEditorContent !== content;
+
+              if (file.type !== 'folder') {
+                files[fileIndex].content = hasNewerActiveEditorContent ? liveEditorContent : serverContent;
+                if (!hasNewerActiveEditorContent && fileId === g('currentFileId') && liveEditorContent !== serverContent) {
                   setEditorContentForFile(fileId, serverContent, { preserveCursor: true });
                 }
               }
@@ -187,10 +191,24 @@ export function createSyncRuntimeApi(ctx: any) {
                   ? result.data.content_version
                   : Number(file.contentVersion || 0) + 1,
               );
-              localStorage.setItem('vditor_files', JSON.stringify(files));
               g('lastSyncedContent')[fileId] = serverContent;
+              if (hasNewerActiveEditorContent) {
+                files[fileIndex].isSynced = false;
+                g('unsavedChanges')[fileId] = true;
+                markPendingServerSync(fileId, true);
+                localStorage.setItem('vditor_files', JSON.stringify(files));
+                setTimeout(function () {
+                  g('unsavedChanges')[fileId] = true;
+                  markPendingServerSync(fileId, true);
+                  if (typeof globalRef.startAutoSave === 'function') {
+                    globalRef.startAutoSave();
+                  }
+                }, 0);
+                return true;
+              }
               g('unsavedChanges')[fileId] = false;
               markPendingServerSync(fileId, false);
+              localStorage.setItem('vditor_files', JSON.stringify(files));
             }
             return true;
           }
