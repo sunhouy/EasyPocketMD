@@ -56,6 +56,10 @@ import {
     const LONG_FILE_MODE_PREVIEW_DEBOUNCE = 180;
     const AUTO_SAVE_DEBOUNCE_MS = 500;
     const AUTO_SAVE_FORCE_MS = 5000;
+    const AUTO_HISTORY_MIN_INTERVAL_MS = 3 * 60 * 1000;
+    const AUTO_HISTORY_MAX_INTERVAL_MS = 15 * 60 * 1000;
+    const AUTO_HISTORY_MIN_CHANGE_CHARS = 120;
+    const AUTO_HISTORY_MIN_CHANGE_RATIO = 0.03;
 
     let markedParserPromise = null;
     let longFilePreviewTimer = null;
@@ -63,6 +67,7 @@ import {
     let autoSaveDebounceTimer = null;
     let autoSaveForceTimer = null;
     let autoSaveInFlight = false;
+    const autoHistoryVersionStates = new Map();
     function ensureFileSwitchLoadingOverlay() {
         let overlay = document.getElementById('fileSwitchLoadingOverlay');
         if (overlay) return overlay;
@@ -1151,6 +1156,71 @@ import {
         }
     }
 
+    function estimateChangedChars(previousContent, nextContent) {
+        const prev = String(previousContent || '');
+        const next = String(nextContent || '');
+        if (prev === next) return 0;
+        const minLength = Math.min(prev.length, next.length);
+        let start = 0;
+        while (start < minLength && prev.charCodeAt(start) === next.charCodeAt(start)) {
+            start++;
+        }
+        let prevEnd = prev.length - 1;
+        let nextEnd = next.length - 1;
+        while (prevEnd >= start && nextEnd >= start && prev.charCodeAt(prevEnd) === next.charCodeAt(nextEnd)) {
+            prevEnd--;
+            nextEnd--;
+        }
+        const changedInPrev = Math.max(0, prevEnd - start + 1);
+        const changedInNext = Math.max(0, nextEnd - start + 1);
+        return Math.max(changedInPrev, changedInNext);
+    }
+
+    function hasSignificantHistoryChange(previousContent, nextContent) {
+        const prev = String(previousContent || '');
+        const next = String(nextContent || '');
+        if (prev === next) return false;
+        const changedChars = estimateChangedChars(prev, next);
+        if (changedChars >= AUTO_HISTORY_MIN_CHANGE_CHARS) return true;
+        const baseLength = Math.max(prev.length, next.length, 1);
+        return changedChars / baseLength >= AUTO_HISTORY_MIN_CHANGE_RATIO;
+    }
+
+    function primeAutoHistoryState(fileId, content) {
+        if (!fileId) return;
+        autoHistoryVersionStates.set(fileId, {
+            lastHistoryAt: Date.now(),
+            lastHistoryContent: String(content || '')
+        });
+    }
+
+    function markAutoHistoryVersionCreated(fileId, content) {
+        if (!fileId) return;
+        autoHistoryVersionStates.set(fileId, {
+            lastHistoryAt: Date.now(),
+            lastHistoryContent: String(content || '')
+        });
+    }
+
+    function shouldCreateAutoHistoryVersion(fileId, content) {
+        if (!fileId) return false;
+        const now = Date.now();
+        const currentContent = String(content || '');
+        const state = autoHistoryVersionStates.get(fileId);
+        if (!state) {
+            primeAutoHistoryState(fileId, currentContent);
+            return false;
+        }
+        const elapsed = now - Number(state.lastHistoryAt || 0);
+        if (elapsed < AUTO_HISTORY_MIN_INTERVAL_MS) {
+            return false;
+        }
+        if (elapsed >= AUTO_HISTORY_MAX_INTERVAL_MS) {
+            return true;
+        }
+        return hasSignificantHistoryChange(state.lastHistoryContent, currentContent);
+    }
+
     async function syncFileAfterSaveIfNeeded(currentFileId, file, content, isManual, contentChanged) {
         if (isExternalLocalFile(file)) {
             g('lastSyncedContent')[currentFileId] = content;
@@ -1166,8 +1236,19 @@ import {
         markPendingServerSync(currentFileId, true);
         try {
             const saveResult = await global.syncFileToServer(currentFileId, { background: !isManual });
-            if (isManual && contentChanged && saveResult) {
-                try { await global.createHistoryVersion(file.name, content); } catch (e) { console.warn('创建历史版本失败', e); }
+            const shouldCreateHistoryVersion = contentChanged && saveResult && (
+                isManual ||
+                shouldCreateAutoHistoryVersion(currentFileId, content)
+            );
+            if (shouldCreateHistoryVersion) {
+                try {
+                    const historyResultCode = await global.createHistoryVersion(file.name, content);
+                    if (historyResultCode === 200 || historyResultCode === 304) {
+                        markAutoHistoryVersionCreated(currentFileId, content);
+                    }
+                } catch (e) {
+                    console.warn('创建历史版本失败', e);
+                }
             }
             if (saveResult) {
                 markPendingServerSync(currentFileId, false);
@@ -4174,6 +4255,7 @@ import {
             if (requestToken !== fileOpenRequestToken) return;
 
             expandActiveFile();
+            primeAutoHistoryState(file.id, file.content);
             global.startAutoSave();
             global.showMessage(isEn() ? 'File opened: ' + file.name : '已打开文件: ' + file.name);
         } finally {
@@ -4193,7 +4275,7 @@ import {
                 g('customAlert')(isEn() ? 'At least one file must be kept' : '至少需要保留一个文件');
                 return;
             }
-            const confirmed = await g('customConfirm')(isEn() ? 'Are you sure you want to delete this file?' : '确定要删除这个文件吗？');
+            const confirmed = await g('customConfirm')(isEn() ? `Are you sure you want to delete "${item.name}"?` : `确定要删除“${item.name}”吗？`);
             if (!confirmed) return;
 
             const idx = files.findIndex(f => f.id === id);
@@ -4203,6 +4285,7 @@ import {
             if (g('currentUser')) global.deleteFileFromServer(item.name);
             delete g('lastSyncedContent')[id];
             delete g('unsavedChanges')[id];
+            autoHistoryVersionStates.delete(id);
 
             if (id === g('currentFileId')) {
                 const firstFile = files.find(f => f.type === 'file');
@@ -4232,6 +4315,7 @@ import {
             toDelete.forEach(f => {
                 delete g('lastSyncedContent')[f.id];
                 delete g('unsavedChanges')[f.id];
+                autoHistoryVersionStates.delete(f.id);
             });
 
             if (id === g('currentFileId') || toDelete.some(f => f.id === g('currentFileId'))) {
@@ -4399,7 +4483,7 @@ import {
     }
 
     async function createHistoryVersion(filename, content) {
-        if (!g('currentUser')) return false;
+        if (!g('currentUser')) return 0;
         try {
             var api = global.getApiBaseUrl ? global.getApiBaseUrl() : 'api';
             const response = await fetch(api + '/files/history/create', {
@@ -4412,11 +4496,11 @@ import {
             // 处理 Token 过期
             if (result.code === 401 || (global.isTokenError && global.isTokenError(result))) {
                 if (await tryHandleTokenExpired(result)) {
-                    return false;
+                    return 401;
                 }
             }
 
-            return result.code === 200;
+            return Number(result.code || 0);
         } catch (e) {
             await tryHandleTokenExpired(e);
             console.error('创建历史版本失败', e);
