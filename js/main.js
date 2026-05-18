@@ -1298,6 +1298,34 @@ document.addEventListener('DOMContentLoaded', function() {
         return window.electron ? './vditor' : (window.location.protocol === 'file:' ? './vditor' : '/vditor');
     }
 
+    function markCurrentFileEdited() {
+        if (!window.currentFileId) return;
+        window.unsavedChanges[window.currentFileId] = true;
+        if (typeof window.startAutoSave === 'function') {
+            window.startAutoSave();
+        }
+        if (window.draftRecovery) {
+            window.draftRecovery.markDirty();
+        }
+        if (window.isMobileEditorEnvironment) return;
+        setTimeout(function() {
+            if (window.LazyImageLoader && window.LazyImageLoader.processVditorImages) {
+                window.LazyImageLoader.processVditorImages();
+            }
+        }, 300);
+    }
+
+    function bindVditorDirtyEvents() {
+        if (!window.vditor || !window.vditor.vditor) return;
+        var internal = window.vditor.vditor;
+        [internal.ir, internal.wysiwyg, internal.sv].forEach(function(modeState) {
+            var element = modeState && modeState.element;
+            if (!element || element.__easypocketmdDirtyBound) return;
+            element.__easypocketmdDirtyBound = true;
+            element.addEventListener('input', markCurrentFileEdited);
+        });
+    }
+
     var editorConfig = {
         height: '100%',
         width: '100%',
@@ -1373,29 +1401,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (userMenu && !loginTriggerClicked && !userMenu.contains(e.target)) userMenu.classList.remove('show');
                 });
             }
+            bindVditorDirtyEvents();
             if (window.vditor && window.vditor.vditor && window.vditor.vditor.ir) {
-                window.vditor.vditor.ir.element.addEventListener('input', function() {
-                    if (window.currentFileId) {
-                        window.unsavedChanges[window.currentFileId] = true;
-                        window.startAutoSave();
-                        // 标记草稿需要备份
-                        if (window.draftRecovery) {
-                            window.draftRecovery.markDirty();
-                        }
-                    }
-
-                    if (window.isMobileEditorEnvironment) {
-                        return;
-                    }
-
-                    // 桌面端再做图片懒处理，避免移动端输入时额外抢占主线程
-                    setTimeout(function() {
-                        if (window.LazyImageLoader && window.LazyImageLoader.processVditorImages) {
-                            window.LazyImageLoader.processVditorImages();
-                        }
-                    }, 300);
-                });
-
                 // 添加粘贴事件监听器，限制粘贴文本长度
                 window.vditor.vditor.ir.element.addEventListener('paste', function(e) {
                     var clipboardData = e.clipboardData || window.clipboardData;
@@ -2028,17 +2035,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function reinitEditorEvents() {
-        if (window.vditor && window.vditor.vditor && window.vditor.vditor.ir) {
-            window.vditor.vditor.ir.element.addEventListener('input', function() {
-                if (window.currentFileId) {
-                    window.unsavedChanges[window.currentFileId] = true;
-                    window.startAutoSave();
-                    if (window.draftRecovery) {
-                        window.draftRecovery.markDirty();
-                    }
-                }
-            });
-        }
+        bindVditorDirtyEvents();
 
         // 重新加载代码运行器模块，为新代码块添加运行按钮
         import('./code-runner.js').then(function() {

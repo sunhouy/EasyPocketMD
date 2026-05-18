@@ -47,6 +47,7 @@
   "dependencies": {
     "@fortawesome/fontawesome-free": "^7.2.0",
     "@sunhouyun/vditor": "^3.11.4",
+    "ai-tokens": "^1.0.3",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "cropperjs": "^1.6.2",
