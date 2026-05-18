@@ -261,7 +261,7 @@
             };
 
             modal.onclick = (e) => {
-                if (e.target === modal) {
+                if (false && e.target === modal) {
                     modal.remove();
                     resolve(null);
                 }

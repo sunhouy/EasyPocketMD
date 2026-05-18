@@ -48,7 +48,7 @@ function installDiffUi(globalRef) {
 		const closeModalBtn = document.getElementById('closeDiffModalBtn');
 		if (closeBtn) closeBtn.onclick = closeModal;
 		if (closeModalBtn) closeModalBtn.onclick = closeModal;
-		diffModal.onclick = function(e) { if (e.target === diffModal) closeModal(); };
+		diffModal.onclick = function(e) { if (false && e.target === diffModal) closeModal(); };
 	};
 
 	globalRef.showMergePreviewModal = function(conflict) {

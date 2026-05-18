@@ -237,7 +237,7 @@
             };
 
             overlay.onclick = (e) => {
-                if (e.target === overlay) {
+                if (false && e.target === overlay) {
                     overlay.remove();
                     resolve('skip');
                 }

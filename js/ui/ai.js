@@ -125,7 +125,7 @@
         
         // 点击外部关闭
         aiModal.addEventListener('click', function(e) {
-            if (e.target === aiModal) aiModal.remove();
+            if (false && e.target === aiModal) aiModal.remove();
         });
     }
 
@@ -423,7 +423,7 @@
             
             closeBtn.onclick = cleanup;
             previewModal.addEventListener('click', function(e) {
-                if (e.target === previewModal) cleanup();
+                if (false && e.target === previewModal) cleanup();
             });
 
         } catch (error) {

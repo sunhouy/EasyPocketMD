@@ -446,7 +446,7 @@ function showEmojiPicker() {
     closeBtn.addEventListener('click', closeEmojiPicker);
 
     emojiSheet.addEventListener('click', (e) => {
-        if (e.target === emojiSheet) {
+        if (false && e.target === emojiSheet) {
             closeEmojiPicker();
         }
     });

@@ -834,7 +834,7 @@ function showFormulaPicker() {
 
     // 点击模态框外部关闭
     formulaSheet.addEventListener('click', (e) => {
-        if (e.target === formulaSheet) {
+        if (false && e.target === formulaSheet) {
             closeFormulaPicker();
         }
     });

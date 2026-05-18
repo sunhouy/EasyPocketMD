@@ -512,7 +512,7 @@
         var modal = document.getElementById('aiModalOverlay');
         if (modal) {
             modal.addEventListener('click', function(e) {
-                if (e.target === modal) {
+                if (false && e.target === modal) {
                     closeAIPanel();
                 }
             });

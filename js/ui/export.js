@@ -139,7 +139,7 @@ async function exportContent() {
 
     // 点击外部关闭
     modal.addEventListener('click', function(e) {
-        if (e.target === modal) {
+        if (false && e.target === modal) {
             modal.remove();
         }
     });
@@ -250,7 +250,7 @@ function showFilenameDialog(defaultName, ext, callback) {
     });
 
     modal.addEventListener('click', function(e) {
-        if (e.target === modal) {
+        if (false && e.target === modal) {
             modal.remove();
         }
     });
