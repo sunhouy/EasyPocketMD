@@ -5244,58 +5244,6 @@ body.night-mode .password-strength-bar {
 }
 
 /* User settings modal styles */
-.settings-section {
-    padding: 4px 0;
-}
-
-.settings-section-header {
-    padding: 8px 0;
-    cursor: default;
-}
-
-.settings-section-title {
-    font-size: 15px;
-    font-weight: 600;
-    margin: 0;
-    color: #333;
-}
-
-.settings-section .form-group {
-    margin-bottom: 12px;
-}
-
-.settings-section .form-group:last-of-type {
-    margin-bottom: 10px;
-}
-
-.settings-section .form-group label {
-    display: block;
-    margin-bottom: 6px;
-    font-size: 14px;
-}
-
-.settings-section .form-group input {
-    width: 100%;
-    box-sizing: border-box;
-    font-size: 14px;
-    padding: 8px 12px;
-}
-
-.settings-section .modal-actions {
-    margin-top: 4px;
-}
-
-.settings-section .modal-actions .modal-btn {
-    min-height: 38px;
-    font-size: 14px;
-}
-
-.settings-section-hint {
-    margin-bottom: 12px;
-    font-size: 13px;
-    line-height: 1.5;
-}
-
 /* Ensure user settings modal has proper size */
 .account-modal {
     width: min(90vw, 440px);

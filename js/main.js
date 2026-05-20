@@ -1435,39 +1435,58 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
             }
             bindVditorDirtyEvents();
+            // 处理粘贴事件，限制长度并处理AI格式
+            function handlePasteEvent(e) {
+                var clipboardData = e.clipboardData || window.clipboardData;
+                var pastedText = clipboardData.getData('text');
+                
+                if (pastedText.length > 10000) {
+                    e.preventDefault();
+                    e.stopImmediatePropagation();
+                    window.showMessage(window.i18n ? window.i18n.t('pasteTextTooLong') : '粘贴文本过长，请减少粘贴内容后重试', 'error');
+                    return;
+                }
+                
+                var aiRegex = /\\\[[\s\S]*?\\\]|\\\([\s\S]*?\\\)|\\_/;
+                if (aiRegex.test(pastedText)) {
+                    e.preventDefault();
+                    e.stopImmediatePropagation();
+                    
+                    window.customConfirm(
+                        window.i18n && window.i18n.t('detectAiMarkdownFormat') && window.i18n.t('detectAiMarkdownFormat') !== 'detectAiMarkdownFormat' ? 
+                        window.i18n.t('detectAiMarkdownFormat') : 
+                        '检测到当前粘贴的格式可能与编辑器的KaTeX渲染格式不一致（例如包含 \\[...\\] 或 \\(...\\)）。是否自动将其转换为标准格式？'
+                    ).then(function(shouldConvert) {
+                        var textToInsert = pastedText;
+                        if (shouldConvert) {
+                            textToInsert = textToInsert.replace(/\\\[([\s\S]*?)\\\]/g, '$$$$$1$$$$');
+                            textToInsert = textToInsert.replace(/\\\(([\s\S]*?)\\\)/g, '$$$1$$');
+                            textToInsert = textToInsert.replace(/\\_/g, '_');
+                            textToInsert = textToInsert.replace(/\\\$/g, '$');
+                        }
+                        
+                        setTimeout(function() {
+                            if (window.vditor && typeof window.vditor.insertValue === 'function') {
+                                window.vditor.insertValue(textToInsert);
+                            } else {
+                                document.execCommand('insertText', false, textToInsert);
+                            }
+                        }, 10);
+                    });
+                }
+            }
+
             if (window.vditor && window.vditor.vditor && window.vditor.vditor.ir) {
-                // 添加粘贴事件监听器，限制粘贴文本长度
-                window.vditor.vditor.ir.element.addEventListener('paste', function(e) {
-                    var clipboardData = e.clipboardData || window.clipboardData;
-                    var pastedText = clipboardData.getData('text');
-                    if (pastedText.length > 10000) {
-                        e.preventDefault();
-                        window.showMessage(window.i18n ? window.i18n.t('pasteTextTooLong') : '粘贴文本过长，请减少粘贴内容后重试', 'error');
-                    }
-                });
+                window.vditor.vditor.ir.element.addEventListener('paste', handlePasteEvent, true);
             }
 
             // 为其他编辑模式添加粘贴事件监听器
             if (window.vditor && window.vditor.vditor && window.vditor.vditor.wysiwyg) {
-                window.vditor.vditor.wysiwyg.element.addEventListener('paste', function(e) {
-                    var clipboardData = e.clipboardData || window.clipboardData;
-                    var pastedText = clipboardData.getData('text');
-                    if (pastedText.length > 10000) {
-                        e.preventDefault();
-                        window.showMessage(window.i18n ? window.i18n.t('pasteTextTooLong') : '粘贴文本过长，请减少粘贴内容后重试', 'error');
-                    }
-                });
+                window.vditor.vditor.wysiwyg.element.addEventListener('paste', handlePasteEvent, true);
             }
 
             if (window.vditor && window.vditor.vditor && window.vditor.vditor.sv) {
-                window.vditor.vditor.sv.element.addEventListener('paste', function(e) {
-                    var clipboardData = e.clipboardData || window.clipboardData;
-                    var pastedText = clipboardData.getData('text');
-                    if (pastedText.length > 10000) {
-                        e.preventDefault();
-                        window.showMessage(window.i18n ? window.i18n.t('pasteTextTooLong') : '粘贴文本过长，请减少粘贴内容后重试', 'error');
-                    }
-                });
+                window.vditor.vditor.sv.element.addEventListener('paste', handlePasteEvent, true);
             }
 
             // 初始化应用生命周期管理（草稿恢复等）
