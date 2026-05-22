@@ -162,12 +162,23 @@ export function createSyncRuntimeApi(ctx: any) {
               return f.id === fileId;
             });
             if (fileIndex !== -1) {
-              const serverContent =
+              let serverContent =
                 file.type === 'folder'
                   ? ''
                   : result.data && typeof result.data.content === 'string'
                     ? result.data.content
                     : content;
+              
+              if (globalRef.currentUser && globalRef.currentUser.e2e_enabled && serverContent && file.type !== 'folder') {
+                try {
+                  const e2e = await import('../../e2e.js');
+                  const decrypted = await e2e.decrypt(serverContent, globalRef.currentUser.password);
+                  if (decrypted !== null) {
+                    serverContent = decrypted;
+                  }
+                } catch(e) { console.error('E2E Decrypt Error during sync', e); }
+              }
+              
               const isActiveFile = fileId === g('currentFileId') && file.type !== 'folder';
               const liveEditorContent = isActiveFile ? getCurrentEditorContent(fileId, files[fileIndex].content) : null;
               const hasNewerActiveEditorContent = isActiveFile && liveEditorContent !== content;
