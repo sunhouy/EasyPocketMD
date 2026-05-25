@@ -21,8 +21,15 @@
         cacheKey: '.ppt_draft_', // 缓存键前缀
         colorScheme: 'white-black', // 配色方案: white-black, black-white, traffic-light, traditional, business
         isAcademic: false,
-        userSelectedPage: false  // 用户是否手动选择了页面
+        userSelectedPage: false,  // 用户是否手动选择了页面
+        taskId: '',
+        lastServerSyncAt: '',
+        serverSyncInFlight: false,
+        notificationShownForTask: false
     };
+
+    var pptEventsBound = false;
+    var pptLifecycleEventsBound = false;
 
     // 配色方案定义
     var colorSchemes = {
@@ -65,10 +72,267 @@
 
     // 初始化PPT生成器
     function initPPTGenerator() {
-        checkCachedDraft();
         initPPTGeneratorEvents();
-        showPPTStep('input');
-        updateSourceUI();
+        initPPTLifecycleEvents();
+        syncPPTStateOnEntry();
+    }
+
+    function initPPTLifecycleEvents() {
+        if (pptLifecycleEventsBound) return;
+        pptLifecycleEventsBound = true;
+
+        document.addEventListener('visibilitychange', function() {
+            if (document.hidden && isPPTGenerationActive()) {
+                saveDraft();
+                notifyPPTGenerationInBackground('hidden');
+                syncPPTStatusToServer('background');
+            } else if (!document.hidden) {
+                syncPPTStateFromServer({ silent: true });
+            }
+        });
+
+        window.addEventListener('pagehide', function() {
+            if (!isPPTGenerationActive()) return;
+            saveDraft();
+            sendPPTStatusBeacon('background');
+            notifyPPTGenerationInBackground('pagehide');
+        });
+
+        window.addEventListener('beforeunload', function() {
+            if (!isPPTGenerationActive()) return;
+            saveDraft();
+            sendPPTStatusBeacon('background');
+        });
+
+        var aiModal = document.getElementById('aiModalOverlay');
+        if (aiModal && typeof MutationObserver !== 'undefined') {
+            var observer = new MutationObserver(function() {
+                if (aiModal.style.display === 'none' && isPPTGenerationActive()) {
+                    saveDraft();
+                    notifyPPTGenerationInBackground('modal');
+                    syncPPTStatusToServer('background');
+                }
+            });
+            observer.observe(aiModal, { attributes: true, attributeFilter: ['style', 'class'] });
+        }
+    }
+
+    function isPPTGenerationActive() {
+        return !!(pptState.isGenerating && pptState.outline && pptState.outline.length);
+    }
+
+    function getPPTTaskId() {
+        if (!pptState.taskId) {
+            var cachedTaskId = localStorage.getItem(pptState.cacheKey + 'task_id');
+            pptState.taskId = cachedTaskId || ('ppt_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 10));
+            localStorage.setItem(pptState.cacheKey + 'task_id', pptState.taskId);
+        }
+        return pptState.taskId;
+    }
+
+    function getPPTUsername() {
+        var user = g('currentUser') || {};
+        if (user.username || user.user_name || user.name) {
+            return user.username || user.user_name || user.name;
+        }
+        try {
+            var storedUser = JSON.parse(localStorage.getItem('vditor_user') || '{}');
+            return storedUser.username || storedUser.user_name || storedUser.name || 'anonymous';
+        } catch (error) {
+            return 'anonymous';
+        }
+    }
+
+    function getPPTStatusApiUrl(taskId) {
+        var base = global.getApiBaseUrl ? global.getApiBaseUrl() : '/api';
+        return base + '/ppt-status' + (taskId ? '/' + encodeURIComponent(taskId) : '/latest');
+    }
+
+    function getGeneratedPPTPageCount(pages) {
+        if (!Array.isArray(pages)) return 0;
+        return pages.reduce(function(count, page) {
+            return count + (page ? 1 : 0);
+        }, 0);
+    }
+
+    function buildPPTStatusPayload(status) {
+        return {
+            username: getPPTUsername(),
+            taskId: getPPTTaskId(),
+            topic: pptState.topic,
+            outline: pptState.outline || [],
+            pages: pptState.pages || [],
+            ratio: pptState.ratio,
+            source: pptState.source,
+            colorScheme: pptState.colorScheme,
+            isAcademic: pptState.isAcademic,
+            currentPage: pptState.currentPage,
+            totalPages: pptState.outline ? pptState.outline.length : 0,
+            status: status || (isPPTGenerationActive() ? 'generating' : 'draft')
+        };
+    }
+
+    async function syncPPTStateOnEntry() {
+        var serverApplied = await syncPPTStateFromServer({ silent: true, allowLatest: true });
+        if (!serverApplied) {
+            checkCachedDraft();
+            if (!localStorage.getItem(pptState.cacheKey + 'draft')) {
+                showPPTStep('input');
+                updateSourceUI();
+            }
+        }
+    }
+
+    async function syncPPTStateFromServer(options) {
+        options = options || {};
+        try {
+            var taskId = localStorage.getItem(pptState.cacheKey + 'task_id') || pptState.taskId;
+            if (!taskId && !options.allowLatest) {
+                return false;
+            }
+            var response = await fetch(getPPTStatusApiUrl(taskId), {
+                method: 'GET',
+                headers: {
+                    'x-ppt-user': getPPTUsername()
+                }
+            });
+            var result = global.parseJsonResponse ? await global.parseJsonResponse(response) : await response.json();
+            var serverState = result && result.code === 200 ? result.data : null;
+            if (!serverState || !serverState.outline || !serverState.outline.length) {
+                return false;
+            }
+
+            var localGenerated = getGeneratedPPTPageCount(pptState.pages);
+            var serverGenerated = getGeneratedPPTPageCount(serverState.pages);
+            var shouldApply = !pptState.outline || serverGenerated >= localGenerated || serverState.status === 'generating';
+            if (!shouldApply) return false;
+
+            applyServerPPTState(serverState);
+            saveDraft();
+            renderOutlinePreview();
+            showPPTStep('outline');
+            updateSourceUI();
+
+            var modal = document.getElementById('pptEditorModal');
+            if (modal && modal.style.display !== 'none') {
+                renderEditorPagesList();
+                renderEditorPreview(pptState.currentPage || 0);
+            }
+
+            if (!options.silent && global.showMessage) {
+                global.showMessage('已同步服务器PPT进度：' + serverGenerated + ' / ' + (pptState.outline ? pptState.outline.length : 0) + ' 页', 'success');
+            }
+            return true;
+        } catch (error) {
+            console.warn('Failed to sync PPT status from server:', error);
+            return false;
+        }
+    }
+
+    function applyServerPPTState(serverState) {
+        pptState.taskId = serverState.taskId || pptState.taskId || '';
+        if (pptState.taskId) {
+            localStorage.setItem(pptState.cacheKey + 'task_id', pptState.taskId);
+        }
+        pptState.topic = serverState.topic || pptState.topic || '';
+        pptState.outline = serverState.outline || [];
+        pptState.pages = Array.isArray(serverState.pages) ? serverState.pages : [];
+        while (pptState.pages.length < pptState.outline.length) {
+            pptState.pages.push(null);
+        }
+        pptState.ratio = serverState.ratio || pptState.ratio || '16:9';
+        pptState.source = serverState.source || pptState.source || 'current';
+        pptState.colorScheme = serverState.colorScheme || pptState.colorScheme || 'white-black';
+        pptState.isAcademic = !!serverState.isAcademic;
+        pptState.currentPage = Math.min(Number(serverState.currentPage) || 0, Math.max(0, pptState.outline.length - 1));
+        pptState.lastServerSyncAt = serverState.updatedAt || '';
+    }
+
+    async function syncPPTStatusToServer(status) {
+        if (pptState.serverSyncInFlight || !pptState.outline || !pptState.outline.length) return;
+        pptState.serverSyncInFlight = true;
+        try {
+            var response = await fetch(getPPTStatusApiUrl(getPPTTaskId()), {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-ppt-user': getPPTUsername()
+                },
+                body: JSON.stringify(buildPPTStatusPayload(status))
+            });
+            var result = global.parseJsonResponse ? await global.parseJsonResponse(response) : await response.json();
+            if (result && result.code === 200 && result.data) {
+                pptState.lastServerSyncAt = result.data.updatedAt || new Date().toISOString();
+            }
+        } catch (error) {
+            console.warn('Failed to sync PPT status to server:', error);
+        } finally {
+            pptState.serverSyncInFlight = false;
+        }
+    }
+
+    function deletePPTStatusFromServer(taskId) {
+        taskId = taskId || pptState.taskId || localStorage.getItem(pptState.cacheKey + 'task_id');
+        if (!taskId) return;
+        try {
+            fetch(getPPTStatusApiUrl(taskId), {
+                method: 'DELETE',
+                headers: {
+                    'x-ppt-user': getPPTUsername()
+                }
+            }).catch(function() {});
+        } catch (error) {}
+    }
+
+    function sendPPTStatusBeacon(status) {
+        if (!navigator.sendBeacon || !pptState.outline || !pptState.outline.length) return false;
+        try {
+            var payload = buildPPTStatusPayload(status);
+            payload.pages = [];
+            payload.generatedPages = getGeneratedPPTPageCount(pptState.pages);
+            var blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
+            return navigator.sendBeacon(getPPTStatusApiUrl(getPPTTaskId()), blob);
+        } catch (error) {
+            return false;
+        }
+    }
+
+    function notifyPPTGenerationInBackground(reason) {
+        if (!isPPTGenerationActive() || pptState.notificationShownForTask) return;
+        pptState.notificationShownForTask = true;
+
+        var generated = getGeneratedPPTPageCount(pptState.pages);
+        var total = pptState.outline ? pptState.outline.length : 0;
+        var title = isEn() ? 'PPT generation is still running' : 'PPT仍在生成中';
+        var body = isEn()
+            ? 'Progress has been synced: ' + generated + ' / ' + total + ' pages.'
+            : '已同步进度：' + generated + ' / ' + total + ' 页，重新进入会先拉取服务器状态。';
+
+        if (!('Notification' in window)) {
+            if (global.showMessage) global.showMessage(body, 'info');
+            return;
+        }
+
+        if (Notification.permission === 'granted') {
+            try {
+                new Notification(title, { body: body, tag: 'easypocketmd-ppt-' + getPPTTaskId() });
+            } catch (error) {
+                if (global.showMessage) global.showMessage(body, 'info');
+            }
+            return;
+        }
+
+        if (Notification.permission === 'default' && reason !== 'pagehide') {
+            Notification.requestPermission().then(function(permission) {
+                if (permission === 'granted' && isPPTGenerationActive()) {
+                    new Notification(title, { body: body, tag: 'easypocketmd-ppt-' + getPPTTaskId() });
+                } else if (global.showMessage) {
+                    global.showMessage(body, 'info');
+                }
+            });
+        } else if (global.showMessage) {
+            global.showMessage(body, 'info');
+        }
     }
 
     // 更新生成方式UI
@@ -99,6 +363,9 @@
 
     // 初始化事件监听
     function initPPTGeneratorEvents() {
+        if (pptEventsBound) return;
+        pptEventsBound = true;
+
         // 生成方式选择
         var fromCurrentBtn = document.getElementById('aiPPTFromCurrent');
         var fromTopicBtn = document.getElementById('aiPPTFromTopic');
@@ -208,6 +475,10 @@
             closeBtn.addEventListener('click', function() {
                 document.getElementById('pptEditorModal').style.display = 'none';
                 saveDraft();
+                if (isPPTGenerationActive()) {
+                    notifyPPTGenerationInBackground('modal');
+                    syncPPTStatusToServer('background');
+                }
             });
         }
 
@@ -557,6 +828,10 @@ ${isAcademic ? '倒数第2页：参考资料\n要点1：文献1\n要点2：文�
         
         pptState.outline = pages;
         pptState.pages = new Array(pages.length).fill(null);
+        pptState.taskId = '';
+        pptState.lastServerSyncAt = '';
+        pptState.notificationShownForTask = false;
+        localStorage.removeItem(pptState.cacheKey + 'task_id');
     }
 
     function detectAcademicContext(text) {
@@ -792,6 +1067,13 @@ ${isAcademic ? '倒数第2页：参考资料\n要点1：文献1\n要点2：文�
             return;
         }
 
+        await syncPPTStateFromServer({ silent: true });
+        pptState.isGenerating = true;
+        pptState.notificationShownForTask = false;
+        getPPTTaskId();
+        saveDraft();
+        await syncPPTStatusToServer('generating');
+
         // 显示全屏编辑器
         document.getElementById('pptEditorModal').style.display = 'flex';
         renderEditorPagesList();
@@ -800,35 +1082,44 @@ ${isAcademic ? '倒数第2页：参考资料\n要点1：文献1\n要点2：文�
         pptState.userSelectedPage = false;
 
         // 逐页生成
-        for (var i = 0; i < pptState.outline.length; i++) {
-            if (!pptState.pages[i]) {
-                // 只在用户没有手动选择页面时才自动切换
-                if (!pptState.userSelectedPage) {
-                    selectPage(i, false);
-                }
-                showEditorLoading(true);
-
-                try {
-                    await generatePage(i);
-                    renderEditorPagesList();
-                    // 只在当前页是正在生成的页面时才刷新预览
-                    if (pptState.currentPage === i) {
-                        renderEditorPreview(i);
+        try {
+            for (var i = 0; i < pptState.outline.length; i++) {
+                if (!pptState.pages[i]) {
+                    // 只在用户没有手动选择页面时才自动切换
+                    if (!pptState.userSelectedPage) {
+                        selectPage(i, false);
                     }
-                    saveDraft();
-                } catch (e) {
-                    console.error('Failed to generate page ' + (i + 1), e);
-                } finally {
-                    showEditorLoading(false);
+                    showEditorLoading(true);
+                    await syncPPTStatusToServer('generating');
+
+                    try {
+                        await generatePage(i);
+                        renderEditorPagesList();
+                        // 只在当前页是正在生成的页面时才刷新预览
+                        if (pptState.currentPage === i) {
+                            renderEditorPreview(i);
+                        }
+                        saveDraft();
+                        await syncPPTStatusToServer('generating');
+                    } catch (e) {
+                        console.error('Failed to generate page ' + (i + 1), e);
+                        await syncPPTStatusToServer('error');
+                    } finally {
+                        showEditorLoading(false);
+                    }
+
+                    await new Promise(r => setTimeout(r, 500));
                 }
-
-                await new Promise(r => setTimeout(r, 500));
             }
-        }
 
-        // 如果用户没有手动选择，最后跳转到第一页
-        if (!pptState.userSelectedPage) {
-            selectPage(0, false);
+            // 如果用户没有手动选择，最后跳转到第一页
+            if (!pptState.userSelectedPage) {
+                selectPage(0, false);
+            }
+            await syncPPTStatusToServer('completed');
+        } finally {
+            pptState.isGenerating = false;
+            saveDraft();
         }
     }
 
@@ -2190,6 +2481,9 @@ JSON 结构：
             ratio: pptState.ratio,
             source: pptState.source,
             colorScheme: pptState.colorScheme,
+            isAcademic: pptState.isAcademic,
+            taskId: pptState.taskId,
+            lastServerSyncAt: pptState.lastServerSyncAt,
             timestamp: new Date().toISOString()
         };
         localStorage.setItem(pptState.cacheKey + 'draft', JSON.stringify(draft));
@@ -2212,6 +2506,12 @@ JSON 结构：
                             pptState.ratio = draft.ratio || '16:9';
                             pptState.source = draft.source || 'current';
                             pptState.colorScheme = draft.colorScheme || 'white-black';
+                            pptState.isAcademic = !!draft.isAcademic;
+                            pptState.taskId = draft.taskId || pptState.taskId || '';
+                            pptState.lastServerSyncAt = draft.lastServerSyncAt || '';
+                            if (pptState.taskId) {
+                                localStorage.setItem(pptState.cacheKey + 'task_id', pptState.taskId);
+                            }
                             
                             var input = document.getElementById('aiPPTInput');
                             if (input && pptState.outline) {
@@ -2226,6 +2526,8 @@ JSON 结构：
                         },
                         function() {
                             clearDraft();
+                            showPPTStep('input');
+                            updateSourceUI();
                         }
                     );
                 } else {
@@ -2239,7 +2541,11 @@ JSON 结构：
 
     // 清除草稿
     function clearDraft() {
+        deletePPTStatusFromServer();
         localStorage.removeItem(pptState.cacheKey + 'draft');
+        localStorage.removeItem(pptState.cacheKey + 'task_id');
+        pptState.taskId = '';
+        pptState.lastServerSyncAt = '';
     }
 
     // 调用AI API

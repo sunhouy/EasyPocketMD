@@ -99,6 +99,7 @@ const convertRoutes = require('./routes/convert');
 const aiRoutes = require('./routes/ai');
 const userFilesRoutes = require('./routes/user_files');
 const pptExportRoutes = require('./routes/ppt-export');
+const pptStatusRoutes = require('./routes/ppt-status');
 const pexelsRoutes = require('./routes/pexels');
 const gatusRoutes = require('./routes/gatus');
 const shareManager = require('./models/ShareManager');
@@ -136,6 +137,9 @@ app.use('/api/convert', convertLimiter, convertRoutes);
 
 // PPT Export routes - rate limiting for PPT export
 app.use('/api/ppt-export', convertLimiter, pptExportRoutes);
+
+// PPT generation progress/status sync
+app.use('/api/ppt-status', apiLimiter, pptStatusRoutes);
 
 // Pexels routes - rate limiting for image search
 app.use('/api/pexels', aiLimiter, pexelsRoutes);
