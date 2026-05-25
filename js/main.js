@@ -141,7 +141,7 @@ document.addEventListener('DOMContentLoaded', function() {
             return true;
         }
 
-        var closeBtn = overlay.querySelector('.modal-close-btn, #closeDiffModalBtn, #closeHistoryBtn, #closeAboutBtn, #closeServiceStatusBtn, #cancelSettingsBtn');
+        var closeBtn = overlay.querySelector('.modal-close-btn, #closeDiffModalBtn, #closeHistoryBtn, #closeAboutBtn, #closeServiceStatusBtn, #cancelSettingsBtn, .delete-confirm-cancel, #importCancelBtn, #cancelChangePasswordBtn, #cancelDeleteAccountBtn, #cancelAddAccountBtn, #cancelSwitchAccountBtn, #cancelFileDiffBtn, #cancelAIBtn, #cancelUncertaintyBtn, #cancelConnectionBtn');
         if (closeBtn) {
             closeBtn.click();
         } else {
@@ -610,6 +610,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function handleGlobalKeyboardShortcuts(event) {
         if (event.defaultPrevented || event.isComposing) return;
+
         if (isFormInputTarget(event.target)) return;
 
         var shortcutValue = buildShortcutFromKeyboardEvent(event);
@@ -922,6 +923,24 @@ document.addEventListener('DOMContentLoaded', function() {
         if (keyboardShortcutListenerInitialized) return;
         keyboardShortcutListenerInitialized = true;
         document.addEventListener('keydown', handleGlobalKeyboardShortcuts, true);
+        
+        document.addEventListener('keydown', function(event) {
+            if (event.defaultPrevented) return;
+            if (event.key === 'Escape') {
+                if (typeof getVisibleModalOverlays === 'function') {
+                    var visibleModals = getVisibleModalOverlays();
+                    if (visibleModals.length > 0) {
+                        var topModal = visibleModals[visibleModals.length - 1];
+                        if (typeof closeOverlayByBackPress === 'function') {
+                            closeOverlayByBackPress(topModal);
+                        }
+                        event.preventDefault();
+                        event.stopPropagation();
+                        event.stopImmediatePropagation();
+                    }
+                }
+            }
+        });
     }
 
     async function handleBottomSave() {
