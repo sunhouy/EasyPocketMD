@@ -1636,7 +1636,7 @@
             e2eCheckbox.addEventListener('change', async function() {
                 if (!global.currentUser || !global.currentUser.token) {
                     this.checked = false;
-                    global.showMessage('请先登录以设置端到端加密', 'error');
+                    global.showMessage('请先登录以设置默认端到端加密', 'error');
                     return;
                 }
                 
@@ -1644,7 +1644,7 @@
                 
                 // 弹窗确认密码或者直接用currentUser.password？
                 if (isEnabled && !global.currentUser.password) {
-                    global.showMessage('需要登录密码作为加密密钥，请重新登录', 'error');
+                        global.showMessage('需要登录密码作为默认加密密钥，请重新登录', 'error');
                     this.checked = false;
                     return;
                 }
@@ -1664,13 +1664,13 @@
                     const result = await response.json();
                     if (result.code === 200) {
                         global.currentUser.e2e_enabled = isEnabled ? 1 : 0;
-                        global.showMessage(isEnabled ? '端到端加密已开启' : '端到端加密已关闭', 'success');
+                        global.showMessage(isEnabled ? '默认端到端加密已开启' : '默认端到端加密已关闭', 'success');
                     } else {
                         throw new Error(result.message);
                     }
                 } catch(e) {
                     this.checked = !isEnabled;
-                    global.showMessage('设置端到端加密失败: ' + e.message, 'error');
+                    global.showMessage('设置默认端到端加密失败: ' + e.message, 'error');
                 }
             });
         }

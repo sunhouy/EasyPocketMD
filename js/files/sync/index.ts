@@ -12,12 +12,21 @@ export function normalizeServerFileRecord(f: any): any {
   const hasContentVersion =
     (f.content_version !== undefined && f.content_version !== null && f.content_version !== '') ||
     (f.contentVersion !== undefined && f.contentVersion !== null && f.contentVersion !== '');
+  const hasE2E =
+    (f.e2e_enabled !== undefined && f.e2e_enabled !== null && f.e2e_enabled !== '') ||
+    (f.e2eEnabled !== undefined && f.e2eEnabled !== null && f.e2eEnabled !== '');
+  const rawE2E = f.e2e_enabled !== undefined && f.e2e_enabled !== null && f.e2e_enabled !== ''
+    ? f.e2e_enabled
+    : f.e2eEnabled;
+  const e2eEnabled = hasE2E && (rawE2E === true || rawE2E === 1 || rawE2E === '1' || rawE2E === 'true') ? 1 : 0;
 
   return {
     ...f,
     name,
     type,
     content,
+    e2e_enabled: e2eEnabled,
+    e2eEnabled: !!e2eEnabled,
     lastModified: f.last_modified || f.lastModified || null,
     serverLastModified: f.last_modified || f.lastModified || null,
     contentVersion: hasContentVersion ? Number(f.content_version ?? f.contentVersion) : null,
@@ -37,6 +46,14 @@ export function createSyncRuntimeApi(ctx: any) {
     isEn,
   } = ctx;
   const fileSyncLocks = new Map<string, Promise<any>>();
+
+  function isFileE2EEnabled(file: any) {
+    if (!file) return false;
+    const raw = file.e2e_enabled !== undefined && file.e2e_enabled !== null && file.e2e_enabled !== ''
+      ? file.e2e_enabled
+      : file.e2eEnabled;
+    return raw === true || raw === 1 || raw === '1' || raw === 'true';
+  }
 
   function startAutoSync() {
     if (globalRef.syncInterval) clearInterval(globalRef.syncInterval);
@@ -122,7 +139,8 @@ export function createSyncRuntimeApi(ctx: any) {
           const api = globalRef.getApiBaseUrl ? globalRef.getApiBaseUrl() : 'api';
           
           let contentToSend = content;
-          if (globalRef.currentUser && globalRef.currentUser.e2e_enabled && contentToSend && file.type !== 'folder') {
+          const fileE2EEnabled = isFileE2EEnabled(file);
+          if (globalRef.currentUser && fileE2EEnabled && contentToSend && file.type !== 'folder') {
             try {
               const e2e = await import('../../e2e.js');
               contentToSend = await e2e.encrypt(contentToSend, globalRef.currentUser.password);
@@ -133,6 +151,7 @@ export function createSyncRuntimeApi(ctx: any) {
             username: g('currentUser').username,
             filename: filenameToSend,
             content: contentToSend,
+            e2e_enabled: fileE2EEnabled ? 1 : 0,
             base_last_modified: baseLastModified,
           };
           const baseContentForCrdt =
@@ -165,7 +184,9 @@ export function createSyncRuntimeApi(ctx: any) {
               let serverContent =
                 file.type === 'folder'
                   ? ''
-                  : result.data && typeof result.data.content === 'string'
+                  : fileE2EEnabled
+                    ? content
+                    : result.data && typeof result.data.content === 'string'
                     ? result.data.content
                     : content;
               
@@ -190,6 +211,8 @@ export function createSyncRuntimeApi(ctx: any) {
                 }
               }
               files[fileIndex].isSynced = true;
+              files[fileIndex].e2e_enabled = result.data && result.data.e2e_enabled !== undefined ? (result.data.e2e_enabled ? 1 : 0) : (fileE2EEnabled ? 1 : 0);
+              files[fileIndex].e2eEnabled = !!files[fileIndex].e2e_enabled;
               delete files[fileIndex].serverDeleted;
               delete files[fileIndex].serverDeletedNotified;
               delete files[fileIndex].crdtBaseContent;
@@ -220,6 +243,9 @@ export function createSyncRuntimeApi(ctx: any) {
               g('unsavedChanges')[fileId] = false;
               markPendingServerSync(fileId, false);
               localStorage.setItem('vditor_files', JSON.stringify(files));
+              if (typeof globalRef.refreshE2EUi === 'function') {
+                globalRef.refreshE2EUi();
+              }
             }
             return true;
           }
@@ -301,7 +327,8 @@ export function createSyncRuntimeApi(ctx: any) {
     markPendingServerSync(currentFileId, true);
 
     let contentToSend = content;
-    if (g('currentUser') && g('currentUser').e2e_enabled && window.e2eEncryptSync) {
+    const fileE2EEnabled = isFileE2EEnabled(file);
+    if (g('currentUser') && fileE2EEnabled && window.e2eEncryptSync) {
       try {
         const encrypted = window.e2eEncryptSync(contentToSend, g('currentUser').password);
         if (encrypted && encrypted !== contentToSend) {
@@ -315,6 +342,7 @@ export function createSyncRuntimeApi(ctx: any) {
       token: g('currentUser').token,
       filename: file.name,
       content: contentToSend,
+      e2e_enabled: fileE2EEnabled ? 1 : 0,
       base_last_modified: file.serverLastModified || null,
     };
     const beaconBaseContent =
