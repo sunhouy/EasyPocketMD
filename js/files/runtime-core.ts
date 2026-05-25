@@ -1655,6 +1655,74 @@ import {
         return raw === true || raw === 1 || raw === '1' || raw === 'true';
     }
 
+    let e2eTooltipElement = null;
+
+    async function generateLocalKeyFingerprint() {
+        const user = g('currentUser');
+        if (!user || !user.password) return 'Unknown';
+        try {
+            const buffer = new TextEncoder().encode(user.password);
+            const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+            return hashHex.substring(0, 16).match(/.{4}/g).join('-');
+        } catch(e) {
+            return 'Unknown';
+        }
+    }
+
+    async function showE2ETooltip(targetEl) {
+        if (!e2eTooltipElement) {
+            e2eTooltipElement = document.createElement('div');
+            e2eTooltipElement.id = 'e2eTooltip';
+            document.body.appendChild(e2eTooltipElement);
+        }
+
+        const isNightMode = document.body.classList.contains('night-mode');
+        const bgColor = isNightMode ? '#2d2d2d' : '#fff';
+        const textColor = isNightMode ? '#d1d5db' : '#333';
+        const borderColor = isNightMode ? '#444' : '#e0e0e0';
+        const codeBgColor = isNightMode ? '#1e1e1e' : '#f5f5f5';
+
+        e2eTooltipElement.style.cssText = `position: absolute; z-index: 10000; background: ${bgColor}; color: ${textColor}; border: 1px solid ${borderColor}; border-radius: 6px; padding: 12px; font-size: 13px; box-shadow: 0 4px 16px rgba(0,0,0,0.2); width: 220px; display: none; pointer-events: none;`;
+
+        const rect = targetEl.getBoundingClientRect();
+        const fingerprint = await generateLocalKeyFingerprint();
+        
+        const text1 = isEn() ? 'This file is end-to-end encrypted' : '本文件已进行端到端加密';
+        const text2 = isEn() ? 'Local Key Fingerprint:' : '本地密钥指纹信息：';
+        
+        e2eTooltipElement.innerHTML = `
+            <div style="font-weight: 500; margin-bottom: 8px; display: flex; align-items: flex-start; gap: 6px;">
+                <i class="fas fa-lock" style="color: #4a90e2; margin-top: 2px;"></i>
+                <div style="line-height: 1.3;">${text1}</div>
+            </div>
+            <div style="font-size: 12px; opacity: 0.85;">
+                <div style="margin-bottom: 4px;">${text2}</div>
+                <code style="display: block; padding: 6px; background: ${codeBgColor}; border: 1px solid ${borderColor}; border-radius: 4px; font-family: monospace; text-align: center; font-size: 11px;">${fingerprint}</code>
+            </div>
+        `;
+
+        e2eTooltipElement.style.display = 'block';
+        
+        let top = rect.bottom + window.scrollY + 8;
+        let left = rect.left + window.scrollX - 110 + (rect.width / 2);
+        
+        if (left < 10) left = 10;
+        if (left + 240 > window.innerWidth) {
+            left = window.innerWidth - 250;
+        }
+        
+        e2eTooltipElement.style.top = top + 'px';
+        e2eTooltipElement.style.left = left + 'px';
+    }
+
+    function hideE2ETooltip() {
+        if (e2eTooltipElement) {
+            e2eTooltipElement.style.display = 'none';
+        }
+    }
+
     function updateCurrentFileE2EIndicator() {
         const indicators = document.querySelectorAll('.current-file-e2e-indicator');
         if (!indicators.length) return;
@@ -1665,9 +1733,44 @@ import {
         indicators.forEach(function(indicator) {
             indicator.style.display = enabled ? 'inline-flex' : 'none';
             indicator.setAttribute('aria-hidden', enabled ? 'false' : 'true');
-            indicator.title = enabled
-                ? (isEn() ? 'This file uses end-to-end encryption' : '此文件已使用端到端加密')
-                : '';
+            indicator.removeAttribute('title'); // 使用自定义浮窗代替
+            
+            if (!indicator.dataset.e2eEventsBound) {
+                indicator.dataset.e2eEventsBound = 'true';
+                indicator.style.cursor = 'pointer';
+                
+                indicator.addEventListener('mouseenter', function(e) {
+                    if (window.innerWidth >= 768) {
+                        showE2ETooltip(indicator);
+                    }
+                });
+                
+                indicator.addEventListener('mouseleave', function(e) {
+                    if (window.innerWidth >= 768) {
+                        hideE2ETooltip();
+                    }
+                });
+                
+                indicator.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    if (window.innerWidth < 768) {
+                        if (e2eTooltipElement && e2eTooltipElement.style.display === 'block') {
+                            hideE2ETooltip();
+                        } else {
+                            showE2ETooltip(indicator);
+                            const outsideClickListener = (ev) => {
+                                if (!indicator.contains(ev.target) && (!e2eTooltipElement || !e2eTooltipElement.contains(ev.target))) {
+                                    hideE2ETooltip();
+                                    document.removeEventListener('click', outsideClickListener);
+                                }
+                            };
+                            setTimeout(() => {
+                                document.addEventListener('click', outsideClickListener);
+                            }, 0);
+                        }
+                    }
+                });
+            }
         });
     }
 
