@@ -5787,7 +5787,33 @@ import {
     async function convertDocToMarkdown(file) {
         const arrayBuffer = await file.arrayBuffer();
         const bytes = new Uint8Array(arrayBuffer);
-        var text = extractTextFromBinary(bytes);
+        let text = '';
+        try {
+            const xlsxModule = await import('xlsx');
+            const XLSX = xlsxModule.default || xlsxModule;
+            if (XLSX && XLSX.CFB) {
+                const cfb = XLSX.CFB.read(bytes, { type: 'array' });
+                const docStream = cfb.FileIndex.find(function(e) { return e.name === 'WordDocument'; });
+                const tableStream = cfb.FileIndex.find(function(e) { return e.name === '1Table' || e.name === '0Table'; });
+                
+                let combinedBytes = [];
+                if (docStream && docStream.content) {
+                    combinedBytes = combinedBytes.concat(Array.from(docStream.content));
+                }
+                if (tableStream && tableStream.content) {
+                    combinedBytes = combinedBytes.concat(Array.from(tableStream.content));
+                }
+                
+                if (combinedBytes.length > 0) {
+                    text = extractTextFromBinary(new Uint8Array(combinedBytes));
+                }
+            }
+        } catch (e) {
+            console.warn('CFB doc parse failed, falling back to binary extraction', e);
+        }
+        if (!text) {
+            text = extractTextFromBinary(bytes);
+        }
         if (!text || !text.trim()) {
             throw new Error(isEn() ? 'The DOC file appears to be empty or cannot be read' : 'DOC 文件内容为空或无法读取');
         }
@@ -5797,7 +5823,23 @@ import {
     async function convertPptToMarkdown(file) {
         const arrayBuffer = await file.arrayBuffer();
         const bytes = new Uint8Array(arrayBuffer);
-        var text = extractTextFromBinary(bytes);
+        let text = '';
+        try {
+            const xlsxModule = await import('xlsx');
+            const XLSX = xlsxModule.default || xlsxModule;
+            if (XLSX && XLSX.CFB) {
+                const cfb = XLSX.CFB.read(bytes, { type: 'array' });
+                const pptStream = cfb.FileIndex.find(function(e) { return e.name === 'PowerPoint Document'; });
+                if (pptStream && pptStream.content) {
+                    text = extractTextFromBinary(pptStream.content);
+                }
+            }
+        } catch (e) {
+            console.warn('CFB ppt parse failed, falling back to binary extraction', e);
+        }
+        if (!text) {
+            text = extractTextFromBinary(bytes);
+        }
         if (!text || !text.trim()) {
             throw new Error(isEn() ? 'The PPT file appears to be empty or cannot be read' : 'PPT 文件内容为空或无法读取');
         }
@@ -5810,42 +5852,43 @@ import {
     }
 
     function extractTextFromBinary(bytes) {
-        var chunks = [];
-        var i = 0;
-        while (i < bytes.length) {
-            if (bytes[i] >= 32 && bytes[i] < 127) {
-                var start = i;
-                while (i < bytes.length && bytes[i] >= 32 && bytes[i] < 127) {
-                    i++;
-                }
-                if (i - start >= 3) {
-                    var str = '';
-                    for (var j = start; j < i; j++) {
-                        str += String.fromCharCode(bytes[j]);
-                    }
-                    chunks.push(str);
-                } else {
-                    i++;
-                }
-            } else if (bytes[i] === 0 && i + 1 < bytes.length) {
-                var start = i;
-                while (i + 1 < bytes.length && bytes[i] === 0 && bytes[i + 1] >= 32 && bytes[i + 1] < 127) {
-                    i += 2;
-                }
-                if ((i - start) / 2 >= 3) {
-                    var str = '';
-                    for (var j = start; j < i; j += 2) {
-                        str += String.fromCharCode(bytes[j + 1]);
-                    }
-                    chunks.push(str);
-                } else {
-                    i++;
-                }
-            } else {
-                i++;
-            }
+        if (!bytes || bytes.length === 0) return '';
+        var filterRegex = /[^\x20-\x7E\u4E00-\u9FFF\u3000-\u303F\uFF00-\uFFEF\n\r\t]/g;
+        
+        function decodeAndFilter(decoder, buffer) {
+            var text = decoder.decode(buffer);
+            return text.replace(filterRegex, '\0')
+                       .split(/\0+/)
+                       .map(function(c) { return c.trim(); })
+                       .filter(function(c) { return c.length >= 2; });
         }
-        return chunks.join(' ').replace(/\s+/g, ' ').trim();
+        
+        var decoder16 = new TextDecoder('utf-16le', { fatal: false });
+        var decoderGBK = new TextDecoder('gbk', { fatal: false });
+        
+        var chunks16_0 = decodeAndFilter(decoder16, bytes);
+        var chunks16_1 = decodeAndFilter(decoder16, bytes.slice(1));
+        var chunksGBK = decodeAndFilter(decoderGBK, bytes);
+        
+        function score(chunks) {
+            var text = chunks.join('');
+            var cjkMatch = text.match(/[\u4E00-\u9FFF]/g);
+            var cjkCount = cjkMatch ? cjkMatch.length : 0;
+            var asciiMatch = text.match(/[a-zA-Z0-9]/g);
+            var asciiCount = asciiMatch ? asciiMatch.length : 0;
+            return (cjkCount * 50) + asciiCount; 
+        }
+        
+        var scores = [
+            { chunks: chunks16_0, score: score(chunks16_0) },
+            { chunks: chunks16_1, score: score(chunks16_1) },
+            { chunks: chunksGBK, score: score(chunksGBK) }
+        ];
+        
+        scores.sort(function(a, b) { return b.score - a.score; });
+        var bestChunks = scores[0].chunks;
+        
+        return bestChunks.join('\n').replace(/\n{3,}/g, '\n\n').trim();
     }
 
     function readFileAsText(file) {

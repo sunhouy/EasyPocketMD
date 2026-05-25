@@ -49,6 +49,7 @@
     "@sunhouyun/vditor": "^3.11.4",
     "ai-tokens": "^1.0.3",
     "bcryptjs": "^2.4.3",
+    "cfb": "^1.2.2",
     "cors": "^2.8.5",
     "cropperjs": "^1.6.2",
     "crypto-js": "^4.2.0",
