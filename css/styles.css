@@ -2104,6 +2104,27 @@ body.night-mode {
     right: auto;
 }
 
+.current-file-e2e-indicator {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    color: #1f8f4d;
+    font-size: 15px;
+}
+
+.desktop-e2e-indicator {
+    width: 24px;
+    height: 24px;
+    margin-left: 6px;
+    color: #1f7a45;
+}
+
+.dropdown-item.active {
+    color: #1f7a45;
+}
+
 .editor-mode-toggle:hover,
 .editor-save-btn:hover {
     transform: scale(1.1);

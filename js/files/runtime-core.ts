@@ -1437,7 +1437,8 @@ import {
                     let content = f.content;
                     let name = f.name.startsWith('/') ? f.name.substring(1) : f.name;
 
-                    if (window.currentUser && window.currentUser.e2e_enabled && content) {
+                    const fileE2EEnabled = isFileE2EEnabled(f);
+                    if (window.currentUser && fileE2EEnabled && content) {
                         try {
                             const e2e = await import('../e2e.js');
                             const decrypted = await e2e.decrypt(content, window.currentUser.password);
@@ -1465,6 +1466,8 @@ import {
                         name: name,
                         type: type,
                         content: content,
+                        e2e_enabled: fileE2EEnabled ? 1 : 0,
+                        e2eEnabled: fileE2EEnabled,
                         lastModified: serverLastModified,
                         serverLastModified: serverLastModified,
                         contentVersion: hasServerContentVersion ? Number(f.content_version ?? f.contentVersion) : null
@@ -1502,6 +1505,8 @@ import {
                         const hasLocalContentVersion = f.content_version !== undefined && f.content_version !== null && f.content_version !== '';
                         f.contentVersion = hasLocalContentVersion ? Number(f.content_version) : null;
                     }
+                    if (f.e2eEnabled === undefined) f.e2eEnabled = isFileE2EEnabled(f);
+                    if (f.e2e_enabled === undefined) f.e2e_enabled = f.e2eEnabled ? 1 : 0;
                     normalizeExternalLocalFileRecord(f);
                 });
                 syncCurrentEditorSnapshotIntoFiles(localFiles);
@@ -1561,6 +1566,58 @@ import {
         return normalizeServerFileRecordCore(f);
     }
 
+    function isFileE2EEnabled(file) {
+        if (!file) return false;
+        const raw = file.e2e_enabled !== undefined && file.e2e_enabled !== null && file.e2e_enabled !== ''
+            ? file.e2e_enabled
+            : file.e2eEnabled;
+        return raw === true || raw === 1 || raw === '1' || raw === 'true';
+    }
+
+    function updateCurrentFileE2EIndicator() {
+        const indicators = document.querySelectorAll('.current-file-e2e-indicator');
+        if (!indicators.length) return;
+        const currentFile = (g('files') || []).find(function(file) {
+            return file && file.id === g('currentFileId') && file.type === 'file';
+        });
+        const enabled = isFileE2EEnabled(currentFile);
+        indicators.forEach(function(indicator) {
+            indicator.style.display = enabled ? 'inline-flex' : 'none';
+            indicator.setAttribute('aria-hidden', enabled ? 'false' : 'true');
+            indicator.title = enabled
+                ? (isEn() ? 'This file uses end-to-end encryption' : '此文件已使用端到端加密')
+                : '';
+        });
+    }
+
+    function updateFileE2EMenuItems() {
+        const currentFile = (g('files') || []).find(function(file) {
+            return file && file.id === g('currentFileId') && file.type === 'file';
+        });
+        const enabled = isFileE2EEnabled(currentFile);
+        [
+            document.getElementById('desktopToggleFileE2EBtn'),
+            document.getElementById('mobileToggleFileE2EBtn')
+        ].forEach(function(btn) {
+            if (!btn) return;
+            btn.classList.toggle('active', enabled);
+            btn.setAttribute('aria-pressed', enabled ? 'true' : 'false');
+            const text = btn.querySelector('.file-e2e-toggle-text');
+            if (text) {
+                text.textContent = enabled
+                    ? (isEn() ? 'Disable E2E for this file' : '关闭当前文件端到端加密')
+                    : (isEn() ? 'Enable E2E for this file' : '开启当前文件端到端加密');
+            }
+            const icon = btn.querySelector('i');
+            if (icon) icon.className = enabled ? 'fas fa-lock' : 'fas fa-lock-open';
+        });
+    }
+
+    function refreshE2EUi() {
+        updateCurrentFileE2EIndicator();
+        updateFileE2EMenuItems();
+    }
+
     function getServerDeletedEditingMessage(file) {
         const name = file && file.name ? file.name : (isEn() ? 'Current file' : '当前文件');
         return isEn()
@@ -1618,19 +1675,16 @@ import {
         const result = global.parseJsonResponse ? await global.parseJsonResponse(response) : await response.json();
         if (result.code !== 200 || !result.data || !Array.isArray(result.data.files)) return;
 
-        let initialServerFiles = result.data.files;
-        if (window.currentUser && window.currentUser.e2e_enabled) {
-            initialServerFiles = await Promise.all(initialServerFiles.map(async f => {
-                if (f.content) {
-                    try {
-                        const e2e = await import('../e2e.js');
-                        const decrypted = await e2e.decrypt(f.content, window.currentUser.password);
-                        if (decrypted !== null) f.content = decrypted;
-                    } catch(e) { console.error(e); }
-                }
-                return f;
-            }));
-        }
+        let initialServerFiles = await Promise.all(result.data.files.map(async f => {
+            if (window.currentUser && isFileE2EEnabled(f) && f.content) {
+                try {
+                    const e2e = await import('../e2e.js');
+                    const decrypted = await e2e.decrypt(f.content, window.currentUser.password);
+                    if (decrypted !== null) f.content = decrypted;
+                } catch(e) { console.error(e); }
+            }
+            return f;
+        }));
         const serverFiles = initialServerFiles.map(normalizeServerFileRecord);
         const serverMap = {};
         serverFiles.forEach(function(sf) {
@@ -1657,6 +1711,8 @@ import {
                 contentVersion: serverFile.contentVersion !== null && serverFile.contentVersion !== undefined
                     ? Number(serverFile.contentVersion)
                     : null,
+                e2e_enabled: isFileE2EEnabled(serverFile) ? 1 : 0,
+                e2eEnabled: isFileE2EEnabled(serverFile),
                 isSynced: true
             };
             files.push(newFile);
@@ -1712,13 +1768,16 @@ import {
             const hasLocalChanges = !file.isSynced || unsavedChanges[file.id] || editorContent !== baseContent;
             if (hasLocalChanges) return;
 
-            if (serverFile.content !== editorContent) {
+            const e2eChanged = isFileE2EEnabled(file) !== isFileE2EEnabled(serverFile);
+            if (serverFile.content !== editorContent || e2eChanged) {
                 file.content = serverFile.content;
                 file.lastModified = serverFile.lastModified || file.lastModified || null;
                 file.serverLastModified = serverFile.serverLastModified || serverFile.lastModified || file.serverLastModified || null;
                 file.contentVersion = serverFile.contentVersion !== null && serverFile.contentVersion !== undefined
                     ? Number(serverFile.contentVersion)
                     : file.contentVersion;
+                file.e2e_enabled = isFileE2EEnabled(serverFile) ? 1 : 0;
+                file.e2eEnabled = isFileE2EEnabled(serverFile);
                 file.isSynced = true;
                 delete file.serverDeleted;
                 delete file.serverDeletedNotified;
@@ -1790,11 +1849,22 @@ import {
 
                 // 使用现有的保存接口（verifyUser 支持 body.token），避免依赖自定义 Header（sendBeacon 也可用）
                 const filenameToSend = f.type === 'folder' ? (f.name.endsWith('/') ? f.name : (f.name + '/')) : f.name;
+                const fileE2EEnabled = isFileE2EEnabled(f);
+                let contentToSend = f.type === 'folder' ? '{"meta":"folder"}' : content;
+                if (fileE2EEnabled && contentToSend) {
+                    try {
+                        const e2e = await import('../e2e.js');
+                        contentToSend = await e2e.encrypt(contentToSend, uploadUser.password);
+                    } catch(e) {
+                        console.error('E2E Encrypt Error', e);
+                    }
+                }
                 const body = {
                     username: uploadUser.username,
                     token: uploadUser.token,
                     filename: filenameToSend,
-                    content: f.type === 'folder' ? '{"meta":"folder"}' : content,
+                    content: contentToSend,
+                    e2e_enabled: fileE2EEnabled ? 1 : 0,
                     base_last_modified: f.serverLastModified || null
                 };
 
@@ -1825,12 +1895,16 @@ import {
                         const retryR = global.parseJsonResponse ? await global.parseJsonResponse(retryResp) : await retryResp.json();
                         if (retryR.code === 200) {
                             f.isSynced = true;
+                            f.e2e_enabled = fileE2EEnabled ? 1 : 0;
+                            f.e2eEnabled = fileE2EEnabled;
                             f.lastModified = Date.now();
                             serverFiles.push({
                                 name: f.name,
                                 type: f.type,
                                 content: f.type === 'folder' ? '{"meta":"folder"}' : content,
-                                lastModified: f.lastModified
+                                lastModified: f.lastModified,
+                                e2e_enabled: fileE2EEnabled ? 1 : 0,
+                                e2eEnabled: fileE2EEnabled
                             });
                         }
                     }
@@ -1840,6 +1914,8 @@ import {
                 if (r.code === 200) {
                     // 标记本地为已同步，并把它加入 serverFiles，避免后续被当成缺失
                     f.isSynced = true;
+                    f.e2e_enabled = fileE2EEnabled ? 1 : 0;
+                    f.e2eEnabled = fileE2EEnabled;
                     f.lastModified = Date.now();
                     f.serverLastModified = r.data && r.data.last_modified ? r.data.last_modified : f.lastModified;
                     f.contentVersion = Number(r.data && r.data.content_version ? r.data.content_version : (f.contentVersion || 1));
@@ -1849,7 +1925,9 @@ import {
                         content: f.type === 'folder' ? '{"meta":"folder"}' : content,
                         lastModified: f.lastModified,
                         serverLastModified: f.serverLastModified,
-                        contentVersion: f.contentVersion
+                        contentVersion: f.contentVersion,
+                        e2e_enabled: fileE2EEnabled ? 1 : 0,
+                        e2eEnabled: fileE2EEnabled
                     });
                 } else {
                     console.warn('自动上传失败:', f.name, r.message);
@@ -1959,6 +2037,8 @@ import {
                 lastModified: serverLastModified,
                 serverLastModified: serverLastModified,
                 contentVersion: hasVersion ? Number(serverFile.contentVersion ?? serverFile.content_version) : null,
+                e2e_enabled: isFileE2EEnabled(serverFile) ? 1 : 0,
+                e2eEnabled: isFileE2EEnabled(serverFile),
                 isSynced: true
             };
             mergedFiles.push(file);
@@ -1977,13 +2057,16 @@ import {
                 }
                 const localBaseContent = localFile && localFile.id ? lastSyncedContent[localFile.id] : undefined;
                 if (localFile.type === 'file' && mergedServerFile.type === 'file') {
-                    if (localFile.content !== mergedServerFile.content) {
+                    const e2eChanged = isFileE2EEnabled(localFile) !== isFileE2EEnabled(mergedServerFile);
+                    if (localFile.content !== mergedServerFile.content || e2eChanged) {
                         const baseContent = typeof localBaseContent === 'string' ? localBaseContent : '';
                         const baseVersionRaw = Number(localFile.contentVersion);
                         mergedServerFile.content = localFile.content;
                         mergedServerFile.lastModified = localFile.lastModified || Date.now();
                         mergedServerFile.serverLastModified = mergedServerFile.serverLastModified || null;
                         mergedServerFile.contentVersion = Number.isFinite(baseVersionRaw) ? baseVersionRaw : 0;
+                        mergedServerFile.e2e_enabled = isFileE2EEnabled(localFile) ? 1 : 0;
+                        mergedServerFile.e2eEnabled = isFileE2EEnabled(localFile);
                         mergedServerFile.isSynced = false;
                         mergedServerFile.crdtBaseContent = baseContent;
                         mergedServerFile.crdtBaseContentVersion = Number.isFinite(baseVersionRaw) ? baseVersionRaw : 0;
@@ -3091,6 +3174,8 @@ import {
             type: 'file',
             content: '# ' + getBasename(path) + '\n\n',
             lastModified: Date.now(),
+            e2e_enabled: g('currentUser') && g('currentUser').e2e_enabled ? 1 : 0,
+            e2eEnabled: !!(g('currentUser') && g('currentUser').e2e_enabled),
             isSynced: false
         };
         files.push(newFile);
@@ -3258,6 +3343,7 @@ import {
         bindFileManagementFabIfNeeded();
         bindFileListSearchIfNeeded();
         notifyInitialFileListRendered();
+        refreshE2EUi();
         if (wasVisible && fileListSidebar) {
             fileListSidebar.classList.add('show');
         }
@@ -3992,11 +4078,14 @@ import {
             type: 'file',
             content: isEn() ? '# Welcome to EasyPocketMD\n\nThis is a new document. \n\nStart writing!' : '# 欢迎使用 EasyPocketMD\n\n这是一个新的文档。\n\n开始编写吧！',
             lastModified: Date.now(),
+            e2e_enabled: g('currentUser') && g('currentUser').e2e_enabled ? 1 : 0,
+            e2eEnabled: !!(g('currentUser') && g('currentUser').e2e_enabled),
             isSynced: false
         };
         global.files.push(defaultFile);
         localStorage.setItem('vditor_files', JSON.stringify(global.files));
         global.currentFileId = defaultFile.id;
+        refreshE2EUi();
 
         if (shouldUseLongFileMode(defaultFile.content)) {
             activateLongFileEditor(defaultFile.id, defaultFile.content);
@@ -4058,6 +4147,8 @@ import {
                 type: 'file',
                 content: '# ' + getBasename(path) + '\n\n开始编写您的内容...',
                 lastModified: Date.now(),
+                e2e_enabled: g('currentUser') && g('currentUser').e2e_enabled ? 1 : 0,
+                e2eEnabled: !!(g('currentUser') && g('currentUser').e2e_enabled),
                 isSynced: false,
                 order: 0
             };
@@ -4127,6 +4218,7 @@ import {
                 return;
             }
             global.currentFileId = fileId;
+            refreshE2EUi();
 
             // 记录最后打开的文件
             localStorage.setItem('vditor_last_opened_file', fileId);
@@ -4242,6 +4334,59 @@ import {
             loadFiles();
             global.showMessage(isEn() ? 'Folder deleted: ' + item.name : '已删除文件夹: ' + item.name);
         }
+    }
+
+    async function toggleCurrentFileE2E() {
+        const currentFileId = g('currentFileId');
+        if (!currentFileId) {
+            global.showMessage(isEn() ? 'Please open a file first' : '请先打开一个文件', 'warning');
+            return false;
+        }
+        if (!g('currentUser') || !g('currentUser').token) {
+            global.showMessage(isEn() ? 'Please log in before using E2E encryption' : '请先登录再使用端到端加密', 'warning');
+            return false;
+        }
+        if (!g('currentUser').password) {
+            global.showMessage(isEn() ? 'Please sign in again so the password can be used as the encryption key' : '需要登录密码作为加密密钥，请重新登录', 'error');
+            return false;
+        }
+
+        const files = g('files') || [];
+        const file = files.find(function(item) {
+            return item && item.id === currentFileId && item.type === 'file';
+        });
+        if (!file) {
+            global.showMessage(isEn() ? 'Cannot change encryption for a folder' : '无法为文件夹切换加密', 'warning');
+            return false;
+        }
+
+        const nextEnabled = !isFileE2EEnabled(file);
+        file.e2e_enabled = nextEnabled ? 1 : 0;
+        file.e2eEnabled = nextEnabled;
+        file.isSynced = false;
+        markPendingServerSync(currentFileId, true);
+        g('unsavedChanges')[currentFileId] = true;
+        localStorage.setItem('vditor_files', JSON.stringify(files));
+        refreshE2EUi();
+
+        const saved = await global.saveCurrentFile(true);
+        if (saved === false) {
+            file.e2e_enabled = nextEnabled ? 0 : 1;
+            file.e2eEnabled = !nextEnabled;
+            file.isSynced = false;
+            markPendingServerSync(currentFileId, true);
+            localStorage.setItem('vditor_files', JSON.stringify(files));
+            refreshE2EUi();
+            return false;
+        }
+
+        global.showMessage(
+            nextEnabled
+                ? (isEn() ? 'E2E enabled for this file' : '当前文件已开启端到端加密')
+                : (isEn() ? 'E2E disabled for this file' : '当前文件已关闭端到端加密'),
+            'success'
+        );
+        return true;
     }
 
     async function saveCurrentFile(isManual) {
@@ -4393,9 +4538,11 @@ import {
             if (isManual) {
                 showSaveStatus('saved');
             }
+            return true;
         } else if (isManual) {
             showSaveStatus('failed');
         }
+        return false;
     }
 
     async function createHistoryVersion(filename, content) {
@@ -4460,7 +4607,10 @@ import {
 
             let histories = (result.code === 200 && result.data && result.data.history) ? result.data.history : [];
             
-            if (window.currentUser && window.currentUser.e2e_enabled && histories.length > 0) {
+            const currentFile = (g('files') || []).find(function(file) {
+                return file && file.id === g('currentFileId') && file.type === 'file';
+            });
+            if (window.currentUser && isFileE2EEnabled(currentFile) && histories.length > 0) {
                 histories = await Promise.all(histories.map(async h => {
                     if (h.content) {
                         try {
@@ -6508,6 +6658,9 @@ import {
     global.createNewFolder = createNewFolder;
     global.openFile = openFile;
     global.deleteFile = deleteFile;
+    global.toggleCurrentFileE2E = toggleCurrentFileE2E;
+    global.isFileE2EEnabled = isFileE2EEnabled;
+    global.refreshE2EUi = refreshE2EUi;
     global.saveCurrentFile = saveCurrentFile;
     global.createHistoryVersion = createHistoryVersion;
     global.getFileHistory = getFileHistory;

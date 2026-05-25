@@ -43,6 +43,7 @@ describe('Files API Integration', () => {
             const mockConnection = {
                 execute: jest.fn()
                     .mockResolvedValueOnce([[]]) // Check existence
+                    .mockResolvedValueOnce([[{ e2e_enabled: 0 }]]) // User default E2E
                     .mockResolvedValueOnce([]), // Insert
                 release: jest.fn()
             };
@@ -68,7 +69,8 @@ describe('Files API Integration', () => {
                         id: 1,
                         content: 'server latest',
                         last_modified: '2024-01-02T00:00:00.000Z',
-                        content_version: 2
+                        content_version: 2,
+                        e2e_enabled: 0
                     }]])
                     .mockResolvedValueOnce([]), // Update
                 release: jest.fn()
@@ -93,7 +95,7 @@ describe('Files API Integration', () => {
         it('should keep backward compatibility when base fields are omitted', async () => {
             const mockConnection = {
                 execute: jest.fn()
-                    .mockResolvedValueOnce([[{ id: 1, content: 'old', last_modified: '2024-01-02T00:00:00.000Z' }]])
+                    .mockResolvedValueOnce([[{ id: 1, content: 'old', last_modified: '2024-01-02T00:00:00.000Z', e2e_enabled: 0 }]])
                     .mockResolvedValueOnce([]),
                 release: jest.fn()
             };

@@ -111,6 +111,18 @@
         var files = g('files');
         var file = files.find(function(f) { return f.id === g('currentFileId'); });
         if (!file) { global.showMessage(isEn ? 'Current file not found' : '未找到当前文件', 'error'); return; }
+        var fileE2EEnabled = typeof global.isFileE2EEnabled === 'function'
+            ? global.isFileE2EEnabled(file)
+            : !!(file.e2eEnabled || file.e2e_enabled);
+        if (fileE2EEnabled) {
+            global.showMessage(
+                isEn
+                    ? 'This file is end-to-end encrypted. Please disable E2E encryption before sharing.'
+                    : '文件已开启端到端加密，请先关闭端到端加密再分享',
+                'warning'
+            );
+            return;
+        }
         var nightMode = g('nightMode') === true;
 
         // 创建分享对话框
