@@ -1689,8 +1689,8 @@ import {
         const rect = targetEl.getBoundingClientRect();
         const fingerprint = await generateLocalKeyFingerprint();
         
-        const text1 = isEn() ? 'This file is end-to-end encrypted' : '本文件已进行端到端加密';
-        const text2 = isEn() ? 'Local Key Fingerprint:' : '您的文档是私密的。其他任何人都无法查看，开发者也不例外。<br>本地密钥指纹信息：';
+        const text1 = isEn() ? 'This file is end-to-end encrypted' : '已开启端到端加密';
+        const text2 = isEn() ? 'Your document is private. No one else can view it, not even developers.<br><br>Local Key Fingerprint (SHA-256):' : '您的文档是私密的。其他任何人都无法查看，开发者也不例外。<br><br>本地密钥指纹信息（SHA-256）：';
         
         e2eTooltipElement.innerHTML = `
             <div style="font-weight: 500; margin-bottom: 8px; display: flex; align-items: flex-start; gap: 6px;">
