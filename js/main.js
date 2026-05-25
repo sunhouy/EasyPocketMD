@@ -1814,7 +1814,15 @@ document.addEventListener('DOMContentLoaded', function() {
         if (mobilePresentationBtn) mobilePresentationBtn.addEventListener('click', function() { enterPresentationMode(); closeDrop(); });
 
         var mobileMenuBtn = document.getElementById('mobileMenuBtn');
-        if (mobileMenuBtn) mobileMenuBtn.addEventListener('click', function(e) { e.stopPropagation(); if (dropdown) dropdown.classList.toggle('show'); });
+        if (mobileMenuBtn) {
+            var neuMenuBtn = mobileMenuBtn.cloneNode(true);
+            if (mobileMenuBtn.parentNode) mobileMenuBtn.parentNode.replaceChild(neuMenuBtn, mobileMenuBtn);
+            neuMenuBtn.addEventListener('click', function(e) { 
+                e.stopPropagation(); 
+                var currentDropdown = document.getElementById('mobileDropdown');
+                if (currentDropdown) currentDropdown.classList.toggle('show'); 
+            });
+        }
         var mobileModeBtn = document.getElementById('mobileModeBtn');
         if (mobileModeBtn) mobileModeBtn.addEventListener('click', function() { showModeSelection(); closeDrop(); });
         var mobileOpenLocalFileBtn = document.getElementById('mobileOpenLocalFileBtn');
