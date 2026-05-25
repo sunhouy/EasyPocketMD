@@ -31,6 +31,7 @@ class FileManager {
                 (!Array.isArray(cached.files) || cached.files.every(file => {
                     if (!file) return false;
                     if (!Object.prototype.hasOwnProperty.call(file, 'content_version')) return false;
+                    if (!Object.prototype.hasOwnProperty.call(file, 'e2e_enabled')) return false;
                     const v = Number(file.content_version);
                     return Number.isFinite(v) && v > 0;
                 }))
@@ -48,7 +49,7 @@ class FileManager {
             }
 
             const [rows] = await db.execute(
-                'SELECT filename, content, last_modified, content_version FROM user_files WHERE username = ? ORDER BY last_modified DESC',
+                'SELECT filename, content, last_modified, content_version, e2e_enabled FROM user_files WHERE username = ? ORDER BY last_modified DESC',
                 [username]
             );
 
@@ -56,6 +57,7 @@ class FileManager {
                 name: row.filename,
                 content: row.content,
                 content_version: row.content_version,
+                e2e_enabled: row.e2e_enabled ? 1 : 0,
                 last_modified: row.last_modified
             }));
 
@@ -92,7 +94,7 @@ class FileManager {
             }
 
             const [rows] = await db.execute(
-                'SELECT filename, content, last_modified, content_version FROM user_files WHERE username = ? AND filename = ?',
+                'SELECT filename, content, last_modified, content_version, e2e_enabled FROM user_files WHERE username = ? AND filename = ?',
                 [username, filename]
             );
 
@@ -105,6 +107,7 @@ class FileManager {
                 filename: row.filename,
                 content: row.content,
                 content_version: row.content_version,
+                e2e_enabled: row.e2e_enabled ? 1 : 0,
                 last_modified: row.last_modified
             };
 
@@ -122,7 +125,17 @@ class FileManager {
     }
 
     // Save file
-    async saveFile(username, filename, content = '', optimisticLock = {}) {
+    async getUserDefaultE2E(username, connection = db) {
+        const [rows] = await connection.execute('SELECT e2e_enabled FROM users WHERE username = ?', [username]);
+        return rows.length > 0 && rows[0].e2e_enabled ? 1 : 0;
+    }
+
+    normalizeFileE2E(value) {
+        if (value === undefined || value === null || value === '') return null;
+        return value === true || value === 1 || value === '1' || value === 'true' ? 1 : 0;
+    }
+
+    async saveFile(username, filename, content = '', optimisticLock = {}, fileOptions = {}) {
         try {
             const connection = await db.getConnection();
             try {
@@ -141,10 +154,14 @@ class FileManager {
                 }
                 // Check if file exists
                 const [rows] = await connection.execute(
-                    'SELECT id, content, last_modified, content_version FROM user_files WHERE username = ? AND filename = ? FOR UPDATE',
+                    'SELECT id, content, last_modified, content_version, e2e_enabled FROM user_files WHERE username = ? AND filename = ? FOR UPDATE',
                     [username, filename]
                 );
 
+                const requestedE2E = this.normalizeFileE2E(fileOptions.e2e_enabled);
+                const fileE2E = rows.length > 0
+                    ? (requestedE2E === null ? (rows[0].e2e_enabled ? 1 : 0) : requestedE2E)
+                    : (requestedE2E === null ? await this.getUserDefaultE2E(username, connection) : requestedE2E);
                 const hasBaseVersion = optimisticLock.base_content_version !== undefined && optimisticLock.base_content_version !== null && optimisticLock.base_content_version !== '';
                 const hasBaseLastModified = optimisticLock.base_last_modified !== undefined && optimisticLock.base_last_modified !== null && optimisticLock.base_last_modified !== '';
                 const hasBaseHash = typeof optimisticLock.base_hash === 'string' && optimisticLock.base_hash.trim() !== '';
@@ -153,7 +170,7 @@ class FileManager {
                 let contentToSave = String(content || '');
                 let mergedByCrdt = false;
 
-                if (rows.length > 0 && shouldCheckOptimisticLock && hasBaseContent) {
+                if (rows.length > 0 && !fileE2E && shouldCheckOptimisticLock && hasBaseContent) {
                     const currentRow = rows[0];
                     const currentContent = String(currentRow.content || '');
                     const baseContentVersion = Number(optimisticLock.base_content_version);
@@ -174,8 +191,8 @@ class FileManager {
                 let message;
                 if (rows.length > 0) {
                     await connection.execute(
-                        'UPDATE user_files SET content = ?, last_modified = NOW(), content_version = content_version + 1 WHERE username = ? AND filename = ?',
-                        [contentToSave, username, filename]
+                        'UPDATE user_files SET content = ?, e2e_enabled = ?, last_modified = NOW(), content_version = content_version + 1 WHERE username = ? AND filename = ?',
+                        [contentToSave, fileE2E, username, filename]
                     );
                     const nextVersion = Number(rows[0].content_version || 0) + 1;
                     message = '文件更新成功';
@@ -196,14 +213,15 @@ class FileManager {
                             content: contentToSave,
                             content_length: Buffer.byteLength(contentToSave, 'utf8'),
                             content_version: nextVersion,
+                            e2e_enabled: fileE2E,
                             last_modified: new Date().toISOString(),
                             merged_by_crdt: mergedByCrdt
                         }
                     };
                 } else {
                     await connection.execute(
-                        'INSERT INTO user_files (username, filename, content, content_version, last_modified) VALUES (?, ?, ?, 1, NOW())',
-                        [username, filename, contentToSave]
+                        'INSERT INTO user_files (username, filename, content, content_version, e2e_enabled, last_modified) VALUES (?, ?, ?, 1, ?, NOW())',
+                        [username, filename, contentToSave, fileE2E]
                     );
                     message = '文件保存成功';
                     if (commit) {
@@ -223,6 +241,7 @@ class FileManager {
                             content: contentToSave,
                             content_length: Buffer.byteLength(contentToSave, 'utf8'),
                             content_version: 1,
+                            e2e_enabled: fileE2E,
                             last_modified: new Date().toISOString(),
                             merged_by_crdt: false
                         }
@@ -237,9 +256,9 @@ class FileManager {
     }
 
     // Save file with history
-    async saveFileWithHistory(username, filename, content, createHistory = false, optimisticLock = {}) {
+    async saveFileWithHistory(username, filename, content, createHistory = false, optimisticLock = {}, fileOptions = {}) {
         try {
-            const result = await this.saveFile(username, filename, content, optimisticLock);
+            const result = await this.saveFile(username, filename, content, optimisticLock, fileOptions);
 
             if (result.code !== 200) {
                 return result;
@@ -347,6 +366,7 @@ class FileManager {
             for (const file of files) {
                 const filename = file.name || '';
                 const content = file.content || '';
+                const requestedE2E = this.normalizeFileE2E(file.e2e_enabled !== undefined ? file.e2e_enabled : file.e2eEnabled);
 
                 if (!filename) {
                     errorFiles.push({ filename: 'unknown', error: '缺少文件名' });
@@ -355,19 +375,22 @@ class FileManager {
 
                 try {
                     const [rows] = await connection.execute(
-                        'SELECT id FROM user_files WHERE username = ? AND filename = ?',
+                        'SELECT id, e2e_enabled FROM user_files WHERE username = ? AND filename = ?',
                         [username, filename]
                     );
+                    const fileE2E = rows.length > 0
+                        ? (requestedE2E === null ? (rows[0].e2e_enabled ? 1 : 0) : requestedE2E)
+                        : (requestedE2E === null ? await this.getUserDefaultE2E(username, connection) : requestedE2E);
 
                     if (rows.length > 0) {
                         await connection.execute(
-                            'UPDATE user_files SET content = ?, last_modified = NOW(), content_version = content_version + 1 WHERE username = ? AND filename = ?',
-                            [content, username, filename]
+                            'UPDATE user_files SET content = ?, e2e_enabled = ?, last_modified = NOW(), content_version = content_version + 1 WHERE username = ? AND filename = ?',
+                            [content, fileE2E, username, filename]
                         );
                     } else {
                         await connection.execute(
-                            'INSERT INTO user_files (username, filename, content, content_version, last_modified) VALUES (?, ?, ?, 1, NOW())',
-                            [username, filename, content]
+                            'INSERT INTO user_files (username, filename, content, content_version, e2e_enabled, last_modified) VALUES (?, ?, ?, 1, ?, NOW())',
+                            [username, filename, content, fileE2E]
                         );
                     }
                     successCount++;

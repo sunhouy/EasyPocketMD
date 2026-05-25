@@ -1792,6 +1792,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
         var aboutBtn = document.getElementById('aboutBtn');
         if (aboutBtn) aboutBtn.addEventListener('click', function() { window.showAboutDialog(); closeDrop(); });
+        var mobileToggleFileE2EBtn = document.getElementById('mobileToggleFileE2EBtn');
+        if (mobileToggleFileE2EBtn) mobileToggleFileE2EBtn.addEventListener('click', async function() {
+            if (typeof window.toggleCurrentFileE2E === 'function') {
+                await window.toggleCurrentFileE2E();
+            }
+            closeDrop();
+        });
 
         var serviceStatusBtn = document.getElementById('serviceStatusBtn');
         if (serviceStatusBtn) serviceStatusBtn.addEventListener('click', function() { window.showServiceStatusDialog(); closeDrop(); });
@@ -1960,6 +1967,12 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             closeDesktopDrop();
         });
+        bindDesktopButton('desktopToggleFileE2EBtn', async function() {
+            if (typeof window.toggleCurrentFileE2E === 'function') {
+                await window.toggleCurrentFileE2E();
+            }
+            closeDesktopDrop();
+        });
         bindDesktopButton('desktopAboutBtn', function() { window.showAboutDialog(); closeDesktopDrop(); });
 
         // 渲染底部工具栏
@@ -2108,6 +2121,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 closeDrop();
             } },
             { id: 'mobileClearBtn', fn: async function() { const confirmed = await window.customConfirm(window.i18n ? window.i18n.t('clearConfirm') : '确定要清空当前文件的内容吗？'); if (confirmed) { if (window.vditor) window.vditor.setValue(''); window.showMessage(window.i18n ? window.i18n.t('contentCleared') : '内容已清空'); } closeDrop(); } },
+            { id: 'mobileToggleFileE2EBtn', fn: async function() { if (typeof window.toggleCurrentFileE2E === 'function') await window.toggleCurrentFileE2E(); closeDrop(); } },
             { id: 'serviceStatusBtn', fn: function() { window.showServiceStatusDialog(); closeDrop(); } },
             // mobileSettingsBtn 已移到顶部工具栏
             { id: 'aboutBtn', fn: function() { window.showAboutDialog(); closeDrop(); } }

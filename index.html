@@ -571,11 +571,11 @@
                     </li>
                     <li class="settings-list-item" id="e2eSettingContainer">
                         <div class="form-group">
-                            <label>端到端加密设置</label>
+                            <label>默认端到端加密</label>
                             <div class="checkbox-group">
-                                <label><input type="checkbox" id="settingsEnableE2E"> <span>启用端到端加密 (当前客户端将在同步前对文件加密)</span></label>
+                                <label><input type="checkbox" id="settingsEnableE2E"> <span>新建文件默认开启端到端加密</span></label>
                             </div>
-                            <p style="font-size:12px;color:#666;margin-top:4px;">注意：开启后请保管好您的登录密码，一旦密码丢失将无法解密服务器上的文件内容。</p>
+                            <p style="font-size:12px;color:#666;margin-top:4px;">注意：此设置只影响之后新建的文件。当前文件请在“更多 - 其他”中单独开启或关闭。</p>
                         </div>
                     </li>
                     <li class="settings-list-item">
@@ -1134,10 +1134,12 @@
                     <button class="dropdown-item" id="desktopPresentationBtn"><i class="fas fa-chalkboard-teacher"></i><span data-i18n="presentationMode">演示模式</span></button>
 
                     <div class="dropdown-category" data-i18n="others">其他</div>
+                    <button class="dropdown-item" id="desktopToggleFileE2EBtn" aria-pressed="false"><i class="fas fa-lock-open"></i><span class="file-e2e-toggle-text">开启当前文件端到端加密</span></button>
                     <button class="dropdown-item" id="desktopClearBtn"><i class="fas fa-trash-alt"></i><span data-i18n="clear">清空</span></button>
                     <button class="dropdown-item" id="desktopAboutBtn"><i class="fas fa-info-circle"></i><span data-i18n="about">关于</span></button>
                 </div>
             </div>
+            <span class="current-file-e2e-indicator desktop-e2e-indicator" aria-hidden="true" title="此文件已使用端到端加密"><i class="fas fa-lock"></i></span>
         </div>
 
         <div class="toolbar-left-actions">
@@ -1156,6 +1158,7 @@
         </div>
         <h1 class="mobile-title" data-i18n="mobileTitle">EasyPocketMD</h1>
         <div class="toolbar-right-actions">
+            <span class="current-file-e2e-indicator mobile-e2e-indicator" aria-hidden="true" title="此文件已使用端到端加密"><i class="fas fa-lock"></i></span>
             <!-- 保存按钮 -->
             <button class="mobile-action-btn editor-save-btn" id="saveFileBtn" title="保存文件">
                 <i class="fas fa-save"></i>
@@ -1185,6 +1188,7 @@
 
                     <div class="dropdown-category" data-i18n="others">其他</div>
                     <button class="dropdown-item" id="mobileClearBtn"><i class="fas fa-trash-alt"></i>  <span data-i18n="clear">清空</span></button>
+                    <button class="dropdown-item" id="mobileToggleFileE2EBtn" aria-pressed="false"><i class="fas fa-lock-open"></i>  <span class="file-e2e-toggle-text">开启当前文件端到端加密</span></button>
                     <button class="dropdown-item" id="aboutBtn"><i class="fas fa-info-circle"></i>  <span data-i18n="about">关于</span></button>
                 </div>
             </div>
