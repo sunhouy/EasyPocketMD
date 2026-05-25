@@ -126,7 +126,7 @@ describe('FileManager', () => {
             expect(result.data.files).toHaveLength(1);
             expect(result.data.files[0].name).toBe('test.md');
             expect(db.execute).toHaveBeenCalledWith(
-                expect.stringContaining('SELECT filename, content, last_modified, content_version FROM user_files'),
+                expect.stringContaining('SELECT filename, content, last_modified, content_version, e2e_enabled FROM user_files'),
                 ['testuser']
             );
             expect(Cache.setUserFiles).toHaveBeenCalled();
@@ -190,7 +190,7 @@ describe('FileManager', () => {
         it('should update an existing file', async () => {
             const mockConnection = {
                 execute: jest.fn()
-                    .mockResolvedValueOnce([[{ id: 1 }]]) // Check existence
+                    .mockResolvedValueOnce([[{ id: 1, e2e_enabled: 0 }]]) // Check existence
                     .mockResolvedValueOnce([]), // Update
                 release: jest.fn()
             };
@@ -202,7 +202,7 @@ describe('FileManager', () => {
             expect(result.message).toBe('文件更新成功');
             expect(mockConnection.execute).toHaveBeenCalledWith(
                 expect.stringContaining('UPDATE user_files'),
-                ['new content', 'testuser', 'test.md']
+                ['new content', 0, 'testuser', 'test.md']
             );
             expect(mockConnection.release).toHaveBeenCalled();
             expect(Cache.deleteUserFiles).toHaveBeenCalled();
@@ -213,6 +213,7 @@ describe('FileManager', () => {
             const mockConnection = {
                 execute: jest.fn()
                     .mockResolvedValueOnce([[]]) // Check existence
+                    .mockResolvedValueOnce([[{ e2e_enabled: 0 }]]) // User default
                     .mockResolvedValueOnce([]), // Insert
                 release: jest.fn()
             };
@@ -224,7 +225,7 @@ describe('FileManager', () => {
             expect(result.message).toBe('文件保存成功');
             expect(mockConnection.execute).toHaveBeenCalledWith(
                 expect.stringContaining('INSERT INTO user_files'),
-                ['testuser', 'new.md', 'new content']
+                ['testuser', 'new.md', 'new content', 0]
             );
         });
 
@@ -235,7 +236,8 @@ describe('FileManager', () => {
                         id: 1,
                         content: 'server content',
                         last_modified: '2024-01-02T00:00:00.000Z',
-                        content_version: 1
+                        content_version: 1,
+                        e2e_enabled: 0
                     }]])
                     .mockResolvedValueOnce([]), // Update
                 release: jest.fn()
@@ -261,7 +263,8 @@ describe('FileManager', () => {
                         id: 1,
                         content: 'A\nB remote',
                         last_modified: '2024-01-02T00:00:00.000Z',
-                        content_version: 2
+                        content_version: 2,
+                        e2e_enabled: 0
                     }]])
                     .mockResolvedValueOnce([]),
                 release: jest.fn()
@@ -282,8 +285,8 @@ describe('FileManager', () => {
             expect(result.data.content).toBe('A local\nB remote');
             expect(result.data.merged_by_crdt).toBe(true);
             expect(mockConnection.execute).toHaveBeenCalledWith(
-                expect.stringContaining('UPDATE user_files SET content = ?, last_modified = NOW()'),
-                ['A local\nB remote', 'testuser', 'test.md']
+                expect.stringContaining('UPDATE user_files SET content = ?, e2e_enabled = ?, last_modified = NOW()'),
+                ['A local\nB remote', 0, 'testuser', 'test.md']
             );
         });
 
@@ -294,7 +297,8 @@ describe('FileManager', () => {
                         id: 1,
                         content: 'server only',
                         last_modified: '2024-01-02T00:00:00.000Z',
-                        content_version: 3
+                        content_version: 3,
+                        e2e_enabled: 0
                     }]])
                     .mockResolvedValueOnce([]),
                 release: jest.fn()
@@ -327,7 +331,8 @@ describe('FileManager', () => {
                         id: 1,
                         content: currentContent,
                         last_modified: '2024-01-02T00:00:00.000Z',
-                        content_version: 1
+                        content_version: 1,
+                        e2e_enabled: 0
                     }]])
                     .mockResolvedValueOnce([]), // Update
                 release: jest.fn()
@@ -354,7 +359,8 @@ describe('FileManager', () => {
                     .mockResolvedValueOnce([[{
                         id: 1,
                         content: currentContent,
-                        last_modified: '2024-01-02T00:00:00.000Z'
+                        last_modified: '2024-01-02T00:00:00.000Z',
+                        e2e_enabled: 0
                     }]])
                     .mockResolvedValueOnce([]),
                 release: jest.fn()
@@ -370,8 +376,8 @@ describe('FileManager', () => {
 
             expect(result.code).toBe(200);
             expect(mockConnection.execute).toHaveBeenCalledWith(
-                expect.stringContaining('UPDATE user_files SET content = ?, last_modified = NOW()'),
-                ['new content', 'testuser', 'test.md']
+                expect.stringContaining('UPDATE user_files SET content = ?, e2e_enabled = ?, last_modified = NOW()'),
+                ['new content', 0, 'testuser', 'test.md']
             );
         });
 
@@ -400,7 +406,7 @@ describe('FileManager', () => {
             const result = await fileManager.saveFileWithHistory('testuser', 'test.md', 'content', true);
 
             expect(result).toEqual(mockSaveResult);
-            expect(fileManager.saveFile).toHaveBeenCalledWith('testuser', 'test.md', 'content', {});
+            expect(fileManager.saveFile).toHaveBeenCalledWith('testuser', 'test.md', 'content', {}, {});
             expect(historyManager.createHistory).toHaveBeenCalledWith('testuser', 'test.md', 'content');
             expect(Cache.deleteUserFiles).toHaveBeenCalled();
             expect(Cache.deleteFileContent).toHaveBeenCalled();
@@ -515,9 +521,10 @@ describe('FileManager', () => {
                 commit: jest.fn(),
                 rollback: jest.fn(),
                 execute: jest.fn()
-                    .mockResolvedValueOnce([[{ id: 1 }]]) // Check file 1 exists
+                    .mockResolvedValueOnce([[{ id: 1, e2e_enabled: 0 }]]) // Check file 1 exists
                     .mockResolvedValueOnce([]) // Update file 1
                     .mockResolvedValueOnce([[]]) // Check file 2 doesn't exist
+                    .mockResolvedValueOnce([[{ e2e_enabled: 0 }]]) // User default for file 2
                     .mockResolvedValueOnce([]), // Insert file 2
                 release: jest.fn()
             };
