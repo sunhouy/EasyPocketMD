@@ -1665,7 +1665,7 @@ import {
             const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
             const hashArray = Array.from(new Uint8Array(hashBuffer));
             const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-            return hashHex.substring(0, 16).match(/.{4}/g).join('-');
+            return hashHex.substring(0, 64).match(/.{4}/g).join('-');
         } catch(e) {
             return 'Unknown';
         }
