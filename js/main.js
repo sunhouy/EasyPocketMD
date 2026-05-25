@@ -646,11 +646,20 @@ document.addEventListener('DOMContentLoaded', function() {
             var button = document.getElementById(definition.toolbarButtonId);
             if (!button) return;
 
-            var baseText = window.i18n ? window.i18n.t(definition.toolbarTextKey) : button.textContent;
+            var baseText = window.i18n ? window.i18n.t(definition.toolbarTextKey) : button.textContent.replace(/\(.*?\)$/, '').trim();
             var shortcut = effectiveShortcuts[definition.id];
             var displayText = shortcut ? baseText + '(' + shortcut + ')' : baseText;
 
-            button.textContent = displayText;
+            // Preserve icon if it already exists, e.g. for some buttons
+            var iElement = button.querySelector('i');
+            if (iElement) {
+                button.innerHTML = '';
+                button.appendChild(iElement);
+                button.appendChild(document.createTextNode(displayText));
+            } else {
+                button.textContent = displayText;
+            }
+
             if (shortcut) {
                 button.setAttribute('title', baseText + ' [' + shortcut + ']');
             } else {
@@ -1447,7 +1456,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     return;
                 }
                 
-                var aiRegex = /\\\[[\s\S]*?\\\]|\\\([\s\S]*?\\\)|\\_/;
+                var aiRegex = /\\\[[\s\S]*?\\\]|\\\([\s\S]*?\\\)|\\_|\\\$/;
                 if (aiRegex.test(pastedText)) {
                     e.preventDefault();
                     e.stopImmediatePropagation();
@@ -1747,10 +1756,15 @@ document.addEventListener('DOMContentLoaded', function() {
     function initMobileFeatures() {
         var dropdown = document.getElementById('mobileDropdown');
         function closeDrop() { if (dropdown) dropdown.classList.remove('show'); }
-        var desktopDropdown = document.getElementById('desktopMoreDropdown');
-        function closeDesktopDrop() { if (desktopDropdown) desktopDropdown.classList.remove('show'); }
+        function closeDesktopDrop() { 
+            var desktopDropdown = document.getElementById('desktopMoreDropdown');
+            if (desktopDropdown) desktopDropdown.classList.remove('show'); 
+        }
         var desktopEditDropdown = document.getElementById('desktopEditDropdown');
-        function closeDesktopEditDrop() { if (desktopEditDropdown) desktopEditDropdown.classList.remove('show'); }
+        function closeDesktopEditDrop() {
+            var desktopEditDropdown = document.getElementById('desktopEditDropdown');
+            if (desktopEditDropdown) desktopEditDropdown.classList.remove('show'); 
+        }
 
         function bindDesktopButton(id, fn) {
             var el = document.getElementById(id);
@@ -1937,6 +1951,7 @@ document.addEventListener('DOMContentLoaded', function() {
         bindDesktopButton('desktopSettingsBtn', function() { window.showSettingsDialog(); });
         bindDesktopButton('desktopEditBtn', function(e) {
             e.stopPropagation();
+            var desktopEditDropdown = document.getElementById('desktopEditDropdown');
             if (desktopEditDropdown) {
                 var willShowEdit = !desktopEditDropdown.classList.contains('show');
                 desktopEditDropdown.classList.toggle('show');
@@ -1956,6 +1971,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         bindDesktopButton('desktopMoreBtn', function(e) {
             e.stopPropagation();
+            var desktopDropdown = document.getElementById('desktopMoreDropdown');
             if (desktopDropdown) {
                 var willShowMore = !desktopDropdown.classList.contains('show');
                 desktopDropdown.classList.toggle('show');
@@ -2155,7 +2171,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 closeDrop();
             } },
             { id: 'mobilePresentationBtn', fn: function() { enterPresentationMode(); closeDrop(); } },
-            { id: 'mobileMenuBtn', fn: function(e) { e.stopPropagation(); if (dropdown) dropdown.classList.toggle('show'); } },
+            { 
+                id: 'mobileMenuBtn', 
+                fn: function(e) { 
+                    e.stopPropagation(); 
+                    var currentDropdown = document.getElementById('mobileDropdown');
+                    if (currentDropdown) currentDropdown.classList.toggle('show'); 
+                } 
+            },
             { id: 'mobileModeBtn', fn: function() { showModeSelection(); closeDrop(); } },
             { id: 'mobileOpenLocalFileBtn', fn: async function() {
                 if (typeof window.openExternalLocalFileByDialog === 'function') {
