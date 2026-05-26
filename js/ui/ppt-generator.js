@@ -31,6 +31,14 @@
     var pptEventsBound = false;
     var pptLifecycleEventsBound = false;
 
+    // 一次并行生成的页数 - 节省总耗时
+    var PPT_BATCH_SIZE = 3;
+    // 需要配图的布局 - 几乎所有正文型页面都配图
+    var LAYOUTS_NEEDING_IMAGES = [
+        'cover', 'content', 'image-left', 'image-right',
+        'two-column', 'timeline', 'comparison', 'quote'
+    ];
+
     // 配色方案定义
     var colorSchemes = {
         'white-black': {
@@ -81,13 +89,19 @@
         if (pptLifecycleEventsBound) return;
         pptLifecycleEventsBound = true;
 
+        // 提前请求通知权限，避免用户最小化时弹权限框
+        requestNotificationPermissionIfNeeded();
+
         document.addEventListener('visibilitychange', function() {
             if (document.hidden && isPPTGenerationActive()) {
                 saveDraft();
                 notifyPPTGenerationInBackground('hidden');
                 syncPPTStatusToServer('background');
             } else if (!document.hidden) {
-                syncPPTStateFromServer({ silent: true });
+                // 重新可见时复位通知标记，下次再离开时可以再次通知
+                pptState.notificationShownForTask = false;
+                // 重新可见时一定先拉取服务器进度，让本地与服务器同步
+                syncPPTStateFromServer({ silent: true, allowLatest: true });
             }
         });
 
@@ -111,9 +125,22 @@
                     saveDraft();
                     notifyPPTGenerationInBackground('modal');
                     syncPPTStatusToServer('background');
+                } else if (aiModal.style.display !== 'none') {
+                    // 重新打开 AI 模态时也刷新服务器状态
+                    pptState.notificationShownForTask = false;
+                    syncPPTStateFromServer({ silent: true, allowLatest: true });
                 }
             });
             observer.observe(aiModal, { attributes: true, attributeFilter: ['style', 'class'] });
+        }
+    }
+
+    function requestNotificationPermissionIfNeeded() {
+        if (!('Notification' in window)) return;
+        if (Notification.permission === 'default') {
+            try {
+                Notification.requestPermission().catch(function() {});
+            } catch (e) {}
         }
     }
 
@@ -204,6 +231,7 @@
 
             var localGenerated = getGeneratedPPTPageCount(pptState.pages);
             var serverGenerated = getGeneratedPPTPageCount(serverState.pages);
+            // 服务器是权威：只要服务器有更多进度或处于生成中状态，本地就跟随服务器
             var shouldApply = !pptState.outline || serverGenerated >= localGenerated || serverState.status === 'generating';
             if (!shouldApply) return false;
 
@@ -219,13 +247,44 @@
                 renderEditorPreview(pptState.currentPage || 0);
             }
 
+            var total = pptState.outline ? pptState.outline.length : 0;
             if (!options.silent && global.showMessage) {
-                global.showMessage('已同步服务器PPT进度：' + serverGenerated + ' / ' + (pptState.outline ? pptState.outline.length : 0) + ' 页', 'success');
+                global.showMessage('已同步服务器PPT进度：' + serverGenerated + ' / ' + total + ' 页', 'success');
+            }
+
+            // 若服务器显示任务仍在生成中且本地未在生成，提示用户是否在本设备继续
+            if (!pptState.isGenerating &&
+                serverState.status === 'generating' &&
+                serverGenerated < total &&
+                !pptState._resumePromptShown) {
+                pptState._resumePromptShown = true;
+                showResumeGenerationPrompt(serverGenerated, total);
             }
             return true;
         } catch (error) {
             console.warn('Failed to sync PPT status from server:', error);
             return false;
+        }
+    }
+
+    function showResumeGenerationPrompt(generated, total) {
+        var ask = function() {
+            if (typeof showCustomConfirm !== 'function') return;
+            showCustomConfirm(
+                '检测到服务器还有未完成的PPT生成任务（已生成 ' + generated + ' / ' + total + ' 页），是否在本设备继续生成？',
+                function() {
+                    var modal = document.getElementById('pptEditorModal');
+                    if (modal) modal.style.display = 'flex';
+                    generateAllPages();
+                },
+                function() {}
+            );
+        };
+        // 等待 DOM 与确认框函数都可用
+        if (document.readyState === 'complete') {
+            ask();
+        } else {
+            window.addEventListener('load', ask, { once: true });
         }
     }
 
@@ -305,30 +364,67 @@
         var total = pptState.outline ? pptState.outline.length : 0;
         var title = isEn() ? 'PPT generation is still running' : 'PPT仍在生成中';
         var body = isEn()
-            ? 'Progress has been synced: ' + generated + ' / ' + total + ' pages.'
-            : '已同步进度：' + generated + ' / ' + total + ' 页，重新进入会先拉取服务器状态。';
+            ? 'Progress has been synced to the server: ' + generated + ' / ' + total + ' pages. You can come back anytime to resume.'
+            : '已同步进度到服务器：' + generated + ' / ' + total + ' 页，重新打开会先拉取服务器状态后继续。';
 
+        showBrowserNotification(title, body, 'progress', reason);
+    }
+
+    function notifyPPTGenerationComplete() {
+        // 仅在用户离开页面或关闭 PPT 模态时才发送完成通知
+        var aiModal = document.getElementById('aiModalOverlay');
+        var pptModal = document.getElementById('pptEditorModal');
+        var isUserAway = document.hidden
+            || (aiModal && aiModal.style.display === 'none')
+            || (pptModal && pptModal.style.display === 'none');
+        if (!isUserAway) return;
+
+        var total = pptState.outline ? pptState.outline.length : 0;
+        var title = isEn() ? 'PPT generation finished' : 'PPT生成完成';
+        var body = isEn()
+            ? 'All ' + total + ' pages are ready. Open the editor to download.'
+            : '全部 ' + total + ' 页已生成完毕，点击通知返回编辑器即可下载。';
+
+        showBrowserNotification(title, body, 'complete', 'completed');
+    }
+
+    function showBrowserNotification(title, body, kind, reason) {
         if (!('Notification' in window)) {
             if (global.showMessage) global.showMessage(body, 'info');
             return;
         }
 
-        if (Notification.permission === 'granted') {
+        var tag = 'easypocketmd-ppt-' + (kind || 'progress') + '-' + getPPTTaskId();
+        var fire = function() {
             try {
-                new Notification(title, { body: body, tag: 'easypocketmd-ppt-' + getPPTTaskId() });
+                var notif = new Notification(title, { body: body, tag: tag });
+                notif.onclick = function() {
+                    try { window.focus(); } catch (e) {}
+                    var aiModal = document.getElementById('aiModalOverlay');
+                    var pptModal = document.getElementById('pptEditorModal');
+                    if (aiModal) aiModal.style.display = 'flex';
+                    if (pptModal && kind === 'complete') pptModal.style.display = 'flex';
+                    notif.close();
+                };
             } catch (error) {
                 if (global.showMessage) global.showMessage(body, 'info');
             }
+        };
+
+        if (Notification.permission === 'granted') {
+            fire();
             return;
         }
 
         if (Notification.permission === 'default' && reason !== 'pagehide') {
             Notification.requestPermission().then(function(permission) {
-                if (permission === 'granted' && isPPTGenerationActive()) {
-                    new Notification(title, { body: body, tag: 'easypocketmd-ppt-' + getPPTTaskId() });
+                if (permission === 'granted') {
+                    fire();
                 } else if (global.showMessage) {
                     global.showMessage(body, 'info');
                 }
+            }).catch(function() {
+                if (global.showMessage) global.showMessage(body, 'info');
             });
         } else if (global.showMessage) {
             global.showMessage(body, 'info');
@@ -1058,7 +1154,7 @@ ${isAcademic ? '倒数第2页：参考资料\n要点1：文献1\n要点2：文�
         return isValid;
     }
 
-    // 生成所有页面
+    // 生成所有页面 - 并行批量生成以节省时间
     async function generateAllPages() {
         if (!pptState.outline || pptState.outline.length === 0) {
             if (global.showMessage) {
@@ -1067,6 +1163,7 @@ ${isAcademic ? '倒数第2页：参考资料\n要点1：文献1\n要点2：文�
             return;
         }
 
+        // 进入生成前，先拉取服务器最新状态，避免重复生成已完成的页面
         await syncPPTStateFromServer({ silent: true });
         pptState.isGenerating = true;
         pptState.notificationShownForTask = false;
@@ -1074,50 +1171,66 @@ ${isAcademic ? '倒数第2页：参考资料\n要点1：文献1\n要点2：文�
         saveDraft();
         await syncPPTStatusToServer('generating');
 
-        // 显示全屏编辑器
         document.getElementById('pptEditorModal').style.display = 'flex';
         renderEditorPagesList();
 
-        // 重置用户选择标记
         pptState.userSelectedPage = false;
 
-        // 逐页生成
+        // 收集尚未生成的页面索引
+        var pendingIndexes = [];
+        for (var i = 0; i < pptState.outline.length; i++) {
+            if (!pptState.pages[i]) pendingIndexes.push(i);
+        }
+
+        if (!pendingIndexes.length) {
+            if (!pptState.userSelectedPage) selectPage(0, false);
+            await syncPPTStatusToServer('completed');
+            notifyPPTGenerationComplete();
+            pptState.isGenerating = false;
+            saveDraft();
+            return;
+        }
+
+        // 让首页先指向第一个待生成页（仅当用户未手动选择）
+        if (!pptState.userSelectedPage) {
+            selectPage(pendingIndexes[0], false);
+        }
+        showEditorLoading(true);
+
         try {
-            for (var i = 0; i < pptState.outline.length; i++) {
-                if (!pptState.pages[i]) {
-                    // 只在用户没有手动选择页面时才自动切换
-                    if (!pptState.userSelectedPage) {
-                        selectPage(i, false);
-                    }
-                    showEditorLoading(true);
-                    await syncPPTStatusToServer('generating');
+            // 以 PPT_BATCH_SIZE 为单位并行生成，每个批次完成后刷新一次 UI 和服务器状态
+            for (var b = 0; b < pendingIndexes.length; b += PPT_BATCH_SIZE) {
+                var batch = pendingIndexes.slice(b, b + PPT_BATCH_SIZE);
 
-                    try {
-                        await generatePage(i);
-                        renderEditorPagesList();
-                        // 只在当前页是正在生成的页面时才刷新预览
-                        if (pptState.currentPage === i) {
-                            renderEditorPreview(i);
-                        }
-                        saveDraft();
-                        await syncPPTStatusToServer('generating');
-                    } catch (e) {
-                        console.error('Failed to generate page ' + (i + 1), e);
-                        await syncPPTStatusToServer('error');
-                    } finally {
-                        showEditorLoading(false);
-                    }
+                var batchResults = await Promise.allSettled(batch.map(function(idx) {
+                    return generatePage(idx).catch(function(err) {
+                        console.error('Failed to generate page ' + (idx + 1), err);
+                        throw err;
+                    });
+                }));
 
-                    await new Promise(r => setTimeout(r, 500));
+                renderEditorPagesList();
+                if (pptState.currentPage !== null && pptState.currentPage !== undefined) {
+                    renderEditorPreview(pptState.currentPage);
+                }
+                saveDraft();
+
+                var hasFailure = batchResults.some(function(r) { return r.status === 'rejected'; });
+                await syncPPTStatusToServer(hasFailure ? 'error' : 'generating');
+
+                // 每个批次之间稍作停顿，避免服务端限流
+                if (b + PPT_BATCH_SIZE < pendingIndexes.length) {
+                    await new Promise(function(r) { setTimeout(r, 400); });
                 }
             }
 
-            // 如果用户没有手动选择，最后跳转到第一页
             if (!pptState.userSelectedPage) {
                 selectPage(0, false);
             }
             await syncPPTStatusToServer('completed');
+            notifyPPTGenerationComplete();
         } finally {
+            showEditorLoading(false);
             pptState.isGenerating = false;
             saveDraft();
         }
@@ -1176,9 +1289,9 @@ ${isAcademic ? '倒数第2页：参考资料\n要点1：文献1\n要点2：文�
             schemeName: scheme.name
         };
 
-        // 智能配图：对于多种布局，自动搜索图片
-        var layoutsNeedingImages = ['image-left', 'image-right', 'cover', 'content'];
-        if (layoutsNeedingImages.includes(preferredLayout) && !pageJson.image) {
+        // 智能配图：对几乎所有正文型布局都搜索配图
+        var effectiveLayout = pageJson.layout || preferredLayout;
+        if (LAYOUTS_NEEDING_IMAGES.indexOf(effectiveLayout) !== -1 && !pageJson.image) {
             try {
                 // 1. 提取关键词
                 var keywordsResponse = await fetch('/api/pexels/extract-keywords', {

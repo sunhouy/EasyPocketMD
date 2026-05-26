@@ -144,12 +144,16 @@ import {
         return false;
     }
 
-    function setFileSwitchLoading(loading) {
+    function setFileSwitchLoading(loading, customText) {
         const isLoading = !!loading;
         const overlay = ensureFileSwitchLoadingOverlay();
         const text = document.getElementById('fileSwitchLoadingText');
         if (text) {
-            text.textContent = isEn() ? 'Loading file...' : '正在加载文件...';
+            if (typeof customText === 'string' && customText) {
+                text.textContent = customText;
+            } else {
+                text.textContent = isEn() ? 'Loading file...' : '正在加载文件...';
+            }
         }
 
         if (overlay) {
@@ -1476,6 +1480,8 @@ import {
             return g('currentUser') && g('currentUser').username === requestUsername;
         }
 
+        setFileSwitchLoading(true, isEn() ? 'Loading files...' : '正在加载文件...');
+
         try {
             if (typeof global.ensureWasmTextEngineReady === 'function') {
                 await global.ensureWasmTextEngineReady();
@@ -1636,6 +1642,8 @@ import {
             await tryHandleTokenExpired(error);
             global.showSyncStatus(isEn() ? 'Sync failed, using local files' : '同步失败，使用本地文件', 'error');
             loadLocalFiles();
+        } finally {
+            setFileSwitchLoading(false);
         }
     }
 
@@ -2900,6 +2908,234 @@ import {
         return raw;
     }
 
+    // ---------- 文件列表多选模式 ----------
+    function isFileListMultiSelectMode() {
+        return !!global.fileListMultiSelectMode;
+    }
+
+    function getFileListMultiSelectedIds() {
+        if (!(global.fileListMultiSelectedIds instanceof Set)) {
+            global.fileListMultiSelectedIds = new Set();
+        }
+        return global.fileListMultiSelectedIds;
+    }
+
+    function ensureFileListMultiSelectToolbar() {
+        let toolbar = document.getElementById('fileListMultiSelectToolbar');
+        if (toolbar) return toolbar;
+        const sidebar = document.getElementById('fileListSidebar');
+        const fileList = document.getElementById('fileList');
+        if (!sidebar || !fileList) return null;
+
+        toolbar = document.createElement('div');
+        toolbar.id = 'fileListMultiSelectToolbar';
+        toolbar.className = 'file-list-multi-select-toolbar';
+        toolbar.innerHTML =
+            '<div class="file-list-multi-select-info">' +
+                '<i class="far fa-check-square"></i> ' +
+                '<span>' + (isEn() ? 'Selected' : '已选') + '</span> ' +
+                '<span id="fileListMultiSelectCount">0</span>' +
+            '</div>' +
+            '<div class="file-list-multi-select-actions">' +
+                '<button type="button" class="file-list-multi-select-btn" data-action="select-all">' + (isEn() ? 'Select All' : '全选') + '</button>' +
+                '<button type="button" class="file-list-multi-select-btn" data-action="invert">' + (isEn() ? 'Invert' : '反选') + '</button>' +
+                '<button type="button" class="file-list-multi-select-btn danger" data-action="delete">' + (isEn() ? 'Delete' : '删除') + '</button>' +
+                '<button type="button" class="file-list-multi-select-btn" data-action="cancel">' + (isEn() ? 'Cancel' : '取消') + '</button>' +
+            '</div>';
+        fileList.parentNode.insertBefore(toolbar, fileList);
+
+        toolbar.addEventListener('click', function(e) {
+            const target = e.target;
+            const btn = target && target.closest ? target.closest('[data-action]') : null;
+            if (!btn) return;
+            const action = btn.getAttribute('data-action');
+            if (action === 'cancel') {
+                exitFileListMultiSelectMode();
+            } else if (action === 'select-all') {
+                selectAllFilesForMulti();
+            } else if (action === 'invert') {
+                invertFileListMultiSelection();
+            } else if (action === 'delete') {
+                batchDeleteFileListMultiSelection();
+            }
+        });
+        return toolbar;
+    }
+
+    function updateFileListMultiSelectToolbar() {
+        const countEl = document.getElementById('fileListMultiSelectCount');
+        if (countEl) {
+            countEl.textContent = String(getFileListMultiSelectedIds().size);
+        }
+    }
+
+    function ensureMultiSelectCheckbox(anchor, nodeId) {
+        if (!isFileListMultiSelectMode()) return;
+        const $anchor = window.$(anchor);
+        if ($anchor.find('.file-multi-checkbox').length) return;
+        const $cb = window.$('<span class="file-multi-checkbox" role="checkbox" aria-checked="false"><i class="far fa-square"></i></span>');
+        $cb.on('click', function(e) {
+            e.stopPropagation();
+            e.preventDefault();
+            toggleFileListMultiSelectItem(nodeId);
+        });
+        $anchor.prepend($cb);
+    }
+
+    function refreshFileListMultiSelectUi() {
+        if (!isFileListMultiSelectMode()) return;
+        window.$('#fileList .jstree-anchor').each(function() {
+            const anchor = this;
+            const anchorId = window.$(anchor).attr('id');
+            const nodeId = resolveNodeIdFromAnchorId(anchorId);
+            if (!nodeId) return;
+            ensureMultiSelectCheckbox(anchor, nodeId);
+        });
+        syncFileListMultiSelectCheckboxes();
+    }
+
+    function syncFileListMultiSelectCheckboxes() {
+        const set = getFileListMultiSelectedIds();
+        window.$('#fileList .jstree-anchor').each(function() {
+            const $anchor = window.$(this);
+            const anchorId = $anchor.attr('id');
+            const nodeId = resolveNodeIdFromAnchorId(anchorId);
+            const $cb = $anchor.find('.file-multi-checkbox');
+            if (!$cb.length) return;
+            const checked = set.has(String(nodeId));
+            $cb.attr('aria-checked', checked ? 'true' : 'false');
+            $cb.toggleClass('checked', checked);
+            const $icon = $cb.find('i');
+            $icon.removeClass('fa-square fa-check-square');
+            $icon.addClass(checked ? 'fa-check-square' : 'fa-square');
+        });
+    }
+
+    function toggleFileListMultiSelectItem(id) {
+        const set = getFileListMultiSelectedIds();
+        const sid = String(id);
+        if (set.has(sid)) set.delete(sid); else set.add(sid);
+        syncFileListMultiSelectCheckboxes();
+        updateFileListMultiSelectToolbar();
+    }
+
+    function selectAllFilesForMulti() {
+        const set = getFileListMultiSelectedIds();
+        window.$('#fileList .jstree-anchor').each(function() {
+            const anchorId = window.$(this).attr('id');
+            const nodeId = resolveNodeIdFromAnchorId(anchorId);
+            if (nodeId) set.add(String(nodeId));
+        });
+        syncFileListMultiSelectCheckboxes();
+        updateFileListMultiSelectToolbar();
+    }
+
+    function invertFileListMultiSelection() {
+        const set = getFileListMultiSelectedIds();
+        window.$('#fileList .jstree-anchor').each(function() {
+            const anchorId = window.$(this).attr('id');
+            const nodeId = resolveNodeIdFromAnchorId(anchorId);
+            if (!nodeId) return;
+            const sid = String(nodeId);
+            if (set.has(sid)) set.delete(sid); else set.add(sid);
+        });
+        syncFileListMultiSelectCheckboxes();
+        updateFileListMultiSelectToolbar();
+    }
+
+    function enterFileListMultiSelectMode(initialId) {
+        global.fileListMultiSelectMode = true;
+        global.fileListMultiSelectedIds = new Set();
+        if (initialId !== undefined && initialId !== null && initialId !== '') {
+            global.fileListMultiSelectedIds.add(String(initialId));
+        }
+        const sidebar = document.getElementById('fileListSidebar');
+        if (sidebar) sidebar.classList.add('multi-select-active');
+        ensureFileListMultiSelectToolbar();
+        refreshFileListMultiSelectUi();
+        updateFileListMultiSelectToolbar();
+    }
+
+    function exitFileListMultiSelectMode() {
+        global.fileListMultiSelectMode = false;
+        global.fileListMultiSelectedIds = new Set();
+        const sidebar = document.getElementById('fileListSidebar');
+        if (sidebar) sidebar.classList.remove('multi-select-active');
+        const tb = document.getElementById('fileListMultiSelectToolbar');
+        if (tb && tb.parentNode) tb.parentNode.removeChild(tb);
+        window.$('#fileList .file-multi-checkbox').remove();
+    }
+
+    async function batchDeleteFileListMultiSelection() {
+        const ids = Array.from(getFileListMultiSelectedIds());
+        if (ids.length === 0) {
+            g('customAlert')(isEn() ? 'No items selected' : '尚未选择任何项');
+            return;
+        }
+        const files = g('files');
+        const idSet = new Set(ids.map(String));
+
+        // 收集所选项及其所有后代（针对选中的文件夹）
+        const selectedItems = files.filter(f => idSet.has(String(f.id)));
+        const allToDelete = new Set(selectedItems);
+        selectedItems.forEach(item => {
+            if (item.type === 'folder') {
+                files.forEach(f => {
+                    if (f === item) return;
+                    if (f.name === item.name || f.name.startsWith(item.name + '/')) {
+                        allToDelete.add(f);
+                    }
+                });
+            }
+        });
+
+        const itemsArr = Array.from(allToDelete);
+        const remainingFileCount = files.filter(f => f.type === 'file' && !allToDelete.has(f)).length;
+        if (remainingFileCount === 0) {
+            g('customAlert')(isEn() ? 'At least one file must be kept' : '至少需要保留一个文件');
+            return;
+        }
+
+        const confirmed = await g('customConfirm')(isEn()
+            ? `Delete ${itemsArr.length} selected item(s)? Folders include all contents.`
+            : `确认删除选中的 ${itemsArr.length} 项？文件夹将连同其所有内容一起删除。`);
+        if (!confirmed) return;
+
+        const deletedFileNames = itemsArr.filter(f => f.type === 'file').map(f => f.name);
+        const deletedFolderNames = itemsArr.filter(f => f.type === 'folder' && f.isSynced).map(f => f.name);
+        const deletedIds = itemsArr.map(f => f.id);
+        const deletedIdSet = new Set(deletedIds.map(String));
+
+        for (let i = files.length - 1; i >= 0; i--) {
+            if (deletedIdSet.has(String(files[i].id))) files.splice(i, 1);
+        }
+        localStorage.setItem('vditor_files', JSON.stringify(files));
+
+        if (g('currentUser')) {
+            deletedFileNames.forEach(name => {
+                try { global.deleteFileFromServer(name); } catch (e) {}
+            });
+            deletedFolderNames.forEach(name => {
+                try { global.deleteFileFromServer(name + '/'); } catch (e) {}
+            });
+        }
+
+        deletedIds.forEach(id => {
+            delete g('lastSyncedContent')[id];
+            delete g('unsavedChanges')[id];
+        });
+
+        if (deletedIdSet.has(String(g('currentFileId')))) {
+            const firstFile = files.find(f => f.type === 'file');
+            if (firstFile) openFile(firstFile.id);
+            else createDefaultFile();
+        }
+
+        exitFileListMultiSelectMode();
+        loadFiles();
+        global.showMessage(isEn() ? 'Deleted ' + itemsArr.length + ' item(s)' : '已删除 ' + itemsArr.length + ' 项');
+    }
+
     function loadLocalFiles() {
         if (deferFileTreeWorkUntilWasmReady(loadLocalFiles, 'loadLocalFiles')) return;
         const localFiles = JSON.parse(localStorage.getItem('vditor_files') || '[]');
@@ -3325,6 +3561,14 @@ import {
                                  }
                              }
                         },
+                        'multi_select': {
+                            'label': isEn() ? 'Multi Select' : '多选',
+                            'action': function(data) {
+                                const inst = window.$.jstree.reference(data.reference);
+                                const obj = inst.get_node(data.reference);
+                                enterFileListMultiSelectMode(obj.id);
+                            }
+                        },
                         'delete': {
                             'label': isEn() ? 'Delete' : '删除',
                             'action': function(data) {
@@ -3384,6 +3628,16 @@ import {
             }
         })
         .on('select_node.jstree', function (e, data) {
+            if (isFileListMultiSelectMode()) {
+                // 多选模式：切换选中状态，但保持 jstree 内部选中态指向当前文件
+                toggleFileListMultiSelectItem(data.node.id);
+                const currentFileId = g('currentFileId');
+                data.instance.deselect_node(data.node);
+                if (currentFileId && data.instance.get_node(currentFileId)) {
+                    data.instance.select_node(currentFileId);
+                }
+                return;
+            }
             if (data.node.type === 'file') {
                 if (g('currentFileId') !== data.node.id) {
                     if (g('currentFileId')) global.saveCurrentFile(true);
@@ -3402,6 +3656,10 @@ import {
         .on('click.jstree', function (e) {
             const inst = window.$.jstree.reference(e.target);
             const node = inst.get_node(e.target);
+            if (isFileListMultiSelectMode()) {
+                // 多选模式下，点击复选框已单独处理；点击节点其他位置不进行展开/打开
+                return;
+            }
             if (node && node.type === 'folder') {
                 const target = window.$(e.target);
                 // 排除右侧菜单按钮和箭头（箭头 jstree 会默认处理，且不需要我们在这里 toggle）
@@ -3430,6 +3688,10 @@ import {
                 const nodeId = resolveNodeIdFromAnchorId(anchorId);
                 renderFileNodeInlineMeta(this, nodeId);
 
+                if (isFileListMultiSelectMode()) {
+                    ensureMultiSelectCheckbox(this, nodeId);
+                }
+
                 if (!window.$(this).find('.file-menu-btn').length) {
                     const menuBtn = window.$('<i class="fas fa-ellipsis-v file-menu-btn"></i>');
                     menuBtn.click(function(e) {
@@ -3438,21 +3700,23 @@ import {
                         const node = window.$('#fileList').jstree(true).get_node(nodeId);
                         if (node) {
                             const rect = e.target.getBoundingClientRect();
+                            const viewportH = window.innerHeight;
+                            const viewportW = window.innerWidth;
                             let x = rect.left;
-                            const y = rect.bottom;
-                            
+                            let y = rect.bottom;
+
                             // 确保菜单不会超出屏幕右侧
                             const menuWidth = 200; // 估算的菜单宽度
-                            if (x + menuWidth > window.innerWidth) {
-                                x = window.innerWidth - menuWidth - 10;
+                            if (x + menuWidth > viewportW) {
+                                x = viewportW - menuWidth - 10;
                             }
-                            
+
                             // 先移除已存在的菜单
                             window.$('.vakata-context').remove();
-                            
+
                             // 显示上下文菜单
                             window.$('#fileList').jstree(true).show_contextmenu(node, x, y);
-                            
+
                             // 阻止菜单点击事件冒泡，防止文件列表被关闭
                             setTimeout(function() {
                                 const $context = window.$('.vakata-context');
@@ -3463,22 +3727,38 @@ import {
                                     });
                                 }
                             }, 10);
-                            
+
                             // 多次尝试设置位置，确保正确
                             const setPosition = function() {
                                 const $context = window.$('.vakata-context');
                                 if ($context.length) {
-                                    // 再次检查和调整位置
-                                    let finalX = x;
                                     const finalMenuWidth = $context.outerWidth() || 200;
-                                    if (finalX + finalMenuWidth > window.innerWidth) {
-                                        finalX = window.innerWidth - finalMenuWidth - 10;
+                                    const finalMenuHeight = $context.outerHeight() || 200;
+
+                                    let finalX = rect.left;
+                                    if (finalX + finalMenuWidth > viewportW) {
+                                        finalX = viewportW - finalMenuWidth - 10;
                                     }
-                                    
+                                    if (finalX < 8) finalX = 8;
+
+                                    // 默认在按钮下方展开；若下方空间不足，则改为按钮上方
+                                    let finalY = rect.bottom;
+                                    if (finalY + finalMenuHeight > viewportH - 8) {
+                                        const yAbove = rect.top - finalMenuHeight;
+                                        if (yAbove >= 8) {
+                                            finalY = yAbove;
+                                        } else {
+                                            // 上下都放不下时，贴底显示并允许菜单内部滚动
+                                            finalY = Math.max(8, viewportH - finalMenuHeight - 8);
+                                        }
+                                    }
+
                                     $context.css({
                                         left: finalX,
-                                        top: y,
+                                        top: finalY,
                                         position: 'fixed',
+                                        'max-height': (viewportH - 16) + 'px',
+                                        'overflow-y': 'auto',
                                         'z-index': 99999
                                     });
                                 }
@@ -3493,9 +3773,16 @@ import {
             });
 
             reapplyFileListSearchVisibility();
+
+            if (isFileListMultiSelectMode()) {
+                syncFileListMultiSelectCheckboxes();
+            }
         })
         .on('ready.jstree', function() {
             expandActiveFile();
+            if (isFileListMultiSelectMode()) {
+                refreshFileListMultiSelectUi();
+            }
             // 禁用长按和右键菜单，统一使用右侧三个点
             window.$('#fileList').on('contextmenu', function(e) {
                 e.preventDefault();
