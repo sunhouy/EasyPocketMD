@@ -1102,30 +1102,35 @@
         const container = document.getElementById('accountListContainer');
         if (!container) return;
 
-        const accounts = getSavedAccounts();
+        // 确保当前登录用户始终出现在列表里（修复部分情况下当前账户不显示的问题）
         const currentUsername = global.currentUser ? global.currentUser.username : null;
+        let accounts = getSavedAccounts();
+        if (currentUsername && !accounts.find(function(acc) { return acc.username === currentUsername; })) {
+            addAccountToList(currentUsername, global.currentUser.password || '');
+            accounts = getSavedAccounts();
+        }
         const isSingleAccount = accounts.length === 1;
 
         let html = '';
         accounts.forEach(function(account) {
             const isCurrent = account.username === currentUsername;
-            html += '<div class="dropdown-item account-item" data-username="' + account.username + '" style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;cursor:pointer;' + (isCurrent ? 'background:#f0f7ff;' : '') + '">';
+            html += '<div class="dropdown-item account-item' + (isCurrent ? ' account-item-current' : '') + '" data-username="' + account.username + '" style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;cursor:pointer;">';
             html += '<span style="display:flex;align-items:center;gap:8px;flex:1;">';
-            html += '<i class="fas fa-user-circle" style="color:#4a90e2;"></i> ';
+            html += '<i class="fas fa-user-circle account-item-avatar"></i> ';
             html += '<span>' + account.username + '</span>';
             if (isCurrent) {
-                html += '<span style="font-size:11px;color:#4a90e2;margin-left:4px;">(' + (isEn() ? 'Current' : '当前') + ')</span>';
+                html += '<span class="account-item-current-tag">(' + (isEn() ? 'Current' : '当前') + ')</span>';
             }
             html += '</span>';
             // 右侧按钮组
             html += '<span style="display:flex;align-items:center;gap:4px;">';
             // 设置按钮（所有账户都显示）
-            html += '<button class="account-settings-btn" data-username="' + account.username + '" style="background:none;border:none;cursor:pointer;padding:4px;color:#666;" title="' + t('userSettings') + '">';
+            html += '<button class="account-settings-btn" data-username="' + account.username + '" title="' + t('userSettings') + '">';
             html += '<i class="fas fa-cog"></i>';
             html += '</button>';
             // 移除按钮（只有一个账户时不显示）
             if (!isSingleAccount) {
-                html += '<button class="remove-account-btn" data-username="' + account.username + '" style="background:none;border:none;cursor:pointer;padding:4px;color:#999;" title="' + t('removeAccount') + '">';
+                html += '<button class="remove-account-btn" data-username="' + account.username + '" title="' + t('removeAccount') + '">';
                 html += '<i class="fas fa-times"></i>';
                 html += '</button>';
             }
@@ -1476,16 +1481,67 @@
             return;
         }
 
-        // 验证账户
+        // 前端基础校验（注册需要满足）
+        if (!validateUsername(username)) {
+            if (messageEl) {
+                messageEl.textContent = t('usernameInvalid');
+                messageEl.className = 'modal-message error';
+            }
+            return;
+        }
+        if (!validatePassword(password)) {
+            if (messageEl) {
+                messageEl.textContent = t('passwordInvalid');
+                messageEl.className = 'modal-message error';
+            }
+            return;
+        }
+
+        // 先尝试登录（账户已存在）；若用户不存在则尝试注册
         try {
-            const result = await verifyAccountCredentials(username, password);
+            let result = await verifyAccountCredentials(username, password);
+
+            if (result.code !== 200) {
+                // 尝试注册新账户
+                try {
+                    const registerUrl = (global.getApiBaseUrl ? global.getApiBaseUrl() : 'api') + '/auth/register';
+                    const regResponse = await fetch(registerUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ username: username, password: password, e2e_enabled: false })
+                    });
+                    const regResult = global.parseJsonResponse ? await global.parseJsonResponse(regResponse) : await regResponse.json();
+                    if (regResult.code === 200) {
+                        // 注册成功后重新登录拿 token
+                        result = await verifyAccountCredentials(username, password);
+                    } else if (regResult.code === 409) {
+                        // 账户已存在，说明前一次失败是密码错误
+                        if (messageEl) {
+                            messageEl.textContent = t('userExistsPasswordIncorrect');
+                            messageEl.className = 'modal-message error';
+                        }
+                        return;
+                    } else {
+                        if (messageEl) {
+                            messageEl.textContent = t('accountAddFailed') + ': ' + (regResult.message || '');
+                            messageEl.className = 'modal-message error';
+                        }
+                        return;
+                    }
+                } catch (regError) {
+                    console.error('注册账户失败:', regError);
+                    if (messageEl) {
+                        messageEl.textContent = t('accountAddFailed');
+                        messageEl.className = 'modal-message error';
+                    }
+                    return;
+                }
+            }
+
             if (result.code === 200) {
-                // 添加账户到列表
                 addAccountToList(username, password);
 
-                // 如果当前没有登录用户，切换到新账户
                 if (!global.currentUser) {
-                    // 设置当前用户
                     global.currentUser = {
                         username: username,
                         token: result.data.token,
@@ -1496,18 +1552,22 @@
                     global.showMessage(t('accountAddedSuccess'), 'success');
                     hideAddAccountModal();
                     showUserInfo();
-                    if (global.loadFiles) global.loadFiles();
+                    if (global.startAutoSync) global.startAutoSync();
+                    if (global.loadFilesFromServer) {
+                        await global.loadFilesFromServer();
+                    } else if (global.loadFiles) {
+                        global.loadFiles();
+                    }
+                    if (global.hideTopNoticeBanner) global.hideTopNoticeBanner();
                 } else {
-                    // 如果已有登录用户，保持当前用户，只添加账户到列表
                     global.showMessage(t('accountAddedSuccess'), 'success');
                     hideAddAccountModal();
                 }
 
-                // 刷新账户列表
                 renderAccountList();
             } else {
                 if (messageEl) {
-                    messageEl.textContent = t('accountAddFailed') + ': ' + result.message;
+                    messageEl.textContent = t('accountAddFailed') + ': ' + (result.message || '');
                     messageEl.className = 'modal-message error';
                 }
             }

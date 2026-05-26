@@ -1554,6 +1554,40 @@ document.addEventListener('DOMContentLoaded', function() {
                 window.vditor.vditor.sv.element.addEventListener('paste', handlePasteEvent, true);
             }
 
+            // 在所见即所得 / 即时渲染模式下，回车默认会产生新段落（markdown 中表现为多一行空行）。
+            // 这里将普通回车转换为软换行（<br> / Shift+Enter 行为），避免多余的空行。
+            function shouldSkipSoftBreak(target) {
+                if (!target || target.nodeType !== 1) return false;
+                // 在以下结构内保持默认回车行为：列表、引用、代码块、标题、表格、任务列表
+                return !!target.closest('li, blockquote, pre, code, h1, h2, h3, h4, h5, h6, table, .vditor-task');
+            }
+            function handleEnterToSoftBreak(e) {
+                if (e.key !== 'Enter' || e.shiftKey || e.ctrlKey || e.metaKey || e.altKey || e.isComposing) return;
+                var sel = window.getSelection ? window.getSelection() : null;
+                if (!sel || sel.rangeCount === 0) return;
+                var range = sel.getRangeAt(0);
+                var node = range.startContainer;
+                var el = node.nodeType === 1 ? node : node.parentElement;
+                if (shouldSkipSoftBreak(el)) return;
+                e.preventDefault();
+                e.stopPropagation();
+                document.execCommand('insertLineBreak');
+                if (window.vditor && typeof window.vditor.tip === 'undefined') { /* noop */ }
+                if (window.vditor && window.vditor.vditor) {
+                    var ed = window.vditor.vditor;
+                    var modeObj = ed.mode === 'wysiwyg' ? ed.wysiwyg : (ed.mode === 'ir' ? ed.ir : null);
+                    if (modeObj && typeof modeObj.afterRenderEvent === 'function') {
+                        try { modeObj.afterRenderEvent({ enableAddUndoStack: true, enableHint: false, enableInput: true }); } catch (_) {}
+                    }
+                }
+            }
+            if (window.vditor && window.vditor.vditor && window.vditor.vditor.wysiwyg) {
+                window.vditor.vditor.wysiwyg.element.addEventListener('keydown', handleEnterToSoftBreak, true);
+            }
+            if (window.vditor && window.vditor.vditor && window.vditor.vditor.ir) {
+                window.vditor.vditor.ir.element.addEventListener('keydown', handleEnterToSoftBreak, true);
+            }
+
             // 初始化应用生命周期管理（草稿恢复等）
             if (window.appLifecycle) {
                 window.appLifecycle.init();
