@@ -2,7 +2,6 @@ const express = require('express');
 const router = express.Router();
 const markdownIt = require('markdown-it');
 const markdownItTaskLists = require('markdown-it-task-lists');
-const markdownItMathjax3 = require('markdown-it-mathjax3');
 const markdownItFootnote = require('markdown-it-footnote');
 const wkhtmltopdf = require('wkhtmltopdf');
 const path = require('path');
@@ -12,19 +11,24 @@ const os = require('os');
 const { spawn } = require('child_process');
 const { v4: uuidv4 } = require('uuid');
 
-// Initialize markdown-it with common options
-const md = markdownIt({
-    html: true,        // Enable HTML tags in source
-    xhtmlOut: true,    // Use '/' to close single tags (<br />)
-    breaks: true,      // Convert '\n' in paragraphs into <br>
-    linkify: true,     // Autoconvert URL-like text to links
-    typographer: true  // Enable some language-neutral replacement + quotes beautification
-});
+let mdInstance = null;
 
-// Use plugins
-md.use(markdownItTaskLists);
-md.use(markdownItMathjax3);
-md.use(markdownItFootnote);
+/** Lazy-init: markdown-it-mathjax3 is slow to load and blocks server startup. */
+function getMarkdownRenderer() {
+    if (mdInstance) return mdInstance;
+    const md = markdownIt({
+        html: true,
+        xhtmlOut: true,
+        breaks: true,
+        linkify: true,
+        typographer: true,
+    });
+    md.use(markdownItTaskLists);
+    md.use(require('markdown-it-mathjax3'));
+    md.use(markdownItFootnote);
+    mdInstance = md;
+    return mdInstance;
+}
 
 /**
  * Clean up MathJax-related content from HTML (Node.js version using regex)
@@ -81,7 +85,7 @@ router.post('/markdown', (req, res) => {
             });
         }
 
-        const html = md.render(content);
+        const html = getMarkdownRenderer().render(content);
         
         return res.json({
             code: 200,
@@ -379,7 +383,7 @@ function buildDocxStyledHtml(markdown, settings = {}) {
         return `\n> [Mermaid Diagram]\n>\n> ${String(content || '').trim().split('\n').join('\n> ')}\n`;
     });
 
-    let html = md.render(processedMarkdown);
+    let html = getMarkdownRenderer().render(processedMarkdown);
     html = cleanMathJaxContent(html);
 
     return `<!DOCTYPE html>

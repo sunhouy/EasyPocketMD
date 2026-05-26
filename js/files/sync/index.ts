@@ -146,7 +146,7 @@ export function createSyncRuntimeApi(ctx: any) {
           const fileE2EEnabled = isFileE2EEnabled(file);
           if (globalRef.currentUser && contentToSend && file.type !== 'folder') {
             try {
-              const e2e = await import('../../e2e.js');
+              const e2e = await import('../../e2e');
               if (fileE2EEnabled) {
                 contentToSend = await e2e.encrypt(contentToSend, globalRef.currentUser.password);
               } else {

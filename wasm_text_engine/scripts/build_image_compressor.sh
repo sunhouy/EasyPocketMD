@@ -21,6 +21,22 @@ em++ \
   -s ERROR_ON_UNDEFINED_SYMBOLS=0 \
   -o "$OUT_DIR/image_compressor.js"
 
-cp "$ROOT_DIR/js/image_compressor_client.js" "$OUT_DIR/image_compressor_client.js"
+CLIENT_SRC="$ROOT_DIR/js/image_compressor_client.ts"
+CLIENT_OUT="$OUT_DIR/image_compressor_client.js"
+PROJECT_ROOT="$(cd "$ROOT_DIR/.." && pwd)"
+
+if [[ ! -f "$CLIENT_SRC" ]]; then
+  echo "Missing image compressor client source: $CLIENT_SRC" >&2
+  exit 1
+fi
+
+(
+  cd "$PROJECT_ROOT"
+  npx esbuild "$CLIENT_SRC" \
+    --format=esm \
+    --platform=browser \
+    --target=es2022 \
+    --outfile="$CLIENT_OUT"
+)
 
 echo "Built image compressor wasm module at $OUT_DIR/image_compressor.js and $OUT_DIR/image_compressor.wasm"

@@ -1,0 +1,7 @@
+{
+  "extends": "./tsconfig.api.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "isolatedModules": true
+  }
+}

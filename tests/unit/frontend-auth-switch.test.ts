@@ -48,7 +48,7 @@ describe('frontend account switch', () => {
             json: jest.fn().mockResolvedValue({ code: 200, data: { token: 'target-token' } })
         });
 
-        require('../../js/auth.js');
+        require('../../js/auth');
     });
 
     afterEach(() => {

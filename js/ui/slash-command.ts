@@ -25,16 +25,16 @@ const state = {
 };
 
 const moduleLoaders = {
-    insertPicker: function() { return import('./insert-picker.js'); },
-    formulaPicker: function() { return import('../formula-picker.js'); },
-    chartPicker: function() { return import('./chart.js'); },
-    emojiPicker: function() { return import('../emoji-picker.js'); },
-    exportPanel: function() { return import('./export.js'); },
-    sharePanel: function() { return import('./share.js'); },
-    printPanel: function() { return import('./print.js'); },
-    aiAssistant: function() { return import('./ai-assistant.js'); },
-    fileManager: function() { return import('./file-manager.js'); },
-    uncertaintyCalculator: function() { return import('../uncertainty-calculator.js'); }
+    insertPicker: function() { return import('./insert-picker'); },
+    formulaPicker: function() { return import('../formula-picker'); },
+    chartPicker: function() { return import('./chart'); },
+    emojiPicker: function() { return import('../emoji-picker'); },
+    exportPanel: function() { return import('./export'); },
+    sharePanel: function() { return import('./share'); },
+    printPanel: function() { return import('./print'); },
+    aiAssistant: function() { return import('./ai-assistant'); },
+    fileManager: function() { return import('./file-manager'); },
+    uncertaintyCalculator: function() { return import('../uncertainty-calculator'); }
 };
 
 const loadedModules = {};
@@ -1030,7 +1030,7 @@ async function loadBuiltinSlashEntries() {
     if (Array.isArray(builtinSlashEntries)) return builtinSlashEntries;
 
     if (!builtinSlashLoadPromise) {
-        builtinSlashLoadPromise = import('./slash-builtin-index.js').then(function(mod) {
+        builtinSlashLoadPromise = import('./slash-builtin-index').then(function(mod) {
             if (mod && typeof mod.getBuiltinSlashEntries === 'function') {
                 builtinSlashEntries = mod.getBuiltinSlashEntries();
             }

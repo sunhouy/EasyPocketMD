@@ -161,7 +161,7 @@ jobs:
     - name: Create deployment tarball
       run: |
         mkdir -p deploy_tmp
-        cp -r dist api print shared package.json package-lock.json nginx.conf sw.js manifest.webmanifest icon.png .env ssl deploy_tmp/
+        cp -r dist api print shared package.json package-lock.json nginx.conf sw.ts manifest.webmanifest icon.png .env ssl deploy_tmp/
 
         # 复制 reference-docs 和 scripts
         if [ -d "reference-docs" ]; then

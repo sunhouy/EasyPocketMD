@@ -91,7 +91,7 @@
                 case 'emoji':
                     closeInsertPicker();
                     if (typeof window.showEmojiPicker !== 'function') {
-                        import('../emoji-picker.js').then(function() {
+                        import('../emoji-picker').then(function() {
                             if (typeof window.showEmojiPicker === 'function') window.showEmojiPicker();
                         });
                     } else {
@@ -101,7 +101,7 @@
                 case 'formula':
                     closeInsertPicker();
                     if (typeof window.showFormulaPicker !== 'function') {
-                        import('../formula-picker.js').then(function() {
+                        import('../formula-picker').then(function() {
                             if (typeof window.showFormulaPicker === 'function') window.showFormulaPicker();
                         });
                     } else {
@@ -111,7 +111,7 @@
                 case 'chart':
                     closeInsertPicker();
                     if (typeof window.showChartPicker !== 'function') {
-                        import('./chart.js').then(function() {
+                        import('./chart').then(function() {
                             if (typeof window.showChartPicker === 'function') window.showChartPicker();
                         });
                     } else {
