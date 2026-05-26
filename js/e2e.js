@@ -21,8 +21,30 @@ export function encryptSync(text, password) {
     return CryptoJS.AES.encrypt(text, password).toString();
 }
 
+export function decryptSync(ciphertext, password) {
+    if (!ciphertext || !password || !CryptoJS) return ciphertext;
+    if (!looksLikeE2ECiphertext(ciphertext)) return ciphertext;
+    try {
+        const bytes = CryptoJS.AES.decrypt(ciphertext, password);
+        const originalText = bytes.toString(CryptoJS.enc.Utf8);
+        return originalText || ciphertext;
+    } catch (e) {
+        console.error('E2E sync decrypt error:', e);
+        return ciphertext;
+    }
+}
+
+export function resolveFileContentSync(content, password, e2eEnabled) {
+    if (!content || !password) return content;
+    if (e2eEnabled || looksLikeE2ECiphertext(content)) {
+        return decryptSync(content, password);
+    }
+    return content;
+}
+
 if (typeof window !== 'undefined') {
     window.e2eEncryptSync = encryptSync;
+    window.e2eResolveFileContentSync = resolveFileContentSync;
 }
 
 /**
@@ -35,6 +57,28 @@ export async function encrypt(text, password) {
     if (!text || !password) return text;
     const crypto = await lazyLoadCrypto();
     return crypto.AES.encrypt(text, password).toString();
+}
+
+/** CryptoJS AES ciphertext in OpenSSL format (Base64) typically starts with this prefix. */
+export function looksLikeE2ECiphertext(text) {
+    return typeof text === 'string' && text.startsWith('U2FsdGVkX1');
+}
+
+/**
+ * Normalize file content for display or plaintext storage.
+ * When E2E is enabled, decrypt ciphertext. When disabled, still decrypt stale ciphertext left on server/local.
+ * @param {string} content
+ * @param {string} password
+ * @param {boolean} e2eEnabled
+ * @returns {Promise<string>}
+ */
+export async function resolveFileContent(content, password, e2eEnabled) {
+    if (!content || !password) return content;
+    if (e2eEnabled || looksLikeE2ECiphertext(content)) {
+        const decrypted = await decrypt(content, password);
+        return decrypted !== null ? decrypted : content;
+    }
+    return content;
 }
 
 /**
