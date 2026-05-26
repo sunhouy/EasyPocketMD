@@ -461,6 +461,40 @@
                     </li>
                     <li class="settings-list-item">
                         <div class="form-group">
+                            <label data-i18n="vditorContentTheme">编辑器正文主题</label>
+                            <div class="select-group">
+                                <select id="vditorContentThemeSelect" class="form-control">
+                                    <option value="auto" data-i18n="vditorThemeFollowApp">跟随应用主题</option>
+                                    <option value="light" data-i18n="vditorContentThemeLight">明亮</option>
+                                    <option value="dark" data-i18n="vditorContentThemeDark">暗黑</option>
+                                    <option value="ant-design" data-i18n="vditorContentThemeAntDesign">Ant Design</option>
+                                    <option value="wechat" data-i18n="vditorContentThemeWechat">微信</option>
+                                </select>
+                            </div>
+                        </div>
+                    </li>
+                    <li class="settings-list-item">
+                        <div class="form-group">
+                            <label data-i18n="vditorCodeTheme">代码高亮主题</label>
+                            <div class="select-group">
+                                <select id="vditorCodeThemeSelect" class="form-control">
+                                    <option value="auto" data-i18n="vditorThemeFollowApp">跟随应用主题</option>
+                                    <option value="github" data-i18n="vditorCodeThemeGithub">GitHub</option>
+                                    <option value="github-dark" data-i18n="vditorCodeThemeGithubDark">GitHub Dark</option>
+                                    <option value="atom-one-dark" data-i18n="vditorCodeThemeAtomOneDark">Atom One Dark</option>
+                                    <option value="atom-one-light" data-i18n="vditorCodeThemeAtomOneLight">Atom One Light</option>
+                                    <option value="vs2015" data-i18n="vditorCodeThemeVs2015">VS 2015</option>
+                                    <option value="monokai" data-i18n="vditorCodeThemeMonokai">Monokai</option>
+                                    <option value="dracula" data-i18n="vditorCodeThemeDracula">Dracula</option>
+                                    <option value="nord" data-i18n="vditorCodeThemeNord">Nord</option>
+                                    <option value="xcode" data-i18n="vditorCodeThemeXcode">Xcode</option>
+                                    <option value="idea" data-i18n="vditorCodeThemeIdea">IntelliJ IDEA</option>
+                                </select>
+                            </div>
+                        </div>
+                    </li>
+                    <li class="settings-list-item">
+                        <div class="form-group">
                             <label data-i18n="fontSize">字体大小</label>
                             <div class="select-group" id="fontSizeGroup">
                                 <select id="fontSizeSelect" class="form-control">
@@ -1144,7 +1178,7 @@
                     <button class="dropdown-item" id="desktopAboutBtn"><i class="fas fa-info-circle"></i><span data-i18n="about">关于</span></button>
                 </div>
             </div>
-            <span class="current-file-e2e-indicator desktop-e2e-indicator" aria-hidden="true" title="此文件已使用端到端加密"><i class="fas fa-lock"></i></span>
+            <span class="current-file-e2e-indicator desktop-e2e-indicator" aria-hidden="true" role="button" tabindex="0" title="此文件已使用端到端加密"><i class="fas fa-lock"></i></span>
         </div>
 
         <div class="toolbar-left-actions">
@@ -1163,7 +1197,7 @@
         </div>
         <h1 class="mobile-title" data-i18n="mobileTitle">EasyPocketMD</h1>
         <div class="toolbar-right-actions">
-            <span class="current-file-e2e-indicator mobile-e2e-indicator" aria-hidden="true" title="此文件已使用端到端加密"><i class="fas fa-lock"></i></span>
+            <span class="current-file-e2e-indicator mobile-e2e-indicator" aria-hidden="true" role="button" tabindex="0" title="此文件已使用端到端加密"><i class="fas fa-lock"></i></span>
             <!-- 保存按钮 -->
             <button class="mobile-action-btn editor-save-btn" id="saveFileBtn" title="保存文件">
                 <i class="fas fa-save"></i>
@@ -1419,6 +1453,22 @@
                 </div>
             </div>
         </div>
+    </div>
+</div>
+
+<!-- 端到端加密信息浮窗 -->
+<div id="e2eInfoPopover" class="e2e-info-popover" role="dialog" aria-hidden="true" aria-labelledby="e2eInfoPopoverTitle">
+    <div class="e2e-info-popover-arrow"></div>
+    <div class="e2e-info-popover-header">
+        <i class="fas fa-shield-alt"></i>
+        <span id="e2eInfoPopoverTitle" data-i18n="e2eInfoTitle">端到端加密</span>
+    </div>
+    <div class="e2e-info-popover-body" data-i18n="e2eInfoMessage">
+        本文件已端到端加密，除您以外的任何用户都无法查看本文件，开发者也不例外。
+    </div>
+    <div class="e2e-info-popover-fingerprint-section">
+        <div class="e2e-info-popover-fingerprint-label" data-i18n="e2eInfoFingerprintLabel">本地密钥指纹</div>
+        <div class="e2e-info-popover-fingerprint" id="e2eInfoPopoverFingerprint">--</div>
     </div>
 </div>
 

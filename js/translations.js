@@ -103,6 +103,23 @@
             chinese: '中文',
             english: 'English',
             fontSize: '字体大小',
+            vditorContentTheme: '编辑器正文主题',
+            vditorCodeTheme: '代码高亮主题',
+            vditorThemeFollowApp: '跟随应用主题',
+            vditorContentThemeLight: '明亮',
+            vditorContentThemeDark: '暗黑',
+            vditorContentThemeAntDesign: 'Ant Design',
+            vditorContentThemeWechat: '微信',
+            vditorCodeThemeGithub: 'GitHub',
+            vditorCodeThemeGithubDark: 'GitHub Dark',
+            vditorCodeThemeAtomOneDark: 'Atom One Dark',
+            vditorCodeThemeAtomOneLight: 'Atom One Light',
+            vditorCodeThemeVs2015: 'VS 2015',
+            vditorCodeThemeMonokai: 'Monokai',
+            vditorCodeThemeDracula: 'Dracula',
+            vditorCodeThemeNord: 'Nord',
+            vditorCodeThemeXcode: 'Xcode',
+            vditorCodeThemeIdea: 'IntelliJ IDEA',
             showOutline: '显示大纲视图（需刷新页面）',
             settingsQuickGuide: '设置已按功能分组，可按“编辑体验 → 文件与存储 → 高级选项”顺序配置。',
             settingsSaveHint: '修改后点击保存立即生效，带“需刷新后生效”提示的选项会在刷新后完全生效。',
@@ -485,7 +502,7 @@
             cannotOpenFolder: '无法打开文件夹',
             fileOpened: '已打开文件',
             atLeastOneFile: '至少需要保留一个文件',
-            confirmDeleteFileQuestion: '确定要删除这个文件吗？',
+            confirmDeleteFileQuestion: '确认删除"{name}"吗？',
             fileDeleted: '已删除文件',
             confirmDeleteFolderQuestion: '确定要删除文件夹"{name}"及其所有内容吗？',
             folderDeleted: '已删除文件夹',
@@ -802,7 +819,13 @@
             compressLargeImageTitle: '图片较大',
             compressLargeImageMessage: '该图片超过 10MB，建议压缩以提升编辑和加载性能。',
             compressSkip: '跳过压缩',
-            compressConfirm: '压缩并上传'
+            compressConfirm: '压缩并上传',
+
+            // 端到端加密信息浮窗
+            e2eInfoTitle: '端到端加密',
+            e2eInfoMessage: '本文件已端到端加密，除您以外的任何用户都无法查看本文件，开发者也不例外。',
+            e2eInfoFingerprintLabel: '本地密钥指纹',
+            e2eInfoFingerprintUnavailable: '请先登录以查看密钥指纹'
         },
         en: {
             // Page title and header
@@ -900,6 +923,23 @@
             chinese: '中文',
             english: 'English',
             fontSize: 'Font Size',
+            vditorContentTheme: 'Editor Content Theme',
+            vditorCodeTheme: 'Code Highlight Theme',
+            vditorThemeFollowApp: 'Follow App Theme',
+            vditorContentThemeLight: 'Light',
+            vditorContentThemeDark: 'Dark',
+            vditorContentThemeAntDesign: 'Ant Design',
+            vditorContentThemeWechat: 'WeChat',
+            vditorCodeThemeGithub: 'GitHub',
+            vditorCodeThemeGithubDark: 'GitHub Dark',
+            vditorCodeThemeAtomOneDark: 'Atom One Dark',
+            vditorCodeThemeAtomOneLight: 'Atom One Light',
+            vditorCodeThemeVs2015: 'VS 2015',
+            vditorCodeThemeMonokai: 'Monokai',
+            vditorCodeThemeDracula: 'Dracula',
+            vditorCodeThemeNord: 'Nord',
+            vditorCodeThemeXcode: 'Xcode',
+            vditorCodeThemeIdea: 'IntelliJ IDEA',
             showOutline: 'Show Outline View',
             settingsQuickGuide: 'Settings are grouped by purpose. Configure in order: Editing Experience → Files & Storage → Advanced.',
             settingsSaveHint: 'Most changes apply after clicking Save. Options marked as refresh-required take full effect after page reload.',
@@ -1281,7 +1321,7 @@
             cannotOpenFolder: 'Cannot open folder',
             fileOpened: 'Opened file',
             atLeastOneFile: 'At least one file must be kept',
-            confirmDeleteFileQuestion: 'Are you sure you want to delete this file?',
+            confirmDeleteFileQuestion: 'Are you sure you want to delete "{name}"?',
             fileDeleted: 'File deleted',
             confirmDeleteFolderQuestion: 'Are you sure you want to delete folder "{name}" and all its contents?',
             folderDeleted: 'Folder deleted',
@@ -1598,7 +1638,13 @@
             compressLargeImageTitle: 'Large Image',
             compressLargeImageMessage: 'This image is over 10MB. Compressing is recommended to improve editing and loading performance.',
             compressSkip: 'Skip Compression',
-            compressConfirm: 'Compress & Upload'
+            compressConfirm: 'Compress & Upload',
+
+            // E2E info popover
+            e2eInfoTitle: 'End-to-End Encrypted',
+            e2eInfoMessage: 'This file is end-to-end encrypted. No one other than you can view it — not even the developer.',
+            e2eInfoFingerprintLabel: 'Local key fingerprint',
+            e2eInfoFingerprintUnavailable: 'Sign in to view your key fingerprint'
         }
     };
 
