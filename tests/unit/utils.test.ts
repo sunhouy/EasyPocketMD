@@ -2,7 +2,7 @@
  * @jest-environment jsdom
  */
 
-require('../../js/utils.js');
+require('../../js/utils');
 
 describe('Frontend Utils', () => {
     describe('formatFileSize', () => {

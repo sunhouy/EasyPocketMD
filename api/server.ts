@@ -72,9 +72,9 @@ if (!isTest) {
 // PWA assets (must NOT fall back to index.html)
 // These files live in project root and are deployed alongside dist/
 const rootPath = path.join(__dirname, '../');
-app.get('/sw.js', (req, res) => {
+app.get('/sw.ts', (req, res) => {
     res.type('application/javascript');
-    res.sendFile(path.join(rootPath, 'sw.js'));
+    res.sendFile(path.join(rootPath, 'sw.ts'));
 });
 app.get('/manifest.webmanifest', (req, res) => {
     // Some browsers expect application/manifest+json; Express doesn't have a built-in shortcut for it.
@@ -311,12 +311,21 @@ app.use((err, req, res, next) => {
     });
 });
 
-// Start server
-if (require.main === module) {
+function isDirectServerRun() {
+    if (isTest) return false;
+    if (require.main === module) return true;
+    if (process.env.npm_lifecycle_event === 'start') return true;
+    const entryName = path.basename(process.argv[1] || '');
+    return entryName === 'server.ts' || entryName === 'server.js';
+}
+
+// Start server (tsx does not set require.main === module)
+if (isDirectServerRun()) {
     const server = http.createServer(app);
     initShareCollabServer(server, shareManager);
     server.listen(port, () => {
         console.log(`Server is running on port ${port}`);
+        console.log(`Local: http://localhost:${port}`);
     });
 }
 

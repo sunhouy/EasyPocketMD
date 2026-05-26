@@ -1,8 +1,10 @@
 /**
  * Vditor 初始化、界面与功能绑定
  */
-import { initSlashCommandRuntime } from './ui/slash-command.js';
-import { getCurrentEngine, createEditor } from './editor-engine.js';
+import { initSlashCommandRuntime } from './ui/slash-command';
+import { getCurrentEngine, createEditor } from './editor-engine';
+import { enterPresentationMode, exitPresentationMode } from './main/presentation-mode';
+import { initBackNavigation } from './main/back-navigation';
 
 document.addEventListener('DOMContentLoaded', function() {
     'use strict';
@@ -55,14 +57,86 @@ document.addEventListener('DOMContentLoaded', function() {
         return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent || '');
     }
 
+    var MODAL_OVERLAY_SELECTOR = [
+        '.modal-overlay',
+        '.mobile-action-sheet-overlay',
+        '.insert-picker-modal',
+        '.footnote-picker-modal',
+        '.formula-picker-modal',
+        '.chart-picker-modal',
+        '.echarts-picker-modal'
+    ].join(', ');
+
+    var MODAL_CLOSE_BUTTON_SELECTOR = [
+        '.modal-close-btn',
+        '#closeDiffModalBtn',
+        '#closeHistoryBtn',
+        '#closeAboutBtn',
+        '#closeServiceStatusBtn',
+        '#cancelSettingsBtn',
+        '#closeAIBtn',
+        '#closeWordCountBtn',
+        '#closeWordCountModalBtn',
+        '#loginModalCloseBtn',
+        '#closeVideoCallBtn',
+        '.share-close-btn',
+        'button[aria-label="close"]',
+        '.custom-dialog-close'
+    ].join(', ');
+
+    var desktopModalEscInitialized = false;
+
+    function isOverlayVisible(el) {
+        if (!el || !el.isConnected) return false;
+        if (el.getAttribute('data-esc-closable') === 'false') return false;
+        if (el.classList.contains('show')) return true;
+        if (el.style.display && el.style.display !== 'none') return true;
+        var computed = window.getComputedStyle(el);
+        return computed.display !== 'none' && computed.visibility !== 'hidden' && computed.opacity !== '0';
+    }
+
+    function isCustomDialogVisible() {
+        var container = document.getElementById('customDialogContainer');
+        if (!container || container.style.display === 'none') return false;
+        return container.innerHTML.trim().length > 0;
+    }
+
+    function isDesktopInterface() {
+        return window.editorInterfaceMode === 'desktop';
+    }
+
     function getVisibleModalOverlays() {
-        return Array.from(document.querySelectorAll('.modal-overlay, .mobile-action-sheet-overlay')).filter(function(el) {
-            if (!el) return false;
-            if (el.classList.contains('show')) return true;
-            if (el.style.display && el.style.display !== 'none') return true;
-            var computed = window.getComputedStyle(el);
-            return computed.display !== 'none' && computed.visibility !== 'hidden';
+        return Array.from(document.querySelectorAll(MODAL_OVERLAY_SELECTOR)).filter(isOverlayVisible);
+    }
+
+    function getTopVisibleModalOverlay() {
+        var overlays = getVisibleModalOverlays();
+        if (!overlays.length) return null;
+
+        overlays.sort(function(a, b) {
+            var za = parseInt(window.getComputedStyle(a).zIndex, 10);
+            var zb = parseInt(window.getComputedStyle(b).zIndex, 10);
+            if (isNaN(za)) za = 0;
+            if (isNaN(zb)) zb = 0;
+            if (zb !== za) return zb - za;
+            return overlays.indexOf(b) - overlays.indexOf(a);
         });
+
+        return overlays[0];
+    }
+
+    function findOverlayCloseButton(overlay) {
+        if (!overlay) return null;
+        var closeBtn = overlay.querySelector(MODAL_CLOSE_BUTTON_SELECTOR);
+        if (closeBtn) return closeBtn;
+
+        var timesIcon = overlay.querySelector('.fa-times');
+        if (timesIcon && timesIcon.closest) {
+            var timesBtn = timesIcon.closest('button');
+            if (timesBtn && overlay.contains(timesBtn)) return timesBtn;
+        }
+
+        return null;
     }
 
     function applySafeAreaToOverlay(overlay) {
@@ -126,9 +200,20 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function closeOverlayByBackPress(overlay) {
         if (!overlay) return false;
+        if (overlay.getAttribute('data-esc-closable') === 'false') return false;
 
         if (overlay.id === 'settingsModalOverlay' && typeof requestCloseSettingsDialog === 'function') {
             requestCloseSettingsDialog();
+            return true;
+        }
+
+        if (overlay.id === 'aiModalOverlay' && typeof window.closeAIPanel === 'function') {
+            window.closeAIPanel();
+            return true;
+        }
+
+        if (overlay.id === 'pptEditorModal') {
+            overlay.style.display = 'none';
             return true;
         }
 
@@ -142,7 +227,7 @@ document.addEventListener('DOMContentLoaded', function() {
             return true;
         }
 
-        var closeBtn = overlay.querySelector('.modal-close-btn, #closeDiffModalBtn, #closeHistoryBtn, #closeAboutBtn, #closeServiceStatusBtn, #cancelSettingsBtn');
+        var closeBtn = findOverlayCloseButton(overlay);
         if (closeBtn) {
             closeBtn.click();
         } else {
@@ -151,7 +236,39 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         var computed = window.getComputedStyle(overlay);
-        return computed.display === 'none' || !overlay.classList.contains('show');
+        var closed = computed.display === 'none' || !overlay.classList.contains('show');
+        if (!closed && overlay.parentNode) {
+            overlay.remove();
+            closed = true;
+        }
+        return closed;
+    }
+
+    function handleDesktopModalEscape(event) {
+        if (!isDesktopInterface()) return;
+        if (event.key !== 'Escape') return;
+        if (event.defaultPrevented || event.isComposing) return;
+        if (isCustomDialogVisible()) return;
+
+        var doc = document;
+        if (doc.fullscreenElement || doc.webkitFullscreenElement || doc.msFullscreenElement) {
+            return;
+        }
+
+        var topOverlay = getTopVisibleModalOverlay();
+        if (!topOverlay) return;
+
+        var closed = closeOverlayByBackPress(topOverlay);
+        if (closed) {
+            event.preventDefault();
+            event.stopPropagation();
+        }
+    }
+
+    function initDesktopModalEscHandler() {
+        if (desktopModalEscInitialized) return;
+        desktopModalEscInitialized = true;
+        document.addEventListener('keydown', handleDesktopModalEscape, true);
     }
 
 
@@ -577,7 +694,7 @@ document.addEventListener('DOMContentLoaded', function() {
         case 'openAIAssistant':
             if (clickElementById('desktopAIBtn')) return;
             if (typeof window.showAIPanel !== 'function') {
-                import('./ui/ai-assistant.js').then(function() {
+                import('./ui/ai-assistant').then(function() {
                     if (typeof window.showAIPanel === 'function') {
                         window.showAIPanel();
                     }
@@ -993,14 +1110,14 @@ document.addEventListener('DOMContentLoaded', function() {
 
     async function handleBottomExport() {
         if (typeof window.exportContent !== 'function') {
-            await import('./ui/export.js');
+            await import('./ui/export');
         }
         window.exportContent();
     }
 
     async function handleBottomShare() {
         if (typeof window.showShareDialog !== 'function') {
-            await import('./ui/share.js');
+            await import('./ui/share');
         }
         window.showShareDialog();
     }
@@ -1065,19 +1182,19 @@ document.addEventListener('DOMContentLoaded', function() {
         { id: 'mobileBottomFileListBtn', icon: 'fas fa-folder-open', textKey: 'fileListTitle', fn: handleBottomFileList },
         { id: 'mobileFormulaBtn', icon: 'fas fa-superscript', textKey: 'formula', fn: async function() {
             if (typeof window.showFormulaPicker !== 'function') {
-                await import('./formula-picker.js');
+                await import('./formula-picker');
             }
             if (typeof window.showFormulaPicker === 'function') window.showFormulaPicker();
         } },
         { id: 'mobileChartBtn', icon: 'fas fa-chart-bar', textKey: 'chart', fn: async function() {
             if (typeof window.showChartPicker !== 'function') {
-                await import('./ui/chart.js');
+                await import('./ui/chart');
             }
             if (typeof window.showChartPicker === 'function') window.showChartPicker();
         } },
         { id: 'mobileUncertaintyBtn', icon: 'fas fa-calculator', textKey: 'uncertainty', isEasterEgg: true, fn: async function() {
             if (typeof window.showUncertaintyCalculator !== 'function') {
-                await import('./uncertainty-calculator.js');
+                await import('./uncertainty-calculator');
             }
             if (typeof window.showUncertaintyCalculator === 'function') window.showUncertaintyCalculator();
         } },
@@ -1086,7 +1203,7 @@ document.addEventListener('DOMContentLoaded', function() {
         { id: 'mobileAIBtn', icon: 'fas fa-robot', textKey: 'aiAssistant', fn: async function() {
             if (typeof window.showAIPanel !== 'function') {
                 // 懒加载 AI 助手模块
-                await import('./ui/ai-assistant.js');
+                await import('./ui/ai-assistant');
             }
             if (typeof window.showAIPanel === 'function') window.showAIPanel();
         } }
@@ -1618,7 +1735,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             // 懒加载代码运行器模块
-            import('./code-runner.js').then(function() {
+            import('./code-runner').then(function() {
                 console.log('Code runner module loaded successfully');
                 // 为现有代码块添加运行按钮
                 if (window.addRunButtons) {
@@ -1891,7 +2008,7 @@ document.addEventListener('DOMContentLoaded', function() {
         var mobileShareBtn = document.getElementById('mobileShareBtn');
         if (mobileShareBtn) mobileShareBtn.addEventListener('click', async function() {
             if (typeof window.showShareDialog !== 'function') {
-                await import('./ui/share.js');
+                await import('./ui/share');
             }
             window.showShareDialog();
             closeDrop();
@@ -1932,7 +2049,7 @@ document.addEventListener('DOMContentLoaded', function() {
         var mobilePrintBtn = document.getElementById('mobilePrintBtn');
         if (mobilePrintBtn) mobilePrintBtn.addEventListener('click', async function() {
             if (typeof window.showPrintDialog !== 'function') {
-                await import('./ui/print.js');
+                await import('./ui/print');
             }
             window.showPrintDialog();
             closeDrop();
@@ -1965,7 +2082,7 @@ document.addEventListener('DOMContentLoaded', function() {
         var mobileExportBtn = document.getElementById('mobileExportBtn');
         if (mobileExportBtn) mobileExportBtn.addEventListener('click', async function() {
             if (typeof window.exportContent !== 'function') {
-                await import('./ui/export.js');
+                await import('./ui/export');
             }
             window.exportContent();
             closeDrop();
@@ -1974,7 +2091,7 @@ document.addEventListener('DOMContentLoaded', function() {
         var mobileUncertaintyBtn = document.getElementById('mobileUncertaintyBtn');
         if (mobileUncertaintyBtn) mobileUncertaintyBtn.addEventListener('click', async function() {
             if (typeof window.showUncertaintyCalculator !== 'function') {
-                await import('./uncertainty-calculator.js');
+                await import('./uncertainty-calculator');
             }
             if (typeof window.showUncertaintyCalculator === 'function') window.showUncertaintyCalculator();
             closeDrop();
@@ -2040,7 +2157,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         bindDesktopButton('desktopAIBtn', async function() {
             if (typeof window.showAIPanel !== 'function') {
-                await import('./ui/ai-assistant.js');
+                await import('./ui/ai-assistant');
             }
             if (typeof window.showAIPanel === 'function') {
                 window.showAIPanel();
@@ -2107,7 +2224,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         bindDesktopButton('desktopShareBtn', async function() {
             if (typeof window.showShareDialog !== 'function') {
-                await import('./ui/share.js');
+                await import('./ui/share');
             }
             window.showShareDialog();
             closeDesktopDrop();
@@ -2135,7 +2252,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         bindDesktopButton('desktopPrintBtn', async function() {
             if (typeof window.showPrintDialog !== 'function') {
-                await import('./ui/print.js');
+                await import('./ui/print');
             }
             window.showPrintDialog();
             closeDesktopDrop();
@@ -2153,7 +2270,7 @@ document.addEventListener('DOMContentLoaded', function() {
         bindDesktopButton('desktopImportBtn', function() { window.importFiles(); closeDesktopDrop(); });
         bindDesktopButton('desktopExportBtn', async function() {
             if (typeof window.exportContent !== 'function') {
-                await import('./ui/export.js');
+                await import('./ui/export');
             }
             window.exportContent();
             closeDesktopDrop();
@@ -2261,7 +2378,7 @@ document.addEventListener('DOMContentLoaded', function() {
         bindVditorDirtyEvents();
 
         // 重新加载代码运行器模块，为新代码块添加运行按钮
-        import('./code-runner.js').then(function() {
+        import('./code-runner').then(function() {
             if (window.addRunButtons) {
                 window.addRunButtons();
             }
@@ -2280,7 +2397,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
             { id: 'mobileShareBtn', fn: async function() {
                 if (typeof window.showShareDialog !== 'function') {
-                    await import('./ui/share.js');
+                    await import('./ui/share');
                 }
                 window.showShareDialog();
                 closeDrop();
@@ -2290,7 +2407,7 @@ document.addEventListener('DOMContentLoaded', function() {
             { id: 'mobileFindBtn', fn: function() { if (typeof window.showFindDialog === 'function') window.showFindDialog(); closeDrop(); } },
             { id: 'mobilePrintBtn', fn: async function() {
                 if (typeof window.showPrintDialog !== 'function') {
-                    await import('./ui/print.js');
+                    await import('./ui/print');
                 }
                 window.showPrintDialog();
                 closeDrop();
@@ -2313,14 +2430,14 @@ document.addEventListener('DOMContentLoaded', function() {
             } },
             { id: 'mobileExportBtn', fn: async function() {
                 if (typeof window.exportContent !== 'function') {
-                    await import('./ui/export.js');
+                    await import('./ui/export');
                 }
                 window.exportContent();
                 closeDrop();
             } },
             { id: 'mobileUncertaintyBtn', fn: async function() {
                 if (typeof window.showUncertaintyCalculator !== 'function') {
-                    await import('./uncertainty-calculator.js');
+                    await import('./uncertainty-calculator');
                 }
                 if (typeof window.showUncertaintyCalculator === 'function') window.showUncertaintyCalculator();
                 closeDrop();
@@ -3737,123 +3854,19 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    function enterPresentationMode() {
-        var mobileToolbar = document.querySelector('.mobile-toolbar-container');
-        var mobileBottomBar = document.querySelector('.mobile-bottom-bar');
-        var editorContainer = document.querySelector('.editor-container');
-
-        if (mobileToolbar) {
-            mobileToolbar.style.display = 'none';
-        }
-        if (mobileBottomBar) {
-            mobileBottomBar.style.display = 'none';
-        }
-        if (editorContainer) {
-            editorContainer.style.top = '0';
-            editorContainer.style.height = '100vh';
-        }
-
-        if (document.documentElement.requestFullscreen) {
-            document.documentElement.requestFullscreen();
-        } else if (document.documentElement.webkitRequestFullscreen) {
-            document.documentElement.webkitRequestFullscreen();
-        } else if (document.documentElement.msRequestFullscreen) {
-            document.documentElement.msRequestFullscreen();
-        }
-
-        document.addEventListener('fullscreenchange', handleFullscreenChange);
-        document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
-        document.addEventListener('msfullscreenchange', handleFullscreenChange);
-
-        window.showMessage(window.i18n ? window.i18n.t('presentationModeStarted') : '已进入演示模式，按 ESC 键退出', 'info');
-    }
-
-    function exitPresentationMode() {
-        var mobileToolbar = document.querySelector('.mobile-toolbar-container');
-        var mobileBottomBar = document.querySelector('.mobile-bottom-bar');
-        var editorContainer = document.querySelector('.editor-container');
-
-        if (mobileToolbar) {
-            mobileToolbar.style.display = '';
-        }
-        if (mobileBottomBar) {
-            mobileBottomBar.style.display = '';
-        }
-        if (editorContainer) {
-            editorContainer.style.top = '';
-            editorContainer.style.height = '';
-        }
-
-        document.removeEventListener('fullscreenchange', handleFullscreenChange);
-        document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
-        document.removeEventListener('msfullscreenchange', handleFullscreenChange);
-
-        window.showMessage(window.i18n ? window.i18n.t('presentationModeEnded') : '已退出演示模式', 'info');
-    }
-
-    function handleFullscreenChange() {
-        if (!document.fullscreenElement && !document.webkitFullscreenElement && !document.msFullscreenElement) {
-            exitPresentationMode();
-        }
-    }
+    window.enterPresentationMode = enterPresentationMode;
+    window.exitPresentationMode = exitPresentationMode;
 
     initializeAppShellOnce();
     
-    // 初始化返回键处理逻辑（非 Tauri mobile 环境）
     if (!window.isTauriMobileEnvironment) {
-        (function() {
-            let lastBackTime = 0;
-
-            // 1. 核心函数：往历史记录里推入一个桩
-            function pushHistory() {
-                window.history.pushState({ title: "prevent" }, "", "");
-            }
-
-            // 初始化时，先推入一次
-            pushHistory();
-
-            // 2. 监听 popstate 事件（用户点击返回键时触发）
-            window.addEventListener("popstate", function() {
-                // 优先关闭可见的 overlay
-                var overlays = getVisibleModalOverlays();
-                if (overlays.length) {
-                    var topOverlay = overlays[overlays.length - 1];
-                    var closed = closeOverlayByBackPress(topOverlay);
-                    if (closed) {
-                        pushHistory();
-                    }
-                    return;
-                }
-
-                // 主界面返回逻辑
-                var isMainScreen = (!overlays.length && !window.isFileManagementMode);
-                if (isMainScreen) {
-                    const currentTime = Date.now();
-
-                    if (currentTime - lastBackTime < 2000) {
-                        history.back();
-                    } else {
-                        lastBackTime = currentTime;
-                        showToast("再按一次离开本站");
-                        pushHistory();
-                    }
-                }
-            }, false);
-
-            // 简单的 UI 提示
-            function showToast(msg) {
-                const div = document.createElement('div');
-                div.innerHTML = msg;
-                div.style = `
-                    position: fixed; bottom: 15%; left: 50%; transform: translateX(-50%);
-                    background: rgba(0,0,0,0.8); color: white; padding: 10px 20px;
-                    border-radius: 25px; z-index: 9999; font-size: 14px; white-space: nowrap;
-                `;
-                document.body.appendChild(div);
-                setTimeout(() => document.body.removeChild(div), 2000);
-            }
-        })();
+        initBackNavigation({
+            getVisibleModalOverlays,
+            closeOverlayByBackPress,
+        });
     }
+
+    initDesktopModalEscHandler();
 
     ensureWasmRuntimeBootstrapped();
 

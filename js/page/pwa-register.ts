@@ -7,7 +7,7 @@
             window.addEventListener('load', async function() {
                 try {
                     const registrations = await navigator.serviceWorker.getRegistrations();
-                    const expectedScript = new URL('/sw.js', window.location.origin).href;
+                    const expectedScript = new URL('/sw.ts', window.location.origin).href;
                     const expectedScope = new URL('/', window.location.origin).href;
 
                     await Promise.all(registrations.map(function(reg) {
@@ -16,13 +16,13 @@
                         const isExpected = reg.scope === expectedScope && scriptUrl === expectedScript;
                         if (isExpected) return Promise.resolve();
 
-                        if (scriptUrl && scriptUrl.indexOf('/sw.js') !== -1) {
+                        if (scriptUrl && scriptUrl.indexOf('/sw.ts') !== -1) {
                             return reg.unregister();
                         }
                         return Promise.resolve();
                     }));
 
-                    await navigator.serviceWorker.register('/sw.js', {
+                    await navigator.serviceWorker.register('/sw.ts', {
                         scope: '/',
                         updateViaCache: 'none'
                     });

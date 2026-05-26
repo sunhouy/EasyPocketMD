@@ -121,7 +121,7 @@ async function compileAndRunSource(code, language) {
         }
 
         const wrapperSource = [
-            "const createCodeRunnerModule = require('./runner.js');",
+            "const createCodeRunnerModule = require('./runner');",
             "Promise.resolve(createCodeRunnerModule({",
             "  print: function(text) { process.stdout.write(String(text) + '\\n'); },",
             "  printErr: function(text) { process.stderr.write(String(text) + '\\n'); }",

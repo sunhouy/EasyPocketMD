@@ -33,8 +33,18 @@ export interface EasyProseMirrorOptions {
  * 其它不常用的 Vditor 专属方法（exportPDF 等）由调用方自行兜底。
  */
 export class EasyProseMirrorEditor {
-  /** 与 Vditor 对齐：暴露内部细节 */
-  public vditor: { ir: { element: HTMLElement }; wysiwyg: { element: HTMLElement }; sv: { element: HTMLElement } } | null = null;
+  /**
+   * 与 Vditor 对齐：暴露内部细节。
+   * 项目里的 `isVditorValueBridgeReady` 会检查 `vditor.vditor.lute.Md2VditorDOM`，
+   * 这里提供同名 stub 以通过检测，实际 markdown→DOM 由 ProseMirror 自身完成。
+   */
+  public vditor: {
+    ir: { element: HTMLElement };
+    wysiwyg: { element: HTMLElement };
+    sv: { element: HTMLElement };
+    lute: { Md2VditorDOM: (md: string) => string };
+    mode?: string;
+  } | null = null;
   /** 编辑器引擎名称，用于业务逻辑判断 */
   public readonly engine = 'prosemirror' as const;
 
@@ -108,10 +118,15 @@ export class EasyProseMirrorEditor {
 
     // 为了让 main.js 中 `[internal.ir, internal.wysiwyg, internal.sv]` 这种
     // 遍历逻辑不爆炸，构造一个三个槽位都指向同一个 element 的对象。
+    // 另外提供 lute.Md2VditorDOM stub 让 editor-runtime 的就绪检测通过。
     this.vditor = {
       ir: { element: editorEl },
       wysiwyg: { element: editorEl },
       sv: { element: editorEl },
+      mode: 'wysiwyg',
+      lute: {
+        Md2VditorDOM: (md: string) => md, // 占位实现，仅用于通过 ready 检测
+      },
     };
   }
 

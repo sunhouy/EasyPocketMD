@@ -146,7 +146,7 @@ jobs:
     - name: Create deployment tarball
       run: |
         mkdir -p deploy_tmp
-        cp -r dist api print shared package.json package-lock.json sw.js manifest.webmanifest icon.png .env ssl deploy_tmp/
+        cp -r dist api print shared package.json package-lock.json sw.ts manifest.webmanifest icon.png .env ssl deploy_tmp/
 
         # dev 部署必须使用 dev 域名和 dev 目录，不能把生产 md.yhsun.cn 配置写入 dev.yhsun.cn.conf。
         sed \

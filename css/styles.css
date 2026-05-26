@@ -5788,10 +5788,14 @@ body.night-mode .account-switch-desc strong {
 }
 body.night-mode #wordCountModalOverlay .word-count-modal,
 body.night-mode #wordCountModalOverlay .word-count-modal .modal-content,
-body.night-mode #wordCountModalOverlay .word-count-modal .word-count-options,
+body.night-mode #wordCountModalOverlay .word-count-modal .word-count-options {
+    background: #2d2d2d !important;
+    color: #eee !important;
+}
+
 body.night-mode #wordCountModalOverlay .word-count-modal #tokenCountDetails {
-    background: #000 !important;
-    color: #fff !important;
+    background: #3d3d3d !important;
+    color: #eee !important;
 }
 
 body.night-mode #wordCountModalOverlay .word-count-modal *,
