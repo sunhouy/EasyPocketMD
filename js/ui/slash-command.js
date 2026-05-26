@@ -677,7 +677,7 @@ async function runAction(action) {
                 window.showServiceStatusDialog();
                 return true;
             }
-            return clickFirstExistingButton(['serviceStatusBtn']);
+            return clickFirstExistingButton(['desktopServiceStatusBtn', 'mobileServiceStatusBtn']);
 
         case 'help':
             if (typeof window.showAboutDialog === 'function') {

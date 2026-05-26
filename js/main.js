@@ -1898,8 +1898,8 @@ document.addEventListener('DOMContentLoaded', function() {
             closeDrop();
         });
 
-        var serviceStatusBtn = document.getElementById('serviceStatusBtn');
-        if (serviceStatusBtn) serviceStatusBtn.addEventListener('click', function() { window.showServiceStatusDialog(); closeDrop(); });
+        var mobileServiceStatusBtn = document.getElementById('mobileServiceStatusBtn');
+        if (mobileServiceStatusBtn) mobileServiceStatusBtn.addEventListener('click', function() { window.showServiceStatusDialog(); closeDrop(); });
 
         var mobileVideoCallBtn = document.getElementById('mobileVideoCallBtn');
         if (mobileVideoCallBtn) mobileVideoCallBtn.addEventListener('click', function() {
@@ -2077,6 +2077,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             closeDesktopDrop();
         });
+        bindDesktopButton('desktopServiceStatusBtn', function() { window.showServiceStatusDialog(); closeDesktopDrop(); });
         bindDesktopButton('desktopAboutBtn', function() { window.showAboutDialog(); closeDesktopDrop(); });
 
         // 渲染底部工具栏
@@ -2233,7 +2234,7 @@ document.addEventListener('DOMContentLoaded', function() {
             } },
             { id: 'mobileClearBtn', fn: async function() { const confirmed = await window.customConfirm(window.i18n ? window.i18n.t('clearConfirm') : '确定要清空当前文件的内容吗？'); if (confirmed) { if (window.vditor) window.vditor.setValue(''); window.showMessage(window.i18n ? window.i18n.t('contentCleared') : '内容已清空'); } closeDrop(); } },
             { id: 'mobileToggleFileE2EBtn', fn: async function() { if (typeof window.toggleCurrentFileE2E === 'function') await window.toggleCurrentFileE2E(); closeDrop(); } },
-            { id: 'serviceStatusBtn', fn: function() { window.showServiceStatusDialog(); closeDrop(); } },
+            { id: 'mobileServiceStatusBtn', fn: function() { window.showServiceStatusDialog(); closeDrop(); } },
             // mobileSettingsBtn 已移到顶部工具栏
             { id: 'aboutBtn', fn: function() { window.showAboutDialog(); closeDrop(); } }
         ];
