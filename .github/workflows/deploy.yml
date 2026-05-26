@@ -417,7 +417,7 @@ jobs:
           export DASHSCOPE_API_KEY=${{ secrets.DASHSCOPE_API_KEY }}
           export MARKITDOWN_PYTHON="$NEXT_DIR/.venv/bin/python"
 
-          "$PM2_BIN" start api/server.js --name "$NEXT_NAME" --env production
+          "$PM2_BIN" start api/server.ts --name "$NEXT_NAME" --env production
 
           # 等待服务启动
           echo "等待服务启动..."
@@ -914,7 +914,7 @@ jobs:
             export MARKITDOWN_PYTHON="$NEXT_DIR/.venv/bin/python"
           fi
 
-          "$PM2_BIN" start api/server.js --name "$NEXT_NAME" --env production
+          "$PM2_BIN" start api/server.ts --name "$NEXT_NAME" --env production
           echo "✓ 服务已启动: $NEXT_NAME"
 
           # 健康检查
