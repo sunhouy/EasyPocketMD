@@ -1402,6 +1402,70 @@ import {
     }
 
     // ---------- 服务器同步相关 ----------
+    function isServerListContentMissing(content) {
+        return content === undefined || content === null;
+    }
+
+    function needsServerFileContentFetch(file) {
+        if (!file || file.type !== 'file' || !g('currentUser') || isExternalLocalFile(file)) return false;
+        if (file.contentLoaded === true) return false;
+        if (file.contentLoaded === false) return true;
+        return isServerListContentMissing(file.content);
+    }
+
+    async function fetchServerFileContent(file) {
+        if (!file || file.type !== 'file' || !g('currentUser')) {
+            return typeof file?.content === 'string' ? file.content : '';
+        }
+        const api = global.getApiBaseUrl ? global.getApiBaseUrl() : 'api';
+        const response = await fetch(
+            api + '/files/content?username=' + encodeURIComponent(g('currentUser').username) +
+            '&filename=' + encodeURIComponent(file.name),
+            { headers: { 'Authorization': 'Bearer ' + g('currentUser').token } }
+        );
+        const result = global.parseJsonResponse ? await global.parseJsonResponse(response) : await response.json();
+        if (result.code === 401 || (global.isTokenError && global.isTokenError(result))) {
+            if (await tryHandleTokenExpired(result)) {
+                return typeof file.content === 'string' ? file.content : '';
+            }
+        }
+        if (result.code !== 200 || !result.data) {
+            throw new Error(result.message || (isEn() ? 'Failed to load file content' : '加载文件内容失败'));
+        }
+
+        let content = result.data.content ?? '';
+        const fileE2EEnabled = isFileE2EEnabled(file) || isFileE2EEnabled(result.data);
+        if (window.currentUser && fileE2EEnabled && content) {
+            try {
+                const e2e = await import('../e2e.js');
+                const decrypted = await e2e.decrypt(content, window.currentUser.password);
+                if (decrypted !== null) content = decrypted;
+            } catch (e) {
+                console.error('E2E Decrypt Error', e);
+            }
+        }
+
+        const serverLastModified = result.data.last_modified || result.data.lastModified || file.serverLastModified || null;
+        const contentVersionRaw = result.data.content_version ?? result.data.contentVersion;
+        file.content = content;
+        file.contentLoaded = true;
+        file.serverLastModified = serverLastModified;
+        file.lastModified = serverLastModified || file.lastModified;
+        if (contentVersionRaw !== undefined && contentVersionRaw !== null && contentVersionRaw !== '') {
+            file.contentVersion = Number(contentVersionRaw);
+        }
+        if (fileE2EEnabled) {
+            file.e2e_enabled = 1;
+            file.e2eEnabled = true;
+        }
+
+        const lastSyncedContent = g('lastSyncedContent') || {};
+        lastSyncedContent[file.id] = content;
+        global.lastSyncedContent = lastSyncedContent;
+        localStorage.setItem('vditor_files', JSON.stringify(g('files')));
+        return content;
+    }
+
     async function loadFilesFromServer(preserveFileName) {
         if (!g('currentUser')) return;
         const requestUsername = g('currentUser').username;
@@ -1461,11 +1525,13 @@ import {
                     const hasServerContentVersion =
                         (f.content_version !== undefined && f.content_version !== null && f.content_version !== '') ||
                         (f.contentVersion !== undefined && f.contentVersion !== null && f.contentVersion !== '');
+                    const contentLoaded = type === 'folder' || !isServerListContentMissing(content);
                     return {
                         ...f,
                         name: name,
                         type: type,
-                        content: content,
+                        content: type === 'folder' ? '' : (content ?? ''),
+                        contentLoaded: contentLoaded,
                         e2e_enabled: fileE2EEnabled ? 1 : 0,
                         e2eEnabled: fileE2EEnabled,
                         lastModified: serverLastModified,
@@ -1705,7 +1771,8 @@ import {
                 id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
                 name: serverFile.name,
                 type: serverFile.type || 'file',
-                content: serverFile.type === 'folder' ? '' : (serverFile.content || ''),
+                content: serverFile.type === 'folder' ? '' : (serverFile.content ?? ''),
+                contentLoaded: serverFile.type === 'folder' ? true : !isServerListContentMissing(serverFile.content),
                 lastModified: serverLastModified,
                 serverLastModified: serverLastModified,
                 contentVersion: serverFile.contentVersion !== null && serverFile.contentVersion !== undefined
@@ -1716,7 +1783,9 @@ import {
                 isSynced: true
             };
             files.push(newFile);
-            lastSyncedContent[newFile.id] = newFile.content;
+            if (newFile.contentLoaded !== false) {
+                lastSyncedContent[newFile.id] = newFile.content;
+            }
             unsavedChanges[newFile.id] = false;
             hasLocalUpdate = true;
         });
@@ -1769,8 +1838,12 @@ import {
             if (hasLocalChanges) return;
 
             const e2eChanged = isFileE2EEnabled(file) !== isFileE2EEnabled(serverFile);
+            if (isServerListContentMissing(serverFile.content)) {
+                return;
+            }
             if (serverFile.content !== editorContent || e2eChanged) {
                 file.content = serverFile.content;
+                file.contentLoaded = true;
                 file.lastModified = serverFile.lastModified || file.lastModified || null;
                 file.serverLastModified = serverFile.serverLastModified || serverFile.lastModified || file.serverLastModified || null;
                 file.contentVersion = serverFile.contentVersion !== null && serverFile.contentVersion !== undefined
@@ -1808,6 +1881,7 @@ import {
         markPendingServerSync,
         tryHandleTokenExpired,
         pullServerUpdatesForCleanFiles,
+        fetchServerFileContent,
         isEn
     });
 
@@ -2029,11 +2103,13 @@ import {
             const hasVersion =
                 (serverFile.contentVersion !== undefined && serverFile.contentVersion !== null && serverFile.contentVersion !== '') ||
                 (serverFile.content_version !== undefined && serverFile.content_version !== null && serverFile.content_version !== '');
+            const serverContentMissing = (serverFile.type || 'file') === 'file' && isServerListContentMissing(serverFile.content);
             const file = {
                 id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
                 name: serverFile.name,
                 type: serverFile.type || 'file',
-                content: serverFile.content,
+                content: serverFile.type === 'folder' ? '' : (serverFile.content ?? ''),
+                contentLoaded: serverFile.type === 'folder' ? true : !serverContentMissing,
                 lastModified: serverLastModified,
                 serverLastModified: serverLastModified,
                 contentVersion: hasVersion ? Number(serverFile.contentVersion ?? serverFile.content_version) : null,
@@ -2058,7 +2134,13 @@ import {
                 const localBaseContent = localFile && localFile.id ? lastSyncedContent[localFile.id] : undefined;
                 if (localFile.type === 'file' && mergedServerFile.type === 'file') {
                     const e2eChanged = isFileE2EEnabled(localFile) !== isFileE2EEnabled(mergedServerFile);
-                    if (localFile.content !== mergedServerFile.content || e2eChanged) {
+                    if (mergedServerFile.contentLoaded === false) {
+                        mergedServerFile.content = typeof localFile.content === 'string' ? localFile.content : '';
+                        mergedServerFile.contentLoaded = typeof localFile.content === 'string';
+                        mergedServerFile.isSynced = true;
+                        delete mergedServerFile.crdtBaseContent;
+                        delete mergedServerFile.crdtBaseContentVersion;
+                    } else if (localFile.content !== mergedServerFile.content || e2eChanged) {
                         const baseContent = typeof localBaseContent === 'string' ? localBaseContent : '';
                         const baseVersionRaw = Number(localFile.contentVersion);
                         mergedServerFile.content = localFile.content;
@@ -2116,8 +2198,10 @@ import {
         mergedFiles.forEach(function(file) {
             if (!file || !file.id || isExternalLocalFile(file)) return;
             if (file.isSynced) {
-                lastSyncedContent[file.id] = file.content;
-                unsavedChanges[file.id] = false;
+                if (file.contentLoaded !== false) {
+                    lastSyncedContent[file.id] = file.content;
+                    unsavedChanges[file.id] = false;
+                }
                 return;
             }
             if (typeof file.crdtBaseContent === 'string') {
@@ -4224,6 +4308,18 @@ import {
             localStorage.setItem('vditor_last_opened_file', fileId);
 
             let content = file.content;
+            if (needsServerFileContentFetch(file)) {
+                try {
+                    content = await fetchServerFileContent(file);
+                } catch (e) {
+                    console.error('Failed to load file content from server:', e);
+                    global.showMessage(
+                        (isEn() ? 'Failed to load file content: ' : '加载文件内容失败：') + ((e && e.message) || ''),
+                        'error'
+                    );
+                    return;
+                }
+            }
             if (global.LocalImageManager && global.LocalImageManager.convertLocalToBlob) {
                 try {
                     content = await global.LocalImageManager.convertLocalToBlob(content);

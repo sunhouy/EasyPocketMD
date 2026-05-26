@@ -17,11 +17,13 @@ export function normalizeServerFileRecord(f: any): any {
     : f.e2eEnabled;
   const e2eEnabled = rawE2E === true || rawE2E === 1 || rawE2E === '1' || rawE2E === 'true' ? 1 : 0;
 
+  const contentLoaded = type === 'folder' || (f.content !== undefined && f.content !== null);
   return {
     ...f,
     name,
     type,
-    content,
+    content: type === 'folder' ? '' : (content ?? ''),
+    contentLoaded,
     e2e_enabled: e2eEnabled,
     e2eEnabled: !!e2eEnabled,
     lastModified: f.last_modified || f.lastModified || null,
@@ -40,6 +42,7 @@ export function createSyncRuntimeApi(ctx: any) {
     markPendingServerSync,
     tryHandleTokenExpired,
     pullServerUpdatesForCleanFiles,
+    fetchServerFileContent,
     isEn,
   } = ctx;
   const fileSyncLocks = new Map<string, Promise<any>>();
@@ -81,6 +84,7 @@ export function createSyncRuntimeApi(ctx: any) {
     const filesToSync = files.filter(function (file: any) {
       if (file.type !== 'file') return false;
       if (isExternalLocalFile(file)) return false;
+      if (file.contentLoaded === false && !pendingServerSync[file.id]) return false;
       const currentContent =
         file.id === currentFileId ? getCurrentEditorContent(currentFileId, file.content) : file.content;
       return pendingServerSync[file.id] || !file.isSynced || currentContent !== lastSyncedContent[file.id];
@@ -123,6 +127,9 @@ export function createSyncRuntimeApi(ctx: any) {
             filenameToSend += '/';
           }
         } else {
+          if (file.contentLoaded === false && typeof fetchServerFileContent === 'function') {
+            await fetchServerFileContent(file);
+          }
           content =
             overrideContent !== null
               ? overrideContent
