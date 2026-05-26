@@ -2000,11 +2000,15 @@ document.addEventListener('DOMContentLoaded', function() {
                     var toolbarOffset = parseFloat(bodyStyles.getPropertyValue('--top-toolbar-offset')) || 0;
                     var toolbarHeight = parseFloat(bodyStyles.getPropertyValue('--top-toolbar-height')) || 0;
                     var moreWidth = desktopDropdown.offsetWidth || desktopDropdown.scrollWidth || 210;
+                    var moreTop = Math.max(moreRect.bottom + 2, toolbarOffset + toolbarHeight + 1);
                     desktopDropdown.style.position = 'fixed';
-                    desktopDropdown.style.top = Math.max(moreRect.bottom + 2, toolbarOffset + toolbarHeight + 1) + 'px';
+                    desktopDropdown.style.top = moreTop + 'px';
                     desktopDropdown.style.left = Math.round(moreRect.right - moreWidth) + 'px';
                     desktopDropdown.style.right = 'auto';
                     desktopDropdown.style.zIndex = '1200';
+                    var moreMaxHeight = Math.max(200, window.innerHeight - moreTop - 12);
+                    desktopDropdown.style.maxHeight = moreMaxHeight + 'px';
+                    desktopDropdown.style.overflowY = 'auto';
                 }
             }
             closeDesktopEditDrop();
