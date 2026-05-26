@@ -116,7 +116,12 @@ describe('FileManager', () => {
         it('should return files from database when no cache', async () => {
             Cache.getUserFiles.mockResolvedValue(null);
             const mockFiles = [
-                { filename: 'test.md', content: 'test content', last_modified: '2023-01-01' }
+                {
+                    filename: 'test.md',
+                    last_modified: '2023-01-01',
+                    content_version: 1,
+                    e2e_enabled: 0
+                }
             ];
             db.execute.mockResolvedValue([mockFiles]);
 
@@ -125,8 +130,11 @@ describe('FileManager', () => {
             expect(result.code).toBe(200);
             expect(result.data.files).toHaveLength(1);
             expect(result.data.files[0].name).toBe('test.md');
+            expect(result.data.files[0].content_version).toBe(1);
+            expect(result.data.files[0].e2e_enabled).toBe(0);
+            expect(result.data.files[0]).not.toHaveProperty('content');
             expect(db.execute).toHaveBeenCalledWith(
-                expect.stringContaining('SELECT filename, content, last_modified, content_version, e2e_enabled FROM user_files'),
+                expect.stringContaining('SELECT filename, last_modified, content_version, e2e_enabled FROM user_files'),
                 ['testuser']
             );
             expect(Cache.setUserFiles).toHaveBeenCalled();

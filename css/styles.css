@@ -601,8 +601,9 @@ body.night-mode .file-list-search-result {
     top: calc(100% + 8px);
     right: 0;
     min-width: 210px;
-    max-height: 1000px;
+    max-height: min(70vh, calc(100dvh - var(--top-toolbar-offset) - var(--top-toolbar-height) - 24px));
     overflow-y: auto;
+    overscroll-behavior: contain;
     background: #fff;
     border: 1px solid #e3e7ef;
     border-radius: 10px;
@@ -613,6 +614,19 @@ body.night-mode .file-list-search-result {
 
 .desktop-dropdown-content.show {
     display: block;
+}
+
+#desktopMoreDropdown {
+    -webkit-overflow-scrolling: touch;
+}
+
+#desktopMoreDropdown::-webkit-scrollbar {
+    width: 6px;
+}
+
+#desktopMoreDropdown::-webkit-scrollbar-thumb {
+    background: rgba(120, 135, 155, 0.45);
+    border-radius: 3px;
 }
 
 .dropdown-category {
