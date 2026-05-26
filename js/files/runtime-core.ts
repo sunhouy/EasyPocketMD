@@ -1443,14 +1443,8 @@ import {
 
         let content = result.data.content ?? '';
         const fileE2EEnabled = isFileE2EEnabled(file) || isFileE2EEnabled(result.data);
-        if (window.currentUser && fileE2EEnabled && content) {
-            try {
-                const e2e = await import('../e2e.js');
-                const decrypted = await e2e.decrypt(content, window.currentUser.password);
-                if (decrypted !== null) content = decrypted;
-            } catch (e) {
-                console.error('E2E Decrypt Error', e);
-            }
+        if (window.currentUser && content) {
+            content = await resolveE2EFileContent(content, file, result.data);
         }
 
         const serverLastModified = result.data.last_modified || result.data.lastModified || file.serverLastModified || null;
@@ -1511,12 +1505,8 @@ import {
                     let name = f.name.startsWith('/') ? f.name.substring(1) : f.name;
 
                     const fileE2EEnabled = isFileE2EEnabled(f);
-                    if (window.currentUser && fileE2EEnabled && content) {
-                        try {
-                            const e2e = await import('../e2e.js');
-                            const decrypted = await e2e.decrypt(content, window.currentUser.password);
-                            if (decrypted !== null) content = decrypted;
-                        } catch(e) { console.error('E2E Decrypt Error', e); }
+                    if (window.currentUser && content) {
+                        content = await resolveE2EFileContent(content, f);
                     }
 
                     // 检查是否为文件夹：以 / 结尾，或者内容包含特定标记
@@ -1661,6 +1651,18 @@ import {
         return raw === true || raw === 1 || raw === '1' || raw === 'true';
     }
 
+    async function resolveE2EFileContent(content, file, serverMeta) {
+        if (!content || !window.currentUser || !window.currentUser.password) return content;
+        const e2eEnabled = isFileE2EEnabled(file) || (serverMeta && isFileE2EEnabled(serverMeta));
+        try {
+            const e2e = await import('../e2e.js');
+            return await e2e.resolveFileContent(content, window.currentUser.password, e2eEnabled);
+        } catch (e) {
+            console.error('E2E content resolve error', e);
+            return content;
+        }
+    }
+
     function updateCurrentFileE2EIndicator() {
         const indicators = document.querySelectorAll('.current-file-e2e-indicator');
         if (!indicators.length) return;
@@ -1763,12 +1765,8 @@ import {
         if (result.code !== 200 || !result.data || !Array.isArray(result.data.files)) return;
 
         let initialServerFiles = await Promise.all(result.data.files.map(async f => {
-            if (window.currentUser && isFileE2EEnabled(f) && f.content) {
-                try {
-                    const e2e = await import('../e2e.js');
-                    const decrypted = await e2e.decrypt(f.content, window.currentUser.password);
-                    if (decrypted !== null) f.content = decrypted;
-                } catch(e) { console.error(e); }
+            if (window.currentUser && f.content) {
+                f.content = await resolveE2EFileContent(f.content, f);
             }
             return f;
         }));
@@ -1946,12 +1944,16 @@ import {
                 const filenameToSend = f.type === 'folder' ? (f.name.endsWith('/') ? f.name : (f.name + '/')) : f.name;
                 const fileE2EEnabled = isFileE2EEnabled(f);
                 let contentToSend = f.type === 'folder' ? '{"meta":"folder"}' : content;
-                if (fileE2EEnabled && contentToSend) {
+                if (contentToSend && uploadUser.password) {
                     try {
                         const e2e = await import('../e2e.js');
-                        contentToSend = await e2e.encrypt(contentToSend, uploadUser.password);
+                        if (fileE2EEnabled) {
+                            contentToSend = await e2e.encrypt(contentToSend, uploadUser.password);
+                        } else {
+                            contentToSend = await e2e.resolveFileContent(contentToSend, uploadUser.password, false);
+                        }
                     } catch(e) {
-                        console.error('E2E Encrypt Error', e);
+                        console.error('E2E content prepare error', e);
                     }
                 }
                 const body = {
@@ -4367,6 +4369,8 @@ import {
                     );
                     return;
                 }
+            } else if (window.currentUser && content) {
+                content = await resolveE2EFileContent(content, file);
             }
             if (global.LocalImageManager && global.LocalImageManager.convertLocalToBlob) {
                 try {
@@ -4505,6 +4509,17 @@ import {
         }
 
         const nextEnabled = !isFileE2EEnabled(file);
+
+        if (!nextEnabled) {
+            let plaintext = getCurrentEditorContent(currentFileId, file.content);
+            plaintext = await resolveE2EFileContent(plaintext, { e2e_enabled: 0, e2eEnabled: false });
+            file.content = plaintext;
+            const lastSyncedContent = g('lastSyncedContent') || {};
+            lastSyncedContent[currentFileId] = plaintext;
+            global.lastSyncedContent = lastSyncedContent;
+            setEditorContentForFile(currentFileId, plaintext, { preserveCursor: true });
+        }
+
         file.e2e_enabled = nextEnabled ? 1 : 0;
         file.e2eEnabled = nextEnabled;
         file.isSynced = false;
@@ -4754,14 +4769,10 @@ import {
             const currentFile = (g('files') || []).find(function(file) {
                 return file && file.id === g('currentFileId') && file.type === 'file';
             });
-            if (window.currentUser && isFileE2EEnabled(currentFile) && histories.length > 0) {
+            if (window.currentUser && histories.length > 0) {
                 histories = await Promise.all(histories.map(async h => {
                     if (h.content) {
-                        try {
-                            const e2e = await import('../e2e.js');
-                            const decrypted = await e2e.decrypt(h.content, window.currentUser.password);
-                            if (decrypted !== null) h.content = decrypted;
-                        } catch(e) {}
+                        h.content = await resolveE2EFileContent(h.content, currentFile || { e2e_enabled: 0, e2eEnabled: false });
                     }
                     return h;
                 }));

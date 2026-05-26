@@ -144,11 +144,21 @@ export function createSyncRuntimeApi(ctx: any) {
           
           let contentToSend = content;
           const fileE2EEnabled = isFileE2EEnabled(file);
-          if (globalRef.currentUser && fileE2EEnabled && contentToSend && file.type !== 'folder') {
+          if (globalRef.currentUser && contentToSend && file.type !== 'folder') {
             try {
               const e2e = await import('../../e2e.js');
-              contentToSend = await e2e.encrypt(contentToSend, globalRef.currentUser.password);
-            } catch(e) { console.error('E2E Encrypt Error', e); }
+              if (fileE2EEnabled) {
+                contentToSend = await e2e.encrypt(contentToSend, globalRef.currentUser.password);
+              } else {
+                contentToSend = await e2e.resolveFileContent(
+                  contentToSend,
+                  globalRef.currentUser.password,
+                  false,
+                );
+              }
+            } catch (e) {
+              console.error('E2E content prepare error', e);
+            }
           }
 
           const requestBody: any = {
@@ -321,13 +331,17 @@ export function createSyncRuntimeApi(ctx: any) {
 
     let contentToSend = content;
     const fileE2EEnabled = isFileE2EEnabled(file);
-    if (g('currentUser') && fileE2EEnabled && window.e2eEncryptSync) {
+    if (g('currentUser') && contentToSend) {
       try {
-        const encrypted = window.e2eEncryptSync(contentToSend, g('currentUser').password);
-        if (encrypted && encrypted !== contentToSend) {
-          contentToSend = encrypted;
+        if (fileE2EEnabled && window.e2eEncryptSync) {
+          const encrypted = window.e2eEncryptSync(contentToSend, g('currentUser').password);
+          if (encrypted && encrypted !== contentToSend) {
+            contentToSend = encrypted;
+          }
+        } else if (typeof window.e2eResolveFileContentSync === 'function') {
+          contentToSend = window.e2eResolveFileContentSync(contentToSend, g('currentUser').password, false);
         }
-      } catch(e) {}
+      } catch (e) {}
     }
 
     const body: any = {
