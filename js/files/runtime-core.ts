@@ -1408,7 +1408,15 @@ import {
 
     function needsServerFileContentFetch(file) {
         if (!file || file.type !== 'file' || !g('currentUser') || isExternalLocalFile(file)) return false;
-        if (file.contentLoaded === true) return false;
+        const pendingServerSync = g('pendingServerSync') || {};
+        const unsavedChanges = g('unsavedChanges') || {};
+        // If there are local edits waiting to sync, avoid pulling server content to overwrite them.
+        if (pendingServerSync[file.id] || unsavedChanges[file.id] || file.isSynced === false) return false;
+        if (file.contentLoaded === true) {
+            // Recovery path for previously poisoned local cache where files were marked loaded but content stayed empty.
+            if (!file.contentFetchedAt && file.isSynced === true && file.content === '') return true;
+            return false;
+        }
         if (file.contentLoaded === false) return true;
         return isServerListContentMissing(file.content);
     }
@@ -1449,6 +1457,7 @@ import {
         const contentVersionRaw = result.data.content_version ?? result.data.contentVersion;
         file.content = content;
         file.contentLoaded = true;
+        file.contentFetchedAt = Date.now();
         file.serverLastModified = serverLastModified;
         file.lastModified = serverLastModified || file.lastModified;
         if (contentVersionRaw !== undefined && contentVersionRaw !== null && contentVersionRaw !== '') {
@@ -1563,6 +1572,10 @@ import {
                 });
 
                 const localFiles = JSON.parse(localStorage.getItem('vditor_files') || '[]');
+                const pendingServerSyncState = g('pendingServerSync') || {};
+                const unsavedChangesState = g('unsavedChanges') || {};
+                global.pendingServerSync = pendingServerSyncState;
+                global.unsavedChanges = unsavedChangesState;
                 // 迁移：给本地文件增加type字段，默认为file
                 localFiles.forEach(f => {
                     if (!f.type) f.type = 'file';
@@ -1573,6 +1586,14 @@ import {
                     }
                     if (f.e2eEnabled === undefined) f.e2eEnabled = isFileE2EEnabled(f);
                     if (f.e2e_enabled === undefined) f.e2e_enabled = f.e2eEnabled ? 1 : 0;
+                    if (f.type === 'file' && f.isSynced === true && f.contentLoaded === true && !f.contentFetchedAt && f.content === '') {
+                        // Recovery for corrupted cache state produced while list API omitted file content.
+                        f.contentLoaded = false;
+                        if (f.id) {
+                            pendingServerSyncState[f.id] = false;
+                            unsavedChangesState[f.id] = false;
+                        }
+                    }
                     normalizeExternalLocalFileRecord(f);
                 });
                 syncCurrentEditorSnapshotIntoFiles(localFiles);
@@ -2136,8 +2157,23 @@ import {
                     const e2eChanged = isFileE2EEnabled(localFile) !== isFileE2EEnabled(mergedServerFile);
                     if (mergedServerFile.contentLoaded === false) {
                         mergedServerFile.content = typeof localFile.content === 'string' ? localFile.content : '';
-                        mergedServerFile.contentLoaded = typeof localFile.content === 'string';
-                        mergedServerFile.isSynced = true;
+                        const hasPendingLocalSync = !!pendingServerSync[localFile.id];
+                        const hasUnsavedLocalChanges = !!unsavedChanges[localFile.id] || localFile.isSynced === false;
+                        const shouldKeepLocalAsSourceOfTruth = hasPendingLocalSync || hasUnsavedLocalChanges;
+
+                        if (shouldKeepLocalAsSourceOfTruth) {
+                            // Keep local-edited files as loaded so open/save uses local state first.
+                            mergedServerFile.contentLoaded = true;
+                            mergedServerFile.isSynced = false;
+                            markPendingServerSync(mergedServerFile.id, true);
+                            g('unsavedChanges')[mergedServerFile.id] = true;
+                        } else {
+                            // Server list omitted content: keep placeholder, force openFile() to fetch real content.
+                            mergedServerFile.contentLoaded = false;
+                            mergedServerFile.isSynced = true;
+                            markPendingServerSync(mergedServerFile.id, false);
+                            g('unsavedChanges')[mergedServerFile.id] = false;
+                        }
                         delete mergedServerFile.crdtBaseContent;
                         delete mergedServerFile.crdtBaseContentVersion;
                     } else if (localFile.content !== mergedServerFile.content || e2eChanged) {
@@ -2652,9 +2688,21 @@ import {
     function loadLocalFiles() {
         if (deferFileTreeWorkUntilWasmReady(loadLocalFiles, 'loadLocalFiles')) return;
         const localFiles = JSON.parse(localStorage.getItem('vditor_files') || '[]');
+        const pendingServerSync = g('pendingServerSync') || {};
+        const unsavedChanges = g('unsavedChanges') || {};
+        global.pendingServerSync = pendingServerSync;
+        global.unsavedChanges = unsavedChanges;
         localFiles.forEach(f => {
             if (!f.type) f.type = 'file';
             if (typeof f.isSynced !== 'boolean') f.isSynced = false;
+            if (f.type === 'file' && f.isSynced === true && f.contentLoaded === true && !f.contentFetchedAt && f.content === '') {
+                // Recovery for corrupted cache state produced while list API omitted file content.
+                f.contentLoaded = false;
+                if (f.id) {
+                    pendingServerSync[f.id] = false;
+                    unsavedChanges[f.id] = false;
+                }
+            }
             normalizeExternalLocalFileRecord(f);
         });
         syncCurrentEditorSnapshotIntoFiles(localFiles);
