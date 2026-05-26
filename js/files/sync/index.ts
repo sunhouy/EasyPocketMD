@@ -22,7 +22,7 @@ export function normalizeServerFileRecord(f: any): any {
     ...f,
     name,
     type,
-    content: type === 'folder' ? '' : (content ?? ''),
+    content: type === 'folder' ? '' : (contentLoaded ? (content ?? '') : undefined),
     contentLoaded,
     e2e_enabled: e2eEnabled,
     e2eEnabled: !!e2eEnabled,
