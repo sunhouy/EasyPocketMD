@@ -49,13 +49,12 @@ class FileManager {
             }
 
             const [rows] = await db.execute(
-                'SELECT filename, content, last_modified, content_version, e2e_enabled FROM user_files WHERE username = ? ORDER BY last_modified DESC',
+                'SELECT filename, last_modified, content_version, e2e_enabled FROM user_files WHERE username = ? ORDER BY last_modified DESC',
                 [username]
             );
 
             const files = rows.map(row => ({
                 name: row.filename,
-                content: row.content,
                 content_version: row.content_version,
                 e2e_enabled: row.e2e_enabled ? 1 : 0,
                 last_modified: row.last_modified

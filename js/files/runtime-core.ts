@@ -1605,8 +1605,8 @@ import {
             const text = btn.querySelector('.file-e2e-toggle-text');
             if (text) {
                 text.textContent = enabled
-                    ? (isEn() ? 'Disable E2E for this file' : '关闭当前文件端到端加密')
-                    : (isEn() ? 'Enable E2E for this file' : '开启当前文件端到端加密');
+                    ? (isEn() ? 'Disable E2E for this file' : '关闭加密')
+                    : (isEn() ? 'Enable E2E for this file' : '开启加密');
             }
             const icon = btn.querySelector('i');
             if (icon) icon.className = enabled ? 'fas fa-lock' : 'fas fa-lock-open';
