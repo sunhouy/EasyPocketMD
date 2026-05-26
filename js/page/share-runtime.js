@@ -251,8 +251,7 @@
         var container = document.getElementById('vditor');
         if (!container) return;
 
-        // 使用 Vditor 的禁用编辑方法（如果可用）
-        var nativeStateApplied = setVditorInteractionLocked(window.vditor, !!locked);
+        // 仅阻止编辑，不显示任何遮罩或灰化效果
 
         // 设置 contenteditable 属性
         var editableNodes = container.querySelectorAll('[contenteditable]');
@@ -266,60 +265,15 @@
             node.readOnly = !!locked;
         });
 
-        // 添加/移除只读模式的 CSS 类，用于视觉反馈（不使用蒙版）
-        if (locked) {
-            container.classList.add('vditor-readonly');
-            // 禁用工具栏按钮
-            var toolbarBtns = container.querySelectorAll('.vditor-toolbar__item, .vditor-toolbar__btn');
-            toolbarBtns.forEach(function(btn) {
-                btn.style.pointerEvents = 'none';
-                btn.style.opacity = '0.5';
-            });
-        } else {
-            container.classList.remove('vditor-readonly');
-            // 启用工具栏按钮
-            var toolbarBtns = container.querySelectorAll('.vditor-toolbar__item, .vditor-toolbar__btn');
-            toolbarBtns.forEach(function(btn) {
-                btn.style.pointerEvents = '';
-                btn.style.opacity = '';
-            });
-        }
+        // 阻止工具栏点击但保持原有视觉样式，不添加白色遮罩 / 灰化
+        var toolbarBtns = container.querySelectorAll('.vditor-toolbar__item, .vditor-toolbar__btn');
+        toolbarBtns.forEach(function(btn) {
+            btn.style.pointerEvents = locked ? 'none' : '';
+            btn.style.opacity = '';
+        });
 
-        if (!nativeStateApplied && typeof window.ensureVditorInitialized === 'function') {
-            Promise.resolve(window.ensureVditorInitialized()).then(function(vditor) {
-                setVditorInteractionLocked(vditor, !!locked);
-            }).catch(function(error) {
-                console.warn('Failed to apply shared editor lock after Vditor init:', error);
-            });
-        }
-    }
-
-    function isVditorInteractionApiReady(vditorInstance) {
-        var internal = vditorInstance && vditorInstance.vditor;
-        if (!internal || !internal.toolbar || !internal.toolbar.elements || !internal.currentMode) {
-            return false;
-        }
-        return !!(internal[internal.currentMode] && internal[internal.currentMode].element);
-    }
-
-    function setVditorInteractionLocked(vditorInstance, locked) {
-        if (!isVditorInteractionApiReady(vditorInstance)) {
-            return false;
-        }
-
-        try {
-            if (locked && typeof vditorInstance.disabled === 'function') {
-                vditorInstance.disabled();
-                return true;
-            }
-            if (!locked && typeof vditorInstance.enable === 'function') {
-                vditorInstance.enable();
-                return true;
-            }
-        } catch (error) {
-            console.warn('Failed to update Vditor interaction state:', error);
-        }
-        return false;
+        // 清理历史遗留可能存在的只读类，避免外部样式叠加
+        container.classList.remove('vditor-readonly');
     }
 
     function getShareConnectionStatusInfo(status) {

@@ -141,7 +141,7 @@ document.addEventListener('DOMContentLoaded', function() {
             return true;
         }
 
-        var closeBtn = overlay.querySelector('.modal-close-btn, #closeDiffModalBtn, #closeHistoryBtn, #closeAboutBtn, #closeServiceStatusBtn, #cancelSettingsBtn, .delete-confirm-cancel, #importCancelBtn, #cancelChangePasswordBtn, #cancelDeleteAccountBtn, #cancelAddAccountBtn, #cancelSwitchAccountBtn, #cancelFileDiffBtn, #cancelAIBtn, #cancelUncertaintyBtn, #cancelConnectionBtn');
+        var closeBtn = overlay.querySelector('.modal-close-btn, #closeDiffModalBtn, #closeHistoryBtn, #closeAboutBtn, #closeServiceStatusBtn, #cancelSettingsBtn');
         if (closeBtn) {
             closeBtn.click();
         } else {
@@ -610,7 +610,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function handleGlobalKeyboardShortcuts(event) {
         if (event.defaultPrevented || event.isComposing) return;
-
         if (isFormInputTarget(event.target)) return;
 
         var shortcutValue = buildShortcutFromKeyboardEvent(event);
@@ -816,6 +815,8 @@ document.addEventListener('DOMContentLoaded', function() {
             uiMode: getCheckedRadioValue('uiMode', 'auto'),
             language: getCheckedRadioValue('language', window.i18n ? window.i18n.getLanguage() : 'zh'),
             fontSize: fontSizeSelect ? fontSizeSelect.value : '16px',
+            vditorContentTheme: (document.getElementById('vditorContentThemeSelect') || {}).value || 'auto',
+            vditorCodeTheme: (document.getElementById('vditorCodeThemeSelect') || {}).value || 'auto',
             showOutline: !!(showOutlineCheckbox && showOutlineCheckbox.checked),
             hideBottomToolbarOnKeyboard: !!(hideBottomToolbarOnKeyboardCheckbox && hideBottomToolbarOnKeyboardCheckbox.checked),
             enableDebugMode: !!(debugModeCheckbox && debugModeCheckbox.checked),
@@ -923,24 +924,6 @@ document.addEventListener('DOMContentLoaded', function() {
         if (keyboardShortcutListenerInitialized) return;
         keyboardShortcutListenerInitialized = true;
         document.addEventListener('keydown', handleGlobalKeyboardShortcuts, true);
-        
-        document.addEventListener('keydown', function(event) {
-            if (event.defaultPrevented) return;
-            if (event.key === 'Escape') {
-                if (typeof getVisibleModalOverlays === 'function') {
-                    var visibleModals = getVisibleModalOverlays();
-                    if (visibleModals.length > 0) {
-                        var topModal = visibleModals[visibleModals.length - 1];
-                        if (typeof closeOverlayByBackPress === 'function') {
-                            closeOverlayByBackPress(topModal);
-                        }
-                        event.preventDefault();
-                        event.stopPropagation();
-                        event.stopImmediatePropagation();
-                    }
-                }
-            }
-        });
     }
 
     async function handleBottomSave() {
@@ -1125,6 +1108,12 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     if (!window.userSettings.defaultFileOpening) {
         window.userSettings.defaultFileOpening = 'lastEdited';
+    }
+    if (!window.userSettings.vditorContentTheme) {
+        window.userSettings.vditorContentTheme = 'auto';
+    }
+    if (!window.userSettings.vditorCodeTheme) {
+        window.userSettings.vditorCodeTheme = 'auto';
     }
 
     var shouldOpenFileListFirst = window.userSettings.defaultFileOpening === 'fileList';
@@ -1359,6 +1348,58 @@ document.addEventListener('DOMContentLoaded', function() {
         return window.electron ? './vditor' : (window.location.protocol === 'file:' ? './vditor' : '/vditor');
     }
 
+    function getVditorContentThemePath() {
+        return getVditorCdn() + '/dist/css/content-theme';
+    }
+
+    function resolveVditorContentTheme(settings) {
+        var targetSettings = settings || window.userSettings || {};
+        var theme = targetSettings.vditorContentTheme;
+        if (!theme || theme === 'auto') {
+            return window.nightMode ? 'dark' : 'light';
+        }
+        return theme;
+    }
+
+    function resolveVditorCodeTheme(settings) {
+        var targetSettings = settings || window.userSettings || {};
+        var theme = targetSettings.vditorCodeTheme;
+        if (!theme || theme === 'auto') {
+            return window.nightMode ? 'github-dark' : 'github';
+        }
+        return theme;
+    }
+
+    var vditorMathPreviewConfig = {
+        inlineDigit: true,
+        engine: 'KaTeX',
+        macros: {},
+    };
+
+    function buildVditorPreviewConfig(settings) {
+        return {
+            math: vditorMathPreviewConfig,
+            theme: {
+                current: resolveVditorContentTheme(settings),
+                path: getVditorContentThemePath(),
+            },
+            hljs: {
+                style: resolveVditorCodeTheme(settings),
+            },
+        };
+    }
+
+    function applyVditorThemes(settings) {
+        if (!window.vditor || typeof window.vditor.setTheme !== 'function') return;
+        var editorTheme = window.nightMode ? 'dark' : 'classic';
+        window.vditor.setTheme(
+            editorTheme,
+            resolveVditorContentTheme(settings),
+            resolveVditorCodeTheme(settings),
+            getVditorContentThemePath()
+        );
+    }
+
     function markCurrentFileEdited() {
         if (!window.currentFileId) return;
         window.unsavedChanges[window.currentFileId] = true;
@@ -1400,13 +1441,7 @@ document.addEventListener('DOMContentLoaded', function() {
         cache: { enable: true, id: 'vditor-mobile-optimized' },
         outline: { enable: window.userSettings.showOutline },
         hint: { emoji: {} },
-        preview: {
-            math: {
-                inlineDigit: true,
-                engine: 'KaTeX',
-                macros: {},
-            }
-        },
+        preview: buildVditorPreviewConfig(),
         upload: {
             accept: 'image/*,.jpg,.jpeg,.png,.gif,.bmp,.webp,.svg,.mp4,.mp3,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.rar,.7z',
             handler: function(files) { return window.uploadFiles(files, true); }
@@ -1427,6 +1462,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // 应用大纲视图设置
             applyOutline(window.userSettings.showOutline);
+
+            applyVditorThemes(window.userSettings);
 
             // 初始化用户界面和移动特性
             var continueAfterEngineReady = function() {
@@ -1898,8 +1935,8 @@ document.addEventListener('DOMContentLoaded', function() {
             closeDrop();
         });
 
-        var mobileServiceStatusBtn = document.getElementById('mobileServiceStatusBtn');
-        if (mobileServiceStatusBtn) mobileServiceStatusBtn.addEventListener('click', function() { window.showServiceStatusDialog(); closeDrop(); });
+        var serviceStatusBtn = document.getElementById('serviceStatusBtn');
+        if (serviceStatusBtn) serviceStatusBtn.addEventListener('click', function() { window.showServiceStatusDialog(); closeDrop(); });
 
         var mobileVideoCallBtn = document.getElementById('mobileVideoCallBtn');
         if (mobileVideoCallBtn) mobileVideoCallBtn.addEventListener('click', function() {
@@ -2000,15 +2037,11 @@ document.addEventListener('DOMContentLoaded', function() {
                     var toolbarOffset = parseFloat(bodyStyles.getPropertyValue('--top-toolbar-offset')) || 0;
                     var toolbarHeight = parseFloat(bodyStyles.getPropertyValue('--top-toolbar-height')) || 0;
                     var moreWidth = desktopDropdown.offsetWidth || desktopDropdown.scrollWidth || 210;
-                    var moreTop = Math.max(moreRect.bottom + 2, toolbarOffset + toolbarHeight + 1);
                     desktopDropdown.style.position = 'fixed';
-                    desktopDropdown.style.top = moreTop + 'px';
+                    desktopDropdown.style.top = Math.max(moreRect.bottom + 2, toolbarOffset + toolbarHeight + 1) + 'px';
                     desktopDropdown.style.left = Math.round(moreRect.right - moreWidth) + 'px';
                     desktopDropdown.style.right = 'auto';
                     desktopDropdown.style.zIndex = '1200';
-                    var moreMaxHeight = Math.max(200, window.innerHeight - moreTop - 12);
-                    desktopDropdown.style.maxHeight = moreMaxHeight + 'px';
-                    desktopDropdown.style.overflowY = 'auto';
                 }
             }
             closeDesktopEditDrop();
@@ -2081,7 +2114,6 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             closeDesktopDrop();
         });
-        bindDesktopButton('desktopServiceStatusBtn', function() { window.showServiceStatusDialog(); closeDesktopDrop(); });
         bindDesktopButton('desktopAboutBtn', function() { window.showAboutDialog(); closeDesktopDrop(); });
 
         // 渲染底部工具栏
@@ -2131,6 +2163,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 cache: editorConfig.cache,
                 outline: editorConfig.outline,
                 hint: editorConfig.hint,
+                preview: buildVditorPreviewConfig(),
                 upload: editorConfig.upload,
                 after: function() {
                     reinitEditorEvents();
@@ -2143,6 +2176,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     applyFontSize(window.userSettings.fontSize);
                     // 应用大纲视图设置
                     applyOutline(window.userSettings.showOutline);
+                    applyVditorThemes(window.userSettings);
                 }
             };
             window.vditor = new Vditor('vditor', newConfig);
@@ -2238,7 +2272,7 @@ document.addEventListener('DOMContentLoaded', function() {
             } },
             { id: 'mobileClearBtn', fn: async function() { const confirmed = await window.customConfirm(window.i18n ? window.i18n.t('clearConfirm') : '确定要清空当前文件的内容吗？'); if (confirmed) { if (window.vditor) window.vditor.setValue(''); window.showMessage(window.i18n ? window.i18n.t('contentCleared') : '内容已清空'); } closeDrop(); } },
             { id: 'mobileToggleFileE2EBtn', fn: async function() { if (typeof window.toggleCurrentFileE2E === 'function') await window.toggleCurrentFileE2E(); closeDrop(); } },
-            { id: 'mobileServiceStatusBtn', fn: function() { window.showServiceStatusDialog(); closeDrop(); } },
+            { id: 'serviceStatusBtn', fn: function() { window.showServiceStatusDialog(); closeDrop(); } },
             // mobileSettingsBtn 已移到顶部工具栏
             { id: 'aboutBtn', fn: function() { window.showAboutDialog(); closeDrop(); } }
         ];
@@ -2361,6 +2395,16 @@ document.addEventListener('DOMContentLoaded', function() {
         var fontSizeSelect = document.getElementById('fontSizeSelect');
         if (fontSizeSelect) {
             fontSizeSelect.value = window.userSettings.fontSize || '16px';
+        }
+
+        var vditorContentThemeSelect = document.getElementById('vditorContentThemeSelect');
+        if (vditorContentThemeSelect) {
+            vditorContentThemeSelect.value = window.userSettings.vditorContentTheme || 'auto';
+        }
+
+        var vditorCodeThemeSelect = document.getElementById('vditorCodeThemeSelect');
+        if (vditorCodeThemeSelect) {
+            vditorCodeThemeSelect.value = window.userSettings.vditorCodeTheme || 'auto';
         }
 
         // 设置大纲视图
@@ -2749,6 +2793,8 @@ document.addEventListener('DOMContentLoaded', function() {
             themeMode: 'system',
             uiMode: 'auto',
             fontSize: '16px',
+            vditorContentTheme: 'auto',
+            vditorCodeTheme: 'auto',
             showOutline: false,
             hideBottomToolbarOnKeyboard: false,
             enableDebugMode: false,
@@ -2817,6 +2863,16 @@ document.addEventListener('DOMContentLoaded', function() {
         var fontSizeSelect = document.getElementById('fontSizeSelect');
         if (fontSizeSelect) {
             newSettings.fontSize = fontSizeSelect.value;
+        }
+
+        var vditorContentThemeSelect = document.getElementById('vditorContentThemeSelect');
+        if (vditorContentThemeSelect) {
+            newSettings.vditorContentTheme = vditorContentThemeSelect.value || 'auto';
+        }
+
+        var vditorCodeThemeSelect = document.getElementById('vditorCodeThemeSelect');
+        if (vditorCodeThemeSelect) {
+            newSettings.vditorCodeTheme = vditorCodeThemeSelect.value || 'auto';
         }
 
         // 获取大纲视图设置
@@ -2904,6 +2960,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // 应用字体大小设置
         applyFontSize(newSettings.fontSize);
+        applyVditorThemes(newSettings);
 
         // 应用主题
         var oldNightMode = window.nightMode;
@@ -3124,21 +3181,35 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     };
 
-    async function updateWordCount() {
+    function approximateTokens(rawText) {
+        return Math.ceil((rawText.match(/[\u4e00-\u9fa5]/g) || []).length * 1.5 + (rawText.match(/[a-zA-Z0-9]+/g) || []).length * 1.3);
+    }
+
+    function renderTokenCounts(tokens) {
+        var tokensElement = document.getElementById('wordCountTokens');
+        if (tokensElement) tokensElement.textContent = tokens;
+
+        var elGPT = document.getElementById('tokenCountGPT');
+        if (elGPT) elGPT.textContent = tokens;
+
+        var elClaude = document.getElementById('tokenCountClaude');
+        if (elClaude) elClaude.textContent = Math.ceil(tokens * 1.05); // Claude typically 5% more overhead
+
+        var elDeepSeek = document.getElementById('tokenCountDeepSeek');
+        if (elDeepSeek) elDeepSeek.textContent = tokens; // DeepSeek v2/v3 very close to cl100k_base
+
+        var elGemini = document.getElementById('tokenCountGemini');
+        if (elGemini) elGemini.textContent = Math.ceil(tokens * 1.02); // Gemini somewhat close
+    }
+
+    // Sequence id ensures stale async token results don't overwrite newer ones.
+    var wordCountTokenSeq = 0;
+
+    function updateWordCount() {
         if (!window.vditor) return;
         var rawText = window.vditor.getValue() || '';
         var text = rawText;
-        
-        let tokens = 0;
-        try {
-            const { encode } = await import('gpt-tokenizer');
-            tokens = encode(rawText).length;
-        } catch (e) {
-            console.error('Failed to calculate exact tokens:', e);
-            // Fallback approximation if import fails
-            tokens = Math.ceil((rawText.match(/[\u4e00-\u9fa5]/g) || []).length * 1.5 + (rawText.match(/[a-zA-Z0-9]+/g) || []).length * 1.3);
-        }
-        
+
         var includeFormatting = document.getElementById('wcIncludeFormatting').checked;
         var includePunctuation = document.getElementById('wcIncludePunctuation').checked;
         var includeSpaces = document.getElementById('wcIncludeSpaces').checked;
@@ -3213,24 +3284,23 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('wordCountChinese').textContent = chineseCharacters;
         document.getElementById('wordCountLines').textContent = lineCount;
         document.getElementById('wordCountWords').textContent = englishWords;
-        
-        var tokensElement = document.getElementById('wordCountTokens');
-        if (tokensElement) {
-            tokensElement.textContent = tokens;
-        }
 
-        // Setup detail tokens for models
-        var elGPT = document.getElementById('tokenCountGPT');
-        if (elGPT) elGPT.textContent = tokens;
-        
-        var elClaude = document.getElementById('tokenCountClaude');
-        if (elClaude) elClaude.textContent = Math.ceil(tokens * 1.05); // Claude typically 5% more overhead
+        // Show an approximation immediately so the modal isn't blank while the
+        // gpt-tokenizer package is being lazy-loaded.
+        renderTokenCounts(approximateTokens(rawText));
 
-        var elDeepSeek = document.getElementById('tokenCountDeepSeek');
-        if (elDeepSeek) elDeepSeek.textContent = tokens; // DeepSeek v2/v3 very close to cl100k_base
-        
-        var elGemini = document.getElementById('tokenCountGemini');
-        if (elGemini) elGemini.textContent = Math.ceil(tokens * 1.02); // Gemini somewhat close
+        // Refine token counts asynchronously once gpt-tokenizer is loaded.
+        var seq = ++wordCountTokenSeq;
+        import('gpt-tokenizer').then(function(mod) {
+            if (seq !== wordCountTokenSeq) return; // a newer update has started
+            try {
+                renderTokenCounts(mod.encode(rawText).length);
+            } catch (e) {
+                console.error('Failed to calculate exact tokens:', e);
+            }
+        }).catch(function(e) {
+            console.error('Failed to load gpt-tokenizer:', e);
+        });
     }
 
     // Bind token details expander
@@ -3553,6 +3623,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 cache: editorConfig.cache,
                 outline: { enable: show },
                 hint: editorConfig.hint,
+                preview: buildVditorPreviewConfig(),
                 upload: editorConfig.upload,
                 after: function() {
                     reinitEditorEvents();
@@ -3562,6 +3633,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         window.initInlineImageTools();
                     }
                     applyFontSize(window.userSettings.fontSize);
+                    applyVditorThemes(window.userSettings);
                 }
             };
             window.vditor = new Vditor('vditor', newConfig);

@@ -1673,9 +1673,8 @@ import {
         indicators.forEach(function(indicator) {
             indicator.style.display = enabled ? 'inline-flex' : 'none';
             indicator.setAttribute('aria-hidden', enabled ? 'false' : 'true');
-            indicator.title = enabled
-                ? (isEn() ? 'This file uses end-to-end encryption' : '此文件已使用端到端加密')
-                : '';
+            // Suppress native tooltip — custom popover handles the messaging
+            indicator.removeAttribute('title');
         });
     }
 
@@ -1705,6 +1704,220 @@ import {
     function refreshE2EUi() {
         updateCurrentFileE2EIndicator();
         updateFileE2EMenuItems();
+        setupE2EIndicatorInteractions();
+    }
+
+    // ---------- 端到端加密锁头浮窗 ----------
+    let e2eIndicatorInteractionsBound = false;
+    let e2eInfoPopoverHideTimer = null;
+    let e2eInfoPopoverOpenAnchor = null;
+    const e2eFingerprintCache = new Map();
+
+    async function computeKeyFingerprint(password) {
+        if (!password) return '';
+        if (e2eFingerprintCache.has(password)) {
+            return e2eFingerprintCache.get(password);
+        }
+        try {
+            const subtle = window.crypto && window.crypto.subtle;
+            if (!subtle) return '';
+            const data = new TextEncoder().encode('EasyPocketMD-E2E-Fingerprint-v1|' + password);
+            const buf = await subtle.digest('SHA-256', data);
+            const bytes = Array.from(new Uint8Array(buf));
+            const hex = bytes.slice(0, 16).map(function(b) {
+                return b.toString(16).padStart(2, '0').toUpperCase();
+            }).join(':');
+            e2eFingerprintCache.set(password, hex);
+            return hex;
+        } catch (e) {
+            console.error('Fingerprint compute error', e);
+            return '';
+        }
+    }
+
+    function positionE2EInfoPopover(popover, anchor) {
+        if (!popover || !anchor) return;
+        const anchorRect = anchor.getBoundingClientRect();
+        // Make popover measurable
+        popover.style.left = '0px';
+        popover.style.top = '0px';
+        const popoverRect = popover.getBoundingClientRect();
+        const margin = 8;
+        const viewportWidth = window.innerWidth || document.documentElement.clientWidth;
+        const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
+
+        let top = anchorRect.bottom + margin;
+        if (top + popoverRect.height > viewportHeight - margin) {
+            top = Math.max(margin, anchorRect.top - popoverRect.height - margin);
+        }
+
+        let left = anchorRect.left + (anchorRect.width / 2) - 28;
+        if (left + popoverRect.width > viewportWidth - margin) {
+            left = viewportWidth - popoverRect.width - margin;
+        }
+        if (left < margin) left = margin;
+
+        popover.style.top = top + 'px';
+        popover.style.left = left + 'px';
+
+        const arrow = popover.querySelector('.e2e-info-popover-arrow');
+        if (arrow) {
+            const arrowLeft = Math.max(12,
+                Math.min(popoverRect.width - 20, anchorRect.left + anchorRect.width / 2 - left - 6)
+            );
+            arrow.style.left = arrowLeft + 'px';
+        }
+    }
+
+    async function showE2EInfoPopover(anchor) {
+        const popover = document.getElementById('e2eInfoPopover');
+        if (!popover || !anchor) return;
+        if (e2eInfoPopoverHideTimer) {
+            clearTimeout(e2eInfoPopoverHideTimer);
+            e2eInfoPopoverHideTimer = null;
+        }
+        e2eInfoPopoverOpenAnchor = anchor;
+
+        const titleEl = document.getElementById('e2eInfoPopoverTitle');
+        const bodyEl = popover.querySelector('.e2e-info-popover-body');
+        const labelEl = popover.querySelector('.e2e-info-popover-fingerprint-label');
+        const fingerprintEl = document.getElementById('e2eInfoPopoverFingerprint');
+        if (titleEl) titleEl.textContent = t('e2eInfoTitle') || (isEn() ? 'End-to-End Encrypted' : '端到端加密');
+        if (bodyEl) bodyEl.textContent = t('e2eInfoMessage') || (isEn()
+            ? 'This file is end-to-end encrypted. No one other than you can view it — not even the developer.'
+            : '本文件已端到端加密，除您以外的任何用户都无法查看本文件，开发者也不例外。');
+        if (labelEl) labelEl.textContent = t('e2eInfoFingerprintLabel') || (isEn() ? 'Local key fingerprint' : '本地密钥指纹');
+
+        if (fingerprintEl) {
+            const user = window.currentUser;
+            if (!user || !user.password) {
+                fingerprintEl.textContent = t('e2eInfoFingerprintUnavailable')
+                    || (isEn() ? 'Sign in to view your key fingerprint' : '请先登录以查看密钥指纹');
+            } else {
+                fingerprintEl.textContent = '…';
+                const requestedAnchor = anchor;
+                computeKeyFingerprint(user.password).then(function(fp) {
+                    if (e2eInfoPopoverOpenAnchor !== requestedAnchor) return;
+                    fingerprintEl.textContent = fp || (isEn() ? 'Unavailable' : '不可用');
+                });
+            }
+        }
+
+        popover.setAttribute('aria-hidden', 'false');
+        popover.classList.add('is-visible');
+        positionE2EInfoPopover(popover, anchor);
+        // Re-position after layout settles (font load, fingerprint text update)
+        requestAnimationFrame(function() {
+            positionE2EInfoPopover(popover, anchor);
+        });
+    }
+
+    function hideE2EInfoPopover(immediate) {
+        const popover = document.getElementById('e2eInfoPopover');
+        if (!popover) return;
+        if (e2eInfoPopoverHideTimer) {
+            clearTimeout(e2eInfoPopoverHideTimer);
+            e2eInfoPopoverHideTimer = null;
+        }
+        const doHide = function() {
+            popover.classList.remove('is-visible');
+            popover.setAttribute('aria-hidden', 'true');
+            e2eInfoPopoverOpenAnchor = null;
+        };
+        if (immediate) {
+            doHide();
+        } else {
+            e2eInfoPopoverHideTimer = setTimeout(doHide, 140);
+        }
+    }
+
+    function setupE2EIndicatorInteractions() {
+        if (e2eIndicatorInteractionsBound) return;
+        const indicators = document.querySelectorAll('.current-file-e2e-indicator');
+        if (!indicators.length) return;
+        const popover = document.getElementById('e2eInfoPopover');
+        if (!popover) return;
+
+        // Suppress native browser tooltip so it doesn't overlap our popover
+        indicators.forEach(function(indicator) {
+            indicator.removeAttribute('title');
+        });
+
+        indicators.forEach(function(indicator) {
+            indicator.addEventListener('mouseenter', function() {
+                showE2EInfoPopover(indicator);
+            });
+            indicator.addEventListener('mouseleave', function() {
+                hideE2EInfoPopover(false);
+            });
+            indicator.addEventListener('focus', function() {
+                showE2EInfoPopover(indicator);
+            });
+            indicator.addEventListener('blur', function() {
+                hideE2EInfoPopover(false);
+            });
+            indicator.addEventListener('click', function(ev) {
+                ev.stopPropagation();
+                if (popover.classList.contains('is-visible') && e2eInfoPopoverOpenAnchor === indicator) {
+                    hideE2EInfoPopover(true);
+                } else {
+                    showE2EInfoPopover(indicator);
+                }
+            });
+            indicator.addEventListener('keydown', function(ev) {
+                if (ev.key === 'Enter' || ev.key === ' ') {
+                    ev.preventDefault();
+                    if (popover.classList.contains('is-visible') && e2eInfoPopoverOpenAnchor === indicator) {
+                        hideE2EInfoPopover(true);
+                    } else {
+                        showE2EInfoPopover(indicator);
+                    }
+                } else if (ev.key === 'Escape') {
+                    hideE2EInfoPopover(true);
+                }
+            });
+        });
+
+        popover.addEventListener('mouseenter', function() {
+            if (e2eInfoPopoverHideTimer) {
+                clearTimeout(e2eInfoPopoverHideTimer);
+                e2eInfoPopoverHideTimer = null;
+            }
+        });
+        popover.addEventListener('mouseleave', function() {
+            hideE2EInfoPopover(false);
+        });
+
+        document.addEventListener('click', function(ev) {
+            if (!popover.classList.contains('is-visible')) return;
+            const target = ev.target;
+            if (popover.contains(target)) return;
+            let inIndicator = false;
+            indicators.forEach(function(indicator) {
+                if (indicator.contains(target)) inIndicator = true;
+            });
+            if (!inIndicator) hideE2EInfoPopover(true);
+        });
+
+        window.addEventListener('resize', function() {
+            if (e2eInfoPopoverOpenAnchor && popover.classList.contains('is-visible')) {
+                positionE2EInfoPopover(popover, e2eInfoPopoverOpenAnchor);
+            }
+        });
+
+        window.addEventListener('scroll', function() {
+            if (e2eInfoPopoverOpenAnchor && popover.classList.contains('is-visible')) {
+                positionE2EInfoPopover(popover, e2eInfoPopoverOpenAnchor);
+            }
+        }, true);
+
+        document.addEventListener('keydown', function(ev) {
+            if (ev.key === 'Escape' && popover.classList.contains('is-visible')) {
+                hideE2EInfoPopover(true);
+            }
+        });
+
+        e2eIndicatorInteractionsBound = true;
     }
 
     function getServerDeletedEditingMessage(file) {
@@ -4433,7 +4646,7 @@ import {
                 g('customAlert')(isEn() ? 'At least one file must be kept' : '至少需要保留一个文件');
                 return;
             }
-            const confirmed = await g('customConfirm')(isEn() ? 'Are you sure you want to delete this file?' : '确定要删除这个文件吗？');
+            const confirmed = await g('customConfirm')(isEn() ? `Are you sure you want to delete "${item.name}"?` : `确认删除"${item.name}"吗？`);
             if (!confirmed) return;
 
             const idx = files.findIndex(f => f.id === id);

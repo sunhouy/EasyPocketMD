@@ -2126,6 +2126,19 @@ body.night-mode {
     height: 32px;
     color: #1f8f4d;
     font-size: 15px;
+    cursor: pointer;
+    border-radius: 6px;
+    transition: background-color 0.15s ease, transform 0.15s ease;
+}
+
+.current-file-e2e-indicator:hover,
+.current-file-e2e-indicator:focus-visible {
+    background-color: rgba(31, 143, 77, 0.12);
+    outline: none;
+}
+
+.current-file-e2e-indicator:active {
+    transform: scale(0.94);
 }
 
 .desktop-e2e-indicator {
@@ -2133,6 +2146,132 @@ body.night-mode {
     height: 24px;
     margin-left: 6px;
     color: #1f7a45;
+}
+
+/* End-to-end encryption info popover */
+.e2e-info-popover {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 99999;
+    width: 320px;
+    max-width: calc(100vw - 24px);
+    padding: 14px 16px 16px;
+    background: #ffffff;
+    color: #1f2937;
+    border: 1px solid rgba(31, 122, 69, 0.18);
+    border-radius: 12px;
+    box-shadow: 0 12px 32px rgba(15, 23, 42, 0.18);
+    font-size: 13px;
+    line-height: 1.55;
+    opacity: 0;
+    transform: translateY(-4px);
+    pointer-events: none;
+    transition: opacity 0.16s ease, transform 0.16s ease;
+}
+
+.e2e-info-popover.is-visible {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+}
+
+.e2e-info-popover-arrow {
+    position: absolute;
+    top: -7px;
+    left: 24px;
+    width: 12px;
+    height: 12px;
+    background: #ffffff;
+    border-top: 1px solid rgba(31, 122, 69, 0.18);
+    border-left: 1px solid rgba(31, 122, 69, 0.18);
+    transform: rotate(45deg);
+}
+
+.e2e-info-popover-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #1f7a45;
+    margin-bottom: 8px;
+}
+
+.e2e-info-popover-header i {
+    font-size: 15px;
+}
+
+.e2e-info-popover-body {
+    color: #374151;
+    margin-bottom: 12px;
+}
+
+.e2e-info-popover-fingerprint-section {
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: rgba(31, 143, 77, 0.08);
+    border: 1px dashed rgba(31, 122, 69, 0.28);
+}
+
+.e2e-info-popover-fingerprint-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #1f7a45;
+    margin-bottom: 6px;
+}
+
+.e2e-info-popover-fingerprint {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+    font-size: 12.5px;
+    color: #0f172a;
+    word-break: break-all;
+    user-select: all;
+    line-height: 1.5;
+}
+
+body.night-mode .e2e-info-popover {
+    background: #1f2937;
+    color: #e5e7eb;
+    border-color: rgba(74, 222, 128, 0.28);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+}
+
+body.night-mode .e2e-info-popover-arrow {
+    background: #1f2937;
+    border-top-color: rgba(74, 222, 128, 0.28);
+    border-left-color: rgba(74, 222, 128, 0.28);
+}
+
+body.night-mode .e2e-info-popover-header {
+    color: #6ee7a3;
+}
+
+body.night-mode .e2e-info-popover-body {
+    color: #d1d5db;
+}
+
+body.night-mode .e2e-info-popover-fingerprint-section {
+    background: rgba(74, 222, 128, 0.08);
+    border-color: rgba(74, 222, 128, 0.32);
+}
+
+body.night-mode .e2e-info-popover-fingerprint-label {
+    color: #6ee7a3;
+}
+
+body.night-mode .e2e-info-popover-fingerprint {
+    color: #f3f4f6;
+}
+
+body.night-mode .current-file-e2e-indicator {
+    color: #6ee7a3;
+}
+
+body.night-mode .current-file-e2e-indicator:hover,
+body.night-mode .current-file-e2e-indicator:focus-visible {
+    background-color: rgba(110, 231, 163, 0.16);
 }
 
 .dropdown-item.active {
