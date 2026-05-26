@@ -141,7 +141,7 @@ document.addEventListener('DOMContentLoaded', function() {
             return true;
         }
 
-        var closeBtn = overlay.querySelector('.modal-close-btn, #closeDiffModalBtn, #closeHistoryBtn, #closeAboutBtn, #closeServiceStatusBtn, #cancelSettingsBtn');
+        var closeBtn = overlay.querySelector('.modal-close-btn, #closeDiffModalBtn, #closeHistoryBtn, #closeAboutBtn, #closeServiceStatusBtn, #cancelSettingsBtn, .delete-confirm-cancel, #importCancelBtn, #cancelChangePasswordBtn, #cancelDeleteAccountBtn, #cancelAddAccountBtn, #cancelSwitchAccountBtn, #cancelFileDiffBtn, #cancelAIBtn, #cancelUncertaintyBtn, #cancelConnectionBtn');
         if (closeBtn) {
             closeBtn.click();
         } else {
@@ -610,6 +610,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function handleGlobalKeyboardShortcuts(event) {
         if (event.defaultPrevented || event.isComposing) return;
+
         if (isFormInputTarget(event.target)) return;
 
         var shortcutValue = buildShortcutFromKeyboardEvent(event);
@@ -646,11 +647,20 @@ document.addEventListener('DOMContentLoaded', function() {
             var button = document.getElementById(definition.toolbarButtonId);
             if (!button) return;
 
-            var baseText = window.i18n ? window.i18n.t(definition.toolbarTextKey) : button.textContent;
+            var baseText = window.i18n ? window.i18n.t(definition.toolbarTextKey) : button.textContent.replace(/\(.*?\)$/, '').trim();
             var shortcut = effectiveShortcuts[definition.id];
             var displayText = shortcut ? baseText + '(' + shortcut + ')' : baseText;
 
-            button.textContent = displayText;
+            // Preserve icon if it already exists, e.g. for some buttons
+            var iElement = button.querySelector('i');
+            if (iElement) {
+                button.innerHTML = '';
+                button.appendChild(iElement);
+                button.appendChild(document.createTextNode(displayText));
+            } else {
+                button.textContent = displayText;
+            }
+
             if (shortcut) {
                 button.setAttribute('title', baseText + ' [' + shortcut + ']');
             } else {
@@ -913,6 +923,24 @@ document.addEventListener('DOMContentLoaded', function() {
         if (keyboardShortcutListenerInitialized) return;
         keyboardShortcutListenerInitialized = true;
         document.addEventListener('keydown', handleGlobalKeyboardShortcuts, true);
+        
+        document.addEventListener('keydown', function(event) {
+            if (event.defaultPrevented) return;
+            if (event.key === 'Escape') {
+                if (typeof getVisibleModalOverlays === 'function') {
+                    var visibleModals = getVisibleModalOverlays();
+                    if (visibleModals.length > 0) {
+                        var topModal = visibleModals[visibleModals.length - 1];
+                        if (typeof closeOverlayByBackPress === 'function') {
+                            closeOverlayByBackPress(topModal);
+                        }
+                        event.preventDefault();
+                        event.stopPropagation();
+                        event.stopImmediatePropagation();
+                    }
+                }
+            }
+        });
     }
 
     async function handleBottomSave() {
@@ -920,6 +948,39 @@ document.addEventListener('DOMContentLoaded', function() {
             await window.saveCurrentFile(true);
             var t = function(key) { return window.i18n ? window.i18n.t(key) : key; };
             // window.showMessage(t('saveSuccess') || '保存成功', 'success');
+        }
+    }
+
+    async function handleCreateHistoryVersionSnapshot() {
+        var t = function(key) { return window.i18n ? window.i18n.t(key) : key; };
+        if (!window.currentUser) {
+            window.showMessage(t('pleaseLoginFirst') || '请先登录', 'warning');
+            return;
+        }
+        var currentFileId = window.currentFileId;
+        var files = window.files || [];
+        var currentFile = files.find(function(file) { return file && file.id === currentFileId && file.type === 'file'; });
+        if (!currentFile) {
+            window.showMessage(t('noActiveFileForHistory') || '当前没有可创建历史版本的文件', 'warning');
+            return;
+        }
+        var content = currentFile.content || '';
+        if (typeof window.getCurrentEditorContent === 'function') {
+            content = window.getCurrentEditorContent(currentFileId, currentFile.content || '');
+        } else if (window.vditor && typeof window.vditor.getValue === 'function') {
+            content = window.vditor.getValue() || '';
+        }
+        try {
+            var resultCode = await window.createHistoryVersion(currentFile.name, content);
+            if (resultCode === 200) {
+                window.showMessage(t('createHistoryVersionSuccess') || '历史版本已创建', 'success');
+            } else if (resultCode === 304) {
+                window.showMessage(t('historyVersionNoChanges') || '内容无变化，未创建新历史版本', 'info');
+            } else {
+                window.showMessage(t('createHistoryVersionFailed') || '创建历史版本失败', 'error');
+            }
+        } catch (error) {
+            window.showMessage(t('createHistoryVersionFailed') || '创建历史版本失败', 'error');
         }
     }
 
@@ -1402,39 +1463,58 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
             }
             bindVditorDirtyEvents();
+            // 处理粘贴事件，限制长度并处理AI格式
+            function handlePasteEvent(e) {
+                var clipboardData = e.clipboardData || window.clipboardData;
+                var pastedText = clipboardData.getData('text');
+                
+                if (pastedText.length > 10000) {
+                    e.preventDefault();
+                    e.stopImmediatePropagation();
+                    window.showMessage(window.i18n ? window.i18n.t('pasteTextTooLong') : '粘贴文本过长，请减少粘贴内容后重试', 'error');
+                    return;
+                }
+                
+                var aiRegex = /\\\[[\s\S]*?\\\]|\\\([\s\S]*?\\\)|\\_|\\\$/;
+                if (aiRegex.test(pastedText)) {
+                    e.preventDefault();
+                    e.stopImmediatePropagation();
+                    
+                    window.customConfirm(
+                        window.i18n && window.i18n.t('detectAiMarkdownFormat') && window.i18n.t('detectAiMarkdownFormat') !== 'detectAiMarkdownFormat' ? 
+                        window.i18n.t('detectAiMarkdownFormat') : 
+                        '检测到当前粘贴的格式可能与编辑器的KaTeX渲染格式不一致（例如包含 \\[...\\] 或 \\(...\\)）。是否自动将其转换为标准格式？'
+                    ).then(function(shouldConvert) {
+                        var textToInsert = pastedText;
+                        if (shouldConvert) {
+                            textToInsert = textToInsert.replace(/\\\[([\s\S]*?)\\\]/g, '$$$$$1$$$$');
+                            textToInsert = textToInsert.replace(/\\\(([\s\S]*?)\\\)/g, '$$$1$$');
+                            textToInsert = textToInsert.replace(/\\_/g, '_');
+                            textToInsert = textToInsert.replace(/\\\$/g, '$');
+                        }
+                        
+                        setTimeout(function() {
+                            if (window.vditor && typeof window.vditor.insertValue === 'function') {
+                                window.vditor.insertValue(textToInsert);
+                            } else {
+                                document.execCommand('insertText', false, textToInsert);
+                            }
+                        }, 10);
+                    });
+                }
+            }
+
             if (window.vditor && window.vditor.vditor && window.vditor.vditor.ir) {
-                // 添加粘贴事件监听器，限制粘贴文本长度
-                window.vditor.vditor.ir.element.addEventListener('paste', function(e) {
-                    var clipboardData = e.clipboardData || window.clipboardData;
-                    var pastedText = clipboardData.getData('text');
-                    if (pastedText.length > 10000) {
-                        e.preventDefault();
-                        window.showMessage(window.i18n ? window.i18n.t('pasteTextTooLong') : '粘贴文本过长，请减少粘贴内容后重试', 'error');
-                    }
-                });
+                window.vditor.vditor.ir.element.addEventListener('paste', handlePasteEvent, true);
             }
 
             // 为其他编辑模式添加粘贴事件监听器
             if (window.vditor && window.vditor.vditor && window.vditor.vditor.wysiwyg) {
-                window.vditor.vditor.wysiwyg.element.addEventListener('paste', function(e) {
-                    var clipboardData = e.clipboardData || window.clipboardData;
-                    var pastedText = clipboardData.getData('text');
-                    if (pastedText.length > 10000) {
-                        e.preventDefault();
-                        window.showMessage(window.i18n ? window.i18n.t('pasteTextTooLong') : '粘贴文本过长，请减少粘贴内容后重试', 'error');
-                    }
-                });
+                window.vditor.vditor.wysiwyg.element.addEventListener('paste', handlePasteEvent, true);
             }
 
             if (window.vditor && window.vditor.vditor && window.vditor.vditor.sv) {
-                window.vditor.vditor.sv.element.addEventListener('paste', function(e) {
-                    var clipboardData = e.clipboardData || window.clipboardData;
-                    var pastedText = clipboardData.getData('text');
-                    if (pastedText.length > 10000) {
-                        e.preventDefault();
-                        window.showMessage(window.i18n ? window.i18n.t('pasteTextTooLong') : '粘贴文本过长，请减少粘贴内容后重试', 'error');
-                    }
-                });
+                window.vditor.vditor.sv.element.addEventListener('paste', handlePasteEvent, true);
             }
 
             // 初始化应用生命周期管理（草稿恢复等）
@@ -1695,10 +1775,15 @@ document.addEventListener('DOMContentLoaded', function() {
     function initMobileFeatures() {
         var dropdown = document.getElementById('mobileDropdown');
         function closeDrop() { if (dropdown) dropdown.classList.remove('show'); }
-        var desktopDropdown = document.getElementById('desktopMoreDropdown');
-        function closeDesktopDrop() { if (desktopDropdown) desktopDropdown.classList.remove('show'); }
+        function closeDesktopDrop() { 
+            var desktopDropdown = document.getElementById('desktopMoreDropdown');
+            if (desktopDropdown) desktopDropdown.classList.remove('show'); 
+        }
         var desktopEditDropdown = document.getElementById('desktopEditDropdown');
-        function closeDesktopEditDrop() { if (desktopEditDropdown) desktopEditDropdown.classList.remove('show'); }
+        function closeDesktopEditDrop() {
+            var desktopEditDropdown = document.getElementById('desktopEditDropdown');
+            if (desktopEditDropdown) desktopEditDropdown.classList.remove('show'); 
+        }
 
         function bindDesktopButton(id, fn) {
             var el = document.getElementById(id);
@@ -1743,6 +1828,11 @@ document.addEventListener('DOMContentLoaded', function() {
             window.showWordCountDialog();
             closeDrop();
         });
+        var mobileCreateHistoryVersionBtn = document.getElementById('mobileCreateHistoryVersionBtn');
+        if (mobileCreateHistoryVersionBtn) mobileCreateHistoryVersionBtn.addEventListener('click', async function() {
+            await handleCreateHistoryVersionSnapshot();
+            closeDrop();
+        });
 
         var mobilePrintBtn = document.getElementById('mobilePrintBtn');
         if (mobilePrintBtn) mobilePrintBtn.addEventListener('click', async function() {
@@ -1757,7 +1847,15 @@ document.addEventListener('DOMContentLoaded', function() {
         if (mobilePresentationBtn) mobilePresentationBtn.addEventListener('click', function() { enterPresentationMode(); closeDrop(); });
 
         var mobileMenuBtn = document.getElementById('mobileMenuBtn');
-        if (mobileMenuBtn) mobileMenuBtn.addEventListener('click', function(e) { e.stopPropagation(); if (dropdown) dropdown.classList.toggle('show'); });
+        if (mobileMenuBtn) {
+            var neuMenuBtn = mobileMenuBtn.cloneNode(true);
+            if (mobileMenuBtn.parentNode) mobileMenuBtn.parentNode.replaceChild(neuMenuBtn, mobileMenuBtn);
+            neuMenuBtn.addEventListener('click', function(e) { 
+                e.stopPropagation(); 
+                var currentDropdown = document.getElementById('mobileDropdown');
+                if (currentDropdown) currentDropdown.classList.toggle('show'); 
+            });
+        }
         var mobileModeBtn = document.getElementById('mobileModeBtn');
         if (mobileModeBtn) mobileModeBtn.addEventListener('click', function() { showModeSelection(); closeDrop(); });
         var mobileOpenLocalFileBtn = document.getElementById('mobileOpenLocalFileBtn');
@@ -1872,6 +1970,7 @@ document.addEventListener('DOMContentLoaded', function() {
         bindDesktopButton('desktopSettingsBtn', function() { window.showSettingsDialog(); });
         bindDesktopButton('desktopEditBtn', function(e) {
             e.stopPropagation();
+            var desktopEditDropdown = document.getElementById('desktopEditDropdown');
             if (desktopEditDropdown) {
                 var willShowEdit = !desktopEditDropdown.classList.contains('show');
                 desktopEditDropdown.classList.toggle('show');
@@ -1891,6 +1990,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         bindDesktopButton('desktopMoreBtn', function(e) {
             e.stopPropagation();
+            var desktopDropdown = document.getElementById('desktopMoreDropdown');
             if (desktopDropdown) {
                 var willShowMore = !desktopDropdown.classList.contains('show');
                 desktopDropdown.classList.toggle('show');
@@ -1932,6 +2032,10 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         bindDesktopButton('desktopWordCountBtn', function() {
             window.showWordCountDialog();
+            closeDesktopDrop();
+        });
+        bindDesktopButton('desktopCreateHistoryVersionBtn', async function() {
+            await handleCreateHistoryVersionSnapshot();
             closeDesktopDrop();
         });
         bindDesktopButton('desktopPrintBtn', async function() {
@@ -2086,7 +2190,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 closeDrop();
             } },
             { id: 'mobilePresentationBtn', fn: function() { enterPresentationMode(); closeDrop(); } },
-            { id: 'mobileMenuBtn', fn: function(e) { e.stopPropagation(); if (dropdown) dropdown.classList.toggle('show'); } },
+            { 
+                id: 'mobileMenuBtn', 
+                fn: function(e) { 
+                    e.stopPropagation(); 
+                    var currentDropdown = document.getElementById('mobileDropdown');
+                    if (currentDropdown) currentDropdown.classList.toggle('show'); 
+                } 
+            },
             { id: 'mobileModeBtn', fn: function() { showModeSelection(); closeDrop(); } },
             { id: 'mobileOpenLocalFileBtn', fn: async function() {
                 if (typeof window.openExternalLocalFileByDialog === 'function') {

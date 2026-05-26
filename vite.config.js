@@ -170,7 +170,8 @@ export default defineConfig({
     __WASM_TEXT_ENGINE_PRESENT__: JSON.stringify(hasWasmTextEngineDist),
     __APP_BUILD_TAG__: JSON.stringify(cacheVersion),
     __APP_PACKAGE_VERSION__: JSON.stringify(appPackageVersion),
-    VDITOR_VERSION: JSON.stringify(scopedVditorVersion)
+    VDITOR_VERSION: JSON.stringify(scopedVditorVersion),
+    global: 'window'
   },
   server: {
     port: 8080,

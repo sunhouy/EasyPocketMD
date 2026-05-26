@@ -196,9 +196,10 @@
             const cardBg = nightMode ? '#3d3d3d' : '#f8f9fa';
 
             const content = document.createElement('div');
-            content.style.cssText = `background:${bg};color:${textColor};border-radius:12px;padding:25px;width:90%;max-width:450px;text-align:center;box-shadow: 0 4px 20px rgba(0,0,0,0.3);`;
+            content.style.cssText = `position:relative;background:${bg};color:${textColor};border-radius:12px;padding:25px;width:90%;max-width:450px;text-align:center;box-shadow: 0 4px 20px rgba(0,0,0,0.3);`;
 
             content.innerHTML = `
+                <button class="modal-close-btn" style="position:absolute;top:15px;right:15px;background:none;border:none;font-size:20px;cursor:pointer;color:${textColor};" id="storage-cancel">&times;</button>
                 <h3 style="margin-top:0;">${t('storageChoiceTitle')}</h3>
                 <p style="margin-bottom:25px;font-size:14px;color:${nightMode ? '#aaa' : '#666'};">${t('storageChoiceMessage')}</p>
                 
@@ -252,6 +253,11 @@
                 localCard.style.background = cardBg;
             };
 
+            content.querySelector('#storage-cancel').onclick = () => {
+                document.body.removeChild(modal);
+                resolve('cloud'); // fallback
+            };
+            
             confirmBtn.onclick = () => {
                 modal.remove();
                 resolve({
