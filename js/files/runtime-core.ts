@@ -1539,7 +1539,7 @@ import {
                         ...f,
                         name: name,
                         type: type,
-                        content: type === 'folder' ? '' : (content ?? ''),
+                        content: type === 'folder' ? '' : (contentLoaded ? (content ?? '') : undefined),
                         contentLoaded: contentLoaded,
                         e2e_enabled: fileE2EEnabled ? 1 : 0,
                         e2eEnabled: fileE2EEnabled,
@@ -1859,7 +1859,7 @@ import {
             if (hasLocalChanges) return;
 
             const e2eChanged = isFileE2EEnabled(file) !== isFileE2EEnabled(serverFile);
-            if (isServerListContentMissing(serverFile.content)) {
+            if (serverFile.contentLoaded === false || isServerListContentMissing(serverFile.content)) {
                 return;
             }
             if (serverFile.content !== editorContent || e2eChanged) {
