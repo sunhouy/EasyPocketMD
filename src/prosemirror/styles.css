@@ -1,0 +1,167 @@
+/* EasyProseMirror 编辑器基础样式 — 与项目整体风格保持简洁 */
+
+.easy-pm-host {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--editor-bg, #ffffff);
+  color: var(--editor-fg, #1f1f1f);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial,
+    "Microsoft YaHei", "PingFang SC", "Source Han Sans CN", sans-serif;
+  overflow: hidden;
+  /* 让 Vditor 残留的样式不渗透进来 */
+  isolation: isolate;
+}
+
+.easy-pm-host.easy-pm-dark {
+  --editor-bg: #1e1f22;
+  --editor-fg: #e6e6e6;
+  background: var(--editor-bg);
+  color: var(--editor-fg);
+}
+
+.easy-pm-editor {
+  flex: 1 1 auto;
+  overflow: auto;
+  padding: 18px 24px 64px;
+  box-sizing: border-box;
+}
+
+.easy-pm-editor .ProseMirror {
+  outline: none;
+  min-height: 100%;
+  font-size: 16px;
+  line-height: 1.7;
+  word-break: break-word;
+}
+
+.easy-pm-editor .ProseMirror:focus {
+  outline: none;
+}
+
+/* 占位符：当文档为空时由调用方在 data-placeholder 上指定 */
+.easy-pm-editor[data-placeholder] .ProseMirror.ProseMirror-empty::before,
+.easy-pm-editor[data-placeholder] .ProseMirror > p:only-child.is-empty::before {
+  /* ProseMirror 没有原生 placeholder，这里仅留 hook，后续可扩展 */
+  content: attr(data-placeholder);
+  color: #9aa0a6;
+  pointer-events: none;
+  position: absolute;
+}
+
+.easy-pm-editor .ProseMirror h1,
+.easy-pm-editor .ProseMirror h2,
+.easy-pm-editor .ProseMirror h3,
+.easy-pm-editor .ProseMirror h4,
+.easy-pm-editor .ProseMirror h5,
+.easy-pm-editor .ProseMirror h6 {
+  font-weight: 600;
+  line-height: 1.3;
+  margin: 1.4em 0 0.6em;
+}
+.easy-pm-editor .ProseMirror h1 { font-size: 1.8em; }
+.easy-pm-editor .ProseMirror h2 { font-size: 1.55em; }
+.easy-pm-editor .ProseMirror h3 { font-size: 1.3em; }
+.easy-pm-editor .ProseMirror h4 { font-size: 1.15em; }
+.easy-pm-editor .ProseMirror h5 { font-size: 1.05em; }
+.easy-pm-editor .ProseMirror h6 { font-size: 1em; color: #6b7280; }
+
+.easy-pm-editor .ProseMirror p { margin: 0.6em 0; }
+
+.easy-pm-editor .ProseMirror blockquote {
+  margin: 0.8em 0;
+  padding: 0.4em 1em;
+  border-left: 4px solid #b3c0d1;
+  background: rgba(125, 145, 175, 0.08);
+  color: inherit;
+  border-radius: 3px;
+}
+
+.easy-pm-host.easy-pm-dark .ProseMirror blockquote {
+  border-left-color: #5a6573;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.easy-pm-editor .ProseMirror pre {
+  background: #f5f5f7;
+  padding: 12px 14px;
+  border-radius: 6px;
+  overflow-x: auto;
+  font-family: "SFMono-Regular", "JetBrains Mono", Consolas, "Source Code Pro",
+    "Liberation Mono", Menlo, monospace;
+  font-size: 14px;
+  line-height: 1.55;
+}
+.easy-pm-host.easy-pm-dark .ProseMirror pre {
+  background: #2b2d31;
+}
+
+.easy-pm-editor .ProseMirror code {
+  font-family: "SFMono-Regular", "JetBrains Mono", Consolas, monospace;
+  background: rgba(120, 120, 140, 0.12);
+  padding: 0.1em 0.35em;
+  border-radius: 3px;
+  font-size: 0.92em;
+}
+.easy-pm-editor .ProseMirror pre code {
+  background: transparent;
+  padding: 0;
+  border-radius: 0;
+  font-size: inherit;
+}
+
+.easy-pm-editor .ProseMirror ul,
+.easy-pm-editor .ProseMirror ol {
+  padding-left: 1.6em;
+  margin: 0.6em 0;
+}
+
+.easy-pm-editor .ProseMirror li[data-task-item] {
+  list-style: none;
+  margin-left: -1.5em;
+}
+.easy-pm-editor .ProseMirror li[data-task-item] > input[type="checkbox"] {
+  margin-right: 0.4em;
+  transform: translateY(2px);
+}
+
+.easy-pm-editor .ProseMirror table {
+  border-collapse: collapse;
+  margin: 0.8em 0;
+  width: 100%;
+  table-layout: fixed;
+}
+.easy-pm-editor .ProseMirror th,
+.easy-pm-editor .ProseMirror td {
+  border: 1px solid #d6d9df;
+  padding: 6px 10px;
+  vertical-align: top;
+}
+.easy-pm-host.easy-pm-dark .ProseMirror th,
+.easy-pm-host.easy-pm-dark .ProseMirror td {
+  border-color: #3a3d44;
+}
+
+.easy-pm-editor .ProseMirror a {
+  color: #2f6df3;
+  text-decoration: none;
+}
+.easy-pm-editor .ProseMirror a:hover {
+  text-decoration: underline;
+}
+
+.easy-pm-editor .ProseMirror hr {
+  border: none;
+  border-top: 1px solid #d6d9df;
+  margin: 1.5em 0;
+}
+
+.easy-pm-editor .ProseMirror img {
+  max-width: 100%;
+  height: auto;
+}
+
+/* 高亮装饰：syntaxHighlight.ts 会塞这些 class */
+.easy-pm-editor .ProseMirror .pm-md-keyword { color: #b96d18; }
+.easy-pm-editor .ProseMirror .pm-md-emphasis { color: #6c757d; font-style: italic; }

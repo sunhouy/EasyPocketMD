@@ -2,6 +2,7 @@
  * Vditor 初始化、界面与功能绑定
  */
 import { initSlashCommandRuntime } from './ui/slash-command.js';
+import { getCurrentEngine, createEditor } from './editor-engine.js';
 
 document.addEventListener('DOMContentLoaded', function() {
     'use strict';
@@ -304,14 +305,36 @@ document.addEventListener('DOMContentLoaded', function() {
         window.vditorInitPromise = new Promise(function(resolve, reject) {
             window.__resolveVditorInit = resolve;
             window.__rejectVditorInit = reject;
-            try {
-                window.vditor = new Vditor('vditor', editorConfig);
-            } catch (error) {
-                window.vditorInitPromise = null;
-                window.__resolveVditorInit = null;
-                window.__rejectVditorInit = null;
-                reject(error);
+            var engine = getCurrentEngine();
+            window.currentEditorEngine = engine;
+            if (engine === 'vditor') {
+                try {
+                    window.vditor = new Vditor('vditor', editorConfig);
+                } catch (error) {
+                    window.vditorInitPromise = null;
+                    window.__resolveVditorInit = null;
+                    window.__rejectVditorInit = null;
+                    reject(error);
+                }
+                return;
             }
+            // 非 Vditor 引擎走异步路径
+            createEditor(engine, 'vditor', editorConfig).then(function(instance) {
+                window.vditor = instance;
+                // EasyProseMirrorEditor 构造时会通过 options.after 触发 editorConfig.after，
+                // 后者内部会调用 window.__resolveVditorInit。无需在这里再 resolve。
+            }).catch(function(error) {
+                console.error('createEditor failed, fallback to Vditor:', error);
+                try {
+                    window.currentEditorEngine = 'vditor';
+                    window.vditor = new Vditor('vditor', editorConfig);
+                } catch (fallbackErr) {
+                    window.vditorInitPromise = null;
+                    window.__resolveVditorInit = null;
+                    window.__rejectVditorInit = null;
+                    reject(fallbackErr);
+                }
+            });
         });
 
         return window.vditorInitPromise;
@@ -810,6 +833,7 @@ document.addEventListener('DOMContentLoaded', function() {
         var hideBottomToolbarOnKeyboardCheckbox = document.getElementById('hideBottomToolbarOnKeyboardCheckbox');
 
         return {
+            editorEngine: getCheckedRadioValue('editorEngine', 'vditor'),
             editorMode: getCheckedRadioValue('editorMode', 'wysiwyg'),
             themeMode: getCheckedRadioValue('themeMode', 'system'),
             uiMode: getCheckedRadioValue('uiMode', 'auto'),
@@ -2175,6 +2199,15 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function setEditorMode(mode) {
         if (!window.vditor || !modeMap[mode]) return;
+        if (window.currentEditorEngine === 'prosemirror') {
+            // ProseMirror 引擎没有 ir / wysiwyg / sv 这三种模式之分
+            localStorage.setItem('vditor_editor_mode', mode);
+            window.showMessage(
+                window.i18n ? window.i18n.t('proseMirrorNoEditorMode') : '当前使用 ProseMirror 引擎，无需切换编辑器模式',
+                'info'
+            );
+            return;
+        }
         if (window.isLongFileMode) {
             window.showMessage(window.i18n ? window.i18n.t('longFileModeSwitchBlocked') : '当前文件处于超长模式，暂不支持切换 Vditor 编辑模式', 'warning');
             return;
@@ -2386,6 +2419,13 @@ document.addEventListener('DOMContentLoaded', function() {
     window.showSettingsDialog = function() {
         var modal = document.getElementById('settingsModalOverlay');
         if (!modal) return;
+
+        // 设置当前编辑器引擎
+        var currentEngine = getCurrentEngine();
+        var engineRadios = document.getElementsByName('editorEngine');
+        for (var ei = 0; ei < engineRadios.length; ei++) {
+            engineRadios[ei].checked = (engineRadios[ei].value === currentEngine);
+        }
 
         // 设置当前编辑器模式
         var currentEditorMode = localStorage.getItem('vditor_editor_mode') || 'wysiwyg';
@@ -2839,6 +2879,24 @@ document.addEventListener('DOMContentLoaded', function() {
             storageLocation: 'cloud'
         };
 
+        // 获取选中的编辑器引擎（切换后需刷新）
+        var engineChanged = false;
+        var engineRadios = document.getElementsByName('editorEngine');
+        for (var ei = 0; ei < engineRadios.length; ei++) {
+            if (engineRadios[ei].checked) {
+                var newEngine = engineRadios[ei].value;
+                if (newEngine !== getCurrentEngine()) {
+                    if (newEngine === 'vditor') {
+                        try { localStorage.removeItem('editor_engine'); } catch (_) {}
+                    } else {
+                        try { localStorage.setItem('editor_engine', newEngine); } catch (_) {}
+                    }
+                    engineChanged = true;
+                }
+                break;
+            }
+        }
+
         // 获取选中的编辑器模式
         var modeRadios = document.getElementsByName('editorMode');
         for (var i = 0; i < modeRadios.length; i++) {
@@ -3021,9 +3079,9 @@ document.addEventListener('DOMContentLoaded', function() {
             };
         }
 
-        if (oldNightMode !== window.nightMode || languageChanged || needReinitForOutline) {
+        if (oldNightMode !== window.nightMode || languageChanged || needReinitForOutline || engineChanged) {
             settingsDialogInitialSnapshot = null;
-            window.location.reload(); // 重新加载以应用主题、语言或大纲视图更改
+            window.location.reload(); // 重新加载以应用主题、语言、大纲或编辑器引擎更改
         } else {
             applyTranslations();
             applyInterfaceMode(window.userSettings);
@@ -3637,6 +3695,11 @@ document.addEventListener('DOMContentLoaded', function() {
         if (window.userSettings.showOutline !== show) {
             window.userSettings.showOutline = show;
             localStorage.setItem('vditor_settings', JSON.stringify(window.userSettings));
+
+            // ProseMirror 引擎没有 outline 大纲视图，跳过重建
+            if (window.currentEditorEngine === 'prosemirror') {
+                return;
+            }
 
             // 重新初始化编辑器
             var currentContent = window.vditor.getValue();

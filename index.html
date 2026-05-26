@@ -422,6 +422,16 @@
                 <ul class="settings-list" role="list">
                     <li class="settings-list-item">
                         <div class="form-group">
+                            <label data-i18n="editorEngine">编辑器引擎</label>
+                            <div class="radio-group" id="editorEngineGroup">
+                                <label><input type="radio" name="editorEngine" value="vditor"> <span data-i18n="editorEngineVditor">Vditor（默认）</span></label>
+                                <label><input type="radio" name="editorEngine" value="prosemirror"> <span data-i18n="editorEngineProseMirror">ProseMirror（实验）</span></label>
+                            </div>
+                            <div class="settings-inline-hint" data-i18n="settingsRequiresRefresh">需刷新后生效</div>
+                        </div>
+                    </li>
+                    <li class="settings-list-item">
+                        <div class="form-group">
                             <label data-i18n="defaultEditorMode">默认编辑器模式</label>
                             <div class="radio-group" id="defaultEditorMode">
                                 <label><input type="radio" name="editorMode" value="wysiwyg"> <span data-i18n="wysiwyg">所见即所得</span></label>

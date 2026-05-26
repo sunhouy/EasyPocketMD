@@ -82,6 +82,10 @@
             // 设置
             settings: '设置',
             defaultEditorMode: '默认编辑器模式',
+            editorEngine: '编辑器引擎',
+            editorEngineVditor: 'Vditor（默认）',
+            editorEngineProseMirror: 'ProseMirror（实验）',
+            proseMirrorNoEditorMode: '当前使用 ProseMirror 引擎，无需切换编辑器模式',
             wysiwyg: '所见即所得',
             instantRender: '即时渲染',
             splitPreview: '分屏预览',
@@ -903,6 +907,10 @@
             // Settings
             settings: 'Settings',
             defaultEditorMode: 'Default Editor Mode',
+            editorEngine: 'Editor Engine',
+            editorEngineVditor: 'Vditor (default)',
+            editorEngineProseMirror: 'ProseMirror (experimental)',
+            proseMirrorNoEditorMode: 'You are using the ProseMirror engine; editor modes do not apply.',
             wysiwyg: 'WYSIWYG',
             instantRender: 'Instant Render',
             splitPreview: 'Split Preview',
