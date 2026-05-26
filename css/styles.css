@@ -26,9 +26,9 @@ html {
 }
 
 body.night-mode {
-    --toolbar-surface-color: rgba(20, 24, 33, 0.96);
-    --toolbar-border-color: rgba(255, 255, 255, 0.08);
-    --toolbar-shadow-color: rgba(0, 0, 0, 0.35);
+    --toolbar-surface-color: #2d2d2d;
+    --toolbar-border-color: #444;
+    --toolbar-shadow-color: rgba(0, 0, 0, 0.2);
 }
 
 body {
@@ -3608,11 +3608,6 @@ body.night-mode .jstree-default a {
 }
 
 /* Night mode styles */
-body.night-mode .mobile-toolbar-container {
-    background: #2d2d2d;
-    border-bottom: 1px solid #444;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
-}
 
 body.night-mode .desktop-toolbar::-webkit-scrollbar-thumb {
     background: rgba(255, 255, 255, 0.25);
@@ -3628,8 +3623,8 @@ body.night-mode .desktop-toolbar-btn:hover {
 }
 
 body.night-mode.ui-mode-desktop .mobile-toolbar-container {
-    background: #202531;
-    border-bottom-color: #373f52;
+    background: var(--toolbar-surface-color);
+    border-bottom-color: var(--toolbar-border-color);
     box-shadow: none;
 }
 
@@ -3676,12 +3671,6 @@ body.night-mode .mobile-action-btn {
     background: rgba(45, 45, 45, 0.9);
     color: #fff;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-}
-
-body.night-mode .mobile-bottom-bar {
-    background: var(--toolbar-surface-color);
-    border-top: 1px solid var(--toolbar-border-color);
-    box-shadow: 0 -2px 10px var(--toolbar-shadow-color);
 }
 
 body.night-mode .bottom-btn {
@@ -5265,58 +5254,6 @@ body.night-mode .password-strength-bar {
 }
 
 /* User settings modal styles */
-.settings-section {
-    padding: 4px 0;
-}
-
-.settings-section-header {
-    padding: 8px 0;
-    cursor: default;
-}
-
-.settings-section-title {
-    font-size: 15px;
-    font-weight: 600;
-    margin: 0;
-    color: #333;
-}
-
-.settings-section .form-group {
-    margin-bottom: 12px;
-}
-
-.settings-section .form-group:last-of-type {
-    margin-bottom: 10px;
-}
-
-.settings-section .form-group label {
-    display: block;
-    margin-bottom: 6px;
-    font-size: 14px;
-}
-
-.settings-section .form-group input {
-    width: 100%;
-    box-sizing: border-box;
-    font-size: 14px;
-    padding: 8px 12px;
-}
-
-.settings-section .modal-actions {
-    margin-top: 4px;
-}
-
-.settings-section .modal-actions .modal-btn {
-    min-height: 38px;
-    font-size: 14px;
-}
-
-.settings-section-hint {
-    margin-bottom: 12px;
-    font-size: 13px;
-    line-height: 1.5;
-}
-
 /* Ensure user settings modal has proper size */
 .account-modal {
     width: min(90vw, 440px);
@@ -5524,7 +5461,27 @@ body.night-mode .account-switch-desc strong {
         width: 100%;
     }
 }
-.night-mode #tokenCountDetails { background: #2d2d2d \!important; border-color: rgba(255,255,255,0.1) \!important; }
-.night-mode #tokenCountDetails .token-model-label { color: #aaa \!important; }
-.night-mode #tokenCountDetails .token-model-value { color: #eee \!important; }
-\n.night-mode #wordCountChinese, .night-mode #wordCountLines, .night-mode #wordCountWords, .night-mode #wordCountTokens { color: #eee \!important; }
+body.night-mode #wordCountModalOverlay .word-count-modal,
+body.night-mode #wordCountModalOverlay .word-count-modal .modal-content,
+body.night-mode #wordCountModalOverlay .word-count-modal .word-count-options,
+body.night-mode #wordCountModalOverlay .word-count-modal #tokenCountDetails {
+    background: #000 !important;
+    color: #fff !important;
+}
+
+body.night-mode #wordCountModalOverlay .word-count-modal *,
+body.night-mode #wordCountModalOverlay .word-count-modal h2,
+body.night-mode #wordCountModalOverlay .word-count-modal label,
+body.night-mode #wordCountModalOverlay .word-count-modal span,
+body.night-mode #wordCountModalOverlay .word-count-modal strong,
+body.night-mode #wordCountModalOverlay .word-count-modal i {
+    color: #fff !important;
+}
+
+body.night-mode #wordCountModalOverlay .word-count-modal .modal-header {
+    border-bottom-color: #2a2a2a !important;
+}
+
+body.night-mode #wordCountModalOverlay .word-count-modal div {
+    border-color: #2a2a2a !important;
+}

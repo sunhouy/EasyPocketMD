@@ -3,7 +3,7 @@
     'use strict';
 
     var DAY_THEME_COLOR = '#f3f4f6';
-    var NIGHT_THEME_COLOR = '#0f172a';
+    var NIGHT_THEME_COLOR = '#2d2d2d';
 
     function g(name) { return global[name]; }
 
