@@ -6,6 +6,24 @@ function g(name) { return global[name]; }
 function isEn() { return window.i18n && window.i18n.getLanguage() === 'en'; }
 function t(key) { return window.i18n ? window.i18n.t(key) : key; }
 
+function documentHasLatex(content) {
+    if (!content) return false;
+    if (/\$\$[\s\S]+?\$\$/.test(content)) return true;
+    if (/(?<!\$)\$(?!\$)[^\n$]+\$(?!\$)/.test(content)) return true;
+    if (/\\\[[\s\S]*?\\\]/.test(content)) return true;
+    if (/\\\([\s\S]*?\\\)/.test(content)) return true;
+    return false;
+}
+
+function documentHasMermaid(content) {
+    if (!content) return false;
+    return /```mermaid\b/i.test(content);
+}
+
+function shouldHideLocalPdfConvert(content) {
+    return documentHasLatex(content) || documentHasMermaid(content);
+}
+
 // 懒加载 PDF 生成器
 async function getPDFGenerator() {
     if (!global.generatePDF) {
@@ -480,8 +498,9 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
             `;
         } else if (mode === 'export-pdf') {
             actionButtons = `
-                <div style="display:flex;gap:10px;margin-top:20px;">
-                    <button id="localConvertBtn" style="flex:1;padding:12px;font-weight:bold;background:#FF9800;color:white;border:none;border-radius:6px;cursor:pointer;">${isEn() ? 'Local Convert (Experimental)' : '本地转换（不支持公式）'}</button>
+                <div style="display:flex;gap:10px;margin-top:20px;flex-wrap:wrap;">
+                    <button id="exportPdfPreviewBtn" style="flex:1;padding:12px;font-weight:bold;background:#4CAF50;color:white;border:none;border-radius:6px;cursor:pointer;">${isEn() ? 'Preview' : '预览'}</button>
+                    <button id="localConvertBtn" style="flex:1;padding:12px;font-weight:bold;background:#FF9800;color:white;border:none;border-radius:6px;cursor:pointer;">${isEn() ? 'Local Convert (Experimental)' : '本地转换（不支持公式/图表）'}</button>
                     <button id="serverConvertBtn" style="flex:1;padding:12px;font-weight:bold;background:#2196F3;color:white;border:none;border-radius:6px;cursor:pointer;">${isEn() ? 'Server Convert' : '后端转换'}</button>
                 </div>
             `;
@@ -510,6 +529,14 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
         
         printModal.appendChild(modalContent);
         document.body.appendChild(printModal);
+
+        if (mode === 'export-pdf') {
+            var exportContent = g('vditor') ? g('vditor').getValue() : '';
+            var localConvertBtnEl = modalContent.querySelector('#localConvertBtn');
+            if (localConvertBtnEl && shouldHideLocalPdfConvert(exportContent)) {
+                localConvertBtnEl.style.display = 'none';
+            }
+        }
 
         // --- Event Listeners for New Settings ---
         
@@ -652,6 +679,18 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
                     await global.saveCurrentFile(true);
                 }
                 cleanup();
+                await showPrintPreview(getPrintSettings(modalContent));
+            }, 500);
+        }
+
+        var exportPdfPreviewBtn = modalContent.querySelector('#exportPdfPreviewBtn');
+        if (exportPdfPreviewBtn) {
+            exportPdfPreviewBtn.onclick = global.debounce(async function() {
+                if (typeof global.saveCurrentFile === 'function' && g('currentFileId')) {
+                    await global.saveCurrentFile(true);
+                }
+                if (typeof cleanup === 'function') cleanup();
+                printModal.remove();
                 await showPrintPreview(getPrintSettings(modalContent));
             }, 500);
         }
