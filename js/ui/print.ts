@@ -1646,14 +1646,30 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
         loadingText.style.cssText = 'font-size:16px;';
         loadingText.textContent = isEn() ? 'Generating PDF preview...' : '正在生成PDF预览...';
         
+        var isCancelled = false;
+        closeBtnLoading.onclick = function() {
+            isCancelled = true;
+            if (loadingModal) loadingModal.remove();
+        };
+
         loadingContent.appendChild(closeBtnLoading);
         loadingContent.appendChild(loadingIcon);
         loadingContent.appendChild(loadingText);
         loadingModal.appendChild(loadingContent);
         document.body.appendChild(loadingModal);
         
+        // Timeout protection logic
+        var timeoutReached = false;
+        var timeoutId = setTimeout(function() {
+            if (isCancelled) return;
+            timeoutReached = true;
+            loadingModal.remove();
+            g('customAlert')((isEn() ? 'Preview timeout ' : '预览超时（超过1分钟）'));
+        }, 65000);
+
         // 函数：显示预览页面
         var showPreview = async function() {
+            if (isCancelled || timeoutReached) return;
             if (!pdfUrl) return;
             
             loadingModal.remove();
@@ -1750,17 +1766,24 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
 
         try {
             var htmlContent = await preparePrintContent(content, settings);
+            if (isCancelled || timeoutReached) return;
+
             // 懒加载 PDF 生成器并生成PDF
             const { generatePDF } = await getPDFGenerator();
             pdfUrl = await generatePDF(htmlContent, settings);
+
+            if (isCancelled || timeoutReached) return;
+            clearTimeout(timeoutId);
 
             // PDF生成完成，直接显示预览
             showPreview();
 
         } catch (error) {
+            clearTimeout(timeoutId);
+            if (isCancelled || timeoutReached) return;
             console.error('预览错误:', error);
             loadingModal.remove();
-            g('customAlert')('预览失败: ' + error.message);
+            g('customAlert')((isEn() ? 'Preview failed: ' : '预览失败: ') + error.message);
         }
     }
 
@@ -1961,11 +1984,18 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
                 body: JSON.stringify({ content: content })
             });
             
-            var result = await response.json();
-            if (result.code === 200) {
+            var result = null;
+            try {
+                result = await response.json();
+            } catch (jsonErr) {
+                console.error('[Print Debug] Failed to parse JSON from markdown conversion:', jsonErr);
+                throw new Error('网络请求异常或服务器返回了非预期数据格式');
+            }
+
+            if (result && result.code === 200) {
                 htmlContent = result.data;
             } else {
-                console.error('[Print Debug] Markdown conversion failed:', result.message);
+                console.error('[Print Debug] Markdown conversion failed:', result ? result.message : 'Unknown error');
                 htmlContent = formatForPrint(content, settings);
             }
         } catch (e) {

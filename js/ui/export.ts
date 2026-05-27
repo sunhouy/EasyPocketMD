@@ -279,18 +279,46 @@ async function exportFile(content, ext) {
             try {
                 var loadingModal = document.createElement('div');
                 loadingModal.className = 'modal-overlay';
-                loadingModal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.9);z-index:10001;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;';
-                loadingModal.innerHTML = '<div style="background:white;color:#333;border-radius:12px;padding:30px;text-align:center;"><div style="font-size:24px;margin-bottom:15px;"><i class="fas fa-spinner fa-spin"></i></div><div style="font-size:16px;">' + (isEn() ? 'Generating PDF...' : '生成PDF中...') + '</div></div>';
+                loadingModal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.9);z-index:21000;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;';
+                
+                var isCancelled = false;
+                var timeoutReached = false;
+                var timeoutId = setTimeout(function() {
+                    if (isCancelled) return;
+                    timeoutReached = true;
+                    loadingModal.remove();
+                    g('customAlert')((isEn() ? 'Export timeout ' : '导出超时（超过1分钟）'));
+                }, 65000);
+
+                var loadingContent = document.createElement('div');
+                loadingContent.style.cssText = 'background:white;color:#333;border-radius:12px;padding:30px;text-align:center;position:relative;';
+                
+                var closeBtnLoading = document.createElement('button');
+                closeBtnLoading.innerHTML = '<i class="fas fa-times"></i>';
+                closeBtnLoading.style.cssText = 'position:absolute;top:10px;right:10px;background:none;border:none;color:#666;font-size:16px;cursor:pointer;padding:5px;';
+                closeBtnLoading.onclick = function() {
+                    isCancelled = true;
+                    if (loadingModal) loadingModal.remove();
+                };
+                
+                loadingContent.innerHTML = '<div style="font-size:24px;margin-bottom:15px;"><i class="fas fa-spinner fa-spin"></i></div><div style="font-size:16px;">' + (isEn() ? 'Generating PDF...' : '生成PDF中...') + '</div>';
+                loadingContent.appendChild(closeBtnLoading);
+                loadingModal.appendChild(loadingContent);
                 document.body.appendChild(loadingModal);
 
                 if (!global.preparePrintContent) {
                     throw new Error(isEn() ? 'Print module not loaded' : '打印模块未加载');
                 }
                 var htmlContent = await global.preparePrintContent(content, settings);
+                
+                if (isCancelled || timeoutReached) return;
 
                 // 懒加载 PDF 生成器并生成PDF
                 const { generatePDF } = await getPDFGenerator();
                 var pdfUrl = await generatePDF(htmlContent, settings);
+                
+                if (isCancelled || timeoutReached) return;
+                clearTimeout(timeoutId);
 
                 loadingModal.remove();
 
@@ -327,9 +355,11 @@ async function exportFile(content, ext) {
                     global.showMessage(isEn() ? 'Document exported as .pdf' : '文档已导出为.pdf格式');
                 });
             } catch (error) {
+                if (typeof timeoutId !== 'undefined') clearTimeout(timeoutId);
+                if (typeof isCancelled !== 'undefined' && (isCancelled || timeoutReached)) return;
                 console.error('PDF导出错误:', error);
-                global.showMessage((isEn() ? 'PDF export failed: ' : 'PDF导出失败: ') + error.message);
-                if (loadingModal) loadingModal.remove();
+                global.showMessage((isEn() ? 'PDF export failed: ' : 'PDF导出失败: ') + error.message, 'error');
+                if (typeof loadingModal !== 'undefined' && loadingModal) loadingModal.remove();
             }
         });
         return;

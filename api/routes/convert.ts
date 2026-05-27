@@ -254,7 +254,14 @@ router.post('/pdf', (req, res) => {
         writeStream = fs.createWriteStream(filePath);
         pdfStream = wkhtmltopdf(html, options);
         
+        let isTimeout = false;
+        let timeoutTimer = null;
+
         const cleanup = () => {
+            if (timeoutTimer) {
+                clearTimeout(timeoutTimer);
+                timeoutTimer = null;
+            }
             if (pdfStream) {
                 pdfStream.destroy();
                 pdfStream = null;
@@ -265,7 +272,24 @@ router.post('/pdf', (req, res) => {
             }
         };
 
+        // 1分钟超时控制
+        timeoutTimer = setTimeout(() => {
+            isTimeout = true;
+            console.error('[PDF Debug] PDF generation timeout (60s)');
+            cleanup();
+            if (!res.headersSent) {
+                res.status(500).json({
+                    code: 500,
+                    message: '导出PDF超时(超过1分钟)，请检查文档内容是否过大。'
+                });
+            }
+            if (fs.existsSync(filePath)) {
+                fs.unlink(filePath, () => {});
+            }
+        }, 60000);
+
         pdfStream.on('error', (err) => {
+            if (isTimeout) return;
             console.error('[PDF Debug] wkhtmltopdf command error:', err);
             cleanup();
             if (!res.headersSent) {
@@ -281,6 +305,7 @@ router.post('/pdf', (req, res) => {
         });
 
         writeStream.on('error', (err) => {
+            if (isTimeout) return;
             console.error('[PDF Debug] writeStream error:', err);
             cleanup();
             if (!res.headersSent) {
@@ -294,6 +319,8 @@ router.post('/pdf', (req, res) => {
 
         pdfStream.pipe(writeStream)
             .on('finish', () => {
+                if (isTimeout) return;
+                cleanup();
                 if (fs.existsSync(filePath)) {
                     const stats = fs.statSync(filePath);
                     if (stats.size > 0) {

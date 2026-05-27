@@ -392,7 +392,13 @@ export async function generatePDF(htmlContent, settings, filename) {
             })
         });
 
-        const result = await response.json();
+        let result;
+        try {
+            result = await response.json();
+        } catch (jsonErr) {
+            console.error('[PDF Debug] Failed to parse JSON from PDF generation:', jsonErr);
+            throw new Error('导出PDF超时或网络请求异常，请稍后重试');
+        }
 
         if (result.code === 200 && result.url) {
             return result.url;
