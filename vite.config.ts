@@ -85,6 +85,7 @@ function shouldCacheRequest(request) {
     url.pathname.startsWith('/screenshots/') ||
     url.pathname.startsWith('/avatars/') ||
     url.pathname.startsWith('/user_files/') ||
+    url.pathname.endsWith('/sw.js') ||
     url.pathname.endsWith('/sw.ts')
   ) {
     return false;
@@ -323,7 +324,7 @@ export default defineConfig({
       writeBundle(options, bundle) {
         const fs = require('fs');
         const path = require('path');
-        const swPath = path.join(options.dir || 'dist', 'sw.ts');
+        const swPath = path.join(options.dir || 'dist', 'sw.js');
         fs.writeFileSync(swPath, swContent);
       }
     }

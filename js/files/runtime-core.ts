@@ -131,6 +131,58 @@ import { installSyncRuntime } from './sync-runtime';
     let autoSaveDebounceTimer = null;
     let autoSaveForceTimer = null;
     let autoSaveInFlight = false;
+    let autoSaveScheduleToken = 0;
+    let restoreSyncScheduleToken = 0;
+
+    let pageCloseGuardsInstalled = false;
+    function installPageCloseGuards() {
+        if (pageCloseGuardsInstalled) return;
+        pageCloseGuardsInstalled = true;
+
+        function tryPersistDraft() {
+            try {
+                Promise.resolve(persistDraftBackup()).catch(function(error) {
+                    console.warn('[Autosave] draft backup failed:', error);
+                });
+            } catch (e) {}
+        }
+
+        function tryBeaconSync() {
+            try {
+                if (typeof syncCurrentFileWithBeacon === 'function') {
+                    syncCurrentFileWithBeacon();
+                }
+            } catch (e) {}
+        }
+
+        window.addEventListener('visibilitychange', function() {
+            if (document.visibilityState === 'hidden') {
+                tryPersistDraft();
+                tryBeaconSync();
+            }
+        });
+
+        // pagehide is more reliable than unload on mobile/Safari.
+        window.addEventListener('pagehide', function() {
+            tryPersistDraft();
+            tryBeaconSync();
+        });
+
+        // Show native prompt when there are unsaved changes.
+        window.addEventListener('beforeunload', function(e) {
+            try {
+                const currentFileId = g('currentFileId');
+                if (currentFileId && isCurrentFileDirty(currentFileId)) {
+                    tryPersistDraft();
+                    tryBeaconSync();
+                    e.preventDefault();
+                    e.returnValue = '';
+                    return '';
+                }
+            } catch (err) {}
+            return undefined;
+        });
+    }
 
 
     // ---------- 差异对比功能 ----------
@@ -2567,6 +2619,9 @@ import { installSyncRuntime } from './sync-runtime';
     async function openFile(fileId) {
         const requestToken = ++fileOpenRequestToken;
         setFileSwitchLoading(true);
+        if (typeof global.clearAutoSave === 'function') {
+            global.clearAutoSave();
+        }
 
         // 先保存当前文档
         if (typeof global.saveCurrentFile === 'function' && g('currentFileId')) {
@@ -2806,7 +2861,9 @@ import { installSyncRuntime } from './sync-runtime';
         const file = files[fileIndex];
         const contentChanged = content !== file.content;
         file.content = content;
-        file.lastModified = Date.now();
+        if (contentChanged) {
+            file.lastModified = Date.now();
+        }
         localStorage.setItem('vditor_files', JSON.stringify(files));
         if (isManual) {
             showSaveStatus('saving');
@@ -3307,11 +3364,14 @@ import { installSyncRuntime } from './sync-runtime';
         }
 
         global.clearAutoSave();
+        const scheduleToken = ++autoSaveScheduleToken;
         Promise.resolve(persistDraftBackup()).catch(function(error) {
             console.warn('[Autosave] draft backup failed:', error);
         });
 
         global.autoSaveTimer = setTimeout(function() {
+            if (scheduleToken !== autoSaveScheduleToken) return;
+            if (g('currentFileId') !== currentFileId) return;
             if (!isCurrentFileDirty(currentFileId) || autoSaveInFlight) return;
             autoSaveInFlight = true;
             Promise.resolve(global.saveCurrentFile(false)).catch(function(error) {
@@ -3322,6 +3382,8 @@ import { installSyncRuntime } from './sync-runtime';
         }, AUTO_SAVE_DEBOUNCE_MS);
 
         global.autoSaveForceTimer = setTimeout(function() {
+            if (scheduleToken !== autoSaveScheduleToken) return;
+            if (g('currentFileId') !== currentFileId) return;
             if (!isCurrentFileDirty(currentFileId) || autoSaveInFlight) return;
             autoSaveInFlight = true;
             Promise.resolve(global.saveCurrentFile(false)).catch(function(error) {
@@ -3484,20 +3546,37 @@ import { installSyncRuntime } from './sync-runtime';
             var files = g('files');
             var fileIndex = files.findIndex(function(f) { return f.id === fileId; });
             if (fileIndex === -1) throw new Error(isEn() ? 'File not found' : '文件不存在');
+            var prevContent = files[fileIndex].content;
             files[fileIndex].content = content;
-            files[fileIndex].lastModified = Date.now();
+            if (prevContent !== content) {
+                files[fileIndex].lastModified = Date.now();
+            }
             files[fileIndex].isSynced = g('currentUser') ? false : true;
             localStorage.setItem('vditor_files', JSON.stringify(files));
             if (g('currentFileId') === fileId) {
                 setEditorContentForFile(fileId, content);
                 global.showMessage((isEn() ? 'Restored to this version (Version ID: ' : '已恢复到此版本（版本ID: ') + versionId + '）', 'success');
                 g('unsavedChanges')[fileId] = true;
-                setTimeout(function() { global.saveCurrentFile(true); }, 1000);
+                if (typeof global.clearAutoSave === 'function') {
+                    global.clearAutoSave();
+                }
+                await Promise.resolve();
+                if (g('currentFileId') === fileId) {
+                    await global.saveCurrentFile(true);
+                }
             }
             var modal = document.getElementById('historyModalOverlay');
             if (modal) modal.classList.remove('show');
             loadFiles();
-            if (g('currentUser')) setTimeout(function() { global.syncFileToServer(fileId); }, 2000);
+            if (g('currentUser')) {
+                const scheduleToken = ++restoreSyncScheduleToken;
+                setTimeout(function() {
+                    if (scheduleToken !== restoreSyncScheduleToken) return;
+                    // Avoid syncing if user already moved away from this file.
+                    if (g('currentFileId') !== fileId) return;
+                    global.syncFileToServer(fileId);
+                }, 2000);
+            }
         } catch (error) {
             console.error('恢复失败', error);
             global.showMessage((isEn() ? 'Restore failed: ' : '恢复失败: ') + error.message, 'error');
@@ -5035,6 +5114,7 @@ import { installSyncRuntime } from './sync-runtime';
 
 
     // 导出函数到全局对象
+    installPageCloseGuards();
     global.loadFilesFromServer = loadFilesFromServer;
     global.loadLocalFiles = loadLocalFiles;
     global.loadFiles = loadFiles;

@@ -3,75 +3,161 @@ const router = express.Router();
 const db = require('../config/db');
 const redis = require('../config/redis');
 
-// 要监控的API端点列表
-const ENDPOINTS_TO_MONITOR = [
-    {
-        name: 'API Health',
-        url: '/api/health',
-        method: 'GET',
-        group: 'core'
-    },
-    {
-        name: 'Auth Login',
-        url: '/api/auth/login',
-        method: 'POST',
-        group: 'auth'
-    },
-    {
-        name: 'Auth Register',
-        url: '/api/auth/register',
-        method: 'POST',
-        group: 'auth'
-    },
-    {
-        name: 'Files List',
-        url: '/api/files',
-        method: 'GET',
-        group: 'files'
-    },
-    {
-        name: 'Files Content',
-        url: '/api/files/content',
-        method: 'GET',
-        group: 'files'
-    },
-    {
-        name: 'Share Get',
-        url: '/api/share/get',
-        method: 'POST',
-        group: 'share'
-    },
-    {
-        name: 'Convert Markdown',
-        url: '/api/convert/markdown',
-        method: 'POST',
-        group: 'convert'
-    },
-    {
-        name: 'Convert PDF',
-        url: '/api/convert/pdf',
-        method: 'POST',
-        group: 'convert'
-    },
-    {
-        name: 'Convert DOCX',
-        url: '/api/convert/docx',
-        method: 'POST',
-        group: 'convert'
-    },
-    {
-        name: 'AI Layout',
-        url: '/api/ai/layout',
-        method: 'POST',
-        group: 'ai'
-    },
-    {
-        name: 'User Files List',
-        url: '/api/user_files/list',
-        method: 'POST',
-        group: 'files'
+// 扫描后端路由，构建“要监控的 API 列表”
+// 说明：
+// - 这里用于“服务状态页”探测，一般不需要真实业务参数，因此会尽量发空 JSON。
+// - 对于需要 multipart 上传/导入/legacy index.php 这类，使用空 JSON 探测很容易造成 500 或副作用，所以做了过滤跳过。
+const authRoutes = require('./auth');
+const filesRoutes = require('./files');
+const userFilesRoutes = require('./user_files');
+const shareRoutes = require('./share');
+const adminRoutes = require('./admin');
+const externalApiRoutes = require('./api'); // mounted at /api/external AND /api
+const codeRunnerRoutes = require('./code-runner');
+const convertRoutes = require('./convert');
+const aiRoutes = require('./ai');
+const pptExportRoutes = require('./ppt-export');
+const pptStatusRoutes = require('./ppt-status');
+const pexelsRoutes = require('./pexels');
+const legacyRoutes = require('./legacy');
+
+function joinPaths(a, b) {
+    const left = String(a || '').replace(/\/+$/, '');
+    const right = String(b || '');
+    if (!right) return left;
+    if (right === '/') return left;
+    if (!right.startsWith('/')) return left + '/' + right;
+    return left + right;
+}
+
+function normalizeMethod(methodKey) {
+    // Express router.methods keys: get/post/put/delete/patch/all
+    if (!methodKey) return 'GET';
+    return methodKey.toUpperCase() === 'ALL' ? 'ALL' : methodKey.toUpperCase();
+}
+
+function shouldSkipEndpoint(fullUrl) {
+    const url = String(fullUrl || '');
+    if (url.includes(':')) return true; // route param
+    if (url.includes('*')) return true;
+
+    // multipart/upload/import/legacy index.php 都不适合用空 JSON 探测
+    const skipSubstrings = [
+        'index.php',
+        'upload_avatar',
+        'upload_screenshot',
+        '/import/',
+        '/files/import',
+        '/upload',
+        '/files/upload',
+    ];
+    return skipSubstrings.some(s => url.includes(s));
+}
+
+function collectRouterEndpoints(routerInstance, mountPath, group) {
+    const endpoints = [];
+    if (!routerInstance || !Array.isArray(routerInstance.stack)) return endpoints;
+
+    for (const layer of routerInstance.stack) {
+        if (!layer || !layer.route || !layer.route.path) continue;
+
+        const routePath = layer.route.path;
+        if (typeof routePath !== 'string') continue;
+        if (routePath.includes(':')) continue;
+
+        const methods = layer.route.methods || {};
+        for (const [methodKey, enabled] of Object.entries(methods)) {
+            if (!enabled) continue;
+            const method = normalizeMethod(methodKey);
+            const fullUrl = joinPaths(mountPath, routePath);
+            if (shouldSkipEndpoint(fullUrl)) continue;
+
+            const displayMethod = method === 'ALL' ? 'POST' : method;
+            const name = `${group} ${displayMethod} ${fullUrl}`;
+            endpoints.push({
+                name,
+                url: fullUrl,
+                method,
+                group
+            });
+        }
     }
-];
+
+    return endpoints;
+}
+
+function dedupeEndpoints(endpoints) {
+    const map = new Map();
+    for (const ep of endpoints) {
+        const key = `${ep.method} ${ep.url}`;
+        if (!map.has(key)) map.set(key, ep);
+    }
+    return Array.from(map.values());
+}
+
+function buildEndpointsToMonitor() {
+    const endpoints = [];
+
+    // 基础健康检查（server.ts 里直接挂的）
+    endpoints.push(
+        { name: 'core GET /api/health', url: '/api/health', method: 'GET', group: 'core' },
+        { name: 'core GET /api/health/redis', url: '/api/health/redis', method: 'GET', group: 'core' }
+    );
+
+    const sources = [
+        { mountPath: '/api/auth', routerInstance: authRoutes, group: 'auth' },
+        { mountPath: '/api/files', routerInstance: filesRoutes, group: 'files' },
+        { mountPath: '/api/user_files', routerInstance: userFilesRoutes, group: 'files' },
+        { mountPath: '/api/share', routerInstance: shareRoutes, group: 'share' },
+        { mountPath: '/api/admin', routerInstance: adminRoutes, group: 'admin' },
+        { mountPath: '/api/external', routerInstance: externalApiRoutes, group: 'external' },
+        { mountPath: '/api', routerInstance: externalApiRoutes, group: 'external' }, // compat mounts
+        { mountPath: '/api/code-runner', routerInstance: codeRunnerRoutes, group: 'code-runner' },
+        { mountPath: '/api/convert', routerInstance: convertRoutes, group: 'convert' },
+        { mountPath: '/api/ai', routerInstance: aiRoutes, group: 'ai' },
+        { mountPath: '/api/ppt-export', routerInstance: pptExportRoutes, group: 'ppt-export' },
+        { mountPath: '/api/ppt-status', routerInstance: pptStatusRoutes, group: 'ppt-status' },
+        { mountPath: '/api/pexels', routerInstance: pexelsRoutes, group: 'pexels' },
+        { mountPath: '/api', routerInstance: legacyRoutes, group: 'legacy' }, // 过滤后一般只剩很少
+    ];
+
+    for (const source of sources) {
+        endpoints.push(...collectRouterEndpoints(source.routerInstance, source.mountPath, source.group));
+    }
+
+    // 去重 + 简单排序（让 UI 更稳定）
+    const deduped = dedupeEndpoints(endpoints);
+    deduped.sort((a, b) => (a.group || '').localeCompare(b.group || '') || (a.url || '').localeCompare(b.url || ''));
+    return deduped;
+}
+
+const ENDPOINTS_TO_MONITOR = buildEndpointsToMonitor();
+
+function mapWithConcurrency(items, concurrency, mapper) {
+    const results = new Array(items.length);
+    let index = 0;
+
+    async function worker() {
+        while (true) {
+            const current = index++;
+            if (current >= items.length) break;
+            results[current] = await mapper(items[current]);
+        }
+    }
+
+    const workers = [];
+    const workerCount = Math.max(1, Math.min(concurrency, items.length));
+    for (let i = 0; i < workerCount; i++) workers.push(worker());
+    return Promise.all(workers).then(() => results);
+}
+
+let nodeFetchPromise = null;
+async function getNodeFetch() {
+    if (!nodeFetchPromise) {
+        nodeFetchPromise = import('node-fetch').then(mod => mod.default);
+    }
+    return nodeFetchPromise;
+}
 
 // 检测单个端点状态
 async function checkEndpointStatus(endpoint, baseUrl) {
@@ -79,49 +165,48 @@ async function checkEndpointStatus(endpoint, baseUrl) {
     const fullUrl = baseUrl + endpoint.url;
     
     try {
-        const fetch = (await import('node-fetch')).default;
-        
-        const options = {
-            method: endpoint.method,
+        const fetch = await getNodeFetch();
+
+        const method = endpoint.method === 'ALL' ? 'POST' : endpoint.method;
+        const timeoutMs = endpoint.timeoutMs || 10000;
+
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+        const options: any = {
+            method,
             headers: {
-                'Accept': 'application/json',
-                'Content-Type': 'application/json'
+                'Accept': 'application/json'
             },
-            timeout: 10000 // 10秒超时
+            signal: controller.signal
         };
 
-        // 对于POST请求，发送测试数据
-        if (endpoint.method === 'POST') {
-            let testBody = {};
-            
-            // 根据端点类型发送不同的测试数据
-            if (endpoint.url.includes('auth/login')) {
-                testBody = { username: 'test', password: 'test' };
-            } else if (endpoint.url.includes('auth/register')) {
-                testBody = { username: 'test', password: 'test' };
-            } else if (endpoint.url.includes('share')) {
-                testBody = { share_id: 'test' };
-            } else if (endpoint.url.includes('user_files')) {
-                testBody = { username: 'test', password: 'test' };
-            } else if (endpoint.url.includes('convert/docx')) {
-                testBody = { markdown: '# Test' };
-            } else if (endpoint.url.includes('convert')) {
-                testBody = { content: '# Test' };
-            } else if (endpoint.url.includes('ai')) {
-                testBody = { content: 'test' };
-            }
-            
-            options.body = JSON.stringify(testBody);
+        // 对于非 GET 请求，发送空 JSON
+        if (method !== 'GET') {
+            options.headers['Content-Type'] = 'application/json';
+            options.body = JSON.stringify(endpoint.testBody || {});
         }
 
         const response = await fetch(fullUrl, options);
+        clearTimeout(timeoutId);
         const responseTime = Date.now() - startTime;
-        
-        // 状态码判断
-        // 200-299: 正常
-        // 400, 401, 403: 服务正常（只是请求参数问题）
-        // 500+: 服务异常
-        const isHealthy = response.status < 500;
+
+        // 服务健康判断：
+        // - 优先看 HTTP status
+        // - 同时读取 JSON body 的 code（很多接口都是 res.json({code:...})，但 HTTP status 仍是 200）
+        let logicalCode = null;
+        let logicalMessage = null;
+        try {
+            const json = await response.clone().json();
+            if (json && typeof json.code === 'number') logicalCode = json.code;
+            if (json && typeof json.message === 'string') logicalMessage = json.message;
+            if (!logicalMessage && json && typeof json.error === 'string') logicalMessage = json.error;
+        } catch {
+            // 非 JSON 响应忽略
+        }
+
+        const statusCode = logicalCode ?? response.status;
+        const isHealthy = response.status < 500 && (logicalCode == null ? true : logicalCode < 500);
         const status = isHealthy ? 'healthy' : 'unhealthy';
         
         return {
@@ -130,8 +215,9 @@ async function checkEndpointStatus(endpoint, baseUrl) {
             method: endpoint.method,
             group: endpoint.group,
             status: status,
-            statusCode: response.status,
+            statusCode: statusCode,
             responseTime: responseTime,
+            error: isHealthy ? undefined : (logicalMessage || undefined),
             timestamp: new Date().toISOString()
         };
     } catch (error) {
@@ -237,23 +323,14 @@ router.get('/v1/endpoints/statuses', async (req, res) => {
         const protocol = req.headers['x-forwarded-proto'] || req.protocol;
         const host = req.headers.host;
         const baseUrl = `${protocol}://${host}`;
-        
-        // 并行检测所有端点
-        const endpointPromises = ENDPOINTS_TO_MONITOR.map(endpoint => 
-            checkEndpointStatus(endpoint, baseUrl)
-        );
-        
-        // 同时检测数据库和Redis
-        const dbPromise = checkDatabaseStatus();
-        const redisPromise = checkRedisStatus();
-        
-        // 等待所有检测完成
+
+        // 控制并发，避免状态页请求时把服务打爆
         const [endpointResults, dbResult, redisResult] = await Promise.all([
-            Promise.all(endpointPromises),
-            dbPromise,
-            redisPromise
+            mapWithConcurrency(ENDPOINTS_TO_MONITOR, 5, (endpoint) => checkEndpointStatus(endpoint, baseUrl)),
+            checkDatabaseStatus(),
+            checkRedisStatus()
         ]);
-        
+
         // 合并结果
         const allResults = [...endpointResults, dbResult, redisResult];
         
@@ -296,23 +373,14 @@ router.get('/status', async (req, res) => {
         const protocol = req.headers['x-forwarded-proto'] || req.protocol;
         const host = req.headers.host;
         const baseUrl = `${protocol}://${host}`;
-        
-        // 并行检测所有端点
-        const endpointPromises = ENDPOINTS_TO_MONITOR.map(endpoint => 
-            checkEndpointStatus(endpoint, baseUrl)
-        );
-        
-        // 同时检测数据库和Redis
-        const dbPromise = checkDatabaseStatus();
-        const redisPromise = checkRedisStatus();
-        
-        // 等待所有检测完成
+
+        // 控制并发，避免状态页请求时把服务打爆
         const [endpointResults, dbResult, redisResult] = await Promise.all([
-            Promise.all(endpointPromises),
-            dbPromise,
-            redisPromise
+            mapWithConcurrency(ENDPOINTS_TO_MONITOR, 5, (endpoint) => checkEndpointStatus(endpoint, baseUrl)),
+            checkDatabaseStatus(),
+            checkRedisStatus()
         ]);
-        
+
         // 合并结果
         const allResults = [...endpointResults, dbResult, redisResult];
         

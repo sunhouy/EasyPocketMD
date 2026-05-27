@@ -330,7 +330,6 @@ const std::vector<CommandItem>& commandCatalog() {
         items.push_back(makeCommand("serviceStatus", "more", 675, "服务状态", "Service Status", "查看服务运行状态", "View service health and status", "serviceStatus", "fas fa-signal", "", false, {"服务状态", "status", "health"}, {"status", "service"}));
         items.push_back(makeCommand("help", "more", 670, "帮助", "Help", "查看使用帮助", "Open the help panel", "help", "fas fa-circle-question", "", false, {"帮助", "关于", "help", "about"}, {"help", "docs", "about"}));
         items.push_back(makeCommand("searchFiles", "more", 665, "全文搜索", "Full-text Search", "在文件中进行全文搜索", "Search across files", "searchFiles", "fas fa-magnifying-glass", "", false, {"搜索文件", "全文搜索", "search files", "cross search"}, {"search", "files"}));
-        items.push_back(makeCommand("uncertainty", "more", 660, "不确定度计算器", "Uncertainty Calculator", "打开不确定度计算器", "Open the uncertainty calculator", "openUncertaintyCalculator", "fas fa-calculator", "", false, {"不确定度", "uncertainty", "calculator"}, {"calculator", "math"}));
 
         return items;
     }();

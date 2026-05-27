@@ -463,14 +463,10 @@ document.addEventListener('DOMContentLoaded', function() {
             console.error('Failed to initialize Vditor after file list ready:', error);
         });
     };
-    var TOOLBAR_EASTER_EGG_KEY = 'vditor_uncertainty_unlocked';
-    var toolbarEasterEggTapCount = 0;
-    var toolbarEasterEggLastTapAt = 0;
-    window.toolbarUncertaintyUnlocked = localStorage.getItem(TOOLBAR_EASTER_EGG_KEY) === 'true';
 
     function isToolbarButtonVisible(btnConfig) {
         if (!btnConfig) return false;
-        return !btnConfig.isEasterEgg || window.toolbarUncertaintyUnlocked;
+        return !btnConfig.isEasterEgg;
     }
 
     function getVisibleToolbarButtons() {
@@ -1146,30 +1142,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    function bindToolbarEasterEggTrigger() {
-        var title = document.querySelector('#settingsModalOverlay [data-i18n="bottomToolbarButtons"]');
-        if (!title || title.dataset.easterEggBound === '1') return;
-
-        title.dataset.easterEggBound = '1';
-        title.addEventListener('click', function() {
-            if (window.toolbarUncertaintyUnlocked) return;
-
-            var now = Date.now();
-            if (now - toolbarEasterEggLastTapAt > 1500) {
-                toolbarEasterEggTapCount = 0;
-            }
-            toolbarEasterEggLastTapAt = now;
-            toolbarEasterEggTapCount += 1;
-
-            if (toolbarEasterEggTapCount >= 5) {
-                window.toolbarUncertaintyUnlocked = true;
-                localStorage.setItem(TOOLBAR_EASTER_EGG_KEY, 'true');
-                toolbarEasterEggTapCount = 0;
-                renderToolbarButtonSettings();
-                window.showMessage(window.i18n ? window.i18n.t('uncertaintyEasterEggUnlocked') : '彩蛋已解锁：不确定度计算器按钮已显示', 'success');
-            }
-        });
-    }
 
     // 工具栏配置（使用翻译函数）
     window.allToolbarButtons = [
@@ -1191,12 +1163,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 await import('./ui/chart');
             }
             if (typeof window.showChartPicker === 'function') window.showChartPicker();
-        } },
-        { id: 'mobileUncertaintyBtn', icon: 'fas fa-calculator', textKey: 'uncertainty', isEasterEgg: true, fn: async function() {
-            if (typeof window.showUncertaintyCalculator !== 'function') {
-                await import('./uncertainty-calculator');
-            }
-            if (typeof window.showUncertaintyCalculator === 'function') window.showUncertaintyCalculator();
         } },
         { id: 'mobileUndoBtn', icon: 'fas fa-undo', textKey: 'undo', fn: function() { if (window.vditor && window.vditor.vditor && window.vditor.vditor.undo) window.vditor.vditor.undo.undo(window.vditor.vditor); } },
         { id: 'mobileRedoBtn', icon: 'fas fa-redo', textKey: 'redo', fn: function() { if (window.vditor && window.vditor.vditor && window.vditor.vditor.undo) window.vditor.vditor.undo.redo(window.vditor.vditor); } },
@@ -2088,15 +2054,6 @@ document.addEventListener('DOMContentLoaded', function() {
             closeDrop();
         });
 
-        var mobileUncertaintyBtn = document.getElementById('mobileUncertaintyBtn');
-        if (mobileUncertaintyBtn) mobileUncertaintyBtn.addEventListener('click', async function() {
-            if (typeof window.showUncertaintyCalculator !== 'function') {
-                await import('./uncertainty-calculator');
-            }
-            if (typeof window.showUncertaintyCalculator === 'function') window.showUncertaintyCalculator();
-            closeDrop();
-        });
-
         var mobileImportBtn = document.getElementById('mobileImportBtn');
         if (mobileImportBtn) mobileImportBtn.addEventListener('click', function() { window.importFiles(); closeDrop(); });
 
@@ -2437,13 +2394,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     await import('./ui/export');
                 }
                 window.exportContent();
-                closeDrop();
-            } },
-            { id: 'mobileUncertaintyBtn', fn: async function() {
-                if (typeof window.showUncertaintyCalculator !== 'function') {
-                    await import('./uncertainty-calculator');
-                }
-                if (typeof window.showUncertaintyCalculator === 'function') window.showUncertaintyCalculator();
                 closeDrop();
             } },
             { id: 'mobileVideoCallBtn', fn: function() {
