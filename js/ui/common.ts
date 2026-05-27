@@ -59,19 +59,14 @@
     }
 
     function insertTable() {
-        var tableMarkdown = '\n| 标题1 | 标题2 | 标题3 |\n|-------|-------|-------|\n| 内容1 | 内容2 | 内容3 |\n| 内容4 | 内容5 | 内容6 |\n\n\n';
-        try {
-            if (g('vditor')) {
-                g('vditor').insertValue(tableMarkdown);
-                global.showMessage(window.i18n ? window.i18n.t('tableInserted') : '表格已插入，可编辑表格内容');
-            }
-        } catch (e) {
-            console.error('插入表格错误', e);
-            if (global.showMessage) {
-                global.showMessage(window.i18n ? window.i18n.t('insertTableFailed') : '插入表格失败，请重试', 'error');
-            }
-        }
         hideMobileActionSheet();
+        if (typeof global.showInsertTableDialog === 'function') {
+            global.showInsertTableDialog();
+            return;
+        }
+        if (global.showMessage) {
+            global.showMessage(window.i18n ? window.i18n.t('insertTableFailed') : '插入表格失败，请重试', 'error');
+        }
     }
 
     function toggleNightMode() {
@@ -123,7 +118,7 @@
             { icon: '<i class="fas fa-bold"></i>', text: t('bold'), action: function() { insertText('**粗体文字**'); } },
             { icon: '<i class="fas fa-italic"></i>', text: t('italic'), action: function() { insertText('*斜体文字*'); } },
             { icon: '<i class="fas fa-strikethrough"></i>', text: t('strikethrough'), action: function() { insertText('~~删除线文字~~'); } },
-            { icon: '<i class="fas fa-code"></i>', text: t('codeBlock'), action: function() { insertText('```\n代码块\n```'); } },
+            { icon: '<i class="fas fa-code"></i>', text: t('codeBlock'), action: function() { hideMobileActionSheet(); if (typeof global.showInsertCodeBlockDialog === 'function') global.showInsertCodeBlockDialog(); } },
             { icon: '<i class="fas fa-quote-right"></i>', text: t('quote'), action: function() { insertText('> 引用文字'); } }
         ];
         showMobileActionSheet(t('selectFormat'), formatOptions);
@@ -132,10 +127,10 @@
     function showInsertMenu() {
         var t = function(key) { return window.i18n ? window.i18n.t(key) : key; };
         var insertOptions = [
-            { icon: '<i class="fas fa-link"></i>', text: t('link'), action: function() { insertText('[链接文字](https://)'); } },
+            { icon: '<i class="fas fa-link"></i>', text: t('link'), action: function() { hideMobileActionSheet(); if (typeof global.showInsertLinkDialog === 'function') global.showInsertLinkDialog(); } },
             { icon: '<i class="fas fa-image"></i>', text: t('uploadImage'), action: function() { if(global.triggerImageUpload) global.triggerImageUpload(); } },
             { icon: '<i class="fas fa-file-upload"></i>', text: t('uploadFile'), action: function() { if(global.triggerFileUpload) global.triggerFileUpload(); } },
-            { icon: '<i class="fas fa-globe"></i>', text: t('webImage'), action: function() { insertText('![图片描述](图片地址)'); } },
+            { icon: '<i class="fas fa-globe"></i>', text: t('webImage'), action: function() { hideMobileActionSheet(); if (typeof global.showInsertWebImageDialog === 'function') global.showInsertWebImageDialog(); } },
             { icon: '<i class="fas fa-table"></i>', text: t('table'), action: insertTable },
             { icon: '<i class="fas fa-list-ul"></i>', text: t('unorderedList'), action: function() { insertText('- 列表项'); } },
             { icon: '<i class="fas fa-list-ol"></i>', text: t('orderedList'), action: function() { insertText('1. 列表项'); } },

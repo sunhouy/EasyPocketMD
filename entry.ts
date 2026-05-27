@@ -30,6 +30,7 @@ import './js/appLifecycle';
 // UI Modules
 import './js/ui/dialog';
 import './js/ui/common';
+import './js/ui/insert-dialogs';
 import './js/ui/render';
 // 图表模块改为懒加载，不在首屏加载
 // import './js/ui/chart';
@@ -55,7 +56,7 @@ import './js/ui/file-manager';
 // import './js/formula-picker';
 import './js/ui/insert-picker';
 
-// 代码运行器模块改为懒加载，不在首屏加载
+// 代码运行器：轻量 loader 在编辑器就绪后加载，完整模块在用户悬停/点击代码块时加载
 // import './js/code-runner';
 
 import './js/main';

@@ -61,6 +61,7 @@ document.addEventListener('DOMContentLoaded', function() {
         '.modal-overlay',
         '.mobile-action-sheet-overlay',
         '.insert-picker-modal',
+        '.insert-dialog-modal',
         '.footnote-picker-modal',
         '.formula-picker-modal',
         '.chart-picker-modal',
@@ -1791,15 +1792,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 window.appLifecycle.init();
             }
 
-            // 懒加载代码运行器模块
-            import('./code-runner').then(function() {
-                console.log('Code runner module loaded successfully');
-                // 为现有代码块添加运行按钮
-                if (window.addRunButtons) {
-                    window.addRunButtons();
+            // 代码运行器按需懒加载（悬停/点击可运行代码块时再加载完整模块）
+            import('./code-runner-loader').then(function() {
+                if (typeof window.initCodeRunnerLazyLoad === 'function') {
+                    window.initCodeRunnerLazyLoad();
                 }
             }).catch(function(error) {
-                console.error('Failed to load code runner module:', error);
+                console.error('Failed to load code runner loader:', error);
             });
 
             // ECharts 懒加载：图表将在用户滚动到可见区域或点击时渲染
@@ -2430,14 +2429,10 @@ document.addEventListener('DOMContentLoaded', function() {
         bindVditorDirtyEvents();
         bindVditorEnterSoftBreak();
 
-        // 重新加载代码运行器模块，为新代码块添加运行按钮
-        import('./code-runner').then(function() {
-            if (window.addRunButtons) {
-                window.addRunButtons();
-            }
-        }).catch(function(error) {
-            console.error('Failed to reload code runner module:', error);
-        });
+        // 若代码运行器已加载，为新代码块刷新运行按钮
+        if (typeof window.addRunButtons === 'function') {
+            window.addRunButtons();
+        }
 
         initSlashCommandRuntime();
     }
@@ -3654,6 +3649,33 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    function getServiceStatusResponseMs(endpoint) {
+        var ms = endpoint.response_time != null ? endpoint.response_time : endpoint.responseTime;
+        if (typeof ms === 'number' && isFinite(ms) && ms >= 0) {
+            return Math.round(ms);
+        }
+        return null;
+    }
+
+    function formatServiceStatusLabel(status, endpoint) {
+        var label;
+        if (status === 'healthy') {
+            label = window.i18n ? window.i18n.t('statusHealthy') : '正常';
+        } else if (status === 'unhealthy') {
+            label = window.i18n ? window.i18n.t('statusUnhealthy') : '异常';
+        } else {
+            label = window.i18n ? window.i18n.t('statusUnknown') : '未知';
+        }
+
+        var ms = getServiceStatusResponseMs(endpoint);
+        if (ms != null) {
+            label += ' (' + ms + 'ms)';
+        } else if (status === 'unhealthy' && endpoint.status_code) {
+            label += ' (' + endpoint.status_code + ')';
+        }
+        return label;
+    }
+
     // 渲染服务状态
     function renderServiceStatus(data) {
         var listContainer = document.getElementById('serviceStatusList');
@@ -3667,9 +3689,9 @@ document.addEventListener('DOMContentLoaded', function() {
         var html = '<div class="service-status-grid">';
         data.forEach(function(endpoint) {
             var status = endpoint.status || 'unknown';
-            var statusClass = 'status-' + status.toLowerCase();
             var statusIcon = status === 'healthy' ? 'fa-check-circle' : (status === 'unhealthy' ? 'fa-times-circle' : 'fa-question-circle');
             var statusColor = status === 'healthy' ? '#28a745' : (status === 'unhealthy' ? '#dc3545' : '#ffc107');
+            var statusLabel = formatServiceStatusLabel(status, endpoint);
 
             html += '<div class="service-status-item" style="display:flex;align-items:center;padding:12px;border:1px solid #eee;border-radius:8px;margin-bottom:8px;background:#fff;">';
             html += '<div class="service-status-icon" style="margin-right:12px;font-size:20px;color:' + statusColor + ';"><i class="fas ' + statusIcon + '"></i></div>';
@@ -3677,7 +3699,7 @@ document.addEventListener('DOMContentLoaded', function() {
             html += '<div class="service-status-name" style="font-weight:500;font-size:14px;color:#333;">' + (endpoint.name || 'Unknown Service') + '</div>';
             html += '<div class="service-status-url" style="font-size:12px;color:#999;word-break:break-all;">' + (endpoint.url || '') + '</div>';
             html += '</div>';
-            html += '<div class="service-status-badge" style="padding:4px 8px;border-radius:4px;font-size:12px;font-weight:500;background:' + (status === 'healthy' ? '#d4edda' : (status === 'unhealthy' ? '#f8d7da' : '#fff3cd')) + ';color:' + statusColor + ';">' + (status === 'healthy' ? (window.i18n ? window.i18n.t('statusHealthy') : '正常') : (status === 'unhealthy' ? (window.i18n ? window.i18n.t('statusUnhealthy') : '异常') : (window.i18n ? window.i18n.t('statusUnknown') : '未知'))) + '</div>';
+            html += '<div class="service-status-badge" style="padding:4px 8px;border-radius:4px;font-size:12px;font-weight:500;background:' + (status === 'healthy' ? '#d4edda' : (status === 'unhealthy' ? '#f8d7da' : '#fff3cd')) + ';color:' + statusColor + ';">' + statusLabel + '</div>';
             html += '</div>';
         });
         html += '</div>';

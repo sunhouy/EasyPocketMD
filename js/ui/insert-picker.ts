@@ -16,15 +16,15 @@
         { id: 'bold', icon: 'fas fa-bold', name: isEn() ? 'Bold' : '粗体', category: 'format', keywords: ['bold', '粗体'], insert: '**粗体文字**' },
         { id: 'italic', icon: 'fas fa-italic', name: isEn() ? 'Italic' : '斜体', category: 'format', keywords: ['italic', '斜体'], insert: '*斜体文字*' },
         { id: 'strikethrough', icon: 'fas fa-strikethrough', name: isEn() ? 'Strikethrough' : '删除线', category: 'format', keywords: ['strikethrough', '删除线'], insert: '~~删除线文字~~' },
-        { id: 'code', icon: 'fas fa-code', name: isEn() ? 'Code Block' : '代码块', category: 'format', keywords: ['code', '代码'], insert: '```\n代码块\n```' },
+        { id: 'code', icon: 'fas fa-code', name: isEn() ? 'Code Block' : '代码块', category: 'format', keywords: ['code', '代码'], action: 'codeBlock' },
         { id: 'inlineCode', icon: 'fas fa-terminal', name: isEn() ? 'Inline Code' : '行内代码', category: 'format', keywords: ['inline', 'code', '行内代码'], insert: '`行内代码`' },
         { id: 'quote', icon: 'fas fa-quote-right', name: isEn() ? 'Quote' : '引用', category: 'format', keywords: ['quote', '引用'], insert: '> 引用文字' },
 
         // 插入类
-        { id: 'link', icon: 'fas fa-link', name: isEn() ? 'Link' : '链接', category: 'insert', keywords: ['link', '链接'], insert: '[链接文字](https://)' },
+        { id: 'link', icon: 'fas fa-link', name: isEn() ? 'Link' : '链接', category: 'insert', keywords: ['link', '链接'], action: 'link' },
         { id: 'image', icon: 'fas fa-image', name: isEn() ? 'Image' : '图片', category: 'insert', keywords: ['image', '图片'], action: 'uploadImage' },
         { id: 'file', icon: 'fas fa-file-upload', name: isEn() ? 'File' : '文件', category: 'insert', keywords: ['file', '文件'], action: 'uploadFile' },
-        { id: 'webImage', icon: 'fas fa-globe', name: isEn() ? 'Web Image' : '网络图片', category: 'insert', keywords: ['web', 'image', '网络图片'], insert: '![图片描述](图片地址)' },
+        { id: 'webImage', icon: 'fas fa-globe', name: isEn() ? 'Web Image' : '网络图片', category: 'insert', keywords: ['web', 'image', '网络图片'], action: 'webImage' },
         { id: 'table', icon: 'fas fa-table', name: isEn() ? 'Table' : '表格', category: 'insert', keywords: ['table', '表格'], action: 'table' },
         { id: 'ul', icon: 'fas fa-list-ul', name: isEn() ? 'Unordered List' : '无序列表', category: 'insert', keywords: ['list', 'ul', '无序列表'], insert: '- 列表项' },
         { id: 'ol', icon: 'fas fa-list-ol', name: isEn() ? 'Ordered List' : '有序列表', category: 'insert', keywords: ['list', 'ol', '有序列表'], insert: '1. 列表项' },
@@ -59,19 +59,14 @@
     }
 
     function insertTable() {
-        var tableMarkdown = '\n| 标题1 | 标题2 | 标题3 |\n|-------|-------|-------|\n| 内容1 | 内容2 | 内容3 |\n| 内容4 | 内容5 | 内容6 |\n\n';
-        try {
-            if (g('vditor')) {
-                g('vditor').insertValue(tableMarkdown);
-                global.showMessage(isEn() ? 'Table inserted' : '表格已插入');
-            }
-        } catch (e) {
-            console.error('插入表格错误', e);
-            if (global.showMessage) {
-                global.showMessage(isEn() ? 'Insert table failed' : '插入表格失败', 'error');
-            }
-        }
         closeInsertPicker();
+        if (typeof global.showInsertTableDialog === 'function') {
+            global.showInsertTableDialog();
+            return;
+        }
+        if (global.showMessage) {
+            global.showMessage(isEn() ? 'Insert table failed' : '插入表格失败', 'error');
+        }
     }
 
     function handleItemClick(item) {
@@ -87,6 +82,18 @@
                     break;
                 case 'table':
                     insertTable();
+                    break;
+                case 'codeBlock':
+                    closeInsertPicker();
+                    if (typeof global.showInsertCodeBlockDialog === 'function') global.showInsertCodeBlockDialog();
+                    break;
+                case 'link':
+                    closeInsertPicker();
+                    if (typeof global.showInsertLinkDialog === 'function') global.showInsertLinkDialog();
+                    break;
+                case 'webImage':
+                    closeInsertPicker();
+                    if (typeof global.showInsertWebImageDialog === 'function') global.showInsertWebImageDialog();
                     break;
                 case 'emoji':
                     closeInsertPicker();

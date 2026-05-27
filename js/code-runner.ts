@@ -558,9 +558,6 @@ fm.fontManager = ForcedFontManager()
         subtree: true
     });
 
-    // 初始加载时添加运行按钮
-    window.addEventListener('DOMContentLoaded', addRunButtons);
-
     // 暴露到全局
     global.CodeRunner = CodeRunner;
     global.codeRunner = codeRunner;
