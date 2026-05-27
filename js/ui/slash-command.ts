@@ -532,6 +532,42 @@ async function runAction(action) {
         case 'uploadFile':
             return activateUploadInput();
 
+        case 'insertCodeBlock':
+        case 'codeBlock':
+            if (typeof window.showInsertCodeBlockDialog === 'function') {
+                window.showInsertCodeBlockDialog();
+                return true;
+            }
+            return false;
+
+        case 'insertLink':
+        case 'link':
+            if (typeof window.showInsertLinkDialog === 'function') {
+                window.showInsertLinkDialog();
+                return true;
+            }
+            return false;
+
+        case 'insertWebImage':
+        case 'webImage':
+            if (typeof window.showInsertWebImageDialog === 'function') {
+                window.showInsertWebImageDialog();
+                return true;
+            }
+            return false;
+
+        case 'insertTable':
+        case 'table':
+            if (typeof window.showInsertTableDialog === 'function') {
+                window.showInsertTableDialog();
+                return true;
+            }
+            if (typeof window.insertTable === 'function') {
+                window.insertTable();
+                return true;
+            }
+            return false;
+
         case 'saveCurrentFile':
             if (typeof window.saveCurrentFile === 'function') {
                 await window.saveCurrentFile(true);

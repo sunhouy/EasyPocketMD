@@ -119,9 +119,8 @@ export function getBuiltinSlashEntries() {
             titleEn: 'Web Image',
             descriptionZh: '插入网络图片链接',
             descriptionEn: 'Insert web image URL',
-            action: '',
+            action: 'insertWebImage',
             icon: 'fas fa-globe',
-            insertText: '![图片描述](图片地址)',
             keywords: ['网络图片', 'web', 'image', 'url', '链接'],
             aliases: ['网络图片', 'web image']
         },
@@ -131,9 +130,8 @@ export function getBuiltinSlashEntries() {
             titleEn: 'Link',
             descriptionZh: '插入超链接',
             descriptionEn: 'Insert hyperlink',
-            action: '',
+            action: 'insertLink',
             icon: 'fas fa-link',
-            insertText: '[链接文字](https://)',
             keywords: ['链接', 'link', '超链接'],
             aliases: ['链接', 'link']
         },
@@ -143,7 +141,7 @@ export function getBuiltinSlashEntries() {
             titleEn: 'Table',
             descriptionZh: '插入表格',
             descriptionEn: 'Insert table',
-            action: 'table',
+            action: 'insertTable',
             icon: 'fas fa-table',
             keywords: ['表格', 'table'],
             aliases: ['表格', 'table']
