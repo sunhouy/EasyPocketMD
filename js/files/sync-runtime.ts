@@ -358,7 +358,7 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
     function getNextAvailableName(baseName, parentPath) {
         const files = g('files');
         let candidateName = baseName;
-        let counter = 2;
+        let counter = 1;
 
         while (true) {
             const fullPath = parentPath ? parentPath + '/' + candidateName : candidateName;
