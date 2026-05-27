@@ -3,6 +3,15 @@
 
     function g(name) { return global[name]; }
 
+    function t(key, zhFallback, enFallback) {
+        if (global.i18n && typeof global.i18n.t === 'function') {
+            var value = global.i18n.t(key);
+            if (value && value !== key) return value;
+        }
+        var isEn = global.i18n && global.i18n.getLanguage && global.i18n.getLanguage() === 'en';
+        return isEn ? (enFallback || zhFallback) : zhFallback;
+    }
+
     var SUPPORTED_LANGUAGES = new Set(['python', 'py', 'javascript', 'js', 'typescript', 'ts', 'html', 'htm', 'c', 'cpp', 'c++']);
     var PYODIDE_VERSION = '0.25.1';
     var PYODIDE_CDN_BASES = [
@@ -406,7 +415,7 @@ fm.fontManager = ForcedFontManager()
 
         var button = document.createElement('button');
         button.className = 'code-run-button';
-        button.innerHTML = '<i class="fas fa-play"></i> Run';
+        button.innerHTML = '<i class="fas fa-play"></i> ' + t('codeRun', '运行', 'Run');
         button.style.cssText = [
             'position: fixed',
             'display: none',
@@ -445,7 +454,7 @@ fm.fontManager = ForcedFontManager()
 
         var outputHeader = document.createElement('div');
         outputHeader.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;font-family:inherit;font-size:12px;color:#5b6573;';
-        outputHeader.textContent = 'Run Output';
+        outputHeader.textContent = t('codeRunOutput', '运行输出', 'Run Output');
         var closeBtn = document.createElement('button');
         closeBtn.textContent = 'x';
         closeBtn.style.cssText = 'border:none;background:transparent;cursor:pointer;color:#5b6573;font-size:13px;line-height:1;';
@@ -472,7 +481,7 @@ fm.fontManager = ForcedFontManager()
             if (!runnerUiState.activeCodeBlock) return;
             var language = getLanguageFromCodeBlock(runnerUiState.activeCodeBlock);
             var code = runnerUiState.activeCodeBlock.textContent || '';
-            renderOutput({ success: true, output: 'Running...' });
+            renderOutput({ success: true, output: t('codeRunning', '运行中...', 'Running...') });
             var result = await codeRunner.runCode(language, code);
             renderOutput(result);
             scheduleButtonRefresh();

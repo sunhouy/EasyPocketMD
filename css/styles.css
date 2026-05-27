@@ -781,6 +781,30 @@ body.mobile-fullscreen .mobile-bottom-bar {
     display: none !important;
 }
 
+/* Mobile web: bottom bar stays visible; top bar can slide away while scrolling down */
+body.mobile-web-chrome.ui-mode-mobile.mobile-fullscreen .mobile-bottom-bar {
+    display: block !important;
+}
+
+body.mobile-web-chrome.ui-mode-mobile .mobile-toolbar-container {
+    transition: transform 0.25s ease, opacity 0.25s ease;
+    will-change: transform;
+}
+
+body.mobile-web-chrome.ui-mode-mobile .editor-container {
+    transition: top 0.25s ease;
+}
+
+body.mobile-web-chrome.ui-mode-mobile.mobile-top-toolbar-hidden .mobile-toolbar-container {
+    transform: translateY(calc(-100% - var(--top-toolbar-offset, 0px)));
+    opacity: 0;
+    pointer-events: none;
+}
+
+body.mobile-web-chrome.ui-mode-mobile.mobile-top-toolbar-hidden .editor-container {
+    top: var(--top-toolbar-offset);
+}
+
 body.mobile-keyboard-visible.hide-mobile-bottom-toolbar-on-keyboard .mobile-bottom-bar {
     display: none !important;
 }

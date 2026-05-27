@@ -596,7 +596,7 @@
         previewContainer.style.cssText = 'margin-bottom: 20px; padding: 15px; background: ' + (nightMode ? '#1a1a1a' : '#f5f5f5') + '; border-radius: 8px;';
 
         var previewLabel = document.createElement('div');
-        previewLabel.textContent = t('preview');
+        previewLabel.textContent = t('chartPreview');
         previewLabel.style.cssText = 'font-size: 12px; color: ' + (nightMode ? '#888' : '#666') + '; margin-bottom: 8px;';
         previewContainer.appendChild(previewLabel);
 
