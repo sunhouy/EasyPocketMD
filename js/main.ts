@@ -158,7 +158,7 @@ document.addEventListener('DOMContentLoaded', function() {
         var fullHeight = 'calc(100vh - var(--safe-area-top, 0px) - 20px)';
         modal.style.setProperty('max-height', fullHeight, 'important');
 
-        if (modal.classList.contains('conflict-modal') || modal.classList.contains('diff-modal') || modal.classList.contains('history-modal')) {
+        if (modal.classList.contains('diff-modal') || modal.classList.contains('history-modal')) {
             modal.style.setProperty('height', 'calc(100vh - var(--safe-area-top, 0px))', 'important');
         }
     }
@@ -1357,8 +1357,6 @@ document.addEventListener('DOMContentLoaded', function() {
     applyInterfaceMode(window.userSettings);
     bindMobileViewportState();
 
-    bindToolbarEasterEggTrigger();
-
     // 初始化主题
     initTheme();
 
@@ -1535,6 +1533,131 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    var VDITOR_ZWSP = '\u200b';
+    var VDITOR_INLINE_SOFT_BREAK_TAGS = ['STRONG', 'STRIKE', 'S', 'I', 'EM', 'B'];
+    var vditorSupportsBeforeInput = (function() {
+        try {
+            return typeof InputEvent !== 'undefined' && 'onbeforeinput' in document.createElement('div');
+        } catch (_) {
+            return false;
+        }
+    })();
+
+    function shouldSkipVditorSoftBreak(target) {
+        if (!target || target.nodeType !== 1) return false;
+        // 列表、引用、代码块、标题、表格、任务列表、代码渲染块保持 Vditor 默认回车
+        if (target.closest('li, blockquote, table, .vditor-task, .vditor-wysiwyg__block, .vditor-ir__marker--pre')) {
+            return true;
+        }
+        // 仅跳过「代码块」内的 pre/code，不要误伤 wysiwyg/ir 外层编辑 pre
+        var codeEl = target.closest('pre[data-type], pre.vditor-ir__marker--pre, .vditor-wysiwyg__block pre, code');
+        if (codeEl && !codeEl.classList.contains('vditor-reset')) {
+            return true;
+        }
+        return !!target.closest('h1, h2, h3, h4, h5, h6');
+    }
+
+    function getVditorEditContext() {
+        if (!window.vditor || !window.vditor.vditor) return null;
+        var internal = window.vditor.vditor;
+        var mode = internal.currentMode || internal.mode;
+        if (mode !== 'wysiwyg' && mode !== 'ir') return null;
+        var modeState = mode === 'wysiwyg' ? internal.wysiwyg : internal.ir;
+        if (!modeState || !modeState.element) return null;
+        return { internal: internal, mode: mode, modeState: modeState };
+    }
+
+    function applyVditorEnterSoftBreak() {
+        var ctx = getVditorEditContext();
+        if (!ctx) return false;
+        var sel = window.getSelection ? window.getSelection() : null;
+        if (!sel || sel.rangeCount === 0) return false;
+        var range = sel.getRangeAt(0);
+        var node = range.startContainer;
+        var el = node.nodeType === 1 ? node : node.parentElement;
+        if (shouldSkipVditorSoftBreak(el)) return false;
+
+        var parent = node.nodeType === 3 ? node.parentElement : (node as Element);
+        var breakText = (parent && VDITOR_INLINE_SOFT_BREAK_TAGS.indexOf(parent.tagName) >= 0)
+            ? '\n' + VDITOR_ZWSP
+            : '\n' + VDITOR_ZWSP;
+        var textNode = document.createTextNode(breakText);
+
+        if (ctx.mode === 'wysiwyg') {
+            // 须在插入前设置，避免 insertNode 触发的 input 被 SpinVditorDOM 合并成新段落
+            ctx.modeState.preventInput = true;
+        }
+        range.insertNode(textNode);
+        range.setStart(textNode, breakText.length);
+        range.collapse(true);
+        sel.removeAllRanges();
+        sel.addRange(range);
+
+        if (ctx.mode === 'wysiwyg') {
+            // insertNode 通常会同步触发 input；若未触发则手动同步
+            if (ctx.modeState.preventInput && typeof ctx.modeState.afterRenderEvent === 'function') {
+                ctx.modeState.preventInput = false;
+                try {
+                    ctx.modeState.afterRenderEvent({ enableAddUndoStack: true, enableHint: false, enableInput: true });
+                } catch (_) { /* noop */ }
+            }
+        } else if (ctx.mode === 'ir') {
+            try {
+                ctx.modeState.element.dispatchEvent(new InputEvent('input', {
+                    bubbles: true,
+                    cancelable: true,
+                    inputType: 'insertText',
+                    data: '\n',
+                }));
+            } catch (_) { /* noop */ }
+        }
+        return true;
+    }
+
+    function handleVditorBeforeInputSoftBreak(e) {
+        var inputEvent = e as InputEvent;
+        if (inputEvent.inputType !== 'insertParagraph' && inputEvent.inputType !== 'insertLineBreak') return;
+        if (inputEvent.isComposing) return;
+        if (inputEvent.defaultPrevented) return;
+        var ctx = getVditorEditContext();
+        if (!ctx) return;
+        var sel = window.getSelection ? window.getSelection() : null;
+        if (!sel || sel.rangeCount === 0) return;
+        var node = sel.getRangeAt(0).startContainer;
+        var el = node.nodeType === 1 ? node : node.parentElement;
+        if (shouldSkipVditorSoftBreak(el)) return;
+        inputEvent.preventDefault();
+        inputEvent.stopPropagation();
+        applyVditorEnterSoftBreak();
+    }
+
+    function handleVditorEnterSoftBreak(e) {
+        if (e.key !== 'Enter' || e.shiftKey || e.ctrlKey || e.metaKey || e.altKey || e.isComposing) return;
+        if (e.defaultPrevented) return;
+        if (vditorSupportsBeforeInput) return;
+        var sel = window.getSelection ? window.getSelection() : null;
+        if (!sel || sel.rangeCount === 0) return;
+        var node = sel.getRangeAt(0).startContainer;
+        var el = node.nodeType === 1 ? node : node.parentElement;
+        if (shouldSkipVditorSoftBreak(el)) return;
+        e.preventDefault();
+        applyVditorEnterSoftBreak();
+    }
+
+    function bindVditorEnterSoftBreak() {
+        if (!window.vditor || !window.vditor.vditor) return;
+        var internal = window.vditor.vditor;
+        [internal.wysiwyg, internal.ir].forEach(function(modeState) {
+            var element = modeState && modeState.element;
+            if (!element || element.__easypocketmdEnterSoftBreakBound) return;
+            element.__easypocketmdEnterSoftBreakBound = true;
+            // capture: 在浏览器 insertParagraph 之前拦截
+            element.addEventListener('beforeinput', handleVditorBeforeInputSoftBreak, true);
+            // keydown 兜底（部分环境 beforeinput 不完整）
+            element.addEventListener('keydown', handleVditorEnterSoftBreak, false);
+        });
+    }
+
     var editorConfig = {
         height: '100%',
         width: '100%',
@@ -1661,39 +1784,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 window.vditor.vditor.sv.element.addEventListener('paste', handlePasteEvent, true);
             }
 
-            // 在所见即所得 / 即时渲染模式下，回车默认会产生新段落（markdown 中表现为多一行空行）。
-            // 这里将普通回车转换为软换行（<br> / Shift+Enter 行为），避免多余的空行。
-            function shouldSkipSoftBreak(target) {
-                if (!target || target.nodeType !== 1) return false;
-                // 在以下结构内保持默认回车行为：列表、引用、代码块、标题、表格、任务列表
-                return !!target.closest('li, blockquote, pre, code, h1, h2, h3, h4, h5, h6, table, .vditor-task');
-            }
-            function handleEnterToSoftBreak(e) {
-                if (e.key !== 'Enter' || e.shiftKey || e.ctrlKey || e.metaKey || e.altKey || e.isComposing) return;
-                var sel = window.getSelection ? window.getSelection() : null;
-                if (!sel || sel.rangeCount === 0) return;
-                var range = sel.getRangeAt(0);
-                var node = range.startContainer;
-                var el = node.nodeType === 1 ? node : node.parentElement;
-                if (shouldSkipSoftBreak(el)) return;
-                e.preventDefault();
-                e.stopPropagation();
-                document.execCommand('insertLineBreak');
-                if (window.vditor && typeof window.vditor.tip === 'undefined') { /* noop */ }
-                if (window.vditor && window.vditor.vditor) {
-                    var ed = window.vditor.vditor;
-                    var modeObj = ed.mode === 'wysiwyg' ? ed.wysiwyg : (ed.mode === 'ir' ? ed.ir : null);
-                    if (modeObj && typeof modeObj.afterRenderEvent === 'function') {
-                        try { modeObj.afterRenderEvent({ enableAddUndoStack: true, enableHint: false, enableInput: true }); } catch (_) {}
-                    }
-                }
-            }
-            if (window.vditor && window.vditor.vditor && window.vditor.vditor.wysiwyg) {
-                window.vditor.vditor.wysiwyg.element.addEventListener('keydown', handleEnterToSoftBreak, true);
-            }
-            if (window.vditor && window.vditor.vditor && window.vditor.vditor.ir) {
-                window.vditor.vditor.ir.element.addEventListener('keydown', handleEnterToSoftBreak, true);
-            }
+            bindVditorEnterSoftBreak();
 
             // 初始化应用生命周期管理（草稿恢复等）
             if (window.appLifecycle) {
@@ -2337,6 +2428,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function reinitEditorEvents() {
         bindVditorDirtyEvents();
+        bindVditorEnterSoftBreak();
 
         // 重新加载代码运行器模块，为新代码块添加运行按钮
         import('./code-runner').then(function() {

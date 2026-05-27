@@ -620,11 +620,12 @@ jobs:
 
           LINK_PATH="/www/wwwroot/js_dev"
           if [ -L "$LINK_PATH" ]; then
-            CURRENT_TARGET=$(readlink -f "$LINK_PATH")
-            cd "$CURRENT_TARGET/print"
+            PRINT_DIR="$(readlink -f "$LINK_PATH")/print"
           else
-            cd "/www/wwwroot/js_dev_green/print"
+            PRINT_DIR="/www/wwwroot/js_dev_green/print"
           fi
+          echo "打印服务目录: $PRINT_DIR"
+          cd "$PRINT_DIR"
 
           # 检查 Python
           if command -v python3 &> /dev/null; then
@@ -665,16 +666,20 @@ jobs:
           # 获取虚拟环境中的 Python 解释器路径
           VENV_PYTHON="$(pwd)/.venv/bin/python"
 
-          # 零停机重启打印服务器
-          echo "零停机重启打印服务器..."
+          # pm2 reload 不会更新 cwd；delete 后按当前活动槽位重建
+          echo "重启打印服务器（绑定到当前活动槽位）..."
           if "$PM2_BIN" describe print-server-dev > /dev/null 2>&1; then
-            "$PM2_BIN" reload print-server-dev --update-env
-          else
-            "$PM2_BIN" start print_server.py --name "print-server-dev" --interpreter "$VENV_PYTHON" -- --host 0.0.0.0 --port 3061
+            "$PM2_BIN" delete print-server-dev
           fi
+          "$PM2_BIN" start print_server.py \
+            --name "print-server-dev" \
+            --cwd "$PRINT_DIR" \
+            --interpreter "$VENV_PYTHON" \
+            -- \
+            --host 0.0.0.0 --port 3061
 
           "$PM2_BIN" save
-          echo "✓ 打印服务器热更新完成！"
+          echo "✓ 打印服务器已切换到 $PRINT_DIR"
 
     - name: Final cleanup
       uses: appleboy/ssh-action@master

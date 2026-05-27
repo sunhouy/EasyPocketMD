@@ -606,12 +606,8 @@
             syncFailedUseLocal: '同步失败，使用本地文件',
             detectingLocalNewFiles: '检测到本地新文件，正在自动上传 {count} 个...',
             fileDeletedOnServer: '该文件在服务器上已经删除',
-            localModifiedTime: '本地修改时间',
-            serverModifiedTime: '服务器修改时间',
             reuploadToServer: '重新上传到服务器',
             deleteLocalFile: '删除本地文件',
-            useLocalVersion: '使用本地版本',
-            useServerVersion: '使用服务器版本',
 
             // AI助手
             aiAssistant: 'AI助手',
@@ -1427,12 +1423,8 @@
             syncFailedUseLocal: '同步失败，使用本地文件',
             detectingLocalNewFiles: '检测到本地新文件，正在自动上传 {count} 个...',
             fileDeletedOnServer: 'This file has been deleted on the server',
-            localModifiedTime: 'Local modified time',
-            serverModifiedTime: 'Server modified time',
             reuploadToServer: 'Re-upload to server',
             deleteLocalFile: 'Delete local file',
-            useLocalVersion: 'Use local version',
-            useServerVersion: 'Use server version',
 
             // AI Assistant
             aiAssistant: 'AI Assistant',

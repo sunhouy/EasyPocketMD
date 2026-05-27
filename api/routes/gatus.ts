@@ -317,7 +317,7 @@ async function checkRedisStatus() {
 }
 
 // Gatus兼容的端点状态接口
-router.get('/v1/endpoints/statuses', async (req, res) => {
+router.get('/endpoints/statuses', async (req, res) => {
     try {
         // 获取基础URL
         const protocol = req.headers['x-forwarded-proto'] || req.protocol;

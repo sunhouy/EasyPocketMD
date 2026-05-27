@@ -491,11 +491,11 @@ class PrintClient:
                         # 为了在同步代码中调用异步 websocket.send，我们需要一个特殊的处理
                         
                         def sync_status_callback(msg):
-                            # 使用 asyncio.get_event_loop().create_task 在异步循环中执行发送
                             try:
-                                loop = asyncio.get_event_loop()
-                                if loop.is_running():
-                                    loop.create_task(send_status(msg))
+                                loop = asyncio.get_running_loop()
+                                loop.create_task(send_status(msg))
+                            except RuntimeError:
+                                pass
                             except Exception as e:
                                 self._log(f"发送状态更新失败: {e}")
 
@@ -586,12 +586,12 @@ class PrintClient:
 
     async def input_listener(self):
         """监听用户输入，允许在运行中修改配置或退出"""
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         while True:
             # 确保监听任务存在且正在运行
             if self.listen_task is None or self.listen_task.done():
                 # 如果任务已结束，重新创建
-                self.listen_task = asyncio.ensure_future(self.connect_and_listen())
+                self.listen_task = asyncio.create_task(self.connect_and_listen())
 
             # 创建输入监听future
             input_future = loop.run_in_executor(None, input, "\n按回车键修改配置，或输入 quit 退出: ")
@@ -729,8 +729,7 @@ async def main():
 
 if __name__ == "__main__":
     try:
-        loop = asyncio.get_event_loop()
-        loop.run_until_complete(main())
+        asyncio.run(main())
     except KeyboardInterrupt:
         print("\n程序已终止")
     except Exception as e:
