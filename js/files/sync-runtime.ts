@@ -937,6 +937,11 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
                 });
                 syncCurrentEditorSnapshotIntoFiles(localFiles);
 
+                // Server list is the source of truth for previously-synced files:
+                // if a file existed on server before (local isSynced=true) but is missing from serverFiles now,
+                // it should be deleted locally on load (instead of being re-uploaded).
+                pruneLocallySyncedFilesDeletedOnServer(localFiles, serverFiles);
+
                 await uploadLocalOnlyFilesToServerIfNeeded(localFiles, serverFiles);
                 if (!isStillCurrentUser()) return;
 
@@ -1268,8 +1273,47 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
     function getServerDeletedEditingMessage(file) {
         const name = file && file.name ? file.name : (isEn() ? 'Current file' : '当前文件');
         return isEn()
-            ? `The server copy of "${name}" was deleted. Your local editing copy is kept; saving will upload it again.`
-            : `服务器上的“${name}”已被删除。本地正在编辑的副本已保留，保存后会重新上传。`;
+            ? `The server copy of "${name}" was deleted. It has been removed locally to match the server.`
+            : `服务器上的“${name}”已被删除。为保持一致性，本地已自动删除。`;
+    }
+
+    function pruneLocallySyncedFilesDeletedOnServer(localFiles, serverFiles) {
+        const serverFileMap = {};
+        (serverFiles || []).forEach(function(f) {
+            if (f && f.name) serverFileMap[f.name] = f;
+        });
+
+        const pendingServerSync = g('pendingServerSync') || {};
+        const lastSyncedContent = g('lastSyncedContent') || {};
+        const unsavedChanges = g('unsavedChanges') || {};
+        let removedCurrentFile = false;
+
+        for (let i = (localFiles || []).length - 1; i >= 0; i--) {
+            const f = localFiles[i];
+            if (!f || !f.name) continue;
+            if (isExternalLocalFile(f)) continue;
+            if (!f.isSynced) continue; // local-only files should still be eligible for upload
+            if (serverFileMap[f.name]) continue;
+
+            if (f.id) {
+                delete pendingServerSync[f.id];
+                delete lastSyncedContent[f.id];
+                delete unsavedChanges[f.id];
+                if (String(f.id) === String(g('currentFileId') || '')) {
+                    removedCurrentFile = true;
+                }
+            }
+            localFiles.splice(i, 1);
+        }
+
+        if (removedCurrentFile) {
+            global.currentFileId = null;
+            try {
+                if (typeof global.showMessage === 'function') {
+                    global.showMessage(getServerDeletedEditingMessage({ name: isEn() ? 'Current file' : '当前文件' }), 'warning');
+                }
+            } catch (e) {}
+        }
     }
 
     function markOpenFileDeletedOnServer(file, editorContent) {
@@ -1377,7 +1421,20 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
                 ? getCurrentEditorContent(currentFileId, file.content)
                 : file.content;
             if (String(file.id || '') === String(currentFileId || '') && file.type === 'file') {
-                hasLocalUpdate = markOpenFileDeletedOnServer(file, editorContent) || hasLocalUpdate;
+                // Keep consistent with initial load behavior: server deletion wins, remove locally.
+                if (file.id) {
+                    delete lastSyncedContent[file.id];
+                    delete unsavedChanges[file.id];
+                    delete pendingServerSync[file.id];
+                }
+                files.splice(i, 1);
+                global.currentFileId = null;
+                hasLocalUpdate = true;
+                if (typeof global.showMessage === 'function') {
+                    global.showMessage(getServerDeletedEditingMessage(file), 'warning');
+                } else if (typeof global.showSyncStatus === 'function') {
+                    global.showSyncStatus(getServerDeletedEditingMessage(file), 'warning');
+                }
                 continue;
             }
 
