@@ -2523,8 +2523,10 @@ import { installSyncRuntime } from './sync-runtime';
     }
 
     function createNewFile() {
-        const defaultName = isEn() ? 'New Document' : '新文档';
-        const defaultPath = getSelectedFolderPath() + defaultName;
+        const baseName = isEn() ? 'New Document' : '新文档';
+        const parentPath = getSelectedFolderPath().replace(/\/$/, '');
+        const defaultName = getNextAvailableName(baseName, parentPath);
+        const defaultPath = parentPath ? parentPath + '/' + defaultName : defaultName;
         g('customPrompt')(isEn() ? 'Please enter filename (to create in a folder, ensure the folder exists, e.g., docs/note)' : '请输入文件名（如需在文件夹中创建，请确保文件夹已存在，例如 docs/note）', { defaultValue: defaultPath }).then(function(input) {
             if (!input) return;
 
@@ -2570,8 +2572,10 @@ import { installSyncRuntime } from './sync-runtime';
     }
 
     function createNewFolder() {
-        const defaultName = isEn() ? 'New Folder' : '新文件夹';
-        const defaultPath = getSelectedFolderPath() + defaultName;
+        const baseName = isEn() ? 'New Folder' : '新文件夹';
+        const parentPath = getSelectedFolderPath().replace(/\/$/, '');
+        const defaultName = getNextAvailableName(baseName, parentPath);
+        const defaultPath = parentPath ? parentPath + '/' + defaultName : defaultName;
         g('customPrompt')(isEn() ? 'Please enter folder path (e.g., docs/notes)' : '请输入文件夹路径（例如 docs/notes）', { defaultValue: defaultPath }).then(function(input) {
             if (!input) return;
 
