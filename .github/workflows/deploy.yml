@@ -63,7 +63,7 @@ jobs:
       run: npm run wasm:text:verify && npm run wasm:image:verify
 
     - name: Run tests
-      run: npm test && npx jest --coverage
+      run: npm test -- --coverage
 
     
         
@@ -107,15 +107,6 @@ jobs:
 
     - name: Install dependencies
       run: npm install --no-audit --no-fund
-
-    - name: Build WASM text engine
-      run: npm run wasm:text:build
-
-    - name: Build WASM image compressor
-      run: npm run wasm:image:build
-
-    - name: Verify WASM source artifacts
-      run: npm run wasm:text:verify && npm run wasm:image:verify
 
     - name: Create .env file
       run: |
@@ -295,6 +286,15 @@ jobs:
 
           echo "✓ 依赖安装完成"
 
+          # 运行 TypeScript 入口需要 tsx，但它在 devDependencies 中；
+          # 生产安装（--omit=dev）不会包含它，因此这里补装一份用于运行时。
+          echo "[3.5/4] 安装 tsx 运行时..."
+          timeout 120 npm install --no-save tsx --no-audit --no-fund --prefer-offline || {
+            echo "错误: tsx 安装失败，无法使用 Node 运行 api/server.ts"
+            exit 1
+          }
+          echo "✓ tsx 已安装"
+
           # 验证安装
           echo "[4/4] 验证安装..."
           if [ ! -d "node_modules" ]; then
@@ -417,7 +417,14 @@ jobs:
           export DASHSCOPE_API_KEY=${{ secrets.DASHSCOPE_API_KEY }}
           export MARKITDOWN_PYTHON="$NEXT_DIR/.venv/bin/python"
 
-          "$PM2_BIN" start api/server.ts --name "$NEXT_NAME" --env production
+          TSX_BIN="$NEXT_DIR/node_modules/.bin/tsx"
+          if [ ! -x "$TSX_BIN" ]; then
+            echo "错误: 未找到 tsx 可执行文件: $TSX_BIN"
+            exit 1
+          fi
+
+          # 明确用 Node + tsx 运行 TS，避免 PM2 试图使用 bun 解释器
+          "$PM2_BIN" start "$TSX_BIN" --name "$NEXT_NAME" --env production -- api/server.ts
 
           # 等待服务启动
           echo "等待服务启动..."
@@ -914,7 +921,13 @@ jobs:
             export MARKITDOWN_PYTHON="$NEXT_DIR/.venv/bin/python"
           fi
 
-          "$PM2_BIN" start api/server.ts --name "$NEXT_NAME" --env production
+          TSX_BIN="$NEXT_DIR/node_modules/.bin/tsx"
+          if [ ! -x "$TSX_BIN" ]; then
+            echo "错误: 未找到 tsx 可执行文件: $TSX_BIN"
+            exit 1
+          fi
+
+          "$PM2_BIN" start "$TSX_BIN" --name "$NEXT_NAME" --env production -- api/server.ts
           echo "✓ 服务已启动: $NEXT_NAME"
 
           # 健康检查
