@@ -95,7 +95,7 @@ declare global {
     logout: () => void;
     saveCurrentFile?: () => void | Promise<void>;
     loadFile?: (fileId: string) => void | Promise<void>;
-    showDiffModal?: (conflict: unknown) => void;
+    showHistoryDiffModal?: (filename: string, versionId: number | string, content: string, timestamp: number | string) => void;
     [key: string]: unknown;
   }
 }

@@ -15,6 +15,7 @@ import json
 import os
 import sys
 import argparse
+import signal
 from datetime import datetime, timedelta
 import ssl
 import socket
@@ -348,21 +349,37 @@ class PrintServer:
             return False
 
     async def start_server(self):
-        """启动WebSocket服务器"""
-        print(f"启动打印服务器...")
+        """启动 WebSocket 服务器（支持 PM2 reload / SIGTERM 优雅退出）"""
+        print("启动打印服务器...")
         print(f"服务器地址: ws://{self.host}:{self.port}")
         print(f"本地客户端地址: {self.local_client_url}")
-        print("按 Ctrl+C 停止服务器")
+        print("按 Ctrl+C 或 PM2 reload 停止服务器")
+
+        stop_event = asyncio.Event()
+
+        def request_shutdown():
+            if not stop_event.is_set():
+                print("收到停止信号，正在关闭服务器...")
+                stop_event.set()
+
+        loop = asyncio.get_running_loop()
+        for sig in (signal.SIGTERM, signal.SIGINT):
+            try:
+                loop.add_signal_handler(sig, request_shutdown)
+            except (NotImplementedError, RuntimeError):
+                pass
 
         try:
-            # 直接启动服务器，不使用SSL（由Nginx处理SSL）
             async with websockets.serve(self.handle_client, self.host, self.port):
-                await asyncio.Future()  # 无限运行
-        except KeyboardInterrupt:
-            print("服务器已停止")
+                print(f"打印服务器已就绪，监听 {self.host}:{self.port}")
+                await stop_event.wait()
+        except asyncio.CancelledError:
+            print("服务器任务已取消")
         except Exception as e:
-            print(f"服务器启动失败: {str(e)}")
+            print(f"服务器运行失败: {e}")
             raise
+        finally:
+            print("服务器已停止")
 
 
 def main():

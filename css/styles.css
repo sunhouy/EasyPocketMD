@@ -2058,6 +2058,25 @@ body.ui-mode-mobile .file-list-sidebar {
     color: #090;
 }
 
+.diff-hunk-active {
+    outline: 2px solid #4a90d9;
+    outline-offset: -2px;
+    z-index: 1;
+    position: relative;
+}
+
+.diff-hunk-resolved {
+    opacity: 0.55;
+}
+
+.file-diff-modal .diff-hunk-active {
+    box-shadow: inset 0 0 0 2px #4a90d9;
+}
+
+#fileDiffConflictBar {
+    display: none;
+}
+
 #diffModalOverlay {
     z-index: 3000;
 }
@@ -4342,6 +4361,11 @@ body.night-mode .diff-added .diff-line-num {
 
 body.night-mode .diff-added .diff-line-content {
     color: #88ff88;
+}
+
+body.night-mode .diff-hunk-active {
+    outline-color: #5a9fd4;
+    box-shadow: inset 0 0 0 2px #5a9fd4;
 }
 
 body.night-mode .sync-status {

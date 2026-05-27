@@ -1,12 +1,16 @@
 /**
- * 文件管理 - 加载、保存、同步、冲突、历史版本、文件夹
+ * 文件管理 - 加载、保存、同步、历史版本、文件夹
  */
 // @ts-nocheck
 import {
     computeDiff as computeDiffCore,
     bindCollapsedDiffInteractions as bindCollapsedDiffInteractionsCore,
     renderDiffView as renderDiffViewCore,
-    escapeHtml as escapeHtmlCore
+    escapeHtml as escapeHtmlCore,
+    groupDiffIntoHunks as groupDiffIntoHunksCore,
+    buildMergedTextFromDiff as buildMergedTextFromDiffCore,
+    smartMergeTexts as smartMergeTextsCore,
+    setAllCollapsedSectionsExpanded as setAllCollapsedSectionsExpandedCore
 } from './conflict/index';
 import { installEditorRuntime } from './editor-runtime';
 import { installSyncRuntime } from './sync-runtime';
@@ -21,7 +25,6 @@ import { installSyncRuntime } from './sync-runtime';
 
     // 抽离至 editor-runtime.ts：长文件模式、Vditor 光标桥接、加载遮罩、编辑器内容读写。
     const editorRt = installEditorRuntime(global, {});
-    const formatDiffTime = editorRt.formatDiffTime;
     const ensureFileSwitchLoadingOverlay = editorRt.ensureFileSwitchLoadingOverlay;
     const setEditorInteractionLocked = editorRt.setEditorInteractionLocked;
     const isVditorInteractionApiReady = editorRt.isVditorInteractionApiReady;
@@ -212,47 +215,31 @@ import { installSyncRuntime } from './sync-runtime';
 
     function renderDiffView(diffResult, options) {
         const opts = options || {};
-        return renderDiffViewCore(diffResult || [], isEn(), opts.collapseSame !== false);
+        return renderDiffViewCore(diffResult || [], isEn(), opts);
+    }
+
+    function groupDiffIntoHunks(diffResult) {
+        return groupDiffIntoHunksCore(diffResult || []);
+    }
+
+    function buildMergedTextFromDiff(diffResult, hunkDecisions) {
+        const gw = global.wasmTextEngineGateway;
+        const merge3Fn = gw && typeof gw.merge3 === 'function'
+            ? function(base, local, remote) {
+                const r = gw.merge3(base, local, remote, 'manual');
+                if (r && r.code === 200 && r.data) return r.data;
+                return null;
+            }
+            : undefined;
+        return buildMergedTextFromDiffCore(diffResult || [], hunkDecisions || {}, merge3Fn);
+    }
+
+    function smartMergeTexts(leftText, rightText) {
+        return smartMergeTextsCore(global, leftText, rightText);
     }
 
     function escapeHtml(text) {
         return escapeHtmlCore(text);
-    }
-
-    function showDiffModal(conflict) {
-        const diffModal = document.getElementById('diffModalOverlay');
-        const diffContent = document.getElementById('diffContent');
-        const diffFileName = document.getElementById('diffFileName');
-        const diffLocalTime = document.getElementById('diffLocalTime');
-        const diffServerTime = document.getElementById('diffServerTime');
-
-        if (!diffModal || !diffContent) return;
-
-        diffFileName.textContent = conflict.filename;
-        diffLocalTime.textContent = formatDiffTime(conflict.localModified);
-        diffServerTime.textContent = formatDiffTime(conflict.serverModified);
-
-        const diffResult = computeDiff(conflict.localContent || '', conflict.serverContent || '');
-        diffContent.innerHTML = renderDiffView(diffResult, { collapseSame: true });
-        bindCollapsedDiffInteractions(diffContent);
-
-        diffModal.classList.add('show');
-
-        const closeBtn = document.getElementById('closeDiffBtn');
-        const closeModalBtn = document.getElementById('closeDiffModalBtn');
-        const closeModal = function() {
-            diffModal.classList.remove('show');
-        };
-
-        if (closeBtn) closeBtn.onclick = closeModal;
-        if (closeModalBtn) closeModalBtn.onclick = closeModal;
-        diffModal.onclick = function(e) {
-            if (false && e.target === diffModal) closeModal();
-        };
-    }
-
-    function showMergePreviewModal(conflict) {
-        showDiffModal(conflict);
     }
 
     let hasNotifiedInitialFileListRendered = false;
@@ -260,7 +247,7 @@ import { installSyncRuntime } from './sync-runtime';
     const FILE_LIST_SEARCH_DEBOUNCE = 180;
     const fileListSearchState = {
         query: '',
-        scope: 'title',
+        scope: 'fullText',
         timer: null,
         token: 0,
         matchedNodeIds: new Set(),
@@ -563,8 +550,8 @@ import { installSyncRuntime } from './sync-runtime';
         if (!toggleBtn || !panel || !input || !scopeSelect || toggleBtn.dataset.bound === '1') return;
 
         toggleBtn.dataset.bound = '1';
-        scopeSelect.value = 'title';
-        fileListSearchState.scope = 'title';
+        scopeSelect.value = 'fullText';
+        fileListSearchState.scope = 'fullText';
 
         const closeSearchPanel = function() {
             panel.style.display = 'none';
@@ -584,7 +571,7 @@ import { installSyncRuntime } from './sync-runtime';
 
             panel.style.display = '';
             toggleBtn.classList.add('active');
-            setFileListSearchResult(isEn() ? 'Title search by default' : '默认仅搜索标题', false);
+            setFileListSearchResult(isEn() ? 'Full-text search by default' : '默认全文搜索', false);
             setTimeout(function() { input.focus(); }, 0);
         });
 
@@ -608,7 +595,7 @@ import { installSyncRuntime } from './sync-runtime';
         });
 
         scopeSelect.addEventListener('change', function() {
-            fileListSearchState.scope = String(scopeSelect.value || 'title');
+            fileListSearchState.scope = String(scopeSelect.value || 'fullText');
             if (!String(fileListSearchState.query || '').trim()) {
                 setFileListSearchResult(
                     fileListSearchState.scope === 'fullText'
@@ -3012,7 +2999,7 @@ import { installSyncRuntime } from './sync-runtime';
                 }
             }
 
-            return result.code === 200;
+            return result.code;
         } catch (e) {
             await tryHandleTokenExpired(e);
             console.error('创建历史版本失败', e);
@@ -3154,7 +3141,7 @@ import { installSyncRuntime } from './sync-runtime';
                 }
 
                 var previewBtn = versionEl.querySelector('.preview-btn');
-                if (previewBtn) previewBtn.addEventListener('click', function(e) { e.stopPropagation(); global.previewHistoryVersion(filename, version.version_id, version.content, version.timestamp); });
+                if (previewBtn) previewBtn.addEventListener('click', function(e) { e.stopPropagation(); global.showHistoryDiffModal(filename, version.version_id, version.content, version.timestamp); });
                 if (index > 0) {
                     var restoreBtn = versionEl.querySelector('.restore-btn');
                     if (restoreBtn) restoreBtn.addEventListener('click', function(e) { e.stopPropagation(); global.restoreFromHistory(filename, version.version_id, version.content, fileId); });
@@ -3422,7 +3409,7 @@ import { installSyncRuntime } from './sync-runtime';
         return syncRuntimeApi.deleteFileFromServer(filename);
     }
 
-    function previewHistoryVersion(filename, versionId, content, timestamp) {
+    function showHistoryDiffModal(filename, versionId, content, timestamp) {
         const diffModal = document.getElementById('diffModalOverlay');
         const diffContent = document.getElementById('diffContent');
         const diffFileName = document.getElementById('diffFileName');
@@ -4176,59 +4163,374 @@ import { installSyncRuntime } from './sync-runtime';
      */
     function showFileDiffComparison(file1, file2) {
         const nightMode = g('nightMode') === true;
+        const borderColor = nightMode ? '#444' : '#ddd';
+        const toolbarBg = nightMode ? '#363636' : '#f0f0f0';
+        const infoBg = nightMode ? '#3d3d3d' : '#f8f9fa';
+        const btnStyle = 'padding:6px 12px;border-radius:6px;border:1px solid ' + borderColor + ';background:' + (nightMode ? '#4a4a4a' : '#fff') + ';color:inherit;cursor:pointer;font-size:12px;display:inline-flex;align-items:center;gap:6px;';
+        const btnPrimaryStyle = btnStyle + 'background:' + (nightMode ? '#3d6fa8' : '#4a90d9') + ';color:#fff;border-color:transparent;';
 
-        // 获取文件内容
-        const content1 = file1.content || '';
-        const content2 = file2.content || '';
+        const state = {
+            leftFile: file1,
+            rightFile: file2,
+            collapseSame: true,
+            conflictMode: false,
+            activeHunkId: null,
+            hunkDecisions: {},
+            resolvedHunkIds: [],
+            currentHunkIndex: 0
+        };
 
-        // 计算差异
-        const diffResult = computeDiff(content1, content2);
+        function getLeftContent() { return state.leftFile.content || ''; }
+        function getRightContent() { return state.rightFile.content || ''; }
 
-        // 创建差异对比模态框（复用现有样式）
+        function getHunks() {
+            return groupDiffIntoHunks(computeDiff(getLeftContent(), getRightContent()));
+        }
+
+        function getUnresolvedHunks() {
+            const resolved = new Set(state.resolvedHunkIds);
+            return getHunks().filter(function(h) { return !resolved.has(h.id); });
+        }
+
+        function writeContentToFile(targetFile, content) {
+            const files = g('files');
+            const idx = files.findIndex(function(f) { return f.id === targetFile.id; });
+            if (idx === -1) return false;
+            files[idx].content = content;
+            files[idx].lastModified = Date.now();
+            files[idx].isSynced = g('currentUser') ? false : true;
+            localStorage.setItem('vditor_files', JSON.stringify(files));
+            g('unsavedChanges')[targetFile.id] = true;
+            if (g('currentFileId') === targetFile.id) {
+                setEditorContentForFile(targetFile.id, content);
+            }
+            if (g('currentUser') && typeof global.syncFileToServer === 'function') {
+                global.syncFileToServer(targetFile.id);
+            }
+            loadFiles();
+            return true;
+        }
+
+        function promptSaveMergedContent(mergedText) {
+            const saveTitle = isEn() ? 'Save merged result' : '保存合并结果';
+            const msg = isEn()
+                ? 'Choose where to save the merged content:'
+                : '请选择合并结果的保存位置：';
+            return new Promise(function(resolve) {
+                const overlay = document.createElement('div');
+                overlay.className = 'modal-overlay';
+                overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:10010;';
+                const box = document.createElement('div');
+                box.style.cssText = 'background:' + (nightMode ? '#2d2d2d' : '#fff') + ';color:' + (nightMode ? '#eee' : '#333') + ';padding:20px;border-radius:10px;max-width:420px;width:90%;';
+                box.innerHTML =
+                    '<h4 style="margin:0 0 10px;">' + saveTitle + '</h4>' +
+                    '<p style="margin:0 0 16px;font-size:13px;color:' + (nightMode ? '#aaa' : '#666') + ';">' + msg + '</p>' +
+                    '<div style="display:flex;flex-direction:column;gap:8px;">' +
+                        '<button type="button" data-save="new" style="' + btnStyle + 'justify-content:center;"><i class="fas fa-file-circle-plus"></i> ' + (isEn() ? 'Save as new file' : '保存为新文件') + '</button>' +
+                        '<button type="button" data-save="left" style="' + btnStyle + 'justify-content:center;"><i class="fas fa-file"></i> ' + (isEn() ? 'Save to current: ' : '保存到当前：') + global.escapeHtml(state.leftFile.name) + '</button>' +
+                        '<button type="button" data-save="right" style="' + btnStyle + 'justify-content:center;"><i class="fas fa-file"></i> ' + (isEn() ? 'Save to compare: ' : '保存到对比：') + global.escapeHtml(state.rightFile.name) + '</button>' +
+                        '<button type="button" data-save="cancel" style="' + btnStyle + 'justify-content:center;margin-top:4px;">' + (isEn() ? 'Cancel' : '取消') + '</button>' +
+                    '</div>';
+                overlay.appendChild(box);
+                document.body.appendChild(overlay);
+
+                box.querySelectorAll('button[data-save]').forEach(function(btn) {
+                    btn.onclick = async function() {
+                        const action = btn.getAttribute('data-save');
+                        global.removeModal(overlay);
+                        if (action === 'cancel') { resolve(false); return; }
+                        if (action === 'new') {
+                            const defaultName = getBasename(state.leftFile.name) + (isEn() ? '-merged' : '-合并');
+                            const parentPath = getParentPath(state.leftFile.name);
+                            const defaultPath = parentPath ? parentPath + '/' + defaultName : defaultName;
+                            const input = await g('customPrompt')(
+                                isEn() ? 'Enter filename for merged file' : '请输入合并后文件名',
+                                { defaultValue: defaultPath }
+                            );
+                            if (!input) { resolve(false); return; }
+                            const path = normalizePath(input);
+                            ensureParentFolders(path);
+                            const files = g('files');
+                            if (files.some(function(f) { return f.name === path && f.type === 'file'; })) {
+                                g('customAlert')(isEn() ? 'File already exists' : '文件已存在');
+                                resolve(false);
+                                return;
+                            }
+                            const newFile = {
+                                id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+                                name: path,
+                                type: 'file',
+                                content: mergedText,
+                                lastModified: Date.now(),
+                                e2e_enabled: g('currentUser') && g('currentUser').e2e_enabled ? 1 : 0,
+                                e2eEnabled: !!(g('currentUser') && g('currentUser').e2e_enabled),
+                                isSynced: false
+                            };
+                            files.push(newFile);
+                            localStorage.setItem('vditor_files', JSON.stringify(files));
+                            g('lastSyncedContent')[newFile.id] = mergedText;
+                            g('unsavedChanges')[newFile.id] = false;
+                            loadFiles();
+                            openFile(newFile.id);
+                            if (g('currentUser')) global.syncFileToServer(newFile.id);
+                            global.showMessage(isEn() ? 'Merged file created' : '已创建合并文件', 'success');
+                            resolve(true);
+                            return;
+                        }
+                        if (action === 'left') {
+                            writeContentToFile(state.leftFile, mergedText);
+                            global.showMessage(isEn() ? 'Saved to current file' : '已保存到当前文件', 'success');
+                            resolve(true);
+                            return;
+                        }
+                        if (action === 'right') {
+                            writeContentToFile(state.rightFile, mergedText);
+                            global.showMessage(isEn() ? 'Saved to compare file' : '已保存到对比文件', 'success');
+                            resolve(true);
+                        }
+                    };
+                });
+            });
+        }
+
         const modal = document.createElement('div');
-        modal.className = 'modal-overlay';
+        modal.className = 'modal-overlay file-diff-modal-overlay';
         modal.id = 'fileDiffResultModal';
         modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;z-index:10002;';
 
         const modalContent = document.createElement('div');
+        modalContent.className = 'file-diff-modal';
         modalContent.style.cssText = 'background:' + (nightMode ? '#2d2d2d' : 'white') + ';color:' + (nightMode ? '#eee' : '#333') + ';border-radius:8px;width:95vw;height:90vh;display:flex;flex-direction:column;overflow:hidden;';
 
-        const headerHtml =
-            '<div style="padding:15px 20px;border-bottom:1px solid ' + (nightMode ? '#444' : '#eee') + ';display:flex;justify-content:space-between;align-items:center;flex-shrink:0;">' +
+        modalContent.innerHTML =
+            '<div style="padding:15px 20px;border-bottom:1px solid ' + borderColor + ';display:flex;justify-content:space-between;align-items:center;flex-shrink:0;">' +
                 '<div>' +
                     '<h3 style="margin:0;">' + (isEn() ? 'File Diff Comparison' : '文件差异对比') + '</h3>' +
-                    '<div style="font-size:12px;color:' + (nightMode ? '#aaa' : '#666') + ';margin-top:5px;">' +
-                        global.escapeHtml(file1.name) + ' ↔ ' + global.escapeHtml(file2.name) +
-                    '</div>' +
+                    '<div id="fileDiffSubtitle" style="font-size:12px;color:' + (nightMode ? '#aaa' : '#666') + ';margin-top:5px;"></div>' +
                 '</div>' +
-                '<button id="closeFileDiffResultBtn" style="background:none;border:none;font-size:24px;cursor:pointer;color:' + (nightMode ? '#eee' : '#333') + ';">×</button>' +
+                '<button id="closeFileDiffResultBtn" type="button" style="background:none;border:none;font-size:24px;cursor:pointer;color:' + (nightMode ? '#eee' : '#333') + ';">×</button>' +
             '</div>' +
-            '<div style="padding:10px 20px;background:' + (nightMode ? '#3d3d3d' : '#f8f9fa') + ';font-size:13px;color:' + (nightMode ? '#aaa' : '#666') + ';flex-shrink:0;">' +
-                '<i class="fas fa-info-circle"></i> ' + (isEn() ? 'Showing differences only (unchanged lines are folded)' : '仅显示差异（相同内容已自动折叠）') +
+            '<div id="fileDiffInfoBar" style="padding:10px 20px;background:' + infoBg + ';font-size:13px;color:' + (nightMode ? '#aaa' : '#666') + ';flex-shrink:0;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">' +
+                '<span id="fileDiffInfoText"><i class="fas fa-info-circle"></i> ' + (isEn() ? 'Showing differences only (unchanged lines are folded)' : '仅显示差异（相同内容已自动折叠）') + '</span>' +
+                '<button type="button" id="fileDiffToggleFoldBtn" style="' + btnStyle + '">' +
+                    '<i class="fas fa-expand-alt"></i> <span id="fileDiffToggleFoldLabel">' + (isEn() ? 'Show all lines' : '展开全部') + '</span>' +
+                '</button>' +
             '</div>' +
-            '<div style="display:flex;padding:10px 20px;background:' + (nightMode ? '#363636' : '#f0f0f0') + ';border-bottom:1px solid ' + (nightMode ? '#444' : '#ddd') + ';flex-shrink:0;">' +
-                '<div style="flex:1;font-weight:500;text-align:center;">' + (isEn() ? 'Current: ' : '当前：') + global.escapeHtml(file1.name) + '</div>' +
-                '<div style="flex:1;font-weight:500;text-align:center;">' + (isEn() ? 'Compare: ' : '对比：') + global.escapeHtml(file2.name) + '</div>' +
-            '</div>';
-
-        const diffHtml = renderDiffView(diffResult, { collapseSame: true });
-
-        modalContent.innerHTML = headerHtml +
-            '<div id="fileDiffResultContent" style="flex:1;overflow:auto;padding:0;">' +
-                '<div style="display:flex;min-width:100%;">' +
-                    '<div style="flex:1;">' + diffHtml + '</div>' +
-                '</div>' +
+            '<div id="fileDiffToolbar" style="padding:8px 20px;background:' + toolbarBg + ';border-bottom:1px solid ' + borderColor + ';flex-shrink:0;display:flex;flex-wrap:wrap;gap:8px;align-items:center;">' +
+                '<button type="button" id="fileDiffSwapBtn" style="' + btnStyle + '" title="' + (isEn() ? 'Swap sides' : '切换左右文件') + '"><i class="fas fa-right-left"></i> ' + (isEn() ? 'Swap' : '切换') + '</button>' +
+                '<button type="button" id="fileDiffSmartMergeBtn" style="' + btnPrimaryStyle + '"><i class="fas fa-wand-magic-sparkles"></i> ' + (isEn() ? 'Smart merge' : '智能合并') + '</button>' +
+                '<button type="button" id="fileDiffResolveBtn" style="' + btnStyle + '"><i class="fas fa-hand-pointer"></i> ' + (isEn() ? 'Resolve conflicts' : '手动解决冲突') + '</button>' +
+            '</div>' +
+            '<div id="fileDiffColumnHeaders" style="display:flex;padding:10px 20px;background:' + toolbarBg + ';border-bottom:1px solid ' + borderColor + ';flex-shrink:0;">' +
+                '<div id="fileDiffLeftHeader" style="flex:1;font-weight:500;text-align:center;"></div>' +
+                '<div style="width:40px;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><i class="fas fa-arrows-left-right" style="opacity:0.5;"></i></div>' +
+                '<div id="fileDiffRightHeader" style="flex:1;font-weight:500;text-align:center;"></div>' +
+            '</div>' +
+            '<div id="fileDiffResultContent" class="diff-content" style="flex:1;overflow:auto;padding:0;"></div>' +
+            '<div id="fileDiffConflictBar" style="display:none;padding:10px 20px;border-top:1px solid ' + borderColor + ';background:' + infoBg + ';flex-shrink:0;flex-wrap:wrap;gap:8px;align-items:center;">' +
+                '<span id="fileDiffConflictProgress" style="font-size:13px;flex:1;min-width:140px;"></span>' +
+                '<button type="button" id="fileDiffAcceptLeftBtn" style="' + btnStyle + '"><i class="fas fa-arrow-left"></i> ' + (isEn() ? 'Accept current' : '接受当前') + '</button>' +
+                '<button type="button" id="fileDiffAcceptRightBtn" style="' + btnStyle + '"><i class="fas fa-arrow-right"></i> ' + (isEn() ? 'Accept compare' : '接受对比') + '</button>' +
+                '<button type="button" id="fileDiffAutoHunkBtn" style="' + btnStyle + '"><i class="fas fa-wand-magic-sparkles"></i> ' + (isEn() ? 'Auto merge' : '自动合并') + '</button>' +
+                '<button type="button" id="fileDiffNextConflictBtn" style="' + btnPrimaryStyle + '"><i class="fas fa-chevron-down"></i> ' + (isEn() ? 'Next conflict' : '下一处') + '</button>' +
             '</div>';
 
         modal.appendChild(modalContent);
         document.body.appendChild(modal);
 
-        const fileDiffScroll = modalContent.querySelector('#fileDiffResultContent');
-        if (fileDiffScroll) {
-            bindCollapsedDiffInteractions(fileDiffScroll);
+        const diffScrollEl = modalContent.querySelector('#fileDiffResultContent');
+        const infoTextEl = modalContent.querySelector('#fileDiffInfoText');
+        const subtitleEl = modalContent.querySelector('#fileDiffSubtitle');
+        const leftHeaderEl = modalContent.querySelector('#fileDiffLeftHeader');
+        const rightHeaderEl = modalContent.querySelector('#fileDiffRightHeader');
+        const conflictBarEl = modalContent.querySelector('#fileDiffConflictBar');
+        const conflictProgressEl = modalContent.querySelector('#fileDiffConflictProgress');
+        const toggleFoldBtn = modalContent.querySelector('#fileDiffToggleFoldBtn');
+        const toggleFoldLabel = modalContent.querySelector('#fileDiffToggleFoldLabel');
+
+        function updateHeaders() {
+            if (subtitleEl) {
+                subtitleEl.textContent = global.escapeHtml(state.leftFile.name) + ' ↔ ' + global.escapeHtml(state.rightFile.name);
+            }
+            if (leftHeaderEl) {
+                leftHeaderEl.textContent = (isEn() ? 'Current: ' : '当前：') + state.leftFile.name;
+            }
+            if (rightHeaderEl) {
+                rightHeaderEl.textContent = (isEn() ? 'Compare: ' : '对比：') + state.rightFile.name;
+            }
         }
 
-        // 绑定关闭按钮
+        function updateInfoBar() {
+            if (!infoTextEl) return;
+            if (state.conflictMode) {
+                const unresolved = getUnresolvedHunks();
+                const total = getHunks().length;
+                const resolved = total - unresolved.length;
+                infoTextEl.innerHTML = '<i class="fas fa-exclamation-triangle"></i> ' +
+                    (isEn()
+                        ? ('Conflict resolution: ' + resolved + '/' + total + ' resolved')
+                        : ('冲突解决中：已处理 ' + resolved + '/' + total));
+            } else if (state.collapseSame) {
+                infoTextEl.innerHTML = '<i class="fas fa-info-circle"></i> ' +
+                    (isEn() ? 'Showing differences only (unchanged lines are folded)' : '仅显示差异（相同内容已自动折叠）');
+            } else {
+                infoTextEl.innerHTML = '<i class="fas fa-info-circle"></i> ' +
+                    (isEn() ? 'Showing all lines' : '显示全部内容（含相同行）');
+            }
+            if (toggleFoldLabel) {
+                toggleFoldLabel.textContent = state.collapseSame
+                    ? (isEn() ? 'Show all lines' : '展开全部')
+                    : (isEn() ? 'Fold identical' : '折叠相同');
+            }
+        }
+
+        function scrollToHunk(hunkId) {
+            if (!diffScrollEl || hunkId === null || hunkId === undefined) return;
+            const row = diffScrollEl.querySelector('.diff-hunk-active, [data-hunk-id="' + hunkId + '"]');
+            if (row && row.scrollIntoView) {
+                row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }
+
+        function refreshDiffView() {
+            const diffResult = computeDiff(getLeftContent(), getRightContent());
+            const renderOpts = {
+                collapseSame: state.collapseSame,
+                markHunks: state.conflictMode,
+                activeHunkId: state.activeHunkId,
+                resolvedHunkIds: state.resolvedHunkIds
+            };
+            if (diffScrollEl) {
+                diffScrollEl.innerHTML = renderDiffView(diffResult, renderOpts);
+                bindCollapsedDiffInteractions(diffScrollEl);
+            }
+            updateHeaders();
+            updateInfoBar();
+            if (state.conflictMode && conflictProgressEl) {
+                const hunks = getHunks();
+                const unresolved = getUnresolvedHunks();
+                const idx = hunks.findIndex(function(h) { return h.id === state.activeHunkId; });
+                conflictProgressEl.textContent = isEn()
+                    ? ('Conflict ' + (idx + 1) + ' of ' + hunks.length + ' (' + unresolved.length + ' remaining)')
+                    : ('第 ' + (idx + 1) + ' / ' + hunks.length + ' 处差异（剩余 ' + unresolved.length + ' 处）');
+            }
+            scrollToHunk(state.activeHunkId);
+        }
+
+        function startConflictMode() {
+            const hunks = getHunks();
+            if (!hunks.length) {
+                global.showMessage(isEn() ? 'No differences to resolve' : '没有可解决的差异', 'info');
+                return;
+            }
+            state.conflictMode = true;
+            state.hunkDecisions = {};
+            state.resolvedHunkIds = [];
+            state.currentHunkIndex = 0;
+            state.activeHunkId = hunks[0].id;
+            if (conflictBarEl) conflictBarEl.style.display = 'flex';
+            refreshDiffView();
+        }
+
+        function applyHunkDecisionAndAdvance(decision) {
+            const hunks = getHunks();
+            const unresolved = getUnresolvedHunks();
+            if (!unresolved.length) return;
+
+            const hunk = unresolved[0];
+            state.hunkDecisions[hunk.id] = decision;
+            if (state.resolvedHunkIds.indexOf(hunk.id) === -1) {
+                state.resolvedHunkIds.push(hunk.id);
+            }
+
+            const nextUnresolved = getUnresolvedHunks();
+            if (!nextUnresolved.length) {
+                state.activeHunkId = null;
+                const merged = buildMergedTextFromDiff(computeDiff(getLeftContent(), getRightContent()), state.hunkDecisions);
+                state.conflictMode = false;
+                if (conflictBarEl) conflictBarEl.style.display = 'none';
+                refreshDiffView();
+                promptSaveMergedContent(merged);
+                return;
+            }
+
+            state.activeHunkId = nextUnresolved[0].id;
+            refreshDiffView();
+        }
+
+        updateHeaders();
+        refreshDiffView();
+
+        if (toggleFoldBtn) {
+            toggleFoldBtn.onclick = function() {
+                state.collapseSame = !state.collapseSame;
+                refreshDiffView();
+            };
+        }
+
+        const swapBtn = modalContent.querySelector('#fileDiffSwapBtn');
+        if (swapBtn) {
+            swapBtn.onclick = function() {
+                const tmp = state.leftFile;
+                state.leftFile = state.rightFile;
+                state.rightFile = tmp;
+                state.hunkDecisions = {};
+                state.resolvedHunkIds = [];
+                state.activeHunkId = null;
+                state.currentHunkIndex = 0;
+                refreshDiffView();
+            };
+        }
+
+        const smartMergeBtn = modalContent.querySelector('#fileDiffSmartMergeBtn');
+        if (smartMergeBtn) {
+            smartMergeBtn.onclick = async function() {
+                const result = smartMergeTexts(getLeftContent(), getRightContent());
+                if (result.hasConflict && result.conflictCount > 0) {
+                    global.showMessage(
+                        (isEn()
+                            ? ('Smart merge found ' + result.conflictCount + ' conflict(s). Opening manual resolver.')
+                            : ('智能合并发现 ' + result.conflictCount + ' 处冲突，已进入手动解决模式')),
+                        'warning'
+                    );
+                    startConflictMode();
+                    return;
+                }
+                const saved = await promptSaveMergedContent(result.mergedText);
+                if (saved) global.removeModal(modal);
+            };
+        }
+
+        const resolveBtn = modalContent.querySelector('#fileDiffResolveBtn');
+        if (resolveBtn) {
+            resolveBtn.onclick = function() {
+                if (!state.conflictMode) startConflictMode();
+            };
+        }
+
+        const acceptLeftBtn = modalContent.querySelector('#fileDiffAcceptLeftBtn');
+        if (acceptLeftBtn) acceptLeftBtn.onclick = function() { applyHunkDecisionAndAdvance('left'); };
+
+        const acceptRightBtn = modalContent.querySelector('#fileDiffAcceptRightBtn');
+        if (acceptRightBtn) acceptRightBtn.onclick = function() { applyHunkDecisionAndAdvance('right'); };
+
+        const autoHunkBtn = modalContent.querySelector('#fileDiffAutoHunkBtn');
+        if (autoHunkBtn) autoHunkBtn.onclick = function() { applyHunkDecisionAndAdvance('auto'); };
+
+        const nextConflictBtn = modalContent.querySelector('#fileDiffNextConflictBtn');
+        if (nextConflictBtn) {
+            nextConflictBtn.onclick = function() {
+                const unresolved = getUnresolvedHunks();
+                if (!unresolved.length) {
+                    const merged = buildMergedTextFromDiff(computeDiff(getLeftContent(), getRightContent()), state.hunkDecisions);
+                    promptSaveMergedContent(merged);
+                    return;
+                }
+                state.activeHunkId = unresolved[0].id;
+                refreshDiffView();
+            };
+        }
+
         const closeBtn = modalContent.querySelector('#closeFileDiffResultBtn');
         if (closeBtn) {
             closeBtn.onclick = function() {
@@ -4236,14 +4538,6 @@ import { installSyncRuntime } from './sync-runtime';
             };
         }
 
-        // 点击外部关闭
-        modal.onclick = function(e) {
-            if (false && e.target === modal) {
-                global.removeModal(modal);
-            }
-        };
-
-        // ESC键关闭
         const handleEsc = function(e) {
             if (e.key === 'Escape') {
                 global.removeModal(modal);
@@ -5141,7 +5435,7 @@ import { installSyncRuntime } from './sync-runtime';
     global.deleteFileFromServer = deleteFileFromServer;
     global.syncCurrentFileWithBeacon = syncCurrentFileWithBeacon;
     global.markPendingServerSync = markPendingServerSync;
-    global.previewHistoryVersion = previewHistoryVersion;
+    global.showHistoryDiffModal = showHistoryDiffModal;
     global.restoreFromHistory = restoreFromHistory;
     global.deleteHistoryVersion = deleteHistoryVersion;
     global.moveFile = moveFile;
@@ -5155,8 +5449,7 @@ import { installSyncRuntime } from './sync-runtime';
 
     // Core handlers exposed for index.ts composition layer.
     global.__filesCoreHandlers = {
-        showDiffModal: showDiffModal,
-        showMergePreviewModal: showMergePreviewModal,
+        showHistoryDiffModal: showHistoryDiffModal,
         openExternalLocalFileByDialog: openExternalLocalFileByDialog,
         openExternalLocalFileByPath: openExternalLocalFileByPath,
         startExternalLocalConflictMonitor: startExternalLocalConflictMonitor
