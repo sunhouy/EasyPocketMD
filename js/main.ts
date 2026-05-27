@@ -5,6 +5,7 @@ import { initSlashCommandRuntime } from './ui/slash-command';
 import { getCurrentEngine, createEditor } from './editor-engine';
 import { enterPresentationMode, exitPresentationMode } from './main/presentation-mode';
 import { initBackNavigation } from './main/back-navigation';
+import { installMobileChromeScroll } from './main/mobile-chrome-scroll';
 
 document.addEventListener('DOMContentLoaded', function() {
     'use strict';
@@ -48,6 +49,18 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     ensureTauriMobileSafeArea();
+
+    var mobileChromeScroll = installMobileChromeScroll({
+        isMobileWeb: function() {
+            return window.editorInterfaceMode === 'mobile' && !window.isTauriMobileEnvironment;
+        },
+        isMobileNative: function() {
+            return window.editorInterfaceMode === 'mobile' && !!window.isTauriMobileEnvironment;
+        },
+        isEnabled: function() {
+            return window.editorInterfaceMode === 'mobile' && !window.isFileManagementMode;
+        },
+    });
 
     function isAndroidClient() {
         return /Android/i.test(navigator.userAgent || '');
@@ -338,6 +351,7 @@ document.addEventListener('DOMContentLoaded', function() {
         var opts = options || {};
         window.isFileManagementMode = true;
         toggleFileManagementBodyClass(true);
+        mobileChromeScroll.reset();
 
         var sidebar = document.getElementById('fileListSidebar');
         if (sidebar) sidebar.classList.add('show');
@@ -351,6 +365,7 @@ document.addEventListener('DOMContentLoaded', function() {
         window.isFileManagementMode = false;
         window.deferInitialFileOpen = false;
         toggleFileManagementBodyClass(false);
+        mobileChromeScroll.bind();
 
         var sidebar = document.getElementById('fileListSidebar');
         if (sidebar) sidebar.classList.remove('show');
@@ -1297,6 +1312,12 @@ document.addEventListener('DOMContentLoaded', function() {
         document.body.classList.remove('ui-mode-mobile', 'ui-mode-desktop');
         document.body.classList.add(mode === 'mobile' ? 'ui-mode-mobile' : 'ui-mode-desktop');
         syncMobileViewportState();
+        mobileChromeScroll.syncPlatformClass();
+        if (mode === 'mobile') {
+            mobileChromeScroll.bind();
+        } else {
+            mobileChromeScroll.reset();
+        }
     }
 
     var mobileViewportStateBound = false;
@@ -1695,6 +1716,7 @@ document.addEventListener('DOMContentLoaded', function() {
             applyOutline(window.userSettings.showOutline);
 
             applyVditorThemes(window.userSettings);
+            mobileChromeScroll.bind();
 
             // 初始化用户界面和移动特性
             var continueAfterEngineReady = function() {
@@ -2412,6 +2434,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     // 应用大纲视图设置
                     applyOutline(window.userSettings.showOutline);
                     applyVditorThemes(window.userSettings);
+                    mobileChromeScroll.bind();
                 }
             };
             window.vditor = new Vditor('vditor', newConfig);
@@ -2428,6 +2451,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function reinitEditorEvents() {
         bindVditorDirtyEvents();
         bindVditorEnterSoftBreak();
+        mobileChromeScroll.bind();
 
         // 若代码运行器已加载，为新代码块刷新运行按钮
         if (typeof window.addRunButtons === 'function') {
@@ -3918,6 +3942,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                     applyFontSize(window.userSettings.fontSize);
                     applyVditorThemes(window.userSettings);
+                    mobileChromeScroll.bind();
                 }
             };
             window.vditor = new Vditor('vditor', newConfig);
@@ -3926,6 +3951,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
     window.enterPresentationMode = enterPresentationMode;
     window.exitPresentationMode = exitPresentationMode;
+    window.resetMobileChromeScroll = function() { mobileChromeScroll.reset(); };
+    window.bindMobileChromeScroll = function() { mobileChromeScroll.bind(); };
 
     initializeAppShellOnce();
     

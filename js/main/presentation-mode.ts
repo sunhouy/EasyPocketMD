@@ -1,6 +1,12 @@
 /** Fullscreen presentation mode for mobile editor. */
 
+function resetMobileChromeScroll(): void {
+  const reset = (window as Window & { resetMobileChromeScroll?: () => void }).resetMobileChromeScroll;
+  if (typeof reset === 'function') reset();
+}
+
 export function enterPresentationMode(): void {
+  resetMobileChromeScroll();
   const mobileToolbar = document.querySelector('.mobile-toolbar-container');
   const mobileBottomBar = document.querySelector('.mobile-bottom-bar');
   const editorContainer = document.querySelector('.editor-container');
@@ -56,6 +62,9 @@ export function exitPresentationMode(): void {
   document.removeEventListener('fullscreenchange', handleFullscreenChange);
   document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
   document.removeEventListener('msfullscreenchange', handleFullscreenChange);
+
+  const bind = (window as Window & { bindMobileChromeScroll?: () => void }).bindMobileChromeScroll;
+  if (typeof bind === 'function') bind();
 
   window.showMessage(
     window.i18n ? window.i18n.t('presentationModeEnded') : '已退出演示模式',

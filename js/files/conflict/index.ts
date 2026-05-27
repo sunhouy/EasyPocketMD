@@ -222,6 +222,19 @@ export function setAllCollapsedSectionsExpanded(diffContainer: HTMLElement | nul
   });
 }
 
+function diffT(key: string, isEn: boolean, zhFallback: string, enFallback: string): string {
+  const g = typeof window !== 'undefined' ? (window as any) : null;
+  if (g?.i18n && typeof g.i18n.t === 'function') {
+    const value = g.i18n.t(key);
+    if (value && value !== key) return value;
+  }
+  return isEn ? enFallback : zhFallback;
+}
+
+function formatDiffMessage(template: string, count: number): string {
+  return template.replace(/\{count\}/g, String(count));
+}
+
 export function renderDiffView(diffResult: any[], isEn: boolean, options: boolean | RenderDiffViewOptions = true): string {
   const opts: RenderDiffViewOptions =
     typeof options === 'boolean' ? { collapseSame: options } : options || {};
@@ -247,10 +260,16 @@ export function renderDiffView(diffResult: any[], isEn: boolean, options: boolea
     collapseSeq += 1;
     const collapseId = `diff-collapse-${collapseSeq}`;
     const payload = encodeURIComponent(JSON.stringify(hiddenSameRows));
+    const foldedTemplate = diffT(
+      'diffFoldedLines',
+      isEn,
+      '[已折叠 {count} 行相同内容，点击展开]',
+      '[Folded {count} identical line(s), click to expand]',
+    );
     html +=
       `<div class="diff-line diff-collapsed" data-collapse-id="${collapseId}" data-collapsed-segment="${payload}">` +
       `<div class="diff-line-content" style="grid-column:1 / -1;"><pre>${escapeHtml(
-        `${isEn ? '[Folded ' : '[已折叠 '}${hiddenSameCount}${isEn ? ' identical line(s), click to expand]' : ' 行相同内容，点击展开]'}`,
+        formatDiffMessage(foldedTemplate, hiddenSameCount),
       )}</pre></div></div>`;
     hiddenSameCount = 0;
     hiddenSameRows = [];
@@ -295,7 +314,7 @@ export function renderDiffView(diffResult: any[], isEn: boolean, options: boolea
 
   if (!hasRealDiff) {
     return `<div class="diff-line diff-collapsed"><div class="diff-line-content" style="grid-column:1 / -1;"><pre>${escapeHtml(
-      isEn ? 'No differences' : '无差异内容',
+      diffT('diffNoDifferences', isEn, '无差异内容', 'No differences'),
     )}</pre></div></div>`;
   }
   return html;
