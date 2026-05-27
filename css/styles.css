@@ -5157,15 +5157,6 @@ body.night-mode #aiPPTOutlineSection label[style*="color:#555"] {
     white-space: nowrap;
 }
 
-.service-status-footer {
-    margin-top: 15px;
-    padding-top: 15px;
-    border-top: 1px solid #eee;
-    text-align: center;
-    font-size: 12px;
-    color: #999;
-}
-
 .service-status-loading {
     text-align: center;
     padding: 30px;
@@ -5192,11 +5183,6 @@ body.night-mode .service-status-name {
 }
 
 body.night-mode .service-status-url {
-    color: #888;
-}
-
-body.night-mode .service-status-footer {
-    border-top-color: #444;
     color: #888;
 }
 

@@ -53,7 +53,6 @@ import './js/ui/file-manager';
 // 以下模块改为懒加载，不在首屏加载
 // import './js/emoji-picker';
 // import './js/formula-picker';
-// import './js/uncertainty-calculator';
 import './js/ui/insert-picker';
 
 // 代码运行器模块改为懒加载，不在首屏加载

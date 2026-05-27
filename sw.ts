@@ -25,7 +25,8 @@ function shouldCacheRequest(request) {
     url.pathname.startsWith('/screenshots/') ||
     url.pathname.startsWith('/avatars/') ||
     url.pathname.startsWith('/user_files/') ||
-    url.pathname.endsWith('/sw.ts')
+    url.pathname.endsWith('/sw.ts') ||
+    url.pathname.endsWith('/sw.js')
   ) {
     return false;
   }

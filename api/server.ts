@@ -72,9 +72,27 @@ if (!isTest) {
 // PWA assets (must NOT fall back to index.html)
 // These files live in project root and are deployed alongside dist/
 const rootPath = path.join(__dirname, '../');
+// Legacy entrypoint: older clients registered /sw.ts. Redirect to /sw.js.
 app.get('/sw.ts', (req, res) => {
+    res.redirect(301, '/sw.js');
+});
+app.get('/sw.js', (req, res) => {
     res.type('application/javascript');
-    res.sendFile(path.join(rootPath, 'sw.ts'));
+
+    // Prefer built artifact in dist/ if present; fall back to project root for non-build setups.
+    const distSwPath = path.join(rootPath, 'dist', 'sw.js');
+    const rootSwPath = path.join(rootPath, 'sw.js');
+    const legacyRootSwTsPath = path.join(rootPath, 'sw.ts');
+    if (fs.existsSync(distSwPath)) {
+        return res.sendFile(distSwPath);
+    }
+    if (fs.existsSync(rootSwPath)) {
+        return res.sendFile(rootSwPath);
+    }
+    if (fs.existsSync(legacyRootSwTsPath)) {
+        return res.sendFile(legacyRootSwTsPath);
+    }
+    res.status(404).send('sw.js not found');
 });
 app.get('/manifest.webmanifest', (req, res) => {
     // Some browsers expect application/manifest+json; Express doesn't have a built-in shortcut for it.

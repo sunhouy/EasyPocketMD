@@ -33,8 +33,7 @@ const moduleLoaders = {
     sharePanel: function() { return import('./share'); },
     printPanel: function() { return import('./print'); },
     aiAssistant: function() { return import('./ai-assistant'); },
-    fileManager: function() { return import('./file-manager'); },
-    uncertaintyCalculator: function() { return import('../uncertainty-calculator'); }
+    fileManager: function() { return import('./file-manager'); }
 };
 
 const loadedModules = {};
@@ -685,14 +684,6 @@ async function runAction(action) {
                 return true;
             }
             return clickFirstExistingButton(['aboutBtn', 'desktopAboutBtn']);
-
-        case 'openUncertaintyCalculator':
-            if (typeof window.showUncertaintyCalculator !== 'function') await ensureImported('uncertaintyCalculator');
-            if (typeof window.showUncertaintyCalculator === 'function') {
-                window.showUncertaintyCalculator();
-                return true;
-            }
-            return clickFirstExistingButton(['mobileUncertaintyBtn']);
 
         default:
             return false;
