@@ -119,147 +119,127 @@
             var el = mermaidElements[i];
             var mermaidCode = el.textContent || el.getAttribute('data-mermaid');
             if (!mermaidCode) continue;
-            
+
+            var tempDiv = null;
+            var mermaidDiv = null;
+            var dataUrl = null;
 
             try {
-                // Create a temporary div for rendering
-                var tempDiv = document.createElement('div');
+                tempDiv = document.createElement('div');
                 tempDiv.className = 'mermaid';
                 tempDiv.textContent = mermaidCode;
-                tempDiv.style.cssText = 'position:fixed; left:0; top:0; min-width:400px; min-height:400px; padding:20px; background:white; z-index:-1;';
-                tempDiv.style.overflow = 'visible';
-                tempDiv.style.width = 'auto';
-                tempDiv.style.height = 'auto';
-
+                tempDiv.style.cssText = 'position:fixed; left:-10000px; top:0; min-width:400px; min-height:400px; padding:20px; background:white; z-index:-1; overflow:visible; width:auto; height:auto;';
                 document.body.appendChild(tempDiv);
 
-                // 尝试使用更直接的方法渲染 Mermaid 图表
-                try {
-                    // 确保 Mermaid 库已加载
-                    if (!window.mermaid) {
-                        // 尝试动态加载 Mermaid
-                        console.warn('[Render Debug] Mermaid库未加载，尝试动态加载...');
-                        await new Promise((resolve, reject) => {
-                            const script = document.createElement('script');
-                            script.src = 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js';
-                            script.onload = resolve;
-                            script.onerror = reject;
-                            document.head.appendChild(script);
-                        });
-                    }
-
-                    if (!window.mermaid) {
-                        throw new Error('Mermaid库加载失败');
-                    }
-
-                    // 清理 Mermaid 代码
-                    var cleanedCode = mermaidCode.trim();
-                    if (cleanedCode.startsWith('---')) {
-                        cleanedCode = cleanedCode.split('---').slice(2).join('---').trim();
-                    }
-
-                    // 初始化 Mermaid
-                    mermaid.initialize({
-                        startOnLoad: false,
-                        theme: 'default',
-                        securityLevel: 'loose',
+                if (!window.mermaid) {
+                    console.warn('[Render Debug] Mermaid库未加载，尝试动态加载...');
+                    await new Promise((resolve, reject) => {
+                        const script = document.createElement('script');
+                        script.src = '/vditor/dist/js/mermaid/mermaid.min.js';
+                        script.onload = resolve;
+                        script.onerror = function() {
+                            const fallback = document.createElement('script');
+                            fallback.src = 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js';
+                            fallback.onload = resolve;
+                            fallback.onerror = reject;
+                            document.head.appendChild(fallback);
+                        };
+                        document.head.appendChild(script);
                     });
-
-                    // 创建一个独立的 div 来渲染 Mermaid 图表
-                    var mermaidDiv = document.createElement('div');
-                    mermaidDiv.className = 'mermaid';
-                    mermaidDiv.textContent = cleanedCode;
-                    mermaidDiv.style.cssText = 'background:white; padding:20px;';
-                    // 先添加到 body 以确保 mermaid 能正确计算尺寸
-                    document.body.appendChild(mermaidDiv);
-                    
-                    try {
-                        // 兼容新旧版本 Mermaid API
-                        if (mermaid.run) {
-                            await mermaid.run({ nodes: [mermaidDiv] });
-                        } else if (mermaid.init) {
-                            mermaid.init(undefined, mermaidDiv);
-                        } else {
-                            throw new Error('未找到可用的 Mermaid 渲染方法');
-                        }
-
-                        // 等待渲染完成
-                        await new Promise(resolve => setTimeout(resolve, 500));
-
-                        var svgElement = mermaidDiv.querySelector('svg');
-                        if (svgElement) {
-                            var svgRect = svgElement.getBoundingClientRect();
-                            var width = Math.max(400, svgRect.width + 40);
-                            var height = Math.max(300, svgRect.height + 40);
-                            
-                            // 将渲染好的 SVG 移动到 tempDiv
-                            tempDiv.innerHTML = '';
-                            tempDiv.appendChild(svgElement);
-                            tempDiv.style.width = width + 'px';
-                            tempDiv.style.height = height + 'px';
-                        } else {
-                            throw new Error('Mermaid渲染未生成SVG');
-                        }
-                    } finally {
-                        if (mermaidDiv.parentNode === document.body) {
-                            document.body.removeChild(mermaidDiv);
-                        }
-                    }
-                } catch (mermaidError) {
-                    console.error('[Render Debug] Mermaid渲染失败:', mermaidError);
-                    // 渲染失败时使用占位符
-                    var svgCode = `
-                        <svg width="600" height="400" xmlns="http://www.w3.org/2000/svg">
-                            <rect width="100%" height="100%" fill="white" stroke="#ddd" stroke-width="1"/>
-                            <text x="300" y="200" font-family="Arial" font-size="24" text-anchor="middle" fill="#333">Mermaid Chart</text>
-                            <text x="300" y="240" font-family="Arial" font-size="16" text-anchor="middle" fill="#666">Chart Rendered</text>
-                        </svg>
-                    `;
-                    tempDiv.innerHTML = svgCode;
                 }
 
-                // Wait a bit for rendering to complete
-                await new Promise(resolve => setTimeout(resolve, 1000)); // 增加等待时间确保渲染完成
+                if (!window.mermaid) {
+                    throw new Error('Mermaid库加载失败');
+                }
 
-                // Convert to image using html2canvas
-                if (html2canvas) {
-                    try {
-                        const canvas = await html2canvas(tempDiv, {
-                            backgroundColor: '#ffffff',
-                            scale: 2
-                        });
-                        var dataUrl = canvas.toDataURL('image/png');
-                        document.body.removeChild(tempDiv);
-                    } catch (imageError) {
-                        console.error('[Render Debug] 图表图片转换失败:', imageError);
-                        document.body.removeChild(tempDiv);
-                        continue;
-                    }
+                var cleanedCode = mermaidCode.trim();
+                if (cleanedCode.startsWith('---')) {
+                    cleanedCode = cleanedCode.split('---').slice(2).join('---').trim();
+                }
+
+                mermaid.initialize({
+                    startOnLoad: false,
+                    theme: 'default',
+                    securityLevel: 'loose',
+                });
+
+                mermaidDiv = document.createElement('div');
+                mermaidDiv.className = 'mermaid';
+                mermaidDiv.textContent = cleanedCode;
+                mermaidDiv.style.cssText = 'background:white; padding:20px; position:fixed; left:-10000px; top:0;';
+                document.body.appendChild(mermaidDiv);
+
+                if (mermaid.run) {
+                    await mermaid.run({ nodes: [mermaidDiv] });
+                } else if (mermaid.init) {
+                    mermaid.init(undefined, mermaidDiv);
                 } else {
-                    console.error('[Render Debug] html2canvas库不可用，无法转换为图片');
-                    document.body.removeChild(tempDiv);
-                    continue;
+                    throw new Error('未找到可用的 Mermaid 渲染方法');
                 }
 
-                // Upload image to server
-                var imgUrl = await global.uploadImage(dataUrl, options && options.useTempDir);
+                await new Promise(resolve => setTimeout(resolve, 300));
 
-                if (imgUrl && el.parentNode) {
-                    // Create image container with proper styling
+                var svgElement = mermaidDiv.querySelector('svg');
+                if (!svgElement) {
+                    throw new Error('Mermaid渲染未生成SVG');
+                }
+
+                var svgRect = svgElement.getBoundingClientRect();
+                var width = Math.max(400, svgRect.width + 40);
+                var height = Math.max(300, svgRect.height + 40);
+
+                tempDiv.innerHTML = '';
+                tempDiv.appendChild(svgElement.cloneNode(true));
+                tempDiv.style.width = width + 'px';
+                tempDiv.style.height = height + 'px';
+
+                if (html2canvas) {
+                    const canvas = await html2canvas(tempDiv, {
+                        backgroundColor: '#ffffff',
+                        scale: 1.5
+                    });
+                    dataUrl = canvas.toDataURL('image/png');
+                } else {
+                    throw new Error('html2canvas库不可用');
+                }
+
+                if (dataUrl && el.parentNode) {
                     var imgContainer = document.createElement('div');
                     imgContainer.style.cssText = 'text-align:center; margin:20px 0;';
                     var img = document.createElement('img');
-                    img.src = imgUrl;
                     img.alt = 'Chart';
+
+                    if (options && options.useTempDir) {
+                        // PDF/打印导出：内联 base64，避免 wkhtmltopdf 回连服务器拉取图片导致卡死
+                        img.src = dataUrl;
+                    } else {
+                        var imgUrl = await global.uploadImage(dataUrl, false);
+                        if (!imgUrl) {
+                            throw new Error('图表图片上传失败');
+                        }
+                        img.src = imgUrl;
+                    }
+
                     img.style.maxWidth = '100%';
                     img.style.height = 'auto';
                     imgContainer.appendChild(img);
                     el.parentNode.replaceChild(imgContainer, el);
-                } else {
-                    console.error('[Render Debug] 图表图片上传失败，URL为空');
                 }
             } catch (e) {
-                    console.error('[Render Debug] Mermaid渲染错误:', e);
+                console.error('[Render Debug] Mermaid渲染错误:', e);
+                if (el.parentNode) {
+                    var fallback = document.createElement('div');
+                    fallback.style.cssText = 'text-align:center;color:#666;margin:1em 0;padding:1em;border:1px dashed #ddd;';
+                    fallback.textContent = '[Mermaid Diagram]';
+                    el.parentNode.replaceChild(fallback, el);
+                }
+            } finally {
+                if (tempDiv && tempDiv.parentNode === document.body) {
+                    document.body.removeChild(tempDiv);
+                }
+                if (mermaidDiv && mermaidDiv.parentNode === document.body) {
+                    document.body.removeChild(mermaidDiv);
+                }
             }
         }
         return container.innerHTML;
