@@ -3,6 +3,8 @@ const app = require('../../api/server');
 
 const request = require('supertest');
 const wkhtmltopdf = require('wkhtmltopdf');
+const fs = require('fs');
+const path = require('path');
 
 jest.mock('child_process', () => {
     const EventEmitter = require('events');
@@ -87,6 +89,45 @@ describe('Convert API Integration', () => {
             expect(res.status).toBe(200);
             expect(res.body.code).toBe(200);
             expect(res.body.url).toMatch(/^\/uploads\/.*\.pdf$/);
+        });
+
+        it('should inline local upload images and strip unconverted mermaid blocks', async () => {
+            const uploadsDir = path.join(__dirname, '../../uploads');
+            fs.mkdirSync(uploadsDir, { recursive: true });
+            const imageName = `pdf-mermaid-test-${Date.now()}.png`;
+            const imagePath = path.join(uploadsDir, imageName);
+            const pngBuffer = Buffer.from(
+                'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+                'base64'
+            );
+            fs.writeFileSync(imagePath, pngBuffer);
+
+            wkhtmltopdf.mockClear();
+
+            const res = await request(app)
+                .post('/api/convert/pdf')
+                .send({
+                    html: [
+                        '<div class="mermaid">graph TD; A-->B;</div>',
+                        `<img src="/uploads/${imageName}" alt="chart">`
+                    ].join('')
+                });
+
+            expect(res.status).toBe(200);
+            expect(res.body.code).toBe(200);
+            expect(wkhtmltopdf).toHaveBeenCalled();
+
+            const htmlInput = wkhtmltopdf.mock.calls[0][0];
+            expect(htmlInput).toContain('data:image/png;base64,');
+            expect(htmlInput).not.toContain(`/uploads/${imageName}`);
+            expect(htmlInput).not.toContain('graph TD');
+            expect(htmlInput).toContain('[Diagram]');
+
+            try {
+                fs.unlinkSync(imagePath);
+            } catch (cleanupError) {
+                // ignore cleanup errors in test
+            }
         });
     });
 

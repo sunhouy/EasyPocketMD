@@ -38,6 +38,100 @@ function getMarkdownRenderer() {
  * @param {string} html - The HTML content to clean
  * @returns {string} - Cleaned HTML
  */
+const STATIC_ASSET_DIRS = {
+    uploads: path.join(__dirname, '../../uploads'),
+    screenshots: path.join(__dirname, '../../screenshots'),
+    user_files: path.join(__dirname, '../../user_files'),
+};
+
+function mimeTypeFromPath(filePath) {
+    const ext = path.extname(filePath).toLowerCase();
+    if (ext === '.png') return 'image/png';
+    if (ext === '.jpg' || ext === '.jpeg') return 'image/jpeg';
+    if (ext === '.gif') return 'image/gif';
+    if (ext === '.webp') return 'image/webp';
+    if (ext === '.svg') return 'image/svg+xml';
+    return 'application/octet-stream';
+}
+
+function resolveStaticAssetPath(src) {
+    if (!src || typeof src !== 'string' || src.startsWith('data:')) {
+        return null;
+    }
+
+    try {
+        const normalized = src.replace(/^https?:\/\/[^/]+/i, '');
+        const match = normalized.match(/^\/(uploads|screenshots|user_files)\/([^?#]+)/i);
+        if (!match) {
+            return null;
+        }
+
+        const localPath = path.join(STATIC_ASSET_DIRS[match[1]], decodeURIComponent(match[2]));
+        if (!localPath.startsWith(STATIC_ASSET_DIRS[match[1]])) {
+            return null;
+        }
+        if (fs.existsSync(localPath)) {
+            return localPath;
+        }
+    } catch (error) {
+        console.warn('[PDF Debug] Failed to resolve static asset path:', src, error.message);
+    }
+
+    return null;
+}
+
+/** Inline /uploads/ etc. as data URLs so wkhtmltopdf does not HTTP-fetch the same server. */
+function inlineStaticAssetsForPdf(html) {
+    return String(html || '').replace(
+        /(<(?:img|embed)[^>]+src=)(["'])([^"']+)\2/gi,
+        (full, prefix, quote, src) => {
+            const localPath = resolveStaticAssetPath(src);
+            if (!localPath) {
+                return full;
+            }
+
+            try {
+                const data = fs.readFileSync(localPath);
+                const dataUrl = `data:${mimeTypeFromPath(localPath)};base64,${data.toString('base64')}`;
+                return `${prefix}${quote}${dataUrl}${quote}`;
+            } catch (error) {
+                console.warn('[PDF Debug] Failed to inline asset:', src, error.message);
+                return full;
+            }
+        }
+    );
+}
+
+function sanitizeHtmlForWkhtmltopdf(html) {
+    let cleaned = String(html || '');
+
+    cleaned = cleaned.replace(/<script\b[\s\S]*?<\/script>/gi, '');
+
+    cleaned = cleaned.replace(
+        /<div\b[^>]*class=["'][^"']*mermaid[^"']*["'][^>]*>[\s\S]*?<\/div>/gi,
+        (block) => {
+            if (/<img\b/i.test(block)) {
+                return block;
+            }
+            return '<div style="text-align:center;color:#666;margin:1em 0;">[Diagram]</div>';
+        }
+    );
+
+    cleaned = cleaned.replace(
+        /<pre\b[^>]*>\s*<code\b[^>]*class=["'][^"']*language-mermaid[^"']*["'][^>]*>[\s\S]*?<\/code>\s*<\/pre>/gi,
+        '<div style="text-align:center;color:#666;margin:1em 0;">[Diagram]</div>'
+    );
+
+    return cleaned;
+}
+
+function prepareHtmlForWkhtmltopdf(html) {
+    let prepared = cleanMathJaxContent(html);
+    prepared = sanitizeHtmlForWkhtmltopdf(prepared);
+    prepared = inlineStaticAssetsForPdf(prepared);
+    return prepared;
+}
+
 function cleanMathJaxContent(html) {
     try {
         let cleaned = html;
@@ -115,7 +209,7 @@ router.post('/pdf', (req, res) => {
             });
         }
 
-        html = cleanMathJaxContent(html);
+        html = prepareHtmlForWkhtmltopdf(html);
 
         // 处理字体设置
         const titleFont = settings?.titleFont || 'SimHei';
@@ -150,7 +244,11 @@ router.post('/pdf', (req, res) => {
             enableLocalFileAccess: true,
             encoding: 'UTF-8',
             imageQuality: 75,
-            imageDpi: 150
+            imageDpi: 150,
+            disableJavascript: true,
+            loadErrorHandling: 'ignore',
+            loadMediaErrorHandling: 'ignore',
+            noStopSlowScripts: true
         };
 
         writeStream = fs.createWriteStream(filePath);
