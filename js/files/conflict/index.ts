@@ -277,7 +277,6 @@ export function renderDiffView(diffResult: any[], isEn: boolean, options: boolea
       currentHunkId = hunkCounter;
       hunkCounter += 1;
     }
-    const hunkAttrs = hunkAttrString(currentHunkId, markHunks, activeHunkId, resolvedSet);
 
     if (item.type === 'removed') {
       html += `<div class="diff-line diff-removed${markHunks ? ' diff-hunk' : ''}${currentHunkId === activeHunkId ? ' diff-hunk-active' : ''}${resolvedSet.has(currentHunkId) ? ' diff-hunk-resolved' : ''}"${markHunks ? ` data-hunk-id="${currentHunkId}"` : ''}><div class="diff-line-num">${leftLine}</div><div class="diff-line-content"><pre>${escapeHtml(
