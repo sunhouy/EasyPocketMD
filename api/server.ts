@@ -341,8 +341,30 @@ function isDirectServerRun() {
 // Start server (tsx does not set require.main === module)
 if (isDirectServerRun()) {
     const server = http.createServer(app);
-    initShareCollabServer(server, shareManager);
-    initFileSyncServer(server);
+    const shareWss = initShareCollabServer(server, shareManager);
+    const fileSyncWss = initFileSyncServer(server);
+
+    server.on('upgrade', function(request, socket, head) {
+        const urlObj = new URL(request.url, 'http://localhost');
+        const pathname = urlObj.pathname;
+
+        if (pathname === '/api/share/ws' && shareWss) {
+            shareWss.handleUpgrade(request, socket, head, function done(ws) {
+                shareWss.emit('connection', ws, request);
+            });
+            return;
+        }
+
+        if (pathname === '/api/files/ws' && fileSyncWss) {
+            fileSyncWss.handleUpgrade(request, socket, head, function done(ws) {
+                fileSyncWss.emit('connection', ws, request);
+            });
+            return;
+        }
+
+        socket.destroy();
+    });
+
     server.listen(port, () => {
         console.log(`Server is running on port ${port}`);
         console.log(`Local: http://localhost:${port}`);
