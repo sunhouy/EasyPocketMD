@@ -26,7 +26,7 @@ function initShareCollabServer(httpServer, shareManager) {
         return null;
     }
 
-    const wss = new WebSocketServer({ server: httpServer, path: '/api/share/ws' });
+    const wss = new WebSocketServer({ noServer: true });
     const roomMap = new Map();
     const connectionTimeout = new Map();
     const HEARTBEAT_INTERVAL = 30000;

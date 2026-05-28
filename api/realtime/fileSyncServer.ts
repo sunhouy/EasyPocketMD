@@ -27,8 +27,8 @@ function initFileSyncServer(httpServer) {
 
     let wss;
     try {
-        wss = new WebSocketServer({ server: httpServer, path: '/api/files/ws' });
-        console.log('[fileSyncServer] WebSocket server created at path /api/files/ws');
+        wss = new WebSocketServer({ noServer: true });
+        console.log('[fileSyncServer] WebSocket server created (noServer mode)');
     } catch (e) {
         console.error('[fileSyncServer] Failed to create WebSocketServer:', e.message);
         return null;
