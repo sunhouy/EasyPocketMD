@@ -2860,6 +2860,10 @@ import { installSyncRuntime } from './sync-runtime';
             showSaveStatus('saving');
         }
 
+        if (g('currentUser')) {
+            scheduleWebSocketSync(currentFileId);
+        }
+
         // 在线共享文档由 share websocket/update 通道负责写入，避免 owner 普通保存覆盖实时协作状态。
         if (
             global.sharedDocState &&
@@ -3411,6 +3415,14 @@ import { installSyncRuntime } from './sync-runtime';
 
     async function deleteFileFromServer(filename) {
         return syncRuntimeApi.deleteFileFromServer(filename);
+    }
+
+    function scheduleWebSocketSync(fileId) {
+        return syncRuntimeApi.scheduleWebSocketSync(fileId);
+    }
+
+    function isWebSocketConnected() {
+        return syncRuntimeApi.isWebSocketConnected();
     }
 
     function showHistoryDiffModal(filename, versionId, content, timestamp) {
@@ -5438,6 +5450,8 @@ import { installSyncRuntime } from './sync-runtime';
     global.syncFileToServer = syncFileToServer;
     global.deleteFileFromServer = deleteFileFromServer;
     global.syncCurrentFileWithBeacon = syncCurrentFileWithBeacon;
+    global.scheduleWebSocketSync = scheduleWebSocketSync;
+    global.isWebSocketConnected = isWebSocketConnected;
     global.markPendingServerSync = markPendingServerSync;
     global.showHistoryDiffModal = showHistoryDiffModal;
     global.restoreFromHistory = restoreFromHistory;

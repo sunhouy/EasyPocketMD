@@ -15,7 +15,17 @@ describe('textCrdt', () => {
         expect(result.merged).toBe(false);
     });
 
-    it('should not concatenate full snapshots when ancestry is unknown', () => {
+    it('should merge overlapping edits at the same position', () => {
+        const result = mergeTextWithCrdt('hello world', 'hello amazing world', 'hello beautiful world');
+
+        expect(result.content).toContain('hello');
+        expect(result.content).toContain('world');
+        expect(result.content).not.toBe('hello amazing world');
+        expect(result.content).not.toBe('hello beautiful world');
+        expect(result.merged).toBe(true);
+    });
+
+    it('should fall back to local snapshot when base is empty', () => {
         const local = '# Doc\n\nline 1\nline 2\nlocal edit';
         const remote = '# Doc\n\nline 1\nline 2\nremote edit';
         const result = mergeTextWithCrdt('', local, remote);
@@ -23,6 +33,20 @@ describe('textCrdt', () => {
         expect(result.content).toBe(local);
         expect(result.content).not.toBe(local + remote);
         expect(result.content).not.toBe(remote + local);
+        expect(result.merged).toBe(false);
+    });
+
+    it('should return local when remote equals base', () => {
+        const result = mergeTextWithCrdt('hello', 'hello world', 'hello');
+
+        expect(result.content).toBe('hello world');
+        expect(result.merged).toBe(false);
+    });
+
+    it('should return result unchanged when both edits are identical', () => {
+        const result = mergeTextWithCrdt('hello', 'hello world', 'hello world');
+
+        expect(result.content).toBe('hello world');
         expect(result.merged).toBe(false);
     });
 });

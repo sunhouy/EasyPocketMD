@@ -122,6 +122,7 @@ const pexelsRoutes = require('./routes/pexels');
 const gatusRoutes = require('./routes/gatus');
 const shareManager = require('./models/ShareManager');
 const { initShareCollabServer } = require('./realtime/shareCollabServer');
+const { initFileSyncServer } = require('./realtime/fileSyncServer');
 
 // Use routes with rate limiting - MUST BE BEFORE SPA FALLBACK!
 // AI routes - strict rate limiting (especially for unauthenticated users)
@@ -341,6 +342,7 @@ function isDirectServerRun() {
 if (isDirectServerRun()) {
     const server = http.createServer(app);
     initShareCollabServer(server, shareManager);
+    initFileSyncServer(server);
     server.listen(port, () => {
         console.log(`Server is running on port ${port}`);
         console.log(`Local: http://localhost:${port}`);
