@@ -55,11 +55,146 @@ export function createSyncRuntimeApi(ctx: any) {
     return raw === true || raw === 1 || raw === '1' || raw === 'true';
   }
 
+  function handleRemoteFileUpdate(payload: any) {
+    const files = g('files');
+    const filename = payload.filename;
+    const file = files.find(function(f: any) { return f.name === filename; });
+    if (!file || file.type === 'folder') return;
+
+    if (Number.isFinite(Number(payload.content_version))) {
+      file.contentVersion = Number(payload.content_version);
+      file.serverLastModified = payload.last_modified || null;
+    }
+
+    const currentFileId = g('currentFileId');
+    if (file.id === currentFileId) return;
+
+    file.content = String(payload.content || '');
+    file.isSynced = true;
+    file.contentLoaded = true;
+
+    const lastSyncedContent = g('lastSyncedContent') || {};
+    lastSyncedContent[file.id] = file.content;
+    g('unsavedChanges')[file.id] = false;
+
+    localStorage.setItem('vditor_files', JSON.stringify(files));
+  }
+
+  function handleRemoteFileSaved(payload: any) {
+    const files = g('files');
+    const file = files.find(function(f: any) { return f.name === payload.filename; });
+    if (!file) return;
+
+    if (Number.isFinite(Number(payload.content_version))) {
+      file.contentVersion = Number(payload.content_version);
+    }
+    file.serverLastModified = payload.last_modified || null;
+    file.isSynced = true;
+
+    const lastSyncedContent = g('lastSyncedContent') || {};
+    lastSyncedContent[file.id] = payload.content || file.content;
+    g('unsavedChanges')[file.id] = false;
+
+    markPendingServerSync(file.id, false);
+    localStorage.setItem('vditor_files', JSON.stringify(files));
+  }
+
+  function scheduleWebSocketSync(fileId: string) {
+    if (!g('currentUser')) return;
+
+    const files = g('files');
+    const file = files.find(function(f: any) { return f.id === fileId; });
+    if (!file || file.type !== 'file' || isExternalLocalFile(file)) return;
+
+    const content = file.id === g('currentFileId')
+      ? getCurrentEditorContent(fileId, file.content)
+      : file.content;
+
+    if (!content && content !== '') return;
+
+    const lastSyncedContent = g('lastSyncedContent') || {};
+
+    let contentToSend = content;
+    const fileE2EEnabled = isFileE2EEnabled(file);
+    if (g('currentUser') && contentToSend && file.type !== 'folder') {
+      try {
+        const e2e = require('../../e2e');
+        if (fileE2EEnabled && typeof e2e.encryptSync === 'function') {
+          const encrypted = e2e.encryptSync(contentToSend, g('currentUser').password);
+          if (encrypted && encrypted !== contentToSend) {
+            contentToSend = encrypted;
+          }
+        }
+      } catch (e) {
+        console.error('[WS] E2E prepare error', e);
+      }
+    }
+
+    if (contentToSend === undefined) return;
+
+    if (!globalRef.wsThrottle) return;
+
+    globalRef.wsThrottle.schedule({
+      type: 'file_save',
+      filename: file.name,
+      content: contentToSend,
+      base_content: lastSyncedContent[fileId],
+      base_content_version: file.contentVersion,
+      e2e_enabled: fileE2EEnabled ? 1 : 0,
+    });
+  }
+
+  function initWebSocketClient() {
+    if (globalRef.wsClient) return;
+
+    try {
+      const { createWebSocketClient, createSyncThrottle } = require('../websocket-sync');
+
+      globalRef.wsThrottle = createSyncThrottle(function(data: any) {
+        if (globalRef.wsClient && globalRef.wsClient.isConnected()) {
+          globalRef.wsClient.send(data);
+        }
+      });
+
+      globalRef.wsClient = createWebSocketClient({
+        getToken: function() {
+          const user = g('currentUser');
+          return user ? user.token : null;
+        },
+        onReady: function() {
+          globalRef.syncAllFiles();
+        },
+        onFileUpdated: function(payload: any) {
+          handleRemoteFileUpdate(payload);
+        },
+        onFileSaved: function(payload: any) {
+          handleRemoteFileSaved(payload);
+        },
+        onFileList: function(_payload: any) {},
+        onDisconnected: function() {},
+      });
+    } catch (e) {
+      console.warn('[WS] Failed to init WebSocket client:', e);
+    }
+  }
+
   function startAutoSync() {
     if (globalRef.syncInterval) clearInterval(globalRef.syncInterval);
+    if (!g('currentUser')) return;
+
+    initWebSocketClient();
+
+    if (globalRef.wsClient && !globalRef.wsClient.isConnected()) {
+      globalRef.wsClient.connect();
+    }
+
     globalRef.syncInterval = setInterval(function () {
-      if (g('currentUser')) globalRef.syncAllFiles();
-    }, 5000);
+      if (g('currentUser')) {
+        if (!globalRef.wsClient || !globalRef.wsClient.isConnected()) {
+          globalRef.syncAllFiles();
+        }
+      }
+    }, 30000);
   }
 
   function stopAutoSync() {
@@ -67,14 +202,21 @@ export function createSyncRuntimeApi(ctx: any) {
       clearInterval(globalRef.syncInterval);
       globalRef.syncInterval = null;
     }
+    if (globalRef.wsClient) {
+      globalRef.wsClient.disconnect();
+      globalRef.wsClient = null;
+      globalRef.wsThrottle = null;
+    }
   }
 
   async function syncAllFiles() {
     if (!g('currentUser')) return;
-    try {
-      await pullServerUpdatesForCleanFiles();
-    } catch (e) {
-      console.warn('拉取服务器更新失败:', e);
+    if (!globalRef.wsClient || !globalRef.wsClient.isConnected()) {
+      try {
+        await pullServerUpdatesForCleanFiles();
+      } catch (e) {
+        console.warn('拉取服务器更新失败:', e);
+      }
     }
 
     const files = g('files');
@@ -393,5 +535,9 @@ export function createSyncRuntimeApi(ctx: any) {
     syncFileToServer,
     deleteFileFromServer,
     syncCurrentFileWithBeacon,
+    scheduleWebSocketSync,
+    isWebSocketConnected: function() {
+      return !!(globalRef.wsClient && globalRef.wsClient.isConnected());
+    },
   };
 }
