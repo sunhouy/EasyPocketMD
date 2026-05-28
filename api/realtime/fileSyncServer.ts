@@ -18,9 +18,21 @@ function safeJsonParse(raw) {
 }
 
 function initFileSyncServer(httpServer) {
-    if (!httpServer || !WebSocketServer) return null;
+    if (!httpServer) return null;
 
-    const wss = new WebSocketServer({ server: httpServer, path: '/api/files/ws' });
+    if (!WebSocketServer) {
+        console.error('[fileSyncServer] ws library not available, cannot start WebSocket server');
+        return null;
+    }
+
+    let wss;
+    try {
+        wss = new WebSocketServer({ server: httpServer, path: '/api/files/ws' });
+        console.log('[fileSyncServer] WebSocket server created at path /api/files/ws');
+    } catch (e) {
+        console.error('[fileSyncServer] Failed to create WebSocketServer:', e.message);
+        return null;
+    }
     const userSockets = new Map();
     const HEARTBEAT_INTERVAL = 25000;
 
@@ -103,7 +115,7 @@ function initFileSyncServer(httpServer) {
                     return;
                 }
 
-                const optimisticLock = {};
+                const optimisticLock: { base_content?: string; base_content_version?: any } = {};
                 if (baseContent !== undefined) optimisticLock.base_content = baseContent;
                 if (baseContentVersion !== undefined && baseContentVersion !== null && baseContentVersion !== '') {
                     optimisticLock.base_content_version = baseContentVersion;
