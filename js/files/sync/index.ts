@@ -1,3 +1,5 @@
+import { createWebSocketClient, createSyncThrottle } from '../websocket-sync';
+
 export function normalizeServerFileRecord(f: any): any {
   let type = 'file';
   let content = f.content;
@@ -99,7 +101,7 @@ export function createSyncRuntimeApi(ctx: any) {
     localStorage.setItem('vditor_files', JSON.stringify(files));
   }
 
-  function scheduleWebSocketSync(fileId: string) {
+  async function scheduleWebSocketSync(fileId: string) {
     if (!g('currentUser')) return;
 
     const files = g('files');
@@ -118,7 +120,7 @@ export function createSyncRuntimeApi(ctx: any) {
     const fileE2EEnabled = isFileE2EEnabled(file);
     if (g('currentUser') && contentToSend && file.type !== 'folder') {
       try {
-        const e2e = require('../../e2e');
+        const e2e = await import('../../e2e');
         if (fileE2EEnabled && typeof e2e.encryptSync === 'function') {
           const encrypted = e2e.encryptSync(contentToSend, g('currentUser').password);
           if (encrypted && encrypted !== contentToSend) {
@@ -148,8 +150,6 @@ export function createSyncRuntimeApi(ctx: any) {
     if (globalRef.wsClient) return;
 
     try {
-      const { createWebSocketClient, createSyncThrottle } = require('../websocket-sync');
-
       globalRef.wsThrottle = createSyncThrottle(function(data: any) {
         if (globalRef.wsClient && globalRef.wsClient.isConnected()) {
           globalRef.wsClient.send(data);
