@@ -26,6 +26,9 @@
 *.tar   binary
 *.gz    binary
 
+# 忽略所有 HTML 和 CSS 文件
+*.html linguist-detectable=false
+*.css linguist-detectable=false
 wasm_text_engine/js/text-engine-client.js linguist-language=C++
 wasm_text_engine/js/text-engine-client.js linguist-language=C++
 
