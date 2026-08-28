@@ -27,11 +27,7 @@ EasyPocketMD 是一款几乎零学习成本的智能 Markdown 编辑器，无需
 如果 EasyPocketMD 对你有帮助，欢迎点一个 Star，这是对我最大的鼓励！
 
 ![Build and Deploy](https://github.com/sunhouy/EasyPocketMD/actions/workflows/deploy.yml/badge.svg)
-![Build Android App](https://github.com/sunhouy/EasyPocketMD/actions/workflows/build-android.yml/badge.svg)
-![Build Tauri App](https://github.com/sunhouy/EasyPocketMD/actions/workflows/build-tauri.yml/badge.svg)
 ![codecov](https://codecov.io/gh/sunhouy/EasyPocketMD/graph/badge.svg?token=8E02GDKIKQ)
-![NPM Downloads](https://img.shields.io/npm/dw/easypocketmd)
-![GitHub stars](https://img.shields.io/github/stars/sunhouy/EasyPocketMD?style=social)
 
 ---
 
