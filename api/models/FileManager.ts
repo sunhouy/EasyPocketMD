@@ -37,6 +37,9 @@ class FileManager {
                 }))
             );
             if (cached && isCachedVersionShapeValid) {
+                if (Array.isArray(cached.files)) {
+                    cached.files = cached.files.filter(f => f && !String(f.name || '').startsWith('.'));
+                }
                 return {
                     code: 200,
                     message: '获取文件列表成功 (缓存)',
@@ -48,17 +51,18 @@ class FileManager {
                 await Cache.deleteUserFiles(username);
             }
 
-            const [rows] = await db.execute(
+            const rows = await db.execute(
                 'SELECT filename, last_modified, content_version, e2e_enabled FROM user_files WHERE username = ? ORDER BY last_modified DESC',
                 [username]
             );
 
+            // 过滤隐藏文件（以 . 开头，用于端到端加密配置同步等系统用途，不展示在文件列表中）
             const files = rows.map(row => ({
                 name: row.filename,
                 content_version: row.content_version,
                 e2e_enabled: row.e2e_enabled ? 1 : 0,
                 last_modified: row.last_modified
-            }));
+            })).filter(f => !f.name.startsWith('.'));
 
             const result = {
                 username,

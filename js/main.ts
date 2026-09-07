@@ -3,6 +3,7 @@
  */
 import { initSlashCommandRuntime } from './ui/slash-command';
 import { getCurrentEngine, createEditor } from './editor-engine';
+import './ai-config';
 import { enterPresentationMode, exitPresentationMode } from './main/presentation-mode';
 import { initBackNavigation } from './main/back-navigation';
 import { installMobileChromeScroll } from './main/mobile-chrome-scroll';
@@ -325,6 +326,21 @@ document.addEventListener('DOMContentLoaded', function() {
     // 全局状态
     window.nightMode = localStorage.getItem('vditor_night_mode') === 'true';
     window.currentUser = JSON.parse(localStorage.getItem('vditor_user') || 'null');
+
+    // 从云端隐藏文件拉取并解密 AI 配置（若有）
+    var aiConfigApiInit = (window as any).AIConfig;
+    if (aiConfigApiInit && window.currentUser && window.currentUser.username) {
+        aiConfigApiInit.loadFromCloud()
+            .then(function(cloudCfg) {
+                if (cloudCfg) {
+                    aiConfigApiInit.save(cloudCfg);
+                    (window as any).aiConfigMergedFromCloud = true;
+                }
+            })
+            .catch(function(err) {
+                console.warn('AI 配置云端拉取失败:', err && err.message);
+            });
+    }
     window.currentFileId = null;
     window.files = JSON.parse(localStorage.getItem('vditor_files') || '[]');
     window.appSessionId = 'session_' + Date.now() + '_' + Math.random().toString(36).slice(2, 10);
@@ -2733,6 +2749,20 @@ document.addEventListener('DOMContentLoaded', function() {
         renderToolbarButtonSettings();
         renderKeyboardShortcutSettings();
 
+        // 填充 AI 模型配置
+        var aiApiKeyInput = document.getElementById('aiApiKeyInput');
+        var aiBaseUrlInput = document.getElementById('aiBaseUrlInput');
+        var aiModelInput = document.getElementById('aiModelInput');
+        var aiSyncToCloudCheckbox = document.getElementById('aiSyncToCloudCheckbox');
+        var aiConfigApi = (window as any).AIConfig;
+        if (aiConfigApi && aiApiKeyInput && aiBaseUrlInput && aiModelInput && aiSyncToCloudCheckbox) {
+            var aiCfg = aiConfigApi.get();
+            aiApiKeyInput.value = aiCfg.apiKey || '';
+            aiBaseUrlInput.value = aiCfg.baseUrl || '';
+            aiModelInput.value = aiCfg.model || '';
+            aiSyncToCloudCheckbox.checked = !!aiCfg.syncToCloud;
+        }
+
         // 每次打开设置都默认折叠空间管理详情
         var slashCommandDetails = document.getElementById('slashCommandDetails');
         if (slashCommandDetails) {
@@ -3227,6 +3257,43 @@ document.addEventListener('DOMContentLoaded', function() {
         // 保存设置
         window.userSettings = newSettings;
         localStorage.setItem('vditor_settings', JSON.stringify(window.userSettings));
+
+        // 保存 AI 模型配置
+        var aiConfigApi = (window as any).AIConfig;
+        var aiApiKeyInput = document.getElementById('aiApiKeyInput');
+        var aiBaseUrlInput = document.getElementById('aiBaseUrlInput');
+        var aiModelInput = document.getElementById('aiModelInput');
+        var aiSyncToCloudCheckbox = document.getElementById('aiSyncToCloudCheckbox');
+        if (aiConfigApi && aiApiKeyInput && aiBaseUrlInput && aiModelInput && aiSyncToCloudCheckbox) {
+            var aiCfg = aiConfigApi.get();
+            aiCfg.apiKey = (aiApiKeyInput.value || '').trim();
+            aiCfg.baseUrl = (aiBaseUrlInput.value || '').trim();
+            aiCfg.model = (aiModelInput.value || '').trim();
+            var newSync = !!aiSyncToCloudCheckbox.checked;
+            var syncChanged = aiCfg.syncToCloud !== newSync;
+            aiCfg.syncToCloud = newSync;
+            aiConfigApi.save(aiCfg);
+
+            if (aiCfg.syncToCloud && aiCfg.apiKey && aiCfg.baseUrl && aiCfg.model) {
+                (function(cfg) {
+                    aiConfigApi.syncToCloud(cfg)
+                        .then(function() {
+                            window.showMessage(window.i18n ? window.i18n.t('settingsSaved') : '设置已保存', 'success');
+                        })
+                        .catch(function(err) {
+                            console.error('AI 配置云端同步失败:', err);
+                            window.showMessage((err && err.message) || 'AI 配置云端同步失败', 'error');
+                        });
+                })(aiCfg);
+            } else if (syncChanged && !newSync) {
+                (function() {
+                    aiConfigApi.deleteFromCloud()
+                        .catch(function(err) {
+                            console.error('删除云端 AI 配置失败:', err);
+                        });
+                })();
+            }
+        }
 
         if (window.electron && typeof window.electron.setMdAssociationEnabled === 'function') {
             window.electron.setMdAssociationEnabled(!!newSettings.mdFileAssociationEnabled).catch(function(error) {

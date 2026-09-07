@@ -2661,30 +2661,15 @@ JSON 结构：
         pptState.lastServerSyncAt = '';
     }
 
-    // 调用AI API
+    // 调用AI API（前端直连，使用用户配置的 apiKey/baseUrl/model）
     async function callAIAPI(prompt, content) {
-        var apiUrl = (global.getApiBaseUrl ? global.getApiBaseUrl() : '/api') + '/ai/generate';
-        
-        var response = await fetch(apiUrl, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': 'Bearer ' + (g('currentUser') ? (g('currentUser').token || g('currentUser').username) : '')
-            },
-            body: JSON.stringify({ prompt: prompt, content: content })
-        });
-
-        if (!response.ok) {
-            throw new Error('API request failed: ' + response.status);
+        var systemPrompt = '你是一个专业的写作及PPT大纲助手。请根据用户要求输出高质量的结构化内容。输出约束：严禁返回HTML标签或完整HTML文档，默认只返回纯文本、Markdown或合法JSON。若要求生成PPT大纲，返回清晰的层级结构。';
+        var userPrompt = content ? prompt + '\n\n' + content : prompt;
+        var aiClient = global.AIConfig;
+        if (!aiClient) {
+            throw new Error('AI config module unavailable');
         }
-
-        var result = await response.json();
-        
-        if (result.code === 200 && result.data) {
-            return result.data;
-        } else {
-            throw new Error(result.message || 'Unknown error');
-        }
+        return await aiClient.callText(systemPrompt, userPrompt, { temperature: 0.7 });
     }
 
     // 自定义确认对话框

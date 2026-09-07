@@ -156,39 +156,14 @@
 
     // 调用AI API
     async function callAIAPI(prompt, content) {
-        // 模拟AI响应（实际使用时替换为真实API调用）
-        await new Promise(resolve => setTimeout(resolve, 1500));
-
-        // 这里应该调用实际的AI API
-        // 示例：调用后端AI接口
-        try {
-            var apiUrl = (global.getApiBaseUrl ? global.getApiBaseUrl() : '/api') + '/ai/generate';
-
-            var response = await fetch(apiUrl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': 'Bearer ' + (g('currentUser') ? (g('currentUser').token || g('currentUser').username) : '')
-                },
-                body: JSON.stringify({
-                    prompt: prompt,
-                    content: content,
-                    timestamp: new Date().toISOString()
-                })
-            });
-
-            if (response.ok) {
-                var result = await response.json();
-                if (result.code === 200 && result.data) {
-                    return result.data;
-                }
-            }
-        } catch (e) {
-            console.log('API调用失败，使用模拟数据');
+        // 前端直连：使用用户配置的 apiKey/baseUrl/model 调用 OpenAI 兼容接口
+        var systemPrompt = '你是一个专业的写作助手，可以帮助用户生成各种类型的文档内容、改写文本、生成PPT大纲等。请根据用户的要求提供高质量的回复。直接返回结果，不要包含解释性文字。输出约束：严禁返回HTML标签（如<div>、<span>、<p>等）或完整HTML文档；默认只返回纯文本、Markdown或JSON。若用户要求JSON，必须返回可直接解析的合法JSON对象，不要使用代码块包裹。';
+        var userPrompt = content ? prompt + '\n\n' + content : prompt;
+        var aiClient = global.AIConfig;
+        if (!aiClient) {
+            throw new Error(isEn() ? 'AI config module unavailable' : 'AI 配置模块不可用');
         }
-
-        // 模拟返回结果
-        return generateMockResult(prompt);
+        return await aiClient.callText(systemPrompt, userPrompt, { temperature: 0.7 });
     }
 
     // 生成模拟结果
