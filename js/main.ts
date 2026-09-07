@@ -1542,6 +1542,7 @@ document.addEventListener('DOMContentLoaded', function() {
             getVditorContentThemePath()
         );
     }
+    window.applyVditorThemes = applyVditorThemes;
 
     function markCurrentFileEdited() {
         if (!window.currentFileId) return;
