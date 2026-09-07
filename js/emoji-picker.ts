@@ -493,33 +493,55 @@ async function performEmojiAISearch(keyword) {
     emojiGrid.appendChild(loadingDiv);
 
     try {
-        const apiUrl = (window.getApiBaseUrl ? window.getApiBaseUrl() : 'api') + '/ai/emoji';
-        const response = await fetch(apiUrl, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': 'Bearer ' + (window.currentUser ? (window.currentUser.token || window.currentUser.username) : '')
-            },
-            body: JSON.stringify({
-                keyword,
-                language: isEn() ? 'en' : 'zh'
-            })
-        });
+        // 前端直连：使用用户配置的 apiKey/baseUrl/model
+        const systemPrompt = isEn()
+            ? `You are an emoji search assistant.
+Given a keyword, return 8-12 relevant emojis with short English and Chinese names.
+Return plain text only, one item per line, in this format:
+emoji | english_name | chinese_name
 
-        const result = await response.json();
-        if (result.code === 200 && result.data) {
-            const items = parseAIEmojiResponse(result.data);
-            if (items.length > 0) {
-                renderAIEmojiResults(items);
-            } else {
-                showAINoEmojiResult();
-            }
+Example:
+😀 | grinning face | 咧嘴笑
+🙏 | folded hands | 祈祷
+
+No extra explanations, no markdown.`
+            : `你是表情搜索助手。
+根据关键词返回 8-12 个相关表情，并附简短英文名和中文名。
+只返回纯文本，每行一个，格式如下：
+emoji | english_name | chinese_name
+
+例如：
+😀 | grinning face | 咧嘴笑
+🙏 | folded hands | 祈祷
+
+不要额外解释，不要 markdown。`;
+        const userPrompt = isEn()
+            ? `Find emojis related to: "${keyword}"`
+            : `搜索与"${keyword}"相关的表情`;
+
+        if (!window.AIConfig) {
+            showAIEmojiError(isEn() ? 'AI config module unavailable' : 'AI 配置模块不可用');
+            return;
+        }
+        if (!window.AIConfig.isReady()) {
+            showAIEmojiError(isEn() ? 'Please configure AI model in Settings first' : '请先在 设置 - AI 模型 中配置 apiKey/baseUrl/模型名称');
+            return;
+        }
+
+        const aiResponse = await window.AIConfig.callText(systemPrompt, userPrompt);
+        const items = parseAIEmojiResponse(aiResponse);
+        if (items.length > 0) {
+            renderAIEmojiResults(items);
         } else {
-            showAIEmojiError(result.message || (isEn() ? 'AI search failed' : 'AI搜索失败'));
+            showAINoEmojiResult();
         }
     } catch (error) {
         console.error('AI emoji search error:', error);
-        showAIEmojiError(isEn() ? 'Network error, please try again' : '网络错误，请重试');
+        if (error && error.code === 'AI_CONFIG_REQUIRED') {
+            showAIEmojiError(error.message || (isEn() ? 'Please configure AI model in Settings first' : '请先在 设置 - AI 模型 中配置'));
+            return;
+        }
+        showAIEmojiError(isEn() ? 'AI search failed, please check your configuration' : 'AI搜索失败，请检查模型配置');
     }
 }
 

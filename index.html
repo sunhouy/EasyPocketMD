@@ -667,6 +667,43 @@
                 </ul>
             </section>
 
+            <section class="settings-section" aria-labelledby="settingsAIGroupTitle">
+                <div class="settings-section-header">
+                    <h3 class="settings-section-title" id="settingsAIGroupTitle">   AI 模型（自备模型）</h3>
+                </div>
+                <ul class="settings-list" role="list">
+                    <li class="settings-list-item">
+                        <div class="form-group">
+                            <label for="aiApiKeyInput">API Key</label>
+                            <input type="password" id="aiApiKeyInput" class="form-control" placeholder="sk-..." autocomplete="off" />
+                            <div class="settings-inline-hint">AI 调用由前端直连发起，密钥仅保存于本地（可选端到端加密同步至云端隐藏文件），云端不提供模型。</div>
+                        </div>
+                    </li>
+                    <li class="settings-list-item">
+                        <div class="form-group">
+                            <label for="aiBaseUrlInput">Base URL（OpenAI 兼容）</label>
+                            <input type="text" id="aiBaseUrlInput" class="form-control" placeholder="https://api.openai.com/v1" />
+                            <div class="settings-inline-hint">支持常见 OpenAI 兼容接口，例如 https://api.openai.com/v1 或 https://dashscope.aliyuncs.com/compatible-mode/v1</div>
+                        </div>
+                    </li>
+                    <li class="settings-list-item">
+                        <div class="form-group">
+                            <label for="aiModelInput">模型名称</label>
+                            <input type="text" id="aiModelInput" class="form-control" placeholder="gpt-4o-mini / deepseek-v4-flash" />
+                        </div>
+                    </li>
+                    <li class="settings-list-item">
+                        <div class="form-group">
+                            <label for="aiSyncToCloudCheckbox">端到端加密同步到云端</label>
+                            <div class="checkbox-group">
+                                <label><input type="checkbox" id="aiSyncToCloudCheckbox"> <span>将 AI 配置端到端加密后作为隐藏文件同步到云端，仅本人可解密</span></label>
+                            </div>
+                            <div class="settings-hint">开启后使用账号密码对配置做 AES 端到端加密，作为隐藏文件（.ai-config.json）存于云端；关闭则删除云端隐藏文件。</div>
+                        </div>
+                    </li>
+                </ul>
+            </section>
+
             <section class="settings-section" aria-labelledby="settingsAdvancedGroupTitle">
                 <div class="settings-section-header">
                     <h3 class="settings-section-title" id="settingsAdvancedGroupTitle" data-i18n="settingsGroupAdvanced">   高级与维护</h3>

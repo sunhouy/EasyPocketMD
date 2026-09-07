@@ -66,11 +66,13 @@ export function installMobileChromeScroll(options: MobileChromeScrollOptions): M
     document.body.classList.toggle('mobile-native-chrome', options.isMobileNative());
   }
 
-  function setTopToolbarHidden(hidden: boolean): void {
-    if (!options.isMobileWeb()) return;
-    if (topToolbarHidden === hidden) return;
-    topToolbarHidden = hidden;
-    document.body.classList.toggle('mobile-top-toolbar-hidden', hidden);
+  function setTopToolbarHidden(_hidden: boolean): void {
+    // 已禁用：移动端下滑自动隐藏顶部工具栏在滚动时会触发高频 class 切换，
+    // 在部分低端设备上造成明显卡顿。因此这里不再隐藏顶部工具栏，始终保持可见。
+    if (topToolbarHidden) {
+      topToolbarHidden = false;
+      document.body.classList.remove('mobile-top-toolbar-hidden');
+    }
   }
 
   function reset(): void {

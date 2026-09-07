@@ -221,57 +221,15 @@
     }
 
     async function callQwenAPI(content, systemPrompt) {
-        // 构建请求体
-        var requestBody = {
-            model: "deepseek-v4-flash", // 使用deepseek模型
-            input: {
-                messages: [
-                    {
-                        role: "system",
-                        content: systemPrompt + "\n" + (isEn() ? 'Please directly return the formatted Markdown content. Do not modify the content text in any way, no matter how casual the content is. Do not include any explanations, preambles, or postscripts. Do not wrap with code blocks.' : '请直接返回排版后的Markdown内容，不得对内容文本进行任何修改，无论内容多么随意。不要包含任何解释、前言或后语。不要使用代码块包裹。')
-                    },
-                    {
-                        role: "user",
-                        content: content
-                    }
-                ]
-            },
-            parameters: {
-                result_format: "message"
-            }
-        };
-
-        // 调用后端代理接口
-        try {
-            var apiUrl = (global.getApiBaseUrl ? global.getApiBaseUrl() : 'api') + '/ai/layout';
-            
-            // 如果后端没有专门的AI接口，我们可以暂时模拟或者使用一个通用的处理接口
-            // 这里假设后端有一个处理AI请求的接口
-            var response = await fetch(apiUrl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': 'Bearer ' + (g('currentUser') ? (g('currentUser').token || g('currentUser').username) : '')
-                },
-                body: JSON.stringify({
-                    content: content,
-                    style: currentAISettings.style,
-                    requirements: currentAISettings.requirements
-                })
-            });
-            
-            var result = await response.json();
-            
-            if (result.code === 200 && result.data) {
-                return result.data;
-            } else {
-                // 如果API调用失败，抛出错误
-                throw new Error(result.message || (isEn() ? 'AI service temporarily unavailable' : 'AI服务暂时不可用'));
-            }
-        } catch (e) {
-            // 如果后端接口不存在
-             throw e;
+        // 前端直连：使用用户配置的 apiKey/baseUrl/model 调用 OpenAI 兼容接口
+        var instruction = (isEn()
+            ? ' Please directly return the formatted Markdown content. Do not modify the content text in any way, no matter how casual the content is. Do not include any explanations, preambles, or postscripts. Do not wrap with code blocks.'
+            : ' 请直接返回排版后的Markdown内容，不得对内容文本进行任何修改，无论内容多么随意。不要包含任何解释、前言或后语。不要使用代码块包裹。');
+        var aiClient = global.AIConfig;
+        if (!aiClient) {
+            throw new Error(isEn() ? 'AI config module unavailable' : 'AI 配置模块不可用');
         }
+        return await aiClient.callText(systemPrompt + instruction, content, { temperature: 0.4 });
     }
     
     // 简单的Markdown转HTML，用于AI预览

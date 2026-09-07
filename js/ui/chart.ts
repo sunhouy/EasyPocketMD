@@ -897,37 +897,30 @@
             generateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ' + t('generatingChart');
 
             try {
-                var apiUrl = (window.getApiBaseUrl ? window.getApiBaseUrl() : 'api') + '/ai/chart';
+                // 前端直连：使用用户配置的 apiKey/baseUrl/model
+                var systemPrompt = (isEn()
+                    ? `You are a Mermaid/Chart expert. Based on the user requirement and chart type, generate the corresponding chart code (Mermaid or ECharts option JSON).
+The chart type is: ${chartType}. Return only valid chart code or JSON, no explanations, no markdown fences unless it is a mermaid block.`
+                    : `你是图表专家。根据用户需求与图表类型生成对应的图表代码（Mermaid 或 ECharts 配置 JSON）。
+图表类型：${chartType}。只返回有效的图表代码或 JSON，不要解释，不要用代码块包裹（除非是 Mermaid 代码块本身）。`);
 
-                var response = await fetch(apiUrl, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': 'Bearer ' + (window.currentUser ? (window.currentUser.token || window.currentUser.username) : '')
-                    },
-                    body: JSON.stringify({
-                        description: description,
-                        chartType: chartType,
-                        language: isEn() ? 'en' : 'zh'
-                    })
-                });
+                var userPrompt = (isEn()
+                    ? `Describe the chart you need with type ${chartType}.\n\n${description}`
+                    : `请生成类型为「${chartType}」的图表代码。\n\n需求描述：${description}`);
 
-                var result = await response.json();
-
-                if (result.code === 200 && result.data) {
-                    generatedCode = result.data;
-                    resultCode.textContent = generatedCode;
-                    resultContainer.style.display = 'block';
-                    generateBtn.style.display = 'none';
-                    insertBtn.style.display = 'inline-block';
-                } else {
-                    global.showMessage(result.message || (isEn() ? 'Generation failed' : '生成失败'), 'error');
-                    generateBtn.disabled = false;
-                    generateBtn.innerHTML = '<i class="fas fa-magic"></i> ' + (isEn() ? 'Generate' : '生成');
-                }
+                if (!window.AIConfig) throw new Error('AI config module unavailable');
+                if (!window.AIConfig.isReady()) throw new Error((isEn() ? 'Please configure AI model in Settings first' : '请先在 设置 - AI 模型 中配置 apiKey/baseUrl/模型名称'));
+                generatedCode = await window.AIConfig.callText(systemPrompt, userPrompt);
+                resultCode.textContent = generatedCode;
+                resultContainer.style.display = 'block';
+                generateBtn.style.display = 'none';
+                insertBtn.style.display = 'inline-block';
             } catch (error) {
                 console.error('AI生成错误:', error);
-                global.showMessage(isEn() ? 'Network error' : '网络错误', 'error');
+                var msg = (error && error.code === 'AI_CONFIG_REQUIRED')
+                    ? (error.message || (isEn() ? 'Please configure AI model in Settings first' : '请先在设置中配置 AI 模型'))
+                    : (isEn() ? 'Generation failed, please check your configuration' : '生成失败，请检查模型配置');
+                global.showMessage(msg, 'error');
                 generateBtn.disabled = false;
                 generateBtn.innerHTML = '<i class="fas fa-magic"></i> ' + (isEn() ? 'Generate' : '生成');
             }

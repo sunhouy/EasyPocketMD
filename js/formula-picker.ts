@@ -891,41 +891,59 @@ async function performAISearch(keyword) {
     formulaGrid.appendChild(loadingDiv);
 
     try {
-        // 调用AI接口搜索公式
-        const apiUrl = (window.getApiBaseUrl ? window.getApiBaseUrl() : 'api') + '/ai/formula';
+        // 前端直连：使用用户配置的 apiKey/baseUrl/model
+        const systemPrompt = isEn()
+            ? `You are a LaTeX formula expert. Given a user's search keyword, provide relevant LaTeX formulas.
+Return the results in the following format (one formula per line):
+display_name | latex_code
 
-        const response = await fetch(apiUrl, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': 'Bearer ' + (window.currentUser ? (window.currentUser.token || window.currentUser.username) : '')
-            },
-            body: JSON.stringify({
-                keyword: keyword,
-                language: isEn() ? 'en' : 'zh'
-            })
-        });
+For example:
+Quadratic formula | x = \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}
+Summation | \\sum_{i=1}^{n} x_i
+Integral | \\int_{a}^{b} f(x) \\,dx
 
-        const result = await response.json();
+Provide 5-10 most relevant formulas. Only return the formula list, no explanations.`
+            : `你是LaTeX公式专家。根据用户的搜索关键词，提供相关的LaTeX公式。
+请按以下格式返回结果（每行一个公式）：
+显示名称 | latex代码
 
-        if (result.code === 200 && result.data) {
-            // 解析AI返回的公式数据
-            const aiFormulas = parseAIFormulaResponse(result.data);
+例如：
+二次公式 | x = \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}
+求和符号 | \\sum_{i=1}^{n} x_i
+积分 | \\int_{a}^{b} f(x) \\,dx
 
-            if (aiFormulas.length > 0) {
-                // 显示AI搜索结果
-                renderAIFormulaResults(aiFormulas, keyword);
-            } else {
-                // AI也没找到结果
-                showAINoResult(keyword);
-            }
+提供5-10个最相关的公式。只返回公式列表，不要解释。`;
+        const userPrompt = isEn()
+            ? `Search for LaTeX formulas related to: "${keyword}"`
+            : `搜索与"${keyword}"相关的LaTeX公式`;
+
+        if (!window.AIConfig) {
+            showAIError(isEn() ? 'AI config module unavailable' : 'AI 配置模块不可用');
+            return;
+        }
+        if (!window.AIConfig.isReady()) {
+            showAIError(isEn() ? 'Please configure AI model in Settings first' : '请先在 设置 - AI 模型 中配置 apiKey/baseUrl/模型名称');
+            return;
+        }
+
+        const aiResponse = await window.AIConfig.callText(systemPrompt, userPrompt);
+        // 解析AI返回的公式数据
+        const aiFormulas = parseAIFormulaResponse(aiResponse);
+
+        if (aiFormulas.length > 0) {
+            // 显示AI搜索结果
+            renderAIFormulaResults(aiFormulas, keyword);
         } else {
-            // API调用失败，显示错误
-            showAIError(result.message || (isEn() ? 'AI search failed' : 'AI搜索失败'));
+            // AI也没找到结果
+            showAINoResult(keyword);
         }
     } catch (error) {
         console.error('AI搜索错误:', error);
-        showAIError(isEn() ? 'Network error, please try again' : '网络错误，请重试');
+        if (error && error.code === 'AI_CONFIG_REQUIRED') {
+            showAIError(error.message || (isEn() ? 'Please configure AI model in Settings first' : '请先在 设置 - AI 模型 中配置'));
+            return;
+        }
+        showAIError(isEn() ? 'AI search failed, please check your configuration' : 'AI搜索失败，请检查模型配置');
     }
 }
 
