@@ -51,7 +51,7 @@ class FileManager {
                 await Cache.deleteUserFiles(username);
             }
 
-            const rows = await db.execute(
+            const [rows] = await db.execute(
                 'SELECT filename, last_modified, content_version, e2e_enabled FROM user_files WHERE username = ? ORDER BY last_modified DESC',
                 [username]
             );
