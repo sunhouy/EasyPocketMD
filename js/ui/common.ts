@@ -80,7 +80,11 @@
             if (modeToggle) modeToggle.innerHTML = '<i class="fas fa-sun"></i>';
 
             localStorage.setItem('vditor_night_mode', 'true');
-            if (g('vditor')) g('vditor').setTheme('dark');
+            if (typeof global.applyVditorThemes === 'function') {
+                global.applyVditorThemes(global.userSettings);
+            } else if (g('vditor')) {
+                g('vditor').setTheme('dark');
+            }
             syncThemeColor();
             global.showMessage(window.i18n ? window.i18n.t('switchedToNight') : '已切换到夜间模式');
         } else {
@@ -88,7 +92,11 @@
             var modeToggle = document.getElementById('modeToggle');
             if (modeToggle) modeToggle.innerHTML = '<i class="fas fa-moon"></i>';
             localStorage.setItem('vditor_night_mode', 'false');
-            if (g('vditor')) g('vditor').setTheme('classic');
+            if (typeof global.applyVditorThemes === 'function') {
+                global.applyVditorThemes(global.userSettings);
+            } else if (g('vditor')) {
+                g('vditor').setTheme('classic');
+            }
             syncThemeColor();
             global.showMessage(window.i18n ? window.i18n.t('switchedToDay') : '已切换到日间模式');
         }
