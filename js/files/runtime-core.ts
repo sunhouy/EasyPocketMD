@@ -14,6 +14,7 @@ import {
 } from './conflict/index';
 import { installEditorRuntime } from './editor-runtime';
 import { installSyncRuntime } from './sync-runtime';
+import { relocateFile } from './relocate';
 
 (function(global) {
     'use strict';
@@ -67,6 +68,7 @@ import { installSyncRuntime } from './sync-runtime';
         shouldAutoOpenInitialFile: function() { return shouldAutoOpenInitialFile(); },
         loadLocalFiles: function() { return loadLocalFiles(); }
     });
+    global.waitForFileSync = syncRt.syncRuntimeApi.waitForFileSync;
     const tryHandleTokenExpired = syncRt.tryHandleTokenExpired;
     const markPendingServerSync = syncRt.markPendingServerSync;
     const showSaveStatus = syncRt.showSaveStatus;
@@ -1615,103 +1617,31 @@ import { installSyncRuntime } from './sync-runtime';
         if (g('currentUser')) global.syncFileToServer(newFolder.id);
     }
 
-    function renameFileInternal(id, newBasename) {
-        const files = g('files');
-        const item = files.find(f => f.id === id);
-        if (!item) return;
-
-        const isFolder = item.type === 'folder';
-        const oldName = item.name;
-        const parentPath = getParentPath(oldName);
-        
-        if (isNameExistsInParent(newBasename.trim(), parentPath, id)) {
-            g('customAlert')(isEn() ? 'A file or folder with the same name already exists in this directory' : '该目录下已存在同名文件或文件夹');
-            loadFiles(); 
-            return;
-        }
-
-        const newName = parentPath ? parentPath + '/' + newBasename.trim() : newBasename.trim();
-
-        if (isFolder) {
-            renameFolderAndChildren(oldName, newName);
-        } else {
-            item.name = newName;
-        }
-
-        item.lastModified = Date.now();
-        item.isSynced = false;
-        localStorage.setItem('vditor_files', JSON.stringify(files));
-        loadFiles();
-        
-        if (g('currentUser')) {
-            if (isFolder) {
-                global.deleteFileFromServer(oldName + '/').catch(e => {});
-                global.syncFileToServer(id);
-                const affectedFiles = files.filter(f => f.type === 'file' && (f.name.startsWith(newName + '/') || f.name === newName));
-                affectedFiles.forEach(f => {
-                    global.deleteFileFromServer(oldName + f.name.substring(newName.length)).catch(e=>{});
-                    global.syncFileToServer(f.id);
-                });
-            } else {
-                global.deleteFileFromServer(oldName).then(() => global.syncFileToServer(id));
-            }
+    async function changeFilePath(id, newName, message) {
+        try {
+            await relocateFile(global, id, newName);
+            loadFiles();
+            global.showMessage(message);
+        } catch (error) {
+            loadFiles();
+            global.showMessage(error.message || (isEn() ? 'Move failed' : '移动失败'), 'error');
         }
     }
 
-    function moveFileTo(id, targetPath) {
-        const files = g('files');
-        const item = files.find(f => f.id === id);
+    async function renameFileInternal(id, newBasename) {
+        const item = g('files').find(f => f.id === id);
+        if (!item || !newBasename || !newBasename.trim()) return;
+        const parentPath = getParentPath(item.name);
+        const newName = parentPath ? parentPath + '/' + newBasename.trim() : newBasename.trim();
+        await changeFilePath(id, newName, isEn() ? 'Renamed' : '已重命名');
+    }
+
+    async function moveFileTo(id, targetPath) {
+        const item = g('files').find(f => f.id === id);
         if (!item) return;
-
-        const oldName = item.name;
-        const newBasename = getBasename(oldName);
-        const newName = targetPath ? targetPath + '/' + newBasename : newBasename;
-
-        if (newName === oldName) return;
-
-        if (item.type === 'folder') {
-            if (newName === oldName || newName.startsWith(oldName + '/')) {
-                g('customAlert')(isEn() ? 'Cannot move folder to itself or its subdirectory' : '不能将文件夹移动到自身或其子目录中');
-                loadFiles(); 
-                return;
-            }
-        }
-
-        if (files.some(f => f.name === newName && f.id !== id)) {
-            g('customAlert')(isEn() ? 'An item with the same name already exists at the target location' : '目��位置已存在同名项');
-            loadFiles(); 
-            return;
-        }
-
-        if (item.type === 'folder') {
-            renameFolderAndChildren(oldName, newName);
-        } else {
-            item.name = newName;
-        }
-        
-        item.lastModified = Date.now();
-        item.isSynced = false;
-
-        localStorage.setItem('vditor_files', JSON.stringify(files));
-        loadFiles();
-        global.showMessage(isEn() ? `${item.type === 'folder' ? 'Folder' : 'File'} moved` : `${item.type === 'folder' ? '文件夹' : '文件'}已移动`);
-        
-        if (g('currentUser')) {
-             if (item.type === 'folder') {
-                global.deleteFileFromServer(oldName + '/').catch(e => {});
-                global.syncFileToServer(id);
-                const affectedFiles = files.filter(f => f.type === 'file' &&
-                    (f.name.startsWith(newName + '/') || f.name === newName));
-                affectedFiles.forEach(f => {
-                    global.deleteFileFromServer(oldName +
-                        f.name.substring(newName.length)).catch(e=>{});
-                    global.syncFileToServer(f.id);
-                });
-            } else {
-                global.deleteFileFromServer(oldName).then(() =>
-                    global.syncFileToServer(item.id));
-            }
-        }
+        const basename = getBasename(item.name);
+        const newName = targetPath ? targetPath + '/' + basename : basename;
+        await changeFilePath(id, newName, isEn() ? 'Moved' : '已移动');
     }
 
     function expandActiveFile() {
@@ -2436,45 +2366,14 @@ import { installSyncRuntime } from './sync-runtime';
     }
 
     function renameFile(id) {
-        const files = g('files');
-        const item = files.find(f => f.id === id);
+        const item = g('files').find(f => f.id === id);
         if (!item) return;
-
-        const isFolder = item.type === 'folder';
-        const oldName = item.name;
-        const parentPath = getParentPath(oldName);
-        const oldBasename = getBasename(oldName);
-
-        g('customPrompt')(isEn() ? `Please enter the new ${isFolder ? 'folder' : 'file'} name:` : `请输入新的${isFolder ? '文件夹' : '文件'}名：`, { defaultValue: oldBasename }).then(function(newBasename) {
-            if (!newBasename || newBasename.trim() === oldBasename) return;
-
-            if (isNameExistsInParent(newBasename.trim(), parentPath, id)) {
-                g('customAlert')(isEn() ? 'A file or folder with the same name already exists in this directory, please use another name' : '该目录下已存在同名文件或文件夹，请使用其他名称');
-                return;
-            }
-
-            const newName = parentPath ? parentPath + '/' + newBasename.trim() : newBasename.trim();
-
-            if (isFolder) {
-                renameFolderAndChildren(oldName, newName);
-            } else {
-                item.name = newName;
-            }
-
-            item.lastModified = Date.now();
-            item.isSynced = false;
-            localStorage.setItem('vditor_files', JSON.stringify(files));
-            loadFiles();
-            global.showMessage(isEn() ? `${isFolder ? 'Folder' : 'File'} renamed` : `${isFolder ? '文件夹' : '文件'}已重命名`);
-            if (g('currentUser')) {
-                if (isFolder) {
-                    const affectedFiles = files.filter(f => f.type === 'file' && (f.name.startsWith(newName + '/') || f.name === newName));
-                    affectedFiles.forEach(f => global.syncFileToServer(f.id));
-                } else {
-                    global.deleteFileFromServer(oldName).then(() => global.syncFileToServer(id));
-                }
-            }
-        });
+        const oldBasename = getBasename(item.name);
+        g('customPrompt')(isEn() ? 'Please enter the new name:' : '请输入新的名称：', { defaultValue: oldBasename })
+            .then(function(newBasename) {
+                if (!newBasename || newBasename.trim() === oldBasename) return;
+                return renameFileInternal(id, newBasename);
+            });
     }
 
     function createDefaultFile() {
@@ -2828,6 +2727,7 @@ import { installSyncRuntime } from './sync-runtime';
     }
 
     async function saveCurrentFile(isManual) {
+        if (global.fileRelocationInProgress) return false;
         isManual = isManual !== false;
         const currentFileId = g('currentFileId');
         const vditor = g('vditor');

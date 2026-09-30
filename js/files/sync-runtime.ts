@@ -1350,6 +1350,8 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
     }
 
     async function pullServerUpdatesForCleanFiles() {
+        if (global.fileRelocationInProgress) return;
+        const relocationGeneration = global.fileRelocationGeneration || 0;
         if (!g('currentUser')) return;
 
         const files = g('files') || [];
@@ -1372,6 +1374,7 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
             }
             return f;
         }));
+        if (global.fileRelocationInProgress || relocationGeneration !== (global.fileRelocationGeneration || 0)) return;
         const serverFiles = initialServerFiles.map(normalizeServerFileRecord);
         const serverMap = {};
         serverFiles.forEach(function(sf) {

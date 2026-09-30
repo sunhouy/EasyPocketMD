@@ -1,8 +1,8 @@
-
+import { jest } from '@jest/globals';
 const app = require('../../api/server');
 
 const request = require('supertest');
-const wkhtmltopdf = require('wkhtmltopdf');
+const { renderPdf } = require('../../api/utils/pdfProcess');
 const fs = require('fs');
 const path = require('path');
 
@@ -12,7 +12,7 @@ jest.mock('child_process', () => {
     const { PassThrough } = require('stream');
 
     return {
-        spawn: jest.fn((command, args) => {
+        spawn: jest.fn((command: string, args: string[]) => {
             const proc = new EventEmitter();
             proc.stdout = new PassThrough();
             proc.stderr = new PassThrough();
@@ -42,19 +42,13 @@ jest.mock('child_process', () => {
     };
 });
 
-// Mock wkhtmltopdf
-jest.mock('wkhtmltopdf', () => {
-    const { PassThrough } = require('stream');
-    return jest.fn(() => {
-        const stream = new PassThrough();
-        // Simulate writing something to the stream asynchronously
-        setImmediate(() => {
-            stream.write('fake pdf content');
-            stream.end();
-        });
-        return stream;
-    });
-});
+// Process lifecycle is exercised separately in pdfProcess.test.ts.
+jest.mock('../../api/utils/pdfProcess', () => ({
+    ...jest.requireActual<any>('../../api/utils/pdfProcess'),
+    renderPdf: jest.fn(async (_html: string, _options: any, filePath: string) => {
+        await require('fs/promises').writeFile(filePath, Buffer.from('fake pdf content'));
+    })
+}));
 
 jest.setTimeout(10000);
 
@@ -102,7 +96,7 @@ describe('Convert API Integration', () => {
             );
             fs.writeFileSync(imagePath, pngBuffer);
 
-            wkhtmltopdf.mockClear();
+            renderPdf.mockClear();
 
             const res = await request(app)
                 .post('/api/convert/pdf')
@@ -115,9 +109,9 @@ describe('Convert API Integration', () => {
 
             expect(res.status).toBe(200);
             expect(res.body.code).toBe(200);
-            expect(wkhtmltopdf).toHaveBeenCalled();
+            expect(renderPdf).toHaveBeenCalled();
 
-            const htmlInput = wkhtmltopdf.mock.calls[0][0];
+            const htmlInput = renderPdf.mock.calls[0][0];
             expect(htmlInput).toContain('data:image/png;base64,');
             expect(htmlInput).not.toContain(`/uploads/${imageName}`);
             expect(htmlInput).not.toContain('graph TD');
