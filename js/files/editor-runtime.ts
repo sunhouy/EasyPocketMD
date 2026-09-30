@@ -5,6 +5,10 @@
  * 把所需函数挂到调用方传入的 ctx 上，供 runtime-core 内部继续以原函数名调用。
  */
 import { escapeHtml as escapeHtmlCore } from './conflict/index';
+import {
+    getVditorEditableElement, getDomSelectionOffsets, setDomSelectionOffsets,
+    captureVditorCursor, restoreVditorCursor, setVditorValuePreservingCursor
+} from '../editor-cursor';
 
 const LONG_FILE_MODE_CHAR_THRESHOLD = 220000;
 const LONG_FILE_MODE_LINE_THRESHOLD = 6000;
@@ -408,154 +412,6 @@ export function installEditorRuntime(global: any, ctx: Partial<EditorRuntimeCtx>
         if (vditorEl) vditorEl.style.display = '';
 
         syncLongFileModeFlag();
-    }
-
-    function getVditorEditableElement(vditorInstance) {
-        const internal = vditorInstance && vditorInstance.vditor ? vditorInstance.vditor : {};
-        return (internal.ir && internal.ir.element) ||
-            (internal.sv && internal.sv.element) ||
-            (internal.wysiwyg && internal.wysiwyg.element) ||
-            null;
-    }
-
-    function getDomSelectionOffsets(root) {
-        const selection = document.getSelection ? document.getSelection() : null;
-        if (!selection || selection.rangeCount === 0 || !root || !root.contains(selection.anchorNode)) return null;
-
-        const range = selection.getRangeAt(0);
-        const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
-        let offset = 0;
-        let start = 0;
-        let end = 0;
-        let foundStart = false;
-        let foundEnd = false;
-        let node;
-
-        while ((node = walker.nextNode())) {
-            const length = node.nodeValue ? node.nodeValue.length : 0;
-            if (node === range.startContainer) {
-                start = offset + range.startOffset;
-                foundStart = true;
-            }
-            if (node === range.endContainer) {
-                end = offset + range.endOffset;
-                foundEnd = true;
-            }
-            offset += length;
-        }
-
-        if (!foundStart || !foundEnd) return null;
-        return { start, end };
-    }
-
-    function setDomSelectionOffsets(root, start, end) {
-        if (!root || !document.createRange || !document.getSelection) return false;
-        const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
-        const range = document.createRange();
-        let offset = 0;
-        let startSet = false;
-        let endSet = false;
-        let node;
-
-        while ((node = walker.nextNode())) {
-            const length = node.nodeValue ? node.nodeValue.length : 0;
-            const nextOffset = offset + length;
-            if (!startSet && start <= nextOffset) {
-                range.setStart(node, Math.max(0, Math.min(length, start - offset)));
-                startSet = true;
-            }
-            if (!endSet && end <= nextOffset) {
-                range.setEnd(node, Math.max(0, Math.min(length, end - offset)));
-                endSet = true;
-                break;
-            }
-            offset = nextOffset;
-        }
-
-        if (!startSet || !endSet) {
-            range.selectNodeContents(root);
-            range.collapse(false);
-        }
-
-        const selection = document.getSelection();
-        selection.removeAllRanges();
-        selection.addRange(range);
-        return true;
-    }
-
-    function captureVditorCursor(vditorInstance) {
-        const element = getVditorEditableElement(vditorInstance);
-        if (!element) return null;
-        const activeElement = document.activeElement;
-        const wasFocused = activeElement === element || (element.contains && element.contains(activeElement));
-        const snapshot: any = {
-            wasFocused,
-            scrollTop: typeof element.scrollTop === 'number' ? element.scrollTop : 0,
-            scrollLeft: typeof element.scrollLeft === 'number' ? element.scrollLeft : 0,
-            windowX: window.pageXOffset,
-            windowY: window.pageYOffset
-        };
-
-        if (typeof (element as any).selectionStart === 'number' && typeof (element as any).selectionEnd === 'number') {
-            snapshot.type = 'input';
-            snapshot.start = (element as any).selectionStart;
-            snapshot.end = (element as any).selectionEnd;
-            return snapshot;
-        }
-
-        const domOffsets = getDomSelectionOffsets(element);
-        if (domOffsets) {
-            snapshot.type = 'dom';
-            snapshot.start = domOffsets.start;
-            snapshot.end = domOffsets.end;
-            return snapshot;
-        }
-
-        return snapshot;
-    }
-
-    function restoreVditorCursor(vditorInstance, snapshot) {
-        if (!snapshot) return;
-        const restore = function() {
-            const element: any = getVditorEditableElement(vditorInstance);
-            if (!element) return;
-            const length = typeof element.value === 'string'
-                ? element.value.length
-                : String(element.textContent || '').length;
-            const start = Math.max(0, Math.min(length, Number(snapshot.start || 0)));
-            const end = Math.max(start, Math.min(length, Number(snapshot.end ?? start)));
-
-            try {
-                if (snapshot.type === 'input' && typeof element.setSelectionRange === 'function') {
-                    element.setSelectionRange(start, end);
-                } else if (snapshot.type === 'dom') {
-                    setDomSelectionOffsets(element, start, end);
-                }
-                if (snapshot.wasFocused && typeof element.focus === 'function') {
-                    try {
-                        element.focus({ preventScroll: true });
-                    } catch (e) {
-                        element.focus();
-                    }
-                }
-                if (typeof element.scrollTop === 'number') element.scrollTop = snapshot.scrollTop || 0;
-                if (typeof element.scrollLeft === 'number') element.scrollLeft = snapshot.scrollLeft || 0;
-                if (typeof window.scrollTo === 'function') {
-                    window.scrollTo(snapshot.windowX || 0, snapshot.windowY || 0);
-                }
-            } catch (error) {
-                console.warn('恢复编辑器光标失败:', error);
-            }
-        };
-
-        requestAnimationFrame(restore);
-        setTimeout(restore, 40);
-    }
-
-    function setVditorValuePreservingCursor(vditorInstance, content) {
-        const cursor = captureVditorCursor(vditorInstance);
-        vditorInstance.setValue(content);
-        restoreVditorCursor(vditorInstance, cursor);
     }
 
     function setEditorContentForFile(fileId, content, options?) {

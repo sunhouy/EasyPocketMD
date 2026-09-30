@@ -3,7 +3,7 @@ const router = express.Router();
 const markdownIt = require('markdown-it');
 const markdownItTaskLists = require('markdown-it-task-lists');
 const markdownItFootnote = require('markdown-it-footnote');
-const wkhtmltopdf = require('wkhtmltopdf');
+const { renderPdf, validatePdfHtml } = require('../utils/pdfProcess');
 const path = require('path');
 const fs = require('fs');
 const fsp = require('fs/promises');
@@ -67,7 +67,7 @@ function resolveStaticAssetPath(src) {
         }
 
         const localPath = path.join(STATIC_ASSET_DIRS[match[1]], decodeURIComponent(match[2]));
-        if (!localPath.startsWith(STATIC_ASSET_DIRS[match[1]])) {
+        if (!localPath.startsWith(STATIC_ASSET_DIRS[match[1]] + path.sep)) {
             return null;
         }
         if (fs.existsSync(localPath)) {
@@ -82,6 +82,7 @@ function resolveStaticAssetPath(src) {
 
 /** Inline /uploads/ etc. as data URLs so wkhtmltopdf does not HTTP-fetch the same server. */
 function inlineStaticAssetsForPdf(html) {
+    let assetBytes = 0;
     return String(html || '').replace(
         /(<(?:img|embed)[^>]+src=)(["'])([^"']+)\2/gi,
         (full, prefix, quote, src) => {
@@ -91,10 +92,16 @@ function inlineStaticAssetsForPdf(html) {
             }
 
             try {
+                const size = fs.statSync(localPath).size;
+                if (size > 5 * 1024 * 1024 || assetBytes + size > 6 * 1024 * 1024) {
+                    throw new Error('PDF images exceed the export size limit');
+                }
                 const data = fs.readFileSync(localPath);
+                assetBytes += data.length;
                 const dataUrl = `data:${mimeTypeFromPath(localPath)};base64,${data.toString('base64')}`;
                 return `${prefix}${quote}${dataUrl}${quote}`;
             } catch (error) {
+                if (error.message === 'PDF images exceed the export size limit') throw error;
                 console.warn('[PDF Debug] Failed to inline asset:', src, error.message);
                 return full;
             }
@@ -195,45 +202,26 @@ router.post('/markdown', (req, res) => {
     }
 });
 
-router.post('/pdf', (req, res) => {
-    let writeStream = null;
-    let pdfStream = null;
-
+router.post('/pdf', async (req, res) => {
+    const controller = new AbortController();
+    const cancel = () => { if (!res.writableEnded) controller.abort(); };
+    res.on('close', cancel);
+    let filePath = null;
     try {
         let { html, settings } = req.body;
-
-        if (!html) {
-            return res.status(400).json({
-                code: 400,
-                message: 'HTML content is required'
-            });
-        }
-
+        validatePdfHtml(html);
         html = prepareHtmlForWkhtmltopdf(html);
-
-        // 处理字体设置
-        const titleFont = settings?.titleFont || 'SimHei';
-        const bodyFont = settings?.bodyFont || 'SimSun';
-
-        // 注入字体样式到HTML
-        html = html.replace(
-            /<style>/i,
-            `<style>
-                h1, h2, h3, h4, h5, h6 { font-family: "${titleFont}", sans-serif !important; }
-                body, p, li, td, th { font-family: "${bodyFont}", serif !important; }
-            `
-        );
-
+        validatePdfHtml(html);
+        const titleFont = String(settings?.titleFont || 'SimHei').replace(/["\\<>]/g, '');
+        const bodyFont = String(settings?.bodyFont || 'SimSun').replace(/["\\<>]/g, '');
+        html = html.replace(/<style>/i, `<style>
+            h1, h2, h3, h4, h5, h6 { font-family: "${titleFont}", sans-serif !important; }
+            body, p, li, td, th { font-family: "${bodyFont}", serif !important; }
+        `);
         const filename = `${uuidv4()}.pdf`;
         const uploadDir = path.join(__dirname, '../../uploads');
-
-        if (!fs.existsSync(uploadDir)) {
-            fs.mkdirSync(uploadDir, { recursive: true });
-        }
-
-        const filePath = path.join(uploadDir, filename);
-        const fileUrl = `/uploads/${filename}`;
-
+        await fsp.mkdir(uploadDir, { recursive: true });
+        filePath = path.join(uploadDir, filename);
         const options = {
             pageSize: 'A4',
             marginTop: settings?.pageMargin ? `${settings.pageMargin}mm` : '15mm',
@@ -241,145 +229,28 @@ router.post('/pdf', (req, res) => {
             marginLeft: settings?.pageMargin ? `${settings.pageMargin}mm` : '15mm',
             marginRight: settings?.pageMargin ? `${settings.pageMargin}mm` : '15mm',
             printMediaType: true,
-            enableLocalFileAccess: true,
+            disableLocalFileAccess: true,
             encoding: 'UTF-8',
             imageQuality: 75,
             imageDpi: 150,
             disableJavascript: true,
             loadErrorHandling: 'ignore',
-            loadMediaErrorHandling: 'ignore',
-            noStopSlowScripts: true
+            loadMediaErrorHandling: 'ignore'
         };
 
-        writeStream = fs.createWriteStream(filePath);
-        pdfStream = wkhtmltopdf(html, options);
-        
-        let isTimeout = false;
-        let timeoutTimer = null;
-
-        const cleanup = () => {
-            if (timeoutTimer) {
-                clearTimeout(timeoutTimer);
-                timeoutTimer = null;
-            }
-            if (pdfStream) {
-                pdfStream.destroy();
-                pdfStream = null;
-            }
-            if (writeStream) {
-                writeStream.destroy();
-                writeStream = null;
-            }
-        };
-
-        // 1分钟超时控制
-        timeoutTimer = setTimeout(() => {
-            isTimeout = true;
-            console.error('[PDF Debug] PDF generation timeout (60s)');
-            cleanup();
-            if (!res.headersSent) {
-                res.status(500).json({
-                    code: 500,
-                    message: '导出PDF超时(超过1分钟)，请检查文档内容是否过大。'
-                });
-            }
-            if (fs.existsSync(filePath)) {
-                fs.unlink(filePath, () => {});
-            }
-        }, 60000);
-
-        pdfStream.on('error', (err) => {
-            if (isTimeout) return;
-            console.error('[PDF Debug] wkhtmltopdf command error:', err);
-            cleanup();
-            if (!res.headersSent) {
-                res.status(500).json({
-                    code: 500,
-                    message: 'PDF generation failed (command error)',
-                    error: err.message
-                });
-            }
-            if (fs.existsSync(filePath)) {
-                fs.unlink(filePath, () => {});
-            }
-        });
-
-        writeStream.on('error', (err) => {
-            if (isTimeout) return;
-            console.error('[PDF Debug] writeStream error:', err);
-            cleanup();
-            if (!res.headersSent) {
-                res.status(500).json({
-                    code: 500,
-                    message: 'PDF generation failed (stream error)',
-                    error: err.message
-                });
-            }
-        });
-
-        pdfStream.pipe(writeStream)
-            .on('finish', () => {
-                if (isTimeout) return;
-                cleanup();
-                if (fs.existsSync(filePath)) {
-                    const stats = fs.statSync(filePath);
-                    if (stats.size > 0) {
-                        if (!res.headersSent) {
-                            res.json({
-                                code: 200,
-                                message: 'PDF generated successfully',
-                                url: fileUrl
-                            });
-                        }
-                    } else {
-                        console.error('[PDF Debug] PDF generation failed: file is empty');
-                        cleanup();
-                        fs.unlink(filePath, () => {});
-                        if (!res.headersSent) {
-                            res.status(500).json({
-                                code: 500,
-                                message: 'PDF generation failed: file is empty'
-                            });
-                        }
-                    }
-                } else {
-                    console.error('[PDF Debug] PDF generation failed: file not found');
-                    cleanup();
-                    if (!res.headersSent) {
-                        res.status(500).json({
-                            code: 500,
-                            message: 'PDF generation failed: file not found'
-                        });
-                    }
-                }
-            });
-
-        const timeout = setTimeout(() => {
-            if (!res.headersSent) {
-                cleanup();
-                if (fs.existsSync(filePath)) {
-                    fs.unlink(filePath, () => {});
-                }
-                res.status(504).json({
-                    code: 504,
-                    message: 'PDF generation timeout'
-                });
-            }
-        }, 120000);
-
-        res.on('finish', () => {
-            clearTimeout(timeout);
-        });
-
+        await renderPdf(html, options, filePath, controller.signal);
+        const stats = await fsp.stat(filePath);
+        if (!stats.size) throw new Error('PDF generation failed: file is empty');
+        if (!controller.signal.aborted) res.json({ code: 200, message: 'PDF generated successfully', url: `/uploads/${filename}` });
     } catch (error) {
-        console.error('PDF conversion endpoint error:', error);
-        if (writeStream) writeStream.destroy();
-        if (pdfStream) pdfStream.destroy();
-        return res.status(500).json({
-            code: 500,
-            message: 'Server error during PDF conversion',
-            error: error.message
-        });
+        if (filePath) await fsp.unlink(filePath).catch(() => {});
+        if (!controller.signal.aborted && !res.headersSent) {
+            const status = error.status || 500;
+            if (status === 503) res.set('Retry-After', '5');
+            res.status(status).json({ code: status, message: error.message || 'PDF generation failed' });
+        }
+    } finally {
+        res.removeListener('close', cancel);
     }
 });
 

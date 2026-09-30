@@ -60,6 +60,16 @@ router.post('/save', verifyUser, async (req, res) => {
 });
 
 // Delete file
+router.post('/move', verifyUser, async (req, res) => {
+    const { old_path, new_path, is_folder } = req.body;
+    try {
+        const result = await fileManager.moveFile(req.user.username, old_path, new_path, is_folder === true);
+        res.status(result.code).json(result);
+    } catch (error) {
+        res.status(500).json({ code: 500, message: '移动失败: ' + error.message });
+    }
+});
+
 router.post('/delete', verifyUser, async (req, res) => {
     const { username, filename } = req.body;
     if (!username || !filename) return res.json({ code: 400, message: '缺少必要参数' });
