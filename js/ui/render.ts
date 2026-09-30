@@ -1,5 +1,5 @@
-
-(function(global) {
+import { exportMermaidSvg } from './mermaid-export';
+(function(global: any) {
     'use strict';
 
     function g(name) { return global[name]; }
@@ -39,15 +39,6 @@
      */
     async function convertFormulasAndChartsToImages(html, options) {
         if (!html) {
-            return html;
-        }
-
-        // 动态加载 html2canvas
-        var html2canvas;
-        try {
-            html2canvas = (await import('html2canvas')).default;
-        } catch (e) {
-            console.error('[Render Debug] Failed to load html2canvas', e);
             return html;
         }
 
@@ -157,10 +148,14 @@
                     cleanedCode = cleanedCode.split('---').slice(2).join('---').trim();
                 }
 
+                const mermaid = (window as any).mermaid;
                 mermaid.initialize({
                     startOnLoad: false,
                     theme: 'default',
                     securityLevel: 'loose',
+                    htmlLabels: false,
+                    arrowMarkerAbsolute: false,
+                    flowchart: { htmlLabels: false },
                 });
 
                 mermaidDiv = document.createElement('div');
@@ -184,6 +179,18 @@
                     throw new Error('Mermaid渲染未生成SVG');
                 }
 
+                const vectorSvg = exportMermaidSvg(svgElement);
+                if (vectorSvg && el.parentNode) {
+                    const vectorContainer = document.createElement('div');
+                    vectorContainer.className = 'mermaid-vector';
+                    vectorContainer.style.cssText = 'text-align:center;margin:20px 0;page-break-inside:avoid;';
+                    vectorContainer.innerHTML = vectorSvg;
+                    vectorContainer.querySelector('svg').style.maxWidth = '100%';
+                    vectorContainer.querySelector('svg').style.height = 'auto';
+                    el.parentNode.replaceChild(vectorContainer, el);
+                    continue;
+                }
+
                 var svgRect = svgElement.getBoundingClientRect();
                 var width = Math.max(400, svgRect.width + 40);
                 var height = Math.max(300, svgRect.height + 40);
@@ -193,6 +200,7 @@
                 tempDiv.style.width = width + 'px';
                 tempDiv.style.height = height + 'px';
 
+                const html2canvas = (await import('html2canvas')).default;
                 if (html2canvas) {
                     const canvas = await html2canvas(tempDiv, {
                         backgroundColor: '#ffffff',

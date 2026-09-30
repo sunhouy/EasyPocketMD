@@ -1,3 +1,4 @@
+import { cleanExportMath } from './export-math';
 import * as pdfjsLib from 'pdfjs-dist';
 import htmlToPdfmake from 'html-to-pdfmake';
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
@@ -171,11 +172,12 @@ async function generatePDFLocal(htmlContent, settings) {
     // 等待所有图片处理完成
     await Promise.all(imagePromises);
 
-    // 处理 LaTeX 公式：移除 SVG 元素
+    // 保留 Mermaid 矢量图，交给 pdfmake 的 SVG 渲染器。
     const svgElements = tempDiv.querySelectorAll('svg');
 
-    // 移除所有 SVG 元素
+    // 本地公式转换仍使用现有的清理流程。
     svgElements.forEach(svg => {
+        if (svg.closest('.mermaid-vector')) return;
         const parent = svg.parentNode;
         if (parent) {
             const container = svg.closest('[data-mml-node], .mjx-chtml, .katex');
@@ -218,7 +220,7 @@ async function generatePDFLocal(htmlContent, settings) {
             content.forEach(item => limitImageWidth(item));
         } else if (content && typeof content === 'object') {
             // 检查是否是图片
-            if (content.image) {
+            if (content.image || content.svg) {
                 // A4 页面宽度：595pt，减去边距（每个边 15mm ≈ 42pt），所以 595 - 42*2 = 511pt
                 // 设置最大 500pt 留一点余地
                 const maxWidth = 500;
@@ -276,60 +278,6 @@ async function generatePDFLocal(htmlContent, settings) {
 }
 
 /**
- * Clean up MathJax-related content from HTML
- * 1. Remove all MathJax scripts
- * 2. Remove <mjx-assistive-mml> nodes
- * 3. Process <mjx-container> to keep only SVG wrapped in div
- * @param {string} html - The HTML content to clean
- * @returns {string} - Cleaned HTML
- */
-function cleanMathJaxContent(html) {
-    // Create a temporary DOM element to parse HTML
-    const tempDiv = document.createElement('div');
-    tempDiv.innerHTML = html;
-
-    // 1. Remove all MathJax scripts
-    const scripts = tempDiv.querySelectorAll('script[src*="mathjax"], script[id*="MathJax"]');
-    scripts.forEach(script => script.remove());
-
-    // Remove any other MathJax-related scripts
-    const allScripts = tempDiv.querySelectorAll('script');
-    allScripts.forEach(script => {
-        if (script.textContent && script.textContent.toLowerCase().includes('mathjax')) {
-            script.remove();
-        }
-    });
-
-    // 2. Remove <mjx-assistive-mml> nodes
-    const assistiveMml = tempDiv.querySelectorAll('mjx-assistive-mml');
-    assistiveMml.forEach(el => el.remove());
-
-    // 3. Process <mjx-container> elements
-    const mjxContainers = tempDiv.querySelectorAll('mjx-container');
-    mjxContainers.forEach(container => {
-        // Find the SVG inside
-        const svg = container.querySelector('svg');
-        if (svg) {
-            // Create a div to wrap the SVG
-            const wrapper = document.createElement('div');
-            wrapper.style.cssText = 'text-align: center; margin: 1em 0;';
-
-            // Clone the SVG to avoid reference issues
-            const svgClone = svg.cloneNode(true);
-            wrapper.appendChild(svgClone);
-
-            // Replace the mjx-container with our wrapper div
-            container.parentNode.replaceChild(wrapper, container);
-        } else {
-            // If no SVG found, just remove the container
-            container.remove();
-        }
-    });
-
-    return tempDiv.innerHTML;
-}
-
-/**
  * Generate PDF from HTML content using server-side conversion
  * @param {string} htmlContent - The HTML content to convert
  * @param {object} settings - Print settings (margin, etc.)
@@ -347,7 +295,7 @@ export async function generatePDF(htmlContent, settings, filename) {
         htmlContent = '<div style="padding: 20px; font-size: 16px; color: #666; text-align: center;">(文档内容为空)</div>';
     }
 
-    const cleanedHtmlContent = cleanMathJaxContent(htmlContent);
+    const cleanedHtmlContent = cleanExportMath(htmlContent);
 
     // 获取字体设置
     const titleFont = settings?.titleFont || 'SimHei';
