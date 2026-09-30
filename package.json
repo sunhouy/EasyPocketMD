@@ -48,6 +48,7 @@
   "dependencies": {
     "@fortawesome/fontawesome-free": "^7.2.0",
     "@sunhouyun/vditor": "^3.11.4",
+    "@xmldom/xmldom": "^0.8.15",
     "ai-tokens": "^1.0.3",
     "bcryptjs": "^2.4.3",
     "cfb": "^1.2.2",

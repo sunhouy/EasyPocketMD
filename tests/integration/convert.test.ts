@@ -1,4 +1,4 @@
-import { jest } from '@jest/globals';
+import { jest, it, expect } from '@jest/globals';
 const app = require('../../api/server');
 
 const request = require('supertest');
@@ -28,7 +28,11 @@ jest.mock('child_process', () => {
                         throw new Error('Missing output path');
                     }
 
-                    await fsPromises.writeFile(outputPath, Buffer.from('fake-docx-content'));
+                    const zip = new (require('jszip'))();
+                    const ns = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+                    zip.file('word/styles.xml', `<w:styles xmlns:w="${ns}"><w:style w:type="paragraph" w:styleId="Normal"><w:name w:val="Normal"/></w:style><w:style w:type="paragraph" w:styleId="Heading1"><w:name w:val="heading 1"/></w:style></w:styles>`);
+                    zip.file('word/document.xml', `<w:document xmlns:w="${ns}"><w:body><w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr><w:r><w:t>标题</w:t></w:r></w:p><w:p><w:r><w:t>正文</w:t></w:r></w:p></w:body></w:document>`);
+                    await fsPromises.writeFile(outputPath, await zip.generateAsync({ type: 'nodebuffer' }));
                     proc.emit('close', 0);
                 } catch (error) {
                     proc.stderr.write(error.message);
@@ -74,6 +78,15 @@ describe('Convert API Integration', () => {
     });
 
     describe('POST /api/convert/pdf', () => {
+        it('preserves inline math and Mermaid SVG in the converter input', async () => {
+            renderPdf.mockClear();
+            await request(app).post('/api/convert/pdf').send({ html: '<p>Before <mjx-container><svg width="20" height="10"><path d="M0 0"/></svg></mjx-container> after</p><mjx-container display="true"><svg><path d="M0 0"/></svg></mjx-container><div class="mermaid-vector"><svg viewBox="0 0 300 90"><text>Start</text></svg></div>' }).expect(200);
+            const input = renderPdf.mock.calls[0][0];
+            expect(input).toContain('<span class="docx-math-svg docx-math-inline"');
+            expect(input).toContain('<div class="docx-math-svg docx-math-display"');
+            expect(input).toContain('<text>Start</text>');
+            expect(input).not.toContain('[Diagram]');
+        });
         it('should initiate pdf generation and return success', async () => {
             // fs methods (createWriteStream, existsSync, statSync, mkdirSync) are mocked in setup.js
             const res = await request(app)
@@ -126,12 +139,27 @@ describe('Convert API Integration', () => {
     });
 
     describe('POST /api/convert/docx', () => {
+        it.each(['native', 'html'])('applies font and size settings in %s math mode', async (docxMathMode: string) => {
+            const response = await request(app).post('/api/convert/docx').buffer(true)
+                .parse((res: any, callback: any) => {
+                    const chunks: Buffer[] = [];
+                    res.on('data', (chunk: Buffer) => chunks.push(chunk));
+                    res.on('end', () => callback(null, Buffer.concat(chunks)));
+                }).send({ markdown: '# 标题\n\n正文', settings: { docxMathMode, titleFont: 'Custom Heading', bodyFont: 'Custom Body', titleFontSize: 20, bodyFontSize: 15 } }).expect(200);
+            const zip = await require('jszip').loadAsync(response.body);
+            const styles = await zip.file('word/styles.xml').async('string');
+            const document = await zip.file('word/document.xml').async('string');
+            expect(styles).toContain('w:eastAsia="Custom Heading"');
+            expect(styles).toContain('w:eastAsia="Custom Body"');
+            expect(styles).toContain('<w:sz w:val="60"');
+            expect(document).toContain('<w:sz w:val="30"');
+        });
         it('should export docx binary successfully', async () => {
             const res = await request(app)
                 .post('/api/convert/docx')
                 .buffer(true)
                 .parse((response, callback) => {
-                    const chunks = [];
+                    const chunks: Buffer[] = [];
                     response.on('data', chunk => chunks.push(chunk));
                     response.on('end', () => callback(null, Buffer.concat(chunks)));
                 })

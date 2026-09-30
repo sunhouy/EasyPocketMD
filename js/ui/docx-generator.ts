@@ -1,7 +1,6 @@
-
 const global = window;
 
-function g(name) { return global[name]; }
+function g(name): any { return global[name]; }
 function isEn() { return window.i18n && window.i18n.getLanguage() === 'en'; }
 
 /**
@@ -33,8 +32,9 @@ async function exportDOCX(content, settings, customFilename) {
             }
         }, 60000);
 
-        // Pandoc 路径下设置参数暂未直连使用，保留兼容字段
         if (!settings) settings = {};
+        const { prepareDocxDiagrams } = await import('./mermaid-export');
+        const diagrams = await prepareDocxDiagrams(content);
 
         // 打印调试信息到控制台
         console.log('DOCX Export Debug:', {
@@ -56,7 +56,8 @@ async function exportDOCX(content, settings, customFilename) {
             },
             body: JSON.stringify({
                 markdown: content,
-                settings: settings
+                settings: settings,
+                diagrams
             })
         });
 
@@ -94,9 +95,9 @@ async function exportDOCX(content, settings, customFilename) {
         console.log('DOCX Export: Generated filename:', filename);
 
         // 下载文件
-        if (window.nativeFileOps && window.nativeFileOps.isTauriRuntime()) {
+        if ((global.nativeFileOps as any) && (global.nativeFileOps as any).isTauriRuntime()) {
             console.log('DOCX Export: Using native file operations');
-            await window.nativeFileOps.saveFile(blob, {
+            await (global.nativeFileOps as any).saveFile(blob, {
                 filename: filename,
                 mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
             });
