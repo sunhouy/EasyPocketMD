@@ -2,18 +2,21 @@
 import { EventEmitter } from 'events';
 import { PassThrough } from 'stream';
 import { spawn } from 'child_process';
-import { createWriteStream } from 'fs';
+import { open, readFile, stat } from 'fs/promises';
 import { renderPdf, validatePdfHtml } from '../../api/utils/pdfProcess';
 
 jest.mock('child_process', () => ({ spawn: jest.fn() }));
+jest.mock('fs/promises', () => ({ ...jest.requireActual('fs/promises'), readFile: jest.fn(), stat: jest.fn(), open: jest.fn() }));
 
 describe('PDF process lifecycle', () => {
     const children: any[] = [];
     beforeEach(() => {
         jest.useFakeTimers();
         children.length = 0;
+        (readFile as jest.Mock).mockResolvedValue('VmSize:\t8388608 kB\nVmRSS:\t100000 kB\nVmSwap:\t0 kB\n');
         (spawn as jest.Mock).mockImplementation(() => {
             const child: any = new EventEmitter();
+            child.pid = 12345;
             child.stdin = new PassThrough();
             child.stdout = new PassThrough();
             child.stderr = new PassThrough();
@@ -21,7 +24,8 @@ describe('PDF process lifecycle', () => {
             children.push(child);
             return child;
         });
-        (createWriteStream as jest.Mock).mockImplementation(() => new PassThrough());
+        (stat as jest.Mock).mockResolvedValue({ size: 100 });
+        (open as jest.Mock).mockResolvedValue({ read: jest.fn(async buffer => { buffer.write('%PDF-'); return { bytesRead: 5 }; }), close: jest.fn().mockResolvedValue(undefined) });
     });
     afterEach(() => jest.useRealTimers());
 
@@ -31,6 +35,40 @@ describe('PDF process lifecycle', () => {
         jest.advanceTimersByTime(100);
         await rejected;
         expect(children[0].kill).toHaveBeenCalledWith('SIGKILL');
+    });
+
+    it('allows WebKit virtual reservations and starts Qt without an X display', async () => {
+        const result = renderPdf('html', {}, '/tmp/test.pdf');
+        const [, args, options] = (spawn as jest.Mock).mock.calls[0];
+        if (process.platform === 'linux') {
+            expect(args[1]).not.toContain('ulimit -v');
+            expect(args[1]).toContain('ulimit -t 60');
+            expect(options.env.QT_QPA_PLATFORM).toBe(process.env.QT_QPA_PLATFORM || 'offscreen');
+            await jest.advanceTimersByTimeAsync(100);
+            expect(children[0].kill).not.toHaveBeenCalled();
+        }
+        children[0].emit('close', 0);
+        await expect(result).resolves.toBeUndefined();
+    });
+
+    it.each(['VmRSS:\t524289 kB\nVmSwap:\t0 kB', 'VmRSS:\t500000 kB\nVmSwap:\t30000 kB'])('kills actual memory overuse: %s', async status => {
+        if (process.platform !== 'linux') return;
+        (readFile as jest.Mock).mockResolvedValue(status);
+        const result = renderPdf('html', {}, '/tmp/test.pdf');
+        const rejected = expect(result).rejects.toMatchObject({ status: 413 });
+        await jest.advanceTimersByTimeAsync(100);
+        await rejected;
+        expect(children[0].kill).toHaveBeenCalledWith('SIGKILL');
+        const reads = (readFile as jest.Mock).mock.calls.length;
+        await jest.advanceTimersByTimeAsync(500);
+        expect(readFile).toHaveBeenCalledTimes(reads);
+    });
+
+    it('accepts ignored unpatched-Qt option warnings when conversion succeeds', async () => {
+        const result = renderPdf('html', {}, '/tmp/test.pdf');
+        children[0].stderr.emit('data', 'The switch --print-media-type is not supported using unpatched qt, and will be ignored.');
+        children[0].emit('close', 0);
+        await expect(result).resolves.toBeUndefined();
     });
 
     it('handles a missing executable without an uncaught exception', async () => {
@@ -58,10 +96,11 @@ describe('PDF process lifecycle', () => {
         expect(children[0].kill).toHaveBeenCalledWith('SIGKILL');
     });
 
-    it('rejects oversized output and stderr stays bounded', async () => {
+    it('kills the converter when its output file exceeds the size limit', async () => {
         const result = renderPdf('html', {}, '/tmp/test.pdf');
         const rejected = expect(result).rejects.toMatchObject({ status: 413 });
-        children[0].stdout.emit('data', Buffer.alloc(33 * 1024 * 1024));
+        (stat as jest.Mock).mockResolvedValue({ size: 33 * 1024 * 1024 });
+        await jest.advanceTimersByTimeAsync(100);
         await rejected;
         expect(children[0].kill).toHaveBeenCalled();
     });
@@ -82,11 +121,36 @@ describe('PDF process lifecycle', () => {
         expect(spawn).not.toHaveBeenCalled();
     });
 
-    it('returns success only after both process exit and output finish', async () => {
+    it.each([0, 33 * 1024 * 1024])('rejects invalid final file size %s even after a successful exit', async size => {
+        (stat as jest.Mock).mockResolvedValue({ size });
         const result = renderPdf('html', {}, '/tmp/test.pdf');
-        const output = (createWriteStream as jest.Mock).mock.results[0].value;
+        const rejected = expect(result).rejects.toThrow(size ? 'exceeds' : 'empty');
         children[0].emit('close', 0);
-        output.emit('finish');
+        await rejected;
+    });
+
+    it('rejects a non-PDF file even when the converter exits successfully', async () => {
+        (open as jest.Mock).mockResolvedValue({ read: jest.fn(async buffer => { buffer.write('error'); return { bytesRead: 5 }; }), close: jest.fn() });
+        const result = renderPdf('html', {}, '/tmp/test.pdf');
+        const rejected = expect(result).rejects.toThrow('invalid output');
+        children[0].emit('close', 0);
+        await rejected;
+    });
+
+    it('returns success only after exit, PDF validation and closing the file handle', async () => {
+        let closeFile;
+        const file = { read: jest.fn(async buffer => { buffer.write('%PDF-'); return { bytesRead: 5 }; }), close: jest.fn(() => new Promise(resolve => { closeFile = resolve; })) };
+        (open as jest.Mock).mockResolvedValue(file);
+        const result = renderPdf('html', {}, '/tmp/test.pdf');
+        let resolved = false;
+        result.then(() => { resolved = true; });
+        const args = (spawn as jest.Mock).mock.calls[0][1];
+        expect(args.slice(-2)).toEqual(['-', '/tmp/test.pdf']);
+        children[0].emit('close', 0);
+        await jest.advanceTimersByTimeAsync(0);
+        expect(file.close).toHaveBeenCalled();
+        expect(resolved).toBe(false);
+        closeFile();
         await expect(result).resolves.toBeUndefined();
         expect(children[0].kill).not.toHaveBeenCalled();
     });
