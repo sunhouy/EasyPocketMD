@@ -48,6 +48,7 @@ export function createSyncRuntimeApi(ctx: any) {
     isEn,
   } = ctx;
   const fileSyncLocks = new Map<string, Promise<any>>();
+  const webSocketSaves = new Map<string, any[]>();
 
   function isFileE2EEnabled(file: any) {
     if (!file) return false;
@@ -83,9 +84,23 @@ export function createSyncRuntimeApi(ctx: any) {
   }
 
   function handleRemoteFileSaved(payload: any) {
+    const pending = webSocketSaves.get(payload.filename);
+    const acknowledged = pending?.shift();
+    if (acknowledged) {
+      clearTimeout(acknowledged.timer);
+      if (payload.code !== undefined && payload.code !== 200) acknowledged.reject(new Error(payload.message || '保存失败'));
+      else acknowledged.resolve();
+      if (!pending.length) webSocketSaves.delete(payload.filename);
+    }
     const files = g('files');
     const file = files.find(function(f: any) { return f.name === payload.filename; });
     if (!file) return;
+    if (payload.code !== undefined && payload.code !== 200) {
+      file.isSynced = false;
+      g('unsavedChanges')[file.id] = true;
+      markPendingServerSync(file.id, true);
+      return;
+    }
 
     if (Number.isFinite(Number(payload.content_version))) {
       file.contentVersion = Number(payload.content_version);
@@ -102,6 +117,7 @@ export function createSyncRuntimeApi(ctx: any) {
   }
 
   async function scheduleWebSocketSync(fileId: string) {
+    if (globalRef.fileRelocationInProgress) return;
     if (!g('currentUser')) return;
 
     const files = g('files');
@@ -132,7 +148,7 @@ export function createSyncRuntimeApi(ctx: any) {
       }
     }
 
-    if (contentToSend === undefined) return;
+    if (contentToSend === undefined || globalRef.fileRelocationInProgress) return;
 
     if (!globalRef.wsThrottle) return;
 
@@ -152,6 +168,19 @@ export function createSyncRuntimeApi(ctx: any) {
     try {
       globalRef.wsThrottle = createSyncThrottle(function(data: any) {
         if (globalRef.wsClient && globalRef.wsClient.isConnected()) {
+          let resolve: any;
+          let reject: any;
+          const promise = new Promise<void>((ok, fail) => { resolve = ok; reject = fail; });
+          // Retain unacknowledged saves, even after timeout: moving their source
+          // before confirmation could let a late save recreate the old path.
+          const task = {
+            promise, resolve, reject,
+            timer: setTimeout(() => reject(new Error('保存尚未确认，已保留原路径，请稍后重试')), 15000)
+          };
+          promise.catch(() => {});
+          const pending = webSocketSaves.get(data.filename) || [];
+          pending.push(task);
+          webSocketSaves.set(data.filename, pending);
           globalRef.wsClient.send(data);
         }
       });
@@ -210,6 +239,7 @@ export function createSyncRuntimeApi(ctx: any) {
   }
 
   async function syncAllFiles() {
+    if (globalRef.fileRelocationInProgress) return;
     if (!g('currentUser')) return;
     if (!globalRef.wsClient || !globalRef.wsClient.isConnected()) {
       try {
@@ -243,6 +273,7 @@ export function createSyncRuntimeApi(ctx: any) {
   }
 
   async function syncFileToServer(fileId: string, options: any) {
+    if (globalRef.fileRelocationInProgress && !options?.relocation) return false;
     if (!g('currentUser')) return;
     const backgroundSync = !options || options.background !== false;
     const overrideContent = options && typeof options.overrideContent === 'string' ? options.overrideContent : null;
@@ -451,6 +482,7 @@ export function createSyncRuntimeApi(ctx: any) {
   }
 
   function syncCurrentFileWithBeacon() {
+    if (globalRef.fileRelocationInProgress) return false;
     const currentFileId = g('currentFileId');
     if (!currentFileId) return false;
     const files = g('files') || [];
@@ -529,6 +561,10 @@ export function createSyncRuntimeApi(ctx: any) {
   }
 
   return {
+    waitForFileSync: () => Promise.all([
+      ...fileSyncLocks.values(),
+      ...[...webSocketSaves.values()].flatMap(tasks => tasks.map(task => task.promise))
+    ]),
     startAutoSync,
     stopAutoSync,
     syncAllFiles,

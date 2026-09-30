@@ -285,6 +285,62 @@ class FileManager {
         }
     }
 
+    // Move names atomically: content, encryption and versions stay on the same rows.
+    async moveFile(username, oldPath, newPath, isFolder = false) {
+        const validPath = value => typeof value === 'string' && value.length > 0 &&
+            Array.from(value).length <= 255 && !value.includes('\\') && !value.includes('\0') &&
+            value.split('/').every(part => part && part !== '.' && part !== '..');
+        if (!validPath(oldPath) || !validPath(newPath) || oldPath === newPath ||
+            (isFolder && newPath.startsWith(oldPath + '/'))) {
+            return { code: 400, message: '无效的移动路径' };
+        }
+        const connection = await db.getConnection();
+        let moved = [];
+        try {
+            await connection.beginTransaction();
+            const [users] = await connection.execute('SELECT id FROM users WHERE username = ? FOR UPDATE', [username]);
+            const [rows] = await connection.execute('SELECT id, filename FROM user_files WHERE username = ? FOR UPDATE', [username]);
+            const source = isFolder ? oldPath + '/' : oldPath;
+            const sourceRows = rows.filter(row => isFolder ? row.filename.startsWith(source) : row.filename === source);
+            if (!sourceRows.length) {
+                await connection.rollback();
+                return { code: 404, message: '文件或文件夹不存在' };
+            }
+            const target = isFolder ? newPath + '/' : newPath;
+            // A virtual folder at the destination is also a conflict; never merge/overwrite.
+            if (rows.some(row => !sourceRows.includes(row) &&
+                (row.filename === newPath || row.filename === target || (isFolder && row.filename.startsWith(target))))) {
+                await connection.rollback();
+                return { code: 409, message: '目标位置已存在同名文件或文件夹' };
+            }
+            moved = sourceRows.map(row => ({ oldName: row.filename, newName: target + row.filename.slice(source.length), id: row.id }));
+            if (moved.some(row => Array.from(row.newName).length > 255)) {
+                await connection.rollback();
+                return { code: 400, message: '移动后的路径过长' };
+            }
+            for (const row of moved) {
+                await connection.execute('UPDATE user_files SET filename = ? WHERE username = ? AND id = ?', [row.newName, username, row.id]);
+                if (users.length) {
+                    await connection.execute('UPDATE file_history SET filename = ? WHERE user_id = ? AND filename = ?', [row.newName, users[0].id, row.oldName]);
+                }
+                // The schema also cascades this update; explicit SQL supports older installs.
+                await connection.execute('UPDATE file_shares SET filename = ? WHERE username = ? AND filename = ?', [row.newName, username, row.oldName]);
+            }
+            await connection.commit();
+        } catch (error) {
+            await connection.rollback();
+            return { code: error.code === 'ER_DUP_ENTRY' ? 409 : 500, message: '移动失败: ' + error.message };
+        } finally {
+            connection.release();
+        }
+        // Cache failure must not report an already committed move as a failed move.
+        await Promise.all([
+            Cache.deleteUserFiles(username),
+            ...moved.flatMap(row => [Cache.deleteFileContent(username, row.oldName), Cache.deleteFileContent(username, row.newName)])
+        ]).catch(error => console.warn('Move cache invalidation failed:', error));
+        return { code: 200, message: '移动成功', data: { moved: moved.length } };
+    }
+
     // Delete file
     async deleteFile(username, filename) {
         const connection = await db.getConnection();
