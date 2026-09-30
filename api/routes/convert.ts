@@ -3,6 +3,8 @@ const router = express.Router();
 const markdownIt = require('markdown-it');
 const markdownItTaskLists = require('markdown-it-task-lists');
 const markdownItFootnote = require('markdown-it-footnote');
+const { normalizeDocxSettings, applyDocxTypography } = require('../utils/docxTypography');
+const { prepareDocxDiagrams } = require('../utils/docxDiagrams');
 const { renderPdf, validatePdfHtml } = require('../utils/pdfProcess');
 const path = require('path');
 const fs = require('fs');
@@ -12,22 +14,23 @@ const { spawn } = require('child_process');
 const { v4: uuidv4 } = require('uuid');
 
 let mdInstance = null;
+let mdInitialization = null;
 
-/** Lazy-init: markdown-it-mathjax3 is slow to load and blocks server startup. */
-function getMarkdownRenderer() {
+/** Share async initialization; the CJS MathJax loader blocks on dynamic import. */
+async function getMarkdownRenderer() {
     if (mdInstance) return mdInstance;
-    const md = markdownIt({
-        html: true,
-        xhtmlOut: true,
-        breaks: true,
-        linkify: true,
-        typographer: true,
-    });
-    md.use(markdownItTaskLists);
-    md.use(require('markdown-it-mathjax3'));
-    md.use(markdownItFootnote);
-    mdInstance = md;
-    return mdInstance;
+    if (!mdInitialization) {
+        mdInitialization = (async () => {
+            const mathjax = await import('markdown-it-mathjax3');
+            const md = markdownIt({ html: true, xhtmlOut: true, breaks: true, linkify: true, typographer: true });
+            md.use(markdownItTaskLists);
+            md.use(mathjax.default || mathjax);
+            md.use(markdownItFootnote);
+            mdInstance = md;
+            return md;
+        })().catch(error => { mdInitialization = null; throw error; });
+    }
+    return mdInitialization;
 }
 
 /**
@@ -117,7 +120,7 @@ function sanitizeHtmlForWkhtmltopdf(html) {
     cleaned = cleaned.replace(
         /<div\b[^>]*class=["'][^"']*mermaid[^"']*["'][^>]*>[\s\S]*?<\/div>/gi,
         (block) => {
-            if (/<img\b/i.test(block)) {
+            if (/<(?:img|svg)\b/i.test(block)) {
                 return block;
             }
             return '<div style="text-align:center;color:#666;margin:1em 0;">[Diagram]</div>';
@@ -154,7 +157,7 @@ function cleanMathJaxContent(html) {
             // Extract SVG from the content
             const svgMatch = content.match(/<svg[\s\S]*?<\/svg>/i);
             if (svgMatch) {
-                const isDisplayMath = /display\s*=\s*"true"/i.test(attrs || '');
+                const isDisplayMath = /display\s*=\s*["']true["']/i.test(attrs || '');
                 const svg = svgMatch[0]
                     .replace(/<svg\b/i, '<svg preserveAspectRatio="xMidYMid meet"')
                     .replace(/\sstyle\s*=\s*"[^"]*"/i, '');
@@ -163,7 +166,7 @@ function cleanMathJaxContent(html) {
                     return `<div class="docx-math-svg docx-math-display">${svg}</div>`;
                 }
 
-                return `<span class="docx-math-svg docx-math-inline">${svg}</span>`;
+                return `<span class="docx-math-svg docx-math-inline" style="display:inline-block;vertical-align:middle;margin:0;white-space:nowrap;">${svg}</span>`;
             }
             return '';
         });
@@ -175,7 +178,7 @@ function cleanMathJaxContent(html) {
     }
 }
 
-router.post('/markdown', (req, res) => {
+router.post('/markdown', async (req, res) => {
     try {
         const { content } = req.body;
         
@@ -186,7 +189,7 @@ router.post('/markdown', (req, res) => {
             });
         }
 
-        const html = getMarkdownRenderer().render(content);
+        const html = (await getMarkdownRenderer()).render(content);
         
         return res.json({
             code: 200,
@@ -349,7 +352,8 @@ function toSafeAlign(value, fallback) {
     return fallback;
 }
 
-function buildDocxStyledHtml(markdown, settings = {}) {
+async function buildDocxStyledHtml(markdown, settings = {}) {
+    settings = normalizeDocxSettings(settings);
     const pageMargin = toFiniteNumber(settings.pageMargin, 25);
     const bodyFontSize = toFiniteNumber(settings.bodyFontSize, 12);
     const lineHeight = toFiniteNumber(settings.lineHeight, 1.5);
@@ -367,19 +371,15 @@ function buildDocxStyledHtml(markdown, settings = {}) {
     const bodyFont = settings.bodyFont || 'SimSun';
 
     const headingSizes = {
-        h1: useCustomHeadingSizes ? toFiniteNumber(settings.h1Size, 32) : titleFontSize * 2,
-        h2: useCustomHeadingSizes ? toFiniteNumber(settings.h2Size, 28) : titleFontSize * 1.6,
-        h3: useCustomHeadingSizes ? toFiniteNumber(settings.h3Size, 24) : titleFontSize * 1.35,
-        h4: useCustomHeadingSizes ? toFiniteNumber(settings.h4Size, 20) : titleFontSize * 1.2,
-        h5: useCustomHeadingSizes ? toFiniteNumber(settings.h5Size, 18) : titleFontSize,
-        h6: useCustomHeadingSizes ? toFiniteNumber(settings.h6Size, 16) : Math.max(14, titleFontSize * 0.9)
+        h1: settings.h1Size, h2: settings.h2Size, h3: settings.h3Size,
+        h4: settings.h4Size, h5: settings.h5Size, h6: settings.h6Size
     };
 
     const processedMarkdown = String(markdown || '').replace(/```mermaid\n([\s\S]*?)```/g, (_match, content) => {
         return `\n> [Mermaid Diagram]\n>\n> ${String(content || '').trim().split('\n').join('\n> ')}\n`;
     });
 
-    let html = getMarkdownRenderer().render(processedMarkdown);
+    let html = (await getMarkdownRenderer()).render(processedMarkdown);
     html = cleanMathJaxContent(html);
 
     return `<!DOCTYPE html>
@@ -513,7 +513,7 @@ function normalizeDocxMarkdown(markdown) {
     return normalized;
 }
 
-async function runPandocDocx(inputContent, options = {}) {
+async function runPandocDocx(inputContent, options: any = {}) {
     const tempDir = await fsp.mkdtemp(path.join(os.tmpdir(), 'easypocketmd-docx-'));
     const inputFormat = options.inputFormat || 'markdown+task_lists+tex_math_dollars+tex_math_single_backslash+tex_math_double_backslash+fenced_code_blocks+pipe_tables';
     const inputExt = inputFormat === 'html' ? 'html' : 'md';
@@ -542,6 +542,22 @@ async function runPandocDocx(inputContent, options = {}) {
     });
 
     try {
+        const diagramMarkdown = await prepareDocxDiagrams(inputContent, options.diagrams, tempDir);
+        inputContent = inputFormat === 'html'
+            ? await buildDocxStyledHtml(diagramMarkdown, options)
+            : normalizeDocxMarkdown(diagramMarkdown);
+        if (inputFormat === 'html') {
+            // Pandoc's HTML reader lowercases SVG viewBox and cannot size ex units.
+            // Give it standalone SVG files with explicit point dimensions instead.
+            let mathIndex = 0;
+            for (const match of Array.from(inputContent.matchAll(/<svg\b[\s\S]*?<\/svg>/gi)) as RegExpMatchArray[]) {
+                const filename = 'math-' + mathIndex++ + '.svg';
+                const svg = match[0].replace(/\b(width|height)="([\d.]+)ex"/g, (_, name, value) =>
+                    name + '="' + (Number(value) * Number(options.bodyFontSize || 12) * 0.5) + 'pt"');
+                await fsp.writeFile(path.join(tempDir, filename), svg, 'utf8');
+                inputContent = inputContent.replace(match[0], '<img src="' + filename + '" alt="Formula" />');
+            }
+        }
         await fsp.writeFile(inputPath, inputContent, 'utf8');
 
         const args = [
@@ -552,97 +568,16 @@ async function runPandocDocx(inputContent, options = {}) {
             'docx',
             '-o',
             outputPath,
-            '--standalone'
+            '--standalone',
+            '--resource-path=' + tempDir
         ];
 
-        // 生成动态模板文档
-        let referencePath = null;
-        try {
-            // 构建配置JSON
-            const config = JSON.stringify({
-                titleFont,
-                bodyFont,
-                titleFontSize: titleFontSize || 24,
-                bodyFontSize: bodyFontSize || 12,
-                h1Size: h1Size || (titleFontSize ? titleFontSize * 2 : 32),
-                h2Size: h2Size || (titleFontSize ? titleFontSize * 1.6 : 28),
-                h3Size: h3Size || (titleFontSize ? titleFontSize * 1.35 : 24),
-                h4Size: h4Size || (titleFontSize ? titleFontSize * 1.2 : 20),
-                h5Size: h5Size || (titleFontSize || 18),
-                h6Size: h6Size || (titleFontSize ? Math.max(14, titleFontSize * 0.9) : 16)
-            });
-
-            console.log(`[DOCX] Generating template with config:`, config);
-
-            // 调用Python脚本生成模板
-            const { spawnSync } = require('child_process');
-            // 使用process.cwd()获取当前工作目录，确保在生产环境中也能正确找到脚本
-            const pythonScript = path.join(process.cwd(), 'scripts', 'generate-docx-template.py');
-            
-            console.log(`[DOCX] Using Python script at: ${pythonScript}`);
-            console.log(`[DOCX] Script exists: ${fs.existsSync(pythonScript)}`);
-            
-            const result = spawnSync('python3', [pythonScript, config], {
-                encoding: 'utf8',
-                timeout: 15000
-            });
-
-            if (result.status === 0 && result.stdout) {
-                referencePath = result.stdout.trim();
-                console.log(`[DOCX] ✅ Generated dynamic template: ${referencePath}`);
-                console.log(`[DOCX] Template file exists: ${fs.existsSync(referencePath)}`);
-            } else {
-                console.log('[DOCX] ❌ Failed to generate dynamic template, falling back to static templates');
-                console.log(`[DOCX] Python script error: ${result.stderr || 'no error output'}`);
-                console.log(`[DOCX] Python script stdout: ${result.stdout || 'no stdout'}`);
-                console.log(`[DOCX] Python script exit code: ${result.status}`);
-            }
-        } catch (error) {
-            console.log('[DOCX] ❌ Error generating dynamic template:', error);
-        }
-
-        // 如果动态模板生成失败，使用静态模板
-        if (!referencePath) {
-            console.log('[DOCX] Falling back to static templates');
-            // 构建reference文档路径
-            const referenceDir = path.join(__dirname, '../../reference-docs');
-            const fontKey = `${titleFont.toLowerCase()}-${bodyFont.toLowerCase()}`;
-            const referenceMap = {
-                'simhei-simsun': 'reference-simhei-simsun.docx',
-                'simhei-simkai': 'reference-simhei-simkai.docx',
-                'simsun-simsun': 'reference-simsun-simsun.docx',
-                'simkai-simsun': 'reference-simkai-simsun.docx',
-            };
-
-            const referenceFile = referenceMap[fontKey] || 'reference.docx';
-            referencePath = path.join(referenceDir, referenceFile);
-
-            console.log(`[DOCX] Trying static template: ${referencePath}`);
-
-            // 检查静态模板是否存在
-            if (!fs.existsSync(referencePath)) {
-                console.log(`[DOCX] Static template not found: ${referencePath}`);
-                // 如果没有找到，尝试使用配置的reference文档
-                const configuredReference = (options.referenceDocx || process.env.PANDOC_REFERENCE_DOCX || '').trim();
-                if (configuredReference) {
-                    const configPath = path.isAbsolute(configuredReference)
-                        ? configuredReference
-                        : path.join(process.cwd(), configuredReference);
-                    if (fs.existsSync(configPath)) {
-                        referencePath = configPath;
-                        console.log(`[DOCX] Using configured template: ${referencePath}`);
-                    } else {
-                        referencePath = null;
-                        console.log(`[DOCX] Configured template not found: ${configPath}`);
-                    }
-                } else {
-                    referencePath = null;
-                    console.log(`[DOCX] No template configured`);
-                }
-            } else {
-                console.log(`[DOCX] Using static template: ${referencePath}`);
-            }
-        }
+        // Templates supply layout; user typography is applied to the final OOXML.
+        const referenceDir = path.join(__dirname, '../../reference-docs');
+        const configured = String(options.referenceDocx || process.env.PANDOC_REFERENCE_DOCX || '').trim();
+        const referencePath = configured
+            ? (path.isAbsolute(configured) ? configured : path.resolve(configured))
+            : path.join(referenceDir, 'reference.docx');
 
         // 添加reference-doc参数
         if (referencePath && fs.existsSync(referencePath)) {
@@ -683,112 +618,16 @@ async function runPandocDocx(inputContent, options = {}) {
         });
 
         const docxBuffer = await fsp.readFile(outputPath);
-
-        // 如果是HTML输入且指定了字体，需要后处理DOCX以确保字体正确应用
-        if (inputFormat === 'html' && (titleFont || bodyFont)) {
-            const result = await postProcessDocxFonts(docxBuffer, titleFont, bodyFont);
-            // 清理临时模板文件
-            if (referencePath && referencePath.includes('/tmp/')) {
-                try {
-                    await fsp.unlink(referencePath).catch(() => {});
-                } catch (error) {
-                    console.log('[DOCX] Error cleaning up temporary template:', error);
-                }
-            }
-            return result;
-        }
-
-        // 清理临时模板文件
-        if (referencePath && referencePath.includes('/tmp/')) {
-            try {
-                await fsp.unlink(referencePath).catch(() => {});
-            } catch (error) {
-                console.log('[DOCX] Error cleaning up temporary template:', error);
-            }
-        }
-
-        return docxBuffer;
+        return await applyDocxTypography(docxBuffer, options);
     } finally {
         await fsp.rm(tempDir, { recursive: true, force: true }).catch(() => {});
-    }
-}
-
-async function postProcessDocxFonts(docxBuffer, titleFont, bodyFont) {
-    try {
-        const JSZip = require('jszip');
-        const zip = await JSZip.loadAsync(docxBuffer);
-
-        // 提取并修改 word/styles.xml
-        const stylesFile = zip.file('word/styles.xml');
-        if (!stylesFile) {
-            console.log('[DOCX] No styles.xml found, skipping font post-processing');
-            return docxBuffer;
-        }
-
-        let stylesXml = await stylesFile.async('string');
-        let modified = false;
-
-        // 修改标题样式的字体 (Heading 1-6)
-        if (titleFont) {
-            for (let i = 1; i <= 6; i++) {
-                const headingPattern = new RegExp(
-                    `(<w:style[^>]*w:styleId="Heading${i}"[^>]*>[\\s\\S]*?<w:rPr>)([\\s\\S]*?)(<\\/w:rPr>)`,
-                    'g'
-                );
-                stylesXml = stylesXml.replace(headingPattern, (match, before, content, after) => {
-                    // 移除现有的 w:rFonts 标签
-                    const cleanedContent = content.replace(/<w:rFonts[^>]*\/>|<w:rFonts[^>]*>[\s\S]*?<\/w:rFonts>/g, '');
-                    // 添加新的字体设置
-                    const newFonts = `<w:rFonts w:ascii="${titleFont}" w:hAnsi="${titleFont}" w:eastAsia="${titleFont}" w:cs="${titleFont}"/>`;
-                    modified = true;
-                    return `${before}${newFonts}${cleanedContent}${after}`;
-                });
-            }
-        }
-
-        // 修改正文样式的字体
-        if (bodyFont) {
-            // 修改Normal样式
-            const normalPattern = /(<w:style[^>]*w:styleId="Normal"[^>]*>[\s\S]*?<w:rPr>)([\s\S]*?)(<\/w:rPr>)/g;
-            stylesXml = stylesXml.replace(normalPattern, (match, before, content, after) => {
-                const cleanedContent = content.replace(/<w:rFonts[^>]*\/>|<w:rFonts[^>]*>[\s\S]*?<\/w:rFonts>/g, '');
-                const newFonts = `<w:rFonts w:ascii="${bodyFont}" w:hAnsi="${bodyFont}" w:eastAsia="${bodyFont}" w:cs="${bodyFont}"/>`;
-                modified = true;
-                return `${before}${newFonts}${cleanedContent}${after}`;
-            });
-
-            // 修改其他段落样式
-            ['BodyText', 'ListParagraph', 'TableNormal'].forEach(styleId => {
-                const pattern = new RegExp(
-                    `(<w:style[^>]*w:styleId="${styleId}"[^>]*>[\\s\\S]*?<w:rPr>)([\\s\\S]*?)(<\\/w:rPr>)`,
-                    'g'
-                );
-                stylesXml = stylesXml.replace(pattern, (match, before, content, after) => {
-                    const cleanedContent = content.replace(/<w:rFonts[^>]*\/>|<w:rFonts[^>]*>[\s\S]*?<\/w:rFonts>/g, '');
-                    const newFonts = `<w:rFonts w:ascii="${bodyFont}" w:hAnsi="${bodyFont}" w:eastAsia="${bodyFont}" w:cs="${bodyFont}"/>`;
-                    modified = true;
-                    return `${before}${newFonts}${cleanedContent}${after}`;
-                });
-            });
-        }
-
-        if (modified) {
-            console.log(`[DOCX] Applied font post-processing: titleFont=${titleFont}, bodyFont=${bodyFont}`);
-            zip.file('word/styles.xml', stylesXml);
-            return await zip.generateAsync({ type: 'nodebuffer' });
-        }
-
-        return docxBuffer;
-    } catch (error) {
-        console.error('[DOCX] Error post-processing fonts:', error);
-        return docxBuffer;
     }
 }
 
 // Word (DOCX) Conversion endpoint (Pandoc)
 router.post('/docx', async (req, res) => {
     try {
-        const { markdown, referenceDocx, settings } = req.body || {};
+        const { markdown, referenceDocx, settings, diagrams } = req.body || {};
 
         if (!markdown || typeof markdown !== 'string') {
             return res.status(400).json({
@@ -801,36 +640,16 @@ router.post('/docx', async (req, res) => {
         const docxMathMode = String(docxSettings.docxMathMode || '').toLowerCase();
         const useNativeMath = docxMathMode !== 'svg' && docxMathMode !== 'html';
 
-        // 转换设置值为正确的类型
-        const titleFontSize = parseFloat(docxSettings.titleFontSize) || 24;
-        const bodyFontSize = parseFloat(docxSettings.bodyFontSize) || 12;
-        const h1Size = parseFloat(docxSettings.h1Size) || (titleFontSize * 2);
-        const h2Size = parseFloat(docxSettings.h2Size) || (titleFontSize * 1.6);
-        const h3Size = parseFloat(docxSettings.h3Size) || (titleFontSize * 1.35);
-        const h4Size = parseFloat(docxSettings.h4Size) || (titleFontSize * 1.2);
-        const h5Size = parseFloat(docxSettings.h5Size) || titleFontSize;
-        const h6Size = parseFloat(docxSettings.h6Size) || Math.max(14, titleFontSize * 0.9);
-
         const pandocOptions = {
+            ...normalizeDocxSettings(docxSettings),
+            diagrams,
             referenceDocx,
-            titleFont: docxSettings.titleFont || 'SimHei',
-            bodyFont: docxSettings.bodyFont || 'SimSun',
-            titleFontSize: titleFontSize,
-            bodyFontSize: bodyFontSize,
-            h1Size: h1Size,
-            h2Size: h2Size,
-            h3Size: h3Size,
-            h4Size: h4Size,
-            h5Size: h5Size,
-            h6Size: h6Size,
             inputFormat: useNativeMath
                 ? 'markdown+task_lists+tex_math_dollars+tex_math_single_backslash+tex_math_double_backslash+fenced_code_blocks+pipe_tables'
                 : 'html'
         };
 
-        const docxBuffer = useNativeMath
-            ? await runPandocDocx(normalizeDocxMarkdown(markdown), pandocOptions)
-            : await runPandocDocx(buildDocxStyledHtml(markdown, docxSettings), pandocOptions);
+        const docxBuffer = await runPandocDocx(markdown, pandocOptions);
 
         const filename = `document_${new Date().toISOString().slice(0, 10)}.docx`;
 
