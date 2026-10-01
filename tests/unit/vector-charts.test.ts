@@ -13,6 +13,25 @@ describe('native vector charts', () => {
         expect(JSON.parse(md.split('\n').slice(2, -3).join('\n'))).toEqual(option);
         expect(md).not.toMatch(/data:image|!\[/);
     });
+    it.each([
+        'echarts.init(e, theme === "dark" ? "dark" : undefined)',
+        'echarts.init(e,"dark"===t?"dark":void 0)'
+    ])('clears JSON before the SVG painter appends its viewport: %s', init => {
+        const e = document.createElement('div');
+        const option = { title: { text: '活动热力图' }, series: [{ type: 'heatmap', data: [[0, 0, 5]] }] };
+        e.textContent = JSON.stringify(option);
+        const chart = { setOption: jest.fn() };
+        const echarts = { init: jest.fn(element => {
+            expect(element.textContent).toBe('');
+            element.innerHTML = '<div><svg><text>活动热力图</text></svg></div>';
+            return chart;
+        }) };
+        const source = 'var option=JSON.parse(e.textContent); ' + init + '.setOption(option);';
+        new Function('e', 'echarts', 'theme', 't', useVditorVectorCharts(source))(e, echarts, 'dark', 'dark');
+        expect(chart.setOption).toHaveBeenCalledWith(option);
+        expect(e.textContent).toBe('活动热力图');
+        expect(echarts.init).toHaveBeenCalledWith(e, 'dark', { renderer: 'svg' });
+    });
     it.each(['index.js', 'index.min.js', 'method.js', 'method.min.js'])('uses SVG in the installed Vditor %s chart renderer', file => {
         const source = fs.readFileSync('node_modules/@sunhouyun/vditor/dist/' + file, 'utf8');
         const patched = useVditorVectorCharts(source);
