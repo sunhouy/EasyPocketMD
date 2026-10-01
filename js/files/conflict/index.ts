@@ -282,7 +282,7 @@ export function renderDiffView(diffResult: any[], isEn: boolean, options: boolea
         hiddenSameCount += 1;
         hiddenSameRows.push({ leftLineNo: leftLine, rightLineNo: rightLine, left: item.left || '', right: item.right || '' });
       } else {
-        html += renderSameDiffRowHTML(leftLine, rightLine, item.left || '', item.right || '', '', '', '');
+        html += renderSameDiffRowHTML(leftLine, rightLine, item.left || '', item.right || '', '', '');
       }
       leftLine += 1;
       rightLine += 1;

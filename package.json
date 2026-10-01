@@ -57,6 +57,7 @@
     "crypto-js": "^4.2.0",
     "diff-match-patch": "^1.0.5",
     "dom-to-image": "^2.6.0",
+    "dompurify": "^3.4.6",
     "dotenv": "^16.3.1",
     "echarts": "^6.0.0",
     "eruda": "^3.4.3",
