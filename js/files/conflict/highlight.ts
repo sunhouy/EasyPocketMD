@@ -5,6 +5,8 @@ export type TextPart = { kind: number; text: string };
 
 /** Compare graphemes so highlights never split emoji or combining characters. */
 export function textDiff(left: string, right: string): TextPart[] {
+    if (left === right) return [{ kind: 0, text: left }];
+    if (!left || !right) return [{ kind: left ? -1 : 1, text: left || right }];
     const Segmenter = (Intl as any).Segmenter;
     const segmenter = Segmenter ? new Segmenter(undefined, { granularity: 'grapheme' }) : null;
     const split = (text: string): string[] => segmenter ? [...segmenter.segment(text)].map(item => item.segment) : Array.from(text);
