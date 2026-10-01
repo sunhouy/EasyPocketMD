@@ -1,0 +1,53 @@
+name: Check Windows installer
+on:
+  pull_request:
+    paths:
+      - 'scripts/prepare-windows-nsis.ps1'
+      - '.github/workflows/build-tauri.yml'
+      - '.github/workflows/check-windows.yml'
+permissions:
+  contents: read
+concurrency:
+  group: check-windows-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  wasm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+      - name: Setup Emscripten
+        run: |
+          git clone --depth 1 https://github.com/emscripten-core/emsdk.git "$RUNNER_TEMP/emsdk"
+          "$RUNNER_TEMP/emsdk/emsdk" install 3.1.57
+          "$RUNNER_TEMP/emsdk/emsdk" activate 3.1.57
+          echo "$RUNNER_TEMP/emsdk/upstream/emscripten" >> "$GITHUB_PATH"
+      - run: npm ci --prefer-offline --no-audit --no-fund
+      - run: npm run wasm:text:build
+      - uses: actions/upload-artifact@v7
+        with:
+          name: windows-check-wasm
+          path: wasm_text_engine/dist/text_engine.*
+  windows:
+    needs: wasm
+    runs-on: windows-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/download-artifact@v8
+        with:
+          name: windows-check-wasm
+          path: wasm_text_engine/dist
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+      - uses: dtolnay/rust-toolchain@stable
+      - run: npm ci --prefer-offline --no-audit --no-fund
+      - name: Prepare verified NSIS toolchain
+        shell: pwsh
+        run: ./scripts/prepare-windows-nsis.ps1
+      - run: npx tauri icon src-tauri/icon-rgba.png
+      - name: Build application and NSIS installer without publishing
+        run: npm run build:tauri:win
