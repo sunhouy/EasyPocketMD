@@ -14,6 +14,13 @@ describe('DOCX vector diagram assets', () => {
         expect(output).toBe('> ![Mermaid Diagram](mermaid-0.svg)\n\nTail');
         expect(await readFile(path.join(directory, 'mermaid-0.svg'), 'utf8')).toBe(svg);
     });
+    it('embeds ECharts SVG and keeps diagram languages distinct', async () => {
+        const markdown = '```echarts\n{"series":[]}\n```\n\n```mermaid\n{"series":[]}\n```';
+        const output = await prepareDocxDiagrams(markdown, [{ code: '{"series":[]}', language: 'echarts', svg }], directory);
+        expect(output).toContain('![ECharts Diagram](echarts-0.svg)');
+        expect(output).toContain('```mermaid');
+        expect(await readFile(path.join(directory, 'echarts-0.svg'), 'utf8')).toBe(svg);
+    });
     it('rejects scripts and external resources in supplied SVG', async () => {
         await expect(prepareDocxDiagrams('', [{ code: 'x', svg: svg.replace('<text>Start</text>', '<script>alert(1)</script>') }], directory)).rejects.toThrow('Unsupported');
     });

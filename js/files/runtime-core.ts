@@ -15,6 +15,7 @@ import {
 import { installEditorRuntime } from './editor-runtime';
 import { installSyncRuntime } from './sync-runtime';
 import { relocateFile } from './relocate';
+import { mountDiffView } from './conflict/markdown';
 
 (function(global) {
     'use strict';
@@ -3354,8 +3355,17 @@ import { relocateFile } from './relocate';
         
         // 计算并渲染差异（历史版本 vs 当前版本）
         const diffResult = computeDiff(content || '', currentContent || '');
-        diffContent.innerHTML = renderDiffView(diffResult, { collapseSame: true });
-        bindCollapsedDiffInteractions(diffContent);
+        let showMarkdown = true;
+        const refresh = () => {
+            mountDiffView(diffContent, diffResult, isEn(), { collapseSame: true, markdown: showMarkdown });
+            bindCollapsedDiffInteractions(diffContent);
+        };
+        const markdownToggle = document.getElementById('historyDiffMarkdownBtn');
+        if (markdownToggle) {
+            markdownToggle.textContent = isEn() ? 'Show source' : '显示源码';
+            markdownToggle.onclick = () => { showMarkdown = !showMarkdown; markdownToggle.textContent = showMarkdown ? (isEn() ? 'Show source' : '显示源码') : (isEn() ? 'Render Markdown' : '渲染 Markdown'); refresh(); };
+        }
+        refresh();
         
         // 显示模态窗口
         diffModal.classList.add('show');
@@ -4089,6 +4099,7 @@ import { relocateFile } from './relocate';
             leftFile: file1,
             rightFile: file2,
             collapseSame: true,
+            markdown: true,
             conflictMode: false,
             activeHunkId: null,
             hunkDecisions: {},
@@ -4233,6 +4244,7 @@ import { relocateFile } from './relocate';
                 '</button>' +
             '</div>' +
             '<div id="fileDiffToolbar" style="padding:8px 20px;background:' + toolbarBg + ';border-bottom:1px solid ' + borderColor + ';flex-shrink:0;display:flex;flex-wrap:wrap;gap:8px;align-items:center;">' +
+                '<button type="button" id="fileDiffMarkdownBtn" style="' + btnStyle + '">' + (isEn() ? 'Show source' : '显示源码') + '</button>' +
                 '<button type="button" id="fileDiffSwapBtn" style="' + btnStyle + '" title="' + (isEn() ? 'Swap sides' : '切换左右文件') + '"><i class="fas fa-right-left"></i> ' + (isEn() ? 'Swap' : '切换') + '</button>' +
                 '<button type="button" id="fileDiffSmartMergeBtn" style="' + btnPrimaryStyle + '"><i class="fas fa-wand-magic-sparkles"></i> ' + (isEn() ? 'Smart merge' : '智能合并') + '</button>' +
                 '<button type="button" id="fileDiffResolveBtn" style="' + btnStyle + '"><i class="fas fa-hand-pointer"></i> ' + (isEn() ? 'Resolve conflicts' : '手动解决冲突') + '</button>' +
@@ -4312,12 +4324,18 @@ import { relocateFile } from './relocate';
             const diffResult = computeDiff(getLeftContent(), getRightContent());
             const renderOpts = {
                 collapseSame: state.collapseSame,
+                markdown: state.markdown,
                 markHunks: state.conflictMode,
                 activeHunkId: state.activeHunkId,
                 resolvedHunkIds: state.resolvedHunkIds
             };
             if (diffScrollEl) {
-                diffScrollEl.innerHTML = renderDiffView(diffResult, renderOpts);
+                mountDiffView(diffScrollEl, diffResult, isEn(), renderOpts);
+                const markdownBtn = modalContent.querySelector('#fileDiffMarkdownBtn');
+                if (markdownBtn) {
+                    markdownBtn.disabled = state.conflictMode;
+                    markdownBtn.textContent = state.markdown && !state.conflictMode ? (isEn() ? 'Show source' : '显示源码') : (isEn() ? 'Render Markdown' : '渲染 Markdown');
+                }
                 bindCollapsedDiffInteractions(diffScrollEl);
             }
             updateHeaders();
@@ -4383,6 +4401,9 @@ import { relocateFile } from './relocate';
                 refreshDiffView();
             };
         }
+
+        const markdownBtn = modalContent.querySelector('#fileDiffMarkdownBtn');
+        if (markdownBtn) markdownBtn.addEventListener('click', () => { state.markdown = !state.markdown; refreshDiffView(); });
 
         const swapBtn = modalContent.querySelector('#fileDiffSwapBtn');
         if (swapBtn) {

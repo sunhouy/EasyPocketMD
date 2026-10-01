@@ -1,3 +1,4 @@
+import { echartsMarkdown } from './echarts-markdown';
 
 (function(global) {
     'use strict';
@@ -1330,7 +1331,7 @@
             
             if (option) {
                 try {
-                    var chart = echarts.init(container);
+                    var chart = echarts.init(container, undefined, { renderer: 'svg' });
                     chart.setOption(option);
                     container.setAttribute('data-rendered', 'true');
                     
@@ -1490,13 +1491,13 @@
                 if (!EChartsLoader.isLoaded()) {
                     EChartsLoader.load(function() {
                         if (!previewChart) {
-                            previewChart = echarts.init(previewChartDiv);
+                            previewChart = echarts.init(previewChartDiv, undefined, { renderer: 'svg' });
                         }
                         previewChart.setOption(option, true);
                     });
                 } else {
                     if (!previewChart) {
-                        previewChart = echarts.init(previewChartDiv);
+                        previewChart = echarts.init(previewChartDiv, undefined, { renderer: 'svg' });
                     }
                     previewChart.setOption(option, true);
                 }
@@ -1549,31 +1550,10 @@
             try {
                 var option = template.generateOption(data);
                 
-                // 获取预览图表的 SVG
-                var svgUrl = '';
-                if (previewChart) {
-                    try {
-                        svgUrl = previewChart.getDataURL({
-                            type: 'png',
-                            pixelRatio: 2,
-                            backgroundColor: '#fff'
-                        });
-                    } catch (e) {
-                        console.error('[ECharts] Get SVG error:', e);
-                    }
-                }
-                
-                // 使用与 Mermaid 图表相同的方式插入
+                // Keep the editable native chart block; Vditor renders it as SVG.
                 try {
                     if (g('vditor')) {
-                        if (svgUrl) {
-                            // 插入图片
-                            g('vditor').insertValue('![' + (data.title || 'Chart') + '](' + svgUrl + ')\n\n');
-                        } else {
-                            // 回退到 HTML
-                            var html = generateEChartsHtml(template.type, option);
-                            g('vditor').insertValue(html + '\n\n');
-                        }
+                        g('vditor').insertValue(echartsMarkdown(option));
                         if (global.showMessage) {
                             global.showMessage(isEn() ? 'Chart inserted' : '图表已插入');
                         }

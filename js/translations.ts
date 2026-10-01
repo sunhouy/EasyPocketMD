@@ -48,6 +48,7 @@
 
             // 差异对比
             diffTitle: '文件差异对比',
+            diffShowSource: '显示源码',
             diffInfo: '绿色表示新增，红色表示删除。',
             selectFileToCompare: '选择要对比的文件',
             currentFile: '当前文件',
@@ -913,6 +914,7 @@
 
             // Diff comparison
             diffTitle: 'File Diff Comparison',
+            diffShowSource: 'Show source',
             diffInfo: 'Left side is local version, right side is server version. Green indicates additions, red indicates deletions.',
             selectFileToCompare: 'Select File to Compare',
             currentFile: 'Current File',
