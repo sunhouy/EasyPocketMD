@@ -114,7 +114,7 @@
         var insertBtn = document.createElement('button');
         insertBtn.type = 'button';
         insertBtn.innerHTML = '<i class="fas fa-plus"></i> ' + t('insert', '插入', 'Insert');
-        insertBtn.style.cssText = 'padding:10px 20px;background:#4a90e2;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:14px;';
+        insertBtn.style.cssText = 'padding:10px 20px;background:var(--theme-accent, #4a90e2);color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:14px;';
         insertBtn.onclick = function() {
             if (onInsert() !== false) closeActiveModal();
         };

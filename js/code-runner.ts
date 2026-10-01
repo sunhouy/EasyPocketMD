@@ -422,7 +422,7 @@ fm.fontManager = ForcedFontManager()
             'align-items: center',
             'gap: 6px',
             'padding: 5px 10px',
-            'background: #4a90e2',
+            'background: var(--theme-accent, #4a90e2)',
             'color: #fff',
             'border: none',
             'border-radius: 4px',

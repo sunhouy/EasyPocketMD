@@ -1082,7 +1082,7 @@ ${isAcademic ? '倒数第2页：参考资料\n要点1：文献1\n要点2：文�
             var page = pptState.outline[i];
             var bgColor = isNightMode ? '#3d3d3d' : '#f8f9fa';
             html += '<div style="margin-bottom:15px;padding:12px;background:' + bgColor + ';border-radius:8px;border-left:3px solid #4a90e2;">';
-            html += '<strong style="color:#4a90e2;">第' + page.number + '页：</strong>' + escapeHtml(page.title);
+            html += '<strong style="color:var(--theme-accent, #4a90e2);">第' + page.number + '页：</strong>' + escapeHtml(page.title);
             if (page.content.length > 0) {
                 html += '<ul style="margin:8px 0 0 0;padding-left:20px;">';
                 for (var j = 0; j < page.content.length; j++) {
@@ -2690,7 +2690,7 @@ JSON 结构：
                 <p style="margin:0 0 20px 0;font-size:15px;line-height:1.6;">${escapeHtml(message)}</p>
                 <div style="display:flex;gap:10px;justify-content:flex-end;">
                     <button class="confirm-cancel" style="padding:10px 20px;background:${cancelBg};border:1px solid ${borderColor};border-radius:6px;cursor:pointer;font-size:14px;color:${cancelColor};">取消</button>
-                    <button class="confirm-ok" style="padding:10px 20px;background:#4a90e2;color:white;border:none;border-radius:6px;cursor:pointer;font-size:14px;">确认</button>
+                    <button class="confirm-ok" style="padding:10px 20px;background:var(--theme-accent, #4a90e2);color:white;border:none;border-radius:6px;cursor:pointer;font-size:14px;">确认</button>
                 </div>
             </div>
         `;
@@ -2728,7 +2728,7 @@ JSON 结构：
                 <textarea class="prompt-input" style="width:100%;min-height:100px;padding:12px;border:1px solid ${borderColor};border-radius:8px;font-size:14px;resize:vertical;margin-bottom:15px;background:${inputBg};color:${inputColor};">${escapeHtml(defaultValue || '')}</textarea>
                 <div style="display:flex;gap:10px;justify-content:flex-end;">
                     <button class="prompt-cancel" style="padding:10px 20px;background:transparent;border:1px solid ${borderColor};border-radius:6px;cursor:pointer;font-size:14px;color:${cancelColor};">取消</button>
-                    <button class="prompt-ok" style="padding:10px 20px;background:#4a90e2;color:white;border:none;border-radius:6px;cursor:pointer;font-size:14px;">确定</button>
+                    <button class="prompt-ok" style="padding:10px 20px;background:var(--theme-accent, #4a90e2);color:white;border:none;border-radius:6px;cursor:pointer;font-size:14px;">确定</button>
                 </div>
             </div>
         `;

@@ -74,7 +74,7 @@
         resultModal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:10000;';
         var modalContent = document.createElement('div');
         modalContent.style.cssText = 'background:' + (nightMode ? '#2d2d2d' : 'white') + ';color:' + (nightMode ? '#eee' : '#333') + ';border-radius:12px;padding:25px;width:90%;max-width:500px;';
-        modalContent.innerHTML = '<div style="text-align:center;margin-bottom:20px;color:#2ecc71;"><i class="fas fa-check-circle" style="font-size:48px;"></i></div><h2 style="text-align:center;margin-bottom:15px;">' + (isEn ? 'Share link created successfully' : '分享链接创建成功') + '</h2><div style="background:' + (nightMode ? '#3d3d3d' : '#f5f5f5') + ';padding:15px;border-radius:8px;margin-bottom:20px;"><div style="font-size:12px;margin-bottom:5px;">' + (isEn ? 'Share link:' : '分享链接：') + '</div><div style="word-break:break-all;font-size:14px;padding:8px;">' + shareData.share_url + '</div></div><div style="display:flex;gap:10px;"><button class="share-copy-btn" style="flex:1;padding:12px;background:#4a90e2;color:white;border:none;border-radius:6px;cursor:pointer;">' + (isEn ? 'Copy Link' : '复制链接') + '</button><button class="share-close-btn" style="flex:1;padding:12px;background:' + (nightMode ? '#555' : '#6c757d') + ';color:white;border:none;border-radius:6px;cursor:pointer;">' + (isEn ? 'Done' : '完成') + '</button></div>';
+        modalContent.innerHTML = '<div style="text-align:center;margin-bottom:20px;color:#2ecc71;"><i class="fas fa-check-circle" style="font-size:48px;"></i></div><h2 style="text-align:center;margin-bottom:15px;">' + (isEn ? 'Share link created successfully' : '分享链接创建成功') + '</h2><div style="background:' + (nightMode ? '#3d3d3d' : '#f5f5f5') + ';padding:15px;border-radius:8px;margin-bottom:20px;"><div style="font-size:12px;margin-bottom:5px;">' + (isEn ? 'Share link:' : '分享链接：') + '</div><div style="word-break:break-all;font-size:14px;padding:8px;">' + shareData.share_url + '</div></div><div style="display:flex;gap:10px;"><button class="share-copy-btn" style="flex:1;padding:12px;background:var(--theme-accent, #4a90e2);color:white;border:none;border-radius:6px;cursor:pointer;">' + (isEn ? 'Copy Link' : '复制链接') + '</button><button class="share-close-btn" style="flex:1;padding:12px;background:' + (nightMode ? '#555' : '#6c757d') + ';color:white;border:none;border-radius:6px;cursor:pointer;">' + (isEn ? 'Done' : '完成') + '</button></div>';
         resultModal.appendChild(modalContent);
         document.body.appendChild(resultModal);
         modalContent.querySelector('.share-copy-btn').onclick = function() {
@@ -231,7 +231,7 @@
             <div style="background:${nightMode ? '#3d3d3d' : '#f5f5f5'};padding:15px;border-radius:8px;margin-bottom:20px;">
                 <h3 style="margin-bottom:10px;">${isEn ? 'Existing Share Link' : '现有分享链接'}</h3>
                 <div style="word-break:break-all;margin-bottom:10px;">
-                    <strong>${isEn ? 'Link:' : '链接:'}</strong> <a href="${existingShare.share_url}" target="_blank" style="color:#4a90e2;">${existingShare.share_url}</a>
+                    <strong>${isEn ? 'Link:' : '链接:'}</strong> <a href="${existingShare.share_url}" target="_blank" style="color:var(--theme-accent, #4a90e2);">${existingShare.share_url}</a>
                 </div>
                 <div style="font-size:14px;color:${nightMode ? '#aaa' : '#666'};">
                     <p><strong>${isEn ? 'Mode:' : '模式:'}</strong> ${existingShare.mode === 'view' ? (isEn ? 'View only' : '仅查看') : (isEn ? 'Editable' : '允许编辑')}</p>
@@ -280,7 +280,7 @@
             
             <div style="display:flex;gap:10px;margin-top:20px;">
                 <button type="button" id="shareDeleteBtn" style="flex:1;padding:10px;background:${nightMode ? '#555' : '#dc3545'};color:white;border:none;border-radius:6px;cursor:pointer;">${isEn ? 'Delete Link' : '删除链接'}</button>
-                <button type="button" id="shareUpdateBtn" style="flex:2;padding:10px;background:#4a90e2;color:white;border:none;border-radius:6px;cursor:pointer;">${isEn ? 'Update Link' : '更新链接'}</button>
+                <button type="button" id="shareUpdateBtn" style="flex:2;padding:10px;background:var(--theme-accent, #4a90e2);color:white;border:none;border-radius:6px;cursor:pointer;">${isEn ? 'Update Link' : '更新链接'}</button>
             </div>
         `;
         shareContent.appendChild(contentDiv);
@@ -475,7 +475,7 @@
             </div>
             <div id="shareError" style="color:#e74c3c;font-size:13px;margin-bottom:10px;display:none;"></div>
             <div style="display:flex;gap:10px;margin-top:20px;">
-                <button type="button" id="shareCreateBtn" style="flex:1;padding:10px;background:#4a90e2;color:white;border:none;border-radius:6px;cursor:pointer;">${isEn ? 'Create Share Link' : '创建分享链接'}</button>
+                <button type="button" id="shareCreateBtn" style="flex:1;padding:10px;background:var(--theme-accent, #4a90e2);color:white;border:none;border-radius:6px;cursor:pointer;">${isEn ? 'Create Share Link' : '创建分享链接'}</button>
             </div>
         `;
         shareContent.appendChild(contentDiv);

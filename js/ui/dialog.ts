@@ -78,7 +78,7 @@
                         <h2 style="text-align:center;margin:0 0 15px 0;font-size:18px;">${title}</h2>
                         <p style="text-align:center;margin:0 0 20px 0;font-size:14px;line-height:1.5;">${message}</p>
                         <div style="display:flex;gap:10px;">
-                            <button class="custom-dialog-btn confirm" style="flex:1;padding:12px;background:#4a90e2;color:white;border:none;border-radius:6px;cursor:pointer;font-size:14px;">${confirmText}</button>
+                            <button class="custom-dialog-btn confirm" style="flex:1;padding:12px;background:var(--theme-accent, #4a90e2);color:white;border:none;border-radius:6px;cursor:pointer;font-size:14px;">${confirmText}</button>
                         </div>
                     </div>
                 </div>
@@ -92,7 +92,7 @@
                         <p style="text-align:center;margin:0 0 20px 0;font-size:14px;line-height:1.5;">${message}</p>
                         <div style="display:flex;gap:10px;">
                             ${buildCancelButton()}
-                            <button class="custom-dialog-btn confirm" style="flex:1;padding:12px;background:#4a90e2;color:white;border:none;border-radius:6px;cursor:pointer;font-size:14px;">${confirmText}</button>
+                            <button class="custom-dialog-btn confirm" style="flex:1;padding:12px;background:var(--theme-accent, #4a90e2);color:white;border:none;border-radius:6px;cursor:pointer;font-size:14px;">${confirmText}</button>
                         </div>
                     </div>
                 </div>
@@ -107,7 +107,7 @@
                         <input type="text" class="custom-dialog-input" style="width:100%;padding:10px;margin-bottom:20px;border:1px solid ${nightMode ? '#555' : '#ddd'};border-radius:6px;background:${inputBgColor};color:${textColor};font-size:14px;box-sizing:border-box;" placeholder="${placeholder}" value="${defaultValue}">
                         <div style="display:flex;gap:10px;">
                             ${buildCancelButton()}
-                            <button class="custom-dialog-btn confirm" style="flex:1;padding:12px;background:#4a90e2;color:white;border:none;border-radius:6px;cursor:pointer;font-size:14px;">${confirmText}</button>
+                            <button class="custom-dialog-btn confirm" style="flex:1;padding:12px;background:var(--theme-accent, #4a90e2);color:white;border:none;border-radius:6px;cursor:pointer;font-size:14px;">${confirmText}</button>
                         </div>
                     </div>
                 </div>

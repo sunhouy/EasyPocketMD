@@ -161,12 +161,12 @@
         loadingDiv.style.cssText = 'text-align:center;padding:40px 0;grid-column: 1/-1;';
 
         var loadingIcon = document.createElement('div');
-        loadingIcon.innerHTML = '<i class="fas fa-magic" style="font-size: 32px; color: #4a90e2;"></i>';
+        loadingIcon.innerHTML = '<i class="fas fa-magic" style="font-size: 32px; color: var(--theme-accent, #4a90e2);"></i>';
         loadingIcon.style.cssText = 'margin-bottom: 15px;';
 
         var loadingText = document.createElement('div');
         loadingText.textContent = isEn() ? 'AI is searching...' : 'AI搜索中...';
-        loadingText.style.cssText = 'color: #4a90e2; font-size: 14px;';
+        loadingText.style.cssText = 'color: var(--theme-accent, #4a90e2); font-size: 14px;';
 
         loadingDiv.appendChild(loadingIcon);
         loadingDiv.appendChild(loadingText);
@@ -292,7 +292,7 @@ Provide 5-10 most relevant Markdown examples. Only return the list, no explanati
         // 添加AI搜索结果标题
         var resultHeader = document.createElement('div');
         resultHeader.style.cssText = 'grid-column: 1/-1; padding: 10px 0; border-bottom: 1px solid ' + (window.nightMode ? '#444' : '#eee') + '; margin-bottom: 10px;';
-        resultHeader.innerHTML = '<span style="color: #4a90e2; font-weight: bold;">' + (isEn() ? 'AI Search Results' : 'AI搜索结果') + '</span>';
+        resultHeader.innerHTML = '<span style="color: var(--theme-accent, #4a90e2); font-weight: bold;">' + (isEn() ? 'AI Search Results' : 'AI搜索结果') + '</span>';
         grid.appendChild(resultHeader);
 
         // 渲染结果列表
@@ -317,7 +317,7 @@ Provide 5-10 most relevant Markdown examples. Only return the list, no explanati
 
             btn.onmouseenter = function() {
                 this.style.background = window.nightMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)';
-                this.style.borderColor = '#4a90e2';
+                this.style.borderColor = 'var(--theme-accent, #4a90e2)';
             };
 
             btn.onmouseleave = function() {
@@ -422,7 +422,7 @@ Provide 5-10 most relevant Markdown examples. Only return the list, no explanati
                         var aiSearchLink = document.createElement('a');
                         aiSearchLink.href = 'javascript:void(0)';
                         aiSearchLink.textContent = isEn() ? 'Try AI Search' : '试试AI搜索';
-                        aiSearchLink.style.cssText = 'color: #4a90e2; text-decoration: underline; cursor: pointer; font-size: 14px;';
+                        aiSearchLink.style.cssText = 'color: var(--theme-accent, #4a90e2); text-decoration: underline; cursor: pointer; font-size: 14px;';
                         aiSearchLink.addEventListener('click', function() {
                             performAISearch(searchKeyword);
                         });
@@ -439,7 +439,7 @@ Provide 5-10 most relevant Markdown examples. Only return the list, no explanati
                 btn.style.cssText = 'padding: 12px 8px; border: 2px solid transparent; background: ' + (nightMode ? '#3d3d3d' : '#f5f5f5') + '; cursor: pointer; border-radius: 8px; transition: all 0.2s; text-align: center; color: ' + (nightMode ? '#eee' : '#333') + '; min-height: 70px; display: flex; flex-direction: column; align-items: center; justify-content: center;';
 
                 var iconDiv = document.createElement('div');
-                iconDiv.style.cssText = 'font-size: 20px; margin-bottom: 6px; color: #4a90e2;';
+                iconDiv.style.cssText = 'font-size: 20px; margin-bottom: 6px; color: var(--theme-accent, #4a90e2);';
                 iconDiv.innerHTML = '<i class="' + item.icon + '"></i>';
 
                 var nameDiv = document.createElement('div');
@@ -455,7 +455,7 @@ Provide 5-10 most relevant Markdown examples. Only return the list, no explanati
 
                 btn.onmouseenter = function() {
                     this.style.background = nightMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)';
-                    this.style.borderColor = '#4a90e2';
+                    this.style.borderColor = 'var(--theme-accent, #4a90e2)';
                 };
 
                 btn.onmouseleave = function() {
@@ -587,7 +587,7 @@ Provide 5-10 most relevant Markdown examples. Only return the list, no explanati
 
         var insertBtn = document.createElement('button');
         insertBtn.innerHTML = '<i class="fas fa-plus"></i> ' + (isEn() ? 'Insert' : '插入');
-        insertBtn.style.cssText = 'padding: 10px 20px; background: #4a90e2; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px;';
+        insertBtn.style.cssText = 'padding: 10px 20px; background: var(--theme-accent, #4a90e2); color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px;';
         insertBtn.onclick = function() {
             var footnoteId = idInput.value.trim() || '1';
             var footnoteContent = contentInput.value.trim() || (isEn() ? 'Footnote content' : '脚注内容');
@@ -729,7 +729,7 @@ Provide 5-10 most relevant Markdown examples. Only return the list, no explanati
 
         var insertBtn = document.createElement('button');
         insertBtn.innerHTML = '<i class="fas fa-plus"></i> ' + (isEn() ? 'Insert' : '插入');
-        insertBtn.style.cssText = 'padding: 10px 20px; background: #4a90e2; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px;';
+        insertBtn.style.cssText = 'padding: 10px 20px; background: var(--theme-accent, #4a90e2); color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px;';
         insertBtn.onclick = function() {
             var mindmapContent = contentInput.value.trim();
             var direction = directionSelect.value;

@@ -8,6 +8,7 @@ import { enterPresentationMode, exitPresentationMode } from './main/presentation
 import { initBackNavigation } from './main/back-navigation';
 import { installMobileChromeScroll } from './main/mobile-chrome-scroll';
 import { applyBackground, createBackgroundControls } from './main/background';
+import { applyThemeColor, createThemeColorControls } from './main/theme-color';
 
 document.addEventListener('DOMContentLoaded', function() {
     'use strict';
@@ -983,6 +984,7 @@ document.addEventListener('DOMContentLoaded', function() {
             editorMode: getCheckedRadioValue('editorMode', 'wysiwyg'),
             themeMode: getCheckedRadioValue('themeMode', 'system'),
             background: backgroundControls.get(),
+            themeColor: themeColorControls.get(),
             uiMode: getCheckedRadioValue('uiMode', 'auto'),
             language: getCheckedRadioValue('language', window.i18n ? window.i18n.getLanguage() : 'zh'),
             fontSize: fontSizeSelect ? fontSizeSelect.value : '16px',
@@ -1215,6 +1217,8 @@ document.addEventListener('DOMContentLoaded', function() {
     // 加载用户配置
     window.userSettings = JSON.parse(localStorage.getItem('vditor_settings') || '{}');
     const backgroundControls = createBackgroundControls();
+    const themeColorControls = createThemeColorControls();
+    applyThemeColor(window.userSettings.themeColor);
     applyBackground(window.userSettings.background);
     if (!window.userSettings.toolbarButtons) {
         window.userSettings.toolbarButtons = window.defaultToolbarButtons;
@@ -2626,6 +2630,8 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!modal) return;
 
         backgroundControls.open(window.userSettings.background);
+        themeColorControls.open(window.userSettings.themeColor);
+        document.getElementById('appearanceSettings')?.removeAttribute('open');
 
         // 设置当前编辑器引擎
         var currentEngine = getCurrentEngine();
@@ -3087,6 +3093,7 @@ document.addEventListener('DOMContentLoaded', function() {
         var newSettings = {
             toolbarButtons: [],
             background: backgroundControls.get(),
+            themeColor: themeColorControls.get(),
             themeMode: 'system',
             uiMode: 'auto',
             fontSize: '16px',
@@ -3272,6 +3279,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         window.userSettings = newSettings;
         applyBackground(newSettings.background);
+        applyThemeColor(newSettings.themeColor);
 
         // 保存 AI 模型配置
         var aiConfigApi = (window as any).AIConfig;
