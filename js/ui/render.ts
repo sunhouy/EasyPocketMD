@@ -1,3 +1,4 @@
+import { renderEChartsExportBlocks } from './echarts-markdown';
 import { exportMermaidSvg } from './mermaid-export';
 (function(global: any) {
     'use strict';
@@ -44,6 +45,7 @@ import { exportMermaidSvg } from './mermaid-export';
 
         var container = document.createElement('div');
         container.innerHTML = html;
+        await renderEChartsExportBlocks(container);
 
         // 处理原始的Markdown公式格式
         var allElements = container.querySelectorAll('div, p, span');

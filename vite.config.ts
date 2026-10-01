@@ -1,4 +1,5 @@
 import { defineConfig } from 'vite';
+import { useVditorVectorCharts } from './scripts/vditor-vector-charts';
 import { viteStaticCopy } from 'vite-plugin-static-copy';
 import { readFileSync, existsSync, writeFileSync, readFile, cpSync } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -41,7 +42,7 @@ if (existsSync(scopedVditorPackagePath)) {
 }
 
 function localizeVditorAssets(code) {
-  return code
+  return useVditorVectorCharts(code)
     .replace(
       /public static readonly CDN = `https:\/\/unpkg\.com\/vditor@\$\{VDITOR_VERSION\}`;/,
       'public static readonly CDN = "/vditor";'
@@ -211,7 +212,18 @@ export default defineConfig({
     format: 'es'
   },
   optimizeDeps: {
-    include: ['docx']
+    include: ['docx'],
+    esbuildOptions: {
+      plugins: [{
+        name: 'vditor-vector-charts',
+        setup(build) {
+          build.onLoad({ filter: /[\\/]@sunhouyun[\\/]vditor[\\/].*\.js$/ }, args => ({
+            contents: localizeVditorAssets(readFileSync(args.path, 'utf8')),
+            loader: 'js'
+          }));
+        }
+      }]
+    }
   },
   plugins: [
     {

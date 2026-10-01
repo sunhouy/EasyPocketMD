@@ -1,3 +1,4 @@
+import { renderEChartsSvg } from './echarts-markdown';
 import MarkdownIt from 'markdown-it';
 
 export function exportMermaidSvg(svg: SVGElement) {
@@ -15,12 +16,16 @@ export function exportMermaidSvg(svg: SVGElement) {
 
 /** Render only actual Mermaid fences; examples inside other code fences stay text. */
 export async function prepareDocxDiagrams(markdown: string) {
-    const fences = new MarkdownIt().parse(markdown, {}).filter(token => token.type === 'fence' && token.info.trim() === 'mermaid');
+    const fences = new MarkdownIt().parse(markdown, {}).filter(token => token.type === 'fence' && ['mermaid', 'echarts'].includes(token.info.trim()));
     if (!fences.length) return [];
     const globalRef = window as any;
     if (typeof globalRef.convertFormulasAndChartsToImages !== 'function') await import('./render');
-    const diagrams: { code: string; svg?: string; png?: string }[] = [];
+    const diagrams: { code: string; language?: string; svg?: string; png?: string }[] = [];
     for (const fence of fences) {
+        if (fence.info.trim() === 'echarts') {
+            diagrams.push({ code: fence.content.trim(), language: 'echarts', svg: await renderEChartsSvg(JSON.parse(fence.content)) });
+            continue;
+        }
         const host = document.createElement('div');
         const diagram = document.createElement('div');
         diagram.className = 'mermaid';
