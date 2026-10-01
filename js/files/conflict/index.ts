@@ -1,3 +1,4 @@
+import { sourceHighlights } from './highlight';
 export function computeDiff(globalRef: any, leftText: string, rightText: string): any[] {
   const wasmDiff = globalRef.wasmTextEngineGateway.diff(leftText, rightText);
   if (!Array.isArray(wasmDiff)) {
@@ -245,6 +246,7 @@ export function renderDiffView(diffResult: any[], isEn: boolean, options: boolea
     Array.isArray(opts.resolvedHunkIds) ? opts.resolvedHunkIds : opts.resolvedHunkIds ? [...opts.resolvedHunkIds] : [],
   );
 
+  const highlights = sourceHighlights(diffResult || []);
   let html = '';
   let leftLine = 1;
   let rightLine = 1;
@@ -298,14 +300,10 @@ export function renderDiffView(diffResult: any[], isEn: boolean, options: boolea
     }
 
     if (item.type === 'removed') {
-      html += `<div class="diff-line diff-removed${markHunks ? ' diff-hunk' : ''}${currentHunkId === activeHunkId ? ' diff-hunk-active' : ''}${resolvedSet.has(currentHunkId) ? ' diff-hunk-resolved' : ''}"${markHunks ? ` data-hunk-id="${currentHunkId}"` : ''}><div class="diff-line-num">${leftLine}</div><div class="diff-line-content"><pre>${escapeHtml(
-        item.left,
-      )}</pre></div><div class="diff-line-num">-</div><div class="diff-line-content diff-empty"></div></div>`;
+      html += `<div class="diff-line diff-removed${markHunks ? ' diff-hunk' : ''}${currentHunkId === activeHunkId ? ' diff-hunk-active' : ''}${resolvedSet.has(currentHunkId) ? ' diff-hunk-resolved' : ''}"${markHunks ? ` data-hunk-id="${currentHunkId}"` : ''}><div class="diff-line-num">${leftLine}</div><div class="diff-line-content"><pre>${highlights.get(item) ?? escapeHtml(item.left)}</pre></div><div class="diff-line-num">-</div><div class="diff-line-content diff-empty"></div></div>`;
       leftLine += 1;
     } else if (item.type === 'added') {
-      html += `<div class="diff-line diff-added${markHunks ? ' diff-hunk' : ''}${currentHunkId === activeHunkId ? ' diff-hunk-active' : ''}${resolvedSet.has(currentHunkId) ? ' diff-hunk-resolved' : ''}"${markHunks ? ` data-hunk-id="${currentHunkId}"` : ''}><div class="diff-line-num">-</div><div class="diff-line-content diff-empty"></div><div class="diff-line-num">${rightLine}</div><div class="diff-line-content"><pre>${escapeHtml(
-        item.right,
-      )}</pre></div></div>`;
+      html += `<div class="diff-line diff-added${markHunks ? ' diff-hunk' : ''}${currentHunkId === activeHunkId ? ' diff-hunk-active' : ''}${resolvedSet.has(currentHunkId) ? ' diff-hunk-resolved' : ''}"${markHunks ? ` data-hunk-id="${currentHunkId}"` : ''}><div class="diff-line-num">-</div><div class="diff-line-content diff-empty"></div><div class="diff-line-num">${rightLine}</div><div class="diff-line-content"><pre>${highlights.get(item) ?? escapeHtml(item.right)}</pre></div></div>`;
       rightLine += 1;
     }
   });
