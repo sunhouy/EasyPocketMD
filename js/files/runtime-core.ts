@@ -2,6 +2,7 @@
  * 文件管理 - 加载、保存、同步、历史版本、文件夹
  */
 // @ts-nocheck
+import { saveAfterDialogOpens } from '../ui/dialog-save';
 import {
     computeDiff as computeDiffCore,
     bindCollapsedDiffInteractions as bindCollapsedDiffInteractionsCore,
@@ -3897,10 +3898,6 @@ import { createDiffFileWriter } from './conflict/live-files';
      * 显示文件对比对话框
      */
     async function showFileDiffDialog() {
-        // 先保存当前文档
-        if (typeof global.saveCurrentFile === 'function' && g('currentFileId')) {
-            await global.saveCurrentFile(true);
-        }
 
         const currentFileId = g('currentFileId');
         if (!currentFileId) {
@@ -3974,6 +3971,7 @@ import { createDiffFileWriter } from './conflict/live-files';
 
         modal.appendChild(modalContent);
         document.body.appendChild(modal);
+        saveAfterDialogOpens(global);
 
         const closeSelectBtn = modalContent.querySelector('#closeFileDiffSelectBtn');
         if (closeSelectBtn) {
@@ -4450,10 +4448,6 @@ import { createDiffFileWriter } from './conflict/live-files';
      * 显示全文查找对话框
      */
     async function showFindDialog() {
-        // 先保存当前文档
-        if (typeof global.saveCurrentFile === 'function' && g('currentFileId')) {
-            await global.saveCurrentFile(true);
-        }
 
         const nightMode = g('nightMode') === true;
         const bgColor = nightMode ? '#2d2d2d' : 'white';
@@ -4520,6 +4514,7 @@ import { createDiffFileWriter } from './conflict/live-files';
                 '<div id="wasmSearchResults" style="max-height:' + wasmResultMaxHeight + ';overflow:auto;font-size:' + statusFontSize + ';"></div>' +
             '</div>';
         document.body.appendChild(dialog);
+        saveAfterDialogOpens(global);
         // 拖动逻辑（支持鼠标和触摸）
         const header = dialog.querySelector('#findDialogHeader');
         let isDragging = false;

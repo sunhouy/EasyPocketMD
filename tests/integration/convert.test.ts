@@ -19,7 +19,8 @@ jest.mock('child_process', () => {
 
             setImmediate(async () => {
                 try {
-                    if (command !== 'pandoc') {
+                    // Native tool resolution can return a system or configured absolute path.
+                    if (require('path').basename(command) !== 'pandoc') {
                         throw new Error('Unexpected command: ' + command);
                     }
                     const outputIndex = args.indexOf('-o');

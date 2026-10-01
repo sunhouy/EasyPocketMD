@@ -1,3 +1,5 @@
+const { normalizePdfResources } = require('../utils/pdfResources');
+const { nativeTool, isMissingPandoc } = require('../utils/nativeTools');
 const express = require('express');
 const router = express.Router();
 const markdownIt = require('markdown-it');
@@ -63,7 +65,7 @@ function resolveStaticAssetPath(src) {
     }
 
     try {
-        const normalized = src.replace(/^https?:\/\/[^/]+/i, '');
+        const normalized = src.replace(/^https?:\/\/[^/]+/i, '').replace(/^(uploads|screenshots|user_files)\//i, '/$1/');
         const match = normalized.match(/^\/(uploads|screenshots|user_files)\/([^?#]+)/i);
         if (!match) {
             return null;
@@ -83,33 +85,24 @@ function resolveStaticAssetPath(src) {
     return null;
 }
 
-/** Inline /uploads/ etc. as data URLs so wkhtmltopdf does not HTTP-fetch the same server. */
-function inlineStaticAssetsForPdf(html) {
+/** Inline local export resources with a shared size budget and cache. */
+function createPdfAssetInliner() {
     let assetBytes = 0;
-    return String(html || '').replace(
-        /(<(?:img|embed)[^>]+src=)(["'])([^"']+)\2/gi,
-        (full, prefix, quote, src) => {
-            const localPath = resolveStaticAssetPath(src);
-            if (!localPath) {
-                return full;
-            }
-
-            try {
-                const size = fs.statSync(localPath).size;
-                if (size > 5 * 1024 * 1024 || assetBytes + size > 6 * 1024 * 1024) {
-                    throw new Error('PDF images exceed the export size limit');
-                }
-                const data = fs.readFileSync(localPath);
-                assetBytes += data.length;
-                const dataUrl = `data:${mimeTypeFromPath(localPath)};base64,${data.toString('base64')}`;
-                return `${prefix}${quote}${dataUrl}${quote}`;
-            } catch (error) {
-                if (error.message === 'PDF images exceed the export size limit') throw error;
-                console.warn('[PDF Debug] Failed to inline asset:', src, error.message);
-                return full;
-            }
+    const cache = new Map();
+    return function(src) {
+        const localPath = resolveStaticAssetPath(src);
+        if (!localPath) return null;
+        if (cache.has(localPath)) return cache.get(localPath);
+        const size = fs.statSync(localPath).size;
+        if (size > 5 * 1024 * 1024 || assetBytes + size > 6 * 1024 * 1024) {
+            throw Object.assign(new Error('PDF images exceed the export size limit'), { status: 413 });
         }
-    );
+        const data = fs.readFileSync(localPath);
+        assetBytes += data.length;
+        const dataUrl = `data:${mimeTypeFromPath(localPath)};base64,${data.toString('base64')}`;
+        cache.set(localPath, dataUrl);
+        return dataUrl;
+    };
 }
 
 function sanitizeHtmlForWkhtmltopdf(html) {
@@ -135,10 +128,10 @@ function sanitizeHtmlForWkhtmltopdf(html) {
     return cleaned;
 }
 
-function prepareHtmlForWkhtmltopdf(html) {
+function prepareHtmlForWkhtmltopdf(html, baseUrl) {
     let prepared = cleanMathJaxContent(html);
     prepared = sanitizeHtmlForWkhtmltopdf(prepared);
-    prepared = inlineStaticAssetsForPdf(prepared);
+    prepared = normalizePdfResources(prepared, baseUrl, createPdfAssetInliner());
     return prepared;
 }
 
@@ -213,7 +206,7 @@ router.post('/pdf', async (req, res) => {
     try {
         let { html, settings } = req.body;
         validatePdfHtml(html);
-        html = prepareHtmlForWkhtmltopdf(html);
+        html = prepareHtmlForWkhtmltopdf(html, req.body.baseUrl || process.env.BASE_URL || `${req.protocol}://${req.get('host')}/`);
         validatePdfHtml(html);
         const titleFont = String(settings?.titleFont || 'SimHei').replace(/["\\<>]/g, '');
         const bodyFont = String(settings?.bodyFont || 'SimSun').replace(/["\\<>]/g, '');
@@ -231,11 +224,8 @@ router.post('/pdf', async (req, res) => {
             marginBottom: settings?.pageMargin ? `${settings.pageMargin}mm` : '15mm',
             marginLeft: settings?.pageMargin ? `${settings.pageMargin}mm` : '15mm',
             marginRight: settings?.pageMargin ? `${settings.pageMargin}mm` : '15mm',
-            printMediaType: true,
             disableLocalFileAccess: true,
             encoding: 'UTF-8',
-            imageQuality: 75,
-            imageDpi: 150,
             disableJavascript: true,
             loadErrorHandling: 'ignore',
             loadMediaErrorHandling: 'ignore'
@@ -594,18 +584,18 @@ async function runPandocDocx(inputContent, options: any = {}) {
         }
 
         await new Promise((resolve, reject) => {
-            const child = spawn('pandoc', args, {
+            const child = spawn(nativeTool('pandoc'), args, {
                 windowsHide: true
             });
 
             let stderr = '';
 
             child.stderr.on('data', (chunk) => {
-                stderr += chunk.toString();
+                stderr = (stderr + chunk.toString()).slice(-65536);
             });
 
             child.on('error', (error) => {
-                reject(error);
+                reject(Object.assign(error, { exportTool: 'pandoc' }));
             });
 
             child.on('close', (code) => {
@@ -659,11 +649,11 @@ router.post('/docx', async (req, res) => {
     } catch (error) {
         console.error('DOCX conversion endpoint error:', error);
 
-        const missingPandoc = error && (error.code === 'ENOENT' || /pandoc/i.test(error.message || ''));
+        const missingPandoc = isMissingPandoc(error);
         return res.status(500).json({
             code: 500,
             message: missingPandoc
-                ? 'Pandoc is not installed or not available in PATH'
+                ? 'Pandoc 未安装或无法启动，请安装 Pandoc 或配置 PANDOC_PATH，然后重新部署服务'
                 : 'DOCX conversion failed: ' + (error.message || 'unknown error')
         });
     }

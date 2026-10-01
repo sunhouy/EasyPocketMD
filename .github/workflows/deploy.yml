@@ -299,6 +299,8 @@ jobs:
           node -e "require('sharp'); require('esbuild').transformSync('const n: number = 1', {loader: 'ts'});"
           echo "✓ 运行依赖验证完成（服务器无需执行 npm 安装）"
 
+          bash api/utils/ensure-export-tools.sh
+
           # 安装 Python 依赖：DOCX 模板生成 + MarkItDown 导入转换
           echo "[5/5] 安装 Python 依赖..."
           if command -v python3 &> /dev/null; then
