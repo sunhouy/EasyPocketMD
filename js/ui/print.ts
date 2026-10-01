@@ -1,3 +1,4 @@
+import { afterDialogPaint, saveAfterDialogOpens } from './dialog-save';
 
 const global = window;
 
@@ -670,31 +671,6 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
             }
         };
 
-        // 预览和发送按钮也需要关闭连接
-        var previewBtn = modalContent.querySelector('#printPreviewBtn');
-        if (previewBtn) {
-            previewBtn.onclick = global.debounce(async function() {
-                // 先保存当前文档
-                if (typeof global.saveCurrentFile === 'function' && g('currentFileId')) {
-                    await global.saveCurrentFile(true);
-                }
-                cleanup();
-                await showPrintPreview(getPrintSettings(modalContent));
-            }, 500);
-        }
-
-        var exportPdfPreviewBtn = modalContent.querySelector('#exportPdfPreviewBtn');
-        if (exportPdfPreviewBtn) {
-            exportPdfPreviewBtn.onclick = global.debounce(async function() {
-                if (typeof global.saveCurrentFile === 'function' && g('currentFileId')) {
-                    await global.saveCurrentFile(true);
-                }
-                if (typeof cleanup === 'function') cleanup();
-                printModal.remove();
-                await showPrintPreview(getPrintSettings(modalContent));
-            }, 500);
-        }
-
         var sendBtn = modalContent.querySelector('#printSendBtn');
         if (sendBtn) {
             sendBtn.onclick = global.debounce(function() {
@@ -1053,6 +1029,21 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
         }
 
         } // End of if (mode === 'print')
+
+        // Open feedback immediately; saving must not delay the preview.
+        var openPreview = function() {
+            var settings = getPrintSettings(modalContent);
+            cleanup();
+            printModal.remove();
+            void showPrintPreview(settings);
+            saveAfterDialogOpens(global);
+        };
+        var previewBtn = modalContent.querySelector('#printPreviewBtn');
+        if (previewBtn) previewBtn.onclick = openPreview;
+        var exportPdfPreviewBtn = modalContent.querySelector('#exportPdfPreviewBtn');
+        if (exportPdfPreviewBtn) exportPdfPreviewBtn.onclick = openPreview;
+
+
 
         // 取消按钮逻辑 (所有模式通用)
         var cancelBtn = modalContent.querySelector('#printCancelBtn');
@@ -1613,7 +1604,6 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
 
     async function showPrintPreview(settings) {
         var nightMode = g('nightMode') === true;
-        var content = g('vditor') ? g('vditor').getValue() : '';
 
         // Pre-define cleanup function to avoid scoping issues
         var previewModal = null;
@@ -1649,6 +1639,7 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
         var isCancelled = false;
         closeBtnLoading.onclick = function() {
             isCancelled = true;
+            clearTimeout(timeoutId);
             if (loadingModal) loadingModal.remove();
         };
 
@@ -1672,8 +1663,6 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
             if (isCancelled || timeoutReached) return;
             if (!pdfUrl) return;
             
-            loadingModal.remove();
-            
             previewModal = document.createElement('div');
             previewModal.className = 'modal-overlay';
             previewModal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.9);z-index:10001;display:flex;flex-direction:column;align-items:stretch;justify-content:stretch;padding:0;';
@@ -1695,7 +1684,9 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
 
             // 确保 PDF 生成器已加载
             const { renderPDF } = await getPDFGenerator();
+            loadingText.textContent = isEn() ? 'Rendering PDF preview...' : '正在渲染PDF预览...';
             await renderPDF(pdfUrl, pagesWrapper);
+            if (isCancelled || timeoutReached) return;
 
             var buttonContainer = document.createElement('div');
             buttonContainer.style.cssText = 'display:flex;gap:8px;padding:12px;background:' + (nightMode ? '#2d2d2d' : '#f8f9fa') + ';border-top:1px solid ' + (nightMode ? '#444' : '#eee') + ';justify-content:flex-end;';
@@ -1756,6 +1747,7 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
             previewContent.appendChild(buttonContainer);
             previewModal.appendChild(previewContent);
             document.body.appendChild(previewModal);
+            loadingModal.remove();
             
             closeBtn.onclick = cleanup;
             cancelBtn.onclick = cleanup;
@@ -1765,6 +1757,9 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
         };
 
         try {
+            await afterDialogPaint();
+            if (isCancelled || timeoutReached) return;
+            var content = g('vditor') ? g('vditor').getValue() : '';
             var htmlContent = await preparePrintContent(content, settings);
             if (isCancelled || timeoutReached) return;
 
@@ -1773,10 +1768,10 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
             pdfUrl = await generatePDF(htmlContent, settings);
 
             if (isCancelled || timeoutReached) return;
-            clearTimeout(timeoutId);
 
             // PDF生成完成，直接显示预览
-            showPreview();
+            await showPreview();
+            clearTimeout(timeoutId);
 
         } catch (error) {
             clearTimeout(timeoutId);

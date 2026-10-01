@@ -71,6 +71,26 @@ describe('PDF process lifecycle', () => {
         await expect(result).resolves.toBeUndefined();
     });
 
+    it('omits patched-Qt-only options and passes a configured executable as an argument', async () => {
+        const previous = process.env.WKHTMLTOPDF_PATH;
+        process.env.WKHTMLTOPDF_PATH = '/opt/pdf tools/wkhtmltopdf';
+        try {
+            const result = renderPdf('html', { printMediaType: true, imageQuality: 75, imageDpi: 150, disableLocalFileAccess: true }, '/tmp/test.pdf');
+            const [command, args] = (spawn as jest.Mock).mock.calls[0];
+            expect(args).not.toContain('--print-media-type');
+            expect(args).not.toContain('--image-quality');
+            expect(args).not.toContain('--image-dpi');
+            expect(args).toContain('--disable-local-file-access');
+            if (process.platform === 'linux') expect(args).toContain('/opt/pdf tools/wkhtmltopdf');
+            else expect(command).toBe('/opt/pdf tools/wkhtmltopdf');
+            children[0].emit('close', 0);
+            await expect(result).resolves.toBeUndefined();
+        } finally {
+            if (previous === undefined) delete process.env.WKHTMLTOPDF_PATH;
+            else process.env.WKHTMLTOPDF_PATH = previous;
+        }
+    });
+
     it('handles a missing executable without an uncaught exception', async () => {
         const result = renderPdf('html', {}, '/tmp/test.pdf');
         const rejected = expect(result).rejects.toThrow('ENOENT');

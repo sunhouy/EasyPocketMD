@@ -1,3 +1,4 @@
+import { nativeTool } from './nativeTools';
 import { spawn } from 'child_process';
 import { open, readFile, stat } from 'fs/promises';
 
@@ -69,8 +70,9 @@ export function renderPdf(html: string, options: Record<string, unknown>, filePa
         };
         try {
             const args = ['--quiet'];
+            const command = nativeTool('wkhtmltopdf');
             for (const [key, value] of Object.entries(options)) {
-                if (value === false || value === undefined) continue;
+                if (value === false || value === undefined || ['printMediaType', 'imageQuality', 'imageDpi'].includes(key)) continue;
                 args.push('--' + key.replace(/[A-Z]/g, letter => '-' + letter.toLowerCase()));
                 if (value !== true) args.push(String(value));
             }
@@ -81,10 +83,10 @@ export function renderPdf(html: string, options: Record<string, unknown>, filePa
             // arguments go through "$@", never interpolated into shell source. There is
             // no pipeline, so SIGKILL reaches the actual converter process.
             child = process.platform === 'linux'
-                ? spawn('/bin/sh', ['-c', 'ulimit -t 60 || exit 1; exec wkhtmltopdf "$@"',
-                    'wkhtmltopdf', ...pdfArgs], { stdio: ['pipe', 'ignore', 'pipe'],
+                ? spawn('/bin/sh', ['-c', 'ulimit -t 60 || exit 1; exec "$@"',
+                    'wkhtmltopdf', command, ...pdfArgs], { stdio: ['pipe', 'ignore', 'pipe'],
                     env: { ...process.env, QT_QPA_PLATFORM: process.env.QT_QPA_PLATFORM || 'offscreen' } })
-                : spawn('wkhtmltopdf', pdfArgs, { stdio: ['pipe', 'ignore', 'pipe'] });
+                : spawn(command, pdfArgs, { stdio: ['pipe', 'ignore', 'pipe'] });
             child.on('error', error => { processClosed = true; release(); fail(error); });
             child.on('close', (code, exitSignal) => {
                 processClosed = true;
