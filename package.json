@@ -102,6 +102,7 @@
     "prosemirror-view": "^1.41.8",
     "sensitive-word-filter": "^1.0.2",
     "sharp": "^0.34.5",
+    "tsx": "^4.22.3",
     "uuid": "^9.0.1",
     "wkhtmltopdf": "^0.4.0",
     "ws": "^8.18.0",
@@ -126,7 +127,6 @@
     "supertest": "^7.2.2",
     "ts-jest": "^29.4.11",
     "ts-migrate": "^0.1.35",
-    "tsx": "^4.22.3",
     "typescript": "^5.8.3",
     "vite": "^7.3.1",
     "vite-plugin-static-copy": "^3.2.0"
