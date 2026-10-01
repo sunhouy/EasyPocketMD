@@ -15,7 +15,7 @@ import {
 import { installEditorRuntime } from './editor-runtime';
 import { installSyncRuntime } from './sync-runtime';
 import { relocateFile } from './relocate';
-import { mountDiffView, renderMergePreview } from './conflict/markdown';
+import { renderMergePreview } from './conflict/markdown';
 import { createDiffEditors } from './conflict/editors';
 import { createDiffFileWriter } from './conflict/live-files';
 
@@ -4060,7 +4060,7 @@ import { createDiffFileWriter } from './conflict/live-files';
         const writer = createDiffFileWriter(global, (id, value) => setEditorContentForFile(id, value), loadFiles);
         function writeContentToFile(targetFile, content) { return writer.write(targetFile, content); }
         let editors = null;
-        function leaveEditing() { editors?.flush(); editors?.destroy(); editors = null; state.editing = false; writer.flush(); modalContent.querySelector('#fileDiffEditBtn').textContent = isEn() ? 'Edit' : '编辑模式'; }
+        function leaveEditing() { editors?.setEditable(false); state.editing = false; writer.flush(); modalContent.querySelector('#fileDiffEditBtn').textContent = isEn() ? 'Edit' : '编辑模式'; }
 
         function promptSaveMergedContent(mergedText) {
             const saveTitle = isEn() ? 'Save merged result' : '保存合并结果';
@@ -4197,7 +4197,7 @@ import { createDiffFileWriter } from './conflict/live-files';
         document.body.appendChild(modal);
 
         const diffScrollEl = modalContent.querySelector('#fileDiffResultContent');
-        const editorHost = modalContent.querySelector('#fileDiffEditors');
+        modalContent.querySelector('#fileDiffEditors').remove();
         if (options.history) {
             modalContent.querySelector('#fileDiffSwapBtn').hidden = true;
             modalContent.querySelector('#fileDiffAcceptLeftBtn').textContent = isEn() ? 'Accept history' : '接受历史';
@@ -4253,6 +4253,7 @@ import { createDiffFileWriter } from './conflict/live-files';
 
         function scrollToHunk(hunkId) {
             if (!diffScrollEl || hunkId === null || hunkId === undefined) return;
+            if (editors) { editors.scrollToHunk(hunkId); return; }
             const row = diffScrollEl.querySelector('.diff-hunk-active, [data-hunk-id="' + hunkId + '"]');
             if (row && row.scrollIntoView) {
                 row.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -4260,7 +4261,6 @@ import { createDiffFileWriter } from './conflict/live-files';
         }
 
         function refreshDiffView() {
-            const diffResult = computeDiff(getLeftContent(), getRightContent());
             const renderOpts = {
                 collapseSame: state.collapseSame,
                 markdown: state.markdown,
@@ -4269,12 +4269,23 @@ import { createDiffFileWriter } from './conflict/live-files';
                 resolvedHunkIds: state.resolvedHunkIds
             };
             if (diffScrollEl) {
-                mountDiffView(diffScrollEl, diffResult, isEn(), renderOpts).then(() => scrollToHunk(state.activeHunkId));
+                if (!editors) {
+                    editors = createDiffEditors(diffScrollEl, [0, 1].map(index => ({
+                        label: () => (index ? state.rightFile : state.leftFile).name,
+                        read: () => (index ? state.rightFile : state.leftFile).content || '',
+                        write: (index ? state.rightFile : state.leftFile).diffReadonly ? undefined : value => writeContentToFile(index ? state.rightFile : state.leftFile, value)
+                    })), () => { infoTextEl.textContent = isEn() ? 'Edits saved to files' : '编辑内容已实时更新到文件'; }, {
+                        ...renderOpts, editable: state.editing, computeDiff,
+                        onDiff: diff => { if (state.editing) infoTextEl.textContent = isEn() ? 'Saved · ' + groupDiffIntoHunks(diff).length + ' difference(s)' : '已实时保存 · ' + groupDiffIntoHunks(diff).length + ' 处差异'; },
+                        onError: error => global.showMessage((isEn() ? 'Editor failed: ' : '编辑器加载失败：') + error.message, 'error')
+                    });
+                    editors.ready.then(() => scrollToHunk(state.activeHunkId));
+                } else { editors.refresh(renderOpts); }
                 const markdownBtn = modalContent.querySelector('#fileDiffMarkdownBtn');
                 if (markdownBtn) {
                     markdownBtn.textContent = state.markdown ? (isEn() ? 'Show source' : '显示源码') : (isEn() ? 'Render Markdown' : '渲染 Markdown');
                 }
-                bindCollapsedDiffInteractions(diffScrollEl);
+                if (!editors) bindCollapsedDiffInteractions(diffScrollEl);
             }
             updateHeaders();
             updateInfoBar();
@@ -4290,7 +4301,7 @@ import { createDiffFileWriter } from './conflict/live-files';
         }
 
         function startConflictMode() {
-            leaveEditing(); editorHost.hidden = true; diffScrollEl.hidden = false;
+            leaveEditing();
             const hunks = getHunks();
             if (!hunks.length) {
                 global.showMessage(isEn() ? 'No differences to resolve' : '没有可解决的差异', 'info');
@@ -4343,26 +4354,21 @@ import { createDiffFileWriter } from './conflict/live-files';
         }
 
         const markdownBtn = modalContent.querySelector('#fileDiffMarkdownBtn');
-        if (markdownBtn) markdownBtn.addEventListener('click', () => { if (state.editing) toggleEditing(); state.markdown = !state.markdown; refreshDiffView(); });
+        if (markdownBtn) markdownBtn.addEventListener('click', async () => { state.markdown = !state.markdown; await editors.setMarkdown(state.markdown); if (modal.isConnected) refreshDiffView(); });
 
         function toggleEditing() {
-            if (state.editing) { leaveEditing(); editorHost.hidden = true; diffScrollEl.hidden = false; refreshDiffView(); }
+            if (state.editing) { leaveEditing(); refreshDiffView(); }
             else {
                 state.conflictMode = false; state.hunkDecisions = {}; state.resolvedHunkIds = []; state.activeHunkId = null;
                 conflictBarEl.style.display = 'none'; state.editing = true;
-                diffScrollEl.hidden = true; editorHost.hidden = false;
-                editors = createDiffEditors(editorHost, [state.leftFile, state.rightFile].map(file => ({
-                    label: file.name + (file.diffReadonly ? (isEn() ? ' (read only)' : '（只读）') : ''),
-                    read: () => file.content || '',
-                    write: file.diffReadonly ? undefined : value => writeContentToFile(file, value)
-                })), () => { infoTextEl.textContent = isEn() ? 'Edits saved to files' : '编辑内容已实时更新到文件'; });
+                editors.setEditable(true); refreshDiffView();
             }
             modalContent.querySelector('#fileDiffEditBtn').textContent = state.editing ? (isEn() ? 'Finish editing' : '结束编辑') : (isEn() ? 'Edit' : '编辑模式');
         }
         modalContent.querySelector('#fileDiffEditBtn').onclick = toggleEditing;
         const restoreBtn = modalContent.querySelector('#fileDiffRestoreBtn');
         if (restoreBtn) restoreBtn.onclick = async () => {
-            leaveEditing(); editorHost.hidden = true; diffScrollEl.hidden = false;
+            leaveEditing();
             await restoreFromHistory(options.history.filename, options.history.versionId, options.history.content, state.rightFile.id);
             refreshDiffView();
         };
@@ -4432,7 +4438,7 @@ import { createDiffFileWriter } from './conflict/live-files';
             };
         }
 
-        function closeComparison() { leaveEditing(); global.removeModal(modal); document.removeEventListener('keydown', handleEsc); }
+        function closeComparison() { leaveEditing(); editors?.destroy(); editors = null; global.removeModal(modal); document.removeEventListener('keydown', handleEsc); }
         modalContent.querySelector('#closeFileDiffResultBtn').onclick = closeComparison;
         const handleEsc = e => { if (e.key === 'Escape' && modal.isConnected && !document.querySelector('.diff-merge-dialog')) closeComparison(); };
         document.addEventListener('keydown', handleEsc);
