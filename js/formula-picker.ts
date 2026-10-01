@@ -529,7 +529,7 @@ function showFormulaPicker() {
     insertBtn.textContent = isEn() ? 'Insert LaTeX' : '插入LaTeX';
     insertBtn.style.cssText = `
         padding: 10px 20px;
-        background: #4a90e2;
+        background: var(--theme-accent, #4a90e2);
         color: white;
         border: none;
         border-radius: 6px;
@@ -541,7 +541,7 @@ function showFormulaPicker() {
     wrapInDollarBtn.textContent = isEn() ? 'Insert Inline' : '行内公式';
     wrapInDollarBtn.style.cssText = `
         padding: 10px 20px;
-        background: #4a90e2;
+        background: var(--theme-accent, #4a90e2);
         color: white;
         border: none;
         border-radius: 6px;
@@ -554,7 +554,7 @@ function showFormulaPicker() {
     wrapInDoubleDollarBtn.textContent = isEn() ? 'Insert Block' : '多行公式';
     wrapInDoubleDollarBtn.style.cssText = `
         padding: 10px 20px;
-        background: #4a90e2;
+        background: var(--theme-accent, #4a90e2);
         color: white;
         border: none;
         border-radius: 6px;
@@ -595,7 +595,7 @@ function showFormulaPicker() {
                 padding: 8px 12px;
                 margin-right: 10px;
                 border: none;
-                background: #4a90e2;
+                background: var(--theme-accent, #4a90e2);
                 border-radius: 20px;
                 white-space: nowrap;
                 cursor: pointer;
@@ -625,7 +625,7 @@ function showFormulaPicker() {
                         t.style.color = (window.nightMode === true) ? '#eee' : '#333';
                         t.style.fontWeight = 'normal';
                     });
-                    tab.style.background = '#4a90e2';
+                    tab.style.background = 'var(--theme-accent, #4a90e2)';
                     tab.style.color = 'white';
                     tab.style.fontWeight = '600';
                     showFormulaCategory(category);
@@ -674,7 +674,7 @@ function showFormulaPicker() {
                     const aiSearchLink = document.createElement('a');
                     aiSearchLink.href = 'javascript:void(0)';
                     aiSearchLink.textContent = isEn() ? 'Try AI Search' : '试试AI搜索';
-                    aiSearchLink.style.cssText = 'color: #4a90e2; text-decoration: underline; cursor: pointer; font-size: 14px;';
+                    aiSearchLink.style.cssText = 'color: var(--theme-accent, #4a90e2); text-decoration: underline; cursor: pointer; font-size: 14px;';
                     aiSearchLink.addEventListener('click', function() {
                         performAISearch(searchKeyword);
                     });
@@ -724,8 +724,8 @@ function showFormulaPicker() {
                     btn.style.borderColor = 'transparent';
                     btn.style.background = 'none';
                 });
-                symbolBtn.style.borderColor = '#4a90e2';
-                symbolBtn.style.background = (window.nightMode === true) ? 'rgba(74, 144, 226, 0.2)' : 'rgba(74, 144, 226, 0.1)';
+                symbolBtn.style.borderColor = 'var(--theme-accent, #4a90e2)';
+                symbolBtn.style.background = (window.nightMode === true) ? 'rgba(var(--theme-accent-rgb, 74, 144, 226), 0.2)' : 'rgba(var(--theme-accent-rgb, 74, 144, 226), 0.1)';
                 selectedFormula = item;
             });
             symbolBtn.addEventListener('mouseenter', function() {
@@ -879,12 +879,12 @@ async function performAISearch(keyword) {
     loadingDiv.style.cssText = 'text-align:center;padding:40px 0;grid-column: 1/-1;';
 
     const loadingIcon = document.createElement('div');
-    loadingIcon.innerHTML = '<i class="fas fa-magic" style="font-size: 32px; color: #4a90e2;"></i>';
+    loadingIcon.innerHTML = '<i class="fas fa-magic" style="font-size: 32px; color: var(--theme-accent, #4a90e2);"></i>';
     loadingIcon.style.cssText = 'margin-bottom: 15px;';
 
     const loadingText = document.createElement('div');
     loadingText.textContent = isEn() ? 'AI is searching...' : 'AI搜索中...';
-    loadingText.style.cssText = 'color: #4a90e2; font-size: 14px;';
+    loadingText.style.cssText = 'color: var(--theme-accent, #4a90e2); font-size: 14px;';
 
     loadingDiv.appendChild(loadingIcon);
     loadingDiv.appendChild(loadingText);
@@ -1041,7 +1041,7 @@ function renderAIFormulaResults(formulas, keyword) {
     // 添加AI搜索结果标题
     const resultHeader = document.createElement('div');
     resultHeader.style.cssText = 'grid-column: 1/-1; padding: 10px 0; border-bottom: 1px solid #eee; margin-bottom: 10px;';
-    resultHeader.innerHTML = `<span style="color: #4a90e2; font-weight: bold;">${isEn() ? 'AI Search Results' : 'AI搜索结果'}</span> <span style="color: #888; font-size: 12px;"></span>`;
+    resultHeader.innerHTML = `<span style="color: var(--theme-accent, #4a90e2); font-weight: bold;">${isEn() ? 'AI Search Results' : 'AI搜索结果'}</span> <span style="color: #888; font-size: 12px;"></span>`;
     formulaGrid.appendChild(resultHeader);
 
     // 渲染公式列表
@@ -1087,8 +1087,8 @@ function renderAIFormulaResults(formulas, keyword) {
                 btn.style.borderColor = 'transparent';
                 btn.style.background = 'none';
             });
-            symbolBtn.style.borderColor = '#4a90e2';
-            symbolBtn.style.background = (window.nightMode === true) ? 'rgba(74, 144, 226, 0.2)' : 'rgba(74, 144, 226, 0.1)';
+            symbolBtn.style.borderColor = 'var(--theme-accent, #4a90e2)';
+            symbolBtn.style.background = (window.nightMode === true) ? 'rgba(var(--theme-accent-rgb, 74, 144, 226), 0.2)' : 'rgba(var(--theme-accent-rgb, 74, 144, 226), 0.1)';
 
             // 保存选中的公式到全局变量供插入按钮使用
             window.selectedFormula = item;

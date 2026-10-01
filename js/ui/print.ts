@@ -301,7 +301,7 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
         if (mode === 'print') {
             aiSection = `
                 <div style="margin-bottom:20px;">
-                    <button id="aiLayoutBtn" style="width:100%;padding:12px;font-weight:bold;background:linear-gradient(135deg, #4a90e2 0%, #357abd 100%);color:white;border:none;border-radius:6px;cursor:pointer;font-size:15px;">
+                    <button id="aiLayoutBtn" style="width:100%;padding:12px;font-weight:bold;background:linear-gradient(135deg, var(--theme-accent, #4a90e2) 0%, var(--theme-accent-hover, #357abd) 100%);color:white;border:none;border-radius:6px;cursor:pointer;font-size:15px;">
                         <i class="fas fa-magic"></i> ${isEn() ? 'AI Smart Layout' : 'AI智能排版'}
                     </button>
                 </div>
@@ -313,7 +313,7 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
             `;
         }
 
-        var downloadLink = '<a href="javascript:void(0)" id="downloadClientBtn" style="color:#4a90e2;cursor:pointer;text-decoration:underline;">' + (isEn() ? 'Click to download print client' : '点击下载打印客户端') + '</a>';
+        var downloadLink = '<a href="javascript:void(0)" id="downloadClientBtn" style="color:var(--theme-accent, #4a90e2);cursor:pointer;text-decoration:underline;">' + (isEn() ? 'Click to download print client' : '点击下载打印客户端') + '</a>';
 
         // 客户端连接状态区域 (仅在打印模式显示)
         var statusSection = '';
@@ -463,7 +463,7 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
                         <div style="grid-column:1/-1;margin-top:10px;display:flex;align-items:center;gap:10px;">
                             <label style="font-size:12px;">${isEn() ? 'Quick set decrement (pt)' : '快速设置递减量 (pt)'}:</label>
                             <input type="number" id="headingStep" value="4" style="width:60px;padding:4px;border:1px solid ${borderColor};border-radius:4px;">
-                            <button id="applyHeadingStep" style="padding:4px 8px;font-size:12px;background:#4a90e2;color:white;border:none;border-radius:4px;cursor:pointer;">${isEn() ? 'Apply Decrement' : '应用递减'}</button>
+                            <button id="applyHeadingStep" style="padding:4px 8px;font-size:12px;background:var(--theme-accent, #4a90e2);color:white;border:none;border-radius:4px;cursor:pointer;">${isEn() ? 'Apply Decrement' : '应用递减'}</button>
                         </div>
                     </div>
                 </div>
@@ -1702,7 +1702,7 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
 
             var printBtn = document.createElement('button');
             printBtn.innerHTML = '<i class="fas fa-print"></i> ' + (isEn() ? 'Print' : '打印');
-            printBtn.style.cssText = 'padding:8px 16px;background:#4a90e2;color:white;border:none;border-radius:4px;cursor:pointer;font-size:14px;font-weight:bold;';
+            printBtn.style.cssText = 'padding:8px 16px;background:var(--theme-accent, #4a90e2);color:white;border:none;border-radius:4px;cursor:pointer;font-size:14px;font-weight:bold;';
             printBtn.onclick = function() {
                 sendToPrint(settings, pdfUrl);
             };
@@ -2149,7 +2149,7 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
                     <span id="statusText" style="font-size:14px;">${isEn() ? 'Please connect print client' : '请连接打印客户端'}</span>
                 </div>
                 <p style="margin-top:10px;font-size:14px;">
-                    <a href="javascript:void(0)" id="fileDownloadClientBtn" style="color:#4a90e2;cursor:pointer;text-decoration:underline;">${isEn() ? 'Click to download print client' : '点击下载打印客户端'}</a>
+                    <a href="javascript:void(0)" id="fileDownloadClientBtn" style="color:var(--theme-accent, #4a90e2);cursor:pointer;text-decoration:underline;">${isEn() ? 'Click to download print client' : '点击下载打印客户端'}</a>
                 </p>
             </div>
         `;

@@ -3604,7 +3604,7 @@ import { relocateFile } from './relocate';
             '</select>' +
             '<div style="display:flex;gap:10px;">' +
                 '<button id="importCancelBtn" style="flex:1;padding:10px;border:1px solid ' + borderColor + ';border-radius:8px;background:transparent;color:' + textColor + ';cursor:pointer;">' + (isEn() ? 'Cancel' : '取消') + '</button>' +
-                '<button id="importChooseBtn" style="flex:1;padding:10px;border:none;border-radius:8px;background:#4a90e2;color:#fff;cursor:pointer;">' + (isEn() ? 'Choose Files' : '选择文件') + '</button>' +
+                '<button id="importChooseBtn" style="flex:1;padding:10px;border:none;border-radius:8px;background:var(--theme-accent, #4a90e2);color:#fff;cursor:pointer;">' + (isEn() ? 'Choose Files' : '选择文件') + '</button>' +
             '</div>';
 
         modal.appendChild(container);
@@ -4523,9 +4523,9 @@ import { relocateFile } from './relocate';
                 '<button id="replaceAllBtn" style="padding:' + buttonPadding + ';background:' + (nightMode ? '#3d3d3d' : '#f0f0f0') + ';color:' + textColor + ';border:1px solid ' + borderColor + ';border-radius:' + compactRadius + ';cursor:pointer;font-size:12px;">' + (isEn() ? 'Replace All' : '全部替换') + '</button>' +
             '</div>' +
             '<div style="display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end;margin-bottom:' + sectionGap + ';">' +
-                '<button id="findBtn" style="padding:' + buttonPadding + ';background:' + (nightMode ? '#4a90e2' : '#4a90e2') + ';color:white;border:none;border-radius:' + compactRadius + ';cursor:pointer;font-size:12px;">' + (isEn() ? 'Find' : '查找') + '</button>' +
-                '<button id="findPrevBtn" style="padding:' + buttonPadding + ';background:' + (nightMode ? '#4a90e2' : '#4a90e2') + ';color:white;border:none;border-radius:' + compactRadius + ';cursor:pointer;font-size:12px;">' + (isEn() ? 'Prev' : '上一个') + '</button>' +
-                '<button id="findNextBtn" style="padding:' + buttonPadding + ';background:' + (nightMode ? '#4a90e2' : '#4a90e2') + ';color:white;border:none;border-radius:' + compactRadius + ';cursor:pointer;font-size:12px;">' + (isEn() ? 'Next' : '下一个') + '</button>' +
+                '<button id="findBtn" style="padding:' + buttonPadding + ';background:' + (nightMode ? 'var(--theme-accent, #4a90e2)' : 'var(--theme-accent, #4a90e2)') + ';color:white;border:none;border-radius:' + compactRadius + ';cursor:pointer;font-size:12px;">' + (isEn() ? 'Find' : '查找') + '</button>' +
+                '<button id="findPrevBtn" style="padding:' + buttonPadding + ';background:' + (nightMode ? 'var(--theme-accent, #4a90e2)' : 'var(--theme-accent, #4a90e2)') + ';color:white;border:none;border-radius:' + compactRadius + ';cursor:pointer;font-size:12px;">' + (isEn() ? 'Prev' : '上一个') + '</button>' +
+                '<button id="findNextBtn" style="padding:' + buttonPadding + ';background:' + (nightMode ? 'var(--theme-accent, #4a90e2)' : 'var(--theme-accent, #4a90e2)') + ';color:white;border:none;border-radius:' + compactRadius + ';cursor:pointer;font-size:12px;">' + (isEn() ? 'Next' : '下一个') + '</button>' +
             '</div>' +
             '<div id="findStatus" style="font-size:' + statusFontSize + ';color:' + secondaryTextColor + ';"></div>' +
             '<div id="wasmSearchPanel" style="margin-top:' + sectionGap + ';border-top:1px solid ' + borderColor + ';padding-top:' + sectionGap + ';display:none;">' +

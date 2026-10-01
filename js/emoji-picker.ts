@@ -224,7 +224,7 @@ function showEmojiPicker() {
     insertBtn.textContent = isEn() ? 'Insert Emoji' : '插入选中的表情';
     insertBtn.style.cssText = `
         padding: 10px 20px;
-        background: #4a90e2;
+        background: var(--theme-accent, #4a90e2);
         color: white;
         border: none;
         border-radius: 6px;
@@ -246,7 +246,7 @@ function showEmojiPicker() {
             t.style.color = (window.nightMode === true) ? '#eee' : '#333';
             t.style.fontWeight = 'normal';
         });
-        tab.style.background = '#4a90e2';
+        tab.style.background = 'var(--theme-accent, #4a90e2)';
         tab.style.color = 'white';
         tab.style.fontWeight = '600';
     }
@@ -261,7 +261,7 @@ function showEmojiPicker() {
                 padding: 8px 12px;
                 margin-right: 10px;
                 border: none;
-                background: #4a90e2;
+                background: var(--theme-accent, #4a90e2);
                 color: white;
                 border-radius: 20px;
                 white-space: nowrap;
@@ -315,7 +315,7 @@ function showEmojiPicker() {
                 const aiLink = document.createElement('a');
                 aiLink.href = 'javascript:void(0)';
                 aiLink.textContent = isEn() ? 'Try AI Search' : '试试AI搜索';
-                aiLink.style.cssText = 'color:#4a90e2;text-decoration:underline;cursor:pointer;font-size:14px;';
+                aiLink.style.cssText = 'color:var(--theme-accent, #4a90e2);text-decoration:underline;cursor:pointer;font-size:14px;';
                 aiLink.addEventListener('click', () => {
                     performEmojiAISearch(keyword);
                 });
@@ -353,7 +353,7 @@ function showEmojiPicker() {
                     btn.style.borderColor = 'transparent';
                     btn.style.background = 'none';
                 });
-                emojiBtn.style.borderColor = '#4a90e2';
+                emojiBtn.style.borderColor = 'var(--theme-accent, #4a90e2)';
                 emojiBtn.style.background = (window.nightMode === true) ? 'rgba(74, 144, 226, 0.2)' : 'rgba(74, 144, 226, 0.1)';
                 selectedEmojiItem = item;
                 window.selectedEmojiItem = item;
@@ -487,8 +487,8 @@ async function performEmojiAISearch(keyword) {
     const loadingDiv = document.createElement('div');
     loadingDiv.style.cssText = 'text-align:center;padding:40px 0;grid-column: 1/-1;';
     loadingDiv.innerHTML = `
-        <div style="margin-bottom:15px;"><i class="fas fa-magic" style="font-size:32px;color:#4a90e2;"></i></div>
-        <div style="color:#4a90e2;font-size:14px;">${isEn() ? 'AI is searching emoji...' : 'AI搜索表情中...'}</div>
+        <div style="margin-bottom:15px;"><i class="fas fa-magic" style="font-size:32px;color:var(--theme-accent, #4a90e2);"></i></div>
+        <div style="color:var(--theme-accent, #4a90e2);font-size:14px;">${isEn() ? 'AI is searching emoji...' : 'AI搜索表情中...'}</div>
     `;
     emojiGrid.appendChild(loadingDiv);
 
@@ -604,7 +604,7 @@ function renderAIEmojiResults(items) {
 
     const header = document.createElement('div');
     header.style.cssText = 'grid-column:1/-1;padding:10px 0;border-bottom:1px solid #eee;margin-bottom:10px;';
-    header.innerHTML = '<span style="color:#4a90e2;font-weight:bold;">AI搜索结果</span>';
+    header.innerHTML = '<span style="color:var(--theme-accent, #4a90e2);font-weight:bold;">AI搜索结果</span>';
     emojiGrid.appendChild(header);
 
     items.forEach((item) => {
@@ -633,7 +633,7 @@ function renderAIEmojiResults(items) {
                 node.style.borderColor = 'transparent';
                 node.style.background = 'none';
             });
-            btn.style.borderColor = '#4a90e2';
+            btn.style.borderColor = 'var(--theme-accent, #4a90e2)';
             btn.style.background = (window.nightMode === true) ? 'rgba(74, 144, 226, 0.2)' : 'rgba(74, 144, 226, 0.1)';
             window.selectedEmojiItem = item;
         });
