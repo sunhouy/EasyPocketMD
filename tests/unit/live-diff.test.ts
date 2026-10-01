@@ -44,18 +44,40 @@ test('never splits emoji or drops text in multiline highlights', () => {
     }
 });
 
-test('both editors write live, keep selection, and respect readonly and IME', () => {
-    jest.useFakeTimers();
+test('native view/editor share DOM, switch Markdown/source, preserve readonly and pending IME edits', async () => {
+    const { marked } = require('marked');
     window.requestAnimationFrame = callback => setTimeout(callback, 0); window.cancelAnimationFrame = clearTimeout;
-    const writes = [jest.fn(), jest.fn()];
-    const editor = createDiffEditors(document.getElementById('host'), [0, 1].map(i => ({ label: 'file'+i, read: () => '# old', write: writes[i] })));
-    editor.inputs.forEach((input, i) => { input.value = '# new'+i; input.setSelectionRange(3, 3); input.dispatchEvent(new Event('input')); expect(writes[i]).toHaveBeenLastCalledWith('# new'+i); });
-    jest.runOnlyPendingTimers(); expect(editor.inputs[0].selectionStart).toBe(3);
-    editor.inputs[0].dispatchEvent(new Event('compositionstart')); editor.inputs[0].value = '中文'; editor.inputs[0].dispatchEvent(new Event('input'));
-    expect(writes[0]).toHaveBeenCalledTimes(1); editor.inputs[0].dispatchEvent(new Event('compositionend')); expect(writes[0]).toHaveBeenLastCalledWith('中文');
-    editor.destroy(); expect(document.querySelector('textarea')).toBeNull();
-    const readonly = createDiffEditors(document.getElementById('host'), [{ label: 'history', read: () => 'old' }, { label: 'current', read: () => 'new', write: writes[1] }]);
-    expect(readonly.inputs[0].readOnly).toBe(true); expect(readonly.inputs[1].readOnly).toBe(false); readonly.destroy();
+    class FakeVditor {
+        constructor(host, options) {
+            this.host = host; this.options = options; this.value = options.value;
+            this.root = document.createElement('pre'); host.append(this.root);
+            this.vditor = { [options.mode]: { element: this.root } };
+            this.setValue(this.value); Promise.resolve().then(options.after);
+        }
+        setValue(value) { this.value = value; this.root.innerHTML = marked.parse(value); [...this.root.children].forEach(node => node.dataset.block = '0'); }
+        getValue() { return this.value + '\n'; }
+        disabled() { this.root.contentEditable = 'false'; this.root.setAttribute('contenteditable', 'false'); }
+        enable() { this.root.contentEditable = 'true'; this.root.setAttribute('contenteditable', 'true'); }
+        edit(value) { this.setValue(value); this.root.dispatchEvent(new Event('input')); this.options.input(value); }
+        destroy() { this.host.replaceChildren(); }
+    }
+    window.Vditor = FakeVditor;
+    const values = ['# Old\n\nprice 10', '# New\n\nprice 20'], writes = [jest.fn(value => values[0] = value), jest.fn(value => values[1] = value)];
+    const surface = createDiffEditors(document.getElementById('host'), [0, 1].map(i => ({ label: 'file'+i, read: () => values[i], write: i ? writes[i] : undefined })), undefined, { editable: false, editorConstructor: FakeVditor });
+    await surface.ready;
+    const roots = [...surface.roots];
+    expect(roots[0].querySelector('h1').textContent).toBe('Old');
+    surface.setEditable(true); expect(surface.roots[0]).toBe(roots[0]); expect(surface.roots[1]).toBe(roots[1]);
+    expect(roots[0].getAttribute('contenteditable')).toBe('false'); expect(roots[1].getAttribute('contenteditable')).toBe('true');
+    surface.setEditable(false); expect(writes[1]).not.toHaveBeenCalled(); // Viewing/toggling does not normalize files.
+    surface.setEditable(true); surface.instances[1].edit('# Updated'); expect(writes[1]).toHaveBeenLastCalledWith('# Updated');
+    roots[1].dispatchEvent(new Event('compositionstart')); surface.instances[1].edit('# 中文'); expect(writes[1]).toHaveBeenCalledTimes(1);
+    surface.flush(); expect(writes[1]).toHaveBeenLastCalledWith('# 中文\n');
+    const previous = surface.instances[1];
+    await surface.setMarkdown(false); const calls = writes[1].mock.calls.length; previous.options.input('stale callback'); expect(writes[1]).toHaveBeenCalledTimes(calls);
+    expect(surface.instances[1].options.mode).toBe('sv'); expect(surface.roots[1].getAttribute('contenteditable')).toBe('true');
+    await surface.setMarkdown(true); expect(surface.instances[1].options.mode).toBe('wysiwyg');
+    surface.destroy(); expect(document.querySelector('.diff-document')).toBeNull();
 });
 
 test('persists both files immediately, updates the active editor and debounces only server sync', () => {
