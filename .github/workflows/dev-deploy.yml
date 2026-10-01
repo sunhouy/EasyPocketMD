@@ -14,7 +14,8 @@ env:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    runs-on: ubuntu-22.04
     steps:
     - name: Checkout source
       uses: actions/checkout@v6
@@ -23,6 +24,8 @@ jobs:
       uses: actions/setup-node@v6
       with:
         node-version: ${{ env.NODE_VERSION }}
+        cache: npm
+        cache-dependency-path: package-lock.json
 
     - name: Setup Emscripten
       run: |
@@ -36,7 +39,7 @@ jobs:
         echo "$HOME/emsdk/upstream/emscripten" >> "$GITHUB_PATH"
 
     - name: Install dependencies
-      run: npm install --no-audit --no-fund
+      run: npm ci --prefer-offline --no-audit --no-fund
 
     - name: Build WASM text engine
       run: npm run wasm:text:build
@@ -48,10 +51,27 @@ jobs:
       run: npm run wasm:text:verify && npm run wasm:image:verify
 
     - name: Run tests
-      run: npm test && npx jest --coverage
+      run: npm test -- --coverage
+
+    - name: Verify locked production dependencies
+      run: |
+        RUNTIME_DIR="$RUNNER_TEMP/easypocketmd-runtime"
+        mkdir -p "$RUNTIME_DIR"
+        cp package.json package-lock.json "$RUNTIME_DIR/"
+        npm ci --prefix "$RUNTIME_DIR" --omit=dev --prefer-offline --no-audit --no-fund
+        cd "$RUNTIME_DIR"
+        ./node_modules/.bin/tsx --version
+        node -e "require('sharp'); require('esbuild').transformSync('const n: number = 1', {loader: 'ts'});"
+
+    - name: Verify frontend build
+      run: npm run build:web && npm run wasm:text:verify:dist && npm run wasm:image:verify:dist
 
   deploy:
-    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    concurrency:
+      group: easypocketmd-server-deployment
+      cancel-in-progress: false
+    runs-on: ubuntu-22.04
     needs: test
 
     steps:
@@ -62,6 +82,8 @@ jobs:
       uses: actions/setup-node@v6
       with:
         node-version: ${{ env.NODE_VERSION }}
+        cache: npm
+        cache-dependency-path: package-lock.json
 
     - name: Extract package version
       id: app_version
@@ -82,22 +104,8 @@ jobs:
         echo "$HOME/emsdk" >> "$GITHUB_PATH"
         echo "$HOME/emsdk/upstream/emscripten" >> "$GITHUB_PATH"
 
-    - name: Clean workspace (node_modules)
-      run: |
-        rm -rf node_modules
-        rm -rf **/node_modules || true
-
     - name: Install dependencies
-      run: npm install --no-audit --no-fund
-
-    - name: Build WASM text engine
-      run: npm run wasm:text:build
-
-    - name: Build WASM image compressor
-      run: npm run wasm:image:build
-
-    - name: Verify WASM source artifacts
-      run: npm run wasm:text:verify && npm run wasm:image:verify
+      run: npm ci --prefer-offline --no-audit --no-fund
 
     - name: Create .env file
       run: |
@@ -175,6 +183,9 @@ jobs:
           cp -r scripts deploy_tmp/
         fi
 
+        # Install only locked runtime dependencies on the runner, never on the server.
+        npm ci --prefix deploy_tmp --omit=dev --prefer-offline --no-audit --no-fund
+        (cd deploy_tmp && ./node_modules/.bin/tsx --version && node -e "require('sharp'); require('esbuild').transformSync('const n: number = 1', {loader: 'ts'});")
         tar -czf deploy.tar.gz -C deploy_tmp .
 
     - name: Prepare and execute zero-downtime deployment
@@ -186,7 +197,9 @@ jobs:
         timeout: 120s
         script: |
           set -e
-          export PATH="$PATH:${{ env.REMOTE_NODE_BIN }}"
+          export PATH="${{ env.REMOTE_NODE_BIN }}:$PATH"
+
+          node -e "if (process.platform !== 'linux' || process.arch !== 'x64' || process.versions.node.split('.')[0] !== '24' || !process.report.getReport().header.glibcVersionRuntime) { console.error('部署包需要 Linux x64 / glibc / Node 24'); process.exit(1); }"
 
           # 定义目录
           GREEN_DIR="/www/wwwroot/js_dev_green"
@@ -220,7 +233,7 @@ jobs:
 
           # 清理下一个部署目录
           echo "清理 $NEXT_DIR..."
-          rm -rf "${NEXT_DIR:?}/"*
+          find "${NEXT_DIR:?}" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
 
           # 等待上传文件（文件会通过 SCP 上传到临时位置）
           echo "等待部署包..."
@@ -232,7 +245,7 @@ jobs:
         username: ${{ secrets.SERVER_USER }}
         password: ${{ secrets.SERVER_PASSWORD }}
         source: "deploy.tar.gz"
-        target: "/tmp"
+        target: "/tmp/easypocketmd-dev-deploy-${{ github.run_id }}-${{ github.run_attempt }}"
         strip_components: 0
 
     - name: Extract and setup deployment
@@ -241,10 +254,11 @@ jobs:
         host: ${{ secrets.SERVER_HOST }}
         username: ${{ secrets.SERVER_USER }}
         password: ${{ secrets.SERVER_PASSWORD }}
-        timeout: 600s
+        timeout: 30s
+        command_timeout: 20m
         script: |
           set -e
-          export PATH="$PATH:${{ env.REMOTE_NODE_BIN }}"
+          export PATH="${{ env.REMOTE_NODE_BIN }}:$PATH"
 
           GREEN_DIR="/www/wwwroot/js_dev_green"
           BLUE_DIR="/www/wwwroot/js_dev_blue"
@@ -265,7 +279,7 @@ jobs:
 
           echo "[1/4] 解压部署包到 $NEXT_DIR..."
           # 使用超时机制解压，避免卡死
-          timeout 120 tar -xzf /tmp/deploy.tar.gz -C "$NEXT_DIR" || {
+          timeout 300 tar -xzf /tmp/easypocketmd-dev-deploy-${{ github.run_id }}-${{ github.run_attempt }}/deploy.tar.gz -C "$NEXT_DIR" || {
             echo "错误: 解压超时或失败"
             exit 1
           }
@@ -280,32 +294,13 @@ jobs:
           ln -s "$SHARED_DIR/user_files" user_files
           echo "✓ 符号链接创建完成"
 
-          # 安装依赖 - 使用更可靠的方式
-          echo "[3/4] 安装依赖..."
-          # 清理 npm 缓存，避免旧缓存问题
-          npm cache clean --force 2>/dev/null || true
-          
-          # 使用 npm ci 如果有 package-lock.json，否则使用 npm install
-          if [ -f "package-lock.json" ]; then
-            echo "使用 npm ci (基于 package-lock.json)..."
-            timeout 300 npm ci --omit=dev --prefer-offline --no-audit --no-fund || {
-              echo "npm ci 失败，尝试 npm install..."
-              timeout 300 npm install --omit=dev --prefer-offline --no-audit --no-fund
-            }
-          else
-            echo "使用 npm install..."
-            timeout 300 npm install --omit=dev --prefer-offline --no-audit --no-fund
-          fi
+          # Runtime dependencies are part of the release; fail before switching traffic.
+          echo "[3/4] 验证预安装运行依赖..."
+          test -x node_modules/.bin/tsx
+          ./node_modules/.bin/tsx --version
+          node -e "require('sharp'); require('esbuild').transformSync('const n: number = 1', {loader: 'ts'});"
+          echo "✓ 运行依赖验证完成（服务器无需执行 npm 安装）"
 
-          echo "✓ 依赖安装完成"
-
-          # 验证安装
-          echo "[4/4] 验证安装..."
-          if [ ! -d "node_modules" ]; then
-            echo "错误: node_modules 目录不存在"
-            exit 1
-          fi
-          
           # 安装 Python 依赖：DOCX 模板生成 + MarkItDown 导入转换
           echo "[5/5] 安装 Python 依赖..."
           if command -v python3 &> /dev/null; then
@@ -341,7 +336,7 @@ jobs:
         timeout: 300s
         script: |
           set -e
-          export PATH="$PATH:${{ env.REMOTE_NODE_BIN }}"
+          export PATH="${{ env.REMOTE_NODE_BIN }}:$PATH"
           PM2_BIN="${{ env.REMOTE_NODE_BIN }}/pm2"
 
           GREEN_DIR="/www/wwwroot/js_dev_green"
@@ -377,13 +372,8 @@ jobs:
           fi
           echo "服务 $NEXT_NAME 将使用端口: $NEXT_PORT"
 
-          # 清理所有可能使用旧端口的 md-dev-server 服务
-          echo "清理所有旧的 md-dev-server 服务..."
-          "$PM2_BIN" stop md-dev-server-green 2>/dev/null || true
-          "$PM2_BIN" delete md-dev-server-green 2>/dev/null || true
-          "$PM2_BIN" stop md-dev-server-blue 2>/dev/null || true
-          "$PM2_BIN" delete md-dev-server-blue 2>/dev/null || true
-          sleep 3
+          # Only recycle the inactive slot; keep the current service alive until checks pass.
+          "$PM2_BIN" delete "$NEXT_NAME" 2>/dev/null || true
 
           # 检查敏感词文件是否存在
           echo "检查敏感词文件..."
@@ -428,14 +418,22 @@ jobs:
           
           # 验证服务健康状态
           echo "验证服务健康状态..."
+          HEALTH_OK=false
           for i in {1..10}; do
-            if curl -s http://localhost:$NEXT_PORT/api/health | grep -q '"code":200'; then
+            if curl --max-time 5 -fsS http://localhost:$NEXT_PORT/api/health | grep -q '"code":200'; then
+              HEALTH_OK=true
               echo "✓ 服务健康检查通过"
               break
             fi
             echo "等待服务就绪... ($i/10)"
             sleep 2
           done
+
+          if [ "$HEALTH_OK" != true ]; then
+            "$PM2_BIN" delete "$NEXT_NAME" 2>/dev/null || true
+            echo "错误: 新服务健康检查失败，保留旧服务"
+            exit 1
+          fi
 
           # 校验 WASM 产物是否为本次构建版本，避免旧产物被错误复用
           echo "校验 WASM 产物版本与完整性..."
@@ -511,13 +509,12 @@ jobs:
           node --input-type=module -e "import { pathToFileURL } from 'node:url'; const mod = await import(pathToFileURL(process.env.TMP_WASM_JS).href); const inst = await mod.default({}); const engine = new inst.WasmTextEngine(); const required=['diff','merge3','findInText','normalizePath','parentPath','basenamePath','pathBasename','compareVersions','isHiddenCrossSearchFile','collectFolderPaths']; const missing=required.filter((m)=>typeof engine[m] !== 'function'); if (missing.length) { console.error('WASM 方法缺失:', missing.join(',')); process.exit(1); }"
           echo "✓ HTTP WASM 完整性校验通过"
 
-          # 原子切换符号链接
-          echo "执行原子切换..."
-          # 如果 LINK_PATH 是目录或已存在的符号链接，先删除
-          if [ -e "$LINK_PATH" ] || [ -L "$LINK_PATH" ]; then
-            rm -rf "$LINK_PATH"
+          # Atomically replace an existing symlink. Preserve a legacy directory on first migration.
+          if [ -d "$LINK_PATH" ] && [ ! -L "$LINK_PATH" ]; then
+            mv "$LINK_PATH" "${LINK_PATH}_legacy_${{ github.run_id }}"
           fi
-          ln -sfn "$NEXT_DIR" "$LINK_PATH"
+          ln -sfn "$NEXT_DIR" "${LINK_PATH}.next"
+          mv -Tf "${LINK_PATH}.next" "$LINK_PATH"
 
           # 配置 SSL 证书
           echo "配置 SSL 证书..."
@@ -615,7 +612,7 @@ jobs:
         timeout: 300s
         script: |
           set -e
-          export PATH="$PATH:${{ env.REMOTE_NODE_BIN }}"
+          export PATH="${{ env.REMOTE_NODE_BIN }}:$PATH"
           PM2_BIN="${{ env.REMOTE_NODE_BIN }}/pm2"
 
           LINK_PATH="/www/wwwroot/js_dev"
@@ -682,6 +679,7 @@ jobs:
           echo "✓ 打印服务器已切换到 $PRINT_DIR"
 
     - name: Final cleanup
+      if: always()
       uses: appleboy/ssh-action@master
       with:
         host: ${{ secrets.SERVER_HOST }}
@@ -690,10 +688,11 @@ jobs:
         timeout: 60s
         script: |
           # 清理临时文件
-          rm -f /tmp/deploy.tar.gz
+          rm -f /tmp/easypocketmd-dev-deploy-${{ github.run_id }}-${{ github.run_attempt }}/deploy.tar.gz
 
           echo ""
           echo "=========================================="
-          echo "✓ 零停机部署成功完成！"
+          echo "部署流程结束，请以上述步骤状态为准"
           echo "=========================================="
           "${{ env.REMOTE_NODE_BIN }}/pm2" list
+
