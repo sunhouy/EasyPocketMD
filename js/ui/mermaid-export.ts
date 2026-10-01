@@ -19,7 +19,7 @@ export async function prepareDocxDiagrams(markdown: string) {
     if (!fences.length) return [];
     const globalRef = window as any;
     if (typeof globalRef.convertFormulasAndChartsToImages !== 'function') await import('./render');
-    const diagrams: { code: string; svg: string }[] = [];
+    const diagrams: { code: string; svg?: string; png?: string }[] = [];
     for (const fence of fences) {
         const host = document.createElement('div');
         const diagram = document.createElement('div');
@@ -31,7 +31,13 @@ export async function prepareDocxDiagrams(markdown: string) {
         const svg = host.querySelector('svg');
         if (svg) {
             const exported = exportMermaidSvg(svg);
-            if (exported) diagrams.push({ code: fence.content.trim(), svg: exported });
+            if (exported) { diagrams.push({ code: fence.content.trim(), svg: exported }); continue; }
+        }
+        const png = host.querySelector('img')?.getAttribute('src');
+        if (png?.startsWith('data:image/png;base64,')) {
+            diagrams.push({ code: fence.content.trim(), png });
+        } else {
+            throw new Error('Mermaid diagram could not be exported; please check its syntax');
         }
     }
     return diagrams;
