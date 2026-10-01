@@ -669,7 +669,7 @@ import { createDiffFileWriter } from './conflict/live-files';
             $anchor.append($meta);
         }
 
-        $meta.find('.file-list-inline-preview').text(getFileListPreview(file.content));
+        $meta.find('.file-list-inline-preview').text(isExternalLocalFile(file) && !['ready', 'copy'].includes(file.localAccessState) ? (isEn() ? 'Local file: awaiting access verification' : '本地文件：待检查读写权限') : getFileListPreview(file.content));
         $meta.find('.file-list-inline-time').text(formatFileListModifiedTime(file.lastModified));
     }
 
@@ -2526,10 +2526,10 @@ import { createDiffFileWriter } from './conflict/live-files';
         }
 
         try {
-        // 先保存当前文档
-        if (typeof global.saveCurrentFile === 'function' && g('currentFileId')) {
-            await global.saveCurrentFile(false);
-        }
+            // 先保存当前文档
+            if (typeof global.saveCurrentFile === 'function' && g('currentFileId')) {
+                await global.saveCurrentFile(false);
+            }
 
             if (requestToken !== fileOpenRequestToken) return;
 
@@ -2769,6 +2769,7 @@ import { createDiffFileWriter } from './conflict/live-files';
         if (contentChanged) {
             file.lastModified = Date.now();
         }
+        if (isExternalLocalFile(file)) file.localPendingWrite = true;
         localStorage.setItem('vditor_files', JSON.stringify(files));
         if (isManual) {
             showSaveStatus('saving');
@@ -2787,7 +2788,7 @@ import { createDiffFileWriter } from './conflict/live-files';
         ) {
             const sharedSaveResult = await global.scheduleSharedDocSync({ manualSave: isManual });
             if (sharedSaveResult !== false) {
-                g('unsavedChanges')[currentFileId] = getCurrentEditorContent(currentFileId, file.content) !== file.content || !!g('pendingServerSync')[currentFileId];
+                g('unsavedChanges')[currentFileId] = false;
                 if (isManual) {
                     showSaveStatus('saved');
                 }

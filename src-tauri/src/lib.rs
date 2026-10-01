@@ -383,7 +383,9 @@ async fn read_local_file(app: AppHandle, file_path: String) -> Result<ReadLocalF
         return android_document(app, "read", serde_json::json!({ "uri": file_path })).await;
     }
     let path = normalize_file_path(file_path);
-    Ok(ReadLocalFileResponse { success: true, path: Some(path_to_string(&path)), name: path.file_name().map(|name| name.to_string_lossy().to_string()), content: Some(read_text_file(&path)?), error: None, local_file_mode: Some("tauri".into()) })
+    let content = read_text_file(&path)?;
+    fs::OpenOptions::new().write(true).open(&path).map_err(|error| error.to_string())?;
+    Ok(ReadLocalFileResponse { success: true, path: Some(path_to_string(&path)), name: path.file_name().map(|name| name.to_string_lossy().to_string()), content: Some(content), error: None, local_file_mode: Some("tauri".into()) })
 }
 
 #[cfg(target_os = "android")]
