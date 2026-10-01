@@ -451,6 +451,26 @@
                         </div>
                     </li>
                     <li class="settings-list-item">
+                        <div class="form-group background-settings">
+                            <label for="backgroundModeSelect" data-i18n="backgroundTitle">更换背景</label>
+                            <select id="backgroundModeSelect">
+                                <option value="default" data-i18n="backgroundDefault">默认背景</option>
+                                <option value="color" data-i18n="backgroundColor">纯色背景</option>
+                                <option value="image" data-i18n="backgroundImage">图片背景</option>
+                            </select>
+                            <div class="background-setting-actions">
+                                <label for="backgroundColorInput" data-i18n="backgroundColor">纯色背景</label>
+                                <input type="color" id="backgroundColorInput" value="#f5f7fa">
+                                <button type="button" id="backgroundResetBtn" data-i18n="backgroundReset">恢复默认</button>
+                            </div>
+                            <label for="backgroundImageInput" data-i18n="backgroundUpload">上传背景图片</label>
+                            <input type="file" id="backgroundImageInput" accept="image/jpeg,image/png,image/webp">
+                            <p class="background-hint" data-i18n="backgroundHint">支持 PNG、JPEG、WebP，最大 10MB。图片保存在本机，点击保存设置后生效。</p>
+                            <div id="backgroundPreview" role="img" aria-label="背景预览"></div>
+                            <p id="backgroundStatus" role="status" aria-live="polite"></p>
+                        </div>
+                    </li>
+                    <li class="settings-list-item">
                         <div class="form-group">
                             <label data-i18n="interfaceStyleMode">界面样式模式</label>
                             <div class="radio-group" id="interfaceStyleModeSetting">

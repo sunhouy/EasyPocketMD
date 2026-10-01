@@ -5848,3 +5848,31 @@ body.night-mode #wordCountModalOverlay .word-count-modal .modal-header {
 body.night-mode #wordCountModalOverlay .word-count-modal div {
     border-color: #2a2a2a !important;
 }
+
+/* User-selected backgrounds keep editor surfaces readable in either theme. */
+body.custom-background {
+    background-color: var(--app-background-color) !important;
+    background-image: var(--app-background-image) !important;
+    background-position: center !important;
+    background-size: cover !important;
+    background-repeat: no-repeat !important;
+    --custom-editor-surface: rgba(255, 255, 255, 0.84);
+}
+body.night-mode.custom-background { --custom-editor-surface: rgba(30, 31, 34, 0.84); }
+body.custom-background .editor-container,
+body.custom-background #vditor,
+body.custom-background .vditor-content,
+body.custom-background .vditor-preview,
+body.custom-background .easy-pm-host { background: transparent !important; }
+body.custom-background .vditor-wysiwyg,
+body.custom-background .vditor-ir,
+body.custom-background .vditor-sv,
+body.custom-background .vditor-preview .vditor-reset,
+body.custom-background .easy-pm-editor { background: var(--custom-editor-surface) !important; }
+.background-setting-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: 12px 0; }
+.background-setting-actions label { margin: 0; }
+#backgroundColorInput { width: 48px; height: 34px; padding: 2px; cursor: pointer; }
+#backgroundPreview { height: 110px; border-radius: 8px; border: 1px solid #aaa; background: linear-gradient(135deg, #f5f7fa, #c3cfe2); background-size: cover; background-position: center; }
+.background-hint, #backgroundStatus { font-size: 12px; line-height: 1.5; }
+#backgroundStatus { color: #c24545; min-height: 1em; }
+.background-settings input[type=file] { max-width: 100%; }

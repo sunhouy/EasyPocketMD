@@ -7,6 +7,7 @@ import './ai-config';
 import { enterPresentationMode, exitPresentationMode } from './main/presentation-mode';
 import { initBackNavigation } from './main/back-navigation';
 import { installMobileChromeScroll } from './main/mobile-chrome-scroll';
+import { applyBackground, createBackgroundControls } from './main/background';
 
 document.addEventListener('DOMContentLoaded', function() {
     'use strict';
@@ -981,6 +982,7 @@ document.addEventListener('DOMContentLoaded', function() {
             editorEngine: getCheckedRadioValue('editorEngine', 'vditor'),
             editorMode: getCheckedRadioValue('editorMode', 'wysiwyg'),
             themeMode: getCheckedRadioValue('themeMode', 'system'),
+            background: backgroundControls.get(),
             uiMode: getCheckedRadioValue('uiMode', 'auto'),
             language: getCheckedRadioValue('language', window.i18n ? window.i18n.getLanguage() : 'zh'),
             fontSize: fontSizeSelect ? fontSizeSelect.value : '16px',
@@ -1212,6 +1214,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // 加载用户配置
     window.userSettings = JSON.parse(localStorage.getItem('vditor_settings') || '{}');
+    const backgroundControls = createBackgroundControls();
+    applyBackground(window.userSettings.background);
     if (!window.userSettings.toolbarButtons) {
         window.userSettings.toolbarButtons = window.defaultToolbarButtons;
     }
@@ -2621,6 +2625,8 @@ document.addEventListener('DOMContentLoaded', function() {
         var modal = document.getElementById('settingsModalOverlay');
         if (!modal) return;
 
+        backgroundControls.open(window.userSettings.background);
+
         // 设置当前编辑器引擎
         var currentEngine = getCurrentEngine();
         var engineRadios = document.getElementsByName('editorEngine');
@@ -3077,8 +3083,10 @@ document.addEventListener('DOMContentLoaded', function() {
     // 保存设置
     var saveSettingsBtn = document.getElementById('saveSettingsBtn');
     if(saveSettingsBtn) saveSettingsBtn.addEventListener('click', function() {
+        if (backgroundControls.isLoading()) { window.showMessage(window.i18n.t('backgroundProcessing'), 'info'); return; }
         var newSettings = {
             toolbarButtons: [],
+            background: backgroundControls.get(),
             themeMode: 'system',
             uiMode: 'auto',
             fontSize: '16px',
@@ -3256,8 +3264,14 @@ document.addEventListener('DOMContentLoaded', function() {
         var needReinitForOutline = window.userSettings.showOutline !== newSettings.showOutline;
 
         // 保存设置
+        try {
+            localStorage.setItem('vditor_settings', JSON.stringify(newSettings));
+        } catch (_) {
+            window.showMessage(window.i18n ? window.i18n.t('backgroundSaveFailed') : '设置保存失败，请释放本机存储空间后重试', 'error');
+            return;
+        }
         window.userSettings = newSettings;
-        localStorage.setItem('vditor_settings', JSON.stringify(window.userSettings));
+        applyBackground(newSettings.background);
 
         // 保存 AI 模型配置
         var aiConfigApi = (window as any).AIConfig;
