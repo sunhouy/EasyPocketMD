@@ -1,4 +1,5 @@
-import { renderDiffView, RenderDiffViewOptions, escapeHtml } from './index';
+import { highlightRenderedPair } from './highlight';
+import { renderDiffView, RenderDiffViewOptions, escapeHtml, groupDiffIntoHunks } from './index';
 
 const vditorCdn = () => (window as any).electron || window.location.protocol === 'file:' ? './vditor' : '/vditor';
 
@@ -7,7 +8,6 @@ type Group = { start: number; end: number; blocks: Block[] };
 
 /** Align complete Markdown blocks using the original line diff, preserving multiline syntax. */
 export async function renderMarkdownDiff(diff: any[], isEn: boolean, options: RenderDiffViewOptions = {}): Promise<string> {
-    if (!diff.some(item => item.type !== 'same')) return renderDiffView(diff, isEn, options);
     const [{ marked }, { default: purifier }] = await Promise.all([import('marked'), import('dompurify')]);
     const lineMaps = { left: [] as number[], right: [] as number[] };
     const sources = { left: [] as string[], right: [] as string[] };
@@ -55,6 +55,8 @@ export async function renderMarkdownDiff(diff: any[], isEn: boolean, options: Re
     }
     const lineNumbers = { left: new Map<number, number>(), right: new Map<number, number>() };
     for (const side of ['left', 'right'] as const) lineMaps[side].forEach((index, line) => lineNumbers[side].set(index, line + 1));
+    const hunks = groupDiffIntoHunks(diff);
+    const resolved = new Set(options.resolvedHunkIds || []);
     let html = '', folded = 0;
     let sameRows: string[] = [];
     const flushSame = () => {
@@ -66,7 +68,10 @@ export async function renderMarkdownDiff(diff: any[], isEn: boolean, options: Re
     };
     for (const group of groups) {
         const changed = diff.slice(group.start, group.end + 1).some(item => item.type !== 'same');
-        let row = '<div class="diff-line diff-markdown-row' + (changed ? '' : ' diff-same') + '">';
+        const ids = hunks.filter(hunk => hunk.startIndex <= group.end && hunk.startIndex + hunk.items.length - 1 >= group.start).map(hunk => hunk.id);
+        const hunkClass = options.markHunks && ids.length ? ' diff-hunk' + (ids.includes(options.activeHunkId!) ? ' diff-hunk-active' : '') + (ids.every(id => resolved.has(id)) ? ' diff-hunk-resolved' : '') : '';
+        let row = '<div class="diff-line diff-markdown-row' + (changed ? '' : ' diff-same') + hunkClass + '">';
+        if (options.markHunks) row += ids.map(id => `<span class="diff-hunk-anchor" data-hunk-id="${id}"></span>`).join('');
         for (const side of ['left', 'right'] as const) {
             const numbers: number[] = [];
             for (let index = group.start; index <= group.end; index++) {
@@ -86,6 +91,11 @@ export async function renderMarkdownDiff(diff: any[], isEn: boolean, options: Re
             row += `<div class="diff-line-num">${escapeHtml(range)}</div><div class="diff-line-content diff-markdown-content${kind}${!numbers.length ? ' diff-empty' : ''}">${rendered || '&nbsp;'}</div>`;
         }
         row += '</div>';
+        if (changed) {
+            const host = document.createElement('div'); host.innerHTML = row;
+            const cells = host.querySelectorAll<HTMLElement>('.diff-markdown-content');
+            highlightRenderedPair(cells[0], cells[1]); row = host.innerHTML;
+        }
         if (!changed && options.collapseSame !== false) sameRows.push(row);
         else { flushSame(); html += row; }
     }
@@ -105,7 +115,7 @@ export function mountDiffView(container: HTMLElement, diff: any[], isEn: boolean
     const revision = (revisions.get(container) || 0) + 1;
     revisions.set(container, revision);
     container.innerHTML = renderDiffView(diff, isEn, options);
-    if (options.markdown === false || options.markHunks) return Promise.resolve();
+    if (options.markdown === false) return Promise.resolve();
     return renderMarkdownDiff(diff, isEn, options).then(html => {
         if (revisions.get(container) !== revision || !container.isConnected) return;
         container.innerHTML = html;
@@ -119,4 +129,13 @@ export function mountDiffView(container: HTMLElement, diff: any[], isEn: boolean
         });
         hydrate(container);
     }).catch(error => { console.error('[Diff] Markdown preview failed:', error); });
+}
+
+/** Render the smart-merge preview using the same safe Markdown pipeline. */
+export async function renderMergePreview(container: HTMLElement, markdown: string) {
+    const [{ marked }, { default: purifier }] = await Promise.all([import('marked'), import('dompurify')]);
+    const api = (window as any).Vditor;
+    const html = api?.md2html ? await api.md2html(markdown, { cdn: vditorCdn(), markdown: { sanitize: true } }) : marked.parse(markdown, { gfm: true, breaks: true }) as string;
+    container.innerHTML = purifier.sanitize(html, { FORBID_TAGS: ['style', 'iframe', 'form', 'input', 'button'], FORBID_ATTR: ['style'] });
+    hydrate(container);
 }

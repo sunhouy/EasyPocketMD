@@ -5900,3 +5900,44 @@ body.custom-background .easy-pm-host .easy-pm-editor {
 body.night-mode .diff-markdown-content.diff-removed { background: #4a1a1a; color: #ff8888; }
 body.night-mode .diff-markdown-content.diff-added { background: #1a4a1a; color: #88ff88; }
 @media (max-width: 600px) { .diff-line { grid-template-columns: 30px minmax(0, 1fr) 30px minmax(0, 1fr); } .diff-line-num { width: auto; padding: 2px 4px; } }
+
+/* Fullscreen comparison: preserve space for the documents on narrow screens too. */
+.file-diff-modal-overlay { padding: 0 !important; }
+.file-diff-modal [hidden] { display: none !important; }
+.file-diff-modal .diff-titlebar > div { display: flex; align-items: center; gap: 10px; min-width: 0; overflow: hidden; }
+.file-diff-modal .diff-titlebar h3 { font-size: 13px; white-space: nowrap; }
+#fileDiffSubtitle { display: none; }
+#fileDiffInfoText { font-size: 11px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.file-diff-modal button { padding: 3px 7px !important; font-size: 12px !important; line-height: 18px; min-height: 24px; flex-shrink: 0; }
+#closeFileDiffResultBtn { font-size: 20px !important; }
+#fileDiffToolbar, #fileDiffConflictBar { flex-wrap: nowrap !important; gap: 4px !important; overflow-x: auto; }
+#fileDiffColumnHeaders { font-size: 11px !important; }
+#fileDiffLeftHeader, #fileDiffRightHeader { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.diff-hunk-anchor { grid-column: 1 / -1; height: 0; min-height: 0; }
+.diff-char-removed { background: #efb0b0; color: inherit; border-radius: 2px; }
+.diff-char-added { background: #a5dcae; color: inherit; border-radius: 2px; }
+body.night-mode .diff-char-removed { background: #813c46; }
+body.night-mode .diff-char-added { background: #286746; }
+.diff-editors { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); flex: 1; min-height: 0; overflow: hidden; }
+.diff-edit-pane { position: relative; overflow: hidden; min-width: 0; min-height: 0; }
+.diff-edit-pane + .diff-edit-pane { border-left: 1px solid #aaa5; }
+.diff-edit-pane .diff-edit-paint, .diff-edit-pane .diff-edit-input {
+    box-sizing: border-box; margin: 0; border: 0; padding: 10px 12px; font: 14px/1.65 monospace;
+    letter-spacing: normal; tab-size: 4; white-space: pre-wrap; overflow-wrap: anywhere; word-break: normal;
+}
+.diff-edit-paint { position: absolute; top: 0; left: 0; pointer-events: none; color: inherit; background: transparent; }
+.diff-edit-input { position: absolute; inset: 0; width: 100%; height: 100%; resize: none; outline: none; overflow-y: scroll; background: transparent !important; color: transparent !important; caret-color: #222; }
+.diff-edit-input::selection { background: #609aff55; color: transparent; }
+body.night-mode .diff-edit-input { caret-color: #eee; }
+.diff-edit-input[readonly] { cursor: default; }
+.diff-merge-dialog { width: min(900px, 95vw); max-height: 94vh; padding: 12px; border-radius: 6px; display: flex; flex-direction: column; overflow: auto; }
+.diff-merge-dialog h4 { margin: 0 0 8px; }
+.diff-merge-preview { min-height: 100px; max-height: 55vh; overflow: auto; padding: 8px; border: 1px solid #aaa5; margin-bottom: 8px; flex-shrink: 0; }
+.history-modal .modal-header { padding: 6px 10px; }
+.history-modal .modal-header h3 { margin: 0; font-size: 15px; }
+.history-modal .history-info { padding: 6px 10px; margin: 0; font-size: 12px; }
+.history-modal button { font-size: 12px; padding: 3px 7px; min-height: 24px; }
+.history-modal .history-batch-toolbar { padding: 5px 8px !important; margin-bottom: 6px !important; }
+.history-modal .modal-header p { margin: 0; padding-right: 24px; font-size: 13px; }
+.history-modal #closeHistoryBtn { top: 4px !important; right: 6px !important; }
+.history-modal { padding: 8px !important; }
