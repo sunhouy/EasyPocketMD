@@ -1532,7 +1532,7 @@
 
         var insertBtn = document.createElement('button');
         insertBtn.innerHTML = '<i class="fas fa-plus"></i> ' + (isEn() ? 'Insert' : '插入');
-        insertBtn.style.cssText = 'padding: 10px 20px; background: #4a90e2; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px;';
+        insertBtn.style.cssText = 'padding: 10px 20px; background: var(--theme-accent, #4a90e2); color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px;';
         insertBtn.onclick = function() {
             var data = {};
             for (var key in formData) {
@@ -1674,7 +1674,7 @@
                 chartBtn.style.cssText = 'padding: 15px; border: 2px solid transparent; background: ' + (nightMode ? '#3d3d3d' : '#f5f5f5') + '; cursor: pointer; border-radius: 8px; transition: all 0.2s; text-align: center; color: ' + (nightMode ? '#eee' : '#333') + ';';
 
                 var iconDiv = document.createElement('div');
-                iconDiv.style.cssText = 'font-size: 28px; margin-bottom: 8px; color: #4a90e2;';
+                iconDiv.style.cssText = 'font-size: 28px; margin-bottom: 8px; color: var(--theme-accent, #4a90e2);';
                 iconDiv.innerHTML = template.icon;
 
                 var nameDiv = document.createElement('div');
@@ -1696,7 +1696,7 @@
 
                 chartBtn.onmouseenter = function() {
                     this.style.background = nightMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)';
-                    this.style.borderColor = '#4a90e2';
+                    this.style.borderColor = 'var(--theme-accent, #4a90e2)';
                 };
 
                 chartBtn.onmouseleave = function() {
