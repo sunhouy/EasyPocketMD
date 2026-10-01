@@ -10,7 +10,20 @@ export async function prepareDocxDiagrams(markdown: string, diagrams: unknown, d
     let totalBytes = 0;
     const assets = new Map<string, string>();
     for (const [index, diagram] of diagrams.entries()) {
-        if (typeof diagram?.code !== 'string' || typeof diagram?.svg !== 'string') throw new Error('Invalid Mermaid diagram');
+        if (typeof diagram?.code !== 'string') throw new Error('Invalid Mermaid diagram');
+        if (typeof diagram.png === 'string' && !diagram.svg) {
+            const encoded = /^data:image\/png;base64,([A-Za-z0-9+/]+={0,2})$/.exec(diagram.png);
+            if (!encoded || encoded[1].length > 3 * 1024 * 1024) throw new Error('Invalid Mermaid PNG');
+            const png = Buffer.from(encoded[1], 'base64');
+            totalBytes += png.length;
+            if (png.length > 2 * 1024 * 1024 || totalBytes > 4 * 1024 * 1024) throw new Error('Mermaid diagrams are too large');
+            if (!png.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) throw new Error('Invalid Mermaid PNG');
+            const filename = 'mermaid-' + index + '.png';
+            await writeFile(path.join(directory, filename), png);
+            assets.set(diagram.code.trim(), filename);
+            continue;
+        }
+        if (typeof diagram.svg !== 'string' || diagram.png) throw new Error('Invalid Mermaid diagram');
         const bytes = Buffer.byteLength(diagram.svg);
         totalBytes += bytes;
         if (bytes > 512 * 1024 || totalBytes > 4 * 1024 * 1024) throw new Error('Mermaid diagrams are too large');

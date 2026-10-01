@@ -17,4 +17,11 @@ describe('DOCX vector diagram assets', () => {
     it('rejects scripts and external resources in supplied SVG', async () => {
         await expect(prepareDocxDiagrams('', [{ code: 'x', svg: svg.replace('<text>Start</text>', '<script>alert(1)</script>') }], directory)).rejects.toThrow('Unsupported');
     });
+    it('embeds valid PNG fallback assets and rejects arbitrary data URLs', async () => {
+        const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aV1cAAAAASUVORK5CYII=', 'base64');
+        const result = await prepareDocxDiagrams('```mermaid\njourney\n```', [{ code: 'journey', png: 'data:image/png;base64,' + png.toString('base64') }], directory);
+        expect(result).toBe('![Mermaid Diagram](mermaid-0.png)');
+        expect(await readFile(path.join(directory, 'mermaid-0.png'))).toEqual(png);
+        await expect(prepareDocxDiagrams('', [{ code: 'x', png: 'data:image/png;base64,aGVsbG8=' }], directory)).rejects.toThrow('Invalid Mermaid PNG');
+    });
 });

@@ -156,6 +156,7 @@ import { exportMermaidSvg } from './mermaid-export';
                     htmlLabels: false,
                     arrowMarkerAbsolute: false,
                     flowchart: { htmlLabels: false },
+                    journey: { textPlacement: 'svg' },
                 });
 
                 mermaidDiv = document.createElement('div');

@@ -2,7 +2,7 @@
 // @ts-nocheck
 export {};
 const { cleanExportMath } = require('../../js/ui/export-math');
-const { prepareDocxDiagrams } = require('../../js/ui/mermaid-export');
+const { prepareDocxDiagrams, exportMermaidSvg } = require('../../js/ui/mermaid-export');
 jest.mock('html2canvas', () => ({ __esModule: true, default: jest.fn() }));
 
 describe('exported formula layout', () => {
@@ -38,12 +38,39 @@ describe('Mermaid vector export', () => {
         expect(html).not.toContain('<img');
         expect(require('html2canvas').default).not.toHaveBeenCalled();
         expect(window.uploadImage).not.toHaveBeenCalled();
-        expect(window.mermaid.initialize).toHaveBeenCalledWith(expect.objectContaining({ htmlLabels: false }));
+        expect(window.mermaid.initialize).toHaveBeenCalledWith(expect.objectContaining({ htmlLabels: false, journey: { textPlacement: 'svg' } }));
     });
     it('extracts actual Mermaid fences for DOCX and leaves code examples alone', async () => {
         const diagrams = await prepareDocxDiagrams('~~~text\n```mermaid\ngraph TD; fake-->example;\n```\n~~~\n\n```mermaid\ngraph TD; A-->B;\n```');
         expect(diagrams).toHaveLength(1);
         expect(diagrams[0].code).toBe('graph TD; A-->B;');
         expect(diagrams[0].svg).toContain('width="300"');
+    });
+    it('embeds PNG fallback instead of silently dropping non-vector diagrams', async () => {
+        window.convertFormulasAndChartsToImages = jest.fn(async () => '<img src="data:image/png;base64,iVBORw0KGgo=" />');
+        const diagrams = await prepareDocxDiagrams('```mermaid\njourney\n title 购物体验\n```');
+        expect(diagrams).toEqual([{ code: 'journey\n title 购物体验', png: 'data:image/png;base64,iVBORw0KGgo=' }]);
+    });
+    it('reports render failures instead of producing a DOCX with missing charts', async () => {
+        window.convertFormulasAndChartsToImages = jest.fn(async () => '<div>[Mermaid Diagram]</div>');
+        await expect(prepareDocxDiagrams('```mermaid\ninvalid\n```')).rejects.toThrow('could not be exported');
+    });
+});
+
+describe('bundled Mermaid journey renderer', () => {
+    it('exports the shopping journey with native SVG labels', async () => {
+        const fs = jest.requireActual('fs');
+        const bundle = fs.readFileSync(require.resolve('@sunhouyun/vditor/dist/js/mermaid/mermaid.min.js'), 'utf8');
+        window.eval(bundle.replace('var __esbuild_esm_mermaid_nm;', 'var __esbuild_esm_mermaid_nm=globalThis.__esbuild_esm_mermaid_nm={};'));
+        SVGElement.prototype.getBBox = () => ({ x: 0, y: 0, width: 300, height: 30 });
+        SVGElement.prototype.getComputedTextLength = function () { return this.textContent.length * 14; };
+        const realMermaid = window.mermaid;
+        realMermaid.initialize({ startOnLoad: false, securityLevel: 'loose', htmlLabels: false, journey: { textPlacement: 'svg' } });
+        const result = await realMermaid.render('shopping-journey', 'journey\n title 购物体验\n section 浏览\n 查看商品: 5: 用户\n section 购买\n 下单支付: 5: 用户\n section 售后\n 收货评价: 5: 用户');
+        const host = document.createElement('div'); host.innerHTML = result.svg;
+        const svg = exportMermaidSvg(host.querySelector('svg'));
+        expect(svg).not.toBeNull();
+        expect(svg).not.toContain('foreignObject');
+        for (const label of ['购物体验', '查看商品', '下单支付', '收货评价']) expect(svg).toContain(label);
     });
 });
