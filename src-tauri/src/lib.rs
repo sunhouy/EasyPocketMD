@@ -8,6 +8,26 @@ use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_opener::OpenerExt;
 
+#[cfg(target_os = "android")]
+struct AndroidDocuments(tauri::plugin::PluginHandle<tauri::Wry>);
+
+fn local_documents_plugin() -> tauri::plugin::TauriPlugin<tauri::Wry> {
+    tauri::plugin::Builder::<tauri::Wry>::new("local-documents")
+        .setup(|_app, _api| {
+            #[cfg(target_os = "android")]
+            _app.manage(AndroidDocuments(_api.register_android_plugin("cn.yhsun.md", "LocalDocumentsPlugin")?));
+            Ok(())
+        })
+        .build()
+}
+
+#[cfg(target_os = "android")]
+async fn android_document<T: serde::de::DeserializeOwned + Send + 'static>(app: AppHandle, command: &'static str, payload: serde_json::Value) -> Result<T, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        app.state::<AndroidDocuments>().0.run_mobile_plugin(command, payload).map_err(|error| error.to_string())
+    }).await.map_err(|error| error.to_string())?
+}
+
 const SETTINGS_FILE: &str = "desktop-settings.json";
 
 pub struct PendingOpenFilePath(pub Mutex<Option<String>>);
@@ -26,7 +46,7 @@ impl Default for DesktopSettings {
     }
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct OpenLocalFileDialogResponse {
     canceled: bool,
@@ -38,7 +58,7 @@ struct OpenLocalFileDialogResponse {
     local_file_mode: Option<String>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct ReadLocalFileResponse {
     success: bool,
@@ -49,7 +69,7 @@ struct ReadLocalFileResponse {
     local_file_mode: Option<String>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct WriteLocalFileResponse {
     success: bool,
@@ -210,6 +230,7 @@ fn get_local_file_path(app: AppHandle, name: String) -> Result<String, String> {
     Ok(format!("file://{}", path_to_string(&file_path)))
 }
 
+#[cfg(not(target_os = "android"))]
 #[tauri::command]
 fn open_local_file_dialog(app: AppHandle) -> OpenLocalFileDialogResponse {
     let result = app
@@ -274,6 +295,7 @@ fn open_local_file_dialog(app: AppHandle) -> OpenLocalFileDialogResponse {
     }
 }
 
+#[cfg(not(target_os = "android"))]
 #[tauri::command]
 fn read_local_file(file_path: String) -> ReadLocalFileResponse {
     if file_path.trim().is_empty() {
@@ -322,6 +344,7 @@ fn read_local_file(file_path: String) -> ReadLocalFileResponse {
     }
 }
 
+#[cfg(not(target_os = "android"))]
 #[tauri::command]
 fn write_local_file(file_path: String, content: String) -> WriteLocalFileResponse {
     if file_path.trim().is_empty() {
@@ -345,6 +368,33 @@ fn write_local_file(file_path: String, content: String) -> WriteLocalFileRespons
             error: Some(error.to_string()),
         },
     }
+}
+
+#[cfg(target_os = "android")]
+#[tauri::command]
+async fn open_local_file_dialog(app: AppHandle) -> Result<OpenLocalFileDialogResponse, String> {
+    android_document(app, "pick", serde_json::json!({})).await
+}
+
+#[cfg(target_os = "android")]
+#[tauri::command]
+async fn read_local_file(app: AppHandle, file_path: String) -> Result<ReadLocalFileResponse, String> {
+    if file_path.starts_with("content://") {
+        return android_document(app, "read", serde_json::json!({ "uri": file_path })).await;
+    }
+    let path = normalize_file_path(file_path);
+    Ok(ReadLocalFileResponse { success: true, path: Some(path_to_string(&path)), name: path.file_name().map(|name| name.to_string_lossy().to_string()), content: Some(read_text_file(&path)?), error: None, local_file_mode: Some("tauri".into()) })
+}
+
+#[cfg(target_os = "android")]
+#[tauri::command]
+async fn write_local_file(app: AppHandle, file_path: String, content: String) -> Result<WriteLocalFileResponse, String> {
+    if file_path.starts_with("content://") {
+        return android_document(app, "write", serde_json::json!({ "uri": file_path, "content": content })).await;
+    }
+    let path = normalize_file_path(file_path);
+    fs::write(&path, content).map_err(|error| error.to_string())?;
+    Ok(WriteLocalFileResponse { success: true, path: Some(path_to_string(&path)), error: None })
 }
 
 #[tauri::command]
@@ -467,6 +517,7 @@ pub fn run() {
 
             Ok(())
         })
+        .plugin(local_documents_plugin())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_opener::init())

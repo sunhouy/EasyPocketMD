@@ -4,10 +4,10 @@ export function isExternalLocalFile(file: any): boolean {
 
 export function normalizeExternalLocalFileRecord(globalRef: any, file: any): void {
   if (!isExternalLocalFile(file)) return;
-  file.isSynced = false;
   if (!file.localFileMode) {
     file.localFileMode = globalRef.electron ? 'electron' : 'browser-file';
   }
+  file.localAccessState = file.localFileMode === 'browser-file' ? 'copy' : 'unverified';
 }
 
 export function getPathBasename(globalRef: any, filePath: string): string {
