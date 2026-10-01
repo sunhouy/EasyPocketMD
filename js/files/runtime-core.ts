@@ -15,7 +15,9 @@ import {
 import { installEditorRuntime } from './editor-runtime';
 import { installSyncRuntime } from './sync-runtime';
 import { relocateFile } from './relocate';
-import { mountDiffView } from './conflict/markdown';
+import { mountDiffView, renderMergePreview } from './conflict/markdown';
+import { createDiffEditors } from './conflict/editors';
+import { createDiffFileWriter } from './conflict/live-files';
 
 (function(global) {
     'use strict';
@@ -3327,77 +3329,11 @@ import { mountDiffView } from './conflict/markdown';
     }
 
     function showHistoryDiffModal(filename, versionId, content, timestamp) {
-        const diffModal = document.getElementById('diffModalOverlay');
-        const diffContent = document.getElementById('diffContent');
-        const diffFileName = document.getElementById('diffFileName');
-        const diffLocalTime = document.getElementById('diffLocalTime');
-        const diffServerTime = document.getElementById('diffServerTime');
-        const diffInfo = diffModal.querySelector('.diff-info span');
-        const localVersionLabel = diffModal.querySelector('.diff-version-header:first-child .diff-version-label');
-        const serverVersionLabel = diffModal.querySelector('.diff-version-header:last-child .diff-version-label');
-        
-        if (!diffModal || !diffContent) return;
-        
-        // 获取当前文件内容
-        const files = g('files');
-        const currentFile = files.find(function(f) { return f.name === filename; });
-        const currentContent = currentFile ? currentFile.content : '';
-        
-        // 设置文件信息
-        diffFileName.textContent = filename;
-        diffLocalTime.textContent = new Date(timestamp).toLocaleString();
-        diffServerTime.textContent = isEn() ? 'Current Version' : '当前版本';
-        
-        // 更新标签文本
-        if (localVersionLabel) localVersionLabel.textContent = (isEn() ? 'History Version ' : '历史版本 ') + versionId;
-        if (serverVersionLabel) serverVersionLabel.textContent = isEn() ? 'Current Version' : '当前版本';
-        if (diffInfo) diffInfo.textContent = isEn() ? 'Showing differences only (unchanged lines are folded).' : '仅显示差异（相同内容已自动折叠）。';
-        
-        // 计算并渲染差异（历史版本 vs 当前版本）
-        const diffResult = computeDiff(content || '', currentContent || '');
-        let showMarkdown = true;
-        const refresh = () => {
-            mountDiffView(diffContent, diffResult, isEn(), { collapseSame: true, markdown: showMarkdown });
-            bindCollapsedDiffInteractions(diffContent);
-        };
-        const markdownToggle = document.getElementById('historyDiffMarkdownBtn');
-        if (markdownToggle) {
-            markdownToggle.textContent = isEn() ? 'Show source' : '显示源码';
-            markdownToggle.onclick = () => { showMarkdown = !showMarkdown; markdownToggle.textContent = showMarkdown ? (isEn() ? 'Show source' : '显示源码') : (isEn() ? 'Render Markdown' : '渲染 Markdown'); refresh(); };
-        }
-        refresh();
-        
-        // 显示模态窗口
-        diffModal.classList.add('show');
-        
-        // 绑定关闭事件
-        const closeBtn = document.getElementById('closeDiffBtn');
-        const closeModalBtn = document.getElementById('closeDiffModalBtn');
-        
-        const closeModal = function() {
-            diffModal.classList.remove('show');
-            // 恢复原始标签文本
-            if (localVersionLabel) localVersionLabel.textContent = isEn() ? 'Local Version' : '本地版本';
-            if (serverVersionLabel) serverVersionLabel.textContent = isEn() ? 'Server Version' : '服务器版本';
-            if (diffInfo) diffInfo.textContent = isEn() ? 'Showing differences only (unchanged lines are folded).' : '仅显示差异（相同内容已自动折叠）。';
-        };
-        
-        if (closeBtn) closeBtn.onclick = closeModal;
-        if (closeModalBtn) closeModalBtn.onclick = closeModal;
-        
-        // 点击外部关闭
-        diffModal.onclick = function(e) {
-            if (false && e.target === diffModal) closeModal();
-        };
-        
-        // ESC键关闭
-        const handleEsc = function(e) {
-            if (e.key === 'Escape' && diffModal.classList.contains('show')) {
-                closeModal();
-                document.removeEventListener('keydown', handleEsc);
-            }
-        };
-        document.addEventListener('keydown', handleEsc);
+        const currentFile = (g('files') || []).find(file => file.name === filename);
+        if (!currentFile) return;
+        // The history snapshot never enters the mutable file collection.
+        const historyFile = { id: 'history:' + currentFile.id + ':' + versionId, name: filename, content: String(content || ''), diffReadonly: true };
+        showFileDiffComparison(historyFile, currentFile, { history: { filename, versionId, content: historyFile.content, timestamp } });
     }
 
     async function restoreHistoryVersion(filename, versionId, content) {
@@ -4087,7 +4023,8 @@ import { mountDiffView } from './conflict/markdown';
     /**
      * 显示两个文件的差异对比
      */
-    function showFileDiffComparison(file1, file2) {
+    function showFileDiffComparison(file1, file2, options = {}) {
+        syncCurrentEditorSnapshotIntoFiles(g('files'));
         const nightMode = g('nightMode') === true;
         const borderColor = nightMode ? '#444' : '#ddd';
         const toolbarBg = nightMode ? '#363636' : '#f0f0f0';
@@ -4100,6 +4037,7 @@ import { mountDiffView } from './conflict/markdown';
             rightFile: file2,
             collapseSame: true,
             markdown: true,
+            editing: false,
             conflictMode: false,
             activeHunkId: null,
             hunkDecisions: {},
@@ -4119,24 +4057,10 @@ import { mountDiffView } from './conflict/markdown';
             return getHunks().filter(function(h) { return !resolved.has(h.id); });
         }
 
-        function writeContentToFile(targetFile, content) {
-            const files = g('files');
-            const idx = files.findIndex(function(f) { return f.id === targetFile.id; });
-            if (idx === -1) return false;
-            files[idx].content = content;
-            files[idx].lastModified = Date.now();
-            files[idx].isSynced = g('currentUser') ? false : true;
-            localStorage.setItem('vditor_files', JSON.stringify(files));
-            g('unsavedChanges')[targetFile.id] = true;
-            if (g('currentFileId') === targetFile.id) {
-                setEditorContentForFile(targetFile.id, content);
-            }
-            if (g('currentUser') && typeof global.syncFileToServer === 'function') {
-                global.syncFileToServer(targetFile.id);
-            }
-            loadFiles();
-            return true;
-        }
+        const writer = createDiffFileWriter(global, (id, value) => setEditorContentForFile(id, value), loadFiles);
+        function writeContentToFile(targetFile, content) { return writer.write(targetFile, content); }
+        let editors = null;
+        function leaveEditing() { editors?.flush(); editors?.destroy(); editors = null; state.editing = false; writer.flush(); modalContent.querySelector('#fileDiffEditBtn').textContent = isEn() ? 'Edit' : '编辑模式'; }
 
         function promptSaveMergedContent(mergedText) {
             const saveTitle = isEn() ? 'Save merged result' : '保存合并结果';
@@ -4148,9 +4072,11 @@ import { mountDiffView } from './conflict/markdown';
                 overlay.className = 'modal-overlay';
                 overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:10010;';
                 const box = document.createElement('div');
-                box.style.cssText = 'background:' + (nightMode ? '#2d2d2d' : '#fff') + ';color:' + (nightMode ? '#eee' : '#333') + ';padding:20px;border-radius:10px;max-width:420px;width:90%;';
+                box.className = 'diff-merge-dialog';
+                box.style.cssText = 'background:' + (nightMode ? '#2d2d2d' : '#fff') + ';color:' + (nightMode ? '#eee' : '#333') + ';';
                 box.innerHTML =
-                    '<h4 style="margin:0 0 10px;">' + saveTitle + '</h4>' +
+                    '<h4>' + saveTitle + '</h4>' +
+                    '<div class="diff-merge-preview diff-markdown-content"></div>' +
                     '<p style="margin:0 0 16px;font-size:13px;color:' + (nightMode ? '#aaa' : '#666') + ';">' + msg + '</p>' +
                     '<div style="display:flex;flex-direction:column;gap:8px;">' +
                         '<button type="button" data-save="new" style="' + btnStyle + 'justify-content:center;"><i class="fas fa-file-circle-plus"></i> ' + (isEn() ? 'Save as new file' : '保存为新文件') + '</button>' +
@@ -4158,6 +4084,8 @@ import { mountDiffView } from './conflict/markdown';
                         '<button type="button" data-save="right" style="' + btnStyle + 'justify-content:center;"><i class="fas fa-file"></i> ' + (isEn() ? 'Save to compare: ' : '保存到对比：') + global.escapeHtml(state.rightFile.name) + '</button>' +
                         '<button type="button" data-save="cancel" style="' + btnStyle + 'justify-content:center;margin-top:4px;">' + (isEn() ? 'Cancel' : '取消') + '</button>' +
                     '</div>';
+                if (options.history) { box.querySelector('[data-save="left"]')?.remove(); box.querySelector('[data-save="right"]').textContent = (isEn() ? 'Save to current: ' : '保存到当前：') + state.rightFile.name; }
+                renderMergePreview(box.querySelector('.diff-merge-preview'), mergedText).catch(() => { box.querySelector('.diff-merge-preview').textContent = mergedText; });
                 overlay.appendChild(box);
                 document.body.appendChild(overlay);
 
@@ -4205,13 +4133,13 @@ import { mountDiffView } from './conflict/markdown';
                             return;
                         }
                         if (action === 'left') {
-                            writeContentToFile(state.leftFile, mergedText);
+                            if (!writeContentToFile(state.leftFile, mergedText)) { resolve(false); return; }
                             global.showMessage(isEn() ? 'Saved to current file' : '已保存到当前文件', 'success');
                             resolve(true);
                             return;
                         }
                         if (action === 'right') {
-                            writeContentToFile(state.rightFile, mergedText);
+                            if (!writeContentToFile(state.rightFile, mergedText)) { resolve(false); return; }
                             global.showMessage(isEn() ? 'Saved to compare file' : '已保存到对比文件', 'success');
                             resolve(true);
                         }
@@ -4227,35 +4155,37 @@ import { mountDiffView } from './conflict/markdown';
 
         const modalContent = document.createElement('div');
         modalContent.className = 'file-diff-modal';
-        modalContent.style.cssText = 'background:' + (nightMode ? '#2d2d2d' : 'white') + ';color:' + (nightMode ? '#eee' : '#333') + ';border-radius:8px;width:95vw;height:90vh;display:flex;flex-direction:column;overflow:hidden;';
+        modalContent.style.cssText = 'background:' + (nightMode ? '#2d2d2d' : 'white') + ';color:' + (nightMode ? '#eee' : '#333') + ';border-radius:0;width:100%;height:100%;display:flex;flex-direction:column;overflow:hidden;';
 
         modalContent.innerHTML =
-            '<div style="padding:15px 20px;border-bottom:1px solid ' + borderColor + ';display:flex;justify-content:space-between;align-items:center;flex-shrink:0;">' +
+            '<div class="diff-titlebar" style="padding:4px 8px;border-bottom:1px solid ' + borderColor + ';display:flex;justify-content:space-between;align-items:center;flex-shrink:0;">' +
                 '<div>' +
-                    '<h3 style="margin:0;">' + (isEn() ? 'File Diff Comparison' : '文件差异对比') + '</h3>' +
+                    '<h3 style="margin:0;">' + (options.history ? (isEn() ? 'History comparison' : '历史版本对比') : (isEn() ? 'File Diff Comparison' : '文件差异对比')) + '</h3>' +
                     '<div id="fileDiffSubtitle" style="font-size:12px;color:' + (nightMode ? '#aaa' : '#666') + ';margin-top:5px;"></div>' +
                 '</div>' +
                 '<button id="closeFileDiffResultBtn" type="button" style="background:none;border:none;font-size:24px;cursor:pointer;color:' + (nightMode ? '#eee' : '#333') + ';">×</button>' +
             '</div>' +
-            '<div id="fileDiffInfoBar" style="padding:10px 20px;background:' + infoBg + ';font-size:13px;color:' + (nightMode ? '#aaa' : '#666') + ';flex-shrink:0;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">' +
+            '<div id="fileDiffInfoBar" style="padding:3px 8px;background:' + infoBg + ';font-size:13px;color:' + (nightMode ? '#aaa' : '#666') + ';flex-shrink:0;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">' +
                 '<span id="fileDiffInfoText"><i class="fas fa-info-circle"></i> ' + (isEn() ? 'Showing differences only (unchanged lines are folded)' : '仅显示差异（相同内容已自动折叠）') + '</span>' +
                 '<button type="button" id="fileDiffToggleFoldBtn" style="' + btnStyle + '">' +
                     '<i class="fas fa-expand-alt"></i> <span id="fileDiffToggleFoldLabel">' + (isEn() ? 'Show all lines' : '展开全部') + '</span>' +
                 '</button>' +
             '</div>' +
-            '<div id="fileDiffToolbar" style="padding:8px 20px;background:' + toolbarBg + ';border-bottom:1px solid ' + borderColor + ';flex-shrink:0;display:flex;flex-wrap:wrap;gap:8px;align-items:center;">' +
+            '<div id="fileDiffToolbar" style="padding:3px 8px;background:' + toolbarBg + ';border-bottom:1px solid ' + borderColor + ';flex-shrink:0;display:flex;flex-wrap:wrap;gap:8px;align-items:center;">' +
+                '<button type="button" id="fileDiffEditBtn" style="' + btnStyle + '">' + (isEn() ? 'Edit' : '编辑模式') + '</button>' +
                 '<button type="button" id="fileDiffMarkdownBtn" style="' + btnStyle + '">' + (isEn() ? 'Show source' : '显示源码') + '</button>' +
+                (options.history ? '<button type="button" id="fileDiffRestoreBtn" style="' + btnStyle + '">' + (isEn() ? 'Restore this version' : '恢复到此版本') + '</button>' : '') +
                 '<button type="button" id="fileDiffSwapBtn" style="' + btnStyle + '" title="' + (isEn() ? 'Swap sides' : '切换左右文件') + '"><i class="fas fa-right-left"></i> ' + (isEn() ? 'Swap' : '切换') + '</button>' +
                 '<button type="button" id="fileDiffSmartMergeBtn" style="' + btnPrimaryStyle + '"><i class="fas fa-wand-magic-sparkles"></i> ' + (isEn() ? 'Smart merge' : '智能合并') + '</button>' +
-                '<button type="button" id="fileDiffResolveBtn" style="' + btnStyle + '"><i class="fas fa-hand-pointer"></i> ' + (isEn() ? 'Resolve conflicts' : '手动解决冲突') + '</button>' +
+                '<button type="button" id="fileDiffResolveBtn" style="' + btnStyle + '"><i class="fas fa-hand-pointer"></i> ' + (isEn() ? 'Resolve conflicts' : '手动处理差异') + '</button>' +
             '</div>' +
-            '<div id="fileDiffColumnHeaders" style="display:flex;padding:10px 20px;background:' + toolbarBg + ';border-bottom:1px solid ' + borderColor + ';flex-shrink:0;">' +
+            '<div id="fileDiffColumnHeaders" style="display:flex;padding:3px 8px;background:' + toolbarBg + ';border-bottom:1px solid ' + borderColor + ';flex-shrink:0;">' +
                 '<div id="fileDiffLeftHeader" style="flex:1;font-weight:500;text-align:center;"></div>' +
                 '<div style="width:40px;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><i class="fas fa-arrows-left-right" style="opacity:0.5;"></i></div>' +
                 '<div id="fileDiffRightHeader" style="flex:1;font-weight:500;text-align:center;"></div>' +
             '</div>' +
-            '<div id="fileDiffResultContent" class="diff-content" style="flex:1;overflow:auto;padding:0;"></div>' +
-            '<div id="fileDiffConflictBar" style="display:none;padding:10px 20px;border-top:1px solid ' + borderColor + ';background:' + infoBg + ';flex-shrink:0;flex-wrap:wrap;gap:8px;align-items:center;">' +
+            '<div id="fileDiffResultContent" class="diff-content" style="flex:1;overflow:auto;padding:0;"></div><div id="fileDiffEditors" class="diff-editor-host" hidden></div>' +
+            '<div id="fileDiffConflictBar" style="display:none;padding:3px 8px;border-top:1px solid ' + borderColor + ';background:' + infoBg + ';flex-shrink:0;flex-wrap:wrap;gap:8px;align-items:center;">' +
                 '<span id="fileDiffConflictProgress" style="font-size:13px;flex:1;min-width:140px;"></span>' +
                 '<button type="button" id="fileDiffAcceptLeftBtn" style="' + btnStyle + '"><i class="fas fa-arrow-left"></i> ' + (isEn() ? 'Accept current' : '接受当前') + '</button>' +
                 '<button type="button" id="fileDiffAcceptRightBtn" style="' + btnStyle + '"><i class="fas fa-arrow-right"></i> ' + (isEn() ? 'Accept compare' : '接受对比') + '</button>' +
@@ -4267,6 +4197,12 @@ import { mountDiffView } from './conflict/markdown';
         document.body.appendChild(modal);
 
         const diffScrollEl = modalContent.querySelector('#fileDiffResultContent');
+        const editorHost = modalContent.querySelector('#fileDiffEditors');
+        if (options.history) {
+            modalContent.querySelector('#fileDiffSwapBtn').hidden = true;
+            modalContent.querySelector('#fileDiffAcceptLeftBtn').textContent = isEn() ? 'Accept history' : '接受历史';
+            modalContent.querySelector('#fileDiffAcceptRightBtn').textContent = isEn() ? 'Accept current' : '接受当前';
+        }
         const infoTextEl = modalContent.querySelector('#fileDiffInfoText');
         const subtitleEl = modalContent.querySelector('#fileDiffSubtitle');
         const leftHeaderEl = modalContent.querySelector('#fileDiffLeftHeader');
@@ -4275,16 +4211,19 @@ import { mountDiffView } from './conflict/markdown';
         const conflictProgressEl = modalContent.querySelector('#fileDiffConflictProgress');
         const toggleFoldBtn = modalContent.querySelector('#fileDiffToggleFoldBtn');
         const toggleFoldLabel = modalContent.querySelector('#fileDiffToggleFoldLabel');
+        modalContent.querySelector('#fileDiffToolbar').append(toggleFoldBtn);
+        modalContent.querySelector('.diff-titlebar > div').append(infoTextEl);
+        modalContent.querySelector('#fileDiffInfoBar').remove();
 
         function updateHeaders() {
             if (subtitleEl) {
-                subtitleEl.textContent = global.escapeHtml(state.leftFile.name) + ' ↔ ' + global.escapeHtml(state.rightFile.name);
+                subtitleEl.textContent = state.leftFile.name + ' ↔ ' + state.rightFile.name;
             }
             if (leftHeaderEl) {
-                leftHeaderEl.textContent = (isEn() ? 'Current: ' : '当前：') + state.leftFile.name;
+                leftHeaderEl.textContent = (options.history ? (isEn() ? 'History ' : '历史版本 ') + options.history.versionId + ' · ' + new Date(options.history.timestamp).toLocaleString() + ' · ' : (isEn() ? 'Current: ' : '当前：')) + state.leftFile.name;
             }
             if (rightHeaderEl) {
-                rightHeaderEl.textContent = (isEn() ? 'Compare: ' : '对比：') + state.rightFile.name;
+                rightHeaderEl.textContent = (options.history ? (isEn() ? 'Current: ' : '当前：') : (isEn() ? 'Compare: ' : '对比：')) + state.rightFile.name;
             }
         }
 
@@ -4330,11 +4269,10 @@ import { mountDiffView } from './conflict/markdown';
                 resolvedHunkIds: state.resolvedHunkIds
             };
             if (diffScrollEl) {
-                mountDiffView(diffScrollEl, diffResult, isEn(), renderOpts);
+                mountDiffView(diffScrollEl, diffResult, isEn(), renderOpts).then(() => scrollToHunk(state.activeHunkId));
                 const markdownBtn = modalContent.querySelector('#fileDiffMarkdownBtn');
                 if (markdownBtn) {
-                    markdownBtn.disabled = state.conflictMode;
-                    markdownBtn.textContent = state.markdown && !state.conflictMode ? (isEn() ? 'Show source' : '显示源码') : (isEn() ? 'Render Markdown' : '渲染 Markdown');
+                    markdownBtn.textContent = state.markdown ? (isEn() ? 'Show source' : '显示源码') : (isEn() ? 'Render Markdown' : '渲染 Markdown');
                 }
                 bindCollapsedDiffInteractions(diffScrollEl);
             }
@@ -4352,6 +4290,7 @@ import { mountDiffView } from './conflict/markdown';
         }
 
         function startConflictMode() {
+            leaveEditing(); editorHost.hidden = true; diffScrollEl.hidden = false;
             const hunks = getHunks();
             if (!hunks.length) {
                 global.showMessage(isEn() ? 'No differences to resolve' : '没有可解决的差异', 'info');
@@ -4384,7 +4323,8 @@ import { mountDiffView } from './conflict/markdown';
                 state.conflictMode = false;
                 if (conflictBarEl) conflictBarEl.style.display = 'none';
                 refreshDiffView();
-                promptSaveMergedContent(merged);
+                if (options.history) { writeContentToFile(state.rightFile, merged); writer.flush(); refreshDiffView(); }
+                else promptSaveMergedContent(merged);
                 return;
             }
 
@@ -4403,11 +4343,34 @@ import { mountDiffView } from './conflict/markdown';
         }
 
         const markdownBtn = modalContent.querySelector('#fileDiffMarkdownBtn');
-        if (markdownBtn) markdownBtn.addEventListener('click', () => { state.markdown = !state.markdown; refreshDiffView(); });
+        if (markdownBtn) markdownBtn.addEventListener('click', () => { if (state.editing) toggleEditing(); state.markdown = !state.markdown; refreshDiffView(); });
+
+        function toggleEditing() {
+            if (state.editing) { leaveEditing(); editorHost.hidden = true; diffScrollEl.hidden = false; refreshDiffView(); }
+            else {
+                state.conflictMode = false; state.hunkDecisions = {}; state.resolvedHunkIds = []; state.activeHunkId = null;
+                conflictBarEl.style.display = 'none'; state.editing = true;
+                diffScrollEl.hidden = true; editorHost.hidden = false;
+                editors = createDiffEditors(editorHost, [state.leftFile, state.rightFile].map(file => ({
+                    label: file.name + (file.diffReadonly ? (isEn() ? ' (read only)' : '（只读）') : ''),
+                    read: () => file.content || '',
+                    write: file.diffReadonly ? undefined : value => writeContentToFile(file, value)
+                })), () => { infoTextEl.textContent = isEn() ? 'Edits saved to files' : '编辑内容已实时更新到文件'; });
+            }
+            modalContent.querySelector('#fileDiffEditBtn').textContent = state.editing ? (isEn() ? 'Finish editing' : '结束编辑') : (isEn() ? 'Edit' : '编辑模式');
+        }
+        modalContent.querySelector('#fileDiffEditBtn').onclick = toggleEditing;
+        const restoreBtn = modalContent.querySelector('#fileDiffRestoreBtn');
+        if (restoreBtn) restoreBtn.onclick = async () => {
+            leaveEditing(); editorHost.hidden = true; diffScrollEl.hidden = false;
+            await restoreFromHistory(options.history.filename, options.history.versionId, options.history.content, state.rightFile.id);
+            refreshDiffView();
+        };
 
         const swapBtn = modalContent.querySelector('#fileDiffSwapBtn');
         if (swapBtn) {
             swapBtn.onclick = function() {
+                if (state.editing) toggleEditing();
                 const tmp = state.leftFile;
                 state.leftFile = state.rightFile;
                 state.rightFile = tmp;
@@ -4422,6 +4385,7 @@ import { mountDiffView } from './conflict/markdown';
         const smartMergeBtn = modalContent.querySelector('#fileDiffSmartMergeBtn');
         if (smartMergeBtn) {
             smartMergeBtn.onclick = async function() {
+                if (state.editing) toggleEditing();
                 const result = smartMergeTexts(getLeftContent(), getRightContent());
                 if (result.hasConflict && result.conflictCount > 0) {
                     global.showMessage(
@@ -4434,7 +4398,7 @@ import { mountDiffView } from './conflict/markdown';
                     return;
                 }
                 const saved = await promptSaveMergedContent(result.mergedText);
-                if (saved) global.removeModal(modal);
+                if (saved) { if (options.history) refreshDiffView(); else closeComparison(); }
             };
         }
 
@@ -4468,19 +4432,9 @@ import { mountDiffView } from './conflict/markdown';
             };
         }
 
-        const closeBtn = modalContent.querySelector('#closeFileDiffResultBtn');
-        if (closeBtn) {
-            closeBtn.onclick = function() {
-                global.removeModal(modal);
-            };
-        }
-
-        const handleEsc = function(e) {
-            if (e.key === 'Escape') {
-                global.removeModal(modal);
-                document.removeEventListener('keydown', handleEsc);
-            }
-        };
+        function closeComparison() { leaveEditing(); global.removeModal(modal); document.removeEventListener('keydown', handleEsc); }
+        modalContent.querySelector('#closeFileDiffResultBtn').onclick = closeComparison;
+        const handleEsc = e => { if (e.key === 'Escape' && modal.isConnected && !document.querySelector('.diff-merge-dialog')) closeComparison(); };
         document.addEventListener('keydown', handleEsc);
     }
 
@@ -5389,6 +5343,7 @@ import { mountDiffView } from './conflict/markdown';
     // Core handlers exposed for index.ts composition layer.
     global.__filesCoreHandlers = {
         showHistoryDiffModal: showHistoryDiffModal,
+        showFileDiffComparison: showFileDiffComparison,
         openExternalLocalFileByDialog: openExternalLocalFileByDialog,
         openExternalLocalFileByPath: openExternalLocalFileByPath,
         startExternalLocalConflictMonitor: startExternalLocalConflictMonitor
