@@ -108,6 +108,12 @@ npm i easypocketmd
 npm install
 ```
 
+服务器导出 DOCX 需要 **Pandoc**，导出 PDF 需要 **wkhtmltopdf**。Debian/Ubuntu 可运行以下脚本安装并检查转换器；自动部署流程也会在切换服务前执行此检查。
+```bash
+bash api/utils/ensure-export-tools.sh
+```
+其他系统需自行安装这两个工具。服务进程的 PATH 不包含安装目录时，可在 `.env` 中配置绝对路径 `PANDOC_PATH`、`WKHTMLTOPDF_PATH`。npm 的 `wkhtmltopdf` 包不包含转换器二进制。
+
 3. **配置环境**
 ```bash
 cp .env.example .env

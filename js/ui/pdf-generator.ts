@@ -1,3 +1,4 @@
+import { preparePdfResources } from './pdf-resources';
 import { cleanExportMath } from './export-math';
 import * as pdfjsLib from 'pdfjs-dist';
 import htmlToPdfmake from 'html-to-pdfmake';
@@ -295,7 +296,8 @@ export async function generatePDF(htmlContent, settings, filename) {
         htmlContent = '<div style="padding: 20px; font-size: 16px; color: #666; text-align: center;">(文档内容为空)</div>';
     }
 
-    const cleanedHtmlContent = cleanExportMath(htmlContent);
+    const baseUrl = window.getAppOrigin ? window.getAppOrigin() : window.location.href;
+    const cleanedHtmlContent = await preparePdfResources(cleanExportMath(htmlContent), baseUrl);
 
     // 获取字体设置
     const titleFont = settings?.titleFont || 'SimHei';
@@ -336,6 +338,7 @@ export async function generatePDF(htmlContent, settings, filename) {
             },
             body: JSON.stringify({
                 html: fullHtml,
+                baseUrl: baseUrl,
                 settings: settings
             })
         });

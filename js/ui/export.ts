@@ -1,3 +1,4 @@
+import { saveAfterDialogOpens } from './dialog-save';
 
 const global = window;
 
@@ -69,12 +70,6 @@ async function getPDFGenerator() {
 async function exportContent() {
     if (!g('vditor')) return;
 
-    // 先保存当前文档
-    if (typeof global.saveCurrentFile === 'function' && g('currentFileId')) {
-        await global.saveCurrentFile(true);
-    }
-
-    var content = g('vditor').getValue();
     var formats = [
         { name: isEn() ? 'Markdown File (.md)' : 'Markdown文件 (.md)', ext: 'md', icon: '<i class="fas fa-file-code"></i>' },
         { name: isEn() ? 'Plain Text File (.txt)' : '纯文本文件 (.txt)', ext: 'txt', icon: '<i class="fas fa-file-alt"></i>' },
@@ -127,7 +122,7 @@ async function exportContent() {
             modal.remove();
             // 使用 setTimeout 确保模态框完全关闭后再执行导出
             setTimeout(function() {
-                exportFile(content, f.ext);
+                exportFile(g('vditor').getValue(), f.ext);
             }, 50);
         };
 
@@ -136,6 +131,7 @@ async function exportContent() {
 
     modal.appendChild(container);
     document.body.appendChild(modal);
+    saveAfterDialogOpens(global);
 
     // 点击外部关闭
     modal.addEventListener('click', function(e) {
