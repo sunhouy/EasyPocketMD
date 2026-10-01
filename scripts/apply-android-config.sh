@@ -135,6 +135,11 @@ class MainActivity : TauriActivity() {
     }
 
     private fun handleIntent(intent: Intent?) {
+        val uri = intent?.data
+        if (uri != null) {
+            val grants = (intent?.flags ?: 0) and (Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+            try { contentResolver.takePersistableUriPermission(uri, grants) } catch (_: SecurityException) { }
+        }
         val action = intent?.action
         val data = intent?.dataString
         if ((Intent.ACTION_VIEW == action || Intent.ACTION_EDIT == action) && data != null) {
@@ -148,6 +153,8 @@ class MainActivity : TauriActivity() {
     }
 }
 EOF
+
+cp "$PROJECT_ROOT/src-tauri/platform/android/LocalDocumentsPlugin.kt" "$ANDROID_MAIN_DIR/LocalDocumentsPlugin.kt"
 
 echo "✅ MainActivity.kt 已同步输入法/窗口配置"
 
@@ -185,7 +192,7 @@ object TauriLifecycleObserver : DefaultLifecycleObserver {
 }
 
 abstract class TauriActivity : WryActivity() {
-    override val handleBackNavigation: Boolean = false
+    override val handleBackNavigation: Boolean = true
 
     fun getPluginManager(): PluginManager {
         return PluginManager
@@ -216,3 +223,11 @@ EOF
 echo ""
 echo "✨ Android 状态栏配置应用完成！"
 echo "状态栏将保持可见，颜色与日/夜间模式主题保持一致"
+# These classes are loaded by name and their argument fields by reflection.
+PROGUARD_RULES="$PROJECT_ROOT/src-tauri/gen/android/app/proguard-rules.pro"
+if [ ! -f "$PROGUARD_RULES" ]; then
+  printf '%s\n' '-keep class app.tauri.** { *; }' '-keep class com.tauri.** { *; }' '-keep class * extends android.app.Activity' > "$PROGUARD_RULES"
+fi
+if ! grep -q 'cn.yhsun.md.LocalDocumentsPlugin' "$PROGUARD_RULES"; then
+  printf '%s\n' '-keep class cn.yhsun.md.LocalDocumentsPlugin { *; }' '-keep class cn.yhsun.md.DocumentArgs { *; }' >> "$PROGUARD_RULES"
+fi

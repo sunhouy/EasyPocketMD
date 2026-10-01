@@ -46,6 +46,8 @@ export function createSyncRuntimeApi(ctx: any) {
     pullServerUpdatesForCleanFiles,
     fetchServerFileContent,
     isEn,
+    writeExternalLocalContent,
+    applyExternalRemoteUpdate,
   } = ctx;
   const fileSyncLocks = new Map<string, Promise<any>>();
   const webSocketSaves = new Map<string, any[]>();
@@ -63,6 +65,10 @@ export function createSyncRuntimeApi(ctx: any) {
     const filename = payload.filename;
     const file = files.find(function(f: any) { return f.name === filename; });
     if (!file || file.type === 'folder') return;
+    if (isExternalLocalFile(file)) {
+      void applyExternalRemoteUpdate?.(file, payload).catch(() => {});
+      return;
+    }
 
     if (Number.isFinite(Number(payload.content_version))) {
       file.contentVersion = Number(payload.content_version);
@@ -255,7 +261,7 @@ export function createSyncRuntimeApi(ctx: any) {
     const pendingServerSync = g('pendingServerSync') || {};
     const filesToSync = files.filter(function (file: any) {
       if (file.type !== 'file') return false;
-      if (isExternalLocalFile(file)) return false;
+      if (isExternalLocalFile(file) && !['ready', 'copy'].includes(file.localAccessState)) return false;
       if (file.contentLoaded === false && !pendingServerSync[file.id]) return false;
       const currentContent =
         file.id === currentFileId ? getCurrentEditorContent(currentFileId, file.content) : file.content;
@@ -285,6 +291,7 @@ export function createSyncRuntimeApi(ctx: any) {
       return f.id === fileId;
     });
     if (!file) return;
+    if (isExternalLocalFile(file) && !['ready', 'copy'].includes(file.localAccessState)) return false;
 
     const previousSyncTask = fileSyncLocks.get(fileId) || Promise.resolve();
     const syncTask = previousSyncTask
@@ -313,6 +320,8 @@ export function createSyncRuntimeApi(ctx: any) {
         }
 
         try {
+          // Cloud acknowledgement must never mark an unsaved original as saved.
+          if (isExternalLocalFile(file) && !(await writeExternalLocalContent(file, content)).success) return false;
           const api = globalRef.getApiBaseUrl ? globalRef.getApiBaseUrl() : 'api';
           
           let contentToSend = content;
@@ -377,9 +386,21 @@ export function createSyncRuntimeApi(ctx: any) {
                     ? result.data.content
                     : content;
               const isActiveFile = fileId === g('currentFileId') && file.type !== 'folder';
-              const liveEditorContent = isActiveFile ? getCurrentEditorContent(fileId, files[fileIndex].content) : null;
-              const hasNewerActiveEditorContent = isActiveFile && liveEditorContent !== content;
+              let liveEditorContent = isActiveFile ? getCurrentEditorContent(fileId, files[fileIndex].content) : null;
+              let hasNewerActiveEditorContent = isActiveFile && liveEditorContent !== content;
 
+              let localWriteFailed = false;
+              if (isExternalLocalFile(file)) {
+                file.localCloudUsername = g('currentUser').username;
+                file.localSyncedContent = serverContent;
+                if (!hasNewerActiveEditorContent && serverContent !== content) {
+                  localWriteFailed = !(await writeExternalLocalContent(file, serverContent)).success;
+                }
+              }
+              if (isActiveFile) {
+                liveEditorContent = getCurrentEditorContent(fileId, files[fileIndex].content);
+                hasNewerActiveEditorContent = liveEditorContent !== content;
+              }
               if (file.type !== 'folder') {
                 files[fileIndex].content = hasNewerActiveEditorContent ? liveEditorContent : serverContent;
                 if (!hasNewerActiveEditorContent && fileId === g('currentFileId') && liveEditorContent !== serverContent) {
@@ -402,7 +423,7 @@ export function createSyncRuntimeApi(ctx: any) {
                   : Number(file.contentVersion || 0) + 1,
               );
               g('lastSyncedContent')[fileId] = serverContent;
-              if (hasNewerActiveEditorContent) {
+              if (hasNewerActiveEditorContent || localWriteFailed) {
                 files[fileIndex].isSynced = false;
                 g('unsavedChanges')[fileId] = true;
                 markPendingServerSync(fileId, true);
@@ -487,7 +508,7 @@ export function createSyncRuntimeApi(ctx: any) {
     if (!currentFileId) return false;
     const files = g('files') || [];
     const file = files.find((f: any) => f.id === currentFileId);
-    if (!file || file.type !== 'file') return false;
+    if (!file || file.type !== 'file' || isExternalLocalFile(file)) return false;
 
     const content = getCurrentEditorContent(currentFileId, file.content);
 
@@ -498,7 +519,7 @@ export function createSyncRuntimeApi(ctx: any) {
       g('unsavedChanges')[currentFileId] = false;
     } catch {}
 
-    if (isExternalLocalFile(file)) return true;
+    if (isExternalLocalFile(file) && !['ready', 'copy'].includes(file.localAccessState)) return false;
     if (!g('currentUser')) return true;
 
     markPendingServerSync(currentFileId, true);

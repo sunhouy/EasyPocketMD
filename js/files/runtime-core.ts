@@ -101,6 +101,8 @@ import { createDiffFileWriter } from './conflict/live-files';
     const writeBrowserLocalFileWithRetry = syncRt.writeBrowserLocalFileWithRetry;
     const syncFileAfterSaveIfNeeded = syncRt.syncFileAfterSaveIfNeeded;
     const readExternalSourceContent = syncRt.readExternalSourceContent;
+    const ensureExternalLocalAccess = syncRt.ensureExternalLocalAccess;
+    const offerLocalFileConversion = syncRt.offerLocalFileConversion;
     const checkExternalLocalConflictForCurrentFile = syncRt.checkExternalLocalConflictForCurrentFile;
     const startExternalLocalConflictMonitor = syncRt.startExternalLocalConflictMonitor;
     const openExternalLocalFileInBrowser = syncRt.openExternalLocalFileInBrowser;
@@ -667,7 +669,7 @@ import { createDiffFileWriter } from './conflict/live-files';
             $anchor.append($meta);
         }
 
-        $meta.find('.file-list-inline-preview').text(getFileListPreview(file.content));
+        $meta.find('.file-list-inline-preview').text(isExternalLocalFile(file) && !['ready', 'copy'].includes(file.localAccessState) ? (isEn() ? 'Local file: awaiting access verification' : '本地文件：待检查读写权限') : getFileListPreview(file.content));
         $meta.find('.file-list-inline-time').text(formatFileListModifiedTime(file.lastModified));
     }
 
@@ -1171,6 +1173,12 @@ import { createDiffFileWriter } from './conflict/live-files';
                     parent: parentId,
                     text: text,
                     type: isReal.type,
+                    icon: isExternalLocalFile(isReal) ? 'fas fa-file-arrow-down' : undefined,
+                    a_attr: isExternalLocalFile(isReal) ? {
+                        title: isReal.localAccessState === 'failed' ? '本地文件：权限失效' : isReal.localFileMode === 'browser-file' ? '本地副本：下载保存' : '本地文件：直接保存原文件',
+                        'data-local-file': isReal.localFileMode === 'browser-file' ? 'copy' : 'local',
+                        'data-local-access': isReal.localAccessState
+                    } : {},
                     state: { 
                         opened: false, // 由 state 插件管理
                         selected: isReal.id === g('currentFileId')
@@ -2517,12 +2525,12 @@ import { createDiffFileWriter } from './conflict/live-files';
             global.clearAutoSave();
         }
 
-        // 先保存当前文档
-        if (typeof global.saveCurrentFile === 'function' && g('currentFileId')) {
-            await global.saveCurrentFile(false);
-        }
-
         try {
+            // 先保存当前文档
+            if (typeof global.saveCurrentFile === 'function' && g('currentFileId')) {
+                await global.saveCurrentFile(false);
+            }
+
             if (requestToken !== fileOpenRequestToken) return;
 
             closeFileManagementFabRing();
@@ -2533,6 +2541,8 @@ import { createDiffFileWriter } from './conflict/live-files';
                 g('customAlert')(isEn() ? 'Cannot open folder' : '无法打开文件夹');
                 return;
             }
+            if (isExternalLocalFile(file) && !await ensureExternalLocalAccess(file, true)) return;
+            if (requestToken !== fileOpenRequestToken) return;
             global.currentFileId = fileId;
             refreshE2EUi();
 
@@ -2759,6 +2769,7 @@ import { createDiffFileWriter } from './conflict/live-files';
         if (contentChanged) {
             file.lastModified = Date.now();
         }
+        if (isExternalLocalFile(file)) file.localPendingWrite = true;
         localStorage.setItem('vditor_files', JSON.stringify(files));
         if (isManual) {
             showSaveStatus('saving');
@@ -2794,11 +2805,12 @@ import { createDiffFileWriter } from './conflict/live-files';
 
         // Electron 本地文件：优先回写原始文件路径，再同步云端
         if (file.isExternalLocal && file.localFilePath && global.electron && typeof global.electron.writeLocalFile === 'function') {
-            const writeResult = await global.electron.writeLocalFile(file.localFilePath, content);
+            const writeResult = await syncRt.writeExternalLocalContent(file, content, isManual);
             if (!writeResult || !writeResult.success) {
                 if (isManual) showSaveStatus('failed');
                 if (isManual) {
                     global.showMessage((isEn() ? 'Failed to save local file: ' : '保存本地文件失败：') + ((writeResult && writeResult.error) || ''), 'error');
+                    if (await offerLocalFileConversion(file, new Error(writeResult?.error || 'Local file write failed'))) await syncFileAfterSaveIfNeeded(currentFileId, file, content, isManual, contentChanged);
                 }
                 return;
             }
@@ -2808,7 +2820,7 @@ import { createDiffFileWriter } from './conflict/live-files';
             }
             const saveSynced = await syncFileAfterSaveIfNeeded(currentFileId, file, content, isManual, contentChanged);
             if (saveSynced) {
-                g('unsavedChanges')[currentFileId] = false;
+                g('unsavedChanges')[currentFileId] = getCurrentEditorContent(currentFileId, file.content) !== file.content || !!g('pendingServerSync')[currentFileId];
                 if (isManual) {
                     showSaveStatus('saved');
                 }
@@ -2837,26 +2849,9 @@ import { createDiffFileWriter } from './conflict/live-files';
                     showSaveStatus('failed');
                 }
             } else {
-                if (writeResult && writeResult.error && !writeResult.canceled) {
-                    if (isManual) showSaveStatus('failed');
-                    if (isManual) {
-                        global.showMessage((isEn() ? 'Failed to save local file: ' : '保存本地文件失败：') + (writeResult.error.message || ''), 'error');
-                    }
-                }
-                downloadLocalContent(file.name, content);
-                setExternalLocalSnapshot(currentFileId, content);
-                if (isManual) {
-                    global.showMessage(t('localFileSavedAsDownload'), 'warning');
-                }
-                const saveSynced = await syncFileAfterSaveIfNeeded(currentFileId, file, content, isManual, contentChanged);
-                if (saveSynced) {
-                    g('unsavedChanges')[currentFileId] = false;
-                    if (isManual) {
-                        showSaveStatus('saved');
-                    }
-                } else if (isManual) {
-                    showSaveStatus('failed');
-                }
+                if (isManual) showSaveStatus('failed');
+                // Keep the recovery copy and dirty state; a download is not a saved original.
+                if (writeResult?.converted) await syncFileAfterSaveIfNeeded(currentFileId, file, content, isManual, contentChanged);
             }
             return;
         }
@@ -2870,7 +2865,7 @@ import { createDiffFileWriter } from './conflict/live-files';
             }
             const saveSynced = await syncFileAfterSaveIfNeeded(currentFileId, file, content, isManual, contentChanged);
             if (saveSynced) {
-                g('unsavedChanges')[currentFileId] = false;
+                g('unsavedChanges')[currentFileId] = getCurrentEditorContent(currentFileId, file.content) !== file.content || !!g('pendingServerSync')[currentFileId];
                 if (isManual) {
                     showSaveStatus('saved');
                 }

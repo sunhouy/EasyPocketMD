@@ -5962,3 +5962,16 @@ body.night-mode .diff-live-surface [data-diff-fold-start]::before { color: #c3cf
 .diff-live-surface .diff-document > [data-diff-line] { position: relative; }
 .diff-live-surface .diff-document > [data-diff-line]:not([data-diff-fold-start])::before { content: attr(data-diff-line); position: absolute; left: -40px; top: 2px; width: 32px; color: #8993a3; font: 11px/18px monospace; text-align: right; pointer-events: none; }
 .diff-live-surface .diff-edit-pane[data-readonly="true"] .vditor-panel { display: none !important; }
+
+/* Keep provenance visible without changing file names used for rename/sync. */
+#fileList a[data-local-file]::after {
+    content: "本地";
+    font-size: 10px;
+    margin-inline-start: 5px;
+    padding: 1px 4px;
+    border: 1px solid currentColor;
+    border-radius: 4px;
+    opacity: .75;
+}
+#fileList a[data-local-file="copy"]::after { content: "本地副本"; }
+#fileList a[data-local-access="failed"]::after { content: "本地 · 权限失效"; color: #d9534f; }

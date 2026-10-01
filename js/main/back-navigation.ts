@@ -3,57 +3,41 @@ export interface BackNavigationOptions {
   closeOverlayByBackPress: (overlay: Element) => boolean;
 }
 
-/** Android-style double-back-to-exit on main editor screen. */
+/** Keep Android WebView history armed while closing application surfaces. */
 export function initBackNavigation(options: BackNavigationOptions): void {
   let lastBackTime = 0;
-
-  function pushHistory(): void {
-    window.history.pushState({ title: 'prevent' }, '', '');
-  }
-
+  const pushHistory = () => window.history.pushState({ title: 'prevent' }, '', '');
   pushHistory();
-
-  window.addEventListener(
-    'popstate',
-    () => {
-      const overlays = options.getVisibleModalOverlays();
-      if (overlays.length) {
-        const topOverlay = overlays[overlays.length - 1];
-        const closed = options.closeOverlayByBackPress(topOverlay);
-        if (closed) {
-          pushHistory();
-        }
-        return;
-      }
-
-      const isMainScreen = !overlays.length && !(window as Window & { isFileManagementMode?: boolean }).isFileManagementMode;
-      if (isMainScreen) {
-        const currentTime = Date.now();
-        if (currentTime - lastBackTime < 2000) {
-          window.history.back();
-        } else {
-          lastBackTime = currentTime;
-          showToast('再按一次离开本站');
-          pushHistory();
-        }
-      }
-    },
-    false,
-  );
-
-  function showToast(msg: string): void {
-    const div = document.createElement('div');
-    div.innerHTML = msg;
-    div.style.cssText = `
-      position: fixed; bottom: 15%; left: 50%; transform: translateX(-50%);
-      background: rgba(0,0,0,0.8); color: white; padding: 10px 20px;
-      border-radius: 25px; z-index: 9999; font-size: 14px; white-space: nowrap;
-    `;
-    document.body.appendChild(div);
-    setTimeout(() => {
-      if (div.parentNode) {
-        div.parentNode.removeChild(div);
-      }
-    }, 2000);
-  }
+  window.addEventListener('popstate', () => {
+    const overlays = options.getVisibleModalOverlays();
+    if (overlays.length) {
+      const top = overlays.map((element, index) => ({ element, index, z: Number.parseInt(getComputedStyle(element).zIndex, 10) || 0 }))
+        .sort((a, b) => a.z - b.z || a.index - b.index).pop()!;
+      // Even a protected or asynchronously closing dialog must consume back.
+      options.closeOverlayByBackPress(top.element);
+      lastBackTime = 0;
+      pushHistory();
+      return;
+    }
+    const app = window as any;
+    if (app.isFileManagementMode || document.getElementById('fileListSidebar')?.classList.contains('show')) {
+      app.enterEditorMode?.();
+      document.getElementById('fileListSidebar')?.classList.remove('show');
+      lastBackTime = 0;
+      pushHistory();
+      return;
+    }
+    const now = Date.now();
+    if (lastBackTime && now - lastBackTime < 2000) {
+      window.history.back();
+      return;
+    }
+    lastBackTime = now;
+    const toast = document.createElement('div');
+    toast.textContent = app.i18n?.getLanguage() === 'en' ? 'Press back again to leave' : '再按一次退出';
+    toast.style.cssText = 'position:fixed;bottom:15%;left:50%;transform:translateX(-50%);background:#000c;color:white;padding:10px 20px;border-radius:25px;z-index:100100;white-space:nowrap;';
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 2000);
+    pushHistory();
+  });
 }

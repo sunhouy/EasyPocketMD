@@ -4046,12 +4046,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
     initializeAppShellOnce();
     
-    if (!window.isTauriMobileEnvironment) {
-        initBackNavigation({
-            getVisibleModalOverlays,
-            closeOverlayByBackPress,
-        });
-    }
+    initBackNavigation({
+        getVisibleModalOverlays,
+        closeOverlayByBackPress,
+    });
 
     initDesktopModalEscHandler();
 

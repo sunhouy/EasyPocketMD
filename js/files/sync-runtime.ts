@@ -26,6 +26,7 @@ import {
     normalizeServerFileRecord as normalizeServerFileRecordCore,
     createSyncRuntimeApi
 } from './sync/index';
+import { createLocalHandleStore, ensureHandlePermission } from './external/handles';
 import type { EditorRuntimeCtx } from './editor-runtime';
 
 export interface SyncRuntimeHooks {
@@ -53,6 +54,9 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
     // 共享 closure 状态
     let tokenRecoveryInProgress = false;
     let lastTokenRecoveryAt = 0;
+    const localHandleStore = createLocalHandleStore();
+    const localAccessPrompts = new Set();
+    const localRemoteUpdateTasks = new Map();
     const browserFileHandleMap = new Map<any, any>();
     const localExternalSnapshotMap = new Map<any, any>();
     const localExternalConflictPrompting = new Set<any>();
@@ -474,51 +478,189 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
         }
     }
 
-    async function writeBrowserLocalFileWithRetry(fileId, content) {
-        let handle = browserFileHandleMap.get(fileId);
+    async function getBrowserHandle(file, interactive) {
+        let handle = browserFileHandleMap.get(file.id);
         if (!handle) {
-            handle = await requestBrowserWriteHandle();
-            if (!handle) return { success: false, canceled: true };
-            browserFileHandleMap.set(fileId, handle);
+            handle = await localHandleStore.get(file.id).catch(() => null);
+            if (handle) browserFileHandleMap.set(file.id, handle);
         }
+        if (!handle && interactive) {
+            const selected = await requestBrowserWriteHandle();
+            if (!selected) throw new Error('Local file authorization cancelled');
+            const expectedName = file.localOriginalName || file.name;
+            if (selected.name !== expectedName) throw new Error('请选择原来的本地文件，不能用其他文件替代');
+            handle = selected;
+            browserFileHandleMap.set(file.id, handle);
+            await localHandleStore.set(file.id, handle).catch(() => {});
+        }
+        try { await ensureHandlePermission(handle, interactive); }
+        catch (error) {
+            if (!interactive) throw error;
+            const selected = await requestBrowserWriteHandle();
+            if (!selected || !handle?.isSameEntry || !await handle.isSameEntry(selected)) throw error;
+            await ensureHandlePermission(selected, true);
+            handle = selected;
+            browserFileHandleMap.set(file.id, handle);
+            await localHandleStore.set(file.id, handle).catch(() => {});
+        }
+        return handle;
+    }
 
+    async function offerLocalFileConversion(file, error) {
+        if (localAccessPrompts.has(file.id)) return false;
+        localAccessPrompts.add(file.id);
         try {
-            const writable = await handle.createWritable();
-            await writable.write(content);
-            await writable.close();
-            localExternalSnapshotMap.set(fileId, content);
-            return { success: true };
-        } catch (error) {
-            if (!isLikelyBrowserWritePermissionError(error)) {
-                return { success: false, error: error };
-            }
+            const accepted = await global.customConfirm(
+                (isEn() ? 'The local file cannot be opened with edit permission. Convert the last saved copy to a cloud file? The original local file will remain unchanged.' : '本地文件无法正常打开或没有编辑权限。是否将最后保存的副本转换为云端文件？原本地文件不会被修改。') +
+                '\n' + (error?.message || String(error || '')) +
+                (!g('currentUser') ? (isEn() ? '\nSign in to sync the converted file.' : '\n转换后登录账号即可同步云端。') : '')
+            );
+            if (!accepted) return false;
+            file.isExternalLocal = false;
+            delete file.localFilePath; delete file.localFileMode; delete file.localAccessState;
+            delete file.localOriginalName; delete file.localCloudUsername; delete file.localSyncedContent; delete file.localPendingWrite;
+            browserFileHandleMap.delete(file.id);
+            void localHandleStore.remove(file.id).catch(() => {});
+            file.isSynced = false; file.contentLoaded = true;
+            markPendingServerSync(file.id, !!g('currentUser'));
+            localStorage.setItem('vditor_files', JSON.stringify(g('files')));
+            hooks.loadFiles();
+            if (g('currentUser')) void global.syncFileToServer(file.id, { background: true }).catch(() => {});
+            return true;
+        } finally { localAccessPrompts.delete(file.id); }
+    }
 
-            global.showMessage(t('localFileNeedReauthorize'), 'warning');
-            const reauthorizedHandle = await requestBrowserWriteHandle();
-            if (!reauthorizedHandle) return { success: false, canceled: true };
-            browserFileHandleMap.set(fileId, reauthorizedHandle);
-
+    async function ensureExternalLocalAccess(file, interactive = true) {
+        if (!isExternalLocalFile(file)) return true;
+        if (file.localFileMode === 'browser-file') { file.localAccessState = 'copy'; return true; }
+        let error;
+        for (let attempt = 0; attempt < (interactive ? 2 : 1); attempt++) {
             try {
-                const writable = await reauthorizedHandle.createWritable();
-                await writable.write(content);
-                await writable.close();
-                localExternalSnapshotMap.set(fileId, content);
-                return { success: true, reauthorized: true };
-            } catch (retryError) {
-                return { success: false, error: retryError };
-            }
+                let content;
+                if (file.localFileMode === 'browser-fsa') {
+                    const handle = await getBrowserHandle(file, interactive);
+                    const probe = await handle.createWritable({ keepExistingData: true });
+                    await probe.abort(); // Validate edit access without committing any bytes.
+                    content = await readTextFromBrowserFile(await handle.getFile());
+                } else {
+                    if (!global.electron?.readLocalFile) throw new Error('This device cannot access the original local file');
+                    if (attempt > 0 && /Android/i.test(navigator.userAgent) && global.electron.openLocalFileDialog) {
+                        const authorization = await global.electron.openLocalFileDialog();
+                        if (authorization?.canceled || authorization?.path !== file.localFilePath) throw new Error('请重新授权原来的本地文件');
+                    }
+                    const result = await global.electron.readLocalFile(file.localFilePath);
+                    if (!result?.success) throw new Error(result?.error || 'Local file permission unavailable');
+                    content = result.content ?? '';
+                }
+                // Pending editor changes are a recovery draft, never silently replace them with disk text.
+                if (!g('unsavedChanges')?.[file.id] && !file.localPendingWrite) file.content = content;
+                else g('unsavedChanges')[file.id] = true;
+                file.contentLoaded = true; file.localAccessState = 'ready';
+                localExternalSnapshotMap.set(file.id, content);
+                if (g('currentUser') && file.localCloudUsername !== g('currentUser').username) {
+                    file.isSynced = false; delete file.serverLastModified; delete file.contentVersion;
+                    delete file.localSyncedContent; g('lastSyncedContent')[file.id] = '';
+                }
+                if (content !== file.localSyncedContent) file.isSynced = false;
+                if (interactive && g('currentUser')?.username === file.localCloudUsername && content === file.localSyncedContent && !g('unsavedChanges')?.[file.id]) {
+                    const oldBase = g('lastSyncedContent')[file.id];
+                    try {
+                        const remote = { ...file };
+                        await fetchServerFileContent(remote);
+                        g('lastSyncedContent')[file.id] = oldBase;
+                        await applyExternalRemoteUpdate(file, remote);
+                    } catch (_) { g('lastSyncedContent')[file.id] = oldBase; }
+                }
+                if (interactive) {
+                    document.getElementById(file.id + '_anchor')?.setAttribute('data-local-access', 'ready');
+                    localStorage.setItem('vditor_files', JSON.stringify(g('files')));
+                }
+                return true;
+            } catch (e) { error = e; }
         }
+        file.localAccessState = 'failed';
+        document.getElementById(file.id + '_anchor')?.setAttribute('data-local-access', 'failed');
+        if (!interactive) return false;
+        localStorage.setItem('vditor_files', JSON.stringify(g('files')));
+        return offerLocalFileConversion(file, error);
+    }
+
+    async function writeExternalLocalContent(file, content, interactive = false) {
+        let error;
+        for (let attempt = 0; attempt < 2; attempt++) {
+            try {
+                if (file.localFileMode === 'browser-fsa') {
+                    const handle = await getBrowserHandle(file, interactive);
+                    const writable = await handle.createWritable();
+                    try { await writable.write(content); await writable.close(); }
+                    catch (e) { await writable.abort?.().catch(() => {}); throw e; }
+                } else if (file.localFileMode !== 'browser-file') {
+                    if (!global.electron?.writeLocalFile) throw new Error('Local file writer unavailable');
+                    const result = await global.electron.writeLocalFile(file.localFilePath, content);
+                    if (!result?.success) throw new Error(result?.error || 'Cannot save local file');
+                }
+                localExternalSnapshotMap.set(file.id, content);
+                file.localAccessState = file.localFileMode === 'browser-file' ? 'copy' : 'ready';
+                file.localPendingWrite = false;
+                if (g('files').includes(file)) localStorage.setItem('vditor_files', JSON.stringify(g('files')));
+                return { success: true };
+            } catch (e) { error = e; }
+        }
+        file.localAccessState = 'failed';
+        localStorage.setItem('vditor_files', JSON.stringify(g('files')));
+        return { success: false, error: error?.message || String(error) };
+    }
+
+    async function writeBrowserLocalFileWithRetry(fileId, content) {
+        const file = g('files').find(f => f.id === fileId);
+        const result = await writeExternalLocalContent(file, content, true);
+        if (!result.success) result.converted = await offerLocalFileConversion(file, new Error(result.error));
+        return result;
+    }
+
+    // Accept a remote revision only after the original file is readable and writable,
+    // and only if its current text still matches the last acknowledged revision.
+    function applyExternalRemoteUpdate(file, remote) {
+        const previous = localRemoteUpdateTasks.get(file.id) || Promise.resolve();
+        const task = previous.catch(() => {}).then(() => applyExternalRemoteRevision(file, remote));
+        localRemoteUpdateTasks.set(file.id, task);
+        return task.finally(() => { if (localRemoteUpdateTasks.get(file.id) === task) localRemoteUpdateTasks.delete(file.id); });
+    }
+
+    async function applyExternalRemoteRevision(file, remote) {
+        if (!g('currentUser') || file.localCloudUsername !== g('currentUser').username) return false;
+        const remoteVersion = Number(remote.content_version ?? remote.contentVersion);
+        if (Number.isFinite(remoteVersion) && remoteVersion < Number(file.contentVersion || 0)) return false;
+        const disk = await readExternalSourceContent(file, file.id).catch(() => null);
+        const current = file.id === g('currentFileId') ? getCurrentEditorContent(file.id, file.content) : file.content;
+        if (disk === null || disk !== file.localSyncedContent || current !== disk || g('unsavedChanges')?.[file.id]) {
+            file.isSynced = false; markPendingServerSync(file.id, true);
+            return false;
+        }
+        const content = await resolveE2EFileContent(String(remote.content ?? ''), file, remote);
+        if (content !== disk && !(await writeExternalLocalContent(file, content)).success) return false;
+        const live = file.id === g('currentFileId') ? getCurrentEditorContent(file.id, file.content) : file.content;
+        file.localSyncedContent = content;
+        if (live !== current) {
+            file.content = live; file.isSynced = false; g('unsavedChanges')[file.id] = true; markPendingServerSync(file.id, true);
+            localStorage.setItem('vditor_files', JSON.stringify(g('files')));
+            return false;
+        }
+        file.content = content; file.contentLoaded = true; file.isSynced = true;
+        file.localSyncedContent = content;
+        file.serverLastModified = remote.last_modified || remote.serverLastModified || file.serverLastModified;
+        if (remote.content_version != null || remote.contentVersion != null) file.contentVersion = Number(remote.content_version ?? remote.contentVersion);
+        g('lastSyncedContent')[file.id] = content;
+        markPendingServerSync(file.id, false);
+        if (file.id === g('currentFileId')) setEditorContentForFile(file.id, content, { preserveCursor: true });
+        localStorage.setItem('vditor_files', JSON.stringify(g('files')));
+        return true;
     }
 
     async function syncFileAfterSaveIfNeeded(currentFileId, file, content, isManual, contentChanged) {
-        if (isExternalLocalFile(file)) {
-            g('lastSyncedContent')[currentFileId] = content;
-            markPendingServerSync(currentFileId, false);
-            return true;
-        }
-
         if (!g('currentUser')) {
             g('lastSyncedContent')[currentFileId] = content;
+            localStorage.setItem('vditor_files', JSON.stringify(g('files')));
             return true;
         }
 
@@ -529,6 +671,10 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
                 try { await global.createHistoryVersion(file.name, content); } catch (e) { console.warn('创建历史版本失败', e); }
             }
             if (saveResult) {
+                const live = getCurrentEditorContent(currentFileId, file.content);
+                if (live !== g('lastSyncedContent')[currentFileId] || (isExternalLocalFile(file) && !['ready', 'copy'].includes(file.localAccessState))) return false;
+                if (isExternalLocalFile(file)) { file.localSyncedContent = g('lastSyncedContent')[currentFileId]; file.localCloudUsername = g('currentUser')?.username; }
+                localStorage.setItem('vditor_files', JSON.stringify(g('files')));
                 markPendingServerSync(currentFileId, false);
                 return true;
             }
@@ -541,6 +687,7 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
 
     async function readExternalSourceContent(file, fileId) {
         if (!file || !file.isExternalLocal) return null;
+        if (file.localFileMode === 'browser-file') return file.content ?? '';
 
         if (global.electron && file.localFilePath && typeof global.electron.readLocalFile === 'function') {
             const result = await global.electron.readLocalFile(file.localFilePath);
@@ -549,7 +696,7 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
         }
 
         if (file.localFileMode === 'browser-fsa') {
-            const handle = browserFileHandleMap.get(fileId);
+            const handle = browserFileHandleMap.get(fileId) || await localHandleStore.get(fileId).catch(() => null);
             if (!handle || typeof handle.getFile !== 'function') return null;
             const browserFile = await handle.getFile();
             return await readTextFromBrowserFile(browserFile);
@@ -630,8 +777,13 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
                 const handle = handles && handles[0];
                 if (!handle) return false;
                 const browserFile = await handle.getFile();
+                // Register a readable recovery copy before checking edit permission.
                 const content = await readTextFromBrowserFile(browserFile);
-                const localPath = createBrowserLocalPath(browserFile.name);
+                let localPath = createBrowserLocalPath(browserFile.name) + '/' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
+                for (const existing of g('files').filter(f => f.localFileMode === 'browser-fsa')) {
+                    const previous = browserFileHandleMap.get(existing.id) || await localHandleStore.get(existing.id).catch(() => null);
+                    if (previous && handle.isSameEntry && await handle.isSameEntry(previous)) { localPath = existing.localFilePath; break; }
+                }
                 return openExternalLocalFileByPath(localPath, {
                     success: true,
                     path: localPath,
@@ -645,7 +797,7 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
             const fallbackFile: any = await pickLocalFileByInput();
             if (!fallbackFile) return false;
             const fallbackContent = await readTextFromBrowserFile(fallbackFile);
-            const fallbackPath = createBrowserLocalPath(fallbackFile.name);
+            const fallbackPath = createBrowserLocalPath(fallbackFile.name) + '/' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
             return openExternalLocalFileByPath(fallbackPath, {
                 success: true,
                 path: fallbackPath,
@@ -674,7 +826,7 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
             fileData = await global.electron.readLocalFile(filePath);
         }
 
-        if (!fileData || !fileData.success) {
+        if (!fileData || (!fileData.success && typeof fileData.content !== 'string')) {
             global.showMessage((isEn() ? 'Failed to open local file: ' : '打开本地文件失败：') + ((fileData && fileData.error) || ''), 'error');
             return false;
         }
@@ -698,11 +850,13 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
                 isSynced: false,
                 isExternalLocal: true,
                 localFilePath: resolvedPath,
-                localFileMode: localFileMode
+                localFileMode: localFileMode,
+                localOriginalName: fileData.name || baseName,
+                localAccessState: 'unverified'
             };
             files.push(target);
         } else {
-            target.content = fileData.content || '';
+            if (!g('unsavedChanges')[target.id]) target.content = fileData.content || '';
             target.lastModified = now;
             target.isSynced = false;
             target.localFileMode = localFileMode;
@@ -711,14 +865,15 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
 
         if (fileData.browserFileHandle) {
             browserFileHandleMap.set(target.id, fileData.browserFileHandle);
+            await localHandleStore.set(target.id, fileData.browserFileHandle).catch(() => {});
         }
         localExternalSnapshotMap.set(target.id, target.content || '');
 
         localStorage.setItem('vditor_files', JSON.stringify(files));
-        g('lastSyncedContent')[target.id] = target.content;
-        g('unsavedChanges')[target.id] = false;
+        if (g('lastSyncedContent')[target.id] === undefined) g('lastSyncedContent')[target.id] = '';
+        if (g('unsavedChanges')[target.id] === undefined) g('unsavedChanges')[target.id] = false;
         hooks.loadFiles();
-        hooks.openFile(target.id);
+        await hooks.openFile(target.id);
         return true;
     }
 
@@ -940,6 +1095,7 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
                 // Server list is the source of truth for previously-synced files:
                 // if a file existed on server before (local isSynced=true) but is missing from serverFiles now,
                 // it should be deleted locally on load (instead of being re-uploaded).
+                for (const local of localFiles.filter(isExternalLocalFile)) await ensureExternalLocalAccess(local, false);
                 pruneLocallySyncedFilesDeletedOnServer(localFiles, serverFiles);
 
                 await uploadLocalOnlyFilesToServerIfNeeded(localFiles, serverFiles);
@@ -1519,6 +1675,8 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
         tryHandleTokenExpired,
         pullServerUpdatesForCleanFiles,
         fetchServerFileContent,
+        writeExternalLocalContent,
+        applyExternalRemoteUpdate,
         isEn
     });
 
@@ -1535,7 +1693,7 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
         const toUpload = localFiles.filter(function(f) {
             if (!f || !f.name) return false;
             if (f.type !== 'file' && f.type !== 'folder') return false;
-            if (isExternalLocalFile(f)) return false;
+            if (isExternalLocalFile(f) && !['ready', 'copy'].includes(f.localAccessState)) return false;
             if (serverFileMap[f.name]) return false;
             return !f.isSynced;
         });
@@ -1550,6 +1708,8 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
                     f.type === 'folder'
                         ? ''
                         : (f.id === g('currentFileId') ? getCurrentEditorContent(f.id, f.content) : f.content);
+
+                if (isExternalLocalFile(f) && !(await writeExternalLocalContent(f, content)).success) continue;
 
                 const filenameToSend = f.type === 'folder' ? (f.name.endsWith('/') ? f.name : (f.name + '/')) : f.name;
                 const fileE2EEnabled = isFileE2EEnabled(f);
@@ -1600,6 +1760,7 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
                         const retryR = global.parseJsonResponse ? await global.parseJsonResponse(retryResp) : await retryResp.json();
                         if (retryR.code === 200) {
                             f.isSynced = true;
+                            if (isExternalLocalFile(f)) { f.localSyncedContent = content; f.localCloudUsername = uploadUser.username; }
                             f.e2e_enabled = fileE2EEnabled ? 1 : 0;
                             f.e2eEnabled = fileE2EEnabled;
                             f.lastModified = Date.now();
@@ -1618,6 +1779,7 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
 
                 if (r.code === 200) {
                     f.isSynced = true;
+                    if (isExternalLocalFile(f)) { f.localSyncedContent = content; f.localCloudUsername = uploadUser.username; }
                     f.e2e_enabled = fileE2EEnabled ? 1 : 0;
                     f.e2eEnabled = fileE2EEnabled;
                     f.lastModified = Date.now();
@@ -1687,7 +1849,16 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
         });
         localFiles.forEach(function(localFile) {
             if (isExternalLocalFile(localFile)) {
-                normalizeExternalLocalFileRecord(localFile);
+                const cloud = fileMap[localFile.name];
+                if (cloud) {
+                    const index = mergedFiles.indexOf(cloud); if (index >= 0) mergedFiles.splice(index, 1);
+                    // Preserve the old content base so the server can merge concurrent edits.
+                    if (typeof localFile.localSyncedContent === 'string') lastSyncedContent[localFile.id] = localFile.localSyncedContent;
+                    else { lastSyncedContent[localFile.id] = ''; localFile.contentVersion = 0; localFile.serverLastModified = null; }
+                    if (localFile.content !== cloud.content || cloud.contentLoaded === false) {
+                        localFile.isSynced = false; markPendingServerSync(localFile.id, true);
+                    }
+                }
                 mergedFiles.push(Object.assign({}, localFile));
                 return;
             }
@@ -1818,6 +1989,10 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
         writeBrowserLocalFileWithRetry,
         syncFileAfterSaveIfNeeded,
         readExternalSourceContent,
+        ensureExternalLocalAccess,
+        writeExternalLocalContent,
+        applyExternalRemoteUpdate,
+        offerLocalFileConversion,
         checkExternalLocalConflictForCurrentFile,
         startExternalLocalConflictMonitor,
         openExternalLocalFileInBrowser,
