@@ -57,29 +57,14 @@
     }
 
     function resolveAndroidURI(uri) {
-        if (typeof uri !== 'string') return uri;
-        if (uri.startsWith('content://com.android.externalstorage.documents/document/')) {
-            var docId = uri.substring('content://com.android.externalstorage.documents/document/'.length);
-            docId = decodeURIComponent(docId);
-            var colonIdx = docId.indexOf(':');
-            if (colonIdx !== -1) {
-                var volumeId = docId.substring(0, colonIdx);
-                var path = docId.substring(colonIdx + 1);
-                if (volumeId === 'primary') {
-                    return '/storage/emulated/0/' + path;
-                } else {
-                    return '/storage/' + volumeId + '/' + path;
-                }
-            }
-        }
-        // Fallback for url-encoded file:// paths or other schemes if needed
+        // A SAF URI is an identifier with a permission grant, not a filesystem path.
         return uri;
     }
 
     function shouldUseInvokeForPath(filePath) {
         var path = String(filePath || '');
         if (!path) return true;
-        if (/^file:\/\//i.test(path)) return true;
+        if (/^(?:content|file):\/\//i.test(path)) return true;
         if (/^[a-zA-Z]:[\\/]/.test(path)) return true;
         if (/^\\\\\\?\\/.test(path)) return true;
         if (/^\\\\/.test(path)) return true;
@@ -189,6 +174,7 @@
             return invokeCommand('get_local_file_path', { name: name });
         },
         openLocalFileDialog: function() {
+            if (/Android/i.test(navigator.userAgent)) return invokeCommand('open_local_file_dialog');
             var openDialog = getDialogOpenApi();
             var fs = getFsApi();
             if (!openDialog) {
@@ -299,6 +285,7 @@
         writeLocalFile: function(filePath, content) {
             filePath = resolveAndroidURI(filePath);
             var fs = getFsApi();
+            if (/^content:\/\//i.test(filePath)) return invokeCommand('write_local_file', { filePath: filePath, content: content });
             if (fs && typeof fs.writeTextFile === 'function') {
                 return ensureParentDirectory(fs, filePath).then(function() {
                     return fs.writeTextFile(String(filePath), String(content));
