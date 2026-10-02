@@ -13,7 +13,7 @@ html {
     --safe-area-top: 0px;
     --safe-area-bottom: 0px;
     --top-toolbar-offset: var(--safe-area-top);
-    --top-toolbar-notice-offset: calc(var(--safe-area-top) + 40px);
+    --top-toolbar-notice-offset: calc(var(--safe-area-top) + var(--top-notice-height, 40px));
     --top-toolbar-btn-size: 32px;
     --top-toolbar-btn-gap: 6px;
     --top-toolbar-btn-top: calc(var(--top-toolbar-offset) + (var(--top-toolbar-height) - var(--top-toolbar-btn-size)) / 2);

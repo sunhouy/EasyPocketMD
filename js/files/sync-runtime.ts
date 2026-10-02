@@ -27,6 +27,7 @@ import {
     normalizeServerFileRecord as normalizeServerFileRecordCore,
     createSyncRuntimeApi
 } from './sync/index';
+import { isUntouchedGuestWelcome, hasLocalTextChanges } from './sync/revisions';
 import { createLocalHandleStore, ensureHandlePermission } from './external/handles';
 import type { EditorRuntimeCtx } from './editor-runtime';
 
@@ -1109,6 +1110,16 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
                 });
                 syncCurrentEditorSnapshotIntoFiles(localFiles);
 
+                if (serverFiles.length) {
+                    for (let i = localFiles.length - 1; i >= 0; i--) {
+                        const f = localFiles[i];
+                        const content = f.id === g('currentFileId') ? getCurrentEditorContent(f.id, f.content) : f.content;
+                        if (!isUntouchedGuestWelcome(f, content)) continue;
+                        localFiles.splice(i, 1); delete pendingServerSyncState[f.id]; delete unsavedChangesState[f.id]; delete g('lastSyncedContent')[f.id];
+                        localStorage.removeItem('epm-file:' + f.id);
+                        if (f.id === g('currentFileId')) global.currentFileId = null;
+                    }
+                }
                 // Server list is the source of truth for previously-synced files:
                 // if a file existed on server before (local isSynced=true) but is missing from serverFiles now,
                 // it should be deleted locally on load (instead of being re-uploaded).
@@ -1760,7 +1771,16 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
                 const localBaseContent = localFile && localFile.id ? (localFile.crdtBaseContent ?? lastSyncedContent[localFile.id] ?? (localFile.isSynced ? localFile.content : undefined)) : undefined;
                 if (localFile.type === 'file' && mergedServerFile.type === 'file') {
                     const e2eChanged = isFileE2EEnabled(localFile) !== isFileE2EEnabled(mergedServerFile);
-                    if (mergedServerFile.contentLoaded === false) {
+                    const dirty = hasLocalTextChanges(localFile, localBaseContent, !!(pendingServerSync[localFile.id] || unsavedChanges[localFile.id]));
+                    if (Number(mergedServerFile.contentVersion || 0) < Number(localFile.contentVersion || 0)) {
+                        Object.assign(mergedServerFile, localFile);
+                    } else if (!dirty && mergedServerFile.contentLoaded !== false) {
+                        mergedServerFile.isSynced = true;
+                        mergedServerFile.crdtBaseContent = mergedServerFile.content;
+                        mergedServerFile.crdtBaseContentVersion = mergedServerFile.contentVersion;
+                        if (localFile.id === g('currentFileId') && localFile.content !== mergedServerFile.content) setEditorContentForFile(localFile.id, mergedServerFile.content, { preserveCursor: true });
+                        delete pendingServerSync[localFile.id]; delete unsavedChanges[localFile.id];
+                    } else if (mergedServerFile.contentLoaded === false) {
                         const remoteVersion = mergedServerFile.contentVersion;
                         Object.assign(mergedServerFile, localFile);
                         mergedServerFile.remoteContentVersion = remoteVersion;
@@ -1800,7 +1820,7 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
                 ? (!localFile.isSynced || unsavedChanges[localFile.id] || localFile.content !== localBaseContent)
                 : (!localFile.isSynced || unsavedChanges[localFile.id]);
 
-            if (String(localFile.id || '') === String(g('currentFileId') || '') && localFile.type === 'file') {
+            if (String(localFile.id || '') === String(g('currentFileId') || '') && localFile.type === 'file' && (localFile.isSynced || Number(localFile.contentVersion) > 0 || localFile.serverLastModified)) {
                 const localCopy = Object.assign({}, localFile);
                 markOpenFileDeletedOnServer(localCopy, getCurrentEditorContent(localCopy.id, localCopy.content));
                 mergedFiles.push(localCopy);

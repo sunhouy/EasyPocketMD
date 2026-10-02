@@ -1,6 +1,7 @@
 /**
  * Vditor 初始化、界面与功能绑定
  */
+import { observeNoticeHeight } from './main/notice-layout';
 import { initSlashCommandRuntime } from './ui/slash-command';
 import { getCurrentEngine, createEditor } from './editor-engine';
 import './ai-config';
@@ -1871,6 +1872,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function initTopNoticeBanner() {
         const banner = document.getElementById('topNoticeBanner');
         const closeBtn = document.getElementById('topNoticeClose');
+        if (banner) observeNoticeHeight(banner);
 
         if (closeBtn) {
             closeBtn.addEventListener('click', function() {
@@ -1937,6 +1939,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // 显示横幅
         banner.style.display = 'flex';
+        document.documentElement.style.setProperty('--top-notice-height', Math.ceil(banner.getBoundingClientRect().height) + 'px');
         document.body.classList.add('has-top-notice');
         currentNoticeType = type;
     }

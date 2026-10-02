@@ -155,3 +155,20 @@ describe('ShareManager', () => {
         });
     });
 });
+
+
+describe('sharing from a token-only encrypted account',()=>{
+    beforeEach(()=>jest.clearAllMocks());
+    it('creates an editable share without passing undefined to bcrypt',async()=>{
+        const token=require('jsonwebtoken').sign({username:'user'},process.env.JWT_SECRET || 'your-secret-key-change-in-production');
+        const connection={execute:jest.fn().mockResolvedValueOnce([[{id:1,password:'hash'}]]).mockResolvedValueOnce([[{id:2}]]).mockResolvedValueOnce([[]]).mockResolvedValue([{}]),beginTransaction:jest.fn(),commit:jest.fn(),rollback:jest.fn(),release:jest.fn()};
+        db.getConnection.mockResolvedValue(connection);
+        const result=await shareManager.createShare('user',undefined,'note.md','edit',null,7,'all',[],null,token);
+        expect(result.code).toBe(200);expect(result.data.mode).toBe('edit');expect(bcrypt.compare).not.toHaveBeenCalled();
+    });
+    it('rejects missing credentials instead of throwing bcrypt illegal arguments',async()=>{
+        db.getConnection.mockResolvedValue({execute:jest.fn().mockResolvedValue([[{id:1,password:'hash'}]]),release:jest.fn()});
+        expect((await shareManager.getFileContentForShare('user',undefined,'note.md')).code).toBe(401);
+        expect(bcrypt.compare).not.toHaveBeenCalled();
+    });
+});

@@ -1,3 +1,4 @@
+import { isUntouchedGuestWelcome } from './revisions';
 import { safeMerge } from '../../../api/utils/safeMerge';
 import { SyncQueue } from './queue';
 import { persistFile, restoreFileFromDB, refreshSyncIcons, deviceId } from './local-state';
@@ -132,6 +133,7 @@ export function createSyncRuntimeApi(ctx: any) {
       const priority = file.id === (selectedId || g('currentFileId')) ? 100 : (g('pendingServerSync')?.[file.id] ? 50 : 0);
       void queue.enqueue(file.id, priority, async () => {
         if (navigator.onLine === false || !g('currentUser') || file.syncConflict || globalRef.fileRelocationInProgress || !g('files').includes(file)) return;
+        if (isUntouchedGuestWelcome(file, file.id === g('currentFileId') ? getCurrentEditorContent(file.id, file.content) : file.content)) return;
         await globalRef.E2EVault?.initialize();
         const state = globalRef.E2EVault?.state();
         if (state?.config && !state.unlocked && isFileE2EEnabled(file)) return;
@@ -363,6 +365,8 @@ export function createSyncRuntimeApi(ctx: any) {
     if (options?.background !== false && vaultState?.config && !vaultState.unlocked && isFileE2EEnabled(g('files').find(f => f.id === fileId))) return false;
     const requestUser = g('currentUser');
     const backgroundSync = !options || options.background !== false;
+    const welcome = g('files').find(f => f.id === fileId);
+    if (backgroundSync && isUntouchedGuestWelcome(welcome, fileId === g('currentFileId') ? getCurrentEditorContent(fileId, welcome?.content) : welcome?.content)) return false;
     const overrideContent = options && typeof options.overrideContent === 'string' ? options.overrideContent : null;
     const baseLastModifiedOption = options && options.baseLastModified ? options.baseLastModified : null;
     const forcedBaseContentVersion =

@@ -184,3 +184,34 @@ test('encryption session expiry does not invalidate the account token', async()=
     expect(await rt.tryHandleTokenExpired({e2eKey:'e2eSessionExpired',message:'端到端加密会话已过期'})).toBe(false);
     expect(app.handleTokenExpired).not.toHaveBeenCalled();expect(app.currentUser.token).toBe('valid');
 });
+
+
+test('clean cached content accepts a newer cloud revision without becoming a conflict',async()=>{
+    const {installSyncRuntime}=await import('../../js/files/sync-runtime');
+    const local={id:'note',name:'note.md',type:'file',content:'old',contentVersion:1,isSynced:true};
+    const app={files:[local],lastSyncedContent:{note:'old'},unsavedChanges:{},pendingServerSync:{}};
+    const rt=installSyncRuntime(app,{},{});
+    rt.mergeFiles([local],[{name:'note.md',type:'file',content:'new',contentVersion:2,contentLoaded:true}]);
+    expect(app.files[0].content).toBe('new');expect(app.files[0].isSynced).toBe(true);expect(app.pendingServerSync.note).toBeUndefined();expect(app.files[0].syncConflict).not.toBe(true);
+});
+
+test('metadata refresh preserves real local edits and their merge base',async()=>{
+    const {installSyncRuntime}=await import('../../js/files/sync-runtime');
+    const local={id:'note',name:'note.md',type:'file',content:'edited',contentVersion:1,isSynced:false,crdtBaseContent:'old'};
+    const app={files:[local],lastSyncedContent:{note:'old'},unsavedChanges:{note:true},pendingServerSync:{note:true}};
+    installSyncRuntime(app,{},{}).mergeFiles([local],[{name:'note.md',type:'file',content:'cloud edit',contentVersion:2,contentLoaded:true}]);
+    expect(app.files[0].content).toBe('edited');expect(app.files[0].crdtBaseContent).toBe('old');expect(app.files[0].isSynced).toBe(false);
+});
+
+
+it.each([false,true])('first login replaces only an untouched guest welcome: edited=%s',async(edited)=>{
+    const {installSyncRuntime}=await import('../../js/files/sync-runtime');
+    jest.useFakeTimers();
+    const content='# 欢迎使用 EasyPocketMD\n\n这是一个新的文档。\n\n开始编写吧！'+(edited?' edited':'');
+    const guest={id:'guest',name:'未命名文档',type:'file',content,isSynced:false,autoCreatedGuestWelcome:true};
+    const app={files:[guest],currentFileId:'guest',currentUser:{username:'user',token:'token'},lastSyncedContent:{},unsavedChanges:{},pendingServerSync:{},showSyncStatus:jest.fn()};
+    const rt=installSyncRuntime(app,{getCurrentEditorContent:()=>content,syncCurrentEditorSnapshotIntoFiles:()=>{}},{loadFiles:()=>{},shouldAutoOpenInitialFile:()=>false});
+    global.fetch=jest.fn(async()=>({json:async()=>({code:200,data:{files:[{name:'cloud.md',content:'cloud',content_version:2}]}})}));
+    try {await rt.loadFilesFromServer();expect(app.files.some(f=>f.id==='guest')).toBe(edited);expect(app.files.find(f=>f.id==='guest')?.serverDeleted).not.toBe(true);expect(app.files.some(f=>f.name==='cloud.md')).toBe(true);}
+    finally {jest.clearAllTimers();jest.useRealTimers();}
+});
