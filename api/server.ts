@@ -132,6 +132,7 @@ app.use('/api/ai', aiLimiter, aiRoutes);
 app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/register', registerLimiter);
 app.use('/api/auth', authRoutes);
+app.use('/api/e2e', require('./routes/e2e'));
 
 // File routes - rate limiting based on auth status
 app.use('/api/files', fileLimiter, fileRoutes);

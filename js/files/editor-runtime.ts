@@ -551,7 +551,8 @@ export function installEditorRuntime(global: any, ctx: Partial<EditorRuntimeCtx>
         }
 
         try {
-            return vditor.getValue();
+            const content = vditor.getValue();
+            return global.LocalImageManager?.convertBlobToLocal ? global.LocalImageManager.convertBlobToLocal(content) : content;
         } catch (error) {
             console.warn('读取编辑器内容失败，回退到本地快照:', error);
             return fallback;

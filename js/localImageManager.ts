@@ -26,7 +26,7 @@
             try {
                 let blobUrl = localToBlobMap.get(url);
                 if (!blobUrl) {
-                    blobUrl = await global.ResourceLoader.getLocalBlobUrl(url);
+                    blobUrl = global.E2EAttachments?.encryptedUrl(url) ? await global.E2EAttachments.load(url) : await global.ResourceLoader.getLocalBlobUrl(url);
                     if (blobUrl) {
                         registerUrlPair(url, blobUrl);
                     }

@@ -278,7 +278,7 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
             const sharedContent = result.data.content || fileContent || '';
             file.content = sharedContent;
             file.lastModified = Date.now();
-            localStorage.setItem('vditor_files', JSON.stringify(g('files')));
+            localStorage.setItem('vditor_files', window.e2eSerializeFiles ? window.e2eSerializeFiles(g('files')) : JSON.stringify(g('files')));
             setEditorContentForFile(file.id, sharedContent);
 
             if (typeof global.activateSharedDocumentSession === 'function') {
@@ -523,7 +523,7 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
             void localHandleStore.remove(file.id).catch(() => {});
             file.isSynced = false; file.contentLoaded = true;
             markPendingServerSync(file.id, !!g('currentUser'));
-            localStorage.setItem('vditor_files', JSON.stringify(g('files')));
+            localStorage.setItem('vditor_files', window.e2eSerializeFiles ? window.e2eSerializeFiles(g('files')) : JSON.stringify(g('files')));
             hooks.loadFiles();
             if (g('currentUser')) void global.syncFileToServer(file.id, { background: true }).catch(() => {});
             return true;
@@ -573,7 +573,7 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
                 }
                 if (interactive) {
                     document.getElementById(file.id + '_anchor')?.setAttribute('data-local-access', 'ready');
-                    localStorage.setItem('vditor_files', JSON.stringify(g('files')));
+                    localStorage.setItem('vditor_files', window.e2eSerializeFiles ? window.e2eSerializeFiles(g('files')) : JSON.stringify(g('files')));
                 }
                 return true;
             } catch (e) { error = e; }
@@ -581,7 +581,7 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
         file.localAccessState = 'failed';
         document.getElementById(file.id + '_anchor')?.setAttribute('data-local-access', 'failed');
         if (!interactive) return false;
-        localStorage.setItem('vditor_files', JSON.stringify(g('files')));
+        localStorage.setItem('vditor_files', window.e2eSerializeFiles ? window.e2eSerializeFiles(g('files')) : JSON.stringify(g('files')));
         return offerLocalFileConversion(file, error);
     }
 
@@ -602,12 +602,12 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
                 localExternalSnapshotMap.set(file.id, content);
                 file.localAccessState = file.localFileMode === 'browser-file' ? 'copy' : 'ready';
                 file.localPendingWrite = false;
-                if (g('files').includes(file)) localStorage.setItem('vditor_files', JSON.stringify(g('files')));
+                if (g('files').includes(file)) localStorage.setItem('vditor_files', window.e2eSerializeFiles ? window.e2eSerializeFiles(g('files')) : JSON.stringify(g('files')));
                 return { success: true };
             } catch (e) { error = e; }
         }
         file.localAccessState = 'failed';
-        localStorage.setItem('vditor_files', JSON.stringify(g('files')));
+        localStorage.setItem('vditor_files', window.e2eSerializeFiles ? window.e2eSerializeFiles(g('files')) : JSON.stringify(g('files')));
         return { success: false, error: error?.message || String(error) };
     }
 
@@ -643,7 +643,7 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
         file.localSyncedContent = content;
         if (live !== current) {
             file.content = live; file.isSynced = false; g('unsavedChanges')[file.id] = true; markPendingServerSync(file.id, true);
-            localStorage.setItem('vditor_files', JSON.stringify(g('files')));
+            localStorage.setItem('vditor_files', window.e2eSerializeFiles ? window.e2eSerializeFiles(g('files')) : JSON.stringify(g('files')));
             return false;
         }
         file.content = content; file.contentLoaded = true; file.isSynced = true;
@@ -653,14 +653,14 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
         g('lastSyncedContent')[file.id] = content;
         markPendingServerSync(file.id, false);
         if (file.id === g('currentFileId')) setEditorContentForFile(file.id, content, { preserveCursor: true });
-        localStorage.setItem('vditor_files', JSON.stringify(g('files')));
+        localStorage.setItem('vditor_files', window.e2eSerializeFiles ? window.e2eSerializeFiles(g('files')) : JSON.stringify(g('files')));
         return true;
     }
 
     async function syncFileAfterSaveIfNeeded(currentFileId, file, content, isManual, contentChanged) {
         if (!g('currentUser')) {
             g('lastSyncedContent')[currentFileId] = content;
-            localStorage.setItem('vditor_files', JSON.stringify(g('files')));
+            localStorage.setItem('vditor_files', window.e2eSerializeFiles ? window.e2eSerializeFiles(g('files')) : JSON.stringify(g('files')));
             return true;
         }
 
@@ -674,7 +674,7 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
                 const live = getCurrentEditorContent(currentFileId, file.content);
                 if (live !== g('lastSyncedContent')[currentFileId] || (isExternalLocalFile(file) && !['ready', 'copy'].includes(file.localAccessState))) return false;
                 if (isExternalLocalFile(file)) { file.localSyncedContent = g('lastSyncedContent')[currentFileId]; file.localCloudUsername = g('currentUser')?.username; }
-                localStorage.setItem('vditor_files', JSON.stringify(g('files')));
+                localStorage.setItem('vditor_files', window.e2eSerializeFiles ? window.e2eSerializeFiles(g('files')) : JSON.stringify(g('files')));
                 markPendingServerSync(currentFileId, false);
                 return true;
             }
@@ -737,7 +737,7 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
             if (useExternal) {
                 file.content = latestExternalContent;
                 file.lastModified = Date.now();
-                localStorage.setItem('vditor_files', JSON.stringify(files));
+                localStorage.setItem('vditor_files', window.e2eSerializeFiles ? window.e2eSerializeFiles(files) : JSON.stringify(files));
                 setEditorContentForFile(currentFileId, latestExternalContent);
                 g('unsavedChanges')[currentFileId] = false;
                 localExternalSnapshotMap.set(currentFileId, latestExternalContent);
@@ -869,7 +869,7 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
         }
         localExternalSnapshotMap.set(target.id, target.content || '');
 
-        localStorage.setItem('vditor_files', JSON.stringify(files));
+        localStorage.setItem('vditor_files', window.e2eSerializeFiles ? window.e2eSerializeFiles(files) : JSON.stringify(files));
         if (g('lastSyncedContent')[target.id] === undefined) g('lastSyncedContent')[target.id] = '';
         if (g('unsavedChanges')[target.id] === undefined) g('unsavedChanges')[target.id] = false;
         hooks.loadFiles();
@@ -975,7 +975,7 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
         const lastSyncedContent = g('lastSyncedContent') || {};
         lastSyncedContent[file.id] = content;
         global.lastSyncedContent = lastSyncedContent;
-        localStorage.setItem('vditor_files', JSON.stringify(g('files')));
+        localStorage.setItem('vditor_files', window.e2eSerializeFiles ? window.e2eSerializeFiles(g('files')) : JSON.stringify(g('files')));
         return content;
     }
 
@@ -993,6 +993,7 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
                 await global.ensureWasmTextEngineReady();
                 if (!isStillCurrentUser()) return;
             }
+            if (window.E2EVault) await window.E2EVault.ensureUnlocked();
             await refreshOwnerShareCache(true);
             if (!isStillCurrentUser()) return;
             var api = global.getApiBaseUrl ? global.getApiBaseUrl() : 'api';
@@ -1292,13 +1293,17 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
 
         if (fingerprintEl) {
             const user = window.currentUser;
-            if (!user || !user.password) {
+            let key = user?.password;
+            if (window.E2EVault?.state().config) {
+                try { key = window.E2EVault.secrets().master; } catch { key = ''; }
+            }
+            if (!key) {
                 fingerprintEl.textContent = t('e2eInfoFingerprintUnavailable')
                     || (isEn() ? 'Sign in to view your key fingerprint' : '请先登录以查看密钥指纹');
             } else {
                 fingerprintEl.textContent = '…';
                 const requestedAnchor = anchor;
-                computeKeyFingerprint(user.password).then(function(fp) {
+                computeKeyFingerprint(key).then(function(fp) {
                     if (e2eInfoPopoverOpenAnchor !== requestedAnchor) return;
                     fingerprintEl.textContent = fp || (isEn() ? 'Unavailable' : '不可用');
                 });
@@ -1651,7 +1656,7 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
         });
 
         if (hasLocalUpdate) {
-            localStorage.setItem('vditor_files', JSON.stringify(files));
+            localStorage.setItem('vditor_files', window.e2eSerializeFiles ? window.e2eSerializeFiles(files) : JSON.stringify(files));
             if (typeof global.loadFiles === 'function') {
                 global.loadFiles();
             }
@@ -1793,7 +1798,7 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
         }
 
         try {
-            localStorage.setItem('vditor_files', JSON.stringify(localFiles));
+            localStorage.setItem('vditor_files', window.e2eSerializeFiles ? window.e2eSerializeFiles(localFiles) : JSON.stringify(localFiles));
         } catch (e) {}
     }
 
@@ -1932,7 +1937,7 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
             global.currentFileId = null;
         }
         global.files = mergedFiles;
-        localStorage.setItem('vditor_files', JSON.stringify(global.files));
+        localStorage.setItem('vditor_files', window.e2eSerializeFiles ? window.e2eSerializeFiles(global.files) : JSON.stringify(global.files));
         mergedFiles.forEach(function(file) {
             if (!file || !file.id || isExternalLocalFile(file)) return;
             if (file.isSynced) {
