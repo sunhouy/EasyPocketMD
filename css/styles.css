@@ -1134,7 +1134,7 @@ body.mobile-fullscreen .editor-container {
     position: sticky;
     top: 0;
     z-index: 2;
-    padding: 0 42px 16px 0;
+    padding: 0 42px 16px;
     background: inherit;
     text-align: center;
 }

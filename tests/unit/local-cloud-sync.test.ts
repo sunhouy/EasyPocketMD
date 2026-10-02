@@ -152,3 +152,14 @@ test('background pulls update content without a success notification', async () 
     expect(file.content).toBe('new'); expect(app.showSyncStatus).not.toHaveBeenCalled();
     expect(rt.needsServerFileContentFetch(file)).toBe(false);
 });
+
+
+test('background sync does not prompt to unlock encrypted files', async () => {
+    const {app, api, file} = fixture(async () => ({success:true}));
+    file.e2e_enabled = 1;
+    app.E2EVault = {initialize: jest.fn(async()=>{}),state:()=>({config:{},unlocked:false})};
+    global.fetch = jest.fn();
+    expect(await api.syncFileToServer(file.id,{background:true})).toBe(false);
+    await app.reconcileRemoteFile(file,{content:'cipher',content_version:8,e2e_enabled:1});
+    expect(fetch).not.toHaveBeenCalled(); expect(file.content).toBe('edit'); expect(file.remoteContentVersion).toBe(8);
+});

@@ -67,3 +67,28 @@ test('falls back to IndexedDB if localStorage is full', async () => {
     try { expect(() => persistFile({ id: 'quota', content: 'offline' })).not.toThrow(); expect(saveFile).toHaveBeenCalledWith('epm-file:quota', expect.stringContaining('offline'), 'application/json'); }
     finally { spy.mockRestore(); delete (window as any).IndexedDBManager; }
 });
+
+
+test('encrypted files show the same lock glyph and remove it when encryption is disabled', () => {
+    document.body.innerHTML = '<a id="private_anchor">private</a><a id="public_anchor">public</a>';
+    const file = {id:'private',type:'file',e2e_enabled:1};
+    const app = {files:[file,{id:'public',type:'file',e2e_enabled:0}]};
+    refreshSyncIcons(app); refreshSyncIcons(app);
+    expect(document.querySelectorAll('.file-e2e-indicator')).toHaveLength(1);
+    expect(document.querySelector('#private_anchor .file-e2e-indicator i').className).toBe('fas fa-lock');
+    expect(document.querySelector('.file-e2e-indicator').getAttribute('title')).toContain('端到端加密');
+    file.e2e_enabled = 0; refreshSyncIcons(app);
+    expect(document.querySelector('.file-e2e-indicator')).toBeNull();
+});
+
+
+test('locked encrypted documents show only the lock and resume status after unlocking', () => {
+    document.body.innerHTML='<a id="private_anchor">private</a>';
+    let unlocked = false;
+    const app={files:[{id:'private',type:'file',e2e_enabled:1,syncBusy:true}],E2EVault:{state:()=>({config:{},loaded:true,unlocked})}};
+    refreshSyncIcons(app);
+    expect(document.querySelector('.file-sync-icon').hidden).toBe(true);
+    expect(document.querySelector('.file-e2e-indicator')).not.toBeNull();
+    unlocked = true; refreshSyncIcons(app);
+    expect(document.querySelector('.file-sync-icon').hidden).toBe(false);
+});
