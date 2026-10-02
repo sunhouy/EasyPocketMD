@@ -2673,17 +2673,16 @@ body.night-mode .long-file-preview {
 }
 
 @media (max-width: 768px) {
-    .history-modal {
-        width: 100vw !important;
-        height: calc(100vh - var(--safe-area-top, 0px)) !important;
-        max-height: calc(100vh - var(--safe-area-top, 0px)) !important;
-        border-radius: 0;
-        margin: 0;
+    #historyModalOverlay {
+        padding: var(--safe-area-top, 0px) 0 var(--safe-area-bottom, 0px);
     }
 
-    .history-list {
-        max-height: none;
-        height: 100%;
+    .history-modal {
+        width: 100vw !important;
+        height: 100% !important;
+        max-height: 100% !important;
+        border-radius: 0;
+        margin: 0;
     }
 }
 
@@ -2703,7 +2702,9 @@ body.night-mode .long-file-preview {
 }
 
 .history-list {
-    max-height: 450px;
+    flex: 1;
+    min-height: 0;
+    max-height: none;
     overflow-y: auto;
     margin: 0 15px;
     border: 1px solid #eee;
