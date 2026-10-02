@@ -455,12 +455,12 @@ class User {
             if (checkE2E) {
                 const [vaults] = await connection.execute('SELECT config_json, revision FROM e2e_vaults WHERE username = ? FOR UPDATE', [username]);
                 if (vaults[0] && JSON.parse(vaults[0].config_json).methods.login && (!e2ePatch || vaults[0].revision !== e2ePatch.revision)) {
-                    await connection.rollback(); return { code:409, message:'加密设置已变更，请重新解锁后重试' };
+                    await connection.rollback(); return { code:409, message_key:'e2eConfigConflict' };
                 }
             }
             if (e2ePatch) {
                 const [updated] = await connection.execute('UPDATE e2e_vaults SET config_json = ?, revision = revision + 1 WHERE username = ? AND revision = ?', [JSON.stringify(e2ePatch.config), username, e2ePatch.revision]);
-                if (!updated.affectedRows) { await connection.rollback(); return { code:409, message:'加密设置已变更，请重试' }; }
+                if (!updated.affectedRows) { await connection.rollback(); return { code:409, message_key:'e2eConfigConflict' }; }
             }
             // Update password
             const hashedPassword = await this.encryptPassword(newPassword);
@@ -491,7 +491,6 @@ class User {
 
             const userId = userRows[0].id;
             if (cleanupE2E) {
-                await connection.execute('DELETE FROM e2e_pairings WHERE username = ?', [username]);
                 await connection.execute('DELETE FROM e2e_vaults WHERE username = ?', [username]);
             }
 

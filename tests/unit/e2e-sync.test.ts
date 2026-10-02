@@ -1,6 +1,8 @@
 /** @jest-environment jsdom */
 // @ts-nocheck
 export {};
+require('../../js/translations');
+window.i18n.setLanguage('zh');
 let mockCallbacks;
 jest.mock('../../js/files/websocket-sync', () => ({
     createWebSocketClient: callbacks => {

@@ -1,6 +1,7 @@
+import { e2eError } from './e2e-i18n';
 /** Client-only key management. The server receives authenticated wrapped keys only. */
 export type Box = { salt: string; iv: string; data: string; credentialId?: string; prfSalt?: string };
-export type VaultConfig = { version: 2; ttlSeconds: number; otp: boolean; check: Box; methods: { login?: Box; dedicated?: Box; passkey?: Box } };
+export type VaultConfig = { version: 2; ttlSeconds: number; check: Box; methods: { login?: Box; dedicated?: Box; passkey?: Box } };
 export type KeyMaterial = { master: string; legacy: string };
 const utf8 = new TextEncoder();
 function protectedAccounts(): string[] { try { return JSON.parse(localStorage.getItem('epmd_e2e_accounts') || '[]'); } catch { return []; } }
@@ -54,11 +55,11 @@ export function setUI(unlock: () => Promise<void>, lock: () => void) { unlockUI 
 function user(): any { return typeof window !== 'undefined' ? window.currentUser : null; }
 export async function request(path: string, body: Record<string, unknown> = {}) {
     const u = user();
-    if (!u?.token) throw new Error('请先登录');
+    if (!u?.token) throw e2eError('e2eLoginRequired');
     const response = await fetch((window.getApiBaseUrl?.() || 'api') + '/e2e/' + path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...body, username: u.username, token: u.token }) });
     const result = await response.json();
-    if (user()?.username !== u.username) throw new Error('账号已切换，请重试');
-    if (!response.ok || result.code !== 200) throw new Error(result.message || '加密服务请求失败');
+    if (user()?.username !== u.username) throw e2eError('e2eAccountChangedRetry');
+    if (!response.ok || result.code !== 200) throw e2eError(result.message_key || (result.code === 409 ? 'e2eConfigConflict' : result.code === 401 ? 'e2eLoginRequired' : 'e2eServiceFailed'));
     return result.data;
 }
 export function state() { return { config, revision, loaded, unlocked: !!material && Date.now() < expiresAt, expiresAt, owner }; }
@@ -78,9 +79,9 @@ export async function initialize() {
     if (!loading) {
         const currentGeneration = generation;
         loading = request('config').then(data => {
-            if (currentGeneration !== generation) throw new Error('账号已切换');
-            if (!data || !('config' in data)) throw new Error('无效的加密配置响应');
-            config = data.config; revision = data.revision; loaded = true;
+            if (currentGeneration !== generation) throw e2eError('e2eAccountChanged');
+            if (!data || !('config' in data)) throw e2eError('e2eConfigResponseInvalid');
+            config = data.config ? { version: data.config.version, ttlSeconds: data.config.ttlSeconds, methods: data.config.methods, check: data.config.check } : null; revision = data.revision; loaded = true;
             if (config) protectSavedPassword();
         }).finally(() => { if (currentGeneration === generation) loading = null; });
     }
@@ -91,26 +92,26 @@ export async function ensureUnlocked() {
     if (!config) return;
     if (material && Date.now() < expiresAt) return;
     if (material) lock();
-    if (!unlockUI) throw new Error('请先解锁端到端加密');
+    if (!unlockUI) throw e2eError('e2eUnlockRequired');
     if (!unlocking) unlocking = unlockUI().finally(() => { unlocking = null; });
     await unlocking;
-    if (!material || Date.now() >= expiresAt) throw new Error('端到端加密尚未解锁');
+    if (!material || Date.now() >= expiresAt) throw e2eError('e2eNotUnlocked');
 }
 export function secrets(): KeyMaterial {
-    if (owner !== user()?.username || !loaded) throw new Error('加密配置尚未载入');
+    if (owner !== user()?.username || !loaded) throw e2eError('e2eConfigNotLoaded');
     if (!config) return null;
-    if (!material || (!sealing && Date.now() >= expiresAt)) throw new Error('加密会话已过期，请重新解锁');
+    if (!material || (!sealing && Date.now() >= expiresAt)) throw e2eError('e2eSessionExpired');
     return material;
 }
 function validateMaterial(value: any): KeyMaterial {
-    if (!value || !/^[A-Za-z0-9+/=]{44}$/.test(value.master) || unbase64(value.master).length !== 32 || typeof value.legacy !== 'string' || value.legacy.length > 128) throw new Error('密钥格式错误');
+    if (!value || !/^[A-Za-z0-9+/=]{44}$/.test(value.master) || unbase64(value.master).length !== 32 || typeof value.legacy !== 'string' || value.legacy.length > 128) throw e2eError('e2eKeyInvalid');
     return { master: value.master, legacy: value.legacy };
 }
 async function accept(value: KeyMaterial) {
     value = validateMaterial(value);
     const activeOwner = owner, activeGeneration = generation;
     const check = await unwrap(config.check, unbase64(value.master));
-    if (check !== 'EasyPocketMD vault v2' || owner !== activeOwner || generation !== activeGeneration || owner !== user()?.username) throw new Error('密钥校验失败');
+    if (check !== 'EasyPocketMD vault v2' || owner !== activeOwner || generation !== activeGeneration || owner !== user()?.username) throw e2eError('e2eKeyCheckFailed');
     material = value; expiresAt = Date.now() + config.ttlSeconds * 1000;
     clearTimeout(timer); timer = setTimeout(lock, config.ttlSeconds * 1000);
     window.dispatchEvent(new Event('e2e-unlocked'));
@@ -122,90 +123,61 @@ export function lock() {
     window.dispatchEvent(new Event('e2e-locked'));
 }
 export async function unlockPassword(method: 'login' | 'dedicated', password: string) {
-    if (!password || !config?.methods[method]) throw new Error('此解锁方式未启用');
+    if (!password || !config?.methods[method]) throw e2eError('e2eMethodDisabled');
     try { await accept(JSON.parse(await unwrap(config.methods[method], password))); }
-    catch { throw new Error('密码错误或密钥校验失败'); }
+    catch { throw e2eError('e2ePasswordIncorrect'); }
 }
 async function prf(credentialId: string, prfSalt: string) {
     const credential = await navigator.credentials.get({ publicKey: { challenge: random(32), allowCredentials: [{ type: 'public-key', id: unbase64(credentialId) }], userVerification: 'required', extensions: { prf: { eval: { first: unbase64(prfSalt) } } } as any } }) as PublicKeyCredential;
     const result = (credential?.getClientExtensionResults() as any)?.prf?.results?.first;
-    if (!result || result.byteLength !== 32) throw new Error('此通行密钥或浏览器不支持 PRF 加密，请使用其他方式');
+    if (!result || result.byteLength !== 32) throw e2eError('e2ePrfUnsupported');
     return new Uint8Array(result) as Uint8Array<ArrayBuffer>;
 }
 export async function unlockPasskey() {
     const box = config?.methods.passkey;
-    if (!box) throw new Error('通行密钥未启用');
+    if (!box) throw e2eError('e2ePasskeyDisabled');
     await accept(JSON.parse(await unwrap(box, await prf(box.credentialId, box.prfSalt))));
 }
 export async function registerPasskey(value: KeyMaterial): Promise<Box> {
-    if (!window.isSecureContext || !navigator.credentials) throw new Error('通行密钥需要 HTTPS 和支持 PRF 的浏览器');
+    if (!window.isSecureContext || !navigator.credentials) throw e2eError('e2ePasskeySecureRequired');
     const salt = base64(random(32));
     const credential = await navigator.credentials.create({ publicKey: { challenge: random(32), rp: { name: 'EasyPocketMD' }, user: { id: await digest(utf8.encode(user().username)), name: user().username, displayName: user().username }, pubKeyCredParams: [{ type: 'public-key', alg: -7 }, { type: 'public-key', alg: -257 }], authenticatorSelection: { residentKey: 'required', userVerification: 'required' }, extensions: { prf: {} } as any } }) as PublicKeyCredential;
-    if (!credential) throw new Error('通行密钥创建已取消');
+    if (!credential) throw e2eError('e2ePasskeyCanceled');
     const credentialId = base64(credential.rawId);
     const secret = await prf(credentialId, salt);
     return { ...await wrap(JSON.stringify(value), secret), credentialId, prfSalt: salt };
 }
-export async function saveSettings(options: { login: boolean; dedicated: boolean; password: string; passkey: boolean; otp: boolean; ttlSeconds: number }, newPasskey?: Box) {
+export async function saveSettings(options: { login: boolean; dedicated: boolean; password: string; loginPassword?: string; passkey: boolean; ttlSeconds: number }, newPasskey?: Box) {
     await ensureUnlocked();
-    if (![60,300,900,1800,3600,14400,86400].includes(options.ttlSeconds)) throw new Error('无效的自动锁定时间');
-    if (!options.login && !options.dedicated && !options.passkey) throw new Error('至少保留一种独立解锁方式；OTP 需要已解锁设备');
+    if (![60,300,900,1800,3600,14400,86400].includes(options.ttlSeconds)) throw e2eError('e2eTtlInvalid');
+    if (!options.login && !options.dedicated && !options.passkey) throw e2eError('e2eMethodRequired');
     const activeOwner = owner, activeGeneration = generation;
     const value = material || { master: base64(random(32)), legacy: user()?.password || '' };
-    if (!material && !value.legacy) throw new Error('首次设置需要登录密码，以兼容已有加密文件');
+    if (!material && !value.legacy) throw e2eError('e2eInitialPasswordRequired');
     const methods: VaultConfig['methods'] = {};
     if (options.login) {
         // Reuse a current wrapper unless the user explicitly supplies a password.
-        if (config?.methods.login) methods.login = config.methods.login;
-        else { const password = options.password && !options.dedicated ? options.password : user()?.password; if (!password) throw new Error('缺少登录密码'); methods.login = await wrap(JSON.stringify(value), password); }
+        if (options.loginPassword) {
+            const response = await fetch((window.getApiBaseUrl?.() || 'api') + '/auth/login', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({username:owner,password:options.loginPassword}) });
+            const result = await response.json();
+            if (!response.ok || result.code !== 200) throw e2eError('e2ePasswordIncorrect');
+            methods.login = await wrap(JSON.stringify(value), options.loginPassword);
+        } else if (config?.methods.login) methods.login = config.methods.login;
+        else { const password = user()?.password; if (!password) throw e2eError('e2eLoginPasswordMissing'); methods.login = await wrap(JSON.stringify(value), password); }
     }
     if (options.dedicated) {
-        if (options.password) { if (options.password.length < 12) throw new Error('专用密码至少需要 12 个字符'); methods.dedicated = await wrap(JSON.stringify(value), options.password); }
+        if (options.password) { if (options.password.length < 12) throw e2eError('e2eDedicatedTooShort'); methods.dedicated = await wrap(JSON.stringify(value), options.password); }
         else if (config?.methods.dedicated) methods.dedicated = config.methods.dedicated;
-        else throw new Error('请输入专用密码');
+        else throw e2eError('e2eDedicatedRequired');
     }
     if (options.passkey) methods.passkey = newPasskey || config?.methods.passkey || await registerPasskey(value);
-    const nextConfig: VaultConfig = { version: 2, ttlSeconds: options.ttlSeconds, otp: options.otp, methods, check: config?.check || await wrap('EasyPocketMD vault v2', unbase64(value.master)) };
-    if (owner !== activeOwner || generation !== activeGeneration || owner !== user()?.username) throw new Error('账号已切换');
+    const nextConfig: VaultConfig = { version: 2, ttlSeconds: options.ttlSeconds, methods, check: config?.check || await wrap('EasyPocketMD vault v2', unbase64(value.master)) };
+    if (owner !== activeOwner || generation !== activeGeneration || owner !== user()?.username) throw e2eError('e2eAccountChanged');
     const data = await request('config/save', { config: nextConfig, revision });
-    if (owner !== activeOwner || generation !== activeGeneration) throw new Error('账号已切换');
+    if (owner !== activeOwner || generation !== activeGeneration) throw e2eError('e2eAccountChanged');
     config = nextConfig; revision = data.revision; protectSavedPassword();
     await accept(value);
 }
-export async function beginPairing() {
-    await initialize();
-    if (!config?.otp) throw new Error('OTP 未启用');
-    const keys = await crypto.subtle.generateKey({ name: 'RSA-OAEP', modulusLength: 3072, publicExponent: new Uint8Array([1,0,1]), hash: 'SHA-256' }, true, ['encrypt','decrypt']);
-    const publicKey = base64(await crypto.subtle.exportKey('spki', keys.publicKey));
-    const data = await request('pair/create', { publicKey });
-    return { ...data, privateKey: keys.privateKey, fingerprint: await fingerprint(publicKey) };
-}
-export async function fingerprint(publicKey: string) {
-    // Full SHA-256, grouped for visual comparison; never trust a relay-supplied fingerprint.
-    return Array.from(await digest(unbase64(publicKey)), b => b.toString(16).padStart(2,'0')).join('').match(/.{1,8}/g).join(' ');
-}
-export async function findPairing(code: string) {
-    await ensureUnlocked();
-    if (!config?.otp) throw new Error('OTP 未启用');
-    const data = await request('pair/find', { code });
-    return { ...data, fingerprint: await fingerprint(data.publicKey) };
-}
-export async function approvePairing(pair: { id: string; publicKey: string }) {
-    await ensureUnlocked();
-    if (!config?.otp) throw new Error('OTP 未启用');
-    const value = secrets(), activeOwner = owner, activeGeneration = generation;
-    const key = await crypto.subtle.importKey('spki', unbase64(pair.publicKey), { name: 'RSA-OAEP', hash: 'SHA-256' }, false, ['encrypt']);
-    const ciphertext = await crypto.subtle.encrypt({ name: 'RSA-OAEP', label: utf8.encode(pair.id) }, key, utf8.encode(JSON.stringify(value)));
-    if (owner !== activeOwner || generation !== activeGeneration || owner !== user()?.username) throw new Error('账号已切换');
-    await request('pair/approve', { id: pair.id, ciphertext: base64(ciphertext) });
-}
-export async function consumePairing(pair: { id: string; secret: string; privateKey: CryptoKey }) {
-    const data = await request('pair/consume', { id: pair.id, secret: pair.secret });
-    if (!data.ciphertext) return false;
-    const raw = await crypto.subtle.decrypt({ name: 'RSA-OAEP', label: utf8.encode(pair.id) }, pair.privateKey, unbase64(data.ciphertext));
-    await accept(JSON.parse(new TextDecoder().decode(raw))); return true;
-}
-
 export async function preparePasswordChange(currentPassword: string, newPassword: string) {
     await initialize();
     if (!config?.methods.login) return null;

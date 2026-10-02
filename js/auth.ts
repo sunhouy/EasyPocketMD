@@ -472,7 +472,7 @@
                     document.getElementById('newPassword').value = '';
                     document.getElementById('confirmNewPassword').value = '';
                 } else {
-                    message.textContent = result.message || t('passwordChangedFailed');
+                    message.textContent = result.message_key ? t(result.message_key) : result.message || t('passwordChangedFailed');
                     message.className = 'modal-message error';
                 }
             }
@@ -567,7 +567,7 @@
                 showLoginModal();
             } else {
                 if (message) {
-                    message.textContent = result.message || t('deleteAccountFailed');
+                    message.textContent = result.message_key ? t(result.message_key) : result.message || t('deleteAccountFailed');
                     message.className = 'modal-message error';
                 }
             }
@@ -1720,7 +1720,7 @@
             e2eCheckbox.addEventListener('change', async function() {
                 if (!global.currentUser || !global.currentUser.token) {
                     this.checked = false;
-                    global.showMessage('请先登录以设置默认端到端加密', 'error');
+                    global.showMessage(t('e2eLoginRequired'), 'error');
                     return;
                 }
                 
@@ -1729,7 +1729,7 @@
                 this.disabled = true;
                 
                 if (isEnabled && !global.currentUser.password && !window.E2EVault?.state().config) {
-                    global.showMessage('需要登录密码作为默认加密密钥，请重新登录', 'error');
+                    global.showMessage(t('e2eLoginPasswordMissing'), 'error');
                     this.checked = false;
                     this.disabled = false;
                     return;
@@ -1752,14 +1752,14 @@
                     if (result.code === 200) {
                         global.currentUser.e2e_enabled = isEnabled ? 1 : 0;
                         localStorage.setItem('vditor_user', window.e2eSerializeUser ? window.e2eSerializeUser(global.currentUser) : JSON.stringify(global.currentUser));
-                        global.showMessage(isEnabled ? '默认端到端加密已开启' : '默认端到端加密已关闭', 'success');
+                        global.showMessage(t(isEnabled ? 'e2eDefaultEnabled' : 'e2eDefaultDisabled'), 'success');
                     } else {
                         throw new Error(result.message);
                     }
                 } catch(e) {
                     if (global.currentUser !== user) return;
                     this.checked = !isEnabled;
-                    global.showMessage('设置默认端到端加密失败: ' + e.message, 'error');
+                    global.showMessage(t('e2eDefaultFailed'), 'error');
                 } finally {
                     this.disabled = false;
                 }
