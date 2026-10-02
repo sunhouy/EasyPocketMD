@@ -50,7 +50,7 @@ describe('E2E save representations', () => {
             const cipher = await e2e.encrypt('remote plaintext', 'secret');
             await mockCallbacks.onFileUpdated({ filename: 'note.md', content: cipher, e2e_enabled: 1 });
             expect(file.content).toBe('remote plaintext');
-            expect(JSON.parse(localStorage.getItem('vditor_files'))[0].content).toBe('remote plaintext');
+            expect(JSON.parse(localStorage.getItem('epm-file:note'))[0].content).toBe('remote plaintext');
         } finally { api.stopAutoSync(); }
     });
     it('retains edits made after an encrypted websocket save', async () => {
@@ -97,16 +97,15 @@ describe('initial upload of encrypted local drafts', () => {
         const { installSyncRuntime } = require('../../js/files/sync-runtime');
         const { app, file } = fixture(); app.currentFileId = null; file.isSynced = false;
         file.content = await e2e.encrypt('# 正文', 'secret');
-        const rt = installSyncRuntime(app, {}, {}); const serverFiles = [];
+        const rt = installSyncRuntime(app, {}, {});
         global.fetch = jest.fn(async (_, options) => {
             const request = JSON.parse(options.body);
             expect(request.e2e_enabled).toBe(1);
             expect(await e2e.decrypt(request.content, 'secret')).toBe('# 正文');
             return { json: async () => ({ code: 200, data: { content_version: 1 } }) };
         });
-        await rt.uploadLocalOnlyFilesToServerIfNeeded([file], serverFiles);
+        await rt.syncRuntimeApi.syncFileToServer(file.id);
         expect(fetch).toHaveBeenCalledTimes(1);
-        expect(serverFiles[0].content).toBe('# 正文');
         expect(file.content).toBe('# 正文');
     });
     it('keeps a local encrypted draft unsynced when its key is unavailable', async () => {
@@ -114,7 +113,7 @@ describe('initial upload of encrypted local drafts', () => {
         const { app, file } = fixture(); app.currentFileId = null; file.isSynced = false; app.currentUser.password = '';
         const rt = installSyncRuntime(app, {}, {});
         global.fetch = jest.fn();
-        await rt.uploadLocalOnlyFilesToServerIfNeeded([file], []);
+        await rt.syncRuntimeApi.syncFileToServer(file.id);
         expect(fetch).not.toHaveBeenCalled(); expect(file.isSynced).toBe(false);
     });
 });

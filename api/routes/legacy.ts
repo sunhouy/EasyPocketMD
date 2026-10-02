@@ -75,7 +75,7 @@ router.all('/index.php', upload.any(), async (req, res) => {
                     base_hash: data.base_hash,
                     base_content_version: data.base_content_version,
                     base_content: data.base_content
-                });
+                }, { e2e_enabled: data.e2e_enabled, conflict_strategy: data.conflict_strategy === 'strict' ? 'strict' : undefined });
                 if (saveResult && saveResult.code === 409) {
                     res.status(409).json(saveResult);
                     break;

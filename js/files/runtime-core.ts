@@ -2,6 +2,8 @@
  * 文件管理 - 加载、保存、同步、历史版本、文件夹
  */
 // @ts-nocheck
+import { AutoSaveScheduler } from './autoSave';
+import { persistFile, restoreFiles, restoreFileFromDB, refreshSyncIcons } from './sync/local-state';
 import { saveAfterDialogOpens } from '../ui/dialog-save';
 import {
     computeDiff as computeDiffCore,
@@ -129,20 +131,15 @@ import { createDiffFileWriter } from './conflict/live-files';
     const getServerDeletedEditingMessage = syncRt.getServerDeletedEditingMessage;
     const markOpenFileDeletedOnServer = syncRt.markOpenFileDeletedOnServer;
     const pullServerUpdatesForCleanFiles = syncRt.pullServerUpdatesForCleanFiles;
-    const uploadLocalOnlyFilesToServerIfNeeded = syncRt.uploadLocalOnlyFilesToServerIfNeeded;
     const syncCurrentFileWithBeacon = syncRt.syncCurrentFileWithBeacon;
     const mergeFiles = syncRt.mergeFiles;
     const syncRuntimeApi = syncRt.syncRuntimeApi;
     const setExternalLocalSnapshot = syncRt.setExternalLocalSnapshot;
 
-    const AUTO_SAVE_DEBOUNCE_MS = 500;
+    const AUTO_SAVE_DEBOUNCE_MS = 1000;
     const AUTO_SAVE_FORCE_MS = 5000;
 
     let fileOpenRequestToken = 0;
-    let autoSaveDebounceTimer = null;
-    let autoSaveForceTimer = null;
-    let autoSaveInFlight = false;
-    let autoSaveScheduleToken = 0;
     let restoreSyncScheduleToken = 0;
 
     let pageCloseGuardsInstalled = false;
@@ -919,6 +916,7 @@ import { createDiffFileWriter } from './conflict/live-files';
     function loadLocalFiles() {
         if (deferFileTreeWorkUntilWasmReady(loadLocalFiles, 'loadLocalFiles')) return;
         const localFiles = JSON.parse(localStorage.getItem('vditor_files') || '[]');
+        restoreFiles(localFiles);
         const pendingServerSync = g('pendingServerSync') || {};
         const unsavedChanges = g('unsavedChanges') || {};
         global.pendingServerSync = pendingServerSync;
@@ -935,6 +933,8 @@ import { createDiffFileWriter } from './conflict/live-files';
                 }
             }
             normalizeExternalLocalFileRecord(f);
+            if (typeof f.crdtBaseContent === 'string') global.lastSyncedContent[f.id] = f.crdtBaseContent;
+            if (f.isSynced === false) { pendingServerSync[f.id] = true; unsavedChanges[f.id] = true; }
         });
         syncCurrentEditorSnapshotIntoFiles(localFiles);
         if (localFiles.length === 0) {
@@ -1260,6 +1260,7 @@ import { createDiffFileWriter } from './conflict/live-files';
             inst.toggle_node(node);
         }
 
+        window.$('#fileList').off('.sync-icons').on('ready.jstree.sync-icons redraw.jstree.sync-icons open_node.jstree.sync-icons', () => refreshSyncIcons(global));
         const tree = window.$('#fileList').jstree({
             'core': {
                 'check_callback': true, // 允许所有操作
@@ -2526,9 +2527,17 @@ import { createDiffFileWriter } from './conflict/live-files';
         }
 
         try {
-            // 先保存当前文档
-            if (typeof global.saveCurrentFile === 'function' && g('currentFileId')) {
-                await global.saveCurrentFile(false);
+            // Capture locally before switching. Network work must not block the selected file.
+            const previousId = g('currentFileId');
+            const previous = (g('files') || []).find(f => f.id === previousId);
+            if (previous && isCurrentFileDirty(previousId)) {
+                previous.content = getCurrentEditorContent(previousId, previous.content);
+                previous.lastModified = Date.now(); previous.isSynced = false;
+                if (isExternalLocalFile(previous)) previous.localPendingWrite = true;
+                persistFile(previous, window.e2eSerializeFiles);
+                markPendingServerSync(previousId, true);
+                if (global.sharedDocState?.ownerFileId === previousId && global.sharedDocState.canEdit) void global.scheduleSharedDocSync?.({ manualSave: true });
+                else setTimeout(() => global.syncFileToServer(previousId, { background: true }), 0);
             }
 
             if (requestToken !== fileOpenRequestToken) return;
@@ -2541,8 +2550,10 @@ import { createDiffFileWriter } from './conflict/live-files';
                 g('customAlert')(isEn() ? 'Cannot open folder' : '无法打开文件夹');
                 return;
             }
+            await restoreFileFromDB(file, global.IndexedDBManager);
             if (isExternalLocalFile(file) && !await ensureExternalLocalAccess(file, true)) return;
             if (requestToken !== fileOpenRequestToken) return;
+            if (global.sharedDocState?.ownerFileId && global.sharedDocState.ownerFileId !== fileId) global.deactivateSharedDocumentSession?.();
             global.currentFileId = fileId;
             refreshE2EUi();
 
@@ -2550,7 +2561,7 @@ import { createDiffFileWriter } from './conflict/live-files';
             localStorage.setItem('vditor_last_opened_file', fileId);
 
             let content = file.content;
-            if (needsServerFileContentFetch(file)) {
+            if (needsServerFileContentFetch(file) && !(typeof content === 'string' && content.length > 0)) {
                 try {
                     content = await fetchServerFileContent(file);
                 } catch (e) {
@@ -2599,11 +2610,12 @@ import { createDiffFileWriter } from './conflict/live-files';
                 setEditorContentForFile(fileId, content);
             }
 
-            await activateOwnerSharedSession(file, content);
-            if (requestToken !== fileOpenRequestToken) return;
-
-            await checkExternalLocalConflictForCurrentFile();
-            if (requestToken !== fileOpenRequestToken) return;
+            setTimeout(() => {
+                if (requestToken !== fileOpenRequestToken) return;
+                void activateOwnerSharedSession(file, content).catch(console.warn);
+                void checkExternalLocalConflictForCurrentFile().catch(console.warn);
+                global.queueBackgroundFileSync?.(fileId);
+            }, 0);
 
             expandActiveFile();
             global.startAutoSave();
@@ -2784,9 +2796,6 @@ import { createDiffFileWriter } from './conflict/live-files';
             showSaveStatus('saving');
         }
 
-        if (g('currentUser')) {
-            scheduleWebSocketSync(currentFileId);
-        }
 
         // 在线共享文档由 share websocket/update 通道负责写入，避免 owner 普通保存覆盖实时协作状态。
         if (
@@ -3259,51 +3268,13 @@ import { createDiffFileWriter } from './conflict/live-files';
         }
     }
 
-    function startAutoSave() {
-        const currentFileId = g('currentFileId');
-        if (!currentFileId || !isCurrentFileDirty(currentFileId)) {
-            global.clearAutoSave();
-            return;
-        }
-
-        global.clearAutoSave();
-        const scheduleToken = ++autoSaveScheduleToken;
-        Promise.resolve(persistDraftBackup()).catch(function(error) {
-            console.warn('[Autosave] draft backup failed:', error);
-        });
-
-        global.autoSaveTimer = setTimeout(function() {
-            if (scheduleToken !== autoSaveScheduleToken) return;
-            if (g('currentFileId') !== currentFileId) return;
-            if (!isCurrentFileDirty(currentFileId) || autoSaveInFlight) return;
-            autoSaveInFlight = true;
-            Promise.resolve(global.saveCurrentFile(false)).catch(function(error) {
-                console.warn('自动保存失败:', error);
-            }).finally(function() {
-                autoSaveInFlight = false;
-            });
-        }, AUTO_SAVE_DEBOUNCE_MS);
-
-        global.autoSaveForceTimer = setTimeout(function() {
-            if (scheduleToken !== autoSaveScheduleToken) return;
-            if (g('currentFileId') !== currentFileId) return;
-            if (!isCurrentFileDirty(currentFileId) || autoSaveInFlight) return;
-            autoSaveInFlight = true;
-            Promise.resolve(global.saveCurrentFile(false)).catch(function(error) {
-                console.warn('强制自动保存失败:', error);
-            }).finally(function() {
-                autoSaveInFlight = false;
-                if (isCurrentFileDirty(currentFileId)) {
-                    startAutoSave();
-                }
-            });
-        }, AUTO_SAVE_FORCE_MS);
-    }
-
-    function clearAutoSave() {
-        if (global.autoSaveTimer) { clearTimeout(global.autoSaveTimer); global.autoSaveTimer = null; }
-        if (global.autoSaveForceTimer) { clearTimeout(global.autoSaveForceTimer); global.autoSaveForceTimer = null; }
-    }
+    const autoSaveScheduler = new AutoSaveScheduler({
+        current: () => g('currentFileId'), dirty: isCurrentFileDirty,
+        persist: persistDraftBackup, save: () => global.saveCurrentFile(false),
+        debounceMs: AUTO_SAVE_DEBOUNCE_MS, forceMs: AUTO_SAVE_FORCE_MS
+    });
+    function startAutoSave() { autoSaveScheduler.trigger(); }
+    function clearAutoSave() { autoSaveScheduler.clear(); }
 
     function startAutoSync() {
         return syncRuntimeApi.startAutoSync();

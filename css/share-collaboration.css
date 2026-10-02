@@ -22,3 +22,21 @@ body.night-mode .share-history-dialog { background: #242424; color: #eee; }
 .share-history-diff .diff-content, .share-history-diff td { overflow-wrap: anywhere; white-space: pre-wrap; }
 
 #vditor[data-shared-readonly="true"] .vditor-toolbar { pointer-events: none; }
+/* Vditor disables its inner surface with opacity .3; keep read-only text fully legible. */
+#vditor[data-shared-readonly="true"] .vditor-reset[contenteditable="false"],
+#vditor[data-shared-readonly="true"] .vditor-sv[contenteditable="false"] { opacity: 1 !important; cursor: text; }
+.file-sync-icon { border: 0; background: transparent; padding: 0 5px; color: inherit; font-size: 12px; cursor: pointer; }
+.file-sync-icon.synced { color: #52a467; }
+.file-sync-icon.conflict,.file-sync-icon.offline-dirty { color: #d98a32; }
+.file-sync-icon.offline { opacity: .65; }
+.file-local-label { font-size: 10px; padding: 1px 4px; border: 1px solid currentColor; border-radius: 3px; margin-left: 3px; }
+.sync-conflict-panel { position: fixed; inset: 0; z-index: 10050; background: var(--theme-bg, #fff); color: var(--theme-text, #222); display: flex; flex-direction: column; }
+body.night-mode .sync-conflict-panel { background: #202020; color: #eee; }
+.sync-conflict-panel header { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 8px; }
+.sync-conflict-panel .sync-conflict-content { flex: 1; min-height: 0; overflow: auto; }
+.sync-conflict-panel textarea { flex: 1; min-height: 0; width: 100%; box-sizing: border-box; }
+/* Skip off-screen paragraph layout without virtualizing or removing editable content. */
+#vditor .vditor-reset > :is(p, h1, h2, h3, h4, h5, h6) {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 48px;
+}

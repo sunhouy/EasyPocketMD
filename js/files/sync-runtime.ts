@@ -8,6 +8,7 @@
  *  - 取入 hooks 中由 runtime-core 提供的延迟回调（loadFiles/openFile 等），
  *    因为它们的定义仍位于 runtime-core 内部。
  */
+import { persistFile, restoreFiles, refreshSyncIcons, deviceId } from './sync/local-state';
 import {
     isExternalLocalFile as isExternalLocalFileCore,
     normalizeExternalLocalFileRecord as normalizeExternalLocalFileRecordCore,
@@ -161,10 +162,20 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
         if (!file) return false;
 
         const content = getCurrentEditorContent(currentFileId, file.content);
+        if (g('unsavedChanges')?.[file.id]) {
+            file.content = content; file.lastModified = Date.now(); file.isSynced = false;
+            if (isExternalLocalFile(file)) file.localPendingWrite = true;
+            if (typeof file.crdtBaseContent !== 'string' && typeof g('lastSyncedContent')?.[file.id] === 'string') {
+                file.crdtBaseContent = g('lastSyncedContent')[file.id]; file.crdtBaseContentVersion = file.contentVersion;
+            }
+            markPendingServerSync(file.id, true);
+            try { persistFile(file, window.e2eSerializeFiles); } catch (error) { console.warn('[Local journal]', error); }
+            refreshSyncIcons(global);
+        }
         const draft = {
             fileId: file.id,
             fileName: file.name,
-            content: String(content || ''),
+            content: window.e2eSerializeFiles ? JSON.parse(window.e2eSerializeFiles([file]))[0].content : String(content || ''),
             timestamp: Date.now(),
             lastModified: Date.now(),
             sessionId: global.appSessionId || '',
@@ -250,6 +261,7 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
     async function activateOwnerSharedSession(file, fileContent) {
         if (!file || !g('currentUser')) return false;
         const byFilename = await refreshOwnerShareCache(false);
+        if (file.id !== g('currentFileId')) return false;
         const shareMeta = byFilename[file.name];
         if (!shareMeta || !shareMeta.share_id) {
             if (typeof global.deactivateSharedDocumentSession === 'function') {
@@ -275,7 +287,8 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
                 return false;
             }
 
-            const sharedContent = result.data.content || fileContent || '';
+            if (file.id !== g('currentFileId') || g('unsavedChanges')?.[file.id]) return false;
+            const sharedContent = result.data.content ?? fileContent ?? '';
             file.content = sharedContent;
             file.lastModified = Date.now();
             localStorage.setItem('vditor_files', window.e2eSerializeFiles ? window.e2eSerializeFiles(g('files')) : JSON.stringify(g('files')));
@@ -516,7 +529,11 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
                 (!g('currentUser') ? (isEn() ? '\nSign in to sync the converted file.' : '\n转换后登录账号即可同步云端。') : '')
             );
             if (!accepted) return false;
-            file.isExternalLocal = false;
+            file.isExternalLocal = false; delete file.localOriginDeviceId;
+            if (g('currentUser')) {
+                const api = global.getApiBaseUrl ? global.getApiBaseUrl() : 'api';
+                void fetch(api + '/files/local-origin', { method: 'DELETE', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + g('currentUser').token }, body: JSON.stringify({ username: g('currentUser').username, filename: file.name }) }).catch(console.warn);
+            }
             delete file.localFilePath; delete file.localFileMode; delete file.localAccessState;
             delete file.localOriginalName; delete file.localCloudUsername; delete file.localSyncedContent; delete file.localPendingWrite;
             browserFileHandleMap.delete(file.id);
@@ -562,15 +579,6 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
                     delete file.localSyncedContent; g('lastSyncedContent')[file.id] = '';
                 }
                 if (content !== file.localSyncedContent) file.isSynced = false;
-                if (interactive && g('currentUser')?.username === file.localCloudUsername && content === file.localSyncedContent && !g('unsavedChanges')?.[file.id]) {
-                    const oldBase = g('lastSyncedContent')[file.id];
-                    try {
-                        const remote = { ...file };
-                        await fetchServerFileContent(remote);
-                        g('lastSyncedContent')[file.id] = oldBase;
-                        await applyExternalRemoteUpdate(file, remote);
-                    } catch (_) { g('lastSyncedContent')[file.id] = oldBase; }
-                }
                 if (interactive) {
                     document.getElementById(file.id + '_anchor')?.setAttribute('data-local-access', 'ready');
                     localStorage.setItem('vditor_files', window.e2eSerializeFiles ? window.e2eSerializeFiles(g('files')) : JSON.stringify(g('files')));
@@ -962,6 +970,7 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
         file.content = content;
         file.contentLoaded = true;
         file.contentFetchedAt = Date.now();
+        file.crdtBaseContent = content; file.crdtBaseContentVersion = Number(contentVersionRaw || 0);
         file.serverLastModified = serverLastModified;
         file.lastModified = serverLastModified || file.lastModified;
         if (contentVersionRaw !== undefined && contentVersionRaw !== null && contentVersionRaw !== '') {
@@ -973,9 +982,10 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
         }
 
         const lastSyncedContent = g('lastSyncedContent') || {};
-        lastSyncedContent[file.id] = content;
-        global.lastSyncedContent = lastSyncedContent;
-        localStorage.setItem('vditor_files', window.e2eSerializeFiles ? window.e2eSerializeFiles(g('files')) : JSON.stringify(g('files')));
+        if (g('files').includes(file)) {
+            lastSyncedContent[file.id] = content; global.lastSyncedContent = lastSyncedContent;
+            persistFile(file, window.e2eSerializeFiles);
+        }
         return content;
     }
 
@@ -986,7 +996,8 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
             return g('currentUser') && g('currentUser').username === requestUsername;
         }
 
-        setFileSwitchLoading(true, isEn() ? 'Loading files...' : '正在加载文件...');
+        if (new URLSearchParams(location.search).has('share_id')) return;
+        if (navigator.onLine === false) { hooks.loadLocalFiles(); return; }
 
         try {
             if (typeof global.ensureWasmTextEngineReady === 'function') {
@@ -994,7 +1005,7 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
                 if (!isStillCurrentUser()) return;
             }
             if (window.E2EVault) await window.E2EVault.ensureUnlocked();
-            await refreshOwnerShareCache(true);
+            void refreshOwnerShareCache(true).catch(console.warn);
             if (!isStillCurrentUser()) return;
             var api = global.getApiBaseUrl ? global.getApiBaseUrl() : 'api';
             const response = await fetch(api + '/files?username=' + encodeURIComponent(g('currentUser').username), {
@@ -1068,7 +1079,8 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
                     }
                 });
 
-                const localFiles = JSON.parse(localStorage.getItem('vditor_files') || '[]');
+                const localFiles = (g('files')?.length ? g('files').map(f => ({ ...f })) : JSON.parse(localStorage.getItem('vditor_files') || '[]'));
+                restoreFiles(localFiles);
                 const pendingServerSyncState = g('pendingServerSync') || {};
                 const unsavedChangesState = g('unsavedChanges') || {};
                 global.pendingServerSync = pendingServerSyncState;
@@ -1096,14 +1108,25 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
                 // Server list is the source of truth for previously-synced files:
                 // if a file existed on server before (local isSynced=true) but is missing from serverFiles now,
                 // it should be deleted locally on load (instead of being re-uploaded).
-                for (const local of localFiles.filter(isExternalLocalFile)) await ensureExternalLocalAccess(local, false);
+
                 pruneLocallySyncedFilesDeletedOnServer(localFiles, serverFiles);
 
-                await uploadLocalOnlyFilesToServerIfNeeded(localFiles, serverFiles);
+
                 if (!isStillCurrentUser()) return;
 
                 mergeFiles(localFiles, serverFiles);
                 hooks.loadFiles();
+                setTimeout(() => global.queueBackgroundFileSync?.(g('currentFileId')), 0);
+                void fetch(api + '/files/local-origins?username=' + encodeURIComponent(requestUsername), { headers: { Authorization: 'Bearer ' + g('currentUser').token } }).then(r => r.json()).then(result => {
+                    if (!isStillCurrentUser() || result.code !== 200 || !Array.isArray(result.data)) return;
+                    for (const origin of result.data) {
+                        const f = g('files').find(f => f.name === origin.filename); if (!f) continue;
+                        f.localOriginDeviceId = origin.device_id;
+                        if (!isExternalLocalFile(f)) { f.isExternalLocal = true; f.localFileMode = 'remote'; }
+                        persistFile(f, window.e2eSerializeFiles);
+                    }
+                    refreshSyncIcons(global);
+                }).catch(console.warn);
 
                 if (hooks.shouldAutoOpenInitialFile()) {
                     if (preserveFileName) {
@@ -1121,21 +1144,7 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
                     }
                 }
 
-                const pendingServerSync = g('pendingServerSync') || {};
-                const pendingFileIds = Object.keys(pendingServerSync).filter(id => pendingServerSync[id]);
-                if (pendingFileIds.length > 0) {
-                    setTimeout(() => {
-                        (async () => {
-                            for (const fileId of pendingFileIds) {
-                                try {
-                                    await global.syncFileToServer(fileId);
-                                } catch (e) {
-                                    console.warn('自动同步文件失败:', fileId, e);
-                                }
-                            }
-                        })();
-                    }, 1000);
-                }
+
             } else {
                 hooks.loadLocalFiles();
                 global.showSyncStatus(isEn() ? 'No files on server, using local files' : '服务器没有文件，使用本地文件', 'success');
@@ -1146,7 +1155,7 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
             global.showSyncStatus(isEn() ? 'Sync failed, using local files' : '同步失败，使用本地文件', 'error');
             hooks.loadLocalFiles();
         } finally {
-            setFileSwitchLoading(false);
+            refreshSyncIcons(global);
         }
     }
 
@@ -1539,7 +1548,7 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
         let hasLocalUpdate = false;
         const localByName = {};
         files.forEach(function(file) {
-            if (!file || !file.name || isExternalLocalFile(file)) return;
+            if (!file || !file.name) return;
             localByName[file.name] = file;
         });
 
@@ -1578,6 +1587,7 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
             const editorContent = file.id === currentFileId
                 ? getCurrentEditorContent(currentFileId, file.content)
                 : file.content;
+            if (pendingServerSync[file.id] || unsavedChanges[file.id] || file.isSynced === false) continue;
             if (String(file.id || '') === String(currentFileId || '') && file.type === 'file') {
                 // Keep consistent with initial load behavior: server deletion wins, remove locally.
                 if (file.id) {
@@ -1616,6 +1626,11 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
 
         files.forEach(function(file) {
             if (!file || file.type !== 'file') return;
+            const meta = serverMap[file.name];
+            if (meta && Number(meta.contentVersion) > Number(file.contentVersion || 0)) {
+                file.remoteContentVersion = Number(meta.contentVersion);
+                if (!isExternalLocalFile(file) && meta.contentLoaded !== false) void global.reconcileRemoteFile?.(file, meta).catch(console.warn);
+            }
             if (isExternalLocalFile(file)) return;
             if (pendingServerSync[file.id]) return;
 
@@ -1665,6 +1680,7 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
     }
 
     const syncRuntimeApi = createSyncRuntimeApi({
+        ensureExternalLocalAccess,
         globalRef: global,
         g,
         isExternalLocalFile,
@@ -1679,139 +1695,9 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
         isEn
     });
 
-    async function uploadLocalOnlyFilesToServerIfNeeded(localFiles, serverFiles) {
-        if (!g('currentUser')) return;
-        const uploadUser = g('currentUser');
-        function isStillUploadUser() {
-            return g('currentUser') && g('currentUser').username === uploadUser.username;
-        }
+    function syncCurrentFileWithBeacon() { return syncRuntimeApi.syncCurrentFileWithBeacon(); }
+    function setExternalLocalSnapshot(fileId, content) { localExternalSnapshotMap.set(fileId, content); }
 
-        const serverFileMap = {};
-        serverFiles.forEach(function(f) { serverFileMap[f.name] = f; });
-
-        const toUpload = localFiles.filter(function(f) {
-            if (!f || !f.name || f.e2eTransition) return false;
-            if (f.type !== 'file' && f.type !== 'folder') return false;
-            if (isExternalLocalFile(f) && !['ready', 'copy'].includes(f.localAccessState)) return false;
-            if (serverFileMap[f.name]) return false;
-            return !f.isSynced;
-        });
-
-        if (toUpload.length === 0) return;
-
-        for (let i = 0; i < toUpload.length; i++) {
-            if (!isStillUploadUser()) return;
-            const f = toUpload[i];
-            try {
-                const storedContent = f.content;
-                let content =
-                    f.type === 'folder'
-                        ? ''
-                        : (f.id === g('currentFileId') ? getCurrentEditorContent(f.id, f.content) : f.content);
-
-                const filenameToSend = f.type === 'folder' ? (f.name.endsWith('/') ? f.name : (f.name + '/')) : f.name;
-                const fileE2EEnabled = isFileE2EEnabled(f);
-                let contentToSend = '{"meta":"folder"}';
-                if (f.type !== 'folder') {
-                    const e2e = await import('../e2e');
-                    content = await e2e.resolveFileContent(content, uploadUser.password, fileE2EEnabled);
-                    if (f.content === storedContent) f.content = content;
-                    contentToSend = fileE2EEnabled ? await e2e.encrypt(content, uploadUser.password) : content;
-                }
-                if (!isStillUploadUser() || f.e2eTransition || fileE2EEnabled !== isFileE2EEnabled(f)) continue;
-                if (isExternalLocalFile(f) && !(await writeExternalLocalContent(f, content)).success) continue;
-                const body: any = {
-                    username: uploadUser.username,
-                    token: uploadUser.token,
-                    filename: filenameToSend,
-                    content: contentToSend,
-                    e2e_enabled: fileE2EEnabled ? 1 : 0,
-                    base_last_modified: f.serverLastModified || null
-                };
-
-                const contentVersion = Number(f.contentVersion || 0);
-                if (Number.isFinite(contentVersion) && contentVersion > 0) {
-                    body.base_content_version = contentVersion;
-                }
-
-                const api = global.getApiBaseUrl ? global.getApiBaseUrl() : 'api';
-                const resp = await fetch(api + '/files/save', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(body)
-                });
-                const r = global.parseJsonResponse ? await global.parseJsonResponse(resp) : await resp.json();
-
-                if (global.isTokenError && global.isTokenError(r)) {
-                    const handled = await global.handleTokenExpired();
-                    if (handled && isStillUploadUser()) {
-                        body.token = g('currentUser').token;
-                        const retryResp = await fetch(api + '/files/save', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(body)
-                        });
-                        const retryR = global.parseJsonResponse ? await global.parseJsonResponse(retryResp) : await retryResp.json();
-                        if (retryR.code === 200) {
-                            f.isSynced = true;
-                            if (isExternalLocalFile(f)) { f.localSyncedContent = content; f.localCloudUsername = uploadUser.username; }
-                            f.e2e_enabled = fileE2EEnabled ? 1 : 0;
-                            f.e2eEnabled = fileE2EEnabled;
-                            f.lastModified = Date.now();
-                            serverFiles.push({
-                                name: f.name,
-                                type: f.type,
-                                content: f.type === 'folder' ? '{"meta":"folder"}' : content,
-                                lastModified: f.lastModified,
-                                e2e_enabled: fileE2EEnabled ? 1 : 0,
-                                e2eEnabled: fileE2EEnabled
-                            });
-                        }
-                    }
-                    continue;
-                }
-
-                if (r.code === 200) {
-                    f.isSynced = true;
-                    if (isExternalLocalFile(f)) { f.localSyncedContent = content; f.localCloudUsername = uploadUser.username; }
-                    f.e2e_enabled = fileE2EEnabled ? 1 : 0;
-                    f.e2eEnabled = fileE2EEnabled;
-                    f.lastModified = Date.now();
-                    f.serverLastModified = r.data && r.data.last_modified ? r.data.last_modified : f.lastModified;
-                    f.contentVersion = Number(r.data && r.data.content_version ? r.data.content_version : (f.contentVersion || 1));
-                    serverFiles.push({
-                        name: f.name,
-                        type: f.type,
-                        content: f.type === 'folder' ? '{"meta":"folder"}' : content,
-                        lastModified: f.lastModified,
-                        serverLastModified: f.serverLastModified,
-                        contentVersion: f.contentVersion,
-                        e2e_enabled: fileE2EEnabled ? 1 : 0,
-                        e2eEnabled: fileE2EEnabled
-                    });
-                } else {
-                    console.warn('自动上传失败:', f.name, r.message);
-                }
-            } catch (e) {
-                console.warn('自动上传异常:', f.name, e);
-            }
-        }
-
-        try {
-            localStorage.setItem('vditor_files', window.e2eSerializeFiles ? window.e2eSerializeFiles(localFiles) : JSON.stringify(localFiles));
-        } catch (e) {}
-    }
-
-    function syncCurrentFileWithBeacon() {
-        return syncRuntimeApi.syncCurrentFileWithBeacon();
-    }
-
-    /** runtime-core 的 saveCurrentFile 在外部本地文件保存后需要同步刷新快照。 */
-    function setExternalLocalSnapshot(fileId, content) {
-        localExternalSnapshotMap.set(fileId, content);
-    }
-
-    // ---------- mergeFiles（属于服务器同步逻辑） ----------
     function mergeFiles(localFiles, serverFiles) {
         const mergedFiles = [];
         const fileMap = {};
@@ -1861,28 +1747,20 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
                 if (localFile.id) {
                     mergedServerFile.id = localFile.id;
                 }
-                const localBaseContent = localFile && localFile.id ? lastSyncedContent[localFile.id] : undefined;
+                const localBaseContent = localFile && localFile.id ? (localFile.crdtBaseContent ?? lastSyncedContent[localFile.id] ?? (localFile.isSynced ? localFile.content : undefined)) : undefined;
                 if (localFile.type === 'file' && mergedServerFile.type === 'file') {
                     const e2eChanged = isFileE2EEnabled(localFile) !== isFileE2EEnabled(mergedServerFile);
                     if (mergedServerFile.contentLoaded === false) {
-                        mergedServerFile.content = typeof localFile.content === 'string' ? localFile.content : '';
-                        const hasPendingLocalSync = !!pendingServerSync[localFile.id];
-                        const hasUnsavedLocalChanges = !!unsavedChanges[localFile.id] || localFile.isSynced === false;
-                        const shouldKeepLocalAsSourceOfTruth = hasPendingLocalSync || hasUnsavedLocalChanges;
-
-                        if (shouldKeepLocalAsSourceOfTruth) {
-                            mergedServerFile.contentLoaded = true;
-                            mergedServerFile.isSynced = false;
-                            markPendingServerSync(mergedServerFile.id, true);
-                            g('unsavedChanges')[mergedServerFile.id] = true;
-                        } else {
-                            mergedServerFile.contentLoaded = false;
-                            mergedServerFile.isSynced = true;
-                            markPendingServerSync(mergedServerFile.id, false);
-                            g('unsavedChanges')[mergedServerFile.id] = false;
+                        const remoteVersion = mergedServerFile.contentVersion;
+                        Object.assign(mergedServerFile, localFile);
+                        mergedServerFile.remoteContentVersion = remoteVersion;
+                        if (typeof localBaseContent === 'string') mergedServerFile.crdtBaseContent = localBaseContent;
+                        mergedServerFile.crdtBaseContentVersion = localFile.crdtBaseContentVersion ?? localFile.contentVersion;
+                        mergedServerFile.contentLoaded = localFile.contentLoaded !== false;
+                        if (Number(remoteVersion) > Number(localFile.contentVersion || 0)) mergedServerFile.remoteContentVersion = remoteVersion;
+                        if (pendingServerSync[localFile.id] || unsavedChanges[localFile.id] || localFile.isSynced === false) {
+                            mergedServerFile.isSynced = false; markPendingServerSync(localFile.id, true);
                         }
-                        delete mergedServerFile.crdtBaseContent;
-                        delete mergedServerFile.crdtBaseContentVersion;
                     } else if (localFile.content !== mergedServerFile.content || e2eChanged) {
                         const baseContent = typeof localBaseContent === 'string' ? localBaseContent : '';
                         const baseVersionRaw = Number(localFile.contentVersion);
@@ -2013,7 +1891,6 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
         getServerDeletedEditingMessage,
         markOpenFileDeletedOnServer,
         pullServerUpdatesForCleanFiles,
-        uploadLocalOnlyFilesToServerIfNeeded,
         syncCurrentFileWithBeacon,
         mergeFiles,
         syncRuntimeApi,
