@@ -20,6 +20,7 @@
             if (!draft || !draft.fileId || typeof draft.content !== 'string') {
                 return null;
             }
+            if (window.E2EVault?.state().config && window.e2eResolveFileContentSync) draft.content = (window.e2eResolveFileContentSync as any)(draft.content, global.currentUser?.password, true);
             return draft;
         } catch (error) {
             return null;
@@ -79,6 +80,8 @@
         }
 
         try {
+            const currentFile = getCurrentFileRecord();
+            if (window.E2EVault?.state().config && [true,1,'1','true'].includes((currentFile?.e2e_enabled ?? currentFile?.e2eEnabled) as any)) draft.content = (window.e2eEncryptSync as any)(draft.content, null);
             localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
             localStorage.setItem(DRAFT_META_KEY, JSON.stringify({
                 lastBackupTime: Date.now(),
@@ -256,7 +259,7 @@
 
             files[fileIndex].content = draft.content;
             files[fileIndex].lastModified = draft.timestamp || Date.now();
-            localStorage.setItem('vditor_files', JSON.stringify(files));
+            localStorage.setItem('vditor_files', window.e2eSerializeFiles ? window.e2eSerializeFiles(files) : JSON.stringify(files));
 
             if (global.unsavedChanges) {
                 global.unsavedChanges[files[fileIndex].id] = true;

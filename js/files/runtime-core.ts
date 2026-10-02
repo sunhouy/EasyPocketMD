@@ -889,7 +889,7 @@ import { createDiffFileWriter } from './conflict/live-files';
         for (let i = files.length - 1; i >= 0; i--) {
             if (deletedIdSet.has(String(files[i].id))) files.splice(i, 1);
         }
-        localStorage.setItem('vditor_files', JSON.stringify(files));
+        localStorage.setItem('vditor_files', window.e2eSerializeFiles ? window.e2eSerializeFiles(files) : JSON.stringify(files));
 
         if (g('currentUser')) {
             deletedFileNames.forEach(name => {
@@ -1026,7 +1026,7 @@ import { createDiffFileWriter } from './conflict/live-files';
         orderFile.lastModified = Date.now();
         orderFile.isSynced = false;
         
-        localStorage.setItem('vditor_files', JSON.stringify(files));
+        localStorage.setItem('vditor_files', window.e2eSerializeFiles ? window.e2eSerializeFiles(files) : JSON.stringify(files));
         
         if (g('currentUser')) {
             global.syncFileToServer(orderFile.id);
@@ -1110,7 +1110,7 @@ import { createDiffFileWriter } from './conflict/live-files';
         orderFile.lastModified = Date.now();
         orderFile.isSynced = false;
         
-        localStorage.setItem('vditor_files', JSON.stringify(files));
+        localStorage.setItem('vditor_files', window.e2eSerializeFiles ? window.e2eSerializeFiles(files) : JSON.stringify(files));
         
         if (g('currentUser')) {
             global.syncFileToServer(orderFile.id);
@@ -1599,7 +1599,7 @@ import { createDiffFileWriter } from './conflict/live-files';
             isSynced: false
         };
         files.push(newFile);
-        localStorage.setItem('vditor_files', JSON.stringify(files));
+        localStorage.setItem('vditor_files', window.e2eSerializeFiles ? window.e2eSerializeFiles(files) : JSON.stringify(files));
         openFile(newFile.id);
         loadFiles();
         g('lastSyncedContent')[newFile.id] = newFile.content;
@@ -1624,7 +1624,7 @@ import { createDiffFileWriter } from './conflict/live-files';
             isSynced: false
         };
         files.push(newFolder);
-        localStorage.setItem('vditor_files', JSON.stringify(files));
+        localStorage.setItem('vditor_files', window.e2eSerializeFiles ? window.e2eSerializeFiles(files) : JSON.stringify(files));
         loadFiles();
         if (g('currentUser')) global.syncFileToServer(newFolder.id);
     }
@@ -2400,7 +2400,7 @@ import { createDiffFileWriter } from './conflict/live-files';
             isSynced: false
         };
         global.files.push(defaultFile);
-        localStorage.setItem('vditor_files', JSON.stringify(global.files));
+        localStorage.setItem('vditor_files', window.e2eSerializeFiles ? window.e2eSerializeFiles(global.files) : JSON.stringify(global.files));
         global.currentFileId = defaultFile.id;
         refreshE2EUi();
 
@@ -2472,7 +2472,7 @@ import { createDiffFileWriter } from './conflict/live-files';
                 order: 0
             };
             files.push(newFile);
-            localStorage.setItem('vditor_files', JSON.stringify(files));
+            localStorage.setItem('vditor_files', window.e2eSerializeFiles ? window.e2eSerializeFiles(files) : JSON.stringify(files));
             openFile(newFile.id);
             loadFiles();
             g('lastSyncedContent')[newFile.id] = newFile.content;
@@ -2509,7 +2509,7 @@ import { createDiffFileWriter } from './conflict/live-files';
                 order: 0
             };
             files.push(newFolder);
-            localStorage.setItem('vditor_files', JSON.stringify(files));
+            localStorage.setItem('vditor_files', window.e2eSerializeFiles ? window.e2eSerializeFiles(files) : JSON.stringify(files));
             loadFiles();
             if (g('currentUser')) {
                 global.syncFileToServer(newFolder.id);
@@ -2630,7 +2630,7 @@ import { createDiffFileWriter } from './conflict/live-files';
 
             const idx = files.findIndex(f => f.id === id);
             files.splice(idx, 1);
-            localStorage.setItem('vditor_files', JSON.stringify(files));
+            localStorage.setItem('vditor_files', window.e2eSerializeFiles ? window.e2eSerializeFiles(files) : JSON.stringify(files));
 
             if (g('currentUser')) global.deleteFileFromServer(item.name);
             delete g('lastSyncedContent')[id];
@@ -2651,7 +2651,7 @@ import { createDiffFileWriter } from './conflict/live-files';
             const fileNamesToDelete = toDelete.filter(f => f.type === 'file').map(f => f.name);
 
             deleteFolderAndChildren(item.name);
-            localStorage.setItem('vditor_files', JSON.stringify(files));
+            localStorage.setItem('vditor_files', window.e2eSerializeFiles ? window.e2eSerializeFiles(files) : JSON.stringify(files));
 
             if (g('currentUser')) {
                 fileNamesToDelete.forEach(name => global.deleteFileFromServer(name));
@@ -2686,7 +2686,7 @@ import { createDiffFileWriter } from './conflict/live-files';
             global.showMessage(isEn() ? 'Please log in before using E2E encryption' : '请先登录再使用端到端加密', 'warning');
             return false;
         }
-        if (!g('currentUser').password) {
+        if (!g('currentUser').password && !window.E2EVault?.state().config) {
             global.showMessage(isEn() ? 'Please sign in again so the password can be used as the encryption key' : '需要登录密码作为加密密钥，请重新登录', 'error');
             return false;
         }
@@ -2710,7 +2710,8 @@ import { createDiffFileWriter } from './conflict/live-files';
             // Drain already-sent saves before changing the representation on the server.
             global.wsThrottle?.cancel();
             await global.waitForFileSync?.();
-            const plaintext = await resolveE2EFileContent(getCurrentEditorContent(currentFileId, file.content), file);
+            let plaintext = await resolveE2EFileContent(getCurrentEditorContent(currentFileId, file.content), file);
+            if (nextEnabled && window.E2EAttachments) plaintext = await window.E2EAttachments.migrateMarkdown(plaintext);
             file.content = plaintext;
             if (currentFileId === g('currentFileId')) setEditorContentForFile(currentFileId, plaintext, { preserveCursor: true });
             file.e2e_enabled = nextEnabled ? 1 : 0;
@@ -2743,7 +2744,7 @@ import { createDiffFileWriter } from './conflict/live-files';
         } finally {
             delete file.e2eTransition;
             setEditorInteractionLocked(false);
-            localStorage.setItem('vditor_files', JSON.stringify(files));
+            localStorage.setItem('vditor_files', window.e2eSerializeFiles ? window.e2eSerializeFiles(files) : JSON.stringify(files));
             refreshE2EUi();
         }
     }
@@ -2778,7 +2779,7 @@ import { createDiffFileWriter } from './conflict/live-files';
             file.lastModified = Date.now();
         }
         if (isExternalLocalFile(file)) file.localPendingWrite = true;
-        localStorage.setItem('vditor_files', JSON.stringify(files));
+        localStorage.setItem('vditor_files', window.e2eSerializeFiles ? window.e2eSerializeFiles(files) : JSON.stringify(files));
         if (isManual) {
             showSaveStatus('saving');
         }
@@ -3405,7 +3406,7 @@ import { createDiffFileWriter } from './conflict/live-files';
                 files[fileIndex].lastModified = Date.now();
             }
             files[fileIndex].isSynced = g('currentUser') ? false : true;
-            localStorage.setItem('vditor_files', JSON.stringify(files));
+            localStorage.setItem('vditor_files', window.e2eSerializeFiles ? window.e2eSerializeFiles(files) : JSON.stringify(files));
             if (g('currentFileId') === fileId) {
                 setEditorContentForFile(fileId, content);
                 global.showMessage((isEn() ? 'Restored to this version (Version ID: ' : '已恢复到此版本（版本ID: ') + versionId + '）', 'success');
@@ -3649,7 +3650,7 @@ import { createDiffFileWriter } from './conflict/live-files';
             if (newFiles.length > 0) {
                 newFiles.forEach(function(f) { ensureParentFolders(f.name); });
                 g('files').push.apply(g('files'), newFiles);
-                localStorage.setItem('vditor_files', JSON.stringify(g('files')));
+                localStorage.setItem('vditor_files', window.e2eSerializeFiles ? window.e2eSerializeFiles(g('files')) : JSON.stringify(g('files')));
 
                 newFiles.forEach(function(file) {
                     g('lastSyncedContent')[file.id] = file.content;
@@ -4123,7 +4124,7 @@ import { createDiffFileWriter } from './conflict/live-files';
                                 isSynced: false
                             };
                             files.push(newFile);
-                            localStorage.setItem('vditor_files', JSON.stringify(files));
+                            localStorage.setItem('vditor_files', window.e2eSerializeFiles ? window.e2eSerializeFiles(files) : JSON.stringify(files));
                             g('lastSyncedContent')[newFile.id] = mergedText;
                             g('unsavedChanges')[newFile.id] = false;
                             loadFiles();

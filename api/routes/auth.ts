@@ -142,8 +142,20 @@ router.post('/change_password', async (req, res) => {
         return res.json({ code: 401, message: '用户身份验证失败' });
     }
     
-    const result = await userModel.changePassword(username, current_password, new_password);
-    res.json(result);
+    try {
+        const { ensureSchema, validConfig } = require('../utils/e2e-vault');
+        await ensureSchema();
+        const db = require('../config/db');
+        const [vaults] = await db.execute('SELECT config_json, revision FROM e2e_vaults WHERE username = ?', [username]);
+        const stored = vaults.length ? JSON.parse(vaults[0].config_json) : null;
+        const patch = req.body.e2e_patch;
+        if (stored?.methods.login && (!patch || !validConfig(patch.config) || patch.revision !== vaults[0].revision ||
+            JSON.stringify({ ...stored, methods: { ...stored.methods, login: null } }) !== JSON.stringify({ ...patch.config, methods: { ...patch.config.methods, login: null } }))) {
+            return res.status(409).json({ code:409, message:'请先解锁加密并更新登录密码密钥保护，或更新客户端' });
+        }
+        const result = await userModel.changePassword(username, current_password, new_password, stored?.methods.login ? patch : null, true);
+        res.json(result);
+    } catch (error) { res.status(500).json({ code:500, message:'密码修改失败，请重试' }); }
 });
 
 // Delete Account
@@ -159,8 +171,11 @@ router.post('/delete_account', async (req, res) => {
         return res.json({ code: 401, message: '用户身份验证失败' });
     }
     
-    const result = await userModel.deleteAccount(username);
-    res.json(result);
+    try {
+        await require('../utils/e2e-vault').ensureSchema();
+        const result = await userModel.deleteAccount(username, true);
+        res.json(result);
+    } catch (error) { res.status(500).json({ code:500, message:'账号删除失败，请重试' }); }
 });
 
 module.exports = router;

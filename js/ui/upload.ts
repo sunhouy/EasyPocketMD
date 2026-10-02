@@ -62,6 +62,12 @@
 
         const location = window.tempStorageLocation || window.userSettings.storageLocation || 'cloud';
 
+        if (window.E2EAttachments?.currentFileEncrypted()) {
+            const links = await window.E2EAttachments.uploadEncrypted(filesArray, location === 'local');
+            if (autoInsert && g('vditor')) g('vditor').insertValue(links + '\n\n');
+            return links;
+        }
+
         if (location === 'local') {
             return await saveFilesLocally(filesArray, autoInsert);
         }
@@ -85,7 +91,8 @@
         // Add user info if available
         if (g('currentUser')) {
             formData.append('username', g('currentUser').username);
-            formData.append('password', g('currentUser').password);
+            if (g('currentUser').token) formData.append('token', g('currentUser').token);
+            else formData.append('password', g('currentUser').password);
         }
         
         formData.append('uploadDir', 'uploads');
@@ -123,7 +130,12 @@
      * 当 useTempDir 为 true 时，不附带用户信息，服务端会将文件保存在公共 uploads 目录，
      * 用于临时文件（例如 PDF 导出 / 云打印中生成的 mermaid 图片）。
      */
-    function uploadImage(dataUrl, useTempDir) {
+    async function uploadImage(dataUrl, useTempDir) {
+        if (window.E2EAttachments?.currentFileEncrypted()) {
+            const blob = await (await fetch(dataUrl)).blob();
+            const link = await window.E2EAttachments.uploadEncrypted([new File([blob], 'image.png', { type: blob.type })], false);
+            return link.match(/\]\(([^)]+)\)$/)?.[1] || null;
+        }
         return new Promise(function(resolve, reject) {
             // Convert data URL to Blob
             var arr = dataUrl.split(','), mime = arr[0].match(/:(.*?);/)[1],
@@ -142,7 +154,8 @@
             // 其它场景仍然附带用户信息，走原有 user_files 目录逻辑。
             if (!useTempDir && g('currentUser')) {
                 formData.append('username', g('currentUser').username);
-                formData.append('password', g('currentUser').password);
+                if (g('currentUser').token) formData.append('token', g('currentUser').token);
+            else formData.append('password', g('currentUser').password);
             }
 
             // Upload to server

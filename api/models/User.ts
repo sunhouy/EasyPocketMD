@@ -432,7 +432,7 @@ class User {
     }
 
     // Change Password
-    async changePassword(username, currentPassword, newPassword) {
+    async changePassword(username, currentPassword, newPassword, e2ePatch = null, checkE2E = false) {
         const connection = await db.getConnection();
         try {
             await connection.beginTransaction();
@@ -452,6 +452,16 @@ class User {
                 return { code: 401, message: '当前密码错误' };
             }
 
+            if (checkE2E) {
+                const [vaults] = await connection.execute('SELECT config_json, revision FROM e2e_vaults WHERE username = ? FOR UPDATE', [username]);
+                if (vaults[0] && JSON.parse(vaults[0].config_json).methods.login && (!e2ePatch || vaults[0].revision !== e2ePatch.revision)) {
+                    await connection.rollback(); return { code:409, message:'加密设置已变更，请重新解锁后重试' };
+                }
+            }
+            if (e2ePatch) {
+                const [updated] = await connection.execute('UPDATE e2e_vaults SET config_json = ?, revision = revision + 1 WHERE username = ? AND revision = ?', [JSON.stringify(e2ePatch.config), username, e2ePatch.revision]);
+                if (!updated.affectedRows) { await connection.rollback(); return { code:409, message:'加密设置已变更，请重试' }; }
+            }
             // Update password
             const hashedPassword = await this.encryptPassword(newPassword);
             await connection.execute('UPDATE users SET password = ? WHERE username = ?', [hashedPassword, username]);
@@ -467,7 +477,7 @@ class User {
     }
 
     // Delete Account
-    async deleteAccount(username) {
+    async deleteAccount(username, cleanupE2E = false) {
         const connection = await db.getConnection();
         try {
             await connection.beginTransaction();
@@ -480,6 +490,10 @@ class User {
             }
 
             const userId = userRows[0].id;
+            if (cleanupE2E) {
+                await connection.execute('DELETE FROM e2e_pairings WHERE username = ?', [username]);
+                await connection.execute('DELETE FROM e2e_vaults WHERE username = ?', [username]);
+            }
 
             // Delete file content first (due to foreign key constraints)
             await connection.execute(`

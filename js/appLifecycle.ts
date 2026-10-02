@@ -75,7 +75,7 @@
                 if (fileIndex !== -1) {
                     files[fileIndex].content = content;
                     files[fileIndex].lastModified = Date.now();
-                    localStorage.setItem('vditor_files', JSON.stringify(files));
+                    localStorage.setItem('vditor_files', window.e2eSerializeFiles ? window.e2eSerializeFiles(files) : JSON.stringify(files));
                     if (global.currentUser && typeof global.markPendingServerSync === 'function') {
                         global.markPendingServerSync(currentFileId, true);
                     }
@@ -163,7 +163,7 @@
             });
 
             if (hasChanges) {
-                localStorage.setItem('vditor_files', JSON.stringify(files));
+                localStorage.setItem('vditor_files', window.e2eSerializeFiles ? window.e2eSerializeFiles(files) : JSON.stringify(files));
             }
 
             // 3. 清除草稿（因为已经正式保存）
