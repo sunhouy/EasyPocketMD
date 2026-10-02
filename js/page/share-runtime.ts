@@ -5,6 +5,19 @@ import { createShareCursors } from './share-cursors';
 import { showSharedEditHistory } from './share-history';
 import { setVditorValuePreservingCursor } from '../editor-cursor';
 
+interface SharedDocumentState {
+    shareId: string;
+    viewerId: string;
+    canEdit: boolean;
+    lastKnownContent: string;
+    contentVersion: number;
+    isSaving: boolean;
+    inFlightContent?: string;
+    ws: WebSocket | null;
+    [key: string]: any;
+}
+declare global { interface Window { sharedDocState: SharedDocumentState | null; } }
+
     // 处理分享链接
     document.addEventListener('DOMContentLoaded', function() {
         const urlParams = new URLSearchParams(window.location.search);
@@ -1145,7 +1158,7 @@ import { setVditorValuePreservingCursor } from '../editor-cursor';
         pending.resolve(result);
     }
 
-    async function syncSharedDocContent(options) {
+    async function syncSharedDocContent(options: { manualSave?: boolean } = {}) {
         options = options || {};
         if (!window.sharedDocState || !window.sharedDocState.canEdit || !window.vditor) return false;
         if (window.sharedDocState.isSaving) return false;
@@ -1255,7 +1268,7 @@ import { setVditorValuePreservingCursor } from '../editor-cursor';
         }
     }
 
-    function scheduleSharedDocSync(options) {
+    function scheduleSharedDocSync(options: { manualSave?: boolean } = {}) {
         options = options || {};
         if (!window.sharedDocState || !window.sharedDocState.canEdit) return options.manualSave ? Promise.resolve(false) : undefined;
         window.sharedDocState.lastLocalEditAt = Date.now();

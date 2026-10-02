@@ -14,8 +14,9 @@ export function createSharedReadOnlyGuard(container: HTMLElement) {
             if (node.getAttribute('contenteditable') !== 'false') node.setAttribute('contenteditable', 'false');
         });
         container.querySelectorAll<HTMLInputElement>('textarea, input').forEach(node => {
-            if (!original.has(node)) original.set(node, { readonly: node.readOnly });
+            if (!original.has(node)) original.set(node, { readonly: node.readOnly, disabled: node.disabled });
             if (!node.readOnly) node.readOnly = true;
+            if (node.matches('input[type="checkbox"], input[type="radio"]')) node.disabled = true;
         });
         container.querySelectorAll<HTMLButtonElement>('.vditor-toolbar button, .vditor-toolbar__item').forEach(node => {
             if (!original.has(node)) original.set(node, { disabled: node.disabled });
@@ -23,6 +24,9 @@ export function createSharedReadOnlyGuard(container: HTMLElement) {
         });
     }
     const blockInput = (event: Event) => { if (locked) { event.preventDefault(); event.stopImmediatePropagation(); } };
+    const blockTaskToggle = (event: Event) => {
+        if (locked && (event.target as Element)?.closest('input[type="checkbox"], input[type="radio"]')) blockInput(event);
+    };
     const blockKeys = (event: KeyboardEvent) => {
         const shortcut = (event.ctrlKey || event.metaKey) && /^[vxzybiu]$/i.test(event.key);
         const typing = !event.ctrlKey && !event.metaKey && !event.altKey && (event.key.length === 1 || ['Backspace', 'Delete', 'Enter', 'Tab'].includes(event.key));
@@ -30,6 +34,7 @@ export function createSharedReadOnlyGuard(container: HTMLElement) {
     };
     for (const type of ['beforeinput', 'paste', 'cut', 'drop']) container.addEventListener(type, blockInput, true);
     container.addEventListener('keydown', blockKeys, true);
+    container.addEventListener('click', blockTaskToggle, true);
     const observer = new MutationObserver(apply);
     observer.observe(container, { childList: true, subtree: true, attributes: true, attributeFilter: ['contenteditable'] });
     function setLocked(value: boolean) {
@@ -49,5 +54,6 @@ export function createSharedReadOnlyGuard(container: HTMLElement) {
         setLocked(false); observer.disconnect();
         for (const type of ['beforeinput', 'paste', 'cut', 'drop']) container.removeEventListener(type, blockInput, true);
         container.removeEventListener('keydown', blockKeys, true);
+        container.removeEventListener('click', blockTaskToggle, true);
     } };
 }

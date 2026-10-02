@@ -29,6 +29,17 @@ describe('Shared reading without a mask', () => {
         await new Promise(resolve => setTimeout(resolve, 0));
         expect(document.getElementById('new')!.getAttribute('contenteditable')).toBe('false');
     });
+    it('blocks task-checkbox clicks that Vditor handles outside beforeinput', () => {
+        const input = document.createElement('input'); input.type = 'checkbox';
+        document.getElementById('text')!.append(input);
+        const handler = jest.fn(); document.getElementById('vditor')!.addEventListener('click', handler);
+        guard.setLocked(true);
+        expect(input.disabled).toBe(true);
+        input.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+        expect(input.checked).toBe(false); expect(handler).not.toHaveBeenCalled();
+        guard.setLocked(false); expect(input.disabled).toBe(false);
+        input.click(); expect(input.checked).toBe(true);
+    });
 });
 
 describe('Cursor anchors', () => {
