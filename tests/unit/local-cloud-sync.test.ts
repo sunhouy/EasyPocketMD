@@ -117,3 +117,38 @@ test('overlap between disk and editor retains a third snapshot without overwriti
     await app.reconcileRemoteFile(file, { content: 'cloud edit', content_version: 2 });
     expect(write).not.toHaveBeenCalled(); expect(file.syncConflict).toBe(true); expect(file.syncConflictDiskContent).toBe('disk edit');
 });
+
+
+test('background reconciliation caches even empty content across a restart', async () => {
+    const { installSyncRuntime } = await import('../../js/files/sync-runtime');
+    const { app, file } = fixture(async () => ({ success: true })); app.currentFileId = 'other';
+    Object.assign(file, { isExternalLocal: false, content: 'old', contentVersion: 1, isSynced: true });
+    await app.reconcileRemoteFile(file, { content: '', content_version: 2 });
+    const { restoreFiles } = await import('../../js/files/sync/local-state');
+    const restored = { id: 'local', type: 'file', lastModified: 0 };
+    restoreFiles([restored]);
+    const rt = installSyncRuntime(app, {}, {});
+    expect(restored.content).toBe(''); expect(restored.contentFetchedAt).toBeGreaterThan(0);
+    expect(rt.needsServerFileContentFetch(restored)).toBe(false);
+});
+
+test('cloud save acknowledgement records a complete cache for an empty document', async () => {
+    const { installSyncRuntime } = await import('../../js/files/sync-runtime');
+    const { app, api, file, edit } = fixture(async () => ({ success: true }));
+    Object.assign(file, { isExternalLocal: false, content: '', contentLoaded: false }); edit('');
+    global.fetch = jest.fn(async () => ({ json: async () => ({ code: 200, data: { content: '', content_version: 3 } }) }));
+    expect(await api.syncFileToServer(file.id)).toBe(true);
+    expect(file.contentLoaded).toBe(true); expect(file.contentFetchedAt).toBeGreaterThan(0);
+    expect(installSyncRuntime(app, {}, {}).needsServerFileContentFetch(file)).toBe(false);
+});
+
+test('background pulls update content without a success notification', async () => {
+    const { installSyncRuntime } = await import('../../js/files/sync-runtime');
+    const file = { id: 'quiet', name: 'quiet.md', type: 'file', content: 'old', contentVersion: 1, isSynced: true };
+    const app = { files: [file], currentUser: { username: 'user', token: 'token' }, lastSyncedContent: { quiet: 'old' }, unsavedChanges: {}, pendingServerSync: {}, showSyncStatus: jest.fn(), loadFiles: jest.fn() };
+    const rt = installSyncRuntime(app, {}, {});
+    global.fetch = jest.fn(async () => ({ json: async () => ({ code: 200, data: { files: [{ name: 'quiet.md', content: 'new', content_version: 2 }] } }) }));
+    await rt.pullServerUpdatesForCleanFiles();
+    expect(file.content).toBe('new'); expect(app.showSyncStatus).not.toHaveBeenCalled();
+    expect(rt.needsServerFileContentFetch(file)).toBe(false);
+});

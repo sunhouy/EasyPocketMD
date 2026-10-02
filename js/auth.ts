@@ -1322,7 +1322,7 @@
             // 1. 先保存当前正在编辑的文件
             if (global.saveCurrentFile) {
                 await runAccountSwitchStep('save current file before account switch', function() {
-                    return global.saveCurrentFile(true);
+                    return global.saveCurrentFile(false);
                 });
             }
 

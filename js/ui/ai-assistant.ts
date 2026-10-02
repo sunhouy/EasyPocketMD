@@ -264,7 +264,7 @@
         // 自动保存文件
         if (typeof global.saveCurrentFile === 'function') {
             try {
-                await global.saveCurrentFile(true);
+                await global.saveCurrentFile(false);
             } catch (e) {
                 console.error('AI内容插入后保存失败:', e);
             }

@@ -39,6 +39,8 @@ describe('E2E save representations', () => {
             await mockCallbacks.onFileSaved({ filename: 'note.md', content: sent.content, code: 200, content_version: 2, e2e_enabled: 1 });
             await api.waitForFileSync();
             expect(app.lastSyncedContent.note).toBe('# 正文');
+            expect(app.files[0].contentLoaded).toBe(true);
+            expect(app.files[0].contentFetchedAt).toBeGreaterThan(0);
             expect(app.unsavedChanges.note).toBe(false);
         } finally { api.stopAutoSync(); }
     });
@@ -84,6 +86,8 @@ describe('E2E save representations', () => {
         expect(await api.syncFileToServer('note')).toBe(true);
         expect(file.content).toBe('# 正文');
         expect(app.lastSyncedContent.note).toBe('# 正文');
+            expect(app.files[0].contentLoaded).toBe(true);
+            expect(app.files[0].contentFetchedAt).toBeGreaterThan(0);
     });
     it('rejects undecipherable content rather than returning encrypted code for the editor', async () => {
         const cipher = await e2e.encrypt('private text', 'secret');
