@@ -17,26 +17,27 @@ export async function lazyLoadCrypto() {
 }
 
 export function encryptSync(text, password) {
-    if (!text || !password || !CryptoJS) return text;
+    if (!text) return text;
+    if (!password || !CryptoJS) throw new Error('加密密钥或加密模块尚未就绪，请重新登录后重试');
     return CryptoJS.AES.encrypt(text, password).toString();
 }
 
 export function decryptSync(ciphertext, password) {
-    if (!ciphertext || !password || !CryptoJS) return ciphertext;
     if (!looksLikeE2ECiphertext(ciphertext)) return ciphertext;
+    if (!password || !CryptoJS) throw new Error('无法解密文件，请重新登录后重试');
     try {
         const bytes = CryptoJS.AES.decrypt(ciphertext, password);
         const originalText = bytes.toString(CryptoJS.enc.Utf8);
-        return originalText || ciphertext;
+        if (!originalText) throw new Error('无法解密文件，请重新登录后重试');
+        return originalText;
     } catch (e) {
         console.error('E2E sync decrypt error:', e);
-        return ciphertext;
+        throw new Error('无法解密文件，请重新登录后重试');
     }
 }
 
 export function resolveFileContentSync(content, password, e2eEnabled) {
-    if (!content || !password) return content;
-    if (e2eEnabled || looksLikeE2ECiphertext(content)) {
+    if (looksLikeE2ECiphertext(content)) {
         return decryptSync(content, password);
     }
     return content;
@@ -54,7 +55,8 @@ if (typeof window !== 'undefined') {
  * @returns {Promise<string>} encrypted string
  */
 export async function encrypt(text, password) {
-    if (!text || !password) return text;
+    if (!text) return text;
+    if (!password) throw new Error('缺少加密密钥，请重新登录');
     const crypto = await lazyLoadCrypto();
     return crypto.AES.encrypt(text, password).toString();
 }
@@ -73,10 +75,11 @@ export function looksLikeE2ECiphertext(text) {
  * @returns {Promise<string>}
  */
 export async function resolveFileContent(content, password, e2eEnabled) {
-    if (!content || !password) return content;
-    if (e2eEnabled || looksLikeE2ECiphertext(content)) {
+    if (looksLikeE2ECiphertext(content)) {
+        if (!password) throw new Error('无法解密文件，请重新登录后重试');
         const decrypted = await decrypt(content, password);
-        return decrypted !== null ? decrypted : content;
+        if (decrypted === null) throw new Error('无法解密文件，请重新登录后重试');
+        return decrypted;
     }
     return content;
 }

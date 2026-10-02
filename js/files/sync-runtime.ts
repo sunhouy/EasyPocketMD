@@ -1162,15 +1162,8 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
     }
 
     async function resolveE2EFileContent(content, file, serverMeta?) {
-        if (!content || !window.currentUser || !window.currentUser.password) return content;
-        const e2eEnabled = isFileE2EEnabled(file) || (serverMeta && isFileE2EEnabled(serverMeta));
-        try {
-            const e2e = await import('../e2e');
-            return await e2e.resolveFileContent(content, window.currentUser.password, e2eEnabled);
-        } catch (e) {
-            console.error('E2E content resolve error', e);
-            return content;
-        }
+        const e2e = await import('../e2e');
+        return e2e.resolveFileContent(content, g('currentUser')?.password, isFileE2EEnabled(file));
     }
 
     function updateCurrentFileE2EIndicator() {
@@ -1199,6 +1192,7 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
             if (!btn) return;
             btn.classList.toggle('active', enabled);
             btn.setAttribute('aria-pressed', enabled ? 'true' : 'false');
+            btn.disabled = !!currentFile?.e2eTransition;
             const text = btn.querySelector('.file-e2e-toggle-text');
             if (text) {
                 text.textContent = enabled

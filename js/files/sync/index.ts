@@ -51,6 +51,7 @@ export function createSyncRuntimeApi(ctx: any) {
   } = ctx;
   const fileSyncLocks = new Map<string, Promise<any>>();
   const webSocketSaves = new Map<string, any[]>();
+  const acknowledgingSaves = new Set<any>();
 
   function isFileE2EEnabled(file: any) {
     if (!file) return false;
@@ -60,11 +61,11 @@ export function createSyncRuntimeApi(ctx: any) {
     return raw === true || raw === 1 || raw === '1' || raw === 'true';
   }
 
-  function handleRemoteFileUpdate(payload: any) {
+  async function handleRemoteFileUpdate(payload: any) {
     const files = g('files');
     const filename = payload.filename;
     const file = files.find(function(f: any) { return f.name === filename; });
-    if (!file || file.type === 'folder') return;
+    if (!file || file.type === 'folder' || file.e2eTransition) return;
     if (isExternalLocalFile(file)) {
       void applyExternalRemoteUpdate?.(file, payload).catch(() => {});
       return;
@@ -78,7 +79,14 @@ export function createSyncRuntimeApi(ctx: any) {
     const currentFileId = g('currentFileId');
     if (file.id === currentFileId) return;
 
-    file.content = String(payload.content || '');
+    const e2e = await import('../../e2e');
+    const plaintext = await e2e.resolveFileContent(String(payload.content ?? ''), g('currentUser')?.password, true);
+    if (file.e2eTransition || file.id === g('currentFileId') || g('unsavedChanges')[file.id]) return;
+    file.content = plaintext;
+    if (payload.e2e_enabled !== undefined) {
+      file.e2e_enabled = isFileE2EEnabled(payload) ? 1 : 0;
+      file.e2eEnabled = !!file.e2e_enabled;
+    }
     file.isSynced = true;
     file.contentLoaded = true;
 
@@ -89,37 +97,60 @@ export function createSyncRuntimeApi(ctx: any) {
     localStorage.setItem('vditor_files', JSON.stringify(files));
   }
 
-  function handleRemoteFileSaved(payload: any) {
+  async function handleRemoteFileSaved(payload: any) {
     const pending = webSocketSaves.get(payload.filename);
     const acknowledged = pending?.shift();
     if (acknowledged) {
       clearTimeout(acknowledged.timer);
-      if (payload.code !== undefined && payload.code !== 200) acknowledged.reject(new Error(payload.message || '保存失败'));
-      else acknowledged.resolve();
+      acknowledgingSaves.add(acknowledged);
       if (!pending.length) webSocketSaves.delete(payload.filename);
     }
-    const files = g('files');
-    const file = files.find(function(f: any) { return f.name === payload.filename; });
-    if (!file) return;
-    if (payload.code !== undefined && payload.code !== 200) {
-      file.isSynced = false;
-      g('unsavedChanges')[file.id] = true;
-      markPendingServerSync(file.id, true);
-      return;
+    try {
+      const files = g('files');
+      const file = files.find(function(f: any) { return f.name === payload.filename; });
+      if (!file) { acknowledged?.resolve(); return; }
+      if (payload.code !== undefined && payload.code !== 200) {
+        file.isSynced = false;
+        g('unsavedChanges')[file.id] = true;
+        markPendingServerSync(file.id, true);
+        acknowledged?.reject(new Error(payload.message || '保存失败'));
+        return;
+      }
+
+      const e2e = await import('../../e2e');
+      let plaintext;
+      try {
+        plaintext = await e2e.resolveFileContent(String(payload.content ?? file.content ?? ''), g('currentUser')?.password, true);
+      } catch (error) {
+        acknowledged?.reject(error);
+        markPendingServerSync(file.id, true);
+        return;
+      }
+      if (acknowledged && acknowledged.e2eEnabled !== isFileE2EEnabled(file)) {
+        acknowledged.resolve();
+        return;
+      }
+
+      if (Number.isFinite(Number(payload.content_version))) {
+        file.contentVersion = Number(payload.content_version);
+      }
+      file.serverLastModified = payload.last_modified || null;
+      const lastSyncedContent = g('lastSyncedContent') || {};
+      lastSyncedContent[file.id] = plaintext;
+      globalRef.lastSyncedContent = lastSyncedContent;
+      const live = file.id === g('currentFileId') ? getCurrentEditorContent(file.id, file.content) : file.content;
+      const dirty = live !== plaintext;
+      file.isSynced = !dirty;
+      g('unsavedChanges')[file.id] = dirty;
+      markPendingServerSync(file.id, dirty);
+      acknowledged?.resolve();
+      localStorage.setItem('vditor_files', JSON.stringify(files));
+    } catch (error) {
+      acknowledged?.reject(error);
+      throw error;
+    } finally {
+      if (acknowledged) acknowledgingSaves.delete(acknowledged);
     }
-
-    if (Number.isFinite(Number(payload.content_version))) {
-      file.contentVersion = Number(payload.content_version);
-    }
-    file.serverLastModified = payload.last_modified || null;
-    file.isSynced = true;
-
-    const lastSyncedContent = g('lastSyncedContent') || {};
-    lastSyncedContent[file.id] = payload.content || file.content;
-    g('unsavedChanges')[file.id] = false;
-
-    markPendingServerSync(file.id, false);
-    localStorage.setItem('vditor_files', JSON.stringify(files));
   }
 
   async function scheduleWebSocketSync(fileId: string) {
@@ -128,7 +159,7 @@ export function createSyncRuntimeApi(ctx: any) {
 
     const files = g('files');
     const file = files.find(function(f: any) { return f.id === fileId; });
-    if (!file || file.type !== 'file' || isExternalLocalFile(file)) return;
+    if (!file || file.type !== 'file' || isExternalLocalFile(file) || file.e2eTransition) return;
 
     const content = file.id === g('currentFileId')
       ? getCurrentEditorContent(fileId, file.content)
@@ -140,21 +171,16 @@ export function createSyncRuntimeApi(ctx: any) {
 
     let contentToSend = content;
     const fileE2EEnabled = isFileE2EEnabled(file);
-    if (g('currentUser') && contentToSend && file.type !== 'folder') {
-      try {
-        const e2e = await import('../../e2e');
-        if (fileE2EEnabled && typeof e2e.encryptSync === 'function') {
-          const encrypted = e2e.encryptSync(contentToSend, g('currentUser').password);
-          if (encrypted && encrypted !== contentToSend) {
-            contentToSend = encrypted;
-          }
-        }
-      } catch (e) {
-        console.error('[WS] E2E prepare error', e);
-      }
+    try {
+      const e2e = await import('../../e2e');
+      contentToSend = await e2e.resolveFileContent(contentToSend, g('currentUser')?.password, fileE2EEnabled);
+      if (fileE2EEnabled) contentToSend = await e2e.encrypt(contentToSend, g('currentUser')?.password);
+    } catch (error) {
+      markPendingServerSync(fileId, true);
+      console.error('[WS] E2E prepare error', error);
+      return;
     }
-
-    if (contentToSend === undefined || globalRef.fileRelocationInProgress) return;
+    if (contentToSend === undefined || globalRef.fileRelocationInProgress || file.e2eTransition || fileE2EEnabled !== isFileE2EEnabled(file)) return;
 
     if (!globalRef.wsThrottle) return;
 
@@ -162,7 +188,7 @@ export function createSyncRuntimeApi(ctx: any) {
       type: 'file_save',
       filename: file.name,
       content: contentToSend,
-      base_content: lastSyncedContent[fileId],
+      base_content: fileE2EEnabled ? undefined : lastSyncedContent[fileId],
       base_content_version: file.contentVersion,
       e2e_enabled: fileE2EEnabled ? 1 : 0,
     });
@@ -180,7 +206,7 @@ export function createSyncRuntimeApi(ctx: any) {
           // Retain unacknowledged saves, even after timeout: moving their source
           // before confirmation could let a late save recreate the old path.
           const task = {
-            promise, resolve, reject,
+            promise, resolve, reject, e2eEnabled: !!data.e2e_enabled,
             timer: setTimeout(() => reject(new Error('保存尚未确认，已保留原路径，请稍后重试')), 15000)
           };
           promise.catch(() => {});
@@ -200,10 +226,10 @@ export function createSyncRuntimeApi(ctx: any) {
           globalRef.syncAllFiles();
         },
         onFileUpdated: function(payload: any) {
-          handleRemoteFileUpdate(payload);
+          return handleRemoteFileUpdate(payload).catch(error => console.error('[WS] Cannot decrypt remote file', error));
         },
         onFileSaved: function(payload: any) {
-          handleRemoteFileSaved(payload);
+          return handleRemoteFileSaved(payload).catch(error => console.error('[WS] Cannot apply save acknowledgement', error));
         },
         onFileList: function(_payload: any) {},
         onDisconnected: function() {},
@@ -291,6 +317,7 @@ export function createSyncRuntimeApi(ctx: any) {
       return f.id === fileId;
     });
     if (!file) return;
+    if (file.e2eTransition && !options?.encryptionTransition) return false;
     if (isExternalLocalFile(file) && !['ready', 'copy'].includes(file.localAccessState)) return false;
 
     const previousSyncTask = fileSyncLocks.get(fileId) || Promise.resolve();
@@ -330,6 +357,7 @@ export function createSyncRuntimeApi(ctx: any) {
             try {
               const e2e = await import('../../e2e');
               if (fileE2EEnabled) {
+                contentToSend = await e2e.resolveFileContent(contentToSend, globalRef.currentUser.password, true);
                 contentToSend = await e2e.encrypt(contentToSend, globalRef.currentUser.password);
               } else {
                 contentToSend = await e2e.resolveFileContent(
@@ -339,7 +367,8 @@ export function createSyncRuntimeApi(ctx: any) {
                 );
               }
             } catch (e) {
-              console.error('E2E content prepare error', e);
+              // Stop the save; falling back would upload plaintext with the E2E flag.
+              throw e;
             }
           }
 
@@ -352,7 +381,7 @@ export function createSyncRuntimeApi(ctx: any) {
           };
           const baseContentForCrdt =
             typeof file.crdtBaseContent === 'string' ? file.crdtBaseContent : (g('lastSyncedContent') || {})[fileId];
-          if (file.type !== 'folder' && typeof baseContentForCrdt === 'string') {
+          if (file.type !== 'folder' && !fileE2EEnabled && typeof baseContentForCrdt === 'string') {
             requestBody.base_content = baseContentForCrdt;
           }
           if (forcedBaseContentVersion !== null) {
@@ -377,7 +406,7 @@ export function createSyncRuntimeApi(ctx: any) {
               return f.id === fileId;
             });
             if (fileIndex !== -1) {
-              const serverContent =
+              let serverContent =
                 file.type === 'folder'
                   ? ''
                   : fileE2EEnabled
@@ -385,6 +414,10 @@ export function createSyncRuntimeApi(ctx: any) {
                     : result.data && typeof result.data.content === 'string'
                     ? result.data.content
                     : content;
+              if (file.type !== 'folder') {
+                const e2e = await import('../../e2e');
+                serverContent = await e2e.resolveFileContent(serverContent, g('currentUser')?.password, fileE2EEnabled);
+              }
               const isActiveFile = fileId === g('currentFileId') && file.type !== 'folder';
               let liveEditorContent = isActiveFile ? getCurrentEditorContent(fileId, files[fileIndex].content) : null;
               let hasNewerActiveEditorContent = isActiveFile && liveEditorContent !== content;
@@ -508,7 +541,7 @@ export function createSyncRuntimeApi(ctx: any) {
     if (!currentFileId) return false;
     const files = g('files') || [];
     const file = files.find((f: any) => f.id === currentFileId);
-    if (!file || file.type !== 'file' || isExternalLocalFile(file)) return false;
+    if (!file || file.type !== 'file' || isExternalLocalFile(file) || file.e2eTransition) return false;
 
     const content = getCurrentEditorContent(currentFileId, file.content);
 
@@ -528,7 +561,8 @@ export function createSyncRuntimeApi(ctx: any) {
     const fileE2EEnabled = isFileE2EEnabled(file);
     if (g('currentUser') && contentToSend) {
       try {
-        if (fileE2EEnabled && window.e2eEncryptSync) {
+        if (fileE2EEnabled) {
+          if (!window.e2eEncryptSync) return false;
           const encrypted = window.e2eEncryptSync(contentToSend, g('currentUser').password);
           if (encrypted && encrypted !== contentToSend) {
             contentToSend = encrypted;
@@ -536,7 +570,7 @@ export function createSyncRuntimeApi(ctx: any) {
         } else if (typeof window.e2eResolveFileContentSync === 'function') {
           contentToSend = window.e2eResolveFileContentSync(contentToSend, g('currentUser').password, false);
         }
-      } catch (e) {}
+      } catch (e) { return false; }
     }
 
     const body: any = {
@@ -549,7 +583,7 @@ export function createSyncRuntimeApi(ctx: any) {
     };
     const beaconBaseContent =
       typeof file.crdtBaseContent === 'string' ? file.crdtBaseContent : (g('lastSyncedContent') || {})[currentFileId];
-    if (typeof beaconBaseContent === 'string') {
+    if (!fileE2EEnabled && typeof beaconBaseContent === 'string') {
       body.base_content = beaconBaseContent;
     }
 
@@ -584,6 +618,7 @@ export function createSyncRuntimeApi(ctx: any) {
   return {
     waitForFileSync: () => Promise.all([
       ...fileSyncLocks.values(),
+      ...[...acknowledgingSaves].map(task => task.promise),
       ...[...webSocketSaves.values()].flatMap(tasks => tasks.map(task => task.promise))
     ]),
     startAutoSync,

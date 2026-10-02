@@ -615,3 +615,24 @@ describe('FileManager', () => {
         });
     });
 });
+
+describe('E2E disable saves', () => {
+    it('does not CRDT merge stored ciphertext into a plaintext conversion on a version mismatch', async () => {
+        const connection = {
+            execute: jest.fn().mockResolvedValueOnce([[{
+                id: 1, content: 'U2FsdGVkX1encrypted', content_version: 7, e2e_enabled: 1,
+                last_modified: '2026-10-01T00:00:00Z'
+            }]]).mockResolvedValueOnce([]),
+            release: jest.fn()
+        };
+        db.getConnection.mockResolvedValue(connection);
+        const result = await fileManager.saveFile('user', 'note.md', '# 正文', {
+            base_content_version: 6, base_content: 'old plaintext'
+        }, { e2e_enabled: 0 });
+        expect(result.code).toBe(200);
+        expect(result.data.content).toBe('# 正文');
+        expect(result.data.e2e_enabled).toBe(0);
+        expect(result.data.merged_by_crdt).toBe(false);
+        expect(connection.execute).toHaveBeenCalledWith(expect.stringContaining('UPDATE user_files'), ['# 正文', 0, 'user', 'note.md']);
+    });
+});

@@ -126,6 +126,7 @@ function initFileSyncServer(httpServer) {
 
                     socket.send(JSON.stringify({
                         type: 'file_saved',
+                        e2e_enabled: result.data?.e2e_enabled,
                         filename: filename,
                         content: result.data && result.data.content ? result.data.content : content,
                         content_version: result.data && result.data.content_version ? result.data.content_version : null,
