@@ -1,9 +1,11 @@
+import { deviceId } from '../sync/local-state';
 export function isExternalLocalFile(file: any): boolean {
-  return !!(file && file.type === 'file' && file.isExternalLocal);
+  return !!(file && file.type === 'file' && file.isExternalLocal && file.localFileMode !== 'remote');
 }
 
 export function normalizeExternalLocalFileRecord(globalRef: any, file: any): void {
   if (!isExternalLocalFile(file)) return;
+  file.localOriginDeviceId ||= deviceId();
   if (!file.localFileMode) {
     file.localFileMode = globalRef.electron ? 'electron' : 'browser-file';
   }

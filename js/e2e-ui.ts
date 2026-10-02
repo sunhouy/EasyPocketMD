@@ -119,7 +119,7 @@ export function serializeFiles(files: any[]) {
     return JSON.stringify(files.map(f=>{
         if (![true,1,'1','true'].includes((f.e2e_enabled ?? f.e2eEnabled) as any)) return f;
         const copy = { ...f };
-        for (const field of ['content','crdtBaseContent','localSyncedContent']) if (typeof copy[field] === 'string' && copy[field] && !looksLikeE2ECiphertext(copy[field])) copy[field] = encryptSync(copy[field],null);
+        for (const field of ['content','crdtBaseContent','localSyncedContent', 'syncConflictRemoteContent']) if (typeof copy[field] === 'string' && copy[field] && !looksLikeE2ECiphertext(copy[field])) copy[field] = encryptSync(copy[field],null);
         return copy;
     }));
 }
@@ -142,7 +142,7 @@ window.e2eSerializeFiles = serializeFiles;
 async function bootstrap() {
     const button = document.getElementById('manageE2E');
     button?.addEventListener('click',()=>showSettings().catch(err=>window.showMessage?.(err.message,'error')));
-    if (!window.currentUser?.token) return;
+    if (!window.currentUser?.token || new URLSearchParams(location.search).has('share_id')) return;
     try { await vault.ensureUnlocked(); await lazyLoadCrypto(); }
     catch(err) { window.showMessage?.(err.message,'error'); }
 }

@@ -1,3 +1,4 @@
+const { safeMerge } = require('../utils/safeMerge');
 const db = require('../config/db');
 const historyManager = require('./HistoryManager');
 const Cache = require('../utils/cache');
@@ -173,7 +174,22 @@ class FileManager {
                 let contentToSave = String(content || '');
                 let mergedByCrdt = false;
 
-                if (rows.length > 0 && !fileE2E && !rows[0].e2e_enabled && shouldCheckOptimisticLock && hasBaseContent) {
+                if (rows.length && fileOptions.conflict_strategy === 'strict') {
+                    const row = rows[0];
+                    const changed = hasBaseVersion ? Number(optimisticLock.base_content_version) !== Number(row.content_version || 0)
+                        : hasBaseLastModified ? this.normalizeDbLastModified(optimisticLock.base_last_modified) !== this.normalizeDbLastModified(row.last_modified)
+                        : String(row.content || '') !== contentToSave;
+                    if (changed) {
+                        const merged = !fileE2E && !row.e2e_enabled ? safeMerge(hasBaseContent ? optimisticLock.base_content : undefined, contentToSave, String(row.content || '')) : { clean: false };
+                        if (!merged.clean) {
+                            if (rollback) await rollback();
+                            return { code: 409, message: '文件存在冲突', data: { content: row.content, content_version: row.content_version, last_modified: row.last_modified, e2e_enabled: row.e2e_enabled } };
+                        }
+                        contentToSave = merged.content; mergedByCrdt = contentToSave !== String(content || '');
+                    }
+                }
+
+                if (fileOptions.conflict_strategy !== 'strict' && rows.length > 0 && !fileE2E && !rows[0].e2e_enabled && shouldCheckOptimisticLock && hasBaseContent) {
                     const currentRow = rows[0];
                     const currentContent = String(currentRow.content || '');
                     const baseContentVersion = Number(optimisticLock.base_content_version);
