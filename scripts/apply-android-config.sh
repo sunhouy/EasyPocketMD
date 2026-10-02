@@ -12,6 +12,8 @@ MAIN_ACTIVITY_PATH="$ANDROID_MAIN_DIR/MainActivity.kt"
 ANDROID_GENERATED_DIR="$PROJECT_ROOT/src-tauri/gen/android/app/src/main/java/${ANDROID_PACKAGE_NAME//./\/}/generated"
 TAURI_ACTIVITY_PATH="$ANDROID_GENERATED_DIR/TauriActivity.kt"
 
+bash "$PROJECT_ROOT/scripts/configure-android-icons.sh"
+
 echo "🔧 正在应用 Android 状态栏配置..."
 
 # 创建必要的目录
