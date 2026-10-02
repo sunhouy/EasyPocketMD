@@ -1,0 +1,24 @@
+#vditor[data-shared-readonly="true"] { opacity: 1 !important; filter: none !important; }
+#vditor[data-shared-readonly="true"] .vditor-content { opacity: 1 !important; filter: none !important; }
+#vditor[data-shared-readonly="true"] .vditor-readonly-mask,
+#vditor[data-shared-readonly="true"] .vditor-mask { display: none !important; }
+.share-cursor-layer { position: fixed; pointer-events: none; overflow: hidden; z-index: 150; }
+.share-remote-caret { position: absolute; border-left: 2px solid var(--cursor-color); pointer-events: none; }
+.share-remote-caret span { position: absolute; bottom: 100%; left: -2px; padding: 1px 4px; color: #fff; background: var(--cursor-color); border-radius: 3px 3px 3px 0; font: 11px/1.5 sans-serif; white-space: nowrap; }
+.share-history-overlay { position: fixed; inset: 0; z-index: 10007; padding: var(--safe-area-top, 0px) 0 var(--safe-area-bottom, 0px); background: #0009; display: flex; justify-content: center; }
+.share-history-dialog { width: min(100%, 1100px); background: var(--bg-color, #fff); color: var(--text-color, #222); display: flex; flex-direction: column; min-height: 0; }
+body.night-mode .share-history-dialog { background: #242424; color: #eee; }
+.share-history-header { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid #8884; flex-wrap: wrap; }
+.share-history-header strong { flex: 1; }
+.share-history-dialog button, .share-history-dialog select { font: inherit; font-size: 12px; padding: 4px 8px; border: 1px solid #8885; border-radius: 4px; background: transparent; color: inherit; cursor: pointer; }
+.share-history-dialog button:disabled { opacity: .5; cursor: default; }
+.share-history-content { flex: 1; min-height: 0; overflow: auto; padding: 12px; }
+.share-history-editor, .share-history-event { padding: 10px; margin-bottom: 8px; border: 1px solid #8884; border-radius: 6px; }
+.share-history-actions { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-top: 6px; }
+.share-history-actions time { font-size: 12px; opacity: .75; }
+.share-history-message { padding: 10px 12px; font-size: 12px; }
+.share-history-diff { margin-top: 8px; overflow: auto; }
+.share-history-diff .diff-container { width: 100%; min-width: 0; }
+.share-history-diff .diff-content, .share-history-diff td { overflow-wrap: anywhere; white-space: pre-wrap; }
+
+#vditor[data-shared-readonly="true"] .vditor-toolbar { pointer-events: none; }

@@ -74,6 +74,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     var MODAL_OVERLAY_SELECTOR = [
+        '.share-history-overlay',
         '.modal-overlay',
         '.mobile-action-sheet-overlay',
         '.insert-picker-modal',
@@ -2004,6 +2005,7 @@ document.addEventListener('DOMContentLoaded', function() {
         initTopNoticeBanner();
 
         var bootFileWorkspace = function() {
+            if (shareModeActive) { hideTopNoticeBanner(); return; }
             if (window.currentUser) {
                 window.showUserInfo();
                 window.startAutoSync();
