@@ -646,12 +646,12 @@
                     </li>
                     <li class="settings-list-item" id="e2eSettingContainer">
                         <div class="form-group">
-                            <label>默认端到端加密</label>
-                            <button type="button" id="manageE2E">管理加密解锁方式 / Encryption unlock methods</button>
+                            <label data-i18n="e2eDefaultTitle">默认端到端加密</label>
+                            <button type="button" class="modal-btn secondary" id="manageE2E" data-i18n="e2eManage">管理加密解锁方式</button>
                             <div class="checkbox-group">
-                                <label><input type="checkbox" id="settingsEnableE2E"> <span>新建文件默认开启端到端加密</span></label>
+                                <label><input type="checkbox" id="settingsEnableE2E"> <span data-i18n="e2eNewFilesDefault">新建文件默认开启端到端加密</span></label>
                             </div>
-                            <p style="font-size:12px;color:#666;margin-top:4px;">注意：此设置只影响之后新建的文件。当前文件请在“更多 - 其他”中单独开启或关闭。</p>
+                            <p class="settings-hint" data-i18n="e2eDefaultHint">此设置只影响之后新建的文件。当前文件请在“更多 - 其他”中单独开启或关闭。</p>
                         </div>
                     </li>
                     <li class="settings-list-item">

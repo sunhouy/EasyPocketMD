@@ -1,6 +1,8 @@
 /** @jest-environment jsdom */
 // @ts-nocheck
 export {};
+require('../../js/translations');
+window.i18n.setLanguage('zh');
 const { webcrypto } = require('node:crypto');
 const { TextEncoder, TextDecoder } = require('node:util');
 const { File } = require('node:buffer');
@@ -11,20 +13,16 @@ const e2e = require('../../js/e2e');
 const attachments = require('../../js/e2e-attachments');
 window.currentUser=null;
 const {serializeFiles}=require('../../js/e2e-ui');
-let stored, revision, relay;
-const options = { login:true, dedicated:true, password:'dedicated-password-123', passkey:false, otp:true, ttlSeconds:60 };
+let stored, revision;
+const options = { login:true, dedicated:true, password:'dedicated-password-123', passkey:false, ttlSeconds:60 };
 beforeEach(()=>{
     vault.reset(); localStorage.clear(); delete window.E2EVault;
     window.currentUser={ username:'user', password:'login-password', token:'token' };
-    stored=null; revision=0; relay=null;
+    stored=null; revision=0;
     global.fetch=jest.fn(async (url,init)=>{
         const body=JSON.parse(init.body); let data;
         if(url.endsWith('/config')) data={ config:stored, revision };
         else if(url.endsWith('/config/save')) { stored=body.config; revision++; data={revision}; }
-        else if(url.endsWith('/pair/create')) { relay={ id:'a'.repeat(32),secret:'b'.repeat(64),code:'12345678', expiresAt:Date.now()+300000,publicKey:body.publicKey }; data=relay; }
-        else if(url.endsWith('/pair/find')) data={ id:relay.id,publicKey:relay.publicKey };
-        else if(url.endsWith('/pair/approve')) { relay.ciphertext=body.ciphertext; data={}; }
-        else if(url.endsWith('/pair/consume')) { data={ciphertext:relay.ciphertext}; relay.ciphertext=null; }
         return { ok:true, json:async()=>({code:200,data}) };
     });
     vault.setUI(async()=>{ throw Error('locked'); },jest.fn());
@@ -50,7 +48,7 @@ it('rejects wrong passwords and authenticated ciphertext modifications',async()=
     const altered=cipher.slice(0,-1)+(cipher.endsWith('a')?'b':'a');
     await expect(e2e.resolveFileContent(altered,null,true)).rejects.toThrow('无法解密');
 });
-it('allows removing login while preserving dedicated unlock, but rejects OTP as the only method',async()=>{
+it('allows removing login while preserving dedicated unlock, but rejects removing every method',async()=>{
     await setup(); const key=vault.secrets().master;
     await vault.saveSettings({...options,login:false,password:''});
     expect(stored.methods.login).toBeUndefined(); await reopen();
@@ -73,16 +71,6 @@ it('rejects PRF-less passkeys and lets a supported passkey independently unlock'
     await reopen(); await vault.unlockPasskey(); expect(vault.secrets().master).toBe(master);
     navigator.credentials.get.mockResolvedValueOnce({getClientExtensionResults:()=>({prf:{}})});
     await expect(vault.registerPasskey(vault.secrets())).rejects.toThrow('不支持 PRF');
-});
-it('OTP transfers a key only as RSA ciphertext and binds it to the request',async()=>{
-    await setup(); const master=vault.secrets().master;
-    await reopen(); const pair=await vault.beginPairing();
-    expect(await vault.consumePairing(pair)).toBe(false);
-    await vault.unlockPassword('dedicated',options.password);
-    const found=await vault.findPairing(pair.code); expect(found.fingerprint).toBe(pair.fingerprint);
-    await vault.approvePairing(found); expect(relay.ciphertext).not.toContain(master);
-    await reopen(); expect(await vault.consumePairing(pair)).toBe(true); expect(vault.secrets().master).toBe(master);
-    expect(await vault.consumePairing(pair)).toBe(false);
 });
 it('encrypts all attachment bytes and metadata, supports password alternatives, and detects tampering',async()=>{
     await setup(); const bytes=Uint8Array.from([0,255,1,128,45,78,0]);
@@ -151,4 +139,20 @@ it('seals the active editor and clears key material on logout or account change'
     expect(window.files[0].content).toMatch(/^EPMD2:/);expect(window.lastSyncedContent.note).toBeUndefined();
     expect(vault.state().unlocked).toBe(false);
     expect(localStorage.getItem('vditor_files')).not.toContain('unfinished private edit');
+});
+
+it('ignores retired OTP settings while preserving password keys',async()=>{
+    await setup(); const master=vault.secrets().master; stored={...stored,otp:true};
+    await reopen(); expect(vault.state().config.otp).toBeUndefined();
+    await vault.unlockPassword('dedicated',options.password); expect(vault.secrets().master).toBe(master);
+    await vault.saveSettings({...options,password:''}); expect(stored.otp).toBeUndefined();
+});
+it('verifies explicitly entered login passwords before updating their wrapper',async()=>{
+    await setup(); const master=vault.secrets().master;
+    fetch.mockResolvedValueOnce({ok:true,json:async()=>({code:401})});
+    await expect(vault.saveSettings({...options,loginPassword:'wrong'})).rejects.toThrow('密码错误');
+    expect(vault.secrets().master).toBe(master);
+    await vault.saveSettings({...options,loginPassword:'login-password'});
+    expect(fetch).toHaveBeenCalledWith(expect.stringContaining('/auth/login'),expect.objectContaining({body:JSON.stringify({username:'user',password:'login-password'})}));
+    await reopen(); await vault.unlockPassword('login','login-password'); expect(vault.secrets().master).toBe(master);
 });

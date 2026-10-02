@@ -2,15 +2,15 @@
 
 设置 → 用户设置 → 管理加密解锁方式。
 
+- 设置与解锁界面中，三种方式均有各自的操作按钮；两种密码分别使用独立输入框。配置一种方式会保留其他已经启用的方式。界面复用现有弹窗和按钮样式，文案使用网站的中英文翻译管理器。
 - 登录密码默认勾选；Passkey、专用密码可以同时启用，任意一种方式都能解锁同一把随机数据密钥。
 - 专用密码至少 12 字符，经过 PBKDF2-SHA-256（600,000 次）派生密钥；登录密码使用相同的保护方式。
 - Passkey 通过 WebAuthn PRF 派生密钥，并要求用户验证。创建后再次调用 `get()` 验证 PRF 可用；不支持 PRF 的设备明确报错，不退回凭据 ID 加密。参考：https://www.w3.org/TR/webauthn-3/#prf-extension
-- OTP 是一次性设备配对码，**不是认证器里的六位 TOTP**。新设备显示八位码与完整 SHA-256 设备指纹。已解锁设备输入码，并与新设备逐组核对完整指纹后批准。密钥通过 RSA-OAEP-3072/SHA-256 加密，绑定请求 ID。服务器仅中转密文，五分钟过期，结果在事务中一次性领取。另一台设备必须在线且已解锁；OTP 不能成为唯一剩余的恢复方式。
 - 自动锁定时间为 1/5/15/30 分钟，或 1/4/24 小时，从成功解锁算起，不随编辑续期。锁定时保存加密的未同步正文并重新加载，清除数据密钥、预览 Blob 和编辑器撤销历史，之后需手动再次验证。浏览器后台节流不应被理解为精确定时器；每次密钥访问还会校验绝对过期时间。
 
 ## 数据与兼容
 
-新格式正文为 `EPMD2:`：AES-256-CBC + encrypt-then-HMAC-SHA-256，使用分别派生的加密与认证密钥以及随机 IV。兼容原有 OpenSSL/CryptoJS 登录密码密文：旧密码仅保存在各解锁方式保护的密钥包中，不随配置以明文上传，因此专用密码、Passkey、OTP 同样可以解锁旧正文。已有弱格式不会自动重写历史版本。
+新格式正文为 `EPMD2:`：AES-256-CBC + encrypt-then-HMAC-SHA-256，使用分别派生的加密与认证密钥以及随机 IV。兼容原有 OpenSSL/CryptoJS 登录密码密文：旧密码仅保存在各解锁方式保护的密钥包中，不随配置以明文上传，因此专用密码、Passkey 同样可以解锁旧正文。已有弱格式不会自动重写历史版本。
 
 图片与任意附件都在上传前使用 AES-256-GCM 加密，随机 salt 与 IV，文件名与 MIME 也位于密文中；云端只收到随机 `.epmd` 文件，不生成明文缩略图。正文保存稳定的 `#epmd-e2e` 链接；客户端解密后生成仅用于显示/下载的 Blob，并在序列化时还原原始链接。SVG/HTML 等活动内容作为下载处理。加密文件选择本地存储时，保存的附件也为密文；解密预览不写入 IndexedDB。
 
@@ -20,7 +20,7 @@
 
 ## 服务端部署
 
-新增 `/api/e2e`，需要当前账号的 JWT；配置带 revision 乐观锁。`e2e_vaults`、`e2e_pairings` 表在已认证的首次请求时执行 `CREATE TABLE IF NOT EXISTS`，部署账号需要建表权限。无权限时提前创建：
+新增 `/api/e2e`，需要当前账号的 JWT；配置带 revision 乐观锁。`e2e_vaults` 表在已认证的首次请求时执行 `CREATE TABLE IF NOT EXISTS`，部署账号需要建表权限。无权限时提前创建：
 
 ```sql
 CREATE TABLE IF NOT EXISTS e2e_vaults (
@@ -28,22 +28,14 @@ CREATE TABLE IF NOT EXISTS e2e_vaults (
   config_json MEDIUMTEXT NOT NULL,
   revision INT NOT NULL DEFAULT 1
 );
-CREATE TABLE IF NOT EXISTS e2e_pairings (
-  id CHAR(32) PRIMARY KEY,
-  username VARCHAR(20) NOT NULL,
-  code_hash CHAR(64) NOT NULL,
-  secret_hash CHAR(64) NOT NULL,
-  public_key TEXT NOT NULL,
-  ciphertext TEXT NULL,
-  expires_at BIGINT NOT NULL,
-  UNIQUE KEY user_code (username, code_hash)
-);
 ```
 
-前后端应一起部署。配置请求失败时拒绝加密操作，不使用未确认的旧默认配置。账号删除会同时清理密钥配置和待配对请求。
+已移除一次性配对入口和 API。读取旧配置时忽略已退役的 `otp` 字段，保留原有密码和通行密钥保护的密钥包；保存后配置不再包含该字段。
+
+前后端应一起部署。配置请求失败时拒绝加密操作，不使用未确认的旧默认配置。账号删除会同时清理密钥配置。
 
 ## 验证范围
 
-自动化覆盖独立密码/模拟 PRF 解锁、旧正文兼容、OTP RSA 密文传递、篡改拒绝、会话过期、附件字节恢复、缓存/草稿加密、登录密码重新保护、认证隔离、配置 revision 冲突与配对一次性领取。
+自动化覆盖独立密码/模拟 PRF 解锁、旧正文兼容、篡改拒绝、会话过期、附件字节恢复、缓存/草稿加密、登录密码重新保护、认证隔离、配置 revision 冲突、三种并列操作按钮及中英文翻译。
 
-发布前需要真实支持 PRF 的认证器及浏览器、两台设备的 OTP 配对、真实 MySQL 事务和后台/恢复场景验证。密码恢复不能代替数据密钥恢复；若所有独立解锁方式都丢失，且没有已解锁设备，数据无法恢复。
+发布前需要真实支持 PRF 的认证器及浏览器、真实 MySQL 事务和后台/恢复场景验证。密码恢复不能代替数据密钥恢复；若所有独立解锁方式都丢失，且没有已解锁设备，数据无法恢复。
