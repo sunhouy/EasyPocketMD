@@ -2392,6 +2392,7 @@ import { createDiffFileWriter } from './conflict/live-files';
     function createDefaultFile() {
         const defaultFile = {
             id: Date.now().toString(),
+            autoCreatedGuestWelcome: !g('currentUser'),
             name: isEn() ? 'Untitled' : '未命名文档', // 无前导斜杠
             type: 'file',
             content: isEn() ? '# Welcome to EasyPocketMD\n\nThis is a new document. \n\nStart writing!' : '# 欢迎使用 EasyPocketMD\n\n这是一个新的文档。\n\n开始编写吧！',
