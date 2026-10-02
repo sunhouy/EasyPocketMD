@@ -250,7 +250,7 @@
             const result = global.parseJsonResponse ? await global.parseJsonResponse(response) : await response.json();
             if (result.code === 200 && result.data.token) {
                 global.currentUser.token = result.data.token;
-                localStorage.setItem('vditor_user', JSON.stringify(global.currentUser));
+                localStorage.setItem('vditor_user', window.e2eSerializeUser ? window.e2eSerializeUser(global.currentUser) : JSON.stringify(global.currentUser));
                 return true;
             }
             return false;
@@ -274,6 +274,8 @@
         }
 
         // 刷新失败，清除登录状态并提示重新登录
+        window.dispatchEvent(new Event('e2e-account-reset'));
+        window.E2EAttachments?.clear();
         global.currentUser = null;
         localStorage.removeItem('vditor_user');
         showUserInfo();
@@ -441,6 +443,7 @@
         }
 
         try {
+            const e2ePatch = window.E2EVault ? await window.E2EVault.preparePasswordChange(currentPassword, newPassword) : null;
             const apiUrl = (global.getApiBaseUrl ? global.getApiBaseUrl() : 'api') + '/auth/change_password';
             const response = await fetch(apiUrl, {
                 method: 'POST',
@@ -448,19 +451,21 @@
                 body: JSON.stringify({
                     username: global.currentUser.username,
                     current_password: currentPassword,
-                    new_password: newPassword
+                    new_password: newPassword,
+                    e2e_patch: e2ePatch
                 })
             });
             const result = global.parseJsonResponse ? await global.parseJsonResponse(response) : await response.json();
 
             if (message) {
                 if (result.code === 200) {
+                    window.E2EVault?.finishPasswordChange(e2ePatch);
                     message.textContent = t('passwordChangedSuccess');
                     message.className = 'modal-message success';
                     
                     // Update current user's password in localStorage
                     global.currentUser.password = newPassword;
-                    localStorage.setItem('vditor_user', JSON.stringify(global.currentUser));
+                    localStorage.setItem('vditor_user', window.e2eSerializeUser ? window.e2eSerializeUser(global.currentUser) : JSON.stringify(global.currentUser));
                     
                     // Clear password fields
                     document.getElementById('currentPassword').value = '';
@@ -549,6 +554,8 @@
             if (result.code === 200) {
                 // Clear user data
                 if (global.stopAutoSync) global.stopAutoSync();
+                window.dispatchEvent(new Event('e2e-account-reset'));
+                window.E2EAttachments?.clear();
                 global.currentUser = null;
                 localStorage.removeItem('vditor_user');
                 localStorage.removeItem('vditor_files');
@@ -752,12 +759,15 @@
             if (message) {
                 if (result.code === 200) {
                     // 使用后端返回的 JWT token，如果没有则使用密码进行后续验证
+                    window.dispatchEvent(new Event('e2e-account-reset'));
+                    window.E2EAttachments?.clear();
                     global.currentUser = {
                         username: username,
                         token: result.data.token,
                         password: password
                     };
-                    localStorage.setItem('vditor_user', JSON.stringify(global.currentUser));
+                    await window.E2EVault?.unlockAfterLogin(password);
+                    localStorage.setItem('vditor_user', window.e2eSerializeUser ? window.e2eSerializeUser(global.currentUser) : JSON.stringify(global.currentUser));
 
                     // 自动添加到账户列表
                     addAccountToList(username, password);
@@ -788,7 +798,7 @@
                                 // 更新本地存储中的内容
                                 currentFile.content = currentFileContent;
                                 currentFile.lastModified = Date.now();
-                                localStorage.setItem('vditor_files', JSON.stringify(files));
+                                localStorage.setItem('vditor_files', window.e2eSerializeFiles ? window.e2eSerializeFiles(files) : JSON.stringify(files));
                             }
                         }
 
@@ -888,12 +898,15 @@
                     const loginResult = global.parseJsonResponse ? await global.parseJsonResponse(loginResponse) : await loginResponse.json();
 
                     if (loginResult.code === 200) {
+                        window.dispatchEvent(new Event('e2e-account-reset'));
+                        window.E2EAttachments?.clear();
                         global.currentUser = {
                             username: username,
                             token: loginResult.data.token,
                             password: password
                         };
-                        localStorage.setItem('vditor_user', JSON.stringify(global.currentUser));
+                        await window.E2EVault?.unlockAfterLogin(password);
+                        localStorage.setItem('vditor_user', window.e2eSerializeUser ? window.e2eSerializeUser(global.currentUser) : JSON.stringify(global.currentUser));
                         message.textContent = t('registerSuccessAutoLogin');
                         message.className = 'modal-message success';
 
@@ -920,7 +933,7 @@
                                     // 更新本地存储中的内容
                                     currentFile.content = currentFileContent;
                                     currentFile.lastModified = Date.now();
-                                    localStorage.setItem('vditor_files', JSON.stringify(files));
+                                    localStorage.setItem('vditor_files', window.e2eSerializeFiles ? window.e2eSerializeFiles(files) : JSON.stringify(files));
                                 }
                             }
 
@@ -955,12 +968,15 @@
 
                     if (loginResult.code === 200) {
                         // 密码正确，自动登录成功
+                        window.dispatchEvent(new Event('e2e-account-reset'));
+                        window.E2EAttachments?.clear();
                         global.currentUser = {
                             username: username,
                             token: loginResult.data.token,
                             password: password
                         };
-                        localStorage.setItem('vditor_user', JSON.stringify(global.currentUser));
+                        await window.E2EVault?.unlockAfterLogin(password);
+                        localStorage.setItem('vditor_user', window.e2eSerializeUser ? window.e2eSerializeUser(global.currentUser) : JSON.stringify(global.currentUser));
                         message.textContent = t('autoLoginSuccess');
                         message.className = 'modal-message success';
 
@@ -987,7 +1003,7 @@
                                     // 更新本地存储中的内容
                                     currentFile.content = currentFileContent;
                                     currentFile.lastModified = Date.now();
-                                    localStorage.setItem('vditor_files', JSON.stringify(files));
+                                    localStorage.setItem('vditor_files', window.e2eSerializeFiles ? window.e2eSerializeFiles(files) : JSON.stringify(files));
                                 }
                             }
 
@@ -1048,6 +1064,8 @@
         }
 
         if (global.stopAutoSync) global.stopAutoSync();
+        window.dispatchEvent(new Event('e2e-account-reset'));
+        window.E2EAttachments?.clear();
         global.currentUser = null;
         localStorage.removeItem('vditor_user');
         // 清除未登录提示横幅的关闭状态，让下次打开时重新显示
@@ -1074,7 +1092,7 @@
 
     // 保存账户列表
     function saveAccounts(accounts) {
-        localStorage.setItem('vditor_accounts', JSON.stringify(accounts));
+        localStorage.setItem('vditor_accounts', window.e2eSerializeUser ? window.e2eSerializeUser(accounts) : JSON.stringify(accounts));
     }
 
     // 添加账户到列表
@@ -1336,12 +1354,14 @@
             await clearAccountLocalFileState();
 
             // 6. 使用新账户登录
+            window.dispatchEvent(new Event('e2e-account-reset'));
+            window.E2EAttachments?.clear();
             global.currentUser = {
                 username: targetAccount.username,
                 token: result.data.token,
                 password: targetAccount.password
             };
-            localStorage.setItem('vditor_user', JSON.stringify(global.currentUser));
+            localStorage.setItem('vditor_user', window.e2eSerializeUser ? window.e2eSerializeUser(global.currentUser) : JSON.stringify(global.currentUser));
 
             global.showMessage(t('accountSwitched').replace('{username}', targetAccount.username), 'success');
 
@@ -1544,12 +1564,15 @@
                 addAccountToList(username, password);
 
                 if (!global.currentUser) {
+                    window.dispatchEvent(new Event('e2e-account-reset'));
+                    window.E2EAttachments?.clear();
                     global.currentUser = {
                         username: username,
                         token: result.data.token,
                         password: password
                     };
-                    localStorage.setItem('vditor_user', JSON.stringify(global.currentUser));
+                    await window.E2EVault?.unlockAfterLogin(password);
+                    localStorage.setItem('vditor_user', window.e2eSerializeUser ? window.e2eSerializeUser(global.currentUser) : JSON.stringify(global.currentUser));
 
                     global.showMessage(t('accountAddedSuccess'), 'success');
                     hideAddAccountModal();
@@ -1705,7 +1728,7 @@
                 const user = global.currentUser;
                 this.disabled = true;
                 
-                if (isEnabled && !global.currentUser.password) {
+                if (isEnabled && !global.currentUser.password && !window.E2EVault?.state().config) {
                     global.showMessage('需要登录密码作为默认加密密钥，请重新登录', 'error');
                     this.checked = false;
                     this.disabled = false;
@@ -1728,7 +1751,7 @@
                     if (global.currentUser !== user) return;
                     if (result.code === 200) {
                         global.currentUser.e2e_enabled = isEnabled ? 1 : 0;
-                        localStorage.setItem('vditor_user', JSON.stringify(global.currentUser));
+                        localStorage.setItem('vditor_user', window.e2eSerializeUser ? window.e2eSerializeUser(global.currentUser) : JSON.stringify(global.currentUser));
                         global.showMessage(isEnabled ? '默认端到端加密已开启' : '默认端到端加密已关闭', 'success');
                     } else {
                         throw new Error(result.message);

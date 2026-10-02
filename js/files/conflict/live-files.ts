@@ -18,7 +18,7 @@ export function createDiffFileWriter(globalRef: any, setEditor: (id: string, con
             if (!actual) return false;
             if (actual.content === content) return true;
             const update = { content, lastModified: Date.now(), isSynced: !globalRef.currentUser };
-            try { localStorage.setItem('vditor_files', JSON.stringify(files.map((item: any) => item === actual ? { ...item, ...update } : item))); }
+            try { localStorage.setItem('vditor_files', window.e2eSerializeFiles ? window.e2eSerializeFiles(files.map((item: any) => item === actual ? { ...item, ...update } : item)) : JSON.stringify(files.map((item: any) => item === actual ? { ...item, ...update } : item))); }
             catch { globalRef.showMessage?.('保存失败，请释放本机存储空间后重试', 'error'); return false; }
             Object.assign(actual, update); Object.assign(file, update);
             if (globalRef.unsavedChanges) globalRef.unsavedChanges[file.id] = true;

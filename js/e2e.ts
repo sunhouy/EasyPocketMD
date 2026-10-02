@@ -5,6 +5,37 @@
  */
 
 let CryptoJS = null;
+const V2_PREFIX = 'EPMD2:';
+function vaultSecret(password) {
+    const value = typeof window !== 'undefined' && window.E2EVault ? window.E2EVault.secrets() : null;
+    return value ? value.master : password;
+}
+function legacySecret(password) {
+    const value = typeof window !== 'undefined' && window.E2EVault ? window.E2EVault.secrets() : null;
+    return value ? value.legacy : password;
+}
+function encryptV2(text, master) {
+    const encKey = CryptoJS.SHA256('EasyPocketMD text enc v2|' + master);
+    const macKey = CryptoJS.SHA256('EasyPocketMD text mac v2|' + master);
+    const iv = CryptoJS.lib.WordArray.random(16);
+    const cipher = CryptoJS.AES.encrypt(text, encKey, { iv }).ciphertext.toString(CryptoJS.enc.Base64);
+    const body = iv.toString(CryptoJS.enc.Base64) + '.' + cipher;
+    return V2_PREFIX + body + '.' + CryptoJS.HmacSHA256(body, macKey).toString();
+}
+function decryptV2(ciphertext, master) {
+    if (!master || !CryptoJS) throw new Error('请先解锁端到端加密');
+    const parts = ciphertext.slice(V2_PREFIX.length).split('.');
+    if (parts.length !== 3 || !/^[a-f0-9]{64}$/.test(parts[2])) throw new Error('加密文件格式错误');
+    const [iv, cipher, mac] = parts;
+    const expected = CryptoJS.HmacSHA256(iv + '.' + cipher, CryptoJS.SHA256('EasyPocketMD text mac v2|' + master)).toString();
+    let different = 0;
+    for (let i = 0; i < 64; i++) different |= expected.charCodeAt(i) ^ mac.charCodeAt(i);
+    if (different) throw new Error('无法解密文件：密钥错误或内容被修改');
+    return CryptoJS.AES.decrypt({ ciphertext: CryptoJS.enc.Base64.parse(cipher) }, CryptoJS.SHA256('EasyPocketMD text enc v2|' + master), { iv: CryptoJS.enc.Base64.parse(iv) }).toString(CryptoJS.enc.Utf8);
+}
+async function prepareVault() {
+    if (typeof window !== 'undefined' && window.E2EVault) await window.E2EVault.ensureUnlocked();
+}
 
 // Lazy load the CryptoJS library
 export async function lazyLoadCrypto() {
@@ -18,12 +49,15 @@ export async function lazyLoadCrypto() {
 
 export function encryptSync(text, password) {
     if (!text) return text;
-    if (!password || !CryptoJS) throw new Error('加密密钥或加密模块尚未就绪，请重新登录后重试');
-    return CryptoJS.AES.encrypt(text, password).toString();
+    const secret = vaultSecret(password);
+    if (!secret || !CryptoJS) throw new Error('加密密钥或加密模块尚未就绪，请重新登录后重试');
+    return typeof window !== 'undefined' && window.E2EVault?.state().config ? encryptV2(text, secret) : CryptoJS.AES.encrypt(text, secret).toString();
 }
 
 export function decryptSync(ciphertext, password) {
     if (!looksLikeE2ECiphertext(ciphertext)) return ciphertext;
+    if (ciphertext.startsWith(V2_PREFIX)) return decryptV2(ciphertext, vaultSecret(password));
+    password = legacySecret(password);
     if (!password || !CryptoJS) throw new Error('无法解密文件，请重新登录后重试');
     try {
         const bytes = CryptoJS.AES.decrypt(ciphertext, password);
@@ -56,14 +90,14 @@ if (typeof window !== 'undefined') {
  */
 export async function encrypt(text, password) {
     if (!text) return text;
-    if (!password) throw new Error('缺少加密密钥，请重新登录');
-    const crypto = await lazyLoadCrypto();
-    return crypto.AES.encrypt(text, password).toString();
+    await prepareVault();
+    await lazyLoadCrypto();
+    return encryptSync(text, password);
 }
 
 /** CryptoJS AES ciphertext in OpenSSL format (Base64) typically starts with this prefix. */
 export function looksLikeE2ECiphertext(text) {
-    return typeof text === 'string' && text.startsWith('U2FsdGVkX1');
+    return typeof text === 'string' && (text.startsWith('U2FsdGVkX1') || text.startsWith(V2_PREFIX));
 }
 
 /**
@@ -76,7 +110,6 @@ export function looksLikeE2ECiphertext(text) {
  */
 export async function resolveFileContent(content, password, e2eEnabled) {
     if (looksLikeE2ECiphertext(content)) {
-        if (!password) throw new Error('无法解密文件，请重新登录后重试');
         const decrypted = await decrypt(content, password);
         if (decrypted === null) throw new Error('无法解密文件，请重新登录后重试');
         return decrypted;
@@ -91,27 +124,9 @@ export async function resolveFileContent(content, password, e2eEnabled) {
  * @returns {Promise<string>} decrypted text
  */
 export async function decrypt(ciphertext, password) {
-    if (!ciphertext || !password) return ciphertext;
-    
-    // Quick check if it might be encrypted
-    // CryptoJS AES ciphertext in Base64 starts with U2Fsd (usually)
-    if (!ciphertext.startsWith('U2FsdGVkX1')) {
-        return ciphertext; // Probably not encrypted with CryptoJS AES
-    }
-
-    const crypto = await lazyLoadCrypto();
-    try {
-        const bytes = crypto.AES.decrypt(ciphertext, password);
-        const originalText = bytes.toString(crypto.enc.Utf8);
-        
-        // If decryption fails (wrong password), bytes.toString(Utf8) might return empty string
-        if (!originalText) {
-            console.warn('E2E Decryption failed: possible incorrect password');
-            return null; // indicate failure
-        }
-        return originalText;
-    } catch (e) {
-        console.error('E2E Decryption error:', e);
-        return null; // indicate failure
-    }
+    if (!looksLikeE2ECiphertext(ciphertext)) return ciphertext;
+    await prepareVault();
+    await lazyLoadCrypto();
+    try { return decryptSync(ciphertext, password); }
+    catch (error) { return null; }
 }

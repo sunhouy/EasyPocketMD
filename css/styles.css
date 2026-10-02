@@ -5976,3 +5976,14 @@ body.night-mode .diff-live-surface [data-diff-fold-start]::before { color: #c3cf
 }
 #fileList a[data-local-file="copy"]::after { content: "本地副本"; }
 #fileList a[data-local-access="failed"]::after { content: "本地 · 权限失效"; color: #d9534f; }
+
+
+.e2e-card { background: var(--bg-color, #fff); color: var(--text-color, #222); border-radius: 12px; padding: 24px; width: min(540px, 92vw); max-height: 88vh; overflow: auto; box-sizing: border-box; }
+.e2e-card label { display: block; margin: 12px 0; }
+.e2e-card input[type=password], .e2e-card input[inputmode], .e2e-card select { display: block; width: 100%; padding: 9px; margin-top: 6px; box-sizing: border-box; }
+.e2e-card button { margin: 5px; padding: 9px 12px; cursor: pointer; }
+.e2e-card button[hidden] { display: none; }
+.e2e-card code { display: block; overflow-wrap: anywhere; white-space: normal; user-select: all; line-height: 1.8; }
+.e2e-card strong[data-code] { font-size: 30px; letter-spacing: 5px; }
+.e2e-error { color: #c62828; }
+body.night-mode .e2e-card { background: #252525; color: #eee; }

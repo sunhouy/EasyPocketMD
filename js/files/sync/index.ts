@@ -94,7 +94,7 @@ export function createSyncRuntimeApi(ctx: any) {
     lastSyncedContent[file.id] = file.content;
     g('unsavedChanges')[file.id] = false;
 
-    localStorage.setItem('vditor_files', JSON.stringify(files));
+    localStorage.setItem('vditor_files', window.e2eSerializeFiles ? window.e2eSerializeFiles(files) : JSON.stringify(files));
   }
 
   async function handleRemoteFileSaved(payload: any) {
@@ -144,7 +144,7 @@ export function createSyncRuntimeApi(ctx: any) {
       g('unsavedChanges')[file.id] = dirty;
       markPendingServerSync(file.id, dirty);
       acknowledged?.resolve();
-      localStorage.setItem('vditor_files', JSON.stringify(files));
+      localStorage.setItem('vditor_files', window.e2eSerializeFiles ? window.e2eSerializeFiles(files) : JSON.stringify(files));
     } catch (error) {
       acknowledged?.reject(error);
       throw error;
@@ -460,7 +460,7 @@ export function createSyncRuntimeApi(ctx: any) {
                 files[fileIndex].isSynced = false;
                 g('unsavedChanges')[fileId] = true;
                 markPendingServerSync(fileId, true);
-                localStorage.setItem('vditor_files', JSON.stringify(files));
+                localStorage.setItem('vditor_files', window.e2eSerializeFiles ? window.e2eSerializeFiles(files) : JSON.stringify(files));
                 setTimeout(function () {
                   g('unsavedChanges')[fileId] = true;
                   markPendingServerSync(fileId, true);
@@ -472,7 +472,7 @@ export function createSyncRuntimeApi(ctx: any) {
               }
               g('unsavedChanges')[fileId] = false;
               markPendingServerSync(fileId, false);
-              localStorage.setItem('vditor_files', JSON.stringify(files));
+              localStorage.setItem('vditor_files', window.e2eSerializeFiles ? window.e2eSerializeFiles(files) : JSON.stringify(files));
               if (typeof globalRef.refreshE2EUi === 'function') {
                 globalRef.refreshE2EUi();
               }
@@ -548,7 +548,7 @@ export function createSyncRuntimeApi(ctx: any) {
     try {
       file.content = content;
       file.lastModified = Date.now();
-      localStorage.setItem('vditor_files', JSON.stringify(files));
+      localStorage.setItem('vditor_files', window.e2eSerializeFiles ? window.e2eSerializeFiles(files) : JSON.stringify(files));
       g('unsavedChanges')[currentFileId] = false;
     } catch {}
 

@@ -20,6 +20,13 @@
                 img.setAttribute('data-original-src', rawSrc);
                 img.src = src;
             }
+            if (global.E2EAttachments?.encryptedUrl(src)) {
+                try {
+                    img.setAttribute('data-original-src', src);
+                    img.src = await global.E2EAttachments.load(src);
+                } catch (error) { img.alt = '加密图片尚未解锁 / Encrypted image locked'; }
+                continue;
+            }
             // 只处理本地图片，云端图片保持原链接
             if (!src || src.startsWith('blob:') || src.startsWith('data:') || src.startsWith('http://') || src.startsWith('https://')) {
                 continue;

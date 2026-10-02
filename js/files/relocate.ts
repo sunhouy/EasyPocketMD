@@ -43,7 +43,7 @@ export async function relocateFile(globalRef: any, fileId: string, newPath: stri
             file.name = name;
             if (!user) file.isSynced = false;
         }
-        localStorage.setItem('vditor_files', JSON.stringify(files));
+        localStorage.setItem('vditor_files', window.e2eSerializeFiles ? window.e2eSerializeFiles(files) : JSON.stringify(files));
     } finally {
         globalRef.fileRelocationGeneration++;
         globalRef.fileRelocationInProgress = false;

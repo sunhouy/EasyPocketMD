@@ -283,6 +283,14 @@ async function handleGeneralUpload(req, res) {
         }
 
         const user = await verifyUploadUser(req);
+        if (req.body.e2e_attachment === '1') {
+            if (!user) { files.forEach(cleanupFile); return res.status(401).json({ code:401, success:false, message:'身份验证失败' }); }
+            const valid = files.every(file => {
+                const fd = fs.openSync(file.path, 'r');
+                try { const header = Buffer.alloc(7); fs.readSync(fd, header, 0, 7, 0); return header.toString() === 'EPMDA2\n'; } finally { fs.closeSync(fd); }
+            });
+            if (!valid) { files.forEach(cleanupFile); return res.status(400).json({ code:400, success:false, message:'加密附件格式错误' }); }
+        }
         const uploadedFiles = [];
 
         for (const file of files) {
