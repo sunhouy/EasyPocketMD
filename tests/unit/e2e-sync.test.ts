@@ -89,3 +89,30 @@ describe('E2E save representations', () => {
         await expect(e2e.resolveFileContent(cipher, '', false)).rejects.toThrow('无法解密');
     });
 });
+
+describe('initial upload of encrypted local drafts', () => {
+    it('encrypts a recovered local draft without retaining a stale ciphertext display value', async () => {
+        const { installSyncRuntime } = require('../../js/files/sync-runtime');
+        const { app, file } = fixture(); app.currentFileId = null; file.isSynced = false;
+        file.content = await e2e.encrypt('# 正文', 'secret');
+        const rt = installSyncRuntime(app, {}, {}); const serverFiles = [];
+        global.fetch = jest.fn(async (_, options) => {
+            const request = JSON.parse(options.body);
+            expect(request.e2e_enabled).toBe(1);
+            expect(await e2e.decrypt(request.content, 'secret')).toBe('# 正文');
+            return { json: async () => ({ code: 200, data: { content_version: 1 } }) };
+        });
+        await rt.uploadLocalOnlyFilesToServerIfNeeded([file], serverFiles);
+        expect(fetch).toHaveBeenCalledTimes(1);
+        expect(serverFiles[0].content).toBe('# 正文');
+        expect(file.content).toBe('# 正文');
+    });
+    it('keeps a local encrypted draft unsynced when its key is unavailable', async () => {
+        const { installSyncRuntime } = require('../../js/files/sync-runtime');
+        const { app, file } = fixture(); app.currentFileId = null; file.isSynced = false; app.currentUser.password = '';
+        const rt = installSyncRuntime(app, {}, {});
+        global.fetch = jest.fn();
+        await rt.uploadLocalOnlyFilesToServerIfNeeded([file], []);
+        expect(fetch).not.toHaveBeenCalled(); expect(file.isSynced).toBe(false);
+    });
+});

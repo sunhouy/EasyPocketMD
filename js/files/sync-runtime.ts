@@ -1685,7 +1685,7 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
         serverFiles.forEach(function(f) { serverFileMap[f.name] = f; });
 
         const toUpload = localFiles.filter(function(f) {
-            if (!f || !f.name) return false;
+            if (!f || !f.name || f.e2eTransition) return false;
             if (f.type !== 'file' && f.type !== 'folder') return false;
             if (isExternalLocalFile(f) && !['ready', 'copy'].includes(f.localAccessState)) return false;
             if (serverFileMap[f.name]) return false;
@@ -1698,28 +1698,23 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
             if (!isStillUploadUser()) return;
             const f = toUpload[i];
             try {
-                const content =
+                const storedContent = f.content;
+                let content =
                     f.type === 'folder'
                         ? ''
                         : (f.id === g('currentFileId') ? getCurrentEditorContent(f.id, f.content) : f.content);
 
-                if (isExternalLocalFile(f) && !(await writeExternalLocalContent(f, content)).success) continue;
-
                 const filenameToSend = f.type === 'folder' ? (f.name.endsWith('/') ? f.name : (f.name + '/')) : f.name;
                 const fileE2EEnabled = isFileE2EEnabled(f);
-                let contentToSend = f.type === 'folder' ? '{"meta":"folder"}' : content;
-                if (contentToSend && uploadUser.password) {
-                    try {
-                        const e2e = await import('../e2e');
-                        if (fileE2EEnabled) {
-                            contentToSend = await e2e.encrypt(contentToSend, uploadUser.password);
-                        } else {
-                            contentToSend = await e2e.resolveFileContent(contentToSend, uploadUser.password, false);
-                        }
-                    } catch(e) {
-                        console.error('E2E content prepare error', e);
-                    }
+                let contentToSend = '{"meta":"folder"}';
+                if (f.type !== 'folder') {
+                    const e2e = await import('../e2e');
+                    content = await e2e.resolveFileContent(content, uploadUser.password, fileE2EEnabled);
+                    if (f.content === storedContent) f.content = content;
+                    contentToSend = fileE2EEnabled ? await e2e.encrypt(content, uploadUser.password) : content;
                 }
+                if (!isStillUploadUser() || f.e2eTransition || fileE2EEnabled !== isFileE2EEnabled(f)) continue;
+                if (isExternalLocalFile(f) && !(await writeExternalLocalContent(f, content)).success) continue;
                 const body: any = {
                     username: uploadUser.username,
                     token: uploadUser.token,
