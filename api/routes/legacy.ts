@@ -185,7 +185,7 @@ router.all('/index.php', upload.any(), async (req, res) => {
                     break;
                 }
 
-                res.json(await shareManager.createShare(data.username, data.password, data.filename, data.mode, data.share_password, data.expire_days));
+                res.json(await shareManager.createShare(data.username, data.password, data.filename, data.mode, data.share_password, data.expire_days, data.edit_policy, data.editor_usernames, data.edit_password, data.token));
                 break;
 
             case 'get_share':

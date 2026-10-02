@@ -15,6 +15,7 @@ const verifyUser = async (req, res, next) => {
     if (result.code !== 200) {
         return res.json(result);
     }
+    req.ownerToken = data.token || null;
     next();
 };
 
@@ -45,7 +46,7 @@ router.post('/create', verifyUser, async (req, res) => {
     if (!username || !filename) return res.json({ code: 400, message: '缺少必要参数' });
 
     // 1. 先获取文件内容进行敏感词检查（不创建分享）
-    const fileResult = await shareManager.getFileContentForShare(username, password, filename);
+    const fileResult = await shareManager.getFileContentForShare(username, password, filename, req.ownerToken);
     if (fileResult.code !== 200) {
         return res.json(fileResult);
     }
@@ -76,7 +77,7 @@ router.post('/create', verifyUser, async (req, res) => {
     }
 
     // 4. 敏感词检查通过后，创建分享
-    const shareResult = await shareManager.createShare(username, password, filename, mode, share_password, expire_days, edit_policy, editor_usernames, edit_password);
+    const shareResult = await shareManager.createShare(username, password, filename, mode, share_password, expire_days, edit_policy, editor_usernames, edit_password, req.ownerToken);
     res.json(shareResult);
 });
 
@@ -199,7 +200,7 @@ router.post('/properties', verifyUser, async (req, res) => {
     const filename = shareResult.data.filename;
 
     // 获取文件内容进行敏感词检测
-    const fileResult = await shareManager.getFileContentForShare(username, password, filename);
+    const fileResult = await shareManager.getFileContentForShare(username, password, filename, req.ownerToken);
     if (fileResult.code !== 200) {
         return res.json(fileResult);
     }

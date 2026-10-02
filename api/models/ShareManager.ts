@@ -4,6 +4,7 @@ const bcrypt = require('bcryptjs');
 const historyManager = require('./HistoryManager');
 const collaboration = require('./ShareCollaboration');
 const Cache = require('../utils/cache');
+const { verifyJwtToken } = require('../utils/auth');
 const { mergeTextWithCrdt } = require('../utils/textCrdt');
 
 interface ShareAccessOptions {
@@ -122,7 +123,7 @@ class ShareManager {
     }
 
     // Get file content for sensitive word check (without creating share)
-    async getFileContentForShare(username, password, filename) {
+    async getFileContentForShare(username, password, filename, token = null) {
         const connection = await db.getConnection();
         try {
             // 1. Authenticate user
@@ -131,7 +132,7 @@ class ShareManager {
 
             const user = userRows[0];
             const bcrypt = require('bcryptjs');
-            if (!(await bcrypt.compare(password, user.password))) {
+            if (token ? verifyJwtToken(token)?.username !== username : typeof password !== 'string' || !(await bcrypt.compare(password, user.password))) {
                 return { code: 401, message: '用户认证失败' };
             }
 
@@ -155,7 +156,7 @@ class ShareManager {
     }
 
     // Create share
-    async createShare(username, password, filename, mode = 'view', sharePassword = null, expireDays = 7, editPolicy = 'all', editorUsernames = [], editPassword = null) {
+    async createShare(username, password, filename, mode = 'view', sharePassword = null, expireDays = 7, editPolicy = 'all', editorUsernames = [], editPassword = null, token = null) {
         const connection = await db.getConnection();
         try {
             // 1. Authenticate user
@@ -164,7 +165,7 @@ class ShareManager {
 
             const user = userRows[0];
             const bcrypt = require('bcryptjs');
-            if (!(await bcrypt.compare(password, user.password))) {
+            if (token ? verifyJwtToken(token)?.username !== username : typeof password !== 'string' || !(await bcrypt.compare(password, user.password))) {
                 return { code: 401, message: '用户认证失败' };
             }
 
