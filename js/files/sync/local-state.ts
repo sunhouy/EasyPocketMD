@@ -56,8 +56,17 @@ export function refreshSyncIcons(globalRef: any): void {
         let icon = anchor.querySelector<HTMLButtonElement>('.file-sync-icon');
         if (!icon) { icon = document.createElement('button'); icon.type = 'button'; icon.className = 'file-sync-icon';
             icon.addEventListener('click', event => { event.preventDefault(); event.stopPropagation(); if (file.syncConflict) globalRef.openSyncConflict?.(file.id); }); anchor.appendChild(icon); }
+        const encrypted = [true, 1, '1', 'true'].includes(file.e2e_enabled ?? file.e2eEnabled);
+        const vault = globalRef.E2EVault?.state();
+        icon.hidden = !!(encrypted && !vault?.unlocked && (vault?.config || vault?.loaded !== true));
         const [symbol, label] = states[status]; if (icon.dataset.state !== status) { icon.dataset.state = status; icon.className = 'file-sync-icon ' + status; icon.title = label; icon.setAttribute('aria-label', label);
         icon.innerHTML = '<i class="fas ' + symbol + '" aria-hidden="true"></i>'; }
+        let lock = anchor.querySelector('.file-e2e-indicator');
+        if (encrypted) {
+            if (!lock) { lock = document.createElement('span'); lock.className = 'file-e2e-indicator'; lock.innerHTML = '<i class="fas fa-lock" aria-hidden="true"></i>'; anchor.appendChild(lock); }
+            const label = globalRef.i18n?.getLanguage?.() === 'en' ? 'This file is end-to-end encrypted' : '此文件已使用端到端加密';
+            lock.setAttribute('aria-label', label); lock.setAttribute('title', label);
+        } else lock?.remove();
         let tag = anchor.querySelector('.file-local-label');
         if (file.isExternalLocal || file.localOriginDeviceId) {
             if (!tag) { tag = document.createElement('small'); tag.className = 'file-local-label'; anchor.appendChild(tag); }

@@ -40,3 +40,8 @@ body.night-mode .sync-conflict-panel { background: #202020; color: #eee; }
     content-visibility: auto;
     contain-intrinsic-size: auto 48px;
 }
+
+.file-e2e-indicator { display: inline-flex; align-items: center; padding: 0 5px; color: #1f8f4d; font-size: 15px; }
+body.night-mode .file-e2e-indicator { color: #6ee7a3; }
+.e2e-modal .modal-header { position: relative; }
+.e2e-modal [data-unlock-close] { position: absolute; top: 0; right: 0; border: 0; background: transparent; font-size: 24px; line-height: 1; cursor: pointer; }

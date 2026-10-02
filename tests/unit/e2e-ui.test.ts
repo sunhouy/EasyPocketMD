@@ -56,3 +56,27 @@ it('shows password errors in the selected language',async()=>{
     expect(document.querySelector('[data-error]').textContent).toContain('Incorrect password');
     expect(document.querySelector('[data-error]').textContent).not.toMatch(/[\u4e00-\u9fff]/);
 });
+
+
+it('cancels unlocking without trapping the next file open', async()=>{
+    const pending = mockUnlock();
+    const rejected = expect(pending).rejects.toMatchObject({e2eKey:'e2eUnlockCancelled'});
+    const close = document.querySelector('.modal-header [data-unlock-close]');
+    expect(close.getAttribute('aria-label')).toBe('关闭');
+    close.click(); await rejected;
+    expect(document.querySelector('.e2e-modal')).toBeNull();
+    expect(vault.unlockPassword).not.toHaveBeenCalled();
+    const retry = mockUnlock();
+    document.querySelector('[data-method="login"]').dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}));
+    await retry; expect(document.querySelector('.e2e-modal')).toBeNull();
+});
+
+
+it('responds to the management button immediately, including a late-mounted settings page', async()=>{
+    let ready; vault.ensureUnlocked.mockImplementationOnce(()=>new Promise(resolve=>{ready=resolve;}));
+    document.body.innerHTML='<button id="manageE2E"><span>manage</span></button>';
+    document.querySelector('#manageE2E span').click();
+    expect(document.querySelector('[role="status"]').textContent).toContain('正在加载');
+    ready(); await tick();
+    expect(document.querySelectorAll('[data-use-login],[data-use-passkey],[data-use-dedicated]')).toHaveLength(3);
+});

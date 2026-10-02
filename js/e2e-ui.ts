@@ -35,7 +35,7 @@ async function run(view: HTMLElement, action: () => Promise<void>) {
 }
 async function requestUnlock() {
     const methods = vault.state().config.methods;
-    return new Promise<void>(resolve => {
+    return new Promise<void>((resolve, reject) => {
         const passwordMethod = (method: string, title: string, input: string, action: string) => `<form class="form-group" data-method="${method}">
             <label>${text(title)}<input class="form-control" type="password" autocomplete="off" data-${method}-password placeholder="${t(input)}" data-i18n-placeholder="${input}"></label>
             <button type="submit" class="modal-btn primary full-width" data-${method}>${text(action)}</button></form>`;
@@ -44,6 +44,12 @@ async function requestUnlock() {
             ${methods.passkey ? `<div class="form-group" data-method="passkey"><label>${text('e2ePasskeyMethod')}</label><button type="button" class="modal-btn primary full-width" data-passkey>${text('e2eUsePasskey')}</button></div>` : ''}
             ${methods.dedicated ? passwordMethod('dedicated','e2eDedicatedMethod','e2eDedicatedInput','e2eUseDedicated') : ''}
             <p class="settings-hint">${text('e2eSessionHint')}</p>`,false);
+        const close = document.createElement('button');
+        close.type = 'button'; close.className = 'modal-close-btn'; close.dataset.unlockClose = '';
+        close.setAttribute('aria-label', t('e2eClose')); close.textContent = '×';
+        close.addEventListener('click', () => { view.remove(); reject(e2eError('e2eUnlockCancelled')); });
+        view.querySelector('.modal-header').append(close);
+        view.addEventListener('keydown', event => { if (event.key === 'Escape' && !close.disabled) { event.preventDefault(); close.click(); } });
         const done = () => { view.remove(); resolve(); };
         for (const method of ['login','dedicated'] as const) view.querySelector(`[data-method="${method}"]`)?.addEventListener('submit',event=>{
             event.preventDefault(); void run(view,async()=>{ await vault.unlockPassword(method,(view.querySelector(`[data-${method}-password]`) as HTMLInputElement).value); done(); });
@@ -52,7 +58,11 @@ async function requestUnlock() {
     });
 }
 export async function showSettings() {
-    await vault.ensureUnlocked(); await lazyLoadCrypto();
+    const loading = dialog('e2eSettingsTitle', `<p role="status" data-i18n="e2eLoading">${t('e2eLoading')}</p>`);
+    try { await vault.ensureUnlocked(); await lazyLoadCrypto(); }
+    catch (err) { loading.remove(); throw err; }
+    if (!loading.isConnected) return;
+    loading.remove();
     const view = dialog('e2eSettingsTitle', `
         <p class="settings-hint">${text('e2eMethodsHint')}</p>
         <div class="form-group" data-method="login"><div class="checkbox-group"><label><input type="checkbox" data-login>${text('e2eLoginMethod')}</label></div>
@@ -124,11 +134,18 @@ function sealAndReload() {
 vault.setUI(requestUnlock,sealAndReload);
 window.showE2ESettings = showSettings;
 window.e2eSerializeFiles = serializeFiles;
+document.addEventListener('click', event => {
+    if (!(event.target instanceof Element) || !event.target.closest('#manageE2E')) return;
+    event.preventDefault();
+    void showSettings().catch(err => { if (err?.e2eKey !== 'e2eUnlockCancelled') window.showMessage?.(e2eErrorText(err), 'error'); });
+});
+window.addEventListener('e2e-unlocked', () => {
+    (window.refreshFileSyncIcons as any)?.();
+    setTimeout(() => (window.queueBackgroundFileSync as any)?.(window.currentFileId), 0);
+});
 async function bootstrap() {
-    const button = document.getElementById('manageE2E');
-    button?.addEventListener('click',()=>showSettings().catch(err=>window.showMessage?.(e2eErrorText(err),'error')));
     if (!window.currentUser?.token || new URLSearchParams(location.search).has('share_id')) return;
-    try { await vault.ensureUnlocked(); await lazyLoadCrypto(); }
+    try { await vault.initialize(); if (vault.state().unlocked) await lazyLoadCrypto(); }
     catch(err) { window.showMessage?.(e2eErrorText(err),'error'); }
 }
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded',bootstrap); else void bootstrap();

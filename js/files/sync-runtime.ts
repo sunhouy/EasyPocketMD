@@ -1028,7 +1028,9 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
 
                     const fileE2EEnabled = isFileE2EEnabled(f);
                     if (window.currentUser && content) {
-                        content = await resolveE2EFileContent(content, f);
+                        await global.E2EVault?.initialize();
+                        const state = global.E2EVault?.state();
+                        content = state?.config && !state.unlocked && isFileE2EEnabled(f) ? undefined : await resolveE2EFileContent(content, f);
                     }
 
                     if (name.endsWith('/') || content === '{"meta":"folder"}' || content === '{"type":"folder"}') {
@@ -1218,6 +1220,7 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
         updateCurrentFileE2EIndicator();
         updateFileE2EMenuItems();
         setupE2EIndicatorInteractions();
+        refreshSyncIcons(global);
     }
 
     // ---------- 端到端加密锁头浮窗 ----------
@@ -1534,7 +1537,9 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
 
         let initialServerFiles = await Promise.all(result.data.files.map(async f => {
             if (window.currentUser && f.content) {
-                f.content = await resolveE2EFileContent(f.content, f);
+                await global.E2EVault?.initialize();
+                const state = global.E2EVault?.state();
+                f.content = state?.config && !state.unlocked && isFileE2EEnabled(f) ? undefined : await resolveE2EFileContent(f.content, f);
             }
             return f;
         }));
