@@ -619,10 +619,10 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
         return { success: false, error: error?.message || String(error) };
     }
 
-    async function writeBrowserLocalFileWithRetry(fileId, content) {
+    async function writeBrowserLocalFileWithRetry(fileId, content, interactive = true) {
         const file = g('files').find(f => f.id === fileId);
-        const result = await writeExternalLocalContent(file, content, true);
-        if (!result.success) result.converted = await offerLocalFileConversion(file, new Error(result.error));
+        const result = await writeExternalLocalContent(file, content, interactive);
+        if (!result.success && interactive) result.converted = await offerLocalFileConversion(file, new Error(result.error));
         return result;
     }
 
@@ -1147,7 +1147,7 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
 
             } else {
                 hooks.loadLocalFiles();
-                global.showSyncStatus(isEn() ? 'No files on server, using local files' : '服务器没有文件，使用本地文件', 'success');
+
             }
         } catch (error) {
             console.error('从服务器加载文件失败:', error);
@@ -1561,6 +1561,7 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
                 type: serverFile.type || 'file',
                 content: serverFile.type === 'folder' ? '' : (serverFile.content ?? ''),
                 contentLoaded: serverFile.type === 'folder' ? true : !isServerListContentMissing(serverFile.content),
+                contentFetchedAt: !isServerListContentMissing(serverFile.content) ? Date.now() : undefined,
                 lastModified: serverLastModified,
                 serverLastModified: serverLastModified,
                 contentVersion: serverFile.contentVersion !== null && serverFile.contentVersion !== undefined
@@ -1651,6 +1652,7 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
             if (serverFile.content !== editorContent || e2eChanged) {
                 file.content = serverFile.content;
                 file.contentLoaded = true;
+                file.contentFetchedAt = Date.now();
                 file.lastModified = serverFile.lastModified || file.lastModified || null;
                 file.serverLastModified = serverFile.serverLastModified || serverFile.lastModified || file.serverLastModified || null;
                 file.contentVersion = serverFile.contentVersion !== null && serverFile.contentVersion !== undefined
@@ -1675,7 +1677,7 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
             if (typeof global.loadFiles === 'function') {
                 global.loadFiles();
             }
-            global.showSyncStatus(isEn() ? 'Updated local files from server changes' : '已拉取服务器更新到本地', 'success');
+
         }
     }
 

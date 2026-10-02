@@ -18,7 +18,7 @@ export function syncStatus(file: any, online: boolean, dirty: boolean): SyncStat
     return dirty ? 'pending' : 'synced';
 }
 /** A small per-file journal avoids serializing the whole workspace for every edit. */
-const snapshotFields = ['content','lastModified','contentVersion','serverLastModified','crdtBaseContent','crdtBaseContentVersion','isSynced','contentLoaded','e2e_enabled','e2eEnabled','localSyncedContent','localPendingWrite','remoteContentVersion','syncConflict','syncConflictRemoteContent','syncConflictVersion','syncConflictDiskContent'];
+const snapshotFields = ['content','lastModified','contentVersion','serverLastModified','crdtBaseContent','crdtBaseContentVersion','isSynced','contentLoaded','contentFetchedAt','e2e_enabled','e2eEnabled','localSyncedContent','localPendingWrite','remoteContentVersion','syncConflict','syncConflictRemoteContent','syncConflictVersion','syncConflictDiskContent'];
 export function persistFile(file: any, serialize?: (files: any[]) => string): void {
     const snapshot = { ...file }; delete snapshot.syncBusy;
     const data = serialize ? serialize([snapshot]) : JSON.stringify([snapshot]);

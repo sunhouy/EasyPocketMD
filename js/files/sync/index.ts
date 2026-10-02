@@ -112,7 +112,7 @@ export function createSyncRuntimeApi(ctx: any) {
     const live = file.id === g('currentFileId') ? getCurrentEditorContent(file.id, file.content) : file.content;
     const final = live !== originalLocal ? safeMerge(originalLocal, live, merged.content) : merged;
     if (!final.clean) { conflict(file, content, version); return; }
-    file.content = final.content; file.contentLoaded = true; file.contentVersion = version;
+    file.content = final.content; file.contentLoaded = true; file.contentFetchedAt = Date.now(); file.contentVersion = version;
     file.crdtBaseContent = content; file.crdtBaseContentVersion = version;
     file.serverLastModified = remote.last_modified ?? remote.serverLastModified; file.lastModified = Date.now();
     if (isExternalLocalFile(file)) { file.localSyncedContent = content; file.localCloudUsername = g('currentUser').username; if (final.content !== merged.content) file.localPendingWrite = true; }
@@ -212,6 +212,8 @@ export function createSyncRuntimeApi(ctx: any) {
       const live = file.id === g('currentFileId') ? getCurrentEditorContent(file.id, file.content) : file.content;
       const dirty = live !== plaintext;
       file.isSynced = !dirty;
+      file.contentLoaded = true;
+      file.contentFetchedAt = Date.now();
       g('unsavedChanges')[file.id] = dirty;
       markPendingServerSync(file.id, dirty);
       acknowledged?.resolve();
@@ -511,6 +513,8 @@ export function createSyncRuntimeApi(ctx: any) {
               }
               if (file.type !== 'folder') {
                 files[fileIndex].content = hasNewerActiveEditorContent ? liveEditorContent : serverContent;
+                files[fileIndex].contentLoaded = true;
+                files[fileIndex].contentFetchedAt = Date.now();
                 if (!hasNewerActiveEditorContent && fileId === g('currentFileId') && liveEditorContent !== serverContent) {
                   setEditorContentForFile(fileId, serverContent, { preserveCursor: true });
                 }
