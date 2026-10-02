@@ -1348,20 +1348,20 @@ body.night-mode #settingsModalOverlay .modal-actions {
     width: 100%;
 }
 
-.modal-btn.loading {
+.modal-btn.is-loading {
     cursor: not-allowed;
     opacity: 0.7;
     pointer-events: none;
     background-color: #999 !important;
 }
 
-.modal-btn.loading .btn-text {
+.modal-btn.is-loading .btn-text {
     display: inline-flex;
     align-items: center;
     gap: 8px;
 }
 
-.modal-btn.loading .btn-spinner {
+.modal-btn.is-loading .btn-spinner {
     display: inline-block;
     width: 16px;
     height: 16px;

@@ -27,7 +27,7 @@ function dialog(titleKey: string, body: string, closable = true) {
     (overlay.querySelector('input,button') as HTMLElement)?.focus();
     return overlay;
 }
-function error(view: HTMLElement, err: any) { const message = view.querySelector('[data-error]'); message.textContent = e2eErrorText(err); message.classList.add('error'); }
+function error(view: HTMLElement, err: any) { const message = view.querySelector('[data-error]'); message.textContent = e2eErrorText(err); message.classList.add('error'); window.showMessage?.(e2eErrorText(err), 'error'); }
 async function run(view: HTMLElement, action: () => Promise<void>) {
     const buttons = Array.from(view.querySelectorAll<HTMLButtonElement>('button')); const states = buttons.map(b=>b.disabled); buttons.forEach(b=>b.disabled=true);
     try { await action(); } catch(err) { error(view,err); }
@@ -50,7 +50,7 @@ async function requestUnlock() {
         close.addEventListener('click', () => { view.remove(); reject(e2eError('e2eUnlockCancelled')); });
         view.querySelector('.modal-header').append(close);
         view.addEventListener('keydown', event => { if (event.key === 'Escape' && !close.disabled) { event.preventDefault(); close.click(); } });
-        const done = () => { view.remove(); resolve(); };
+        const done = () => { window.showMessage?.(t('e2eUnlockSuccess'), 'success'); view.remove(); resolve(); };
         for (const method of ['login','dedicated'] as const) view.querySelector(`[data-method="${method}"]`)?.addEventListener('submit',event=>{
             event.preventDefault(); void run(view,async()=>{ await vault.unlockPassword(method,(view.querySelector(`[data-${method}-password]`) as HTMLInputElement).value); done(); });
         });

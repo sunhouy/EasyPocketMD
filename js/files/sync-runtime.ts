@@ -70,6 +70,8 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
     }
 
     async function tryHandleTokenExpired(source) {
+        // Encryption expiry is separate from the authenticated account session.
+        if (source?.e2eKey && source.e2eKey !== 'e2eLoginRequired') return false;
         const resultLike = source && typeof source === 'object' && Object.prototype.hasOwnProperty.call(source, 'code')
             ? source
             : null;
@@ -1004,7 +1006,7 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
                 await global.ensureWasmTextEngineReady();
                 if (!isStillCurrentUser()) return;
             }
-            if (window.E2EVault) await window.E2EVault.ensureUnlocked();
+            if (window.E2EVault) await window.E2EVault.initialize();
             void refreshOwnerShareCache(true).catch(console.warn);
             if (!isStillCurrentUser()) return;
             var api = global.getApiBaseUrl ? global.getApiBaseUrl() : 'api';

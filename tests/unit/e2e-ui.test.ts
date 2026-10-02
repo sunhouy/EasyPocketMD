@@ -15,7 +15,7 @@ window.currentUser=null;
 const vault=require('../../js/e2e-vault');
 const {showSettings}=require('../../js/e2e-ui');
 const tick=()=>new Promise(resolve=>setTimeout(resolve,0));
-beforeEach(()=>{document.body.innerHTML='';jest.clearAllMocks();mockConfig={ttlSeconds:900,methods:{login:{},passkey:{}}};window.files=[];window.i18n.setLanguage('zh');});
+beforeEach(()=>{document.body.innerHTML='';jest.clearAllMocks();window.showMessage=jest.fn();mockConfig={ttlSeconds:900,methods:{login:{},passkey:{}}};window.files=[];window.i18n.setLanguage('zh');});
 it.each(['zh','en'])('uses existing buttons and complete %s translations',async lang=>{
     window.i18n.setLanguage(lang);await showSettings();
     expect(document.querySelectorAll('[data-use-login],[data-use-passkey],[data-use-dedicated]')).toHaveLength(3);
@@ -48,12 +48,14 @@ it.each(['login','dedicated','passkey'])('unlocks directly through independent %
     if(method==='passkey') expect(vault.unlockPasskey).toHaveBeenCalledTimes(1);
     else expect(vault.unlockPassword).toHaveBeenCalledWith(method,method+'-secret');
     expect(document.querySelector('.e2e-modal')).toBeNull();
+    expect(window.showMessage).toHaveBeenCalledWith('端到端加密验证成功','success');
 });
 it('shows password errors in the selected language',async()=>{
     window.i18n.setLanguage('en');mockConfig.methods.dedicated={};void mockUnlock();
     vault.unlockPassword.mockRejectedValueOnce(require('../../js/e2e-i18n').e2eError('e2ePasswordIncorrect'));
     document.querySelector('[data-method="dedicated"]').dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}));await tick();
     expect(document.querySelector('[data-error]').textContent).toContain('Incorrect password');
+    expect(window.showMessage).toHaveBeenCalledWith(expect.stringContaining('Incorrect password'),'error');
     expect(document.querySelector('[data-error]').textContent).not.toMatch(/[\u4e00-\u9fff]/);
 });
 
