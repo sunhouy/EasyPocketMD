@@ -1553,6 +1553,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     window.applyVditorThemes = applyVditorThemes;
 
+    let imageScanTimer;
     function markCurrentFileEdited() {
         if (!window.currentFileId) return;
         window.unsavedChanges[window.currentFileId] = true;
@@ -1563,7 +1564,8 @@ document.addEventListener('DOMContentLoaded', function() {
             window.draftRecovery.markDirty();
         }
         if (window.isMobileEditorEnvironment) return;
-        setTimeout(function() {
+        clearTimeout(imageScanTimer);
+        imageScanTimer = setTimeout(function() {
             if (window.LazyImageLoader && window.LazyImageLoader.processVditorImages) {
                 window.LazyImageLoader.processVditorImages();
             }
@@ -1716,7 +1718,9 @@ document.addEventListener('DOMContentLoaded', function() {
         customWysiwygToolbar: function() {}, // 修复报错
         theme: window.nightMode ? 'dark' : 'classic',
         mode: localStorage.getItem('vditor_editor_mode') || 'wysiwyg',
-        cache: { enable: true, id: 'vditor-mobile-optimized' },
+        // Per-file journals own recovery; Vditor's shared cache duplicates conversion and storage.
+        cache: { enable: false, id: 'vditor-mobile-optimized' },
+        undoDelay: 1000,
         outline: { enable: window.userSettings.showOutline },
         hint: { emoji: {} },
         preview: buildVditorPreviewConfig(),
@@ -2008,8 +2012,9 @@ document.addEventListener('DOMContentLoaded', function() {
             if (shareModeActive) { hideTopNoticeBanner(); return; }
             if (window.currentUser) {
                 window.showUserInfo();
+                if (localStorage.getItem('vditor_files')) window.loadLocalFiles();
                 window.startAutoSync();
-                window.loadFilesFromServer();
+                setTimeout(() => window.loadFilesFromServer(), 0);
                 hideTopNoticeBanner();
             } else {
                 const urlParams = new URLSearchParams(window.location.search);

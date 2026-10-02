@@ -1,3 +1,4 @@
+const { getLocalOrigins, setLocalOrigin, clearLocalOrigin } = require('../models/LocalOrigins');
 const express = require('express');
 const router = express.Router();
 const fileManager = require('../models/FileManager');
@@ -30,6 +31,22 @@ router.get('/', verifyUser, async (req, res) => {
     res.json(await fileManager.getUserFiles(username));
 });
 
+router.get('/local-origins', verifyUser, async (req, res) => {
+    try { res.json({ code: 200, data: await getLocalOrigins(req.user.username) }); }
+    catch { res.status(503).json({ code: 503, message: '本地来源元数据暂不可用' }); }
+});
+router.delete('/local-origin', verifyUser, async (req, res) => {
+    if (typeof req.body.filename !== 'string' || !req.body.filename) return res.status(400).json({ code: 400 });
+    try { await clearLocalOrigin(req.user.username, req.body.filename); res.json({ code: 200 }); }
+    catch { res.status(503).json({ code: 503, message: '移除本地来源失败' }); }
+});
+router.post('/local-origin', verifyUser, async (req, res) => {
+    const { filename, device_id } = req.body;
+    if (typeof filename !== 'string' || !filename || filename.length > 255 || typeof device_id !== 'string' || !/^[a-zA-Z0-9-]{1,64}$/.test(device_id)) return res.status(400).json({ code: 400, message: '无效的文件来源' });
+    try { await setLocalOrigin(req.user.username, filename, device_id); res.json({ code: 200 }); }
+    catch { res.status(503).json({ code: 503, message: '本地来源元数据保存失败' }); }
+});
+
 // Get single file
 router.get('/content', verifyUser, async (req, res) => {
     const { username, filename } = req.query;
@@ -39,7 +56,7 @@ router.get('/content', verifyUser, async (req, res) => {
 
 // Save file
 router.post('/save', verifyUser, async (req, res) => {
-    const { username, filename, content, create_history, base_last_modified, base_hash, base_content_version, base_content, e2e_enabled } = req.body;
+    const { username, filename, content, create_history, base_last_modified, base_hash, base_content_version, base_content, e2e_enabled, conflict_strategy } = req.body;
     if (!username || !filename) return res.json({ code: 400, message: '缺少必要参数' });
     
     const shouldCreateHistory = create_history === 'true' || create_history === true;
@@ -49,7 +66,7 @@ router.post('/save', verifyUser, async (req, res) => {
         content,
         shouldCreateHistory,
         { base_last_modified, base_hash, base_content_version, base_content },
-        { e2e_enabled }
+        { e2e_enabled, conflict_strategy: conflict_strategy === 'strict' ? 'strict' : undefined }
     );
 
     if (result.code === 409) {

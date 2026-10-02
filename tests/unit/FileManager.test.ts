@@ -636,3 +636,27 @@ describe('E2E disable saves', () => {
         expect(connection.execute).toHaveBeenCalledWith(expect.stringContaining('UPDATE user_files'), ['# 正文', 0, 'user', 'note.md']);
     });
 });
+
+describe('strict offline conflict policy', () => {
+    function connection(content, enabled = 0) {
+        const mock = { beginTransaction: jest.fn(async () => {}), commit: jest.fn(async () => {}), rollback: jest.fn(async () => {}), release: jest.fn(),
+            execute: jest.fn().mockResolvedValueOnce([[{ id: 1, content, e2e_enabled: enabled, content_version: 2, last_modified: '2026-10-02T00:00:00Z' }]]).mockResolvedValue([{}]) };
+        db.getConnection.mockResolvedValue(mock); return mock;
+    }
+    it('returns both the current cloud revision and 409 instead of overwriting overlapping changes', async () => {
+        const conn = connection('remote');
+        const result = await fileManager.saveFile('u', 'a.md', 'local', { base_content_version: 1, base_content: 'original' }, { e2e_enabled: 0, conflict_strategy: 'strict' });
+        expect(result.code).toBe(409); expect(result.data.content).toBe('remote'); expect(result.data.content_version).toBe(2);
+        expect(conn.execute).toHaveBeenCalledTimes(1); expect(conn.rollback).toHaveBeenCalled();
+    });
+    it('allows independent changes in the transaction', async () => {
+        const conn = connection('one\ntwo\nTHREE');
+        const result = await fileManager.saveFile('u', 'a.md', 'ONE\ntwo\nthree', { base_content_version: 1, base_content: 'one\ntwo\nthree' }, { e2e_enabled: 0, conflict_strategy: 'strict' });
+        expect(result.code).toBe(200); expect(result.data.content).toBe('ONE\ntwo\nTHREE'); expect(conn.commit).toHaveBeenCalled();
+    });
+    it('never tries to merge encrypted ciphertext on the server', async () => {
+        const conn = connection('cipher-remote', 1);
+        const result = await fileManager.saveFile('u', 'a.md', 'cipher-local', { base_content_version: 1 }, { e2e_enabled: 1, conflict_strategy: 'strict' });
+        expect(result.code).toBe(409); expect(conn.execute).toHaveBeenCalledTimes(1);
+    });
+});

@@ -483,3 +483,10 @@ CREATE TABLE IF NOT EXISTS share_edit_blocks (
     PRIMARY KEY (share_id, actor_key),
     FOREIGN KEY (share_id) REFERENCES file_shares(share_id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Local sources: only opaque device IDs; binding remains stable across folder/file moves.
+CREATE TABLE IF NOT EXISTS file_local_origins (
+    file_id INT NOT NULL PRIMARY KEY,
+    device_id VARCHAR(64) NOT NULL,
+    FOREIGN KEY (file_id) REFERENCES user_files(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

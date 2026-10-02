@@ -27,7 +27,7 @@ describe('local and cloud acknowledgements', () => {
         const events = [];
         const write = jest.fn(async (_, content) => { events.push(content); return { success: true }; });
         const { api, file } = fixture(write);
-        global.fetch = jest.fn(async () => { events.push('upload'); return { json: async () => ({ code: 200, data: { content: 'merged', content_version: 2 } }) }; });
+        global.fetch = jest.fn(async url => { if (!String(url).endsWith('/local-origin')) events.push('upload'); return { json: async () => ({ code: 200, data: { content: 'merged', content_version: 2 } }) }; });
         expect(await api.syncFileToServer('local')).toBe(true);
         expect(events).toEqual(['edit', 'upload', 'merged']);
         expect(file.localSyncedContent).toBe('merged'); expect(file.localCloudUsername).toBe('user');
@@ -60,5 +60,33 @@ describe('local save wrapper retains concurrent drafts', () => {
         const rt = installSyncRuntime(app, {}, {});
         expect(await rt.ensureExternalLocalAccess(file)).toBe(true);
         expect(file.content).toBe('unsaved recovery draft'); expect(app.unsavedChanges.local).toBe(true);
+    });
+});
+
+describe('version-aware offline reconciliation', () => {
+    beforeEach(() => localStorage.clear());
+    afterEach(() => jest.restoreAllMocks());
+    it('automatically merges independent edits and writes them to the original', async () => {
+        const write = jest.fn(async () => ({ success: true }));
+        const { app, file, edit } = fixture(write);
+        const base = 'one\ntwo\nthree', local = 'ONE\ntwo\nthree', remote = 'one\ntwo\nTHREE';
+        Object.assign(file, { content: local, crdtBaseContent: base, contentVersion: 1, isSynced: false }); edit(local); app.unsavedChanges.local = true;
+        await app.reconcileRemoteFile(file, { content: remote, content_version: 2 });
+        expect(file.content).toBe('ONE\ntwo\nTHREE'); expect(file.crdtBaseContent).toBe(remote); expect(file.contentVersion).toBe(2);
+        expect(write).toHaveBeenCalledWith(file, 'ONE\ntwo\nTHREE'); expect(app.pendingServerSync.local).toBe(true);
+    });
+    it('retains both versions and does not advance the base on overlapping edits', async () => {
+        const { app, file } = fixture(async () => ({ success: true })); app.currentFileId = 'other';
+        Object.assign(file, { content: 'local', crdtBaseContent: 'original', contentVersion: 1, isSynced: false });
+        await app.reconcileRemoteFile(file, { content: 'remote', content_version: 2 });
+        expect(file.content).toBe('local'); expect(file.contentVersion).toBe(1); expect(file.syncConflict).toBe(true);
+        expect(file.syncConflictRemoteContent).toBe('remote'); expect(JSON.parse(localStorage.getItem('epm-file:local'))[0].content).toBe('local');
+    });
+    it('does not attempt network writes while offline', async () => {
+        jest.spyOn(navigator, 'onLine', 'get').mockReturnValue(false); global.fetch = jest.fn();
+        const { api } = fixture(async () => ({ success: true })); expect(await api.syncFileToServer('local')).toBe(false); expect(fetch).not.toHaveBeenCalled();
+    });
+    it('treats other-device local sources as editable cloud copies', () => {
+        expect(isExternalLocalFile({ type: 'file', isExternalLocal: true, localFileMode: 'remote' })).toBe(false);
     });
 });
