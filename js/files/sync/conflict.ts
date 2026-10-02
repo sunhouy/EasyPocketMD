@@ -1,6 +1,6 @@
 import { computeDiff, renderDiffView, bindCollapsedDiffInteractions } from '../conflict/index';
 import { renderMarkdownDiff } from '../conflict/markdown';
-export async function showSyncConflict(globalRef: any, file: any, local: string, remote: string, resolve: (content: string) => Promise<void>) {
+export async function showSyncConflict(globalRef: any, file: any, local: string, remote: string, resolve: (content: string) => Promise<void>, disk?: string) {
     document.getElementById('syncConflictPanel')?.remove();
     const panel = document.createElement('section'); panel.id = 'syncConflictPanel'; panel.className = 'sync-conflict-panel'; panel.setAttribute('role', 'dialog'); panel.setAttribute('aria-modal', 'true');
     const header = document.createElement('header');
@@ -12,6 +12,7 @@ export async function showSyncConflict(globalRef: any, file: any, local: string,
     const choose = async (value: string) => { header.querySelectorAll('button').forEach(b => b.disabled = true);
         try { await resolve(value); panel.remove(); } catch (error: any) { globalRef.showMessage?.(error.message, 'error'); header.querySelectorAll('button').forEach(b => b.disabled = false); } };
     button('使用本地', () => void choose(local)); button('使用云端', () => void choose(remote));
+    if (disk !== undefined) button('使用原本地文件', () => { editor.value = disk; manual = true; editor.hidden = false; body.hidden = true; });
     button('手动合并', () => { manual = !manual; editor.hidden = !manual; body.hidden = manual; });
     button('保存合并', () => { if (manual) void choose(editor.value); });
     button('源码 / Markdown', () => { source = !source; void render(); });
