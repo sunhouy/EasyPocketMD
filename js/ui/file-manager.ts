@@ -85,10 +85,11 @@
             var apiUrl = (window.getApiBaseUrl ? window.getApiBaseUrl() : 'api') + '/user_files/list';
             const response = await fetch(apiUrl, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', ...(g('currentUser').token ? { Authorization: 'Bearer ' + g('currentUser').token } : {}) },
                 body: JSON.stringify({
                     username: g('currentUser').username,
-                    password: g('currentUser').password
+                    token: g('currentUser').token,
+                    password: g('currentUser').token ? undefined : g('currentUser').password
                 })
             });
             const result = await response.json();
@@ -228,10 +229,11 @@
                                     var apiUrl = (window.getApiBaseUrl ? window.getApiBaseUrl() : 'api') + '/user_files/delete';
                                     const delRes = await fetch(apiUrl, {
                                         method: 'POST',
-                                        headers: { 'Content-Type': 'application/json' },
+                                        headers: { 'Content-Type': 'application/json', ...(g('currentUser').token ? { Authorization: 'Bearer ' + g('currentUser').token } : {}) },
                                         body: JSON.stringify({
                                             username: g('currentUser').username,
-                                            password: g('currentUser').password,
+                                            token: g('currentUser').token,
+                    password: g('currentUser').token ? undefined : g('currentUser').password,
                                             filename: file.name
                                         })
                                     });

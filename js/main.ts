@@ -3134,13 +3134,14 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
 
-        // 获取选中的编辑器模式
+        // Apply mode after settings are persisted and the dialog is closed.
+        var modeToApply = null;
         var modeRadios = document.getElementsByName('editorMode');
         for (var i = 0; i < modeRadios.length; i++) {
             if (modeRadios[i].checked) {
                 var newMode = modeRadios[i].value;
                 if (newMode !== localStorage.getItem('vditor_editor_mode')) {
-                    setEditorMode(newMode);
+                    modeToApply = newMode;
                 }
                 break;
             }
@@ -3280,11 +3281,15 @@ document.addEventListener('DOMContentLoaded', function() {
         // 保存设置
         try {
             localStorage.setItem('vditor_settings', JSON.stringify(newSettings));
+            if (modeToApply) localStorage.setItem('vditor_editor_mode', modeToApply);
         } catch (_) {
             window.showMessage(window.i18n ? window.i18n.t('backgroundSaveFailed') : '设置保存失败，请释放本机存储空间后重试', 'error');
             return;
         }
         window.userSettings = newSettings;
+        settingsDialogInitialSnapshot = null;
+        document.getElementById('settingsModalOverlay').classList.remove('show');
+        window.showMessage(window.i18n ? window.i18n.t('settingsSaved') : '设置已保存', 'success');
         applyBackground(newSettings.background);
         applyThemeColor(newSettings.themeColor);
 
@@ -3375,7 +3380,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (window.loadFiles) window.loadFiles();
             settingsDialogInitialSnapshot = null;
             document.getElementById('settingsModalOverlay').classList.remove('show');
-            window.showMessage(window.i18n ? window.i18n.t('settingsSaved') : '设置已保存', 'success');
+            if (modeToApply) setEditorMode(modeToApply);
         }
     });
 

@@ -163,3 +163,24 @@ test('background sync does not prompt to unlock encrypted files', async () => {
     await app.reconcileRemoteFile(file,{content:'cipher',content_version:8,e2e_enabled:1});
     expect(fetch).not.toHaveBeenCalled(); expect(file.content).toBe('edit'); expect(file.remoteContentVersion).toBe(8);
 });
+
+
+test('loading file metadata initializes encryption without asking to unlock', async () => {
+    const {installSyncRuntime} = await import('../../js/files/sync-runtime');
+    const previous = window.E2EVault;
+    const vault = {initialize:jest.fn(async()=>{}),ensureUnlocked:jest.fn(async()=>{throw Error('must not prompt');}),state:()=>({config:{},loaded:true,unlocked:false})};
+    window.E2EVault = vault;
+    const app = {E2EVault:vault,files:[],currentUser:{username:'user',token:'token'},unsavedChanges:{},pendingServerSync:{},lastSyncedContent:{},showSyncStatus:jest.fn()};
+    const rt=installSyncRuntime(app,{syncCurrentEditorSnapshotIntoFiles:()=>{}},{loadFiles:()=>{},loadLocalFiles:jest.fn(),shouldAutoOpenInitialFile:()=>false});
+    global.fetch=jest.fn(async()=>({json:async()=>({code:200,data:{files:[{name:'locked.md',e2e_enabled:1,content:'EPMD2:locked',content_version:1}]}})}));
+    try { await rt.loadFilesFromServer(); expect(vault.ensureUnlocked).not.toHaveBeenCalled(); expect(app.files[0].name).toBe('locked.md'); expect(app.showSyncStatus).not.toHaveBeenCalled(); }
+    finally { window.E2EVault=previous; }
+});
+
+test('encryption session expiry does not invalidate the account token', async()=>{
+    const {installSyncRuntime}=await import('../../js/files/sync-runtime');
+    const app={currentUser:{username:'user',token:'valid'},handleTokenExpired:jest.fn(),isTokenError:()=>true};
+    const rt=installSyncRuntime(app,{},{});
+    expect(await rt.tryHandleTokenExpired({e2eKey:'e2eSessionExpired',message:'端到端加密会话已过期'})).toBe(false);
+    expect(app.handleTokenExpired).not.toHaveBeenCalled();expect(app.currentUser.token).toBe('valid');
+});
