@@ -88,6 +88,9 @@ export function createSyncRuntimeApi(ctx: any) {
   }
   async function reconcileRemote(file: any, remote: any) {
     if (!g('currentUser') || file.e2eTransition || file.syncConflict || globalRef.sharedDocState?.ownerFileId === file.id) return;
+    await globalRef.E2EVault?.initialize();
+    const vaultState = globalRef.E2EVault?.state();
+    if (vaultState?.config && !vaultState.unlocked && isFileE2EEnabled(file)) { file.remoteContentVersion = Number(remote.content_version ?? remote.contentVersion ?? 0); persist(file); return; }
     const username = g('currentUser').username;
     const version = Number(remote.content_version ?? remote.contentVersion ?? 0);
     if (version < Number(file.contentVersion || 0)) return;
@@ -129,6 +132,9 @@ export function createSyncRuntimeApi(ctx: any) {
       const priority = file.id === (selectedId || g('currentFileId')) ? 100 : (g('pendingServerSync')?.[file.id] ? 50 : 0);
       void queue.enqueue(file.id, priority, async () => {
         if (navigator.onLine === false || !g('currentUser') || file.syncConflict || globalRef.fileRelocationInProgress || !g('files').includes(file)) return;
+        await globalRef.E2EVault?.initialize();
+        const state = globalRef.E2EVault?.state();
+        if (state?.config && !state.unlocked && isFileE2EEnabled(file)) return;
         await restoreFileFromDB(file, globalRef.IndexedDBManager);
         if (isExternalLocalFile(file) && !['ready','copy'].includes(file.localAccessState)) {
           if (!(await ctx.ensureExternalLocalAccess?.(file, false))) return;
@@ -352,6 +358,9 @@ export function createSyncRuntimeApi(ctx: any) {
   async function syncFileToServer(fileId: string, options: any) {
     if (globalRef.fileRelocationInProgress && !options?.relocation) return false;
     if (!g('currentUser') || navigator.onLine === false) { refreshSyncIcons(globalRef); return false; }
+    await globalRef.E2EVault?.initialize();
+    const vaultState = globalRef.E2EVault?.state();
+    if (options?.background !== false && vaultState?.config && !vaultState.unlocked && isFileE2EEnabled(g('files').find(f => f.id === fileId))) return false;
     const requestUser = g('currentUser');
     const backgroundSync = !options || options.background !== false;
     const overrideContent = options && typeof options.overrideContent === 'string' ? options.overrideContent : null;

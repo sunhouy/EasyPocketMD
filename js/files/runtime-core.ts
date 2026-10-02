@@ -2553,18 +2553,12 @@ import { createDiffFileWriter } from './conflict/live-files';
             await restoreFileFromDB(file, global.IndexedDBManager);
             if (isExternalLocalFile(file) && !await ensureExternalLocalAccess(file, true)) return;
             if (requestToken !== fileOpenRequestToken) return;
-            if (global.sharedDocState?.ownerFileId && global.sharedDocState.ownerFileId !== fileId) global.deactivateSharedDocumentSession?.();
-            global.currentFileId = fileId;
-            refreshE2EUi();
-
-            // 记录最后打开的文件
-            localStorage.setItem('vditor_last_opened_file', fileId);
-
             let content = file.content;
             if (needsServerFileContentFetch(file) && !(typeof content === 'string' && content.length > 0)) {
                 try {
                     content = await fetchServerFileContent(file);
                 } catch (e) {
+                    if (e?.e2eKey === 'e2eUnlockCancelled') return;
                     console.error('Failed to load file content from server:', e);
                     global.showMessage(
                         (isEn() ? 'Failed to load file content: ' : '加载文件内容失败：') + ((e && e.message) || ''),
@@ -2584,6 +2578,13 @@ import { createDiffFileWriter } from './conflict/live-files';
             }
 
             if (requestToken !== fileOpenRequestToken) return;
+
+            if (global.sharedDocState?.ownerFileId && global.sharedDocState.ownerFileId !== fileId) global.deactivateSharedDocumentSession?.();
+            global.currentFileId = fileId;
+            refreshE2EUi();
+
+            // 记录最后打开的文件
+            localStorage.setItem('vditor_last_opened_file', fileId);
 
             const useLongFileMode = shouldUseLongFileMode(content);
             if (typeof global.enterEditorMode === 'function') {
@@ -2620,6 +2621,8 @@ import { createDiffFileWriter } from './conflict/live-files';
             expandActiveFile();
             global.startAutoSave();
             global.showMessage(isEn() ? 'File opened: ' + file.name : '已打开文件: ' + file.name);
+        } catch (error) {
+            if (error?.e2eKey !== 'e2eUnlockCancelled') throw error;
         } finally {
             if (requestToken === fileOpenRequestToken) {
                 setFileSwitchLoading(false);
