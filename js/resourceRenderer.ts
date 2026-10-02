@@ -24,7 +24,7 @@
                 try {
                     img.setAttribute('data-original-src', src);
                     img.src = await global.E2EAttachments.load(src);
-                } catch (error) { img.alt = '加密图片尚未解锁 / Encrypted image locked'; }
+                } catch (error) { img.alt = global.i18n.t('e2eImageLocked'); }
                 continue;
             }
             // 只处理本地图片，云端图片保持原链接
