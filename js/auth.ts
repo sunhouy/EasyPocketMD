@@ -354,6 +354,8 @@
         const modal = document.getElementById('userSettingsModalOverlay');
         if (!modal) return;
         modal.classList.add('show');
+        const defaultE2E = document.getElementById('settingsEnableE2E');
+        if (defaultE2E) defaultE2E.checked = [true, 1, '1', 'true'].includes(global.currentUser?.e2e_enabled);
         bindUserSettingsModalEvents();
         document.addEventListener('keydown', handleUserSettingsModalKeydown);
     }
@@ -1687,12 +1689,11 @@
     global.hideSwitchAccountConfirm = hideSwitchAccountConfirm;
     global.confirmSwitchAccount = confirmSwitchAccount;
 
-})(typeof window !== 'undefined' ? window : this);
-    
     // 初始化时监听端到端加密设置更改
-    window.addEventListener('DOMContentLoaded', () => {
+    function initializeE2ESettings() {
         const e2eCheckbox = document.getElementById('settingsEnableE2E');
-        if (e2eCheckbox) {
+        if (e2eCheckbox && !e2eCheckbox.dataset.e2eBound) {
+            e2eCheckbox.dataset.e2eBound = 'true';
             e2eCheckbox.addEventListener('change', async function() {
                 if (!global.currentUser || !global.currentUser.token) {
                     this.checked = false;
@@ -1701,11 +1702,13 @@
                 }
                 
                 const isEnabled = this.checked;
+                const user = global.currentUser;
+                this.disabled = true;
                 
-                // 弹窗确认密码或者直接用currentUser.password？
                 if (isEnabled && !global.currentUser.password) {
-                        global.showMessage('需要登录密码作为默认加密密钥，请重新登录', 'error');
+                    global.showMessage('需要登录密码作为默认加密密钥，请重新登录', 'error');
                     this.checked = false;
+                    this.disabled = false;
                     return;
                 }
                 
@@ -1722,15 +1725,20 @@
                     });
                     
                     const result = await response.json();
+                    if (global.currentUser !== user) return;
                     if (result.code === 200) {
                         global.currentUser.e2e_enabled = isEnabled ? 1 : 0;
+                        localStorage.setItem('vditor_user', JSON.stringify(global.currentUser));
                         global.showMessage(isEnabled ? '默认端到端加密已开启' : '默认端到端加密已关闭', 'success');
                     } else {
                         throw new Error(result.message);
                     }
                 } catch(e) {
+                    if (global.currentUser !== user) return;
                     this.checked = !isEnabled;
                     global.showMessage('设置默认端到端加密失败: ' + e.message, 'error');
+                } finally {
+                    this.disabled = false;
                 }
             });
         }
@@ -1740,8 +1748,14 @@
         if (settingsBtn) {
             settingsBtn.addEventListener('click', () => {
                 if (e2eCheckbox && global.currentUser) {
-                    e2eCheckbox.checked = !!global.currentUser.e2e_enabled;
+                    e2eCheckbox.checked = [true, 1, '1', 'true'].includes(global.currentUser.e2e_enabled);
                 }
             });
         }
-    });
+    }
+    if (document.readyState === 'loading') {
+        window.addEventListener('DOMContentLoaded', initializeE2ESettings, { once: true });
+    } else {
+        initializeE2ESettings();
+    }
+})(typeof window !== 'undefined' ? window : this);

@@ -1594,8 +1594,8 @@ import { createDiffFileWriter } from './conflict/live-files';
             type: 'file',
             content: '# ' + getBasename(path) + '\n\n',
             lastModified: Date.now(),
-            e2e_enabled: g('currentUser') && g('currentUser').e2e_enabled ? 1 : 0,
-            e2eEnabled: !!(g('currentUser') && g('currentUser').e2e_enabled),
+            e2e_enabled: isFileE2EEnabled(g('currentUser')) ? 1 : 0,
+            e2eEnabled: isFileE2EEnabled(g('currentUser')),
             isSynced: false
         };
         files.push(newFile);
@@ -2395,8 +2395,8 @@ import { createDiffFileWriter } from './conflict/live-files';
             type: 'file',
             content: isEn() ? '# Welcome to EasyPocketMD\n\nThis is a new document. \n\nStart writing!' : '# 欢迎使用 EasyPocketMD\n\n这是一个新的文档。\n\n开始编写吧！',
             lastModified: Date.now(),
-            e2e_enabled: g('currentUser') && g('currentUser').e2e_enabled ? 1 : 0,
-            e2eEnabled: !!(g('currentUser') && g('currentUser').e2e_enabled),
+            e2e_enabled: isFileE2EEnabled(g('currentUser')) ? 1 : 0,
+            e2eEnabled: isFileE2EEnabled(g('currentUser')),
             isSynced: false
         };
         global.files.push(defaultFile);
@@ -2466,8 +2466,8 @@ import { createDiffFileWriter } from './conflict/live-files';
                 type: 'file',
                 content: '# ' + getBasename(path) + '\n\n开始编写您的内容...',
                 lastModified: Date.now(),
-                e2e_enabled: g('currentUser') && g('currentUser').e2e_enabled ? 1 : 0,
-                e2eEnabled: !!(g('currentUser') && g('currentUser').e2e_enabled),
+                e2e_enabled: isFileE2EEnabled(g('currentUser')) ? 1 : 0,
+                e2eEnabled: isFileE2EEnabled(g('currentUser')),
                 isSynced: false,
                 order: 0
             };
@@ -2700,44 +2700,52 @@ import { createDiffFileWriter } from './conflict/live-files';
             return false;
         }
 
-        const nextEnabled = !isFileE2EEnabled(file);
-
-        if (!nextEnabled) {
-            let plaintext = getCurrentEditorContent(currentFileId, file.content);
-            plaintext = await resolveE2EFileContent(plaintext, { e2e_enabled: 0, e2eEnabled: false });
-            file.content = plaintext;
-            const lastSyncedContent = g('lastSyncedContent') || {};
-            lastSyncedContent[currentFileId] = plaintext;
-            global.lastSyncedContent = lastSyncedContent;
-            setEditorContentForFile(currentFileId, plaintext, { preserveCursor: true });
-        }
-
-        file.e2e_enabled = nextEnabled ? 1 : 0;
-        file.e2eEnabled = nextEnabled;
-        file.isSynced = false;
-        markPendingServerSync(currentFileId, true);
-        g('unsavedChanges')[currentFileId] = true;
-        localStorage.setItem('vditor_files', JSON.stringify(files));
+        if (file.e2eTransition) return false;
+        const previousEnabled = isFileE2EEnabled(file);
+        const nextEnabled = !previousEnabled;
+        file.e2eTransition = true;
+        setEditorInteractionLocked(true);
         refreshE2EUi();
-
-        const saved = await global.saveCurrentFile(true);
-        if (saved === false) {
-            file.e2e_enabled = nextEnabled ? 0 : 1;
-            file.e2eEnabled = !nextEnabled;
+        try {
+            // Drain already-sent saves before changing the representation on the server.
+            global.wsThrottle?.cancel();
+            await global.waitForFileSync?.();
+            const plaintext = await resolveE2EFileContent(getCurrentEditorContent(currentFileId, file.content), file);
+            file.content = plaintext;
+            if (currentFileId === g('currentFileId')) setEditorContentForFile(currentFileId, plaintext, { preserveCursor: true });
+            file.e2e_enabled = nextEnabled ? 1 : 0;
+            file.e2eEnabled = nextEnabled;
             file.isSynced = false;
             markPendingServerSync(currentFileId, true);
+            g('unsavedChanges')[currentFileId] = true;
+            const saved = await global.syncFileToServer(currentFileId, {
+                background: false, encryptionTransition: true, overrideContent: plaintext
+            });
+            if (saved !== true) {
+                file.e2e_enabled = previousEnabled ? 1 : 0;
+                file.e2eEnabled = previousEnabled;
+                file.isSynced = false;
+                markPendingServerSync(currentFileId, true);
+                return false;
+            }
+            if (currentFileId === g('currentFileId')) {
+                setEditorContentForFile(currentFileId, file.content, { preserveCursor: true });
+            }
+            global.showMessage(nextEnabled
+                ? (isEn() ? 'E2E enabled for this file' : '当前文件已开启端到端加密')
+                : (isEn() ? 'E2E disabled for this file' : '当前文件已关闭端到端加密'), 'success');
+            return true;
+        } catch (error) {
+            file.e2e_enabled = previousEnabled ? 1 : 0;
+            file.e2eEnabled = previousEnabled;
+            global.showMessage(error.message || (isEn() ? 'Encryption change failed' : '切换加密失败'), 'error');
+            return false;
+        } finally {
+            delete file.e2eTransition;
+            setEditorInteractionLocked(false);
             localStorage.setItem('vditor_files', JSON.stringify(files));
             refreshE2EUi();
-            return false;
         }
-
-        global.showMessage(
-            nextEnabled
-                ? (isEn() ? 'E2E enabled for this file' : '当前文件已开启端到端加密')
-                : (isEn() ? 'E2E disabled for this file' : '当前文件已关闭端到端加密'),
-            'success'
-        );
-        return true;
     }
 
     async function saveCurrentFile(isManual) {
@@ -4110,8 +4118,8 @@ import { createDiffFileWriter } from './conflict/live-files';
                                 type: 'file',
                                 content: mergedText,
                                 lastModified: Date.now(),
-                                e2e_enabled: g('currentUser') && g('currentUser').e2e_enabled ? 1 : 0,
-                                e2eEnabled: !!(g('currentUser') && g('currentUser').e2e_enabled),
+                                e2e_enabled: isFileE2EEnabled(g('currentUser')) ? 1 : 0,
+                                e2eEnabled: isFileE2EEnabled(g('currentUser')),
                                 isSynced: false
                             };
                             files.push(newFile);

@@ -10,7 +10,7 @@ jest.mock('../../js/files/websocket-sync', () => ({
     }),
     createSyncThrottle: send => ({ schedule: send, cancel: jest.fn() })
 }));
-jest.mock('../../js/e2e', () => ({ encryptSync: value => value }));
+jest.mock('../../js/e2e', () => ({ resolveFileContent: async value => value, encrypt: async value => value }));
 
 describe('move waits for background saves', () => {
     let state: any;
