@@ -97,7 +97,9 @@
             if (btnLabel) {
                 btn.dataset.originalText = btnLabel.getAttribute('data-i18n');
             }
-            btn.classList.add('loading');
+            btn.classList.add('is-loading');
+            btn.disabled = true;
+            btn.setAttribute('aria-busy', 'true');
             if (btnSpinner) {
                 btnSpinner.style.display = 'inline-block';
             }
@@ -106,7 +108,9 @@
             }
         } else {
             // 恢复原始状态
-            btn.classList.remove('loading');
+            btn.classList.remove('is-loading');
+            btn.disabled = false;
+            btn.removeAttribute('aria-busy');
             if (btnSpinner) {
                 btnSpinner.style.display = 'none';
             }
@@ -766,7 +770,7 @@
                         token: result.data.token,
                         password: password
                     };
-                    await window.E2EVault?.unlockAfterLogin(password);
+                    await window.E2EVault?.initialize?.().catch(error => console.warn('Encryption configuration unavailable; login remains valid:', error));
                     localStorage.setItem('vditor_user', window.e2eSerializeUser ? window.e2eSerializeUser(global.currentUser) : JSON.stringify(global.currentUser));
 
                     // 自动添加到账户列表
@@ -829,6 +833,7 @@
             setButtonLoading('loginSubmitBtn', false);
         } finally {
             // 无论成功或失败，都释放锁，允许再次提交
+            setButtonLoading('loginSubmitBtn', false);
             _loginSubmitting = false;
         }
     }
@@ -905,7 +910,7 @@
                             token: loginResult.data.token,
                             password: password
                         };
-                        await window.E2EVault?.unlockAfterLogin(password);
+                        await window.E2EVault?.initialize?.().catch(error => console.warn('Encryption configuration unavailable; login remains valid:', error));
                         localStorage.setItem('vditor_user', window.e2eSerializeUser ? window.e2eSerializeUser(global.currentUser) : JSON.stringify(global.currentUser));
                         message.textContent = t('registerSuccessAutoLogin');
                         message.className = 'modal-message success';
@@ -975,7 +980,7 @@
                             token: loginResult.data.token,
                             password: password
                         };
-                        await window.E2EVault?.unlockAfterLogin(password);
+                        await window.E2EVault?.initialize?.().catch(error => console.warn('Encryption configuration unavailable; login remains valid:', error));
                         localStorage.setItem('vditor_user', window.e2eSerializeUser ? window.e2eSerializeUser(global.currentUser) : JSON.stringify(global.currentUser));
                         message.textContent = t('autoLoginSuccess');
                         message.className = 'modal-message success';
@@ -1044,6 +1049,7 @@
             setButtonLoading('registerSubmitBtn', false);
         } finally {
             // 释放锁
+            setButtonLoading('registerSubmitBtn', false);
             _registerSubmitting = false;
         }
     }
@@ -1571,7 +1577,7 @@
                         token: result.data.token,
                         password: password
                     };
-                    await window.E2EVault?.unlockAfterLogin(password);
+                    await window.E2EVault?.initialize?.().catch(error => console.warn('Encryption configuration unavailable; login remains valid:', error));
                     localStorage.setItem('vditor_user', window.e2eSerializeUser ? window.e2eSerializeUser(global.currentUser) : JSON.stringify(global.currentUser));
 
                     global.showMessage(t('accountAddedSuccess'), 'success');

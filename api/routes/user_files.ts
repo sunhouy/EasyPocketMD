@@ -1,19 +1,16 @@
 const express = require('express');
 const router = express.Router();
 const userModel = require('../models/User');
+const { verifyTokenOrPassword } = require('../utils/auth');
 const fs = require('fs');
 const path = require('path');
 
 // Middleware to check auth
 const checkAuth = async (req, res, next) => {
     const { username, password } = req.body;
-    if (!username || !password) {
-        return res.json({ code: 400, message: '缺少认证信息' });
-    }
-    const auth = await userModel.login(username, password);
-    if (auth.code !== 200) {
-        return res.json({ code: 401, message: '认证失败' });
-    }
+    const bearer = req.headers.authorization?.match(/^Bearer\s+(.+)$/i)?.[1];
+    const auth = await verifyTokenOrPassword(userModel, { username, password, token: bearer || req.body.token });
+    if (auth.code !== 200) return res.json(auth);
     req.user = { username };
     next();
 };
