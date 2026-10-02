@@ -5,7 +5,8 @@ PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ICON_DIR="$PROJECT_ROOT/src-tauri/icons/android"
 RES_DIR="$PROJECT_ROOT/src-tauri/gen/android/app/src/main/res"
 
-if [ ! -f "$ICON_DIR/mipmap-mdpi/ic_launcher_foreground.png" ]; then
+if [ ! -f "$ICON_DIR/mipmap-mdpi/ic_launcher_foreground.png" ] &&
+   [ ! -f "$RES_DIR/mipmap-mdpi/ic_launcher_foreground.png" ]; then
     echo "Android icons missing; run tauri icon src-tauri/icon-rgba.png first" >&2
     exit 1
 fi
@@ -13,9 +14,13 @@ fi
 # Preserve Tauri's density-specific legacy icons instead of copying a 1024px
 # source into every density bucket. Apply after every Android project init.
 mkdir -p "$RES_DIR/drawable-v26" "$RES_DIR/mipmap-anydpi-v26" "$RES_DIR/values"
-for directory in "$ICON_DIR"/mipmap-*; do
-    cp -R "$directory" "$RES_DIR/"
-done
+# Android init can consume the generated icon directory while installing it
+# into the project. In that case its resources are already density-correct.
+if [ -d "$ICON_DIR" ]; then
+    for directory in "$ICON_DIR"/mipmap-*; do
+        [ -d "$directory" ] && cp -R "$directory" "$RES_DIR/"
+    done
+fi
 
 # Android masks the central 72dp of its 108dp adaptive layer. Inset the full
 # web icon by 18/108 on each edge so the M retains the web/PWA proportions.
