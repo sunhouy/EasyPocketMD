@@ -1,4 +1,22 @@
+import { mergeTextWithCrdt } from '../../shared/text-crdt';
+import '../../css/share-collaboration.css';
+import { createSharedReadOnlyGuard } from './share-readonly';
+import { createShareCursors } from './share-cursors';
+import { showSharedEditHistory } from './share-history';
 import { setVditorValuePreservingCursor } from '../editor-cursor';
+
+interface SharedDocumentState {
+    shareId: string;
+    viewerId: string;
+    canEdit: boolean;
+    lastKnownContent: string;
+    contentVersion: number;
+    isSaving: boolean;
+    inFlightContent?: string;
+    ws: WebSocket | null;
+    [key: string]: any;
+}
+declare global { interface Window { sharedDocState: SharedDocumentState | null; } }
 
     // 处理分享链接
     document.addEventListener('DOMContentLoaded', function() {
@@ -25,10 +43,10 @@ import { setVditorValuePreservingCursor } from '../editor-cursor';
 
     function getSharedViewerId() {
         var key = 'shared_viewer_id';
-        var id = localStorage.getItem(key);
+        var id = sessionStorage.getItem(key);
         if (!id) {
-            id = 'viewer-' + Math.random().toString(36).slice(2, 10);
-            localStorage.setItem(key, id);
+            id = 'viewer-' + (window.crypto?.randomUUID?.() || Date.now().toString(36) + '-' + Math.random().toString(36).slice(2));
+            sessionStorage.setItem(key, id);
         }
         return id;
     }
@@ -41,8 +59,9 @@ import { setVditorValuePreservingCursor } from '../editor-cursor';
     }
 
     function getEditorIdentityPayload() {
-        if (!window.currentUser || !window.currentUser.username) return {};
+        if (!window.currentUser || !window.currentUser.username) return { viewer_id: window.sharedDocState?.viewerId || getSharedViewerId() };
         return {
+            viewer_id: window.sharedDocState?.viewerId || getSharedViewerId(),
             editor_username: window.currentUser.username,
             editor_token: window.currentUser.token,
             editor_password: window.currentUser.password
@@ -108,33 +127,29 @@ import { setVditorValuePreservingCursor } from '../editor-cursor';
         return { canEdit: false, editPassword: '' };
     }
 
+    let sharedReadOnlyGuard = null;
+    let sharedCursorController = null;
     function setSharedEditorLocked(locked) {
-        var container = document.getElementById('vditor');
+        const container = document.getElementById('vditor');
         if (!container) return;
-
-        // 仅阻止编辑，不显示任何遮罩或灰化效果
-
-        // 设置 contenteditable 属性
-        var editableNodes = container.querySelectorAll('[contenteditable]');
-        editableNodes.forEach(function(node) {
-            node.setAttribute('contenteditable', locked ? 'false' : 'true');
-        });
-
-        // 设置 textarea 和 input 的 readOnly 属性
-        var textInputs = container.querySelectorAll('textarea, input');
-        textInputs.forEach(function(node) {
-            node.readOnly = !!locked;
-        });
-
-        // 阻止工具栏点击但保持原有视觉样式，不添加白色遮罩 / 灰化
-        var toolbarBtns = container.querySelectorAll('.vditor-toolbar__item, .vditor-toolbar__btn');
-        toolbarBtns.forEach(function(btn) {
-            btn.style.pointerEvents = locked ? 'none' : '';
-            btn.style.opacity = '';
-        });
-
-        // 清理历史遗留可能存在的只读类，避免外部样式叠加
-        container.classList.remove('vditor-readonly');
+        if (!sharedReadOnlyGuard) sharedReadOnlyGuard = createSharedReadOnlyGuard(container);
+        sharedReadOnlyGuard.setLocked(locked);
+    }
+    const hiddenEditStyles = new Map();
+    function setSharePermission(canEdit) {
+        if (!window.sharedDocState) return;
+        window.sharedDocState.canEdit = !!canEdit;
+        setSharedEditorLocked(!canEdit);
+        if (!canEdit) {
+            clearTimeout(window.sharedDocState.saveTimer);
+            window.sharedDocState.isSaving = false;
+            resolveSharedManualSave(false);
+            hideEditElements();
+        } else {
+            for (const [element, style] of hiddenEditStyles) element.setAttribute('style', style);
+            hiddenEditStyles.clear();
+        }
+        renderSharePresence(window.sharedDocState.onlineUsers || []);
     }
 
     function getShareConnectionStatusInfo(status) {
@@ -174,388 +189,27 @@ import { setVditorValuePreservingCursor } from '../editor-cursor';
         return true;
     }
 
-    function sendCursorPosition(position, selection) {
-        // 禁用光标位置广播
-        return;
-    }
-
-    function getTextOffset() {
-        try {
-            const selection = window.getSelection();
-            if (!selection || selection.rangeCount === 0) return null;
-
-            const range = selection.getRangeAt(0);
-            const contentElement = document.querySelector('.vditor-ir__preview, .vditor-wysiwyg, .vditor-sv');
-            if (!contentElement) return null;
-
-            // 计算从内容开始到光标位置的文本偏移量
-            const preRange = document.createRange();
-            preRange.selectNodeContents(contentElement);
-            preRange.setEnd(range.startContainer, range.startOffset);
-
-            return preRange.toString().length;
-        } catch (e) {
-            return null;
-        }
-    }
-
-    function setTextOffset(offset) {
-        try {
-            const contentElement = document.querySelector('.vditor-ir__preview, .vditor-wysiwyg, .vditor-sv');
-            if (!contentElement) return false;
-
-            const walker = document.createTreeWalker(
-                contentElement,
-                NodeFilter.SHOW_TEXT,
-                null,
-                false
-            );
-
-            let currentOffset = 0;
-            let node;
-
-            while (node = walker.nextNode()) {
-                const nodeLength = node.textContent.length;
-                if (currentOffset + nodeLength >= offset) {
-                    const range = document.createRange();
-                    const nodeOffset = offset - currentOffset;
-
-                    // 确保偏移量在有效范围内
-                    const safeOffset = Math.min(nodeOffset, node.textContent.length);
-                    range.setStart(node, safeOffset);
-                    range.collapse(true);
-
-                    const selection = window.getSelection();
-                    if (!selection) return false;
-
-                    selection.removeAllRanges();
-
-                    // 验证 range 是否在文档中，避免 addRange 错误
-                    if (range.startContainer && range.startContainer.ownerDocument === document) {
-                        selection.addRange(range);
-
-                        // 移动端兼容：滚动到光标位置，防止跳到文件开头
-                        if (/Mobi|Android|iPhone/i.test(navigator.userAgent)) {
-                            setTimeout(() => {
-                                const rect = range.getBoundingClientRect();
-                                if (rect.top < 0 || rect.bottom > window.innerHeight) {
-                                    range.startContainer.parentElement?.scrollIntoView({
-                                        behavior: 'smooth',
-                                        block: 'center'
-                                    });
-                                }
-                            }, 100);
-                        }
-                    }
-                    return true;
-                }
-                currentOffset += nodeLength;
-            }
-            return false;
-        } catch (e) {
-            console.warn('设置光标位置失败:', e);
-            return false;
-        }
-    }
-
     function initCursorTracking() {
-        // 禁用光标追踪
-        return;
+        sharedCursorController?.destroy();
+        sharedCursorController = createShareCursors(() => window.sharedDocState, () => window.vditor,
+            sendShareWsPayload, () => { if (window.sharedDocState?.canEdit) scheduleSharedDocSync(); });
     }
-
-    function renderRemoteCursors() {
-        // 禁用远程光标渲染
-        return;
-    }
-
-    // 添加光标闪烁动画样式
-    if (!document.getElementById('remoteCursorStyle')) {
-        const style = document.createElement('style');
-        style.id = 'remoteCursorStyle';
-        style.textContent = `
-            @keyframes blink {
-                0%, 49% { opacity: 1; }
-                50%, 100% { opacity: 0.3; }
-            }
-        `;
-        document.head.appendChild(style);
-    }
-
-    function getPixelPositionFromOffset(textOffset) {
-        try {
-            const contentElement = document.querySelector('.vditor-ir__preview, .vditor-wysiwyg, .vditor-sv');
-            if (!contentElement) return null;
-
-            const walker = document.createTreeWalker(
-                contentElement,
-                NodeFilter.SHOW_TEXT,
-                null,
-                false
-            );
-
-            let currentOffset = 0;
-            let node;
-
-            while (node = walker.nextNode()) {
-                const nodeLength = node.textContent.length;
-                if (currentOffset + nodeLength >= textOffset) {
-                    const range = document.createRange();
-                    range.setStart(node, Math.min(textOffset - currentOffset, nodeLength));
-                    range.collapse(true);
-
-                    const rect = range.getBoundingClientRect();
-                    const editorRect = contentElement.getBoundingClientRect();
-
-                    return {
-                        x: rect.left - editorRect.left + contentElement.scrollLeft,
-                        y: rect.top - editorRect.top + contentElement.scrollTop,
-                        height: rect.height || 20
-                    };
-                }
-                currentOffset += nodeLength;
-            }
-            return null;
-        } catch (e) {
-            return null;
-        }
-    }
-
-    function getCursorColor(viewerId) {
-        // 为每个用户生成唯一的颜色
-        const colors = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899'];
-        const hash = viewerId.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-        return colors[hash % colors.length];
-    }
+    function renderRemoteCursors() { sharedCursorController?.rerender(); }
 
     async function showHistoryModal() {
-        if (!window.sharedDocState || !window.currentUser) return;
-
-        const modal = document.createElement('div');
-        modal.id = 'shareHistoryModal';
-        modal.style.cssText = 'position:fixed;inset:0;z-index:10007;background:rgba(0,0,0,0.75);display:flex;align-items:center;justify-content:center;padding:16px;';
-
-        modal.innerHTML = `
-            <div style="width:min(900px,95vw);max-height:90vh;background:#1f2937;color:#f3f4f6;border-radius:12px;display:flex;flex-direction:column;">
-                <div style="display:flex;justify-content:space-between;align-items:center;padding:16px;border-bottom:1px solid #374151;">
-                    <h3 style="margin:0;font-size:18px;font-weight:600;">📜 文档修改历史</h3>
-                    <button id="closeHistoryModal" style="border:none;background:transparent;color:#9ca3af;font-size:24px;cursor:pointer;padding:0;width:32px;height:32px;line-height:1;">&times;</button>
-                </div>
-                <div id="historyContent" style="flex:1;overflow-y:auto;padding:16px;">
-                    <div style="text-align:center;padding:40px;color:#9ca3af;">
-                        <div style="font-size:14px;">加载中...</div>
-                    </div>
-                </div>
-            </div>
-        `;
-
-        document.body.appendChild(modal);
-
-        document.getElementById('closeHistoryModal').onclick = () => modal.remove();
-        modal.onclick = (e) => { if (false && e.target === modal) modal.remove(); };
-
-        // 加载历史记录
-        await loadHistoryList(modal);
+        await showSharedEditHistory(() => window.sharedDocState, data => {
+            if (typeof data?.content === 'string' && window.sharedDocState) {
+                setSharedEditorValue(data.content, true);
+                window.sharedDocState.lastKnownContent = data.content;
+                window.sharedDocState.contentVersion = data.content_version;
+                pollSharedDocContent();
+            }
+        });
     }
-
-    async function loadHistoryList(modal) {
-        if (!window.sharedDocState || !window.currentUser) return;
-
-        try {
-            const apiUrl = (window.getApiBaseUrl ? window.getApiBaseUrl() : 'api') + '/files/history/list';
-            const response = await fetch(apiUrl + '?' + new URLSearchParams({
-                username: window.sharedDocState.ownerUsername,
-                filename: window.sharedDocState.filename
-            }), {
-                method: 'GET',
-                headers: {
-                    'Authorization': 'Bearer ' + window.currentUser.token
-                }
-            });
-
-            const result = await response.json();
-            const contentDiv = modal.querySelector('#historyContent');
-
-            if (result.code !== 200 || !result.data || !result.data.history) {
-                contentDiv.innerHTML = '<div style="text-align:center;padding:40px;color:#9ca3af;">加载失败或无历史记录</div>';
-                return;
-            }
-
-            const history = result.data.history;
-            if (history.length === 0) {
-                contentDiv.innerHTML = '<div style="text-align:center;padding:40px;color:#9ca3af;">暂无历史记录</div>';
-                return;
-            }
-
-            let html = '<div style="display:flex;flex-direction:column;gap:12px;">';
-            history.forEach((item, index) => {
-                const date = new Date(item.timestamp);
-                const dateStr = date.toLocaleString('zh-CN', {
-                    year: 'numeric',
-                    month: '2-digit',
-                    day: '2-digit',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    second: '2-digit'
-                });
-                const modifiedBy = item.modified_by || '未知';
-                const isCurrent = item.is_current;
-                const sizeKB = (item.content_length / 1024).toFixed(2);
-
-                html += `
-                    <div style="background:#374151;border-radius:8px;padding:12px;${isCurrent ? 'border:2px solid #10b981;' : ''}">
-                        <div style="display:flex;justify-content:space-between;align-items:start;gap:12px;">
-                            <div style="flex:1;">
-                                <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
-                                    <span style="font-weight:600;font-size:14px;">版本 ${item.version_id}</span>
-                                    ${isCurrent ? '<span style="background:#10b981;color:white;padding:2px 8px;border-radius:12px;font-size:11px;">当前版本</span>' : ''}
-                                </div>
-                                <div style="font-size:12px;color:#9ca3af;margin-bottom:4px;">
-                                    <span>📅 ${dateStr}</span>
-                                    <span style="margin-left:12px;">👤 ${escapeShareHtml(modifiedBy)}</span>
-                                    <span style="margin-left:12px;">📦 ${sizeKB} KB</span>
-                                </div>
-                            </div>
-                            <div style="display:flex;gap:8px;">
-                                <button class="viewHistoryBtn" data-version="${item.version_id}" style="border:none;background:#3b82f6;color:white;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:12px;">预览</button>
-                                ${!isCurrent ? `<button class="restoreHistoryBtn" data-version="${item.version_id}" style="border:none;background:#10b981;color:white;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:12px;">回滚</button>` : ''}
-                            </div>
-                        </div>
-                    </div>
-                `;
-            });
-            html += '</div>';
-
-            contentDiv.innerHTML = html;
-
-            // 绑定预览按钮
-            contentDiv.querySelectorAll('.viewHistoryBtn').forEach(btn => {
-                btn.onclick = async () => {
-                    const versionId = parseInt(btn.getAttribute('data-version'));
-                    await previewHistoryVersion(versionId);
-                };
-            });
-
-            // 绑定回滚按钮
-            contentDiv.querySelectorAll('.restoreHistoryBtn').forEach(btn => {
-                btn.onclick = async () => {
-                    const versionId = parseInt(btn.getAttribute('data-version'));
-                    if (confirm(`确定要回滚到版本 ${versionId} 吗？这将创建一个新版本。`)) {
-                        await restoreHistoryVersion(versionId);
-                        modal.remove();
-                    }
-                };
-            });
-
-        } catch (error) {
-            console.error('加载历史记录失败:', error);
-            const contentDiv = modal.querySelector('#historyContent');
-            contentDiv.innerHTML = '<div style="text-align:center;padding:40px;color:#ef4444;">加载失败: ' + error.message + '</div>';
-        }
-    }
-
-    async function previewHistoryVersion(versionId) {
-        if (!window.sharedDocState || !window.currentUser) return;
-
-        try {
-            const apiUrl = (window.getApiBaseUrl ? window.getApiBaseUrl() : 'api') + '/files/history/restore';
-            const response = await fetch(apiUrl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': 'Bearer ' + window.currentUser.token
-                },
-                body: JSON.stringify({
-                    username: window.sharedDocState.ownerUsername,
-                    filename: window.sharedDocState.filename,
-                    version_id: versionId
-                })
-            });
-
-            const result = await response.json();
-
-            if (result.code !== 200 || !result.data) {
-                showToast('预览失败: ' + (result.message || '未知错误'), 'error');
-                return;
-            }
-
-            // 显示预览模态框
-            const previewModal = document.createElement('div');
-            previewModal.style.cssText = 'position:fixed;inset:0;z-index:10008;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;padding:16px;';
-
-            previewModal.innerHTML = `
-                <div style="width:min(1000px,95vw);max-height:90vh;background:#1f2937;color:#f3f4f6;border-radius:12px;display:flex;flex-direction:column;">
-                    <div style="display:flex;justify-content:space-between;align-items:center;padding:16px;border-bottom:1px solid #374151;">
-                        <h3 style="margin:0;font-size:16px;">预览版本 ${versionId}</h3>
-                        <button id="closePreviewModal" style="border:none;background:transparent;color:#9ca3af;font-size:24px;cursor:pointer;padding:0;width:32px;height:32px;line-height:1;">&times;</button>
-                    </div>
-                    <div style="flex:1;overflow-y:auto;padding:16px;background:#111827;font-family:monospace;font-size:13px;line-height:1.6;white-space:pre-wrap;word-wrap:break-word;">${escapeShareHtml(result.data.content)}</div>
-                </div>
-            `;
-
-            document.body.appendChild(previewModal);
-
-            document.getElementById('closePreviewModal').onclick = () => previewModal.remove();
-            previewModal.onclick = (e) => { if (false && e.target === previewModal) previewModal.remove(); };
-
-        } catch (error) {
-            console.error('预览历史版本失败:', error);
-            showToast('预览失败: ' + error.message, 'error');
-        }
-    }
-
-    async function restoreHistoryVersion(versionId) {
-        if (!window.sharedDocState || !window.currentUser) return;
-
-        try {
-            // 1. 获取历史版本内容
-            const apiUrl = (window.getApiBaseUrl ? window.getApiBaseUrl() : 'api') + '/files/history/restore';
-            const response = await fetch(apiUrl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': 'Bearer ' + window.currentUser.token
-                },
-                body: JSON.stringify({
-                    username: window.sharedDocState.ownerUsername,
-                    filename: window.sharedDocState.filename,
-                    version_id: versionId
-                })
-            });
-
-            const result = await response.json();
-
-            if (result.code !== 200 || !result.data) {
-                showToast('回滚失败: ' + (result.message || '未知错误'), 'error');
-                return;
-            }
-
-            // 2. 更新编辑器内容
-            if (window.vditor) {
-                setSharedEditorValue(result.data.content, true);
-            }
-
-            // 3. 保存到分享文档（创建新版本）
-            const saved = await scheduleSharedDocSync({ manualSave: true });
-
-            if (saved) {
-                showToast(`已回滚到版本 ${versionId}`, 'success');
-            } else {
-                showToast('回滚成功但保存失败，请手动保存', 'error');
-            }
-
-        } catch (error) {
-            console.error('回滚历史版本失败:', error);
-            showToast('回滚失败: ' + error.message, 'error');
-        }
-    }
+    window.showSharedEditHistory = showHistoryModal;
 
     function removeShareVideoUi() {
-        var panel = document.getElementById('shareVideoUserPanel');
-        if (panel) panel.remove();
-        var modal = document.getElementById('shareVideoCallModal');
-        if (modal) modal.remove();
-        var roomModal = document.getElementById('shareVideoRoomModal');
-        if (roomModal) roomModal.remove();
+        for (const id of ['shareVideoUserPanel', 'shareVideoCallModal', 'shareVideoRoomModal']) document.getElementById(id)?.remove();
     }
 
     function getShareVideoState() {
@@ -1333,8 +987,12 @@ import { setVditorValuePreservingCursor } from '../editor-cursor';
         if (window.sharedDocState.ws) {
             try { window.sharedDocState.ws.close(); } catch (e) {}
         }
+        sharedCursorController?.destroy(); sharedCursorController = null;
+        sharedReadOnlyGuard?.destroy(); sharedReadOnlyGuard = null;
+        for (const [element, style] of hiddenEditStyles) element.setAttribute('style', style);
+        hiddenEditStyles.clear();
+        const collabButton = document.getElementById('historyCollabBtn'); if (collabButton) collabButton.hidden = true;
         window.sharedDocState = null;
-        setSharedEditorLocked(false);
         var bar = document.getElementById('sharePresenceBar');
         if (bar) bar.remove();
         removeShareVideoUi();
@@ -1344,6 +1002,8 @@ import { setVditorValuePreservingCursor } from '../editor-cursor';
         options = options || {};
         var targetShareId = options.shareId || shareData.share_id;
         var targetOwnerFileId = options.ownerFileId || null;
+        const collabButton = document.getElementById('historyCollabBtn');
+        if (collabButton) { collabButton.hidden = false; collabButton.onclick = showHistoryModal; }
         var sameSession =
             window.sharedDocState &&
             window.sharedDocState.shareId === targetShareId &&
@@ -1353,7 +1013,7 @@ import { setVditorValuePreservingCursor } from '../editor-cursor';
             window.sharedDocState.sharePassword = options.sharePassword || window.sharedDocState.sharePassword || '';
             window.sharedDocState.editPassword = options.editPassword || window.sharedDocState.editPassword || '';
             window.sharedDocState.canEdit = !!options.canEdit;
-            window.sharedDocState.viewerId = options.viewerId || window.sharedDocState.viewerId;
+            window.sharedDocState.viewerId = targetOwnerFileId ? getSharedViewerId() : (options.viewerId || window.sharedDocState.viewerId);
             window.sharedDocState.viewerName = options.viewerName || window.sharedDocState.viewerName;
             window.sharedDocState.ownerUsername = shareData.username || window.sharedDocState.ownerUsername;
             window.sharedDocState.filename = shareData.filename || window.sharedDocState.filename;
@@ -1372,6 +1032,7 @@ import { setVditorValuePreservingCursor } from '../editor-cursor';
         }
 
         deactivateSharedDocumentSession();
+        if (collabButton) collabButton.hidden = false;
         window.sharedDocState = {
             shareId: targetShareId,
             sharePassword: options.sharePassword || '',
@@ -1381,7 +1042,7 @@ import { setVditorValuePreservingCursor } from '../editor-cursor';
             lastModified: shareData.last_modified || null,
             contentVersion: shareData.content_version || 1,
             lastLocalEditAt: 0,
-            viewerId: options.viewerId || getSharedViewerId(),
+            viewerId: targetOwnerFileId ? getSharedViewerId() : (options.viewerId || getSharedViewerId()),
             viewerName: options.viewerName || getSharedViewerName(),
             ownerUsername: shareData.username || '',
             filename: shareData.filename || '',
@@ -1417,18 +1078,10 @@ import { setVditorValuePreservingCursor } from '../editor-cursor';
                 pendingByPeer: {}
             }
         };
-        setSharedEditorLocked(!window.sharedDocState.canEdit);
+        setSharePermission(window.sharedDocState.canEdit);
         startSharedDocRealtime();
         // 初始化光标跟踪
         initCursorTracking();
-        // 监听编辑器输入事件，更新最后编辑时间
-        if (window.vditor && window.vditor.options && window.sharedDocState.canEdit) {
-            window.vditor.options.input = function() {
-                if (window.sharedDocState) {
-                    window.sharedDocState.lastLocalEditAt = Date.now();
-                }
-            };
-        }
     }
 
     async function handleShareLink(shareId, password) {
@@ -1505,7 +1158,7 @@ import { setVditorValuePreservingCursor } from '../editor-cursor';
         pending.resolve(result);
     }
 
-    async function syncSharedDocContent(options) {
+    async function syncSharedDocContent(options: { manualSave?: boolean } = {}) {
         options = options || {};
         if (!window.sharedDocState || !window.sharedDocState.canEdit || !window.vditor) return false;
         if (window.sharedDocState.isSaving) return false;
@@ -1519,6 +1172,7 @@ import { setVditorValuePreservingCursor } from '../editor-cursor';
         // WebSocket online path
         if (window.sharedDocState.ws && window.sharedDocState.wsConnected && window.sharedDocState.ws.readyState === WebSocket.OPEN) {
             window.sharedDocState.isSaving = true;
+            window.sharedDocState.inFlightContent = currentContent;
             if (manualSave) {
                 if (window.sharedDocState.pendingManualSave && window.sharedDocState.pendingManualSave.timer) {
                     clearTimeout(window.sharedDocState.pendingManualSave.timer);
@@ -1553,6 +1207,7 @@ import { setVditorValuePreservingCursor } from '../editor-cursor';
         }
 
         window.sharedDocState.isSaving = true;
+        const savingState = window.sharedDocState;
         try {
             var apiUrl = (window.getApiBaseUrl ? window.getApiBaseUrl() : 'api') + '/share/update';
             const response = await fetch(apiUrl, {
@@ -1573,15 +1228,21 @@ import { setVditorValuePreservingCursor } from '../editor-cursor';
                 })
             });
             const result = await response.json();
+            if (window.sharedDocState !== savingState) return false;
             if (result.code === 200 && result.data) {
-                window.sharedDocState.lastKnownContent = result.data.content || currentContent;
+                const draft = window.vditor?.getValue();
+                if (typeof draft === 'string' && draft !== currentContent && typeof result.data.content === 'string') {
+                    setSharedEditorValue(mergeTextWithCrdt(currentContent, draft, result.data.content).content, true);
+                }
+                window.sharedDocState.lastKnownContent = result.data.content ?? currentContent;
                 window.sharedDocState.lastModified = result.data.last_modified || window.sharedDocState.lastModified;
                 window.sharedDocState.contentVersion = result.data.content_version || window.sharedDocState.contentVersion;
-                if (window.vditor && typeof result.data.content === 'string' && window.vditor.getValue() !== result.data.content) {
+                if (window.vditor && window.vditor.getValue() === currentContent && typeof result.data.content === 'string' && currentContent !== result.data.content) {
                     setSharedEditorValue(result.data.content, true);
                 }
                 return true;
             }
+            if (result.code === 403) { setSharePermission(false); return false; }
             if (result.code === 409 && result.data) {
                 window.sharedDocState.lastKnownContent = result.data.content || window.sharedDocState.lastKnownContent;
                 window.sharedDocState.lastModified = result.data.last_modified || window.sharedDocState.lastModified;
@@ -1603,11 +1264,11 @@ import { setVditorValuePreservingCursor } from '../editor-cursor';
             console.error('共享文档同步失败:', err);
             return false;
         } finally {
-            window.sharedDocState.isSaving = false;
+            if (window.sharedDocState === savingState) savingState.isSaving = false;
         }
     }
 
-    function scheduleSharedDocSync(options) {
+    function scheduleSharedDocSync(options: { manualSave?: boolean } = {}) {
         options = options || {};
         if (!window.sharedDocState || !window.sharedDocState.canEdit) return options.manualSave ? Promise.resolve(false) : undefined;
         window.sharedDocState.lastLocalEditAt = Date.now();
@@ -1635,31 +1296,32 @@ import { setVditorValuePreservingCursor } from '../editor-cursor';
                     share_id: window.sharedDocState.shareId,
                     password: window.sharedDocState.sharePassword,
                     since: window.sharedDocState.lastModified,
+                    since_version: window.sharedDocState.contentVersion,
                     edit_password: window.sharedDocState.editPassword,
                     ...getEditorIdentityPayload()
                 })
             });
             const result = await response.json();
             if (result.code !== 200 || !result.data) return;
+            if (result.data.can_edit !== undefined && result.data.can_edit !== window.sharedDocState.canEdit) setSharePermission(result.data.can_edit);
 
-            window.sharedDocState.lastModified = result.data.last_modified || window.sharedDocState.lastModified;
-            window.sharedDocState.contentVersion = result.data.content_version || window.sharedDocState.contentVersion;
             if (!result.data.changed) return;
+            if (Number(result.data.content_version) < Number(window.sharedDocState.contentVersion)) return;
 
             var remoteContent = result.data.content || '';
             var localContent = window.vditor ? window.vditor.getValue() : '';
             var localRecentlyEdited = Date.now() - window.sharedDocState.lastLocalEditAt < 3000;
 
             // 如果正在编辑，不要用轮询结果覆盖本地内容
-            if (localRecentlyEdited) {
+            if (window.sharedDocState.canEdit && (localRecentlyEdited || localContent !== window.sharedDocState.lastKnownContent)) {
                 console.log('跳过轮询更新：用户正在编辑');
                 return;
             }
 
-            if (window.vditor && remoteContent !== localContent) {
-                setSharedEditorValue(remoteContent, true);
-                window.sharedDocState.lastKnownContent = remoteContent;
-            }
+            window.sharedDocState.lastModified = result.data.last_modified || window.sharedDocState.lastModified;
+            window.sharedDocState.contentVersion = result.data.content_version || window.sharedDocState.contentVersion;
+            window.sharedDocState.lastKnownContent = remoteContent;
+            if (window.vditor && remoteContent !== localContent) setSharedEditorValue(remoteContent, true);
         } catch (err) {
             console.error('共享文档轮询失败:', err);
         }
@@ -1699,7 +1361,7 @@ import { setVditorValuePreservingCursor } from '../editor-cursor';
         updateShareConnectionStatus('connecting');
 
         socket.onopen = function() {
-            if (!window.sharedDocState) return;
+            if (window.sharedDocState?.ws !== socket) return;
             window.sharedDocState.wsConnected = true;
             if (window.sharedDocState.wsGraceTimer) {
                 clearTimeout(window.sharedDocState.wsGraceTimer);
@@ -1713,7 +1375,7 @@ import { setVditorValuePreservingCursor } from '../editor-cursor';
         };
 
         socket.onmessage = function(event) {
-            if (!window.sharedDocState) return;
+            if (window.sharedDocState?.ws !== socket) return;
             var payload;
             try {
                 payload = JSON.parse(event.data || '{}');
@@ -1721,6 +1383,8 @@ import { setVditorValuePreservingCursor } from '../editor-cursor';
                 return;
             }
 
+            if (payload.type === 'cursor') { sharedCursorController?.receive(payload); return; }
+            if (payload.type === 'permission_changed') { setSharePermission(!!payload.can_edit); return; }
             if (payload.type === 'presence') {
                 window.sharedDocState.onlineUsers = payload.online_users || [];
                 renderSharePresence(payload.online_users || []);
@@ -1790,28 +1454,25 @@ import { setVditorValuePreservingCursor } from '../editor-cursor';
             }
 
             if (payload.type === 'ready' || payload.type === 'doc_updated') {
-                if (payload.last_modified) {
-                    window.sharedDocState.lastModified = payload.last_modified;
-                }
-                if (payload.content_version) {
-                    window.sharedDocState.contentVersion = payload.content_version;
-                }
-
-                var localRecentlyEdited = Date.now() - window.sharedDocState.lastLocalEditAt < 3000;
+                if (payload.can_edit !== undefined) setSharePermission(!!payload.can_edit);
+                sharedCursorController?.capture();
+                if (Number(payload.content_version) < Number(window.sharedDocState.contentVersion)) return;
+                const local = window.vditor?.getValue() || '';
                 var isSelfUpdate = payload.updated_by && payload.updated_by === window.sharedDocState.viewerId;
-
-                // 如果正在编辑且不是自己的更新，不要覆盖本地内容
-                if (localRecentlyEdited && !isSelfUpdate) {
-                    console.log('跳过远程更新：用户正在编辑');
-                    return;
+                const unsaved = window.sharedDocState.canEdit && local !== window.sharedDocState.lastKnownContent;
+                // Keep the old base while an unsaved draft awaits server-side merge.
+                if (!isSelfUpdate && unsaved) return;
+                const continuedTyping = isSelfUpdate && local !== window.sharedDocState.inFlightContent;
+                if (continuedTyping && typeof payload.content === 'string') {
+                    setSharedEditorValue(mergeTextWithCrdt(window.sharedDocState.inFlightContent || '', local, payload.content).content, true);
                 }
-
+                if (payload.last_modified) window.sharedDocState.lastModified = payload.last_modified;
+                if (payload.content_version) window.sharedDocState.contentVersion = payload.content_version;
                 if (typeof payload.content === 'string') {
-                    if (window.vditor && window.vditor.getValue() !== payload.content) {
-                        setSharedEditorValue(payload.content, true);
-                    }
+                    if (!continuedTyping && window.vditor && local !== payload.content) setSharedEditorValue(payload.content, true);
                     window.sharedDocState.lastKnownContent = payload.content;
                 }
+                renderRemoteCursors();
                 window.sharedDocState.isSaving = false;
                 if (isSelfUpdate) {
                     resolveSharedManualSave(true);
@@ -1839,15 +1500,18 @@ import { setVditorValuePreservingCursor } from '../editor-cursor';
             }
 
             if (payload.type === 'error') {
+                if (payload.code === 403) setSharePermission(false);
                 window.sharedDocState.isSaving = false;
                 resolveSharedManualSave(false);
             }
         };
 
         socket.onclose = function() {
-            if (!window.sharedDocState) return;
+            if (window.sharedDocState?.ws !== socket) return;
             window.sharedDocState.wsConnected = false;
             window.sharedDocState.ws = null;
+            window.sharedDocState.isSaving = false;
+            resolveSharedManualSave(false);
             cleanupShareVideoRoom(false);
             updateShareConnectionStatus('polling');
             if (!window.sharedDocState.pollTimer) {
@@ -1923,7 +1587,7 @@ import { setVditorValuePreservingCursor } from '../editor-cursor';
                 ? '🎥 多人通话中'
                 : '🎥 多人通话') +
             '</button>' : '') +
-            (isOwner ? '<button id="showHistoryBtn" style="border:none;background:#f59e0b;color:#fff;padding:2px 8px;border-radius:999px;cursor:pointer;font-size:12px;">📜 历史</button>' : '') +
+            ('<button id="showHistoryBtn" style="border:none;background:#f59e0b;color:#fff;padding:2px 8px;border-radius:999px;cursor:pointer;font-size:12px;">📜 历史</button>') +
             '<button id="minimizeSharePresenceBtn" title="最小化" style="border:none;background:transparent;color:#fff;padding:0 4px;line-height:1;cursor:pointer;font-size:16px;opacity:0.85;">-</button>' +
             '</div>';
 
@@ -2016,11 +1680,14 @@ import { setVditorValuePreservingCursor } from '../editor-cursor';
                     viewer_id: window.sharedDocState.viewerId,
                     viewer_name: window.sharedDocState.viewerName,
                     can_edit: window.sharedDocState.canEdit,
+                    edit_password: window.sharedDocState.editPassword,
+                    ...getEditorIdentityPayload(),
                     is_editing: (Date.now() - window.sharedDocState.lastLocalEditAt) < 5000
                 })
             });
             const result = await response.json();
             if (result.code === 200 && result.data) {
+                if (result.data.can_edit !== undefined && result.data.can_edit !== window.sharedDocState.canEdit) setSharePermission(result.data.can_edit);
                 window.sharedDocState.onlineUsers = result.data.online_users || [];
                 renderSharePresence(result.data.online_users || []);
             }
@@ -2038,12 +1705,7 @@ import { setVditorValuePreservingCursor } from '../editor-cursor';
         if (window.sharedDocState.wsRetryTimer) clearTimeout(window.sharedDocState.wsRetryTimer);
         if (window.sharedDocState.wsGraceTimer) clearTimeout(window.sharedDocState.wsGraceTimer);
 
-        // 仅查看模式下不启动实时同步和在线状态功能
-        if (!window.sharedDocState.canEdit) {
-            return;
-        }
-
-        if (window.sharedDocState.canEdit) {
+        {
             window.sharedDocState.localWatchTimer = setInterval(function() {
                 if (window.vditor && window.sharedDocState && window.sharedDocState.canEdit) {
                     var current = window.vditor.getValue();
@@ -2074,6 +1736,9 @@ import { setVditorValuePreservingCursor } from '../editor-cursor';
     window.scheduleSharedDocSync = scheduleSharedDocSync;
 
     function hideEditElements() {
+        document.querySelectorAll('.mobile-toolbar-container, .mobile-bottom-bar, #mobileFileBtn, #mobileLoginBtn, #mobileMenuBtn, #modeToggle, #saveFileBtn, .editor-container').forEach(element => {
+            if (!hiddenEditStyles.has(element)) hiddenEditStyles.set(element, element.getAttribute('style') || '');
+        });
         // 隐藏顶部工具栏
         const mobileToolbar = document.querySelector('.mobile-toolbar-container');
         if (mobileToolbar) {

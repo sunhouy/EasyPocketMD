@@ -112,6 +112,7 @@ router.post('/get', async (req, res) => {
 
     const result = await shareManager.getSharedFile(share_id, password, {
         editorUsername: verifiedEditorUsername,
+        viewerId: req.body.viewer_id,
         editPassword: edit_password
     });
 
@@ -232,16 +233,44 @@ router.post('/properties', verifyUser, async (req, res) => {
 });
 
 router.post('/presence', async (req, res) => {
-    const { share_id, password, viewer_id, viewer_name, is_editing, can_edit } = req.body;
+    const { share_id, password, viewer_id, viewer_name, is_editing, edit_password } = req.body;
     if (!share_id || !viewer_id) return res.json({ code: 400, message: '缺少必要参数' });
-
-    const shareResult = await shareManager.getSharedFile(share_id, password);
-    if (shareResult.code !== 200) {
-        return res.json(shareResult);
-    }
-
-    res.json(await shareManager.updateSharePresence(share_id, viewer_id, viewer_name, !!is_editing, !!can_edit));
+    const editorUsername = await verifyOptionalEditor(req);
+    const access = await shareManager.getSharedFile(share_id, password, { editorUsername, viewerId: viewer_id, editPassword: edit_password });
+    if (access.code !== 200) return res.json(access);
+    const result = await shareManager.updateSharePresence(share_id, viewer_id, editorUsername || viewer_name, !!is_editing && access.data.can_edit, access.data.can_edit);
+    return res.json({ ...result, data: { ...result.data, can_edit: access.data.can_edit } });
 });
+
+router.post('/history', async (req, res) => {
+    const { share_id, password, viewer_id, edit_password } = req.body;
+    if (!share_id) return res.json({ code: 400, message: '缺少分享标识' });
+    const editorUsername = await verifyOptionalEditor(req);
+    try {
+        return res.json(await shareManager.getEditHistory(share_id, password, { editorUsername, viewerId: viewer_id, editPassword: edit_password, before_id: req.body.before_id, actor_key: req.body.actor_key }));
+    } catch (error) { return res.json({ code: 500, message: '加载协作历史失败' }); }
+});
+
+router.post('/history-event', async (req, res) => {
+    const { share_id, password, viewer_id, edit_password, event_id } = req.body;
+    if (!share_id) return res.json({ code: 400, message: '缺少分享 ID' });
+    const editorUsername = await verifyOptionalEditor(req);
+    try { return res.json(await shareManager.getEditEvent(share_id, password, { editorUsername, viewerId: viewer_id, editPassword: edit_password, event_id })); }
+    catch (error) { return res.json({ code: 500, message: '加载编辑详情失败' }); }
+});
+
+for (const action of ['undo', 'editor-permission']) {
+    router.post('/' + action, verifyUser, async (req, res) => {
+        const { username, share_id, event_id, actor_key, revoked } = req.body;
+        if (!username || !share_id) return res.json({ code: 400, message: '缺少必要参数' });
+        const result = await shareManager.manageEditorEdits(username, share_id, action === 'undo' ? 'undo' : 'permission', { event_id, actor_key, revoked });
+        if (result.code === 200 && req.app.locals.shareCollaborationServer) {
+            try { await req.app.locals.shareCollaborationServer.refreshRoom(share_id, action === 'undo'); }
+            catch (error) { console.warn('协作通知失败，客户端将通过心跳刷新:', error.message); }
+        }
+        return res.json(result);
+    });
+}
 
 router.get('/presence', async (req, res) => {
     const { share_id, password } = req.query;
@@ -262,6 +291,7 @@ router.post('/poll', async (req, res) => {
     const verifiedEditorUsername = await verifyOptionalEditor(req);
     const shareResult = await shareManager.getSharedFile(share_id, password, {
         editorUsername: verifiedEditorUsername,
+        viewerId: req.body.viewer_id,
         editPassword: edit_password
     });
     if (shareResult.code !== 200) {
@@ -276,7 +306,7 @@ router.post('/poll', async (req, res) => {
         code: 200,
         message: '轮询成功',
         data: {
-            changed: !since || (lastModified > sinceTime),
+            changed: !since || (lastModified > sinceTime) || (Number.isFinite(Number(req.body.since_version)) && Number(req.body.since_version) < Number(data.content_version)),
             ...data
         }
     });

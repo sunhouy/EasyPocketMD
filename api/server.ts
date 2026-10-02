@@ -342,6 +342,7 @@ function isDirectServerRun() {
 if (isDirectServerRun()) {
     const server = http.createServer(app);
     const shareWss = initShareCollabServer(server, shareManager);
+    app.locals.shareCollaborationServer = shareWss;
     const fileSyncWss = initFileSyncServer(server);
 
     server.on('upgrade', function(request, socket, head) {

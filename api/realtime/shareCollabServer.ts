@@ -115,6 +115,28 @@ function initShareCollabServer(httpServer, shareManager) {
         });
     }
 
+    async function refreshClient(client, sendContent = false) {
+        if (!client.ctx || client.readyState !== 1) return;
+        const ctx = client.ctx;
+        const access = await shareManager.getSharedFile(ctx.shareId, ctx.password, { editorUsername: ctx.editorUsername, viewerId: ctx.viewerId, editPassword: ctx.editPassword });
+        if (access.code !== 200) { client.close(1008, 'share access removed'); return; }
+        const changed = ctx.canEdit !== !!access.data.can_edit;
+        ctx.canEdit = !!access.data.can_edit;
+        if (!ctx.canEdit) ctx.cursor = null;
+        if (changed) {
+            await shareManager.updateSharePresence(ctx.shareId, ctx.viewerId, ctx.viewerName, false, ctx.canEdit);
+            client.send(JSON.stringify({ type: 'permission_changed', can_edit: ctx.canEdit }));
+            broadcast(ctx.shareId, { type: 'cursor', viewer_id: ctx.viewerId, cursor: null });
+        }
+        if (sendContent) client.send(JSON.stringify({ type: 'doc_updated', ...access.data, updated_by: 'owner-action' }));
+    }
+    wss.refreshRoom = async (shareId, sendContent = false) => {
+        const room = roomMap.get(shareId);
+        if (!room) return;
+        await Promise.all([...room].map(client => refreshClient(client, sendContent)));
+        await broadcastPresence(shareId);
+    };
+
     wss.on('connection', async (socket, request) => {
         const urlObj = new URL(request.url, 'http://localhost');
         const shareId = String(urlObj.searchParams.get('share_id') || '').trim();
@@ -145,6 +167,7 @@ function initShareCollabServer(httpServer, shareManager) {
 
         const shareResult = await shareManager.getSharedFile(shareId, password, {
             editorUsername: verifiedEditorUsername,
+            viewerId,
             editPassword
         });
         if (shareResult.code !== 200) {
@@ -158,7 +181,8 @@ function initShareCollabServer(httpServer, shareManager) {
             editPassword,
             editorUsername: verifiedEditorUsername,
             viewerId,
-            viewerName,
+            viewerName: verifiedEditorUsername || viewerName,
+            actorKey: verifiedEditorUsername ? 'user:' + verifiedEditorUsername : 'guest:' + viewerId,
             canEdit: !!shareResult.data.can_edit,
             contentVersion: shareResult.data.content_version || 1,
             lastHeartbeat: Date.now()
@@ -167,7 +191,7 @@ function initShareCollabServer(httpServer, shareManager) {
         addClientToRoom(shareId, socket);
         resetConnectionTimeout(socket, shareId);
 
-        await shareManager.updateSharePresence(shareId, viewerId, viewerName, false, socket.ctx.canEdit);
+        await shareManager.updateSharePresence(shareId, viewerId, socket.ctx.viewerName, false, socket.ctx.canEdit);
 
         socket.send(JSON.stringify({
             type: 'ready',
@@ -180,6 +204,9 @@ function initShareCollabServer(httpServer, shareManager) {
         }));
 
         await broadcastPresence(shareId);
+        for (const client of roomMap.get(shareId) || []) {
+            if (client !== socket && client.ctx?.cursor) socket.send(JSON.stringify({ type: 'cursor', viewer_id: client.ctx.viewerId, viewer_name: client.ctx.viewerName, cursor: client.ctx.cursor }));
+        }
 
         socket.on('message', async (rawMessage) => {
             resetConnectionTimeout(socket, shareId);
@@ -189,12 +216,30 @@ function initShareCollabServer(httpServer, shareManager) {
                 return;
             }
 
+            if (!socket.ctx) return;
+            if (payload.type === 'heartbeat' || payload.type === 'cursor' || String(payload.type).startsWith('video')) {
+                if (!socket.ctx.permissionCheckedAt || Date.now() - socket.ctx.permissionCheckedAt > 1000) {
+                    socket.ctx.permissionCheckedAt = Date.now();
+                    await refreshClient(socket);
+                }
+                if (!socket.ctx || socket.readyState !== 1) return;
+            }
+            if (payload.type === 'cursor') {
+                if (!socket.ctx.canEdit) return;
+                const cursor = payload.cursor;
+                if (cursor && (!Number.isSafeInteger(cursor.markdown_offset) || cursor.markdown_offset < 0 || cursor.markdown_offset > 50000000 || !['sv', 'ir', 'wysiwyg'].includes(cursor.mode))) return;
+                if (socket.ctx.cursorAt && Date.now() - socket.ctx.cursorAt < 80) return;
+                socket.ctx.cursorAt = Date.now();
+                socket.ctx.cursor = cursor ? { markdown_offset: cursor.markdown_offset, text_offset: Math.max(0, Math.min(50000000, Number(cursor.text_offset) || 0)), mode: cursor.mode, content_version: Number(cursor.content_version) || 0, fingerprint: String(cursor.fingerprint || '').slice(0, 16), context_before: String(cursor.context_before || '').slice(-40), context_after: String(cursor.context_after || '').slice(0, 40) } : null;
+                broadcast(shareId, { type: 'cursor', viewer_id: socket.ctx.viewerId, viewer_name: socket.ctx.viewerName, cursor: socket.ctx.cursor });
+                return;
+            }
             if (payload.type === 'heartbeat') {
                 await shareManager.updateSharePresence(
                     socket.ctx.shareId,
                     socket.ctx.viewerId,
                     socket.ctx.viewerName,
-                    toBoolean(payload.is_editing),
+                    socket.ctx.canEdit && toBoolean(payload.is_editing),
                     socket.ctx.canEdit
                 );
                 await broadcastPresence(socket.ctx.shareId);
@@ -455,6 +500,7 @@ function initShareCollabServer(httpServer, shareManager) {
                     return;
                 }
 
+                if (updateResult.code === 403) { socket.ctx.canEdit = false; socket.send(JSON.stringify({ type: 'permission_changed', can_edit: false })); }
                 socket.send(JSON.stringify({
                     type: 'error',
                     code: updateResult.code || 500,
@@ -482,13 +528,14 @@ function initShareCollabServer(httpServer, shareManager) {
                     }
                 });
             }
-            await shareManager.updateSharePresence(shareId, viewerId, viewerName, false, socket.ctx ? socket.ctx.canEdit : false);
+            broadcast(shareId, { type: 'cursor', viewer_id: viewerId, cursor: null });
+            await shareManager.updateSharePresence(shareId, viewerId, socket.ctx?.viewerName || viewerName, false, socket.ctx ? socket.ctx.canEdit : false);
             await broadcastPresence(shareId);
             cleanupConnection(socket, shareId);
         });
     });
 
-    setInterval(() => {
+    const roomCleanup = setInterval(() => {
         for (const [shareId, room] of roomMap.entries()) {
             if (room.size === 0) {
                 roomMap.delete(shareId);
@@ -496,6 +543,7 @@ function initShareCollabServer(httpServer, shareManager) {
         }
     }, 60000);
 
+    wss.on('close', () => clearInterval(roomCleanup));
     return wss;
 }
 
