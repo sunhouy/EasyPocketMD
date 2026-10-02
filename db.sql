@@ -461,3 +461,25 @@ COMMIT;
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
+
+
+CREATE TABLE IF NOT EXISTS share_edit_events (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    share_id VARCHAR(32) COLLATE utf8mb4_unicode_ci NOT NULL,
+    actor_key VARCHAR(260) COLLATE utf8mb4_unicode_ci NOT NULL,
+    actor_name VARCHAR(255) NOT NULL,
+    before_content LONGTEXT NOT NULL, after_content LONGTEXT NOT NULL,
+    content_version BIGINT UNSIGNED NOT NULL, kind VARCHAR(16) NOT NULL DEFAULT 'edit',
+    undone_by BIGINT UNSIGNED NULL, created_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    INDEX share_events (share_id, id), INDEX share_actor (share_id, actor_key(191)),
+    FOREIGN KEY (share_id) REFERENCES file_shares(share_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+CREATE TABLE IF NOT EXISTS share_edit_blocks (
+    share_id VARCHAR(32) COLLATE utf8mb4_unicode_ci NOT NULL,
+    actor_key VARCHAR(260) COLLATE utf8mb4_unicode_ci NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (share_id, actor_key),
+    FOREIGN KEY (share_id) REFERENCES file_shares(share_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

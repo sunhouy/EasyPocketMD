@@ -1,6 +1,7 @@
 
 const bcrypt = require('bcryptjs');
 const historyManager = require('../../api/models/HistoryManager');
+const collaboration = require('../../api/models/ShareCollaboration');
 const app = require('../../api/server');
 
 const request = require('supertest');
@@ -21,6 +22,7 @@ jest.mock('../../api/utils/auth', () => ({
 describe('Share API Integration', () => {
     beforeEach(() => {
         jest.clearAllMocks();
+        jest.spyOn(collaboration, 'ensureSchema').mockResolvedValue(undefined);
         historyManager.createHistory.mockResolvedValue({ code: 200, data: { version_id: 1, history_id: 1 } });
     });
 
@@ -94,57 +96,46 @@ describe('Share API Integration', () => {
     });
 
     describe('POST /api/share/update', () => {
-        it('should update file content if mode is edit', async () => {
-            db.execute
-                .mockResolvedValueOnce([[
-                    { share_id: 'sid', username: 'u', filename: 'f.md', mode: 'edit', password: null }
-                ]]) // getSharedFile
-                .mockResolvedValueOnce([]) // UPDATE user_files
-                .mockResolvedValueOnce([[{ content: 'new content', last_modified: '2026-01-01 00:00:00' }]]); // SELECT updated content
-
-            const res = await request(app)
-                .post('/api/share/update')
-                .send({ share_id: 'sid', content: 'new content' });
-
-            expect(res.status).toBe(200);
+        function connection(before = 'old', version = 1) {
+            const row = { share_id: 'sid', username: 'owner', filename: 'note.md', mode: 'edit', edit_policy: 'all', password: null, content: before, content_version: version };
+            const cx = {
+                execute: jest.fn(async (sql, values) => {
+                    if (sql.includes('FROM file_shares')) return [[row]];
+                    if (sql.includes('FROM share_edit_blocks')) return [[]];
+                    if (sql.startsWith('UPDATE user_files')) { row.content = values[0]; row.content_version = values[1]; return [{ affectedRows: 1 }]; }
+                    if (sql.includes('INSERT INTO share_edit_events')) return [{ insertId: 123 }];
+                    if (sql.startsWith('SELECT content, last_modified')) return [[row]];
+                    return [[]];
+                }),
+                beginTransaction: jest.fn(), commit: jest.fn(), rollback: jest.fn(), release: jest.fn()
+            };
+            db.getConnection.mockResolvedValue(cx); return cx;
+        }
+        it('records every accepted autosave with its verified editor identity', async () => {
+            const cx = connection();
+            const res = await request(app).post('/api/share/update').send({ share_id: 'sid', content: 'new content', editor_username: 'editor', editor_token: 'token', viewer_id: 'session-1', viewer_name: 'spoofed-name', base_version: 1, base_content: 'old' });
             expect(res.body.code).toBe(200);
+            expect(res.body.data.content).toBe('new content');
+            expect(cx.execute).toHaveBeenCalledWith(expect.stringContaining('INSERT INTO share_edit_events'), ['sid', 'user:editor', 'editor', 'old', 'new content', 2, 'edit']);
+            expect(cx.commit).toHaveBeenCalled();
         });
-
-        it('should pass manual save flag through share update route', async () => {
-            db.execute
-                .mockResolvedValueOnce([[
-                    { share_id: 'sid', username: 'u', filename: 'f.md', mode: 'edit', password: null, content_version: 1 }
-                ]])
-                .mockResolvedValueOnce([{ affectedRows: 1 }])
-                .mockResolvedValueOnce([[{ content: 'new content', last_modified: '2026-01-01 00:00:00', content_version: 2 }]]);
-
-            const res = await request(app)
-                .post('/api/share/update')
-                .send({ share_id: 'sid', content: 'new content', base_version: 1, manual_save: true });
-
-            expect(res.status).toBe(200);
+        it('creates a manual history snapshot in addition to the collaboration record', async () => {
+            connection();
+            const res = await request(app).post('/api/share/update').send({ share_id: 'sid', content: 'new content', viewer_id: 'guest-1', base_version: 1, manual_save: true });
             expect(res.body.code).toBe(200);
-            expect(historyManager.createHistory).toHaveBeenCalledWith('u', 'f.md', 'new content', 'Guest');
+            expect(historyManager.createHistory).toHaveBeenCalledWith('owner', 'note.md', 'new content', 'Guest（访客）');
             expect(res.body.data.history).toBeTruthy();
         });
-
-
-        it('should handle optimistic version check gracefully', async () => {
-            db.execute
-                .mockResolvedValueOnce([[
-                    { share_id: 'sid', username: 'u', filename: 'f.md', mode: 'edit', password: null, content_version: 2 }
-                ]]) // getSharedFile
-                .mockResolvedValueOnce([{ affectedRows: 0 }]) // First update (version mismatch)
-                .mockResolvedValueOnce([{ affectedRows: 1 }]) // Second update (force update)
-                .mockResolvedValueOnce([[{ content: 'my content', last_modified: '2026-01-01 00:00:00', content_version: 4 }]]); // SELECT updated content
-
-            const res = await request(app)
-                .post('/api/share/update')
-                .send({ share_id: 'sid', content: 'my content', base_version: 2 });
-
-            expect(res.status).toBe(200);
+        it('merges concurrent edits against the locked current document', async () => {
+            connection('A\nB remote', 2);
+            const res = await request(app).post('/api/share/update').send({ share_id: 'sid', content: 'A local\nB', base_version: 1, base_content: 'A\nB', viewer_id: 'guest-1' });
             expect(res.body.code).toBe(200);
-            expect(res.body.data.content).toBe('my content');
+            expect(res.body.data.content).toBe('A local\nB remote');
+        });
+        it('rejects stale full snapshots that cannot be merged safely', async () => {
+            const cx = connection('newer remote', 2);
+            const res = await request(app).post('/api/share/update').send({ share_id: 'sid', content: 'stale', base_version: 1, viewer_id: 'guest-1' });
+            expect(res.body.code).toBe(409); expect(cx.rollback).toHaveBeenCalled();
         });
     });
 });

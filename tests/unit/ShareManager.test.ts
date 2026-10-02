@@ -96,92 +96,62 @@ describe('ShareManager', () => {
     });
 
     describe('updateSharedFile', () => {
-        it('should update file content if mode is edit', async () => {
-            historyManager.createHistory.mockResolvedValue({ code: 200, data: { version_id: 1 } });
-            db.execute
-                .mockResolvedValueOnce([[
-                    { share_id: 'sid', username: 'u', filename: 'f.md', mode: 'edit', password: null }
-                ]]) // getSharedFile internal
-                .mockResolvedValueOnce([]) // UPDATE user_files
-                .mockResolvedValueOnce([[{ content: 'new content', last_modified: '2026-01-01 00:00:00' }]]); // SELECT updated content
-
-            const result = await shareManager.updateSharedFile('sid', 'new content');
-
+        let cx, row;
+        beforeEach(() => {
+            jest.spyOn(require('../../api/models/ShareCollaboration'), 'ensureSchema').mockResolvedValue(undefined);
+            row = { share_id: 'sid', username: 'u', filename: 'f.md', mode: 'edit', edit_policy: 'all', content: 'old', content_version: 1 };
+            cx = {
+                execute: jest.fn(async (sql, values) => {
+                    if (sql.includes('FROM file_shares')) return [[row]];
+                    if (sql.includes('FROM share_edit_blocks')) return [[]];
+                    if (sql.startsWith('UPDATE user_files')) { row.content = values[0]; row.content_version = values[1]; return [{ affectedRows: 1 }]; }
+                    if (sql.includes('INSERT INTO share_edit_events')) return [{ insertId: 9 }];
+                    if (sql.startsWith('SELECT content, last_modified')) return [[row]];
+                    return [[]];
+                }), beginTransaction: jest.fn(), commit: jest.fn(), rollback: jest.fn(), release: jest.fn()
+            };
+            db.getConnection.mockResolvedValue(cx);
+            historyManager.createHistory.mockResolvedValue({ code: 200, data: { version_id: 2 } });
+        });
+        it('commits content and editor attribution together for autosaves', async () => {
+            const result = await shareManager.updateSharedFile('sid', 'new', null, { viewerId: 'guest-1' });
             expect(result.code).toBe(200);
-            expect(db.execute).toHaveBeenCalledWith(
-                expect.stringContaining('UPDATE user_files'),
-                ['new content', 'u', 'f.md']
-            );
+            expect(cx.execute).toHaveBeenCalledWith(expect.stringContaining('INSERT INTO share_edit_events'), ['sid', 'guest:guest-1', 'Guest（访客）', 'old', 'new', 2, 'edit']);
+            expect(cx.commit).toHaveBeenCalled();
             expect(historyManager.createHistory).not.toHaveBeenCalled();
         });
-
-        it('should create history for manual shared saves', async () => {
-            historyManager.createHistory.mockResolvedValue({ code: 200, data: { version_id: 2, history_id: 9 } });
-            db.execute
-                .mockResolvedValueOnce([[
-                    { share_id: 'sid', username: 'u', filename: 'f.md', mode: 'edit', password: null, content_version: 1 }
-                ]])
-                .mockResolvedValueOnce([{ affectedRows: 1 }])
-                .mockResolvedValueOnce([[{ content: 'new content', last_modified: '2026-01-01 00:00:00', content_version: 2 }]]);
-
-            const result = await shareManager.updateSharedFile('sid', 'new content', null, { baseVersion: 1, manualSave: true });
-
+        it('also creates manual history without misreporting a committed save if snapshot creation fails', async () => {
+            historyManager.createHistory.mockRejectedValue(new Error('snapshot unavailable'));
+            const result = await shareManager.updateSharedFile('sid', 'new', null, { editorUsername: 'editor', manualSave: true });
             expect(result.code).toBe(200);
-            expect(historyManager.createHistory).toHaveBeenCalledWith('u', 'f.md', 'new content', 'Guest');
-            expect(result.data.history).toEqual({ version_id: 2, history_id: 9 });
+            expect(historyManager.createHistory).toHaveBeenCalledWith('u', 'f.md', 'new', 'editor');
+            expect(cx.rollback).not.toHaveBeenCalled();
         });
-
-        it('should return 403 if mode is view', async () => {
-             db.execute
-                .mockResolvedValueOnce([[
-                    { share_id: 'sid', username: 'u', filename: 'f.md', mode: 'view', password: null }
-                ]]);
-
-            const result = await shareManager.updateSharedFile('sid', 'new content');
-
-            expect(result.code).toBe(403);
+        it('rejects readonly mode before writing', async () => {
+            row.mode = 'view';
+            expect((await shareManager.updateSharedFile('sid', 'new', null, { viewerId: 'guest-1' })).code).toBe(403);
+            expect(cx.commit).not.toHaveBeenCalled();
         });
-
-        it('should handle optimistic version check gracefully', async () => {
-            historyManager.createHistory.mockResolvedValue({ code: 200, data: { version_id: 1 } });
-            db.execute
-                .mockResolvedValueOnce([[
-                    { share_id: 'sid', username: 'u', filename: 'f.md', mode: 'edit', password: null, content_version: 2 }
-                ]])
-                .mockResolvedValueOnce([{ affectedRows: 0 }]) // First update (version mismatch)
-                .mockResolvedValueOnce([{ affectedRows: 1 }]) // Second update (force update)
-                .mockResolvedValueOnce([[{ content: 'new content', last_modified: '2026-01-01 00:00:00', content_version: 4 }]]); // SELECT updated content
-
-            const result = await shareManager.updateSharedFile('sid', 'new content', null, { baseVersion: 2, manualSave: true });
-
-            expect(result.code).toBe(200);
-            expect(result.data.content).toBe('new content');
-            expect(historyManager.createHistory).toHaveBeenCalledWith('u', 'f.md', 'new content', 'Guest');
+        it('rejects missing identities and rolls back failed audit writes', async () => {
+            expect((await shareManager.updateSharedFile('sid', 'new')).code).toBe(400);
+            const original = cx.execute.getMockImplementation();
+            cx.execute.mockImplementation((sql, values) => sql.includes('INSERT INTO share_edit_events') ? Promise.reject(new Error('audit unavailable')) : original(sql, values));
+            expect((await shareManager.updateSharedFile('sid', 'new', null, { viewerId: 'guest-1' })).code).toBe(500);
+            expect(cx.rollback).toHaveBeenCalled();
+            expect(cx.commit).not.toHaveBeenCalled();
         });
-
-        it('should merge stale shared document updates with CRDT when base content is provided', async () => {
-            historyManager.createHistory.mockResolvedValue({ code: 200, data: { version_id: 1 } });
-            db.execute
-                .mockResolvedValueOnce([[
-                    { share_id: 'sid', username: 'u', filename: 'f.md', mode: 'edit', password: null, content: 'A\nB remote', content_version: 2 }
-                ]])
-                .mockResolvedValueOnce([{ affectedRows: 0 }])
-                .mockResolvedValueOnce([{ affectedRows: 1 }])
-                .mockResolvedValueOnce([[{ content: 'A local\nB remote', last_modified: '2026-01-01 00:00:00', content_version: 3 }]]);
-
-            const result = await shareManager.updateSharedFile('sid', 'A local\nB', null, {
-                baseVersion: 1,
-                baseContent: 'A\nB',
-                manualSave: true
-            });
-
+        it('merges stale edits against the locked current document', async () => {
+            row.content = 'A\nB remote'; row.content_version = 2;
+            const result = await shareManager.updateSharedFile('sid', 'A local\nB', null, { viewerId: 'guest-1', baseVersion: 1, baseContent: 'A\nB' });
             expect(result.code).toBe(200);
             expect(result.data.content).toBe('A local\nB remote');
             expect(result.data.merged_by_crdt).toBe(true);
-            expect(db.execute).toHaveBeenCalledWith(
-                expect.stringContaining('UPDATE user_files SET content = ?, content_version = content_version + 1'),
-                ['A local\nB remote', 'u', 'f.md']
-            );
+        });
+        it('rejects revoked editors even if a client still claims it can edit', async () => {
+            const original = cx.execute.getMockImplementation();
+            cx.execute.mockImplementation((sql, values) => sql.includes('FROM share_edit_blocks') ? Promise.resolve([[{ actor_key: 'user:editor' }]]) : original(sql, values));
+            expect((await shareManager.updateSharedFile('sid', 'new', null, { editorUsername: 'editor' })).code).toBe(403);
+            expect(cx.execute.mock.calls.some(([sql]) => sql.startsWith('UPDATE user_files'))).toBe(false);
         });
     });
 });

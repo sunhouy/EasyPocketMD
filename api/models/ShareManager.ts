@@ -2,9 +2,25 @@ const db = require('../config/db');
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const historyManager = require('./HistoryManager');
+const collaboration = require('./ShareCollaboration');
+const Cache = require('../utils/cache');
 const { mergeTextWithCrdt } = require('../utils/textCrdt');
 
+interface ShareAccessOptions {
+    editorUsername?: string;
+    viewerId?: string;
+    editPassword?: string;
+    connection?: any;
+}
+interface ShareUpdateOptions extends ShareAccessOptions {
+    viewerName?: string;
+    baseVersion?: number;
+    baseContent?: string;
+    manualSave?: boolean;
+}
+
 class ShareManager {
+    baseUrl: string;
     constructor() {
         this.baseUrl = process.env.BASE_URL || 'http://localhost:3000';
     }
@@ -51,14 +67,22 @@ class ShareManager {
         }
     }
 
-    async getShareEditors(shareId) {
-        const [rows] = await db.execute('SELECT editor_username FROM share_editors WHERE share_id = ?', [shareId]);
+    async getShareEditors(shareId, connection = db) {
+        const [rows] = await connection.execute('SELECT editor_username FROM share_editors WHERE share_id = ?', [shareId]);
         return rows.map(row => row.editor_username);
     }
 
-    async canEditSharedFile(share, options = {}) {
+    async canEditSharedFile(share, options: ShareAccessOptions = {}) {
+        if (share && options.editorUsername && options.editorUsername === share.username) return { canEdit: true, reason: 'owner' };
         if (!share || share.mode !== 'edit') {
             return { canEdit: false, reason: 'view_only' };
+        }
+
+        if (options.editorUsername || options.viewerId) {
+            const actor = collaboration.actor(options);
+            if (await collaboration.isBlocked(share.share_id, actor.key, options.connection || db)) {
+                return { canEdit: false, reason: 'editor_revoked' };
+            }
         }
 
         const editPolicy = share.edit_policy || 'all';
@@ -71,7 +95,7 @@ class ShareManager {
             if (!editorUsername) {
                 return { canEdit: false, reason: 'specific_user_required' };
             }
-            const editorUsernames = await this.getShareEditors(share.share_id);
+            const editorUsernames = await this.getShareEditors(share.share_id, options.connection || db);
             return {
                 canEdit: editorUsernames.includes(editorUsername),
                 reason: editorUsernames.includes(editorUsername) ? 'specific_user_match' : 'specific_user_denied',
@@ -216,13 +240,14 @@ class ShareManager {
     }
 
     // Get shared file
-    async getSharedFile(shareId, password = null, options = {}) {
+    async getSharedFile(shareId, password = null, options: ShareAccessOptions = {}) {
         try {
-            const [rows] = await db.execute(`
+            const [rows] = await (options.connection || db).execute(`
                 SELECT s.*, f.content, f.last_modified, f.content_version 
                 FROM file_shares s 
                 JOIN user_files f ON s.username = f.username AND s.filename = f.filename 
                 WHERE s.share_id = ? AND (s.expires_at IS NULL OR s.expires_at > NOW())
+                ${options.connection ? 'FOR UPDATE' : ''}
             `, [shareId]);
 
             if (rows.length === 0) return { code: 404, message: '分享不存在或已过期' };
@@ -237,8 +262,7 @@ class ShareManager {
             }
 
             const editPermission = await this.canEditSharedFile(share, {
-                editorUsername: options.editorUsername,
-                editPassword: options.editPassword
+                ...options
             });
 
             return {
@@ -267,93 +291,118 @@ class ShareManager {
         }
     }
 
-    // Update shared file
-    async updateSharedFile(shareId, content, password = null, options = {}) {
+    // Serialize shared edits and their attribution on the document row.
+    async updateSharedFile(shareId, content, password = null, options: ShareUpdateOptions = {}) {
+        let connection;
         try {
-            const shareResult = await this.getSharedFile(shareId, password, {
-                editorUsername: options.editorUsername,
-                editPassword: options.editPassword
-            });
-            if (shareResult.code !== 200) return shareResult;
-
+            await collaboration.ensureSchema();
+            const actor = collaboration.actor(options);
+            connection = await db.getConnection();
+            await connection.beginTransaction();
+            const shareResult = await this.getSharedFile(shareId, password, { ...options, connection });
+            if (shareResult.code !== 200) { await connection.rollback(); return shareResult; }
             const share = shareResult.data;
-            if (share.mode !== 'edit') return { code: 403, message: '当前分享仅允许查看，不允许编辑' };
             if (!share.can_edit) {
-                if (share.edit_policy === 'specific') {
-                    return { code: 403, message: '当前分享仅允许特定用户编辑' };
-                }
-                if (share.edit_policy === 'password') {
-                    return { code: 403, message: '请输入正确的编辑密码后再编辑' };
-                }
-                return { code: 403, message: '当前用户无编辑权限' };
+                await connection.rollback();
+                return { code: 403, message: '当前用户无编辑权限', data: { can_edit: false } };
             }
-
-            const hasBaseVersion = Number.isInteger(options.baseVersion);
-            const hasBaseContent = typeof options.baseContent === 'string';
+            const before = String(share.content || '');
             let contentToSave = String(content || '');
             let mergedByCrdt = false;
-            let updateResult;
-            if (hasBaseVersion) {
-                const [result] = await db.execute(
-                    'UPDATE user_files SET content = ?, content_version = content_version + 1, last_modified = NOW() WHERE username = ? AND filename = ? AND content_version = ?',
-                    [contentToSave, share.username, share.filename, options.baseVersion]
-                );
-                updateResult = result;
-            } else {
-                const [result] = await db.execute(
-                    'UPDATE user_files SET content = ?, content_version = content_version + 1, last_modified = NOW() WHERE username = ? AND filename = ?',
-                    [contentToSave, share.username, share.filename]
-                );
-                updateResult = result;
-            }
-
-            if (hasBaseVersion && (!updateResult || updateResult.affectedRows === 0)) {
-                if (hasBaseContent) {
-                    const mergeResult = mergeTextWithCrdt(options.baseContent, contentToSave, share.content || '');
-                    contentToSave = mergeResult.content;
-                    mergedByCrdt = mergeResult.merged;
+            if (Number.isInteger(options.baseVersion) && options.baseVersion !== Number(share.content_version)) {
+                if (typeof options.baseContent !== 'string') {
+                    await connection.rollback();
+                    return { code: 409, message: '文档已更新，请同步后重试', data: share };
                 }
-                const [result] = await db.execute(
-                    'UPDATE user_files SET content = ?, content_version = content_version + 1, last_modified = NOW() WHERE username = ? AND filename = ?',
-                    [contentToSave, share.username, share.filename]
-                );
-                updateResult = result;
+                const merged = mergeTextWithCrdt(options.baseContent, contentToSave, before);
+                contentToSave = merged.content; mergedByCrdt = merged.merged;
             }
-
-            // 更新在线会话中的编辑状态
-            if (options.viewerId) {
-                await this.updateSharePresence(shareId, options.viewerId, options.viewerName || options.editorUsername || 'Guest', true, true);
+            let version = Number(share.content_version || 1);
+            let eventId = null;
+            if (contentToSave !== before) {
+                version++;
+                await connection.execute('UPDATE user_files SET content = ?, content_version = ?, last_modified = NOW() WHERE username = ? AND filename = ?', [contentToSave, version, share.username, share.filename]);
+                eventId = await collaboration.record(connection, shareId, actor, before, contentToSave, version);
             }
-
-            const [updatedRows] = await db.execute('SELECT content, last_modified, content_version FROM user_files WHERE username = ? AND filename = ? LIMIT 1', [share.username, share.filename]);
-            const updated = updatedRows[0] || {};
-            let historyResult = null;
+            const [rows] = await connection.execute('SELECT content, last_modified, content_version FROM user_files WHERE username = ? AND filename = ? LIMIT 1', [share.username, share.filename]);
+            const updated = rows[0] || { content: contentToSave, content_version: version };
+            await connection.commit();
+            connection.release(); connection = null;
+            try {
+                await Cache.deleteUserFiles(share.username);
+                await Cache.deleteFileContent(share.username, share.filename);
+                if (options.viewerId) await this.updateSharePresence(shareId, options.viewerId, actor.name, true, true);
+            } catch (error) { console.warn('协作保存后的状态刷新失败:', error.message); }
+            let history = null;
             if (options.manualSave) {
-                const modifiedBy = options.viewerName || options.editorUsername || 'Guest';
-                historyResult = await historyManager.createHistory(share.username, share.filename, updated.content || '', modifiedBy);
-                if (historyResult.code !== 200 && historyResult.code !== 304) {
-                    return historyResult;
-                }
+                try {
+                    const result = await historyManager.createHistory(share.username, share.filename, updated.content, actor.name);
+                    if (result.code === 200) history = result.data;
+                } catch (error) { console.warn('手动历史快照失败，协作编辑记录已保存:', error.message); }
             }
-
-            return {
-                code: 200,
-                message: '文档更新成功',
-                data: {
-                    share_id: share.share_id,
-                    username: share.username,
-                    filename: share.filename,
-                    mode: share.mode,
-                    content: updated.content,
-                    last_modified: updated.last_modified,
-                    content_version: updated.content_version || (share.content_version || 1),
-                    merged_by_crdt: mergedByCrdt,
-                    history: historyResult && historyResult.data ? historyResult.data : null
-                }
-            };
+            return { code: 200, message: '文档更新成功', data: {
+                share_id: shareId, username: share.username, filename: share.filename,
+                content: updated.content, content_version: updated.content_version, last_modified: updated.last_modified,
+                merged_by_crdt: mergedByCrdt, history, event_id: eventId
+            } };
         } catch (error) {
-            return { code: 500, message: '更新分享文档失败: ' + error.message };
-        }
+            if (connection) await connection.rollback();
+            return { code: error.code === 400 ? 400 : 500, message: '更新分享文档失败: ' + error.message };
+        } finally { connection?.release(); }
+    }
+
+    async getEditHistory(shareId, password, options: any = {}) {
+        const access = await this.getSharedFile(shareId, password, options);
+        if (access.code !== 200) return access;
+        const data = await collaboration.list(shareId, options);
+        return { code: 200, data: { ...data, can_manage: options.editorUsername === access.data.username } };
+    }
+
+    async getEditEvent(shareId, password, options: any = {}) {
+        const access = await this.getSharedFile(shareId, password, options);
+        if (access.code !== 200) return access;
+        const eventId = Number(options.event_id);
+        if (!Number.isSafeInteger(eventId) || eventId <= 0) return { code: 400, message: '无效的编辑记录' };
+        const data = await collaboration.event(shareId, eventId);
+        return data ? { code: 200, data } : { code: 404, message: '编辑记录不存在' };
+    }
+
+    async manageEditorEdits(owner, shareId, action, target: any = {}) {
+        let connection;
+        try {
+            await collaboration.ensureSchema();
+            connection = await db.getConnection();
+            await connection.beginTransaction();
+            const access = await this.getSharedFile(shareId, null, { editorUsername: owner, connection });
+            if (access.code !== 200) { await connection.rollback(); return access; }
+            const share = access.data;
+            if (share.username !== owner) { await connection.rollback(); return { code: 403, message: '仅文档所有者可管理协作编辑' }; }
+            let data;
+            if (action === 'undo') {
+                const eventId = Number(target.event_id);
+                const actorKey = String(target.actor_key || '');
+                if (!(Number.isSafeInteger(eventId) && eventId > 0) && !/^(user|guest):.{1,255}$/.test(actorKey)) {
+                    throw Object.assign(new Error('请选择编辑记录或编辑者'), { code: 400 });
+                }
+                data = await collaboration.undo(connection, { ...share, share_id: shareId }, owner, eventId > 0 ? eventId : null, actorKey);
+            } else {
+                const actorKey = String(target.actor_key || '');
+                if (!/^(user|guest):.{1,255}$/.test(actorKey) || actorKey === 'user:' + owner) throw Object.assign(new Error('不能关闭所有者的编辑权限'), { code: 400 });
+                if (target.revoked !== false) {
+                    await connection.execute('INSERT IGNORE INTO share_edit_blocks (share_id, actor_key) VALUES (?, ?)', [shareId, actorKey]);
+                } else {
+                    await connection.execute('DELETE FROM share_edit_blocks WHERE share_id = ? AND actor_key = ?', [shareId, actorKey]);
+                }
+                data = { actor_key: actorKey, revoked: target.revoked !== false };
+            }
+            await connection.commit();
+            await Cache.deleteUserFiles(owner);
+            await Cache.deleteFileContent(owner, share.filename);
+            return { code: 200, data };
+        } catch (error) {
+            if (connection) await connection.rollback();
+            return { code: [400, 404, 409].includes(error.code) ? error.code : 500, message: error.message };
+        } finally { connection?.release(); }
     }
 
     // Get user shares
