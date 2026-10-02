@@ -280,8 +280,7 @@ jobs:
       - name: Clean install dependencies
         shell: bash
         run: |
-          rm -rf node_modules package-lock.json
-          npm install
+          npm ci --prefer-offline --no-audit --no-fund
 
       - name: Verify WASM source artifacts
         run: npm run wasm:text:verify
@@ -331,6 +330,10 @@ jobs:
             const patched = cargoRaw.replace(/^version\\s*=\\s*"[^"]+"/m, `version = "${version}"`);
             fs.writeFileSync(cargoPath, patched);
           '
+
+      - name: Prepare verified NSIS toolchain with download retries
+        shell: pwsh
+        run: ./scripts/prepare-windows-nsis.ps1
 
       - name: Build Tauri app (Windows)
         run: npm run build:tauri:win
