@@ -173,7 +173,7 @@ class FileManager {
                 let contentToSave = String(content || '');
                 let mergedByCrdt = false;
 
-                if (rows.length > 0 && !fileE2E && shouldCheckOptimisticLock && hasBaseContent) {
+                if (rows.length > 0 && !fileE2E && !rows[0].e2e_enabled && shouldCheckOptimisticLock && hasBaseContent) {
                     const currentRow = rows[0];
                     const currentContent = String(currentRow.content || '');
                     const baseContentVersion = Number(optimisticLock.base_content_version);
