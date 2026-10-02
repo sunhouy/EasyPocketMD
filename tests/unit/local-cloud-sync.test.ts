@@ -5,14 +5,14 @@ import { isExternalLocalFile } from '../../js/files/external';
 jest.mock('../../js/files/websocket-sync', () => ({ createWebSocketClient: jest.fn(), createSyncThrottle: jest.fn() }));
 jest.mock('../../js/e2e', () => ({ resolveFileContent: async content => content }));
 
-function fixture(write) {
+function fixture(write, read) {
     const file = { id: 'local', name: 'note.md', type: 'file', content: 'edit', isExternalLocal: true, localFileMode: 'tauri', localAccessState: 'ready' };
     const app = { files: [file], currentUser: { username: 'user', token: 'token' }, currentFileId: 'local', lastSyncedContent: {}, unsavedChanges: {}, pendingServerSync: {}, showMessage: jest.fn() };
     let text = 'edit';
     const api = createSyncRuntimeApi({ globalRef: app, g: k => app[k], isExternalLocalFile,
         getCurrentEditorContent: () => text, setEditorContentForFile: (_, value) => { text = value; },
         markPendingServerSync: (id, value) => { app.pendingServerSync[id] = value; }, tryHandleTokenExpired: async () => false,
-        writeExternalLocalContent: write, isEn: () => false });
+        writeExternalLocalContent: write, readExternalSourceContent: read, isEn: () => false });
     return { file, app, api, edit: value => { text = value; } };
 }
 describe('local and cloud acknowledgements', () => {
@@ -100,4 +100,20 @@ test('metadata refresh retains dirty drafts even if the cloud document was delet
     global.fetch = jest.fn(async () => ({ json: async () => ({ code: 200, data: { files: [] } }) }));
     try { await rt.loadFilesFromServer(); expect(app.files).toHaveLength(1); expect(app.files[0].content).toBe('offline edit'); }
     finally { jest.clearAllTimers(); jest.useRealTimers(); }
+});
+
+
+test('cloud reception preserves edits made directly to the original local file', async () => {
+    const write = jest.fn(async () => ({ success: true }));
+    const { app, file, edit } = fixture(write, async () => 'ONE\ntwo\nthree');
+    Object.assign(file, { content: 'one\ntwo\nthree', crdtBaseContent: 'one\ntwo\nthree', contentVersion: 1, isSynced: true }); edit(file.content);
+    await app.reconcileRemoteFile(file, { content: 'one\ntwo\nTHREE', content_version: 2 });
+    expect(file.content).toBe('ONE\ntwo\nTHREE'); expect(write).toHaveBeenCalledWith(file, 'ONE\ntwo\nTHREE');
+});
+test('overlap between disk and editor retains a third snapshot without overwriting disk', async () => {
+    const write = jest.fn(async () => ({ success: true }));
+    const { app, file } = fixture(write, async () => 'disk edit'); app.currentFileId = 'other';
+    Object.assign(file, { content: 'editor edit', crdtBaseContent: 'original', contentVersion: 1, isSynced: false });
+    await app.reconcileRemoteFile(file, { content: 'cloud edit', content_version: 2 });
+    expect(write).not.toHaveBeenCalled(); expect(file.syncConflict).toBe(true); expect(file.syncConflictDiskContent).toBe('disk edit');
 });

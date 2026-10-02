@@ -66,6 +66,7 @@ export function createSyncRuntimeApi(ctx: any) {
     const e2e = await import('../../e2e');
     const remote = await e2e.resolveFileContent(file.syncConflictRemoteContent, g('currentUser')?.password, isFileE2EEnabled(file));
     const local = file.id === g('currentFileId') ? getCurrentEditorContent(file.id, file.content) : await e2e.resolveFileContent(file.content, g('currentUser')?.password, isFileE2EEnabled(file));
+    const disk = typeof file.syncConflictDiskContent === 'string' ? await e2e.resolveFileContent(file.syncConflictDiskContent, g('currentUser')?.password, isFileE2EEnabled(file)) : undefined;
     await showSyncConflict(globalRef, file, local, remote, async (chosen) => {
       const live = file.id === g('currentFileId') ? getCurrentEditorContent(file.id, file.content) : file.content;
       if (live !== local) throw new Error('文档在处理冲突期间有新修改，请重新打开冲突页面。');
@@ -73,11 +74,11 @@ export function createSyncRuntimeApi(ctx: any) {
       file.contentVersion = file.syncConflictVersion;
       file.crdtBaseContentVersion = file.syncConflictVersion; file.crdtBaseContent = remote;
       g('lastSyncedContent')[file.id] = remote;
-      delete file.syncConflict; delete file.syncConflictRemoteContent; delete file.syncConflictVersion;
+      delete file.syncConflict; delete file.syncConflictRemoteContent; delete file.syncConflictVersion; delete file.syncConflictDiskContent;
       file.isSynced = false; file.lastModified = Date.now(); g('unsavedChanges')[file.id] = true; markPendingServerSync(file.id, true);
       if (file.id === g('currentFileId')) setEditorContentForFile(file.id, chosen, { preserveCursor: true });
       persist(file); void syncFileToServer(file.id, { background: true });
-    });
+    }, disk);
   }
   globalRef.openSyncConflict = (id: string) => { const file = g('files').find((f: any) => f.id === id); if (file) void resolveConflict(file).catch(console.warn); };
   function conflict(file: any, remote: string, version: number) {
@@ -94,14 +95,22 @@ export function createSyncRuntimeApi(ctx: any) {
     const content = await e2e.resolveFileContent(String(remote.content ?? ''), g('currentUser')?.password, isFileE2EEnabled(remote));
     const base = await baseContent(file);
     if (g('currentUser')?.username !== username) return;
-    const local = file.id === g('currentFileId') ? getCurrentEditorContent(file.id, file.content) : await e2e.resolveFileContent(String(file.content ?? ''), g('currentUser')?.password, isFileE2EEnabled(file));
-    const dirty = !!(g('pendingServerSync')?.[file.id] || g('unsavedChanges')?.[file.id] || file.isSynced === false || (file.id === g('currentFileId') && local !== file.content));
+    const originalLocal = file.id === g('currentFileId') ? getCurrentEditorContent(file.id, file.content) : await e2e.resolveFileContent(String(file.content ?? ''), g('currentUser')?.password, isFileE2EEnabled(file));
+    let local = originalLocal;
+    if (isExternalLocalFile(file) && ctx.readExternalSourceContent) {
+      const disk = await ctx.readExternalSourceContent(file, file.id).catch(() => null);
+      if (disk === null) { file.remoteContentVersion = version; persist(file); return; }
+      const combined = safeMerge(base, local, disk);
+      if (!combined.clean) { file.syncConflictDiskContent = disk; conflict(file, content, version); return; }
+      local = combined.content;
+    }
+    const dirty = local !== originalLocal || !!(g('pendingServerSync')?.[file.id] || g('unsavedChanges')?.[file.id] || file.isSynced === false || (file.id === g('currentFileId') && local !== file.content));
     const merged = dirty ? safeMerge(base, local, content) : { clean: true as const, content };
     if (!merged.clean) { conflict(file, content, version); return; }
     if (isExternalLocalFile(file) && !(await writeExternalLocalContent(file, merged.content)).success) { file.remoteContentVersion = version; persist(file); return; }
     // Awaiting a physical write can race with typing; don't discard the newer draft.
     const live = file.id === g('currentFileId') ? getCurrentEditorContent(file.id, file.content) : file.content;
-    const final = live !== local ? safeMerge(local, live, merged.content) : merged;
+    const final = live !== originalLocal ? safeMerge(originalLocal, live, merged.content) : merged;
     if (!final.clean) { conflict(file, content, version); return; }
     file.content = final.content; file.contentLoaded = true; file.contentVersion = version;
     file.crdtBaseContent = content; file.crdtBaseContentVersion = version;

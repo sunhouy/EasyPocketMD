@@ -1680,6 +1680,7 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
     }
 
     const syncRuntimeApi = createSyncRuntimeApi({
+        readExternalSourceContent,
         ensureExternalLocalAccess,
         globalRef: global,
         g,
