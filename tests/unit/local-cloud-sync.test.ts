@@ -90,3 +90,14 @@ describe('version-aware offline reconciliation', () => {
         expect(isExternalLocalFile({ type: 'file', isExternalLocal: true, localFileMode: 'remote' })).toBe(false);
     });
 });
+
+test('metadata refresh retains dirty drafts even if the cloud document was deleted', async () => {
+    const { installSyncRuntime } = await import('../../js/files/sync-runtime');
+    localStorage.clear(); jest.useFakeTimers();
+    const file = { id: 'deleted-cloud', name: 'a.md', type: 'file', content: 'offline edit', isSynced: true, contentLoaded: true };
+    const app = { files: [file], currentUser: { username: 'user', token: 'token' }, unsavedChanges: { 'deleted-cloud': true }, pendingServerSync: {}, lastSyncedContent: { 'deleted-cloud': 'original' }, showSyncStatus: jest.fn() };
+    const rt = installSyncRuntime(app, { syncCurrentEditorSnapshotIntoFiles: () => {} }, { loadFiles: () => {}, shouldAutoOpenInitialFile: () => false });
+    global.fetch = jest.fn(async () => ({ json: async () => ({ code: 200, data: { files: [] } }) }));
+    try { await rt.loadFilesFromServer(); expect(app.files).toHaveLength(1); expect(app.files[0].content).toBe('offline edit'); }
+    finally { jest.clearAllTimers(); jest.useRealTimers(); }
+});

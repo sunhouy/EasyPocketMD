@@ -1456,7 +1456,7 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
             const f = localFiles[i];
             if (!f || !f.name) continue;
             if (isExternalLocalFile(f)) continue;
-            if (!f.isSynced) continue; // local-only files should still be eligible for upload
+            if (!f.isSynced || pendingServerSync[f.id] || unsavedChanges[f.id]) continue; // Never remove an offline or in-flight draft.
             if (serverFileMap[f.name]) continue;
 
             if (f.id) {
