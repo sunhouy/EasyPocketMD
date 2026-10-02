@@ -11,7 +11,7 @@ export function saveAfterDialogOpens(app: any = window): void {
     if (!fileId || typeof app.saveCurrentFile !== 'function') return;
     void afterDialogPaint().then(async () => {
         if (app.currentFileId !== fileId) return;
-        await app.saveCurrentFile(true);
+        await app.saveCurrentFile(false);
     }).catch(error => {
         console.error('Background document save failed:', error);
         app.showMessage?.((app.i18n?.getLanguage() === 'en' ? 'Save failed: ' : '保存失败: ') + error.message, 'error');

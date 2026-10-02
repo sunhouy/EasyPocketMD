@@ -339,7 +339,7 @@
         shareContent.querySelector('#shareUpdateBtn').onclick = async function() {
             // 先保存当前文档
             if (typeof global.saveCurrentFile === 'function') {
-                await global.saveCurrentFile(true);
+                await global.saveCurrentFile(false);
             }
 
             var btn = this;
@@ -494,7 +494,7 @@
         shareContent.querySelector('#shareCreateBtn').onclick = async function() {
             // 先保存当前文档
             if (typeof global.saveCurrentFile === 'function') {
-                await global.saveCurrentFile(true);
+                await global.saveCurrentFile(false);
             }
 
             var btn = this;

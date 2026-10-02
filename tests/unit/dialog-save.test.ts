@@ -16,7 +16,7 @@ describe('saving after opening a dialog', () => {
         frame(0);
         expect(app.saveCurrentFile).not.toHaveBeenCalled();
         await jest.runOnlyPendingTimersAsync();
-        expect(app.saveCurrentFile).toHaveBeenCalledWith(true);
+        expect(app.saveCurrentFile).toHaveBeenCalledWith(false);
     });
     it('does not save the wrong file if it changes before the frame', async () => {
         const app = { currentFileId: 'a', saveCurrentFile: jest.fn() };

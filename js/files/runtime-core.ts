@@ -1427,7 +1427,7 @@ import { createDiffFileWriter } from './conflict/live-files';
             }
             if (data.node.type === 'file') {
                 if (g('currentFileId') !== data.node.id) {
-                    if (g('currentFileId')) global.saveCurrentFile(true);
+                    if (g('currentFileId')) global.saveCurrentFile(false);
                     openFile(data.node.id);
                 }
             } else if (data.node.type === 'folder') {
@@ -2852,7 +2852,7 @@ import { createDiffFileWriter } from './conflict/live-files';
 
         // 浏览器本地文件（File System Access API）：有写权限时直接回写
         if (file.isExternalLocal && file.localFileMode === 'browser-fsa') {
-            const writeResult = await writeBrowserLocalFileWithRetry(currentFileId, content);
+            const writeResult = await writeBrowserLocalFileWithRetry(currentFileId, content, isManual);
             if (writeResult && writeResult.success) {
                 if (isManual) {
                     global.showMessage(t('localFileSaved'), 'success');
@@ -2876,7 +2876,7 @@ import { createDiffFileWriter } from './conflict/live-files';
 
         // 浏览器 input 打开的文件无法直接写回，回退为下载
         if (file.isExternalLocal && file.localFileMode === 'browser-file') {
-            downloadLocalContent(file.name, content);
+            if (isManual) downloadLocalContent(file.name, content);
             setExternalLocalSnapshot(currentFileId, content);
             if (isManual) {
                 global.showMessage(t('localFileSavedAsDownload'), 'warning');
@@ -3387,7 +3387,7 @@ import { createDiffFileWriter } from './conflict/live-files';
                 }
                 await Promise.resolve();
                 if (g('currentFileId') === fileId) {
-                    await global.saveCurrentFile(true);
+                    await global.saveCurrentFile(false);
                 }
             }
             var modal = document.getElementById('historyModalOverlay');
