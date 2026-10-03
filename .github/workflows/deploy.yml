@@ -69,8 +69,19 @@ jobs:
 
     - name: Build and verify isolated Python runner
       run: |
-        bash scripts/setup-python-sandbox.sh
+        bash scripts/setup-python-sandbox.sh --build
         npx tsx scripts/check-python-sandbox.ts
+        bash scripts/export-python-sandbox.sh "$RUNNER_TEMP/python-sandbox-image"
+        bash scripts/setup-python-sandbox.sh --load "$RUNNER_TEMP/python-sandbox-image/python-sandbox.tar.gz"
+
+    - name: Upload verified Python sandbox image
+      uses: actions/upload-artifact@v4
+      with:
+        name: python-sandbox-image
+        path: ${{ runner.temp }}/python-sandbox-image/
+        compression-level: 0
+        retention-days: 3
+        if-no-files-found: error
 
     - name: Run tests
       run: npm test -- --coverage
@@ -173,10 +184,19 @@ jobs:
         echo "image_js_sha256=$(sha256sum dist/wasm_text_engine/image_compressor.js | awk '{print $1}')" >> "$GITHUB_OUTPUT"
         echo "image_wasm_sha256=$(sha256sum dist/wasm_text_engine/image_compressor.wasm | awk '{print $1}')" >> "$GITHUB_OUTPUT"
 
+    - name: Download verified Python sandbox image
+      uses: actions/download-artifact@v4
+      with:
+        name: python-sandbox-image
+        path: python-sandbox-image
+
     - name: Create deployment tarball
       run: |
         mkdir -p deploy_tmp
         cp -r dist api print shared sandbox requirements.txt package.json package-lock.json nginx.conf sw.ts manifest.webmanifest icon.png .env ssl deploy_tmp/
+
+        (cd python-sandbox-image && sha256sum -c python-sandbox.tar.gz.sha256)
+        cp python-sandbox-image/python-sandbox.tar.gz python-sandbox-image/python-sandbox.tar.gz.sha256 python-sandbox-image/python-sandbox.image-id deploy_tmp/sandbox/python/
 
         # 复制 reference-docs 和 scripts
         if [ -d "reference-docs" ]; then
@@ -247,6 +267,7 @@ jobs:
         host: ${{ secrets.SERVER_HOST }}
         username: ${{ secrets.SERVER_USER }}
         password: ${{ secrets.SERVER_PASSWORD }}
+        command_timeout: 20m
         source: "deploy.tar.gz"
         target: "/tmp/easypocketmd-deploy-${{ github.run_id }}-${{ github.run_attempt }}"
         strip_components: 0
@@ -321,6 +342,9 @@ jobs:
             echo "使用 Python: $PYTHON_CMD"
             $PYTHON_CMD -m venv .venv
             source .venv/bin/activate
+            export PIP_INDEX_URL="${{ vars.SERVER_PIP_INDEX_URL || 'https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple' }}"
+            export PIP_CONFIG_FILE=/dev/null
+            export PIP_EXTRA_INDEX_URL=
             python -m pip install --upgrade pip -q
             if [ -f "requirements.txt" ]; then
               python -m pip install -r requirements.txt -q
@@ -330,7 +354,7 @@ jobs:
             python -c "from markitdown import MarkItDown; print('MarkItDown ready')"
           fi
           
-          bash scripts/setup-python-sandbox.sh
+          bash scripts/setup-python-sandbox.sh --load sandbox/python/python-sandbox.tar.gz
 
           echo "✓ 部署目录准备完成: $NEXT_DIR"
 
@@ -639,6 +663,10 @@ jobs:
           echo "创建虚拟环境..."
           $PYTHON_CMD -m venv .venv
           source .venv/bin/activate
+
+          export PIP_INDEX_URL="${{ vars.SERVER_PIP_INDEX_URL || 'https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple' }}"
+          export PIP_CONFIG_FILE=/dev/null
+          export PIP_EXTRA_INDEX_URL=
 
           # 安装依赖
           if [ -f "requirements.txt" ]; then
