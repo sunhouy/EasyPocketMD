@@ -174,10 +174,6 @@
             // 设置
             settings: '设置',
             defaultEditorMode: '默认编辑器模式',
-            editorEngine: '编辑器引擎',
-            editorEngineVditor: 'Vditor（默认）',
-            editorEngineProseMirror: 'ProseMirror（实验）',
-            proseMirrorNoEditorMode: '当前使用 ProseMirror 引擎，无需切换编辑器模式',
             wysiwyg: '所见即所得',
             instantRender: '即时渲染',
             splitPreview: '分屏预览',
@@ -420,7 +416,7 @@
             selectEditorMode: '选择编辑器模式',
             switchedTo: '已切换到',
             switchFailed: '切换失败: ',
-            pasteTextTooLong: '粘贴文本过长，请减少粘贴内容后重试',
+            pasteTextTooLong: '一次最多可粘贴 2,000,000 个字符，请分批粘贴',
             detectAiMarkdownFormat: '检测到当前粘贴的格式可能与编辑器的 KaTeX 渲染格式不一致（例如包含 \\[...\\] 或 \\(...\\)）。是否自动将其转换为标准格式？',
             syncFailed: '初始化失败',
 
@@ -1131,10 +1127,6 @@
             // Settings
             settings: 'Settings',
             defaultEditorMode: 'Default Editor Mode',
-            editorEngine: 'Editor Engine',
-            editorEngineVditor: 'Vditor (default)',
-            editorEngineProseMirror: 'ProseMirror (experimental)',
-            proseMirrorNoEditorMode: 'You are using the ProseMirror engine; editor modes do not apply.',
             wysiwyg: 'WYSIWYG',
             instantRender: 'Instant Render',
             splitPreview: 'Split Preview',
@@ -1377,7 +1369,7 @@
             selectEditorMode: 'Select Editor Mode',
             switchedTo: 'Switched to ',
             switchFailed: 'Switch failed: ',
-            pasteTextTooLong: 'Pasted text is too long. Please paste a smaller amount and try again.',
+            pasteTextTooLong: 'Paste up to 2,000,000 characters at a time. Please split longer text into batches.',
             detectAiMarkdownFormat: 'The pasted content may not match the editor\'s KaTeX format (for example \\[...\\] or \\(...\\)). Convert it to the standard format automatically?',
             syncFailed: 'Initialization failed',
 

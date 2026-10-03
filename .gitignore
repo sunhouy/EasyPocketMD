@@ -34,3 +34,6 @@ AGENTS.md
 drafts/
 docs/
 emsdk/
+
+# Generated TypeScript app compilation cache
+tsconfig.app.tsbuildinfo
