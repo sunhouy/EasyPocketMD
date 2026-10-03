@@ -626,6 +626,7 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
                 ws.send(JSON.stringify({
                     type: 'check_client_status',
                     username: g('currentUser').username,
+                    token: g('currentUser').token,
                     password: g('currentUser').password
                 }));
             };
@@ -769,6 +770,7 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
                     ws.send(JSON.stringify({
                         type: 'check_client_status',
                         username: g('currentUser').username,
+                        token: g('currentUser').token,
                         password: g('currentUser').password
                     }));
                 };
@@ -965,7 +967,8 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
                     var printData = {
                         type: 'print_request',
                         username: username,
-                        password: userPassword,
+                        token: g('currentUser').token,
+                    password: userPassword,
                         content: fullFileUrl,
                         content_type: 'file',
                         file_name: fileName,
@@ -1860,6 +1863,7 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
                 var printData = {
                     type: 'print_request',
                     username: username,
+                    token: g('currentUser').token,
                     password: userPassword,
                     content: fullFileUrl,
                     content_type: 'file',
@@ -2225,6 +2229,7 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
                 ws.send(JSON.stringify({
                     type: 'check_client_status',
                     username: g('currentUser').username,
+                    token: g('currentUser').token,
                     password: g('currentUser').password
                 }));
             };
@@ -2467,7 +2472,8 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
                     var printData = {
                         type: 'print_request',
                         username: username,
-                        password: userPassword,
+                        token: g('currentUser').token,
+                    password: userPassword,
                         content: fullFileUrl,
                         content_type: 'file',
                         file_name: fileName,

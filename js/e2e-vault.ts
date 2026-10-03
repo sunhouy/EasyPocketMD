@@ -181,8 +181,10 @@ export async function saveSettings(options: { login: boolean; dedicated: boolean
 export async function preparePasswordChange(currentPassword: string, newPassword: string) {
     await initialize();
     if (!config?.methods.login) return null;
-    await ensureUnlocked();
-    const next = { ...config, methods: { ...config.methods, login: await wrap(JSON.stringify(secrets()), newPassword) } };
+    // Verify the login-method wrapper with the explicitly entered ordinary password.
+    // Do not open or unlock the document encryption session to change login credentials.
+    const value = validateMaterial(JSON.parse(await unwrap(config.methods.login, currentPassword)));
+    const next = { ...config, methods: { ...config.methods, login: await wrap(JSON.stringify(value), newPassword) } };
     return { config: next, revision };
 }
 export function finishPasswordChange(patch: { config: VaultConfig; revision: number }) {
