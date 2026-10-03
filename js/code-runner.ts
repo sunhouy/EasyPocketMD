@@ -16,22 +16,36 @@ import { explainPythonError, pythonErrorLine } from './python-run-diagnostics';
     var SUPPORTED_LANGUAGES = new Set(['python', 'py', 'javascript', 'js', 'typescript', 'ts', 'html', 'htm', 'c', 'cpp', 'c++']);
     // Python runs in the server's isolated container; no browser interpreter is loaded.
     class CodeRunner {
+        abortRun: (() => void) | null = null;
         constructor() { this.cCompilerEndpoint = '/api/code-runner/run'; }
         async runPython(code) {
             const controller = new AbortController();
-            const timeout = setTimeout(() => controller.abort(), 30000);
+            this.abortRun = () => controller.abort();
+            const timeout = setTimeout(() => controller.abort(), 310000);
             try {
                 const base = global.getApiBaseUrl ? global.getApiBaseUrl() : '/api';
-                const response = await fetch(base.replace(/\/$/, '') + '/code-runner/run', {
+                const endpoint = base.replace(/\/$/, '') + '/code-runner';
+                const response = await fetch(endpoint + '/run', {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ language: 'python', code }), signal: controller.signal
+                    body: JSON.stringify({ language: 'python', code, interactive:true }), signal: controller.signal
                 });
-                const result = await response.json();
-                if (!response.ok && !result.error) result.error = 'Python execution failed';
-                return result;
+                if (!response.ok || !response.headers?.get?.('content-type')?.includes('ndjson')) return await response.json();
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder(); let buffer = '';
+                for (;;) {
+                    const {value, done} = await reader.read();
+                    buffer += decoder.decode(value, {stream:!done});
+                    let newline;
+                    while ((newline = buffer.indexOf('\n')) >= 0) {
+                        const event = JSON.parse(buffer.slice(0,newline)); buffer = buffer.slice(newline+1);
+                        if (event.type === 'result') return event;
+                        if (event.type === 'input') showInteractiveInput(event, endpoint, controller);
+                    }
+                    if (done) throw new Error('Execution connection closed');
+                }
             } catch (error) {
-                return { success: false, error: error.name === 'AbortError' ? t('codeRunTimeout', '代码运行超时', 'Execution timed out') : String(error.message || error) };
-            } finally { clearTimeout(timeout); }
+                return { success: false, error: error.name === 'AbortError' ? t('codeRunCancelled', '运行已取消或超时', 'Execution cancelled or timed out') : String(error.message || error) };
+            } finally { clearTimeout(timeout); this.abortRun = null; }
         }
 
         async runHtml(code) {
@@ -133,6 +147,38 @@ import { explainPythonError, pythonErrorLine } from './python-run-diagnostics';
         }
     }
 
+    function showInteractiveInput(event, endpoint, controller) {
+        renderOutput({success:true,output:event.output || ''});
+        runnerUiState.minimized = false; updatePanelSize();
+        const form = document.createElement('form');
+        form.style.cssText = 'display:flex;flex-direction:column;gap:8px;padding:10px;border:1px solid #aaa;border-radius:6px;';
+        const label = document.createElement('label');
+        label.textContent = event.prompt || t('codeInput', '程序正在等待输入：', 'The program is waiting for input:');
+        const input = document.createElement('input'); input.type = 'text'; input.autocomplete = 'off';
+        input.style.cssText = 'display:block;width:100%;box-sizing:border-box;padding:8px;margin-top:8px;color:#222;background:white;border:1px solid #aaa;border-radius:4px;';
+        label.appendChild(input); form.appendChild(label);
+        const buttons = document.createElement('div'); buttons.style.cssText = 'display:flex;gap:8px;';
+        const submit = document.createElement('button'); submit.type = 'submit'; submit.textContent = t('codeInputSubmit','提交输入','Submit input');
+        const cancel = document.createElement('button'); cancel.type = 'button'; cancel.textContent = t('cancel','取消运行','Cancel execution');
+        cancel.onclick = () => controller.abort(); buttons.append(submit,cancel); form.appendChild(buttons);
+        const status = document.createElement('span'); status.setAttribute('role','status'); form.appendChild(status);
+        form.onsubmit = async eventSubmit => {
+            eventSubmit.preventDefault(); if (submit.disabled) return;
+            submit.disabled = true; input.readOnly = true; status.textContent = t('codeInputSending','正在提交…','Submitting…');
+            try {
+                const response = await fetch(endpoint + '/input', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:event.token,value:input.value}),signal:controller.signal});
+                if (!response.ok) throw new Error((await response.json()).error || 'Input failed');
+                if (form.isConnected) renderOutput({success:true,output:(event.output || '') + (event.prompt || '') + '\n' + t('codeRunning','运行中…','Running…')});
+            } catch (error) {
+                if (!controller.signal.aborted && form.isConnected) {
+                    status.textContent = t('codeInputFailed','输入提交失败，请重试：','Input failed, please retry: ') + error.message;
+                    submit.disabled = false; input.readOnly = false;
+                }
+            }
+        };
+        runnerUiState.outputBody.appendChild(form); input.focus();
+    }
+
     global.runCodeBlock = async function(context) {
         ensureRunnerUi();
         if (runnerUiState.button.disabled) return;
@@ -141,7 +187,8 @@ import { explainPythonError, pythonErrorLine } from './python-run-diagnostics';
         runnerUiState.runContext = context; runnerUiState.minimized = false;
         try {
             renderOutput({success:true, output:t('codeRunning', '运行中...', 'Running...')});
-            renderOutput(await codeRunner.runCode(context.language, context.code));
+            const result = await codeRunner.runCode(context.language, context.code);
+            if (runnerUiState.outputPanel.style.display !== 'none') renderOutput(result);
         } finally { runnerUiState.button.disabled = false; }
     };
 
@@ -307,7 +354,7 @@ import { explainPythonError, pythonErrorLine } from './python-run-diagnostics';
         const help = runnerUiState.help;
         help.dataset.open = help.dataset.open === 'true' ? 'false' : 'true';
         runnerUiState.minimized = false;
-        help.textContent = '运行方式与环境\n\nPython：在服务器隔离 Docker 沙箱中运行，Python 3.12。已安装 NumPy、pandas、SciPy、SymPy、Matplotlib、seaborn、scikit-learn、Pillow、openpyxl，支持中文字体及图表图片返回。禁止联网、只允许 /tmp 临时写入；每次运行独立容器，文件不会保留。限时 20 秒、内存 512 MB、代码 64 KB，最多返回 8 张图，图片总计不超过 2 MB。\n\nJavaScript：在浏览器 Worker 中执行，没有页面 DOM。TypeScript 当前按 JavaScript 语法执行，不支持类型标注。HTML：在隔离 iframe 中预览。C/C++：在服务器通过 Emscripten 编译成 WebAssembly，再由 Node.js 执行；编译最长 30 秒，运行最长 15 秒。\n\n复制：复制文字、原始错误及中文解释；支持富文本剪贴板时同时复制图表。报错行对应本次运行的代码，编辑代码后原位置高亮自动清除。';
+        help.textContent = '运行方式与环境\n\nPython：在服务器隔离 Docker 沙箱中运行，Python 3.12。已安装 NumPy、pandas、SciPy、SymPy、Matplotlib、seaborn、scikit-learn、Pillow、openpyxl，支持中文字体及图表图片返回。禁止联网、只允许 /tmp 临时写入；每次运行独立容器，文件不会保留。计算限时 20 秒（等待输入不计入）；input() 或 stdin.readline() 会在此窗口请求输入，单次等待最多 2 分钟、整次运行最多 5 分钟。内存按服务器容量限制为 256/512 MB、代码 64 KB，最多返回 8 张图，图片总计不超过 2 MB。\n\nJavaScript：在浏览器 Worker 中执行，没有页面 DOM。TypeScript 当前按 JavaScript 语法执行，不支持类型标注。HTML：在隔离 iframe 中预览。C/C++：在服务器通过 Emscripten 编译成 WebAssembly，再由 Node.js 执行；编译最长 30 秒，运行最长 15 秒。\n\n复制：复制文字、原始错误及中文解释；支持富文本剪贴板时同时复制图表。报错行对应本次运行的代码，编辑代码后原位置高亮自动清除。';
         updatePanelSize();
     }
 
@@ -471,7 +518,7 @@ import { explainPythonError, pythonErrorLine } from './python-run-diagnostics';
             maximize.innerHTML = '<i class="fas fa-' + (runnerUiState.maximized ? 'compress' : 'expand') + '" aria-hidden="true"></i>';
         });
         action('最小化/展开', 'window-minimize', () => { runnerUiState.minimized = !runnerUiState.minimized; updatePanelSize(); });
-        action('关闭', 'times', () => { outputPanel.style.display = 'none'; refreshErrorHighlight(); });
+        action('关闭', 'times', () => { codeRunner.abortRun?.(); outputPanel.style.display = 'none'; refreshErrorHighlight(); });
         outputHeader.appendChild(actions);
 
         var outputBody = document.createElement('div');
@@ -508,7 +555,7 @@ import { explainPythonError, pythonErrorLine } from './python-run-diagnostics';
                 runnerUiState.minimized = false;
                 renderOutput({ success: true, output: t('codeRunning', '运行中...', 'Running...') });
                 var result = await codeRunner.runCode(language, code);
-                renderOutput(result);
+                if (runnerUiState.outputPanel.style.display !== 'none') renderOutput(result);
             } finally { button.disabled = false; }
             scheduleButtonRefresh();
         });

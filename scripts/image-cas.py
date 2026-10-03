@@ -49,7 +49,7 @@ def export(directory, image_pairs):
                         raw.seek(0)
                         with target.open('wb') as output, gzip.GzipFile(fileobj=output, mode='wb', mtime=0, compresslevel=1) as compressed:
                             shutil.copyfileobj(raw, compressed, length=1024 * 1024)
-                    members.append({'name': member.name, 'size': member.size, 'sha256': key, 'mode': member.mode})
+                    members.append({'name': member.name, 'size': member.size, 'sha256': key, 'mode': member.mode, 'compressed_size': target.stat().st_size})
         if process.wait() != 0:
             raise RuntimeError('docker save failed')
     finally:
@@ -74,6 +74,12 @@ def load(directory, manifest_file):
     manifest = json.loads(content)
     if manifest.get('version') != 1 or set(manifest['images']) != {'app', 'print', 'gateway', 'python'}:
         raise RuntimeError('Invalid image release manifest')
+    try:
+        if all(portable_identity(image) == manifest['identities'][role] for role, image in manifest['images'].items()):
+            print('Release images already installed and verified; skipping import')
+            return
+    except (subprocess.CalledProcessError, KeyError):
+        pass
     # Validate cached objects before docker load. Remove damaged objects so retry
     # retransmits them; never silently reuse corrupt local cache.
     for member in manifest['members']:
@@ -92,24 +98,28 @@ def load(directory, manifest_file):
         except Exception:
             path.unlink(missing_ok=True)
             raise RuntimeError(f'Image object corrupt or missing: {key}; retry to upload it again')
-    process = subprocess.Popen(['docker', 'load'], stdin=subprocess.PIPE)
-    try:
-        with tarfile.open(fileobj=process.stdin, mode='w|') as archive:
-            for member in manifest['members']:
-                info = tarfile.TarInfo(member['name'])
-                info.size, info.mode = member['size'], member['mode']
-                with gzip.open(objects / (member['sha256'] + '.gz'), 'rb') as source:
-                    archive.addfile(info, source)
-        process.stdin.close()
-        if process.wait() != 0:
-            raise RuntimeError('docker load failed')
-    finally:
-        if process.poll() is None:
-            process.kill()
-        process.wait()
-    for role, image in manifest['images'].items():
-        if portable_identity(image) != manifest['identities'][role]:
-            raise RuntimeError(f'Loaded image content mismatch: {role}')
+    import importlib.util
+    spec = importlib.util.spec_from_file_location('deploy_resources', Path(__file__).with_name('deploy-resources.py'))
+    resources = importlib.util.module_from_spec(spec); spec.loader.exec_module(resources)
+    with resources.import_budget(directory, manifest):
+        process = subprocess.Popen(['docker', 'load'], stdin=subprocess.PIPE)
+        try:
+            with tarfile.open(fileobj=process.stdin, mode='w|') as archive:
+                for member in manifest['members']:
+                    info = tarfile.TarInfo(member['name'])
+                    info.size, info.mode = member['size'], member['mode']
+                    with gzip.open(objects / (member['sha256'] + '.gz'), 'rb') as source:
+                        archive.addfile(info, source)
+            process.stdin.close()
+            if process.wait() != 0:
+                raise RuntimeError('docker load failed')
+        finally:
+            if process.poll() is None:
+                process.kill()
+            process.wait()
+        for role, image in manifest['images'].items():
+            if portable_identity(image) != manifest['identities'][role]:
+                raise RuntimeError(f'Loaded image content mismatch: {role}')
     print('All loaded image layers and runtime configurations verified')
 
 

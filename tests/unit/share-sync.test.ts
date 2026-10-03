@@ -16,7 +16,7 @@ describe('Shared document acknowledgement and session isolation', () => {
     }
     function activate(content = 'A\nB', id = 's') {
         editor.setValue(content);
-        window.activateSharedDocumentSession({ share_id: id, username: 'owner', filename: 'x.md', content, content_version: 1 }, { canEdit: true, viewerId: 'my-session' });
+        window.activateSharedDocumentSession({ share_id: id, mode: 'edit', username: 'owner', filename: 'x.md', content, content_version: 1 }, { canEdit: true, viewerId: 'my-session' });
         socket.onopen();
     }
     function receive(payload) { socket.onmessage({ data: JSON.stringify(payload) }); }

@@ -230,7 +230,12 @@ router.post('/properties', verifyUser, async (req, res) => {
         }
     }
 
-    res.json(await shareManager.updateShareProperties(username, share_id, mode, expire_days, share_password, edit_policy, editor_usernames, edit_password));
+    const result = await shareManager.updateShareProperties(username, share_id, mode, expire_days, share_password, edit_policy, editor_usernames, edit_password);
+    if (result.code === 200 && req.app.locals.shareCollaborationServer) {
+        try { await req.app.locals.shareCollaborationServer.refreshRoom(share_id, true); }
+        catch (error) { console.warn('分享权限通知失败:', error.message); }
+    }
+    res.json(result);
 });
 
 router.post('/presence', async (req, res) => {
