@@ -75,6 +75,7 @@ async function exportContent() {
         { name: isEn() ? 'Plain Text File (.txt)' : '纯文本文件 (.txt)', ext: 'txt', icon: '<i class="fas fa-file-alt"></i>' },
         { name: isEn() ? 'HTML File (.html)' : 'HTML文件 (.html)', ext: 'html', icon: '<i class="fab fa-html5"></i>' },
         { name: isEn() ? 'Word File (.docx)' : 'Word文档 (.docx)', ext: 'docx', icon: '<i class="fas fa-file-word"></i>' },
+        { name: isEn() ? 'PowerPoint (.pptx)' : '导出 PPT (.pptx)', ext: 'pptx', icon: '<i class="fas fa-file-powerpoint"></i>' },
         { name: isEn() ? 'PDF File (.pdf)' : 'PDF文件 (.pdf)', ext: 'pdf', icon: '<i class="fas fa-file-pdf"></i>' }
     ];
 
@@ -111,6 +112,12 @@ async function exportContent() {
         optionBtn.style.cssText = 'display:flex;align-items:center;width:100%;padding:15px 20px;background:' + (nightMode ? '#3d3d3d' : '#f5f5f5') + ';border:none;border-radius:8px;margin-bottom:10px;text-align:left;font-size:16px;color:' + textColor + ';cursor:pointer;transition:background 0.2s;';
         optionBtn.innerHTML = '<span style="font-size:20px;margin-right:15px;width:30px;text-align:center;color:var(--theme-accent, #4a90e2);">' + f.icon + '</span><span>' + f.name + '</span>';
 
+        if (f.ext === 'pptx') {
+            optionBtn.style.position = 'relative';
+            const badge = document.createElement('span'); badge.textContent = 'NEW';
+            badge.style.cssText = 'position:absolute;right:8px;top:5px;font-size:10px;font-weight:700;padding:2px 5px;border-radius:4px;background:#e74c3c;color:white;';
+            optionBtn.appendChild(badge);
+        }
         optionBtn.onmouseenter = function() {
             this.style.background = nightMode ? '#4d4d4d' : '#e8e8e8';
         };
@@ -258,6 +265,16 @@ async function exportFile(content, ext) {
 
     // 获取默认文件名
     var defaultFileName = getCurrentFileName();
+
+    if (ext === 'pptx') {
+        try {
+            const { showManualPPTExport } = await import('./ppt-manual-export');
+            showManualPPTExport(content, defaultFileName);
+        } catch (error) {
+            global.showMessage((isEn() ? 'Unable to open PPT export. Please retry: ' : '无法打开 PPT 导出，请重试：') + error.message, 'error');
+        }
+        return;
+    }
 
     // 纯文本导出：去掉 Markdown 标签
     if (ext === 'txt') {
