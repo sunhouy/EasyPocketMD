@@ -5994,3 +5994,16 @@ body.tauri-mobile-safe-area #historyModalOverlay .modal {
     padding-top: calc(var(--safe-area-top, 0px) + 16px);
     padding-bottom: calc(var(--safe-area-bottom, 0px) + 16px);
 }
+
+/* One code surface: keep Vditor source for serialization, show our editor only. */
+.epmd-custom-code-block > pre:not(.vditor-wysiwyg__preview):not(.vditor-ir__preview),
+.epmd-custom-code-block > .vditor-ir__marker,
+.epmd-custom-code-block > .vditor-ir__marker--pre { display:none !important; }
+.epmd-custom-code-block > .vditor-wysiwyg__preview,
+.epmd-custom-code-block > .vditor-ir__preview { padding:0;white-space:normal; }
+.epmd-code-editor { white-space:normal;border:1px solid var(--border-color,#d7deea);border-radius:6px;background:var(--editor-background,transparent);overflow:hidden; }
+.epmd-code-editor[hidden], .epmd-custom-code-block [hidden] { display:none !important; }
+.epmd-code-header { display:flex;align-items:center;justify-content:space-between;gap:8px;padding:4px 8px;font:12px system-ui; }
+.epmd-code-header button { margin-left:6px;font:inherit;padding:3px 7px;border:1px solid var(--border-color,#d7deea);border-radius:4px;background:transparent;color:inherit;cursor:pointer; }
+.epmd-code-editor .cm-line { white-space:pre; }
+.epmd-code-editor .cm-editor { color:inherit; }

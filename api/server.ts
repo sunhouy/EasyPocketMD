@@ -40,6 +40,7 @@ const userFilesPath = path.join(__dirname, '../user_files');
 if (!isTest) {
 }
 
+app.use('/shared', express.static(path.join(__dirname, '../shared')));
 app.use('/uploads', express.static(uploadsPath));
 app.use('/avatars', express.static(avatarsPath));
 app.use('/screenshots', express.static(screenshotsPath));
@@ -367,7 +368,7 @@ if (isDirectServerRun()) {
         socket.destroy();
     });
 
-    server.listen(port, () => {
+    server.listen(port, process.env.HOST || '0.0.0.0', () => {
         console.log(`Server is running on port ${port}`);
         console.log(`Local: http://localhost:${port}`);
     });
