@@ -114,6 +114,8 @@ bash api/utils/ensure-export-tools.sh
 ```
 其他系统需自行安装这两个工具。服务进程的 PATH 不包含安装目录时，可在 `.env` 中配置绝对路径 `PANDOC_PATH`、`WKHTMLTOPDF_PATH`。npm 的 `wkhtmltopdf` 包不包含转换器二进制。
 
+Python 代码执行需要 Docker 沙箱。自动部署由 GitHub Actions 构建、测试并上传镜像，国内服务器只执行离线 `docker load`，不会从官方镜像仓库拉取。镜像压缩包和内容描述均校验 SHA-256；导入后比较有序文件系统层、架构和运行配置，再检查 Python/Matplotlib。不同 Docker 存储后端的 `.Id` 可能不同，不能作为跨机器校验依据。CI 另用独立的 Docker 27 引擎验证离线导入。
+
 3. **配置环境**
 ```bash
 cp .env.example .env

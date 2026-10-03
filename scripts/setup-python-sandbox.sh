@@ -10,7 +10,7 @@ case "$mode" in
     archive_dir=$(cd "$(dirname "$archive")" && pwd)
     archive_name=$(basename "$archive")
     (cd "$archive_dir" && sha256sum -c "$archive_name.sha256")
-    test -f "$archive_dir/python-sandbox.image-id"
+    test -f "$archive_dir/python-sandbox.image.json"
     ;;
   *) echo 'Usage: setup-python-sandbox.sh --build | --load [IMAGE_ARCHIVE]' >&2; exit 1 ;;
 esac
@@ -31,9 +31,8 @@ if [ "$mode" = --build ]; then
   docker build --platform=linux/amd64 -t "$image" sandbox/python
 else
   docker load --input "$archive"
-  expected_id=$(cat "$archive_dir/python-sandbox.image-id")
-  actual_id=$(docker image inspect "$image" --format '{{.Id}}')
-  test "$actual_id" = "$expected_id" || { echo 'Loaded sandbox image ID does not match the CI artifact' >&2; exit 1; }
+  # .Id differs between classic/containerd stores; verify executable content instead.
+  docker image inspect "$image" | python3 scripts/sandbox-image-identity.py "$archive_dir/python-sandbox.image.json"
 fi
 printf '%s' '{"code":"import numpy, pandas, scipy, sympy, sklearn, seaborn, PIL, openpyxl; import matplotlib.pyplot as plt; plt.plot([1,2],[3,4]); plt.title(\"中文图表\"); plt.show(); print(\"sandbox ready\")"}' |
   docker run --rm --pull=never -i --network=none --read-only --cap-drop=ALL --security-opt=no-new-privileges \

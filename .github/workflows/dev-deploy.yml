@@ -57,6 +57,10 @@ jobs:
         bash scripts/export-python-sandbox.sh "$RUNNER_TEMP/python-sandbox-image"
         bash scripts/setup-python-sandbox.sh --load "$RUNNER_TEMP/python-sandbox-image/python-sandbox.tar.gz"
 
+    - name: Verify sandbox image in a separate Docker engine
+      timeout-minutes: 5
+      run: bash scripts/check-sandbox-image-portability.sh "$RUNNER_TEMP/python-sandbox-image"
+
     - name: Upload verified Python sandbox image
       uses: actions/upload-artifact@v4
       with:
@@ -179,7 +183,7 @@ jobs:
         cp -r dist api print shared sandbox requirements.txt package.json package-lock.json sw.ts manifest.webmanifest icon.png .env ssl deploy_tmp/
 
         (cd python-sandbox-image && sha256sum -c python-sandbox.tar.gz.sha256)
-        cp python-sandbox-image/python-sandbox.tar.gz python-sandbox-image/python-sandbox.tar.gz.sha256 python-sandbox-image/python-sandbox.image-id deploy_tmp/sandbox/python/
+        cp python-sandbox-image/python-sandbox.tar.gz python-sandbox-image/python-sandbox.tar.gz.sha256 python-sandbox-image/python-sandbox.image.json deploy_tmp/sandbox/python/
 
         # dev 部署必须使用 dev 域名和 dev 目录，不能把生产 md.yhsun.cn 配置写入 dev.yhsun.cn.conf。
         sed \

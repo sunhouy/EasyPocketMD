@@ -11,7 +11,7 @@ beforeEach(()=>{
 printf '%s\\n' "$*" >> "$DOCKER_CALLS"
 case "$1" in
  info) exit 0 ;;
- image) printf 'sha256:fixture\\n' ;;
+ image) cat "$DOCKER_INSPECT" ;;
  save) printf 'saved-image-archive' ;;
  load) exit 0 ;;
  run) printf '{"success":true,"images":[{"mime":"image/png","data":"fixture"}]}' ;;
@@ -19,6 +19,12 @@ case "$1" in
 esac
 `,{mode:0o755});
     env={...process.env,PATH:bin+path.delimiter+process.env.PATH,DOCKER_CALLS:path.join(temp,'calls')};
+    env.DOCKER_INSPECT=path.join(temp,'inspect.json');
+    fs.writeFileSync(env.DOCKER_INSPECT,JSON.stringify([{
+        Id:'sha256:ci-index',Os:'linux',Architecture:'amd64',
+        RootFS:{Type:'layers',Layers:['sha256:layer1','sha256:layer2']},
+        Config:{User:'65534:65534',Env:['MPLBACKEND=Agg'],Entrypoint:['python','-I','/runner/runner.py'],Cmd:null,Labels:{}}
+    }]));
     delete env.PYTHON_SANDBOX_IMAGE;
 });
 afterEach(()=>fs.rmSync(temp,{recursive:true,force:true}));
@@ -43,15 +49,38 @@ it('fails closed on a missing archive instead of building automatically',()=>{
     expect(result.status).not.toBe(0);expect(result.stderr).toContain('refusing to pull or build');
     expect(fs.existsSync(env.DOCKER_CALLS)).toBe(false);
 });
-it('rejects an image ID mismatch before executing containers',()=>{
-    const archive=exportImage();fs.writeFileSync(env.DOCKER_CALLS,'');fs.writeFileSync(path.join(temp,'image/python-sandbox.image-id'),'sha256:wrong');
+function changeLoadedImage(update){
+    const images=JSON.parse(fs.readFileSync(env.DOCKER_INSPECT,'utf8'));
+    update(images[0]);fs.writeFileSync(env.DOCKER_INSPECT,JSON.stringify(images));
+}
+it('accepts identical image content with different IDs across Docker stores',()=>{
+    const archive=exportImage();
+    changeLoadedImage(image=>{image.Id='sha256:server-config';image.Config.Labels=null;image.Config.Shell=[];});
     const result=execute('scripts/setup-python-sandbox.sh',['--load',archive]);
-    expect(result.status).not.toBe(0);expect(result.stderr).toContain('does not match');
+    expect(result.status).toBe(0);expect(result.stdout).toContain('configuration match CI artifact');
+});
+it.each([
+    ['layers',image=>image.RootFS.Layers.reverse()],
+    ['entrypoint',image=>image.Config.Entrypoint=['/different/runner']],
+    ['environment',image=>image.Config.Env=['MPLBACKEND=Other']],
+    ['user',image=>image.Config.User='0'],
+    ['architecture',image=>image.Architecture='arm64'],
+])('rejects changed %s before executing containers',(_name,update)=>{
+    const archive=exportImage();fs.writeFileSync(env.DOCKER_CALLS,'');changeLoadedImage(update);
+    const result=execute('scripts/setup-python-sandbox.sh',['--load',archive]);
+    expect(result.status).not.toBe(0);
     expect(fs.readFileSync(env.DOCKER_CALLS,'utf8')).not.toMatch(/^run /m);
+});
+it('rejects changed identity metadata before contacting Docker',()=>{
+    const archive=exportImage();fs.writeFileSync(env.DOCKER_CALLS,'');
+    fs.appendFileSync(path.join(temp,'image/python-sandbox.image.json'),'corruption');
+    const result=execute('scripts/setup-python-sandbox.sh',['--load',archive]);
+    expect(result.status).not.toBe(0);expect(fs.readFileSync(env.DOCKER_CALLS,'utf8')).toBe('');
 });
 it.each(['deploy.yml','dev-deploy.yml'])('uploads the tested artifact and only loads it remotely in %s',file=>{
     const workflow=yaml.load(fs.readFileSync(path.join(root,'.github/workflows',file),'utf8'));
     const test=workflow.jobs.test.steps;
+    expect(test.find(step=>step.name==='Verify sandbox image in a separate Docker engine').run).toContain('check-sandbox-image-portability.sh');
     expect(test.find(step=>step.name==='Upload verified Python sandbox image').uses).toBe('actions/upload-artifact@v4');
     const deploy=workflow.jobs.deploy.steps;
     expect(deploy.find(step=>step.name==='Download verified Python sandbox image').uses).toBe('actions/download-artifact@v4');
