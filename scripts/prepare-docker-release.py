@@ -9,7 +9,7 @@ from urllib.parse import urlparse
 
 root = Path('docker-control')
 root.mkdir(mode=0o700, exist_ok=True)
-for name in ('image-cas.py', 'sandbox-image-identity.py', 'deploy-docker.py'):
+for name in ('image-cas.py', 'sandbox-image-identity.py', 'deploy-docker.py', 'deploy-resources.py'):
     shutil.copy2(Path('scripts') / name, root / name)
 for name in ('release.json', 'release.sha256'):
     shutil.copy2(Path('image-cas') / name, root / name)

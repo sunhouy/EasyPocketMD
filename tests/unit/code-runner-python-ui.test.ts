@@ -6,7 +6,7 @@ it('uses the server endpoint instead of loading a browser Python interpreter',as
     fetch.mockResolvedValueOnce({ok:true,json:async()=>({success:true,output:'ok',images:[]})});
     const result=await new window.CodeRunner().runPython('print(1)');
     expect(result.success).toBe(true);
-    expect(fetch).toHaveBeenCalledWith('/api/code-runner/run',expect.objectContaining({body:JSON.stringify({language:'python',code:'print(1)'})}));
+    expect(fetch).toHaveBeenCalledWith('/api/code-runner/run',expect.objectContaining({body:JSON.stringify({language:'python',code:'print(1)',interactive:true})}));
 });
 it('displays matplotlib images with text in the runner panel',async()=>{
     document.body.innerHTML='<pre><code class="language-python">print(1)</code></pre>';

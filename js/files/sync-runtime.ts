@@ -291,6 +291,12 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
             }
 
             if (file.id !== g('currentFileId') || g('unsavedChanges')?.[file.id]) return false;
+            // An owner's normal file remains editable through their authenticated
+            // file API; a view-only share must never open an editable share session.
+            if (result.data.mode !== 'edit') {
+                if (global.sharedDocState?.ownerFileId === file.id) global.deactivateSharedDocumentSession?.();
+                return false;
+            }
             const sharedContent = result.data.content ?? fileContent ?? '';
             file.content = sharedContent;
             file.lastModified = Date.now();

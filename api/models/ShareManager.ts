@@ -74,10 +74,10 @@ class ShareManager {
     }
 
     async canEditSharedFile(share, options: ShareAccessOptions = {}) {
-        if (share && options.editorUsername && options.editorUsername === share.username) return { canEdit: true, reason: 'owner' };
         if (!share || share.mode !== 'edit') {
             return { canEdit: false, reason: 'view_only' };
         }
+        if (share && options.editorUsername && options.editorUsername === share.username) return { canEdit: true, reason: 'owner' };
 
         if (options.editorUsername || options.viewerId) {
             const actor = collaboration.actor(options);

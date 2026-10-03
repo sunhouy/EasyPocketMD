@@ -22,7 +22,10 @@ sshpass -e ssh "${ssh_options[@]}" "$remote" \
   "set -e; command -v docker >/dev/null; command -v python3 >/dev/null; command -v rsync >/dev/null; docker info >/dev/null; mkdir -p '$remote_root/cache/objects' '$release'; chmod 700 '$remote_root/releases' '$release'"
 # SHA-addressed immutable members: existing image layers are never sent again.
 export RSYNC_RSH="sshpass -e ssh ${ssh_options[*]}"
-rsync -r --ignore-existing --partial-dir=.rsync-partial --delay-updates --stats image-cas/objects/ "$remote:$remote_root/cache/objects/"
 rsync -r --chmod=F600,D700 docker-control/ "$remote:$release/"
+# Fail before uploading large layers if transfer/import would fill the disk.
 sshpass -e ssh "${ssh_options[@]}" "$remote" \
-  "set -e; python3 '$release/image-cas.py' load '$remote_root/cache' '$release/release.json'; python3 '$release/deploy-docker.py' deploy '$channel' '$release'"
+  "python3 '$release/deploy-resources.py' transfer '$remote_root/cache' '$release'"
+rsync -r --ignore-existing --partial-dir=.rsync-partial --delay-updates --stats --bwlimit=8192 image-cas/objects/ "$remote:$remote_root/cache/objects/"
+sshpass -e ssh "${ssh_options[@]}" "$remote" \
+  "python3 '$release/deploy-resources.py' deploy '$remote_root/cache' '$release' '$channel'"

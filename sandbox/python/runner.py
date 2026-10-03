@@ -1,4 +1,5 @@
 """Container entrypoint: execute one stdin request and return bounded text/PNG JSON."""
+import builtins
 import base64
 import contextlib
 import io
@@ -67,8 +68,35 @@ def install_chinese_font_fallback(matplotlib):
 
 
 def main():
-    request = json.loads(sys.stdin.read(128 * 1024))
+    wire_in, wire_out = sys.stdin, sys.stdout
+    request = json.loads(wire_in.readline(128 * 1024))
     output = Output()
+    if request.get('interactive'):
+        calls = 0
+        def ask(prompt=''):
+            nonlocal calls
+            calls += 1
+            if calls > 20:
+                raise RuntimeError('Too many input requests (maximum 20)')
+            wire_out.write(json.dumps({'type':'input', 'prompt':str(prompt)[:4096], 'output':output.getvalue()}) + '\n')
+            wire_out.flush()
+            message = wire_in.readline(128 * 1024)
+            if not message:
+                raise EOFError('Input cancelled')
+            data = json.loads(message)
+            if data.get('cancel'):
+                raise EOFError('Input cancelled')
+            value = str(data.get('value', ''))
+            output.write(str(prompt))
+            return value
+        builtins.input = ask
+        class InteractiveStdin(io.TextIOBase):
+            def readable(self):
+                return True
+            def readline(self, size=-1):
+                value = ask() + '\n'
+                return value if size < 0 else value[:size]
+        sys.stdin = InteractiveStdin()
     images = []
     result = {"success": True}
     with contextlib.redirect_stdout(output), contextlib.redirect_stderr(output):
@@ -116,7 +144,8 @@ def main():
             line = error.lineno if isinstance(error, SyntaxError) and error.filename == '/tmp/main.py' else (user_lines[-1] if user_lines else None)
             result = {"success": False, "phase": "runtime", "error": traceback.format_exc(limit=12)[-MAX_TEXT:], "errorLine": line}
     result.update(output=output.getvalue(), images=images)
-    sys.stdout.write(json.dumps(result))
+    wire_out.write(json.dumps(dict(type='result', **result)) + '\n')
+    wire_out.flush()
 
 
 if __name__ == '__main__':

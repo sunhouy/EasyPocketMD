@@ -1,6 +1,6 @@
 /** Lock document input while leaving selection, scrolling and chart interaction intact. */
-export function createSharedReadOnlyGuard(container: HTMLElement) {
-    let locked = false;
+export function createSharedReadOnlyGuard(container: HTMLElement, content?: {get: () => string; restore: (value: string) => void}) {
+    let locked = false, baseline = '', scheduled = false;
     const original = new Map<Element, { editable?: string; readonly?: boolean; disabled?: boolean }>();
     function apply() {
         if (!locked) return;
@@ -35,9 +35,18 @@ export function createSharedReadOnlyGuard(container: HTMLElement) {
     for (const type of ['beforeinput', 'paste', 'cut', 'drop']) container.addEventListener(type, blockInput, true);
     container.addEventListener('keydown', blockKeys, true);
     container.addEventListener('click', blockTaskToggle, true);
-    const observer = new MutationObserver(apply);
-    observer.observe(container, { childList: true, subtree: true, attributes: true, attributeFilter: ['contenteditable'] });
+    const observer = new MutationObserver(() => {
+        apply();
+        if (!locked || !content || scheduled) return;
+        scheduled = true;
+        requestAnimationFrame(() => {
+            scheduled = false;
+            if (locked && content.get() !== baseline) { content.restore(baseline); apply(); }
+        });
+    });
+    observer.observe(container, { childList: true, characterData: true, subtree: true, attributes: true, attributeFilter: ['contenteditable'] });
     function setLocked(value: boolean) {
+        if (value && !locked) baseline = content?.get() || '';
         locked = value;
         if (locked) apply();
         else {
@@ -50,7 +59,7 @@ export function createSharedReadOnlyGuard(container: HTMLElement) {
             original.clear();
         }
     }
-    return { setLocked, destroy() {
+    return { setLocked, acceptContent() { baseline = content?.get() || ''; }, destroy() {
         setLocked(false); observer.disconnect();
         for (const type of ['beforeinput', 'paste', 'cut', 'drop']) container.removeEventListener(type, blockInput, true);
         container.removeEventListener('keydown', blockKeys, true);
