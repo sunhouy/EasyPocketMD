@@ -1,0 +1,16 @@
+.git
+node_modules
+.env
+.env.*
+ssl
+uploads
+user_uploads
+user_files
+avatars
+screenshots
+temp_uploads
+**/__pycache__
+**/.venv
+src-tauri/target
+src-tauri/gen
+image-cas

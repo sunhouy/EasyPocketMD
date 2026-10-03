@@ -23,6 +23,7 @@ export async function runPythonSandbox(code: string, signal?: AbortSignal): Prom
             let output = '', stderr = '', bytes = 0, settled = false;
             const child = spawn('docker', [
                 'run', '--rm', '--pull=never', '--name', name, '-i',
+                '--label', 'easypocketmd.sandbox-owner=' + (process.env.EPMD_SANDBOX_OWNER || 'standalone'),
                 '--network=none', '--read-only', '--cap-drop=ALL',
                 '--security-opt=no-new-privileges', '--user=65534:65534',
                 '--memory=512m', '--memory-swap=512m', '--cpus=1', '--pids-limit=64',
@@ -62,7 +63,7 @@ export async function runPythonSandbox(code: string, signal?: AbortSignal): Prom
                         if (imageBytes > 2 * 1024 * 1024 || !png.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10]))) throw Error('Invalid image');
                         return {mime:'image/png',data:image.data};
                     });
-                    finish({success:value.success,output:value.output.slice(0,65536),error:value.success ? undefined : String(value.error || 'Python failed').slice(0,65536),images});
+                    finish({success:value.success,errorLine:Number.isSafeInteger(value.errorLine) && value.errorLine > 0 && value.errorLine <= code.split("\n").length ? value.errorLine : undefined,output:value.output.slice(0,65536),error:value.success ? undefined : String(value.error || 'Python failed').slice(0,65536),images});
                 } catch { finish({success:false,status:500,error:'Invalid Python sandbox response'}); }
             });
             if (signal?.aborted) abort();

@@ -137,13 +137,14 @@ export function createDiffEditors(host: HTMLElement, sides: [Side, Side], onEdit
                     const mode = options.markdown ? 'wysiwyg' : 'sv', root = instances[index].vditor[mode].element as HTMLElement;
                     roots[index] = root; scrollers[index] = root;
                     root.classList.add('diff-document');
+                    (window as any).attachCodeBlockEditors?.(instances[index], el);
                     root.addEventListener('input', () => {
                         if (!options.editable || !sides[index].write) return;
                         dirty[index] = true;
                         Promise.resolve().then(() => { if (!destroyed && current === generation) save(index, instances[index].getValue()); });
                     }, true);
                     root.addEventListener('click', event => {
-                        if ((!options.editable || !sides[index].write) && (event.target as Element).closest('input, button')) { event.preventDefault(); event.stopImmediatePropagation(); }
+                        if ((!options.editable || !sides[index].write) && (event.target as Element).closest('input, button') && !(event.target as Element).closest('.epmd-code-header')) { event.preventDefault(); event.stopImmediatePropagation(); }
                     }, true);
                     root.addEventListener('compositionstart', () => { composing[index] = true; });
                     root.addEventListener('compositionend', () => { composing[index] = false; requestAnimationFrame(() => { if (!destroyed && current === generation) save(index, instances[index].getValue()); }); });

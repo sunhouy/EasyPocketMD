@@ -61,3 +61,5 @@ import './js/ui/insert-picker';
 // import './js/code-runner';
 
 import './js/main';
+
+import './js/code-block-editor-loader';

@@ -116,6 +116,8 @@ bash api/utils/ensure-export-tools.sh
 
 Python 代码执行需要 Docker 沙箱。自动部署由 GitHub Actions 构建、测试并上传镜像，国内服务器只执行离线 `docker load`，不会从官方镜像仓库拉取。镜像压缩包和内容描述均校验 SHA-256；导入后比较有序文件系统层、架构和运行配置，再检查 Python/Matplotlib。不同 Docker 存储后端的 `.Id` 可能不同，不能作为跨机器校验依据。CI 另用独立的 Docker 27 引擎验证离线导入。
 
+生产部署使用 Docker，镜像由 CI 构建并通过 SSH 增量上传，服务器无需访问国外镜像仓库。详见 [Docker 部署说明](deploy/README.md)。
+
 3. **配置环境**
 ```bash
 cp .env.example .env
