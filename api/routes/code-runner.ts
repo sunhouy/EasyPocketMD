@@ -198,7 +198,9 @@ router.post('/run', async (req, res) => {
                     res.write(JSON.stringify({type:'input',token,...event}) + '\n');
                     if (signal.aborted) cancelInput();
                 }) : undefined;
-                const result = await runPythonSandbox(code, controller.signal, input);
+                const result = interactive
+                    ? await runPythonSandbox(code, controller.signal, input)
+                    : await runPythonSandbox(code, controller.signal);
                 if (interactive) {
                     if (!res.destroyed) res.end(JSON.stringify({type:'result',...result}) + '\n');
                     return;
