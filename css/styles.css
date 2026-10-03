@@ -6007,3 +6007,10 @@ body.tauri-mobile-safe-area #historyModalOverlay .modal {
 .epmd-code-header button { margin-left:6px;font:inherit;padding:3px 7px;border:1px solid var(--border-color,#d7deea);border-radius:4px;background:transparent;color:inherit;cursor:pointer; }
 .epmd-code-editor .cm-line { white-space:pre; }
 .epmd-code-editor .cm-editor { color:inherit; }
+
+.epmd-code-header > div { display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:4px; }
+.epmd-code-header button { margin-left:0;white-space:nowrap; }
+.epmd-code-header .epmd-code-language { border-color:transparent;padding:3px 2px;overflow:hidden;text-overflow:ellipsis;max-width:30%;flex-shrink:0; }
+.epmd-code-header button:disabled { opacity:.5;cursor:default; }
+.epmd-code-header .epmd-code-language-input { min-width:70px;width:130px;max-width:40%;padding:3px 5px;border:1px solid var(--border-color,#d7deea);border-radius:4px;background:var(--editor-background,transparent);color:inherit;font:inherit; }
+.epmd-code-header .epmd-code-delete:hover:not(:disabled) { color:#dc2626;border-color:#dc2626; }
