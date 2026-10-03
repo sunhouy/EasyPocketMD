@@ -126,7 +126,7 @@ it('removes saved login passwords so a lock cannot be bypassed by silently readi
     localStorage.setItem('vditor_accounts',JSON.stringify([window.currentUser,{username:'other',password:'other-password'}]));
     await setup();
     expect(JSON.parse(localStorage.getItem('vditor_user')).password).toBeUndefined();
-    const accounts=JSON.parse(localStorage.getItem('vditor_accounts'));expect(accounts[0].password).toBeUndefined();expect(accounts[1].password).toBe('other-password');
+    const accounts=JSON.parse(localStorage.getItem('vditor_accounts'));expect(accounts[0].password).toBeUndefined();expect(accounts[0].token).toBe('token');expect(accounts[1].password).toBe('other-password');
     expect(JSON.parse(vault.serializeUser(window.currentUser)).password).toBeUndefined();
 });
 
@@ -155,4 +155,20 @@ it('verifies explicitly entered login passwords before updating their wrapper',a
     await vault.saveSettings({...options,loginPassword:'login-password'});
     expect(fetch).toHaveBeenCalledWith(expect.stringContaining('/auth/login'),expect.objectContaining({body:JSON.stringify({username:'user',password:'login-password'})}));
     await reopen(); await vault.unlockPassword('login','login-password'); expect(vault.secrets().master).toBe(master);
+});
+
+it('changes the ordinary login password while the encryption vault remains locked',async()=>{
+    await setup(); const master=vault.secrets().master;
+    await reopen(); const prompt=jest.fn(async()=>{throw Error('must not request encryption password');});
+    vault.setUI(prompt,jest.fn());
+    const patch=await vault.preparePasswordChange('login-password','new-login-password');
+    expect(prompt).not.toHaveBeenCalled(); expect(vault.state().unlocked).toBe(false);
+    stored=patch.config; revision++;
+    await reopen(); await vault.unlockPassword('login','new-login-password'); expect(vault.secrets().master).toBe(master);
+    await reopen(); await vault.unlockPassword('dedicated',options.password); expect(vault.secrets().master).toBe(master);
+});
+it('does not require encryption credentials for ordinary password changes with dedicated-only encryption',async()=>{
+    await setup({login:false}); await reopen();
+    await expect(vault.preparePasswordChange('login-password','new-login-password')).resolves.toBeNull();
+    expect(vault.state().unlocked).toBe(false);
 });

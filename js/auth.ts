@@ -254,6 +254,7 @@
             const result = global.parseJsonResponse ? await global.parseJsonResponse(response) : await response.json();
             if (result.code === 200 && result.data.token) {
                 global.currentUser.token = result.data.token;
+                addAccountToList(global.currentUser.username, global.currentUser.password, result.data.token);
                 localStorage.setItem('vditor_user', window.e2eSerializeUser ? window.e2eSerializeUser(global.currentUser) : JSON.stringify(global.currentUser));
                 return true;
             }
@@ -469,6 +470,7 @@
                     
                     // Update current user's password in localStorage
                     global.currentUser.password = newPassword;
+                    addAccountToList(global.currentUser.username, newPassword, global.currentUser.token);
                     localStorage.setItem('vditor_user', window.e2eSerializeUser ? window.e2eSerializeUser(global.currentUser) : JSON.stringify(global.currentUser));
                     
                     // Clear password fields
@@ -550,7 +552,8 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     username: global.currentUser.username,
-                    password: global.currentUser.password
+                    password: global.currentUser.password,
+                    token: global.currentUser.token
                 })
             });
             const result = global.parseJsonResponse ? await global.parseJsonResponse(response) : await response.json();
@@ -912,6 +915,7 @@
                         };
                         await window.E2EVault?.initialize?.().catch(error => console.warn('Encryption configuration unavailable; login remains valid:', error));
                         localStorage.setItem('vditor_user', window.e2eSerializeUser ? window.e2eSerializeUser(global.currentUser) : JSON.stringify(global.currentUser));
+                        addAccountToList(username, password, loginResult.data.token);
                         message.textContent = t('registerSuccessAutoLogin');
                         message.className = 'modal-message success';
 
@@ -951,6 +955,7 @@
                         }, 1500);
                     } else {
                         // 登录失败，但仍显示注册成功，让用户手动登录
+                        addAccountToList(username, password, loginResult.data.token);
                         message.textContent = t('registerSuccessAutoLogin');
                         message.className = 'modal-message success';
                         // 移除加载状态
@@ -1102,16 +1107,18 @@
     }
 
     // 添加账户到列表
-    function addAccountToList(username, password) {
+    function addAccountToList(username, password, token?) {
+        token = token || (global.currentUser?.username === username ? global.currentUser.token : undefined);
         const accounts = getSavedAccounts();
         // 检查是否已存在
         const existingIndex = accounts.findIndex(acc => acc.username === username);
         if (existingIndex >= 0) {
             // 更新密码
-            accounts[existingIndex].password = password;
+            if (password) accounts[existingIndex].password = password;
+            if (token) accounts[existingIndex].token = token;
         } else {
             // 添加新账户
-            accounts.push({ username, password });
+            accounts.push({ username, password, token });
         }
         saveAccounts(accounts);
     }
@@ -1131,7 +1138,7 @@
         // 确保当前登录用户始终出现在列表里（修复部分情况下当前账户不显示的问题）
         const currentUsername = global.currentUser ? global.currentUser.username : null;
         let accounts = getSavedAccounts();
-        if (currentUsername && !accounts.find(function(acc) { return acc.username === currentUsername; })) {
+        if (currentUsername && !accounts.some(acc => acc.username === currentUsername && acc.token === global.currentUser.token)) {
             addAccountToList(currentUsername, global.currentUser.password || '');
             accounts = getSavedAccounts();
         }
@@ -1208,6 +1215,7 @@
 
     // 显示切换账户确认对话框
     let pendingSwitchUsername = null;
+    let reauthSwitchUsername = null;
 
     function setSwitchAccountControlsLoading(loading) {
         const confirmBtn = document.getElementById('confirmSwitchAccountBtn');
@@ -1347,9 +1355,15 @@
             }
 
             // 3. 切换前先验证目标账户，避免凭据失效时清空当前本地状态
-            const result = await verifyAccountCredentials(targetAccount.username, targetAccount.password);
+            const result = await verifyAccountCredentials(targetAccount.username, targetAccount.password, targetAccount.token);
             if (result.code !== 200) {
-                global.showMessage(t('accountAddFailed') + ': ' + result.message, 'error');
+                if (result.code === 401 && !targetAccount.password) {
+                    showAddAccountModal(); reauthSwitchUsername = targetAccount.username;
+                    const input = document.getElementById('addAccountUsername'); if (input) { input.value = targetAccount.username; input.readOnly = true; }
+                    const message = document.getElementById('addAccountMessage'); if (message) message.textContent = t('accountLoginRequired');
+                    return;
+                }
+                global.showMessage(t('accountSwitchFailed') + ': ' + result.message, 'error');
                 return;
             }
 
@@ -1369,6 +1383,7 @@
             };
             localStorage.setItem('vditor_user', window.e2eSerializeUser ? window.e2eSerializeUser(global.currentUser) : JSON.stringify(global.currentUser));
 
+            addAccountToList(targetAccount.username, targetAccount.password, result.data.token);
             global.showMessage(t('accountSwitched').replace('{username}', targetAccount.username), 'success');
 
             // 7. 重新加载文件列表，加载异常或超时不应把界面永久卡在“切换中”
@@ -1401,7 +1416,7 @@
             }
         } catch (error) {
             console.error('切换账户失败:', error);
-            global.showMessage(t('accountAddFailed'), 'error');
+            global.showMessage(t('accountSwitchFailed'), 'error');
         } finally {
             pendingSwitchUsername = null;
             _accountSwitching = false;
@@ -1429,13 +1444,14 @@
             const usernameInput = document.getElementById('addAccountUsername');
             const passwordInput = document.getElementById('addAccountPassword');
             const messageEl = document.getElementById('addAccountMessage');
-            if (usernameInput) usernameInput.value = '';
+            if (usernameInput) { usernameInput.value = ''; usernameInput.readOnly = false; }
             if (passwordInput) passwordInput.value = '';
             if (messageEl) {
                 messageEl.textContent = '';
                 messageEl.className = 'modal-message';
             }
         }
+        reauthSwitchUsername = null;
         // 关闭下拉菜单
         const dropdown = document.getElementById('userMenuDropdown');
         if (dropdown) dropdown.classList.remove('show');
@@ -1450,7 +1466,19 @@
     }
 
     // 验证账户凭据（用于添加账户）
-    async function verifyAccountCredentials(username, password) {
+    async function verifyAccountCredentials(username, password, token?) {
+        if (token) {
+            const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+            const timeoutId = controller ? setTimeout(() => controller.abort(), ACCOUNT_SWITCH_STEP_TIMEOUT_MS) : null;
+            try {
+                const response = await fetch((global.getApiBaseUrl ? global.getApiBaseUrl() : 'api') + '/auth/verify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, token }), signal: controller?.signal });
+                const verified = await response.json();
+                if (verified.code === 200) return { code: 200, data: { token } };
+                if (verified.code !== 401 && verified.code !== 403) return verified;
+            } catch (error) { return { code: 503, message: t('networkErrorPleaseRetry') }; }
+            finally { if (timeoutId) clearTimeout(timeoutId); }
+        }
+        if (!password) return { code: 401, message: t('accountLoginRequired') };
         let timeoutId = null;
         try {
             const apiUrl = (global.getApiBaseUrl ? global.getApiBaseUrl() : 'api') + '/auth/login';
@@ -1501,7 +1529,7 @@
 
         // 检查是否已存在
         const accounts = getSavedAccounts();
-        if (accounts.find(acc => acc.username === username)) {
+        if (accounts.find(acc => acc.username === username) && reauthSwitchUsername !== username) {
             if (messageEl) {
                 messageEl.textContent = t('accountAlreadyExists');
                 messageEl.className = 'modal-message error';
@@ -1530,6 +1558,11 @@
             let result = await verifyAccountCredentials(username, password);
 
             if (result.code !== 200) {
+                // 重新认证已有账号不应尝试注册。
+                if (reauthSwitchUsername === username) {
+                    if (messageEl) { messageEl.textContent = result.message || t('accountSwitchFailed'); messageEl.className = 'modal-message error'; }
+                    return;
+                }
                 // 尝试注册新账户
                 try {
                     const registerUrl = (global.getApiBaseUrl ? global.getApiBaseUrl() : 'api') + '/auth/register';
@@ -1567,7 +1600,7 @@
             }
 
             if (result.code === 200) {
-                addAccountToList(username, password);
+                addAccountToList(username, password, result.data.token);
 
                 if (!global.currentUser) {
                     window.dispatchEvent(new Event('e2e-account-reset'));
@@ -1596,6 +1629,7 @@
                 }
 
                 renderAccountList();
+                if (reauthSwitchUsername === username) { reauthSwitchUsername = null; pendingSwitchUsername = username; await confirmSwitchAccount(); }
             } else {
                 if (messageEl) {
                     messageEl.textContent = t('accountAddFailed') + ': ' + (result.message || '');

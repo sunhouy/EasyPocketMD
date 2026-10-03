@@ -320,7 +320,8 @@ import CropperModule from 'cropperjs';
         formData.append('files[]', file);
         if (global.currentUser) {
             formData.append('username', global.currentUser.username);
-            formData.append('password', global.currentUser.password);
+            if (global.currentUser.token) formData.append('token', global.currentUser.token);
+            else if (global.currentUser.password) formData.append('password', global.currentUser.password);
         }
         formData.append('uploadDir', 'uploads');
 
@@ -356,7 +357,8 @@ import CropperModule from 'cropperjs';
         formData.append('files[]', file);
         if (global.currentUser) {
             formData.append('username', global.currentUser.username);
-            formData.append('password', global.currentUser.password);
+            if (global.currentUser.token) formData.append('token', global.currentUser.token);
+            else if (global.currentUser.password) formData.append('password', global.currentUser.password);
         }
         formData.append('uploadDir', 'uploads');
 
@@ -401,7 +403,8 @@ import CropperModule from 'cropperjs';
         formData.append('files[]', blob, 'image.png');
         if (global.currentUser) {
             formData.append('username', global.currentUser.username);
-            formData.append('password', global.currentUser.password);
+            if (global.currentUser.token) formData.append('token', global.currentUser.token);
+            else if (global.currentUser.password) formData.append('password', global.currentUser.password);
         }
         formData.append('uploadDir', 'uploads');
 
@@ -433,7 +436,8 @@ import CropperModule from 'cropperjs';
         formData.append('files[]', blob, filename);
         if (global.currentUser) {
             formData.append('username', global.currentUser.username);
-            formData.append('password', global.currentUser.password);
+            if (global.currentUser.token) formData.append('token', global.currentUser.token);
+            else if (global.currentUser.password) formData.append('password', global.currentUser.password);
         }
         formData.append('uploadDir', 'uploads');
 
