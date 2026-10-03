@@ -76,13 +76,13 @@ router.post('/activate_member', async (req, res) => {
 
 // Upload Avatar
 router.post('/upload_avatar', upload.single('avatar'), async (req, res) => {
-    const { username, password } = req.body;
-    if (!username || !password) {
+    const { username, password, token } = req.body;
+    if (!username || (!password && !token)) {
         return res.json({ code: 400, message: '缺少必要参数' });
     }
     
     // Authenticate
-    const auth = await userModel.login(username, password);
+    const auth = await verifyTokenOrPassword(userModel, {username, password, token});
     if (auth.code !== 200) {
         return res.json({ code: 401, message: '用户身份验证失败' });
     }
@@ -160,13 +160,13 @@ router.post('/change_password', async (req, res) => {
 
 // Delete Account
 router.post('/delete_account', async (req, res) => {
-    const { username, password } = req.body;
-    if (!username || !password) {
+    const { username, password, token } = req.body;
+    if (!username || (!password && !token)) {
         return res.json({ code: 400, message: '缺少必要参数' });
     }
     
     // Authenticate first
-    const auth = await userModel.login(username, password);
+    const auth = await verifyTokenOrPassword(userModel, {username, password, token});
     if (auth.code !== 200) {
         return res.json({ code: 401, message: '用户身份验证失败' });
     }
