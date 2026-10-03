@@ -5976,3 +5976,21 @@ body.night-mode .diff-live-surface [data-diff-fold-start]::before { color: #c3cf
 }
 #fileList a[data-local-file="copy"]::after { content: "本地副本"; }
 #fileList a[data-local-access="failed"]::after { content: "本地 · 权限失效"; color: #d9534f; }
+
+/* Native full-screen dialogs cover the app toolbar; insets belong inside the dialog. */
+body.tauri-mobile-safe-area #settingsModalOverlay,
+body.tauri-mobile-safe-area #historyModalOverlay {
+    inset: 0;
+    padding: 0;
+    align-items: stretch;
+    z-index: 20000;
+}
+body.tauri-mobile-safe-area #settingsModalOverlay .modal,
+body.tauri-mobile-safe-area #historyModalOverlay .modal {
+    height: 100%;
+    max-height: 100% !important;
+    margin: 0;
+    border-radius: 0;
+    padding-top: calc(var(--safe-area-top, 0px) + 16px);
+    padding-bottom: calc(var(--safe-area-bottom, 0px) + 16px);
+}

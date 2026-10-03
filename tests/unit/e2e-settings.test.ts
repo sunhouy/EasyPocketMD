@@ -37,4 +37,13 @@ describe('new-file encryption preference', () => {
         window.currentUser.e2e_enabled = '0'; window.showUserSettingsModal();
         expect(document.getElementById('settingsEnableE2E').checked).toBe(false);
     });
+    it('saves the default encryption preference with a token and no remembered password',async()=>{
+        window.currentUser={username:'user',token:'token',e2e_enabled:0};
+        const checkbox=document.getElementById('settingsEnableE2E');
+        checkbox.checked=true; checkbox.dispatchEvent(new Event('change'));
+        await new Promise(resolve=>setTimeout(resolve,0));
+        expect(window.currentUser.e2e_enabled).toBe(1);
+        expect(window.showMessage).not.toHaveBeenCalledWith('e2eLoginPasswordMissing','error');
+    });
+
 });

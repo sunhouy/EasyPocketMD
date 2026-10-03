@@ -97,7 +97,7 @@ export async function showSettings() {
     // Each method can be configured independently without removing other enabled methods.
     for (const method of ['login','passkey','dedicated'] as const) view.querySelector('[data-use-'+method+']').addEventListener('click',()=>run(view,async()=>{
         const c = vault.state().config;
-        const selected = { ...options(),login:c ? !!c.methods.login : true,passkey:!!c?.methods.passkey,dedicated:!!c?.methods.dedicated,[method]:true };
+        const selected = { ...options(),login:c ? !!c.methods.login : method === 'login',passkey:!!c?.methods.passkey,dedicated:!!c?.methods.dedicated,[method]:true };
         if (method !== 'dedicated') selected.password = '';
         if (method !== 'login') selected.loginPassword = '';
         if (method === 'dedicated' && !selected.password && !c?.methods.dedicated) throw e2eError('e2eDedicatedRequired');

@@ -149,7 +149,7 @@ app.use('/api/admin', strictLimiter, adminRoutes);
 // External API routes
 app.use('/api/external', apiLimiter, apiRoutes);
 
-// Code runner routes - server-side C/C++ compilation via emscripten
+// Code runner routes - isolated Python containers and C/C++ compilation via emscripten
 app.use('/api/code-runner', apiLimiter, codeRunnerRoutes);
 
 // Convert routes - rate limiting for export functions

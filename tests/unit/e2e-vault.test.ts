@@ -57,7 +57,7 @@ it('allows removing login while preserving dedicated unlock, but rejects removin
     await expect(vault.saveSettings({...options,login:false,dedicated:false})).rejects.toThrow('至少保留');
 });
 it('expires at the configured boundary and never implicitly reuses the saved login password',async()=>{
-    jest.useFakeTimers(); await setup(); const onLock=jest.fn(); vault.setUI(async()=>{throw Error('locked');},onLock);
+    jest.useFakeTimers(); await setup({login:false}); const onLock=jest.fn(); vault.setUI(async()=>{throw Error('locked');},onLock);
     jest.advanceTimersByTime(60000);
     expect(onLock).toHaveBeenCalledTimes(1); expect(vault.state().unlocked).toBe(false);
     expect(()=>vault.secrets()).toThrow('已过期');
@@ -124,7 +124,7 @@ it('stores encrypted crash-recovery drafts and decrypts them only in an unlocked
 it('removes saved login passwords so a lock cannot be bypassed by silently reading the account cache',async()=>{
     localStorage.setItem('vditor_user',JSON.stringify(window.currentUser));
     localStorage.setItem('vditor_accounts',JSON.stringify([window.currentUser,{username:'other',password:'other-password'}]));
-    await setup();
+    await setup({login:false});
     expect(JSON.parse(localStorage.getItem('vditor_user')).password).toBeUndefined();
     const accounts=JSON.parse(localStorage.getItem('vditor_accounts'));expect(accounts[0].password).toBeUndefined();expect(accounts[0].token).toBe('token');expect(accounts[1].password).toBe('other-password');
     expect(JSON.parse(vault.serializeUser(window.currentUser)).password).toBeUndefined();
@@ -171,4 +171,30 @@ it('does not require encryption credentials for ordinary password changes with d
     await setup({login:false}); await reopen();
     await expect(vault.preparePasswordChange('login-password','new-login-password')).resolves.toBeNull();
     expect(vault.state().unlocked).toBe(false);
+});
+
+it('remembers login-mode credentials across reloads and saves settings without prompting',async()=>{
+    await setup();
+    expect(JSON.parse(localStorage.getItem('vditor_user')).password).toBe('login-password');
+    window.currentUser=JSON.parse(localStorage.getItem('vditor_user'));
+    await reopen(); const prompt=jest.fn(async()=>{throw Error('unnecessary prompt');}); vault.setUI(prompt,jest.fn());
+    await vault.saveSettings({...options,password:'',ttlSeconds:300});
+    expect(prompt).not.toHaveBeenCalled(); expect(vault.state().unlocked).toBe(true);
+    expect(stored.ttlSeconds).toBe(300);
+});
+it('sets up dedicated-only encryption with token authentication and no ordinary password',async()=>{
+    window.currentUser={username:'user',token:'token'};
+    await setup({login:false});
+    expect(stored.methods.dedicated).toBeDefined(); expect(stored.methods.login).toBeUndefined();
+    await reopen(); await vault.unlockPassword('dedicated',options.password);
+    expect(vault.state().unlocked).toBe(true);
+});
+
+it('remembers an explicitly verified login unlock after an older client removed its cache',async()=>{
+    await setup(); await reopen();
+    window.currentUser={username:'user',token:'token'};
+    await vault.unlockPassword('login','login-password');
+    expect(JSON.parse(localStorage.getItem('vditor_user')).password).toBe('login-password');
+    await reopen(); const prompt=jest.fn(async()=>{throw Error('must remember');}); vault.setUI(prompt,jest.fn());
+    await vault.ensureUnlocked(); expect(prompt).not.toHaveBeenCalled();
 });

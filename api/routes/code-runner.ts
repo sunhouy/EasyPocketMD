@@ -5,6 +5,7 @@ const path = require('path');
 const { spawn } = require('child_process');
 
 const router = express.Router();
+const { runPythonSandbox } = require('../services/python-sandbox');
 
 function toErrorMessage(error) {
     if (!error) return 'Unknown error';
@@ -165,10 +166,22 @@ router.post('/run', async (req, res) => {
             });
         }
 
+        if (language === 'python' || language === 'py') {
+            if (Buffer.byteLength(code, 'utf8') > 64 * 1024) return res.status(413).json({success:false,error:'Code exceeds 64 KB limit'});
+            const controller = new AbortController();
+            const cancel = () => { if (!res.writableEnded) controller.abort(); };
+            res.once('close', cancel);
+            try {
+                const result = await runPythonSandbox(code, controller.signal);
+                if (!res.destroyed) return res.status(result.status || 200).json(result);
+                return;
+            } finally { res.removeListener('close', cancel); }
+        }
+
         if (language !== 'c' && language !== 'cpp' && language !== 'c++') {
             return res.status(400).json({
                 success: false,
-                error: 'Only C and C++ are supported by the server runner'
+                error: 'Only Python, C and C++ are supported by the server runner'
             });
         }
 

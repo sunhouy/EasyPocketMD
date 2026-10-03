@@ -1768,13 +1768,6 @@
                 const user = global.currentUser;
                 this.disabled = true;
                 
-                if (isEnabled && !global.currentUser.password && !window.E2EVault?.state().config) {
-                    global.showMessage(t('e2eLoginPasswordMissing'), 'error');
-                    this.checked = false;
-                    this.disabled = false;
-                    return;
-                }
-                
                 try {
                     const apiUrl = (global.getApiBaseUrl ? global.getApiBaseUrl() : 'api') + '/auth/update_e2e';
                     const response = await fetch(apiUrl, {
