@@ -125,7 +125,7 @@ function initShareCollabServer(httpServer, shareManager) {
         if (!ctx.canEdit) ctx.cursor = null;
         if (changed) {
             await shareManager.updateSharePresence(ctx.shareId, ctx.viewerId, ctx.viewerName, false, ctx.canEdit);
-            client.send(JSON.stringify({ type: 'permission_changed', can_edit: ctx.canEdit }));
+            client.send(JSON.stringify({ type: 'permission_changed', mode: access.data.mode, can_edit: ctx.canEdit }));
             broadcast(ctx.shareId, { type: 'cursor', viewer_id: ctx.viewerId, cursor: null });
         }
         if (sendContent) client.send(JSON.stringify({ type: 'doc_updated', ...access.data, updated_by: 'owner-action' }));
@@ -197,6 +197,7 @@ function initShareCollabServer(httpServer, shareManager) {
             type: 'ready',
             share_id: shareId,
             can_edit: socket.ctx.canEdit,
+            mode: shareResult.data.mode,
             edit_policy: shareResult.data.edit_policy,
             content: shareResult.data.content,
             last_modified: shareResult.data.last_modified,
@@ -453,6 +454,8 @@ function initShareCollabServer(httpServer, shareManager) {
             }
 
             if (payload.type === 'update_content') {
+                await refreshClient(socket);
+                if (socket.readyState !== 1) return;
                 if (!socket.ctx.canEdit) {
                     socket.send(JSON.stringify({ type: 'error', code: 403, message: 'no edit permission' }));
                     return;

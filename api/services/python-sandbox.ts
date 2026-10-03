@@ -3,6 +3,8 @@ const { spawn } = require('child_process');
 const { randomUUID } = require('crypto');
 const MAX_CAPTURE = 4 * 1024 * 1024;
 const TIMEOUT = 20000;
+const smallHost = require('os').totalmem() < 3 * 1024 * 1024 * 1024;
+const MEMORY_MB = smallHost ? 256 : 512;
 let active = 0;
 
 function cleanup(name) {
@@ -14,31 +16,38 @@ function cleanup(name) {
     });
 }
 
-export async function runPythonSandbox(code: string, signal?: AbortSignal): Promise<any> {
-    if (active >= 2) return { success:false, status:429, error:'Python sandbox is busy. Please retry shortly.' };
+export async function runPythonSandbox(code: string, signal?: AbortSignal, onInput?: (event: any, signal: AbortSignal) => Promise<string>): Promise<any> {
+    if (active >= (smallHost ? 1 : 2)) return { success:false, status:429, error:'Python sandbox is busy. Please retry shortly.' };
     active++;
     const name = 'epmd-python-' + randomUUID();
     try {
         return await new Promise(resolve => {
-            let output = '', stderr = '', bytes = 0, settled = false;
+            let output = '', stderr = '', bytes = 0, settled = false, resultValue: any, waiting = false;
+            let remaining = TIMEOUT, started = Date.now(), timer: ReturnType<typeof setTimeout>;
+            const inputController = new AbortController();
             const child = spawn('docker', [
                 'run', '--rm', '--pull=never', '--name', name, '-i',
                 '--label', 'easypocketmd.sandbox-owner=' + (process.env.EPMD_SANDBOX_OWNER || 'standalone'),
                 '--network=none', '--read-only', '--cap-drop=ALL',
                 '--security-opt=no-new-privileges', '--user=65534:65534',
-                '--memory=512m', '--memory-swap=512m', '--cpus=1', '--pids-limit=64',
+                `--memory=${MEMORY_MB}m`, `--memory-swap=${MEMORY_MB}m`, '--cpus=1', '--pids-limit=64',
                 '--ulimit=nofile=128:128', '--ulimit=core=0', '--log-driver=none',
                 '--tmpfs=/tmp:rw,noexec,nosuid,size=64m,mode=1777',
                 process.env.PYTHON_SANDBOX_IMAGE || 'easypocketmd-python:1'
             ], { shell:false, stdio:['pipe','pipe','pipe'] });
             const finish = (result) => {
                 if (settled) return; settled = true;
-                clearTimeout(timer); signal?.removeEventListener('abort', abort);
+                clearTimeout(timer); clearTimeout(lifetime); inputController.abort(); signal?.removeEventListener('abort', abort);
                 child.kill('SIGKILL');
                 void cleanup(name).finally(() => resolve(result));
             };
             const abort = () => finish({success:false,status:499,error:'Execution cancelled'});
-            const timer = setTimeout(() => finish({success:false,status:408,error:'Python execution timed out (20 seconds)'}), TIMEOUT);
+            const arm = () => {
+                started = Date.now();
+                timer = setTimeout(() => finish({success:false,status:408,error:'Python execution timed out (20 seconds of execution)'}), Math.max(1, remaining));
+            };
+            const lifetime = setTimeout(() => finish({success:false,status:408,error:'Interactive execution session expired (5 minutes)'}), 5 * 60000);
+            arm();
             signal?.addEventListener('abort', abort, {once:true});
             child.stdin.on('error', () => {});
             child.stdout.setEncoding('utf8');
@@ -47,6 +56,25 @@ export async function runPythonSandbox(code: string, signal?: AbortSignal): Prom
                 bytes += Buffer.byteLength(chunk, 'utf8');
                 if (bytes > MAX_CAPTURE) return finish({success:false,status:413,error:'Python output exceeds size limit'});
                 output += chunk.toString('utf8');
+                let newline: number;
+                while (!settled && (newline = output.indexOf('\n')) >= 0) {
+                    const line = output.slice(0, newline); output = output.slice(newline + 1);
+                    try {
+                        const value = JSON.parse(line);
+                        if (value.type === 'input') {
+                            if (!onInput || waiting || typeof value.prompt !== 'string' || typeof value.output !== 'string') throw Error('Invalid input request');
+                            waiting = true; remaining -= Date.now() - started; clearTimeout(timer);
+                            timer = setTimeout(() => finish({success:false,status:408,error:'Input timed out (2 minutes)'}), 120000);
+                            Promise.resolve(onInput({prompt:value.prompt.slice(0,4096),output:value.output.slice(0,65536)}, inputController.signal)).then(text => {
+                                if (settled) return;
+                                if (typeof text !== 'string' || Buffer.byteLength(text) > 65536) return finish({success:false,status:413,error:'Input exceeds 64 KB limit'});
+                                clearTimeout(timer); waiting = false; arm();
+                                child.stdin.write(JSON.stringify({value:text}) + '\n');
+                            }).catch(() => finish({success:false,status:499,error:'Input cancelled'}));
+                        } else if (value.type === 'result') resultValue = value;
+                        else throw Error('Invalid event');
+                    } catch { return finish({success:false,status:500,error:'Invalid Python sandbox response'}); }
+                }
             });
             child.stderr.on('data', chunk => { stderr = (stderr + chunk.toString('utf8')).slice(-8192); });
             child.once('error', () => finish({success:false,status:503,error:'Python sandbox unavailable. Install Docker and build the sandbox image.'}));
@@ -54,7 +82,7 @@ export async function runPythonSandbox(code: string, signal?: AbortSignal): Prom
                 if (settled) return;
                 if (exit !== 0) return finish({success:false,status:503,error:exit === 137 ? 'Python exceeded its memory limit' : 'Python sandbox failed. Check its image and Docker service.', details:stderr});
                 try {
-                    const value = JSON.parse(output);
+                    const value = resultValue || JSON.parse(output);
                     if (typeof value.success !== 'boolean' || typeof value.output !== 'string' || !Array.isArray(value.images)) throw Error('Invalid response');
                     let imageBytes = 0;
                     const images = value.images.slice(0,8).map(image => {
@@ -67,6 +95,7 @@ export async function runPythonSandbox(code: string, signal?: AbortSignal): Prom
                 } catch { finish({success:false,status:500,error:'Invalid Python sandbox response'}); }
             });
             if (signal?.aborted) abort();
+            else if (onInput) child.stdin.write(JSON.stringify({code,interactive:true}) + '\n');
             else child.stdin.end(JSON.stringify({code}));
         });
     } finally { active--; }

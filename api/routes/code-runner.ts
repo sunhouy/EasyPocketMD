@@ -154,6 +154,17 @@ async function compileAndRunSource(code, language) {
     }
 }
 
+// One-use unpredictable capabilities tie each answer to a single pending input.
+const pendingInputs = new Map<string, {resolve: (value: string) => void}>();
+router.post('/input', (req, res) => {
+    const token = typeof req.body?.token === 'string' ? req.body.token : '';
+    const pending = pendingInputs.get(token);
+    if (!pending) return res.status(410).json({success:false,error:'Input request expired'});
+    if (typeof req.body.value !== 'string' || Buffer.byteLength(req.body.value) > 65536) return res.status(400).json({success:false,error:'Invalid input (64 KB maximum)'});
+    pendingInputs.delete(token); pending.resolve(req.body.value);
+    res.json({success:true});
+});
+
 router.post('/run', async (req, res) => {
     try {
         const code = String(req.body && req.body.code ? req.body.code : '');
@@ -172,7 +183,26 @@ router.post('/run', async (req, res) => {
             const cancel = () => { if (!res.writableEnded) controller.abort(); };
             res.once('close', cancel);
             try {
-                const result = await runPythonSandbox(code, controller.signal);
+                const interactive = req.body.interactive === true;
+                if (interactive) {
+                    res.status(200).set({'Content-Type':'application/x-ndjson; charset=utf-8','Cache-Control':'no-cache, no-transform','X-Accel-Buffering':'no'});
+                    res.flushHeaders();
+                }
+                const input = interactive ? (event, signal) => new Promise<string>((resolve, reject) => {
+                    const token = require('crypto').randomUUID();
+                    const cancelInput = () => { pendingInputs.delete(token); reject(new Error('Input cancelled')); };
+                    signal.addEventListener('abort', cancelInput, {once:true});
+                    pendingInputs.set(token, {resolve: value => {
+                        signal.removeEventListener('abort', cancelInput); resolve(value);
+                    }});
+                    res.write(JSON.stringify({type:'input',token,...event}) + '\n');
+                    if (signal.aborted) cancelInput();
+                }) : undefined;
+                const result = await runPythonSandbox(code, controller.signal, input);
+                if (interactive) {
+                    if (!res.destroyed) res.end(JSON.stringify({type:'result',...result}) + '\n');
+                    return;
+                }
                 if (!res.destroyed) return res.status(result.status || 200).json(result);
                 return;
             } finally { res.removeListener('close', cancel); }
@@ -192,6 +222,10 @@ router.post('/run', async (req, res) => {
 
         return res.json(result);
     } catch (error) {
+        if (res.headersSent) {
+            if (!res.destroyed) res.end(JSON.stringify({type:'result',success:false,error:toErrorMessage(error)}) + '\n');
+            return;
+        }
         return res.status(500).json({
             success: false,
             error: toErrorMessage(error)

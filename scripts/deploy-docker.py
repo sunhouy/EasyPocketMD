@@ -15,6 +15,10 @@ import sys
 import time
 import urllib.request
 
+import importlib.util
+_spec = importlib.util.spec_from_file_location('deploy_resources', Path(__file__).with_name('deploy-resources.py'))
+resources = importlib.util.module_from_spec(_spec); _spec.loader.exec_module(resources)
+
 ROOT = Path('/www/wwwroot/easypocketmd/docker')
 os.environ['PATH'] = '/www/server/nodejs/v24.14.1/bin:' + os.environ.get('PATH', '')
 
@@ -67,7 +71,10 @@ def health(port, checksums):
                     raise RuntimeError('API unhealthy')
             for path, expected in checksums.items():
                 with urllib.request.urlopen(f'http://127.0.0.1:{port}/{path}', timeout=5) as response:
-                    if hashlib.sha256(response.read()).hexdigest() != expected:
+                    digest = hashlib.sha256()
+                    while chunk := response.read(64 * 1024):
+                        digest.update(chunk)
+                    if digest.hexdigest() != expected:
                         raise RuntimeError('Served WASM checksum mismatch: ' + path)
             return
         except Exception:
@@ -105,9 +112,9 @@ def activate(release, channel, slot, current):
     try:
         docker(*common, '--name', names['app'], '--env-file', str(release / 'app.env'),
                '-e', f'PORT={app_port}', '-e', 'HOST=127.0.0.1', '-e', f"EPMD_SANDBOX_OWNER={names['app']}", '-e', f"PYTHON_SANDBOX_IMAGE={images['python']}",
-               '--memory=1536m', '--pids-limit=512', '--cpus=2', *mounts, images['app'])
-        docker(*common, '--name', names['print'], '--memory=256m', '--pids-limit=64', images['print'], '--port', str(print_port))
-        docker(*common, '--name', names['gateway'], '--memory=128m', '--pids-limit=128',
+               f"--memory={resources.container_limits('app')}m", f"--memory-swap={resources.container_limits('app')}m", '-e', f"NODE_OPTIONS=--max-old-space-size={resources.container_limits('app') // 2}", '--pids-limit=256', '--cpus=1', *mounts, images['app'])
+        docker(*common, '--name', names['print'], f"--memory={resources.container_limits('print')}m", f"--memory-swap={resources.container_limits('print')}m", '--cpus=.5', '--pids-limit=64', images['print'], '--port', str(print_port))
+        docker(*common, '--name', names['gateway'], f"--memory={resources.container_limits('gateway')}m", f"--memory-swap={resources.container_limits('gateway')}m", '--cpus=.5', '--pids-limit=64',
                '-v', f'{static}:/www/wwwroot/static:ro', '-e', f'APP_PORT={app_port}',
                '-e', f'PRINT_PORT={print_port}', '-e', f'GATEWAY_PORT={gateway_port}',
                '-e', f'PRINT_GATEWAY_PORT={print_gateway_port}', images['gateway'])
@@ -206,7 +213,20 @@ def main():
     else:
         raise RuntimeError('Invalid action')
     slot = 1 - current['slot'] if current else 0
-    candidate = activate(release, channel, slot, current)
+    paused = []
+    try:
+        if current and resources.small_host():
+            # A small host cannot hold two complete releases safely. Briefly pause
+            # this site's old services, then restore them if activation fails.
+            cleanup_sandboxes(current['containers']['app'])
+            for name in current['containers'].values():
+                command('docker', 'stop', '--time', '10', name, stdout=subprocess.DEVNULL)
+                paused.append(name)
+        candidate = activate(release, channel, slot, current)
+    except BaseException:
+        for name in paused:
+            command('docker', 'start', name, stdout=subprocess.DEVNULL)
+        raise
     # Old connections get a grace period; rollback keeps the old immutable release.
     if current:
         for name in current['containers'].values():
