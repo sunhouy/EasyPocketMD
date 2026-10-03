@@ -1,10 +1,15 @@
 import { runPythonSandbox } from '../api/services/python-sandbox';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 async function main() {
     const result = await runPythonSandbox("import numpy, pandas, scipy, sympy, sklearn, seaborn, PIL, openpyxl\nimport matplotlib.pyplot as plt\nplt.plot([1,2],[3,4]); plt.title('中文图表'); plt.show()\nplt.figure(); plt.plot([3,2,1]); print('ok')");
     assert.equal(result.success, true, JSON.stringify(result));
     assert.equal(result.output.trim(), 'ok'); assert.equal(result.images.length, 2);
     assert.equal(result.images[0].mime, 'image/png');
+    const fonts = await runPythonSandbox(readFileSync(new URL('../tests/fixtures/python-chinese-fonts.py', import.meta.url), 'utf8'));
+    assert.equal(fonts.success, true, JSON.stringify(fonts));
+    assert.equal(fonts.output.trim(), 'Chinese font overrides passed');
+    assert.equal(fonts.images.length, 2);
     const isolated = await runPythonSandbox("import os, socket\nassert not os.path.exists('/var/run/docker.sock')\nassert 'JWT_SECRET' not in os.environ\ntry:\n socket.create_connection(('1.1.1.1',443), timeout=1)\n raise RuntimeError('network unexpectedly available')\nexcept OSError:\n print('isolated')");
     assert.equal(isolated.success, true, JSON.stringify(isolated));
     const timeout = await runPythonSandbox('while True: pass');
