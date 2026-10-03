@@ -82,3 +82,10 @@ it('responds to the management button immediately, including a late-mounted sett
     ready(); await tick();
     expect(document.querySelectorAll('[data-use-login],[data-use-passkey],[data-use-dedicated]')).toHaveLength(3);
 });
+
+it.each(['dedicated','passkey'])('sets up %s independently without enabling login-password protection',async method=>{
+    mockConfig=null;await showSettings();
+    if(method==='dedicated') {document.querySelector('[data-password]').value='dedicated-password';document.querySelector('[data-confirm]').value='dedicated-password';}
+    document.querySelector('[data-use-'+method+']').click();await tick();
+    expect(vault.saveSettings).toHaveBeenCalledWith(expect.objectContaining({login:false,[method]:true}));
+});
