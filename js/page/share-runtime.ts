@@ -75,6 +75,7 @@ declare global { interface Window { sharedDocState: SharedDocumentState | null; 
         } else {
             window.vditor.setValue(content);
         }
+        sharedReadOnlyGuard?.acceptContent();
     }
 
     async function fetchShareData(shareId, password, editPassword) {
@@ -132,13 +133,15 @@ declare global { interface Window { sharedDocState: SharedDocumentState | null; 
     function setSharedEditorLocked(locked) {
         const container = document.getElementById('vditor');
         if (!container) return;
-        if (!sharedReadOnlyGuard) sharedReadOnlyGuard = createSharedReadOnlyGuard(container);
+        if (!sharedReadOnlyGuard) sharedReadOnlyGuard = createSharedReadOnlyGuard(container, {get: () => window.vditor?.getValue() || '', restore: value => window.vditor?.setValue(value)});
         sharedReadOnlyGuard.setLocked(locked);
     }
     const hiddenEditStyles = new Map();
     function setSharePermission(canEdit) {
         if (!window.sharedDocState) return;
-        window.sharedDocState.canEdit = !!canEdit;
+        canEdit = canEdit === true && window.sharedDocState.shareMode === 'edit';
+        if (!canEdit && window.sharedDocState.canEdit) setSharedEditorValue(window.sharedDocState.lastKnownContent, false);
+        window.sharedDocState.canEdit = canEdit;
         setSharedEditorLocked(!canEdit);
         if (!canEdit) {
             clearTimeout(window.sharedDocState.saveTimer);
@@ -1012,7 +1015,8 @@ declare global { interface Window { sharedDocState: SharedDocumentState | null; 
         if (sameSession) {
             window.sharedDocState.sharePassword = options.sharePassword || window.sharedDocState.sharePassword || '';
             window.sharedDocState.editPassword = options.editPassword || window.sharedDocState.editPassword || '';
-            window.sharedDocState.canEdit = !!options.canEdit;
+            window.sharedDocState.shareMode = shareData.mode;
+            window.sharedDocState.canEdit = options.canEdit === true && shareData.mode === 'edit';
             window.sharedDocState.viewerId = targetOwnerFileId ? getSharedViewerId() : (options.viewerId || window.sharedDocState.viewerId);
             window.sharedDocState.viewerName = options.viewerName || window.sharedDocState.viewerName;
             window.sharedDocState.ownerUsername = shareData.username || window.sharedDocState.ownerUsername;
@@ -1037,7 +1041,8 @@ declare global { interface Window { sharedDocState: SharedDocumentState | null; 
             shareId: targetShareId,
             sharePassword: options.sharePassword || '',
             editPassword: options.editPassword || '',
-            canEdit: !!options.canEdit,
+            shareMode: shareData.mode,
+            canEdit: options.canEdit === true && shareData.mode === 'edit',
             lastKnownContent: shareData.content || '',
             lastModified: shareData.last_modified || null,
             contentVersion: shareData.content_version || 1,
@@ -1303,6 +1308,7 @@ declare global { interface Window { sharedDocState: SharedDocumentState | null; 
             });
             const result = await response.json();
             if (result.code !== 200 || !result.data) return;
+            if (result.data.mode) window.sharedDocState.shareMode = result.data.mode;
             if (result.data.can_edit !== undefined && result.data.can_edit !== window.sharedDocState.canEdit) setSharePermission(result.data.can_edit);
 
             if (!result.data.changed) return;
@@ -1384,7 +1390,10 @@ declare global { interface Window { sharedDocState: SharedDocumentState | null; 
             }
 
             if (payload.type === 'cursor') { sharedCursorController?.receive(payload); return; }
-            if (payload.type === 'permission_changed') { setSharePermission(!!payload.can_edit); return; }
+            if (payload.type === 'permission_changed') {
+                if (payload.mode) window.sharedDocState.shareMode = payload.mode;
+                setSharePermission(payload.can_edit === true); return;
+            }
             if (payload.type === 'presence') {
                 window.sharedDocState.onlineUsers = payload.online_users || [];
                 renderSharePresence(payload.online_users || []);
@@ -1454,7 +1463,8 @@ declare global { interface Window { sharedDocState: SharedDocumentState | null; 
             }
 
             if (payload.type === 'ready' || payload.type === 'doc_updated') {
-                if (payload.can_edit !== undefined) setSharePermission(!!payload.can_edit);
+                if (payload.mode) window.sharedDocState.shareMode = payload.mode;
+                if (payload.can_edit !== undefined) setSharePermission(payload.can_edit === true);
                 sharedCursorController?.capture();
                 if (Number(payload.content_version) < Number(window.sharedDocState.contentVersion)) return;
                 const local = window.vditor?.getValue() || '';
@@ -1687,7 +1697,8 @@ declare global { interface Window { sharedDocState: SharedDocumentState | null; 
             });
             const result = await response.json();
             if (result.code === 200 && result.data) {
-                if (result.data.can_edit !== undefined && result.data.can_edit !== window.sharedDocState.canEdit) setSharePermission(result.data.can_edit);
+                if (result.data.mode) window.sharedDocState.shareMode = result.data.mode;
+            if (result.data.can_edit !== undefined && result.data.can_edit !== window.sharedDocState.canEdit) setSharePermission(result.data.can_edit);
                 window.sharedDocState.onlineUsers = result.data.online_users || [];
                 renderSharePresence(result.data.online_users || []);
             }

@@ -27,3 +27,11 @@ MySQL、Redis 及 TLS 入口继续复用现有服务，避免迁移数据库或�
 候选槽位启动 app/print/gateway 容器后，检查 API、实际 HTTP WASM 摘要和打印 WebSocket；随后检查并重载 TLS 入口。检查失败恢复原配置并删除候选容器，不停止当前服务。成功后保存 `state-main.json`/`state-dev.json`，再停止旧容器和本项目的旧 PM2 进程，Docker 的 restart policy 负责重启。
 
 主站 Actions 手动选择 `rollback`，重新启动上一份 Docker 发布并通过同样的检查再切换。首次从 PM2 迁移时尚无上一份 Docker 发布，需完成至少两次 Docker 发布后才能使用该回滚入口；旧目录仍保留，不被清空。
+
+## 小内存服务器与部署资源
+
+低于 3 GiB 内存的机器使用 app 512 MiB、print 96 MiB、gateway 48 MiB 的上限，关闭额外 swap 配额，Node 堆上限为 256 MiB；Python 沙箱最多同时运行一个、内存 256 MiB。大内存机器 app 上限为 1024 MiB，Python 沙箱仍为 512 MiB/最多两个。部署健康校验按块计算 WASM 摘要。
+
+传输前检查新增压缩缓存与 Docker 内容/解包空间，并限速为 8 MiB/s；空间不足明确终止，保留现有服务。导入前至少需要 384 MiB 可用内存。小内存机器要求 systemd/cgroup v2，镜像导入期间临时限制 Docker 和 containerd 守护进程的 CPU、memory.high 与 I/O 权重，结束后恢复原限制；不会重启 Docker、删除用户数据或自动清理回滚镜像。已安装且内容身份一致的发布跳过重复导入。服务器锁禁止并发导入和切换。
+
+小内存机器切换期间短暂停止本网站旧容器，避免新旧应用同时占满内存；新版本健康检查失败则重启旧容器。其他网站、MySQL、Redis 和宿主 Nginx 不停止。此模式会有短暂不可用时间，大内存机器仍采用新旧服务并行校验。
