@@ -50,6 +50,11 @@ jobs:
     - name: Verify WASM source artifacts
       run: npm run wasm:text:verify && npm run wasm:image:verify
 
+    - name: Build and verify isolated Python runner
+      run: |
+        bash scripts/setup-python-sandbox.sh
+        npx tsx scripts/check-python-sandbox.ts
+
     - name: Run tests
       run: npm test -- --coverage
 
@@ -154,7 +159,7 @@ jobs:
     - name: Create deployment tarball
       run: |
         mkdir -p deploy_tmp
-        cp -r dist api print shared package.json package-lock.json sw.ts manifest.webmanifest icon.png .env ssl deploy_tmp/
+        cp -r dist api print shared sandbox requirements.txt package.json package-lock.json sw.ts manifest.webmanifest icon.png .env ssl deploy_tmp/
 
         # dev 部署必须使用 dev 域名和 dev 目录，不能把生产 md.yhsun.cn 配置写入 dev.yhsun.cn.conf。
         sed \
@@ -327,6 +332,8 @@ jobs:
             python -c "from markitdown import MarkItDown; print('MarkItDown ready')"
           fi
           
+          bash scripts/setup-python-sandbox.sh
+
           echo "✓ 部署目录准备完成: $NEXT_DIR"
 
     - name: Zero-downtime switch

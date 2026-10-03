@@ -12,11 +12,25 @@ export function serializeUser(value: any): string {
 }
 function protectSavedPassword() {
     const names = protectedAccounts();
-    if (!names.includes(owner)) localStorage.setItem('epmd_e2e_accounts', JSON.stringify([...names,owner]));
+    // Login-password mode intentionally remembers the already authenticated login password.
+    // Independent dedicated/passwordless modes keep it out of persistent caches.
+    const next = config?.methods.login ? names.filter(name => name !== owner) : [...new Set([...names,owner])];
+    localStorage.setItem('epmd_e2e_accounts', JSON.stringify(next));
     for (const key of ['vditor_user','vditor_accounts']) {
         const raw = localStorage.getItem(key);
         if (raw) { try { localStorage.setItem(key,serializeUser(JSON.parse(raw))); } catch { /* Existing malformed account cache is handled by auth. */ } }
     }
+}
+function rememberLoginPassword(password: string) {
+    if (!config?.methods.login || owner !== user()?.username || !password) return;
+    user().password = password;
+    localStorage.setItem('vditor_user', serializeUser(user()));
+    let accounts: any[] = [];
+    try { const value = JSON.parse(localStorage.getItem('vditor_accounts') || '[]'); if (Array.isArray(value)) accounts = value; } catch { /* Rebuild malformed account cache. */ }
+    const account = accounts.find(account => account.username === owner);
+    if (account) { account.password = password; account.token = user().token; }
+    else accounts.push({username:owner,token:user().token,password});
+    localStorage.setItem('vditor_accounts', serializeUser(accounts));
 }
 export const random = (size: number) => crypto.getRandomValues(new Uint8Array(size));
 export function base64(bytes: ArrayBuffer | Uint8Array): string {
@@ -92,6 +106,10 @@ export async function ensureUnlocked() {
     if (!config) return;
     if (material && Date.now() < expiresAt) return;
     if (material) lock();
+    if (config.methods.login && user()?.password) {
+        try { await unlockPassword('login', user().password); return; }
+        catch { /* A changed or missing remembered password requires an explicit method. */ }
+    }
     if (!unlockUI) throw e2eError('e2eUnlockRequired');
     if (!unlocking) unlocking = unlockUI().finally(() => { unlocking = null; });
     await unlocking;
@@ -124,7 +142,7 @@ export function lock() {
 }
 export async function unlockPassword(method: 'login' | 'dedicated', password: string) {
     if (!password || !config?.methods[method]) throw e2eError('e2eMethodDisabled');
-    try { await accept(JSON.parse(await unwrap(config.methods[method], password))); }
+    try { await accept(JSON.parse(await unwrap(config.methods[method], password))); if (method === 'login') rememberLoginPassword(password); }
     catch { throw e2eError('e2ePasswordIncorrect'); }
 }
 async function prf(credentialId: string, prfSalt: string) {
@@ -152,8 +170,7 @@ export async function saveSettings(options: { login: boolean; dedicated: boolean
     if (![60,300,900,1800,3600,14400,86400].includes(options.ttlSeconds)) throw e2eError('e2eTtlInvalid');
     if (!options.login && !options.dedicated && !options.passkey) throw e2eError('e2eMethodRequired');
     const activeOwner = owner, activeGeneration = generation;
-    const value = material || { master: base64(random(32)), legacy: user()?.password || '' };
-    if (!material && !value.legacy) throw e2eError('e2eInitialPasswordRequired');
+    const value = material || { master: base64(random(32)), legacy: options.loginPassword || user()?.password || '' };
     const methods: VaultConfig['methods'] = {};
     if (options.login) {
         // Reuse a current wrapper unless the user explicitly supplies a password.
@@ -176,6 +193,7 @@ export async function saveSettings(options: { login: boolean; dedicated: boolean
     const data = await request('config/save', { config: nextConfig, revision });
     if (owner !== activeOwner || generation !== activeGeneration) throw e2eError('e2eAccountChanged');
     config = nextConfig; revision = data.revision; protectSavedPassword();
+    if (config.methods.login) rememberLoginPassword(options.loginPassword || user()?.password);
     await accept(value);
 }
 export async function preparePasswordChange(currentPassword: string, newPassword: string) {

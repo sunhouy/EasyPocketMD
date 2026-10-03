@@ -13,175 +13,24 @@
     }
 
     var SUPPORTED_LANGUAGES = new Set(['python', 'py', 'javascript', 'js', 'typescript', 'ts', 'html', 'htm', 'c', 'cpp', 'c++']);
-    var PYODIDE_VERSION = '0.25.1';
-    var PYODIDE_CDN_BASES = [
-        'https://static.yhsun.cn/cdn/pyodide/v' + PYODIDE_VERSION + '/full/'
-    ];
-
-    // 代码运行器类
+    // Python runs in the server's isolated container; no browser interpreter is loaded.
     class CodeRunner {
-        constructor() {
-            this.cCompilerEndpoint = '/api/code-runner/run';
-            this.pyodide = null;
-            this.pyodideLoaded = false;
-            this.pyodideLoadingPromise = null;
-            this.pyodideCdnBase = null;
-        }
-
-        async initPyodide() {
-            if (this.pyodideLoaded && this.pyodide) {
-                return this.pyodide;
-            }
-
-            if (this.pyodideLoadingPromise) {
-                return this.pyodideLoadingPromise;
-            }
-
-            var self = this;
-            this.pyodideLoadingPromise = (async function() {
-                var lastError = null;
-
-                for (var i = 0; i < PYODIDE_CDN_BASES.length; i++) {
-                    var baseUrl = PYODIDE_CDN_BASES[i];
-                    try {
-                        var moduleUrl = baseUrl + 'pyodide.mjs';
-                        var pyodideModule = await import(moduleUrl);
-                        self.pyodide = await pyodideModule.loadPyodide({
-                            indexURL: baseUrl,
-                            lockFileURL: baseUrl + 'pyodide-lock.json?version=' + Date.now(),
-                            packageCacheDir: 'pyodide-' + Date.now()
-                        });
-                        self.pyodideLoaded = true;
-                        self.pyodideCdnBase = baseUrl;
-                        
-                        // 自动加载常用第三方库
-                        try {
-                            // 确保numpy等核心库加载成功
-                            await self.pyodide.loadPackage('numpy');
-                            // 尝试加载其他可选库
-                            try {
-                                await self.pyodide.loadPackage(['pandas', 'matplotlib']);
-                                
-                                // 添加中文字体支持
-                                await self.pyodide.runPython(`
-import matplotlib
-import matplotlib.font_manager as fm
-import urllib.request
-import os
-
-# 下载中文字体
-font_url = 'https://static.yhsun.cn/cdn/pyodide/chinese.ttf'
-font_path = os.path.join(os.path.dirname(matplotlib.__file__), 'mpl-data', 'fonts', 'ttf', 'chinese.ttf')
-
-# 下载字体文件
-urllib.request.urlretrieve(font_url, font_path)
-
-# 清除字体缓存
-fm._rebuild()
-
-# 强制设置matplotlib使用中文字体
-matplotlib.rcParams['font.family'] = ['sans-serif']
-matplotlib.rcParams['font.sans-serif'] = ['chinese'] + matplotlib.rcParams['font.sans-serif']
-matplotlib.rcParams['axes.unicode_minus'] = False  # 解决负号显示问题
-
-# 重写字体获取方法，强制使用指定字体
-original_fontManager = fm.FontManager
-
-class ForcedFontManager(original_fontManager):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-    
-    def findfont(self, prop, fontext='ttf', directory=None, fallback_to_default=True, rebuild_if_missing=True):
-        # 无论请求什么字体，都返回我们的中文字体
-        return font_path
-
-fm.FontManager = ForcedFontManager
-# 重新创建字体管理器实例
-fm.fontManager = ForcedFontManager()
-                                `);
-                            } catch (e) {
-                                console.warn('Failed to load optional packages (pandas, matplotlib) or set up Chinese font:', e);
-                            }
-                        } catch (e) {
-                            console.error('Failed to load essential packages (numpy):', e);
-                            throw e; // 核心库加载失败，抛出错误
-                        }
-                        
-                        return self.pyodide;
-                    } catch (error) {
-                        lastError = error;
-                    }
-                }
-
-                self.pyodideLoadingPromise = null;
-                throw lastError || new Error('Failed to load Pyodide from CDN');
-            })();
-
-            try {
-                return await this.pyodideLoadingPromise;
-            } catch (error) {
-                this.pyodideLoadingPromise = null;
-                throw error;
-            }
-        }
-
+        constructor() { this.cCompilerEndpoint = '/api/code-runner/run'; }
         async runPython(code) {
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 30000);
             try {
-                var pyodide = await this.initPyodide();
-                var stdoutChunks = [];
-                var stderrChunks = [];
-
-                if (pyodide.setStdout) {
-                    pyodide.setStdout({
-                        batched: function(message) {
-                            stdoutChunks.push(String(message));
-                        }
-                    });
-                }
-
-                if (pyodide.setStderr) {
-                    pyodide.setStderr({
-                        batched: function(message) {
-                            stderrChunks.push(String(message));
-                        }
-                    });
-                }
-
-                // 尝试运行代码，如果模块未找到则动态加载
-                try {
-                    var result = pyodide.runPython(code);
-                } catch (error) {
-                    var errorStr = String(error);
-                    if (errorStr.includes('ModuleNotFoundError')) {
-                        // 尝试解析错误信息中的模块名
-                        var moduleMatch = errorStr.match(/No module named ['"](\w+)['"]/);
-                        if (moduleMatch) {
-                            var moduleName = moduleMatch[1];
-                            try {
-                                await pyodide.loadPackage(moduleName);
-                                result = pyodide.runPython(code);
-                            } catch (loadError) {
-                                throw error; // 如果加载失败，返回原始错误
-                            }
-                        } else {
-                            throw error;
-                        }
-                    } else {
-                        throw error;
-                    }
-                }
-
-                var outputParts = [];
-                if (stdoutChunks.length) outputParts.push(stdoutChunks.join(''));
-                if (stderrChunks.length) outputParts.push(stderrChunks.join(''));
-                if (result !== undefined && result !== null && String(result).length > 0) {
-                    outputParts.push(String(result));
-                }
-
-                return { success: true, output: outputParts.join('') || 'Execution completed successfully' };
+                const base = global.getApiBaseUrl ? global.getApiBaseUrl() : '/api';
+                const response = await fetch(base.replace(/\/$/, '') + '/code-runner/run', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ language: 'python', code }), signal: controller.signal
+                });
+                const result = await response.json();
+                if (!response.ok && !result.error) result.error = 'Python execution failed';
+                return result;
             } catch (error) {
-                return { success: false, error: error && error.stack ? error.stack : (error && error.message ? error.message : String(error)) };
-            }
+                return { success: false, error: error.name === 'AbortError' ? t('codeRunTimeout', '代码运行超时', 'Execution timed out') : String(error.message || error) };
+            } finally { clearTimeout(timeout); }
         }
 
         async runHtml(code) {
@@ -358,6 +207,18 @@ fm.fontManager = ForcedFontManager()
         });
     }
 
+    function appendImages(images) {
+        if (!Array.isArray(images)) return;
+        images.slice(0, 8).forEach((image, index) => {
+            if (image.mime !== 'image/png' || typeof image.data !== 'string' || image.data.length > 2800000 || !/^[A-Za-z0-9+/=]+$/.test(image.data)) return;
+            const img = document.createElement('img');
+            img.src = 'data:image/png;base64,' + image.data;
+            img.alt = 'Python figure ' + (index + 1);
+            img.style.cssText = 'display:block;max-width:100%;height:auto;margin:12px auto;background:#fff;';
+            runnerUiState.outputBody.appendChild(img);
+        });
+    }
+
     function renderOutput(result) {
         if (!runnerUiState.outputPanel || !runnerUiState.outputBody) return;
 
@@ -389,6 +250,7 @@ fm.fontManager = ForcedFontManager()
             pre.style.cssText = 'margin:0;white-space:pre-wrap;word-break:break-word;';
             pre.textContent = result.output !== undefined ? String(result.output) : 'Execution completed successfully';
             runnerUiState.outputBody.appendChild(pre);
+            appendImages(result.images);
             return;
         }
 
@@ -398,6 +260,8 @@ fm.fontManager = ForcedFontManager()
         err.style.cssText = 'margin:0;white-space:pre-wrap;word-break:break-word;color:#a93131;';
         err.textContent = 'Error: ' + (result.error || 'Unknown error');
         runnerUiState.outputBody.appendChild(err);
+        if (result.output) { const output = document.createElement('pre'); output.textContent = result.output; runnerUiState.outputBody.appendChild(output); }
+        appendImages(result.images);
     }
 
     function ensureRunnerUi() {
@@ -479,11 +343,15 @@ fm.fontManager = ForcedFontManager()
 
         button.addEventListener('click', async function() {
             if (!runnerUiState.activeCodeBlock) return;
-            var language = getLanguageFromCodeBlock(runnerUiState.activeCodeBlock);
-            var code = runnerUiState.activeCodeBlock.textContent || '';
-            renderOutput({ success: true, output: t('codeRunning', '运行中...', 'Running...') });
-            var result = await codeRunner.runCode(language, code);
-            renderOutput(result);
+            if (button.disabled) return;
+            button.disabled = true;
+            try {
+                var language = getLanguageFromCodeBlock(runnerUiState.activeCodeBlock);
+                var code = runnerUiState.activeCodeBlock.textContent || '';
+                renderOutput({ success: true, output: t('codeRunning', '运行中...', 'Running...') });
+                var result = await codeRunner.runCode(language, code);
+                renderOutput(result);
+            } finally { button.disabled = false; }
             scheduleButtonRefresh();
         });
 

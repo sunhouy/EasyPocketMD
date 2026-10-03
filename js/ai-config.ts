@@ -4,7 +4,7 @@
  * - 用户需自行填写 apiKey / baseUrl / model，配置保存在本地(localStorage)。
  * - AI 调用由前端直接请求用户配置的 OpenAI 兼容接口，密钥与模型完全由用户自己掌握，
  *   云端既不保存密钥、也不提供模型，仅可能存放一份端到端加密的隐藏配置文件。
- * - 可选项：端到端加密同步到云端（作为隐藏文件存储，只有拥有账号密码的用户可解密）。
+ * - 可选项：端到端加密同步到云端（作为隐藏文件存储，通过用户选择的加密解锁方式解密）。
  */
 
 export interface AIConfig {
@@ -146,9 +146,11 @@ const HIDDEN_FILE_KEY = 'ai_config_cloud_uploaded';
 /** 将配置端到端加密后保存到云端隐藏文件。仅当前端保存本地会保存时调用。 */
 export async function syncAIConfigToCloud(config: AIConfig): Promise<void> {
   const user = (window as any).currentUser;
-  if (!user || !user.username) throw new Error('请先登录后再同步 AI 配置');
+  if (!user?.username || !user.token) throw new Error('请先登录后再同步 AI 配置');
+  // Encryption unlock is independent from ordinary account authentication.
+  if (window.E2EVault) await window.E2EVault.ensureUnlocked();
   const password = user.password;
-  if (!password) throw new Error('缺少账号密码，无法端到端加密');
+  if (!window.E2EVault?.state().config && !password) throw new Error('请先在管理加密解锁方式中设置账号密码、专用密码或通行密钥');
 
   const json = JSON.stringify({
     apiKey: config.apiKey,
@@ -159,10 +161,11 @@ export async function syncAIConfigToCloud(config: AIConfig): Promise<void> {
   // 端到端加密
   const e2e = await import('./e2e');
   const encrypted = await e2e.encrypt(json, password);
+  if ((window as any).currentUser?.username !== user.username) throw new Error('账号已切换，请重试');
 
   const payload: any = {
     username: user.username,
-    token: user.token || user.username,
+    token: user.token,
     filename: HIDDEN_FILE_NAME,
     content: encrypted,
     e2e_enabled: 1
@@ -193,7 +196,7 @@ export async function deleteAIConfigFromCloud(): Promise<void> {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         username: user.username,
-        token: user.token || user.username,
+        token: user.token,
         filename: HIDDEN_FILE_NAME
       })
     });
@@ -205,13 +208,12 @@ export async function deleteAIConfigFromCloud(): Promise<void> {
 /** 从云端隐藏文件拉取并解密配置（合并到本地配置）。 */
 export async function loadAIConfigFromCloud(): Promise<AIConfig | null> {
   const user = (window as any).currentUser;
-  if (!user || !user.username) return null;
+  if (!user?.username || !user.token) return null;
   const password = user.password;
-  if (!password) return null;
 
   const api = (window as any).getApiBaseUrl ? (window as any).getApiBaseUrl() : 'api';
   const resp = await fetch(api + '/files/content?username=' + encodeURIComponent(user.username) +
-    '&filename=' + encodeURIComponent(HIDDEN_FILE_NAME) + '&token=' + encodeURIComponent(user.token || user.username));
+    '&filename=' + encodeURIComponent(HIDDEN_FILE_NAME) + '&token=' + encodeURIComponent(user.token));
   const r = (window as any).parseJsonResponse ? await (window as any).parseJsonResponse(resp) : await resp.json();
   if (!r || r.code !== 200 || !r.data) return null;
 
@@ -220,6 +222,7 @@ export async function loadAIConfigFromCloud(): Promise<AIConfig | null> {
 
   const e2e = await import('./e2e');
   const plain = await e2e.decrypt(String(encrypted), password);
+  if ((window as any).currentUser?.username !== user.username) return null;
   if (!plain) return null;
 
   try {

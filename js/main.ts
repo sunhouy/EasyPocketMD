@@ -1,6 +1,7 @@
 /**
  * Vditor 初始化、界面与功能绑定
  */
+import { applyNativeModalLayout } from './main/modal-layout';
 import { observeNoticeHeight } from './main/notice-layout';
 import { initSlashCommandRuntime } from './ui/slash-command';
 import { getCurrentEngine, createEditor } from './editor-engine';
@@ -159,27 +160,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function applySafeAreaToOverlay(overlay) {
-        if (!overlay) return;
-        if (!window.isTauriMobileEnvironment) return;
-        if (!overlay.classList.contains('modal-overlay') && !overlay.classList.contains('mobile-action-sheet-overlay')) return;
-
-        overlay.style.setProperty('padding-top', 'calc(var(--safe-area-top, 0px) + 10px)', 'important');
-        overlay.style.setProperty('padding-bottom', '10px', 'important');
-
-        if (!overlay.classList.contains('mobile-action-sheet-overlay')) {
-            overlay.style.setProperty('padding-left', '10px', 'important');
-            overlay.style.setProperty('padding-right', '10px', 'important');
-        }
-
-        var modal = overlay.querySelector('.modal');
-        if (!modal) return;
-
-        var fullHeight = 'calc(100vh - var(--safe-area-top, 0px) - 20px)';
-        modal.style.setProperty('max-height', fullHeight, 'important');
-
-        if (modal.classList.contains('diff-modal') || modal.classList.contains('history-modal')) {
-            modal.style.setProperty('height', 'calc(100vh - var(--safe-area-top, 0px))', 'important');
-        }
+        if (window.isTauriMobileEnvironment) applyNativeModalLayout(overlay);
     }
 
     function initModalSafeAreaObserver() {
@@ -216,6 +197,8 @@ document.addEventListener('DOMContentLoaded', function() {
             attributeFilter: ['class', 'style']
         });
     }
+
+    if (window.isTauriMobileEnvironment) initModalSafeAreaObserver();
 
     function closeOverlayByBackPress(overlay) {
         if (!overlay) return false;
