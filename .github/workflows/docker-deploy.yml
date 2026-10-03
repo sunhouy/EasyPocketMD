@@ -1,0 +1,133 @@
+name: Docker deployment (offline incremental images)
+on:
+  workflow_call:
+    inputs:
+      channel:
+        required: true
+        type: string
+      action:
+        default: deploy
+        type: string
+permissions:
+  contents: read
+  actions: read
+jobs:
+  deploy:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+    concurrency:
+      group: easypocketmd-server-deployment
+      cancel-in-progress: false
+    steps:
+    - uses: actions/checkout@v6
+    - name: Install SSH transfer tools on CI
+      run: sudo apt-get update && sudo apt-get install -y sshpass rsync
+    - uses: actions/setup-node@v6
+      if: inputs.action == 'deploy'
+      with:
+        node-version: '24'
+        cache: npm
+    - name: Setup Emscripten
+      if: inputs.action == 'deploy'
+      run: |
+        git clone --depth 1 https://github.com/emscripten-core/emsdk.git "$RUNNER_TEMP/emsdk"
+        cd "$RUNNER_TEMP/emsdk"
+        ./emsdk install 3.1.57
+        ./emsdk activate 3.1.57
+        echo "$RUNNER_TEMP/emsdk" >> "$GITHUB_PATH"
+        echo "$RUNNER_TEMP/emsdk/upstream/emscripten" >> "$GITHUB_PATH"
+    - name: Build frontend in CI
+      if: inputs.action == 'deploy'
+      run: npm ci --prefer-offline --no-audit --no-fund && npm run build
+    - name: Download verified Python sandbox image
+      if: inputs.action == 'deploy'
+      uses: actions/download-artifact@v4
+      with:
+        name: python-sandbox-image
+        path: python-sandbox-image
+    - name: Load verified sandbox on CI
+      if: inputs.action == 'deploy'
+      run: |
+        bash scripts/setup-python-sandbox.sh --load python-sandbox-image/python-sandbox.tar.gz
+        docker tag easypocketmd-python:1 easypocketmd-python:${{ github.sha }}
+    - uses: docker/setup-buildx-action@v3
+      if: inputs.action == 'deploy'
+    - name: Build application image
+      if: inputs.action == 'deploy'
+      uses: docker/build-push-action@v7
+      with:
+        context: .
+        file: deploy/Dockerfile
+        target: app
+        platforms: linux/amd64
+        load: true
+        tags: easypocketmd-app:${{ github.sha }}
+        cache-from: type=gha,scope=epmd-app
+        cache-to: type=gha,scope=epmd-app,mode=max,ignore-error=true
+    - name: Build print service image
+      if: inputs.action == 'deploy'
+      uses: docker/build-push-action@v7
+      with:
+        context: .
+        file: deploy/Dockerfile
+        target: print
+        platforms: linux/amd64
+        load: true
+        tags: easypocketmd-print:${{ github.sha }}
+        cache-from: type=gha,scope=epmd-print
+        cache-to: type=gha,scope=epmd-print,mode=max,ignore-error=true
+    - name: Build application gateway image
+      if: inputs.action == 'deploy'
+      uses: docker/build-push-action@v7
+      with:
+        context: .
+        file: deploy/Dockerfile
+        target: gateway
+        platforms: linux/amd64
+        load: true
+        tags: easypocketmd-gateway:${{ github.sha }}
+        cache-from: type=gha,scope=epmd-gateway
+        cache-to: type=gha,scope=epmd-gateway,mode=max,ignore-error=true
+    - name: Export content-addressed images
+      if: inputs.action == 'deploy'
+      run: |
+        python3 scripts/image-cas.py export image-cas \
+          app=easypocketmd-app:${{ github.sha }} \
+          print=easypocketmd-print:${{ github.sha }} \
+          gateway=easypocketmd-gateway:${{ github.sha }} \
+          python=easypocketmd-python:${{ github.sha }}
+    - name: Prepare private runtime configuration
+      if: inputs.action == 'deploy'
+      env:
+        DB_HOST: ${{ secrets.DB_HOST }}
+        DB_PORT: ${{ secrets.DB_PORT }}
+        DB_USER: ${{ secrets.DB_USER }}
+        DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+        DB_NAME: ${{ secrets.DB_NAME }}
+        REDIS_HOST: ${{ secrets.REDIS_HOST }}
+        REDIS_PORT: ${{ secrets.REDIS_PORT }}
+        REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
+        REDIS_DB: ${{ secrets.REDIS_DB }}
+        JWT_SECRET: ${{ secrets.JWT_SECRET }}
+        JWT_EXPIRES_IN: ${{ secrets.JWT_EXPIRES_IN }}
+        ADMIN_USER: ${{ secrets.ADMIN_USER }}
+        ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+        DASHSCOPE_API_KEY: ${{ secrets.DASHSCOPE_API_KEY }}
+        BASE_URL: ${{ inputs.channel == 'dev' && (secrets.DEV_BASE_URL || 'https://dev.yhsun.cn') || (secrets.BASE_URL || 'https://md.yhsun.cn') }}
+        TLS_KEY: ${{ inputs.channel == 'main' && secrets.KEY || '' }}
+        TLS_PEM: ${{ inputs.channel == 'main' && secrets.PEM || '' }}
+      run: |
+        python3 scripts/prepare-docker-release.py
+        if [ '${{ inputs.channel }}' = dev ]; then
+          openssl req -x509 -newkey rsa:4096 -keyout docker-control/tls.key -out docker-control/tls.pem -days 365 -nodes -subj '/CN=dev.yhsun.cn'
+        fi
+    - name: Transfer missing image objects and activate Docker release
+      env:
+        SERVER_HOST: ${{ secrets.SERVER_HOST }}
+        SERVER_USER: ${{ secrets.SERVER_USER }}
+        SSHPASS: ${{ secrets.SERVER_PASSWORD }}
+        SERVER_SSH_HOST_KEY: ${{ secrets.SERVER_SSH_HOST_KEY }}
+      run: bash scripts/transfer-docker-release.sh '${{ inputs.channel }}' '${{ inputs.action }}'
+    - name: Remove private CI configuration
+      if: always()
+      run: rm -rf docker-control

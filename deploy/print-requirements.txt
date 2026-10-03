@@ -1,0 +1,2 @@
+# Server only; do not include the desktop GUI/client dependencies.
+websockets>=12,<14

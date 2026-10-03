@@ -110,7 +110,11 @@ def main():
                 capture()
                 plt.close('all')
         except BaseException:
-            result = {"success": False, "phase": "runtime", "error": traceback.format_exc(limit=12)[-MAX_TEXT:]}
+            error = sys.exc_info()[1]
+            frames = traceback.extract_tb(error.__traceback__)
+            user_lines = [frame.lineno for frame in frames if frame.filename == '/tmp/main.py']
+            line = error.lineno if isinstance(error, SyntaxError) and error.filename == '/tmp/main.py' else (user_lines[-1] if user_lines else None)
+            result = {"success": False, "phase": "runtime", "error": traceback.format_exc(limit=12)[-MAX_TEXT:], "errorLine": line}
     result.update(output=output.getvalue(), images=images)
     sys.stdout.write(json.dumps(result))
 
