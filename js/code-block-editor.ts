@@ -20,7 +20,7 @@ const errorMarks = StateField.define<DecorationSet>({
     },
     provide: field => EditorView.decorations.from(field),
 });
-const entries = new Map<HTMLElement, {view: EditorView; source: HTMLElement; host: HTMLElement; readonly: Compartment; theme: Compartment; language: string; syncing: boolean; instance: any; readonlyValue: boolean; darkValue: boolean}>();
+const entries = new Map<HTMLElement, {view: EditorView; source: HTMLElement; host: HTMLElement; readonly: Compartment; theme: Compartment; language: string; syncing: boolean; instance: any; readonlyValue: boolean; darkValue: boolean; editControls: HTMLButtonElement[]}>();
 const roots = new Map<HTMLElement, any>();
 const diagramLanguages = new Set(['mermaid', 'echarts', 'math', 'abc', 'graphviz', 'flowchart', 'mindmap', 'markmap', 'plantuml', 'wavedrom', 'smiles']);
 let queued = false;
@@ -53,7 +53,53 @@ function createEditor(block: HTMLElement, source: HTMLElement, preview: HTMLElem
     const host = document.createElement('div');
     host.className = 'epmd-code-editor'; host.contentEditable = 'false';
     const header = document.createElement('div'); header.className = 'epmd-code-header';
-    const label = document.createElement('span'); label.textContent = language || '纯文本'; header.appendChild(label);
+    const label = document.createElement('button');
+    label.type = 'button'; label.className = 'epmd-code-language';
+    label.textContent = language || '纯文本'; label.title = '修改代码语言';
+    label.setAttribute('aria-label', '修改代码语言'); header.appendChild(label);
+    const editControls: HTMLButtonElement[] = [label];
+    const snapshot = () => instance?.vditor?.undo?.addToUndoStack(instance.vditor);
+    label.addEventListener('click', () => {
+        if (readonlyBlock(block) || header.querySelector('input')) return;
+        const input = document.createElement('input');
+        input.className = 'epmd-code-language-input'; input.value = language;
+        input.placeholder = '语言名称（留空为纯文本）'; input.setAttribute('aria-label', '代码语言');
+        label.hidden = true; label.after(input); input.focus(); input.select();
+        let finished = false;
+        const finish = (commit: boolean) => {
+            if (finished) return;
+            const next = input.value.trim().toLowerCase();
+            if (commit && !/^[a-z0-9_+#.-]*$/.test(next)) {
+                (window as any).showToast?.('语言名称只能包含字母、数字及 _ + # . -', 'error');
+                input.focus(); return;
+            }
+            finished = true; input.remove(); label.hidden = false;
+            if (!commit || next === language || readonlyBlock(block)) { label.focus(); return; }
+            snapshot();
+            const selection = view.state.selection;
+            for (const name of [...source.classList]) if (name.startsWith('language-')) source.classList.remove(name);
+            if (next) source.classList.add('language-' + next);
+            const info = block.querySelector('[data-type="code-block-info"]');
+            if (info) info.textContent = '\u200b' + next;
+            // Rebuild only this view; canonical code and enclosing document stay in place.
+            view.destroy(); entries.delete(block); host.remove();
+            preview.replaceChildren(source.cloneNode(true)); preview.hidden = false;
+            preview.dataset.render = '2';
+            createEditor(block, source, preview, instance);
+            const replacement = entries.get(block);
+            if (replacement && !diagramLanguages.has(next)) {
+                replacement.view.dispatch({selection}); replacement.view.focus();
+            }
+            notifyChanged(block, instance); snapshot();
+        };
+        input.addEventListener('keydown', event => {
+            if (event.isComposing) return;
+            if (event.key === 'Enter' || event.key === 'Escape') {
+                event.preventDefault(); finish(event.key === 'Enter');
+            }
+        });
+        input.addEventListener('blur', () => finish(true));
+    });
     const actions = document.createElement('div'); header.appendChild(actions);
     function button(text: string, callback: () => void) {
         const element = document.createElement('button'); element.type = 'button'; element.textContent = text;
@@ -68,6 +114,17 @@ function createEditor(block: HTMLElement, source: HTMLElement, preview: HTMLElem
     }
     button('复制', () => navigator.clipboard?.writeText(view.state.doc.toString()).catch(() => (window as any).showToast?.('复制失败，请手动选择代码复制', 'error')));
     const editorParent = document.createElement('div'); host.append(header, editorParent);
+    const renderDiagram = () => {
+        const global = window as any;
+        preview.replaceChildren(source.cloneNode(true)); preview.dataset.render = '2';
+        const internal = instance?.vditor;
+        const renderer = global.Vditor;
+        const methods: Record<string, string> = {echarts:'chartRender', mermaid:'mermaidRender', abc:'abcRender', smiles:'SMILESRender', markmap:'markmapRender', flowchart:'flowchartRender', graphviz:'graphvizRender', wavedrom:'wavedromRender', mindmap:'mindmapRender', plantuml:'plantumlRender'};
+        if (language === 'math') renderer?.mathRender?.(preview, {cdn:internal?.options.cdn, math:internal?.options.preview.math});
+        else renderer?.[methods[language]]?.(preview, internal?.options.cdn, internal?.options.theme);
+        preview.dataset.render = '1';
+    };
+    let diagramToggle: HTMLButtonElement | undefined;
     if (diagram) {
         const toggle = button('编辑代码', () => {
             const editing = editorParent.hidden;
@@ -75,19 +132,9 @@ function createEditor(block: HTMLElement, source: HTMLElement, preview: HTMLElem
             preview.hidden = editing;
             toggle.textContent = editing ? '查看图表' : '编辑代码';
             if (editing) { view.requestMeasure(); view.focus(); }
-            else {
-                const global = window as any;
-                // Re-render diagram from the canonical source, retaining vector renderers.
-                preview.replaceChildren(source.cloneNode(true));
-                preview.dataset.render = '2';
-                const internal = instance?.vditor;
-                const renderer = global.Vditor;
-                const methods = {echarts:'chartRender', mermaid:'mermaidRender', abc:'abcRender', smiles:'SMILESRender', markmap:'markmapRender', flowchart:'flowchartRender', graphviz:'graphvizRender', wavedrom:'wavedromRender', mindmap:'mindmapRender', plantuml:'plantumlRender'};
-                if (language === 'math') renderer?.mathRender?.(preview, {cdn:internal?.options.cdn, math:internal?.options.preview.math});
-                else renderer?.[methods[language]]?.(preview, internal?.options.cdn, internal?.options.theme);
-                preview.dataset.render = '1';
-            }
+            else renderDiagram();
         });
+        diagramToggle = toggle;
         editorParent.hidden = true;
         preview.before(host);
         // data-render containers are ignored by Lute's Markdown serializer.
@@ -95,9 +142,51 @@ function createEditor(block: HTMLElement, source: HTMLElement, preview: HTMLElem
     } else {
         preview.replaceChildren(host); preview.hidden = false; preview.dataset.render = '1';
     }
+    let collapsed = false, editorWasHidden = editorParent.hidden, previewWasHidden = preview.hidden;
+    const fold = button('折叠', () => {
+        collapsed = !collapsed;
+        if (collapsed) {
+            editorWasHidden = editorParent.hidden; previewWasHidden = preview.hidden;
+            editorParent.hidden = true;
+            if (diagram) preview.hidden = true;
+        } else {
+            editorParent.hidden = editorWasHidden;
+            if (diagram) preview.hidden = previewWasHidden;
+            view.requestMeasure();
+        }
+        if (diagramToggle) diagramToggle.hidden = collapsed;
+        fold.textContent = collapsed ? '展开' : '折叠';
+        fold.setAttribute('aria-expanded', String(!collapsed));
+    });
+    fold.setAttribute('aria-expanded', 'true'); fold.title = '折叠或展开代码';
+    const remove = button('删除', () => {
+        if (readonlyBlock(block)) return;
+        snapshot();
+        const parent = block.parentElement;
+        if (!parent) return;
+        const next = block.nextElementSibling || block.previousElementSibling;
+        // The attached parent identifies the document after removing the block.
+        view.destroy(); entries.delete(block);
+        block.remove();
+        if (!parent.firstChild) {
+            const paragraph = document.createElement('p');
+            paragraph.setAttribute('data-block', '0'); paragraph.appendChild(document.createElement('br'));
+            parent.appendChild(paragraph);
+        }
+        const target = (next?.isConnected ? next : parent.firstElementChild) as HTMLElement;
+        if (target) {
+            const range = document.createRange(); range.selectNodeContents(target); range.collapse(true);
+            const selection = window.getSelection(); selection?.removeAllRanges(); selection?.addRange(range);
+            parent.closest<HTMLElement>('[contenteditable="true"]')?.focus();
+        }
+        notifyChanged(parent, instance); snapshot();
+    });
+    remove.title = '删除整个代码块（可撤销）'; remove.className = 'epmd-code-delete';
+    editControls.push(remove);
+    editControls.forEach(control => { control.disabled = readonlyBlock(block); });
     block.classList.add('epmd-custom-code-block');
     const readonly = new Compartment(), theme = new Compartment(), syntax = new Compartment();
-    const entry = {view: null as EditorView, source, host, readonly, theme, language, syncing: false, instance, readonlyValue: readonlyBlock(block), darkValue: document.body.classList.contains('dark-mode') || !!(window as any).nightMode};
+    const entry = {view: null as EditorView, source, host, readonly, theme, language, syncing: false, instance, readonlyValue: readonlyBlock(block), editControls, darkValue: document.body.classList.contains('dark-mode') || !!(window as any).nightMode};
     const view = new EditorView({
         parent: editorParent,
         state: EditorState.create({doc: source.textContent || '', extensions: [
@@ -119,6 +208,7 @@ function createEditor(block: HTMLElement, source: HTMLElement, preview: HTMLElem
         ]}),
     });
     entry.view = view; entries.set(block, entry);
+    if (diagram && preview.firstElementChild?.tagName === 'CODE') renderDiagram();
     // CodeMirror maintains local undo while typing; snapshot the document on exit,
     // avoiding Vditor's full-DOM diff on every short pause in code input.
     host.addEventListener('focusout', event => {
@@ -151,6 +241,7 @@ function scan() {
         const effects = [];
         if (readonly !== entry.readonlyValue) {
             entry.readonlyValue = readonly;
+            entry.editControls.forEach(control => { control.disabled = readonly; });
             effects.push(entry.readonly.reconfigure([EditorState.readOnly.of(readonly), EditorView.editable.of(!readonly)]));
         }
         if (dark !== entry.darkValue) { entry.darkValue = dark; effects.push(entry.theme.reconfigure(dark ? oneDark : [])); }
@@ -166,7 +257,10 @@ function scan() {
         if (!surface) continue;
         surface.querySelectorAll('[data-type="code-block"]').forEach((block: HTMLElement) => {
             if (entries.has(block)) return;
-            const preview = block.querySelector('.vditor-wysiwyg__preview, .vditor-ir__preview') as HTMLElement;
+            // Undo restores serialized DOM, including stale custom headers. Recreate views
+            // from canonical source, never mistake a diagram header for its preview.
+            block.querySelectorAll<HTMLElement>('.epmd-code-editor').forEach(host => host.remove());
+            const preview = block.querySelector('.vditor-wysiwyg__preview:not(.epmd-code-editor), .vditor-ir__preview:not(.epmd-code-editor)') as HTMLElement;
             const source = [...block.querySelectorAll('pre > code')].find(code => !code.closest('.vditor-wysiwyg__preview, .vditor-ir__preview')) as HTMLElement;
             if (source && preview) createEditor(block, source, preview, instance);
         });
