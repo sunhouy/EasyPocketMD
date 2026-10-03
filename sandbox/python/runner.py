@@ -20,6 +20,52 @@ class Output(io.StringIO):
         return len(value)
 
 
+def install_chinese_font_fallback(matplotlib):
+    """Resolve unavailable font names and add CJK glyph fallback at render time.
+
+    User rcParams, styles and per-text font properties can override startup
+    defaults. Resolve their families lazily so those overrides remain supported.
+    This affects only this disposable Python process, never the document source.
+    """
+    from matplotlib import font_manager
+
+    manager = font_manager.fontManager
+    available = {entry.name.casefold(): entry.name for entry in manager.ttflist}
+    preferred = ('Noto Sans CJK SC', 'Noto Sans CJK JP', 'Noto Sans CJK TC')
+    fallback = next((available[name.casefold()] for name in preferred
+                     if name.casefold() in available), None)
+    if fallback is None:
+        raise RuntimeError('Chinese fonts missing from sandbox; rebuild with fonts-noto-cjk')
+    original_get_family = font_manager.FontProperties.get_family
+    generic = {'sans': 'sans-serif', 'sans serif': 'sans-serif',
+               'sans-serif': 'sans-serif', 'serif': 'serif',
+               'monospace': 'monospace', 'cursive': 'cursive', 'fantasy': 'fantasy'}
+    font_count = len(manager.ttflist)
+
+    def get_family(properties):
+        nonlocal available, font_count
+        # Respect fonts users register explicitly with font_manager.addfont().
+        if len(manager.ttflist) != font_count:
+            available = {entry.name.casefold(): entry.name for entry in manager.ttflist}
+            font_count = len(manager.ttflist)
+        resolved = []
+        for name in original_get_family(properties):
+            key = name.casefold()
+            candidates = matplotlib.rcParams['font.' + generic[key]] if key in generic else [name]
+            for candidate in candidates:
+                family = available.get(candidate.casefold(), fallback)
+                if family not in resolved:
+                    resolved.append(family)
+        # Keep available Latin fonts, and supply Chinese glyphs from Noto CJK.
+        if fallback not in resolved:
+            resolved.append(fallback)
+        return resolved
+
+    font_manager.FontProperties.get_family = get_family
+    matplotlib.rcParams['font.sans-serif'] = [fallback, 'DejaVu Sans']
+    matplotlib.rcParams['axes.unicode_minus'] = False
+
+
 def main():
     request = json.loads(sys.stdin.read(128 * 1024))
     output = Output()
@@ -30,8 +76,7 @@ def main():
             import matplotlib
             matplotlib.use('Agg', force=True)
             import matplotlib.pyplot as plt
-            plt.rcParams['font.sans-serif'] = ['Noto Sans CJK JP', 'DejaVu Sans']
-            plt.rcParams['axes.unicode_minus'] = False
+            install_chinese_font_fallback(matplotlib)
             plt.rcParams['figure.max_open_warning'] = MAX_IMAGES
             total = 0
             captured = set()
