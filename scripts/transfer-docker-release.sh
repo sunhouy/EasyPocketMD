@@ -14,8 +14,13 @@ if [ -n "${SERVER_SSH_HOST_KEY:-}" ]; then
 fi
 remote="${SERVER_USER:?}@${SERVER_HOST:?}"
 # sshpass reads SSHPASS from the process environment, not command-line arguments.
-if [ "$action" = rollback ]; then
-  sshpass -e ssh "${ssh_options[@]}" "$remote" "test -f '$remote_root/state-$channel.json' && current=\$(python3 -c 'import json;print(json.load(open(\"$remote_root/state-$channel.json\"))[\"current\"][\"release\"])') && python3 \"\$current/deploy-docker.py\" rollback '$channel'"
+if [ "$action" = resolve-rollback ]; then
+  run_id=$(sshpass -e ssh "${ssh_options[@]}" "$remote" "python3 -c 'import json; s=json.load(open(\"$remote_root/state-$channel.json\")); print((s.get(\"previous\") or {}).get(\"github_run_id\") or \"\")'")
+  if [[ ! "$run_id" =~ ^[0-9]+$ ]]; then
+    echo "Previous release has no GitHub artifact reference; redeploy the desired Git commit instead." >&2
+    exit 1
+  fi
+  printf 'run_id=%s\n' "$run_id" >> "${GITHUB_OUTPUT:?}"
   exit
 fi
 sshpass -e ssh "${ssh_options[@]}" "$remote" \
@@ -25,7 +30,7 @@ export RSYNC_RSH="sshpass -e ssh ${ssh_options[*]}"
 rsync -r --chmod=F600,D700 docker-control/ "$remote:$release/"
 # Fail before uploading large layers if transfer/import would fill the disk.
 sshpass -e ssh "${ssh_options[@]}" "$remote" \
-  "python3 '$release/deploy-resources.py' transfer '$remote_root/cache' '$release'"
+  "python3 '$release/deploy-resources.py' transfer '$remote_root/cache' '$release' '$channel'"
 rsync -r --ignore-existing --partial-dir=.rsync-partial --delay-updates --stats --bwlimit=8192 image-cas/objects/ "$remote:$remote_root/cache/objects/"
 sshpass -e ssh "${ssh_options[@]}" "$remote" \
   "python3 '$release/deploy-resources.py' deploy '$remote_root/cache' '$release' '$channel'"

@@ -199,7 +199,12 @@ declare global { interface Window { sharedDocState: SharedDocumentState | null; 
     }
     function renderRemoteCursors() { sharedCursorController?.rerender(); }
 
+    function isSharedDocumentOwner() {
+        return !!(window.sharedDocState?.ownerUsername && window.currentUser?.username === window.sharedDocState.ownerUsername);
+    }
+
     async function showHistoryModal() {
+        if (!isSharedDocumentOwner()) return;
         await showSharedEditHistory(() => window.sharedDocState, data => {
             if (typeof data?.content === 'string' && window.sharedDocState) {
                 setSharedEditorValue(data.content, true);
@@ -1006,7 +1011,7 @@ declare global { interface Window { sharedDocState: SharedDocumentState | null; 
         var targetShareId = options.shareId || shareData.share_id;
         var targetOwnerFileId = options.ownerFileId || null;
         const collabButton = (document.getElementById('historyCollabBtn') as HTMLButtonElement);
-        if (collabButton) { collabButton.hidden = false; collabButton.onclick = showHistoryModal; }
+        if (collabButton) collabButton.onclick = showHistoryModal;
         var sameSession =
             window.sharedDocState &&
             window.sharedDocState.shareId === targetShareId &&
@@ -1030,13 +1035,13 @@ declare global { interface Window { sharedDocState: SharedDocumentState | null; 
             if (!window.sharedDocState.wsConnected) {
                 connectShareWebSocket();
             }
+            renderSharePresence(window.sharedDocState.onlineUsers || []);
             // 初始化光标跟踪
             initCursorTracking();
             return;
         }
 
         deactivateSharedDocumentSession();
-        if (collabButton) collabButton.hidden = false;
         window.sharedDocState = {
             shareId: targetShareId,
             sharePassword: options.sharePassword || '',
@@ -1541,7 +1546,13 @@ declare global { interface Window { sharedDocState: SharedDocumentState | null; 
     }
 
     function renderSharePresence(onlineUsers) {
-        // 所有用户都显示在线状态栏（包括查看者）
+        const collabButton = document.getElementById('historyCollabBtn') as HTMLButtonElement;
+        if (collabButton) collabButton.hidden = !isSharedDocumentOwner();
+        if (!window.sharedDocState?.canEdit) {
+            document.getElementById('sharePresenceBar')?.remove();
+            document.getElementById('shareVideoUserPanel')?.remove();
+            return;
+        }
 
         var bar = document.getElementById('sharePresenceBar');
         if (!bar) {
@@ -1560,7 +1571,7 @@ declare global { interface Window { sharedDocState: SharedDocumentState | null; 
 
         if (isMinimized) {
             bar.innerHTML =
-                '<button id="restoreSharePresenceBtn" title="恢复连接状态" style="width:16px;height:16px;padding:0;border:none;border-radius:50%;background:#2da44e;cursor:pointer;box-shadow:0 4px 10px rgba(0,0,0,0.22);"></button>';
+                '<button id="restoreSharePresenceBtn" title="恢复连接状态" style="padding:4px 8px;border:none;border-radius:999px;background:#2da44e;color:#fff;cursor:pointer;box-shadow:0 4px 10px rgba(0,0,0,0.22);">恢复</button>';
 
             var restoreBtn = (document.getElementById('restoreSharePresenceBtn') as HTMLButtonElement);
             if (restoreBtn) {
@@ -1577,7 +1588,7 @@ declare global { interface Window { sharedDocState: SharedDocumentState | null; 
         }
 
         var editableUsers = getShareEditableUsers();
-        var isOwner = window.sharedDocState && window.currentUser && window.currentUser.username === window.sharedDocState.ownerUsername;
+        var isOwner = isSharedDocumentOwner();
         var canEdit = window.sharedDocState && window.sharedDocState.canEdit;
 
         bar.innerHTML =
@@ -1588,17 +1599,17 @@ declare global { interface Window { sharedDocState: SharedDocumentState | null; 
             '</span>' +
             '<span style="opacity:0.8;">|</span>' +
             '<span title="' + names.join(', ') + '" style="display:flex;align-items:center;gap:4px;">' +
-            '<span>👥 ' + (onlineUsers.length || 0) + ' 在线</span>' +
+            '<span>' + (onlineUsers.length || 0) + ' 在线</span>' +
             (names.length > 0 ? '<span style="opacity:0.7;font-size:11px;">(' + names.slice(0, 3).join(', ') + (names.length > 3 ? '...' : '') + ')</span>' : '') +
             '</span>' +
-            (canEdit && editableUsers.length > 0 ? '<button id="toggleShareVideoUsers" style="border:none;background:#2563eb;color:#fff;padding:2px 8px;border-radius:999px;cursor:pointer;font-size:12px;">📹 通话 (' + editableUsers.length + ')</button>' : '') +
+            (canEdit && editableUsers.length > 0 ? '<button id="toggleShareVideoUsers" style="border:none;background:#2563eb;color:#fff;padding:2px 8px;border-radius:999px;cursor:pointer;font-size:12px;">通话 (' + editableUsers.length + ')</button>' : '') +
             (canEdit ? '<button id="toggleShareVideoRoom" style="border:none;background:#7c3aed;color:#fff;padding:2px 8px;border-radius:999px;cursor:pointer;font-size:12px;">' +
             (window.sharedDocState && window.sharedDocState.videoRoom && window.sharedDocState.videoRoom.joined
-                ? '🎥 多人通话中'
-                : '🎥 多人通话') +
+                ? '多人通话中'
+                : '多人通话') +
             '</button>' : '') +
-            ('<button id="showHistoryBtn" style="border:none;background:#f59e0b;color:#fff;padding:2px 8px;border-radius:999px;cursor:pointer;font-size:12px;">📜 历史</button>') +
-            '<button id="minimizeSharePresenceBtn" title="最小化" style="border:none;background:transparent;color:#fff;padding:0 4px;line-height:1;cursor:pointer;font-size:16px;opacity:0.85;">-</button>' +
+            (isOwner ? '<button id="showHistoryBtn" style="border:none;background:#f59e0b;color:#fff;padding:2px 8px;border-radius:999px;cursor:pointer;font-size:12px;">历史</button>' : '') +
+            '<button id="minimizeSharePresenceBtn" title="最小化" style="border:none;background:transparent;color:#fff;padding:0 4px;line-height:1;cursor:pointer;font-size:12px;opacity:0.85;">最小化</button>' +
             '</div>';
 
         var minimizeBtn = (document.getElementById('minimizeSharePresenceBtn') as HTMLButtonElement);

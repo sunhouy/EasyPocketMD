@@ -36,8 +36,8 @@
 
 1. 准备 Linux amd64 服务器、Docker Engine、Python、rsync，以及 MySQL、Redis 和 Nginx TLS 入口。沙箱总资源控制需要 systemd、cgroup v2 和 Docker 的 systemd cgroup 驱动。
 2. 按 [环境变量清单](.env.example) 配置数据库、Redis、JWT、站点地址和管理员账号；将 SSH 连接及 TLS 配置放入 GitHub Actions secrets。可选 `SSL_EMAIL` 用于证书续签通知。
-3. 在 Actions 中运行 **CI/CD** 工作流，选择 `deploy`；需要回退时选择 `rollback`。回滚需要已保留的上一份成功发布及其镜像。
-4. 保留当前/上一发布的持久化文件、镜像和缓存对象，定期备份数据库与用户文件。TLS 自动续签仍要求域名解析及 HTTP 验证入口可达。
+3. 在 Actions 中运行 **CI/CD** 工作流，选择 `deploy`；需要回退时选择 `rollback`。每次部署将镜像与公开校验信息保存为 GitHub Actions 的 `docker-release-main` / `docker-release-dev` artifact（保留 90 天，不含运行密钥）。回滚由 CI 下载上一份成功发布的 artifact，并使用当前 Secrets 重新生成运行配置；artifact 过期或旧发布没有 artifact 时，需要重新部署目标 Git 提交。服务器在镜像传输及导入前清理过期资源，成功切换后仅保留各频道当前版本的容器、镜像、发布文件与共享层缓存，上一版本只保留 GitHub 引用。
+4. 服务器仅保留当前发布所需资源，定期备份数据库与用户文件。TLS 自动续签仍要求域名解析及 HTTP 验证入口可达。
 
 完整服务器约定、secret 名称、增量传输、资源预算和证书说明见 [部署指南](deploy/README.md)。该流程按仓库现有服务器布局设计；首次部署到其他环境时，需要调整路径和 Nginx 入口。
 

@@ -22,6 +22,23 @@ jobs:
     - uses: actions/checkout@v6
     - name: Install SSH transfer tools on CI
       run: sudo apt-get update && sudo apt-get install -y sshpass rsync
+    - name: Resolve previous release artifact from server metadata
+      if: inputs.action == 'rollback'
+      id: rollback
+      env:
+        SERVER_HOST: ${{ secrets.SERVER_HOST }}
+        SERVER_USER: ${{ secrets.SERVER_USER }}
+        SSHPASS: ${{ secrets.SERVER_PASSWORD }}
+        SERVER_SSH_HOST_KEY: ${{ secrets.SERVER_SSH_HOST_KEY }}
+      run: bash scripts/transfer-docker-release.sh '${{ inputs.channel }}' resolve-rollback
+    - name: Download rollback images from GitHub
+      if: inputs.action == 'rollback'
+      uses: actions/download-artifact@v4
+      with:
+        name: docker-release-${{ inputs.channel }}
+        path: image-cas
+        run-id: ${{ steps.rollback.outputs.run_id }}
+        github-token: ${{ github.token }}
     - uses: actions/setup-node@v6
       if: inputs.action == 'deploy'
       with:
@@ -97,7 +114,6 @@ jobs:
           gateway=easypocketmd-gateway:${{ github.sha }} \
           python=easypocketmd-python:${{ github.sha }}
     - name: Prepare private runtime configuration
-      if: inputs.action == 'deploy'
       env:
         DB_HOST: ${{ secrets.DB_HOST }}
         DB_PORT: ${{ secrets.DB_PORT }}
@@ -122,6 +138,18 @@ jobs:
         if [ '${{ inputs.channel }}' = dev ]; then
           openssl req -x509 -newkey rsa:4096 -keyout docker-control/tls.key -out docker-control/tls.pem -days 365 -nodes -subj '/CN=dev.yhsun.cn'
         fi
+    - name: Add public rollback metadata
+      if: inputs.action == 'deploy'
+      run: cp docker-control/config.json image-cas/config.json
+    - name: Keep rollback images on GitHub
+      if: inputs.action == 'deploy'
+      uses: actions/upload-artifact@v4
+      with:
+        name: docker-release-${{ inputs.channel }}
+        path: image-cas/
+        compression-level: 0
+        retention-days: 90
+        if-no-files-found: error
     - name: Transfer missing image objects and activate Docker release
       env:
         SERVER_HOST: ${{ secrets.SERVER_HOST }}
