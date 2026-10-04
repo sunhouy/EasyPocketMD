@@ -1,6 +1,8 @@
 /**
  * Vditor 初始化、界面与功能绑定
  */
+import { applyEditorNightMode, applyEditorOutline } from './main/view-settings';
+import { uiText } from './i18n-messages';
 import { applyNativeModalLayout } from './main/modal-layout';
 import { observeNoticeHeight } from './main/notice-layout';
 import { initSlashCommandRuntime } from './ui/slash-command';
@@ -95,7 +97,6 @@ document.addEventListener('DOMContentLoaded', function() {
         '#cancelSettingsBtn',
         '#closeAIBtn',
         '#closeWordCountBtn',
-        '#closeWordCountModalBtn',
         '#loginModalCloseBtn',
         '#closeVideoCallBtn',
         '.share-close-btn',
@@ -305,10 +306,6 @@ document.addEventListener('DOMContentLoaded', function() {
     var loading = document.getElementById('loading');
     if (loading) loading.style.display = 'block';
 
-    // 国际化：增加 pressAgainToExit
-    if (window.i18n && window.i18n.translations && !window.i18n.translations['pressAgainToExit']) {
-        window.i18n.translations['pressAgainToExit'] = '再按一次返回键退出';
-    }
     // 全局状态
     window.nightMode = localStorage.getItem('vditor_night_mode') === 'true';
     window.currentUser = JSON.parse(localStorage.getItem('vditor_user') || 'null');
@@ -1400,32 +1397,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function applyTranslations() {
         if (!window.i18n) return;
 
-        // 翻译普通文本
-        var elements = document.querySelectorAll('[data-i18n]');
-        elements.forEach(function(el) {
-            var key = el.getAttribute('data-i18n');
-            if (key && window.i18n.t(key)) {
-                el.textContent = window.i18n.t(key);
-            }
-        });
-
-        // 翻译 title 属性
-        elements = document.querySelectorAll('[data-i18n-title]');
-        elements.forEach(function(el) {
-            var key = el.getAttribute('data-i18n-title');
-            if (key && window.i18n.t(key)) {
-                el.setAttribute('title', window.i18n.t(key));
-            }
-        });
-
-        // 翻译 placeholder 属性
-        elements = document.querySelectorAll('[data-i18n-placeholder]');
-        elements.forEach(function(el) {
-            var key = el.getAttribute('data-i18n-placeholder');
-            if (key && window.i18n.t(key)) {
-                el.setAttribute('placeholder', window.i18n.t(key));
-            }
-        });
+        window.i18n.translate(document);
 
         if (Array.isArray(keyboardShortcutActionDefinitions)) {
             renderDesktopToolbarShortcutLabels();
@@ -2220,7 +2192,7 @@ document.addEventListener('DOMContentLoaded', function() {
         bindDesktopButton('desktopLoginBtn', function() { window.handleLoginButtonClick(); });
         const syncQuickActions = () => {
             const theme = document.getElementById('desktopThemeToggleBtn');
-            if (theme) { theme.innerHTML = '<i class="fas fa-' + (window.nightMode ? 'sun' : 'moon') + '"></i>'; theme.setAttribute('aria-label', window.nightMode ? '切换到日间模式' : '切换到夜间模式'); theme.title = theme.getAttribute('aria-label'); }
+            if (theme) { theme.innerHTML = '<i class="fas fa-' + (window.nightMode ? 'sun' : 'moon') + '"></i>'; theme.setAttribute('aria-label', window.nightMode ? uiText('切换到日间模式') : uiText('切换到夜间模式')); theme.title = theme.getAttribute('aria-label'); }
             document.getElementById('desktopOutlineToggleBtn')?.setAttribute('aria-pressed', String(!!window.userSettings.showOutline));
         };
         bindDesktopButton('desktopThemeToggleBtn', function() { window.toggleNightMode(); syncQuickActions(); });
@@ -2230,14 +2202,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (window.isLongFileMode || !window.vditor) return;
             const editor = window.vditor.vditor;
             const show = editor?.outline?.element ? editor.outline.element.style.display !== 'block' : !window.userSettings.showOutline;
-            if (typeof editor?.outline?.toggle === 'function') {
-                editor.outline.toggle(editor, show, false);
-                window.userSettings.showOutline = show;
-                editor.options.outline.enable = show;
-                localStorage.setItem('vditor_settings', JSON.stringify(window.userSettings));
-            } else applyOutline(show);
-            const checkbox = document.getElementById('showOutlineCheckbox') as HTMLInputElement;
-            if (checkbox) checkbox.checked = window.userSettings.showOutline;
+            applyOutline(show);
             syncQuickActions();
         });
         syncQuickActions();
@@ -2584,8 +2549,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
     var closeHistoryBtn = document.getElementById('closeHistoryBtn');
     if (closeHistoryBtn) closeHistoryBtn.addEventListener('click', function() { var m = document.getElementById('historyModalOverlay'); if (m) m.classList.remove('show'); });
-    var historyModalOverlay = document.getElementById('historyModalOverlay');
-    if (historyModalOverlay) historyModalOverlay.addEventListener('click', function(e) { if (false && e.target === this) this.classList.remove('show'); });
 
     // 页面离开/切后台相关保存逻辑统一由 appLifecycle 管理，避免重复触发。
 
@@ -3231,9 +3194,6 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        // 检查是否需要重新初始化编辑器来应用大纲视图设置
-        var needReinitForOutline = window.userSettings.showOutline !== newSettings.showOutline;
-
         // 保存设置
         try {
             localStorage.setItem('vditor_settings', JSON.stringify(newSettings));
@@ -3294,10 +3254,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // 应用字体大小设置
         applyFontSize(newSettings.fontSize);
-        applyVditorThemes(newSettings);
-
-        // 应用主题
-        var oldNightMode = window.nightMode;
+        // Apply visual settings in place, preserving editor state.
         if (newSettings.themeMode === 'system') {
             if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
                 window.nightMode = true;
@@ -3310,6 +3267,9 @@ document.addEventListener('DOMContentLoaded', function() {
             window.nightMode = false;
         }
 
+        applyEditorNightMode(window, window.nightMode);
+        applyOutline(newSettings.showOutline);
+
         // 应用语言更改
         if (languageChanged && window.i18n && newLanguage) {
             window.i18n.setLanguage(newLanguage);
@@ -3321,23 +3281,17 @@ document.addEventListener('DOMContentLoaded', function() {
             };
         }
 
-        if (oldNightMode !== window.nightMode || languageChanged || needReinitForOutline) {
-            settingsDialogInitialSnapshot = null;
-            window.location.reload(); // 重新加载以应用主题、语言、大纲或编辑器引擎更改
-        } else {
-            applyTranslations();
-            applyInterfaceMode(window.userSettings);
-            syncMobileViewportState();
-            window.renderBottomToolbar();
-            initMobileFeatures();
-            initSlashCommandRuntime();
-            applyDebugModeSetting(window.userSettings.enableDebugMode, true);
-            // 重新加载文件列表以应用新的排序设置
-            if (window.loadFiles) window.loadFiles();
-            settingsDialogInitialSnapshot = null;
-            document.getElementById('settingsModalOverlay').classList.remove('show');
-            if (modeToApply) setEditorMode(modeToApply);
-        }
+        applyTranslations();
+        applyInterfaceMode(window.userSettings);
+        syncMobileViewportState();
+        window.renderBottomToolbar();
+        initMobileFeatures();
+        initSlashCommandRuntime();
+        applyDebugModeSetting(window.userSettings.enableDebugMode, true);
+        settingsDialogInitialSnapshot = null;
+        document.getElementById('settingsModalOverlay').classList.remove('show');
+        if (modeToApply) setEditorMode(modeToApply);
+
     });
 
     var cancelSettingsBtn = document.getElementById('cancelSettingsBtn');
@@ -3679,25 +3633,11 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('wordCountModalOverlay').classList.remove('show');
     });
 
-    var closeWordCountModalBtn = document.getElementById('closeWordCountModalBtn');
-    if (closeWordCountModalBtn) closeWordCountModalBtn.addEventListener('click', function() {
-        document.getElementById('wordCountModalOverlay').classList.remove('show');
-    });
-
-    var wordCountModalOverlay = document.getElementById('wordCountModalOverlay');
-    if (wordCountModalOverlay) wordCountModalOverlay.addEventListener('click', function(e) {
-        if (false && e.target === this) this.classList.remove('show');
-    });
-
     var closeServiceStatusBtn = document.getElementById('closeServiceStatusBtn');
     if (closeServiceStatusBtn) closeServiceStatusBtn.addEventListener('click', function() {
         document.getElementById('serviceStatusModalOverlay').classList.remove('show');
     });
 
-    var serviceStatusModalOverlay = document.getElementById('serviceStatusModalOverlay');
-    if (serviceStatusModalOverlay) serviceStatusModalOverlay.addEventListener('click', function(e) {
-        if (false && e.target === this) this.classList.remove('show');
-    });
 
     // 加载服务状态
     async function loadServiceStatus() {
@@ -3882,26 +3822,6 @@ document.addEventListener('DOMContentLoaded', function() {
         if (iframe) iframe.src = ''; // 清空iframe以停止视频流
     });
 
-    var videoCallModalOverlay = document.getElementById('videoCallModalOverlay');
-    if (videoCallModalOverlay) videoCallModalOverlay.addEventListener('click', function(e) {
-        if (false && e.target === this) {
-            this.classList.remove('show');
-            var iframe = document.getElementById('videoCallIframe');
-            if (iframe) iframe.src = '';
-        }
-    });
-
-    // 点击遮罩层关闭模态框
-    var settingsModalOverlay = document.getElementById('settingsModalOverlay');
-    if (settingsModalOverlay) settingsModalOverlay.addEventListener('click', function(e) {
-        if (false && e.target === this) requestCloseSettingsDialog();
-    });
-
-    var aboutModalOverlay = document.getElementById('aboutModalOverlay');
-    if (aboutModalOverlay) aboutModalOverlay.addEventListener('click', function(e) {
-        if (false && e.target === this) this.classList.remove('show');
-    });
-
     // 应用字体大小设置
     function applyFontSize(fontSize) {
         var longFileTextarea = document.getElementById('longFileTextarea');
@@ -3957,49 +3877,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // 应用大纲视图设置
     function applyOutline(show) {
-        if (window.isLongFileMode) return;
-        if (!window.vditor) return;
-
-        // 如果需要，重新初始化编辑器以应用大纲视图设置
-        if (window.userSettings.showOutline !== show) {
-            window.userSettings.showOutline = show;
-            localStorage.setItem('vditor_settings', JSON.stringify(window.userSettings));
-
-            // 重新初始化编辑器
-            var currentContent = window.vditor.getValue();
-            var currentMode = window.vditor.vditor ? window.vditor.vditor.mode : 'ir';
-            if (window.vditor.destroy) window.vditor.destroy();
-
-            var newConfig = {
-                height: editorConfig.height,
-                width: editorConfig.width,
-                placeholder: window.i18n ? window.i18n.t('startEditing') : '开始编辑...支持 Markdown 语法',
-                cdn: getVditorCdn(),
-                lang: 'en_US', // 彻底禁用中文语言文件，使用默认英语
-                toolbar: ['emoji', 'br', 'bold', 'italic', 'strike', '|', 'line', 'quote', 'list', 'ordered-list', 'check', 'outdent', 'indent', 'code', 'inline-code', 'insert-after', 'insert-before', 'upload', 'link', 'table', 'record', 'edit-mode', 'both', 'preview', 'fullscreen', 'outline', 'code-theme', 'content-theme', 'export', 'info', 'help', 'br'],
-                customWysiwygToolbar: function() {},
-                theme: window.nightMode ? 'dark' : 'classic',
-                mode: currentMode,
-                value: currentContent,
-                cache: editorConfig.cache,
-                outline: { enable: show },
-                hint: editorConfig.hint,
-                preview: buildVditorPreviewConfig(),
-                upload: editorConfig.upload,
-                after: function() {
-                    reinitEditorEvents();
-                    reinitMenuEvents();
-                    reinitMobileFeatures();
-                    if (typeof window.initInlineImageTools === 'function') {
-                        window.initInlineImageTools();
-                    }
-                    applyFontSize(window.userSettings.fontSize);
-                    applyVditorThemes(window.userSettings);
-                    mobileChromeScroll.bind();
-                }
-            };
-            window.vditor = new Vditor('vditor', newConfig);
-        }
+        applyEditorOutline(window, !!show);
     }
 
     window.enterPresentationMode = enterPresentationMode;

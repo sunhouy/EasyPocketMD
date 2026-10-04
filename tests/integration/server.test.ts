@@ -44,9 +44,10 @@ describe('Server Integration', () => {
         expect(res.body.message).toBe('No update needed');
     });
 
-    it('should handle health check or root', async () => {
-        const res = await request(app).get('/');
-        // Depending on whether index.html exists, it returns 200, 404, or 500 (if dist not found)
-        expect([200, 404, 500]).toContain(res.status);
+    it('returns a healthy status through the public health endpoint', async () => {
+        const res = await request(app).get('/api/health');
+        expect(res.status).toBe(200);
+        expect(res.body).toMatchObject({code: 200, status: 'ok', message: 'Service is healthy'});
+        expect(res.body.timestamp).toBeDefined();
     });
 });

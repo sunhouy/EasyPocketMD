@@ -287,7 +287,7 @@
             <div class="form-group enable-e2e-group" style="display: flex; align-items: center; justify-content: flex-start; gap: 8px;">
                 <input type="checkbox" id="registerEnableE2E" name="registerEnableE2E" style="width: auto; margin: 0;">
                 <label for="registerEnableE2E" style="margin: 0; font-weight: normal; cursor: pointer;">
-                    启用端到端加密 <br><small style="color: #888;">(内容将被加密同步，提升隐私安全)</small>
+                    <span data-i18n="ui:启用端到端加密">启用端到端加密</span> <br><small style="color: #888;"> <span data-i18n="ui:(内容将被加密同步，提升隐私安全)">(内容将被加密同步，提升隐私安全)</span></small>
                 </label>
             </div>
             <div class="modal-message" id="registerMessage"></div>
@@ -392,7 +392,7 @@
                 <button id="historyBatchDeleteBtn" class="modal-btn small" style="background:#dc3545;color:white;display:none;">
                     <i class="fas fa-trash"></i> <span data-i18n="batchDelete">批量删除</span>
                 </button>
-                <button id="historyCollabBtn" class="modal-btn small" hidden>协作编辑记录</button>
+                <button id="historyCollabBtn" class="modal-btn small" hidden> <span data-i18n="ui:协作编辑记录">协作编辑记录</span></button>
                 <button id="historyClearAllBtn" class="modal-btn small" style="background:#6c757d;color:white;">
                     <i class="fas fa-broom"></i> <span data-i18n="clearAllHistory">清空全部</span>
                 </button>
@@ -462,7 +462,7 @@
                                 <label for="backgroundImageInput" data-i18n="backgroundUpload">上传背景图片</label>
                                 <input type="file" id="backgroundImageInput" accept="image/jpeg,image/png,image/webp">
                                 <p class="background-hint" data-i18n="backgroundHint">支持 PNG、JPEG、WebP，最大 10MB。图片保存在本机，点击保存设置后生效。</p>
-                                <div id="backgroundPreview" role="img" aria-label="背景预览"></div>
+                                <div id="backgroundPreview" role="img" data-i18n-aria-label="ui:背景预览" aria-label="背景预览"></div>
                                 <p id="backgroundStatus" role="status" aria-live="polite"></p>
                                 <div class="background-setting-actions">
                                     <label for="themeColorInput" data-i18n="themeColorTitle">主题颜色</label>
@@ -692,36 +692,36 @@
 
             <section class="settings-section" aria-labelledby="settingsAIGroupTitle">
                 <div class="settings-section-header">
-                    <h3 class="settings-section-title" id="settingsAIGroupTitle">   AI 模型（自备模型）</h3>
+                    <h3 class="settings-section-title" id="settingsAIGroupTitle">   <span data-i18n="ui:AI 模型（自备模型）">AI 模型（自备模型）</span></h3>
                 </div>
                 <ul class="settings-list" role="list">
                     <li class="settings-list-item">
                         <div class="form-group">
                             <label for="aiApiKeyInput">API Key</label>
                             <input type="password" id="aiApiKeyInput" class="form-control" placeholder="sk-..." autocomplete="off" />
-                            <div class="settings-inline-hint">AI 调用由前端直连发起，密钥仅保存于本地（可选端到端加密同步至云端隐藏文件），云端不提供模型。</div>
+                            <div class="settings-inline-hint"> <span data-i18n="ui:AI 调用由前端直连发起，密钥仅保存于本地（可选端到端加密同步至云端隐藏文件），云端不提供模型。">AI 调用由前端直连发起，密钥仅保存于本地（可选端到端加密同步至云端隐藏文件），云端不提供模型。</span></div>
                         </div>
                     </li>
                     <li class="settings-list-item">
                         <div class="form-group">
-                            <label for="aiBaseUrlInput">Base URL（OpenAI 兼容）</label>
+                            <label for="aiBaseUrlInput"> <span data-i18n="ui:Base URL（OpenAI 兼容）">Base URL（OpenAI 兼容）</span></label>
                             <input type="text" id="aiBaseUrlInput" class="form-control" placeholder="https://api.openai.com/v1" />
-                            <div class="settings-inline-hint">支持常见 OpenAI 兼容接口，例如 https://api.openai.com/v1 或 https://dashscope.aliyuncs.com/compatible-mode/v1</div>
+                            <div class="settings-inline-hint"> <span data-i18n="ui:支持常见 OpenAI 兼容接口，例如 https://api.openai.com/v1 或 https://dashscope.aliyuncs.com/compatible-mode/v1">支持常见 OpenAI 兼容接口，例如 https://api.openai.com/v1 或 https://dashscope.aliyuncs.com/compatible-mode/v1</span></div>
                         </div>
                     </li>
                     <li class="settings-list-item">
                         <div class="form-group">
-                            <label for="aiModelInput">模型名称</label>
+                            <label for="aiModelInput"> <span data-i18n="ui:模型名称">模型名称</span></label>
                             <input type="text" id="aiModelInput" class="form-control" placeholder="gpt-4o-mini / deepseek-v4-flash" />
                         </div>
                     </li>
                     <li class="settings-list-item">
                         <div class="form-group">
-                            <label for="aiSyncToCloudCheckbox">端到端加密同步到云端</label>
+                            <label for="aiSyncToCloudCheckbox"> <span data-i18n="ui:端到端加密同步到云端">端到端加密同步到云端</span></label>
                             <div class="checkbox-group">
-                                <label><input type="checkbox" id="aiSyncToCloudCheckbox"> <span>将 AI 配置端到端加密后作为隐藏文件同步到云端，仅本人可解密</span></label>
+                                <label><input type="checkbox" id="aiSyncToCloudCheckbox"> <span> <span data-i18n="ui:将 AI 配置端到端加密后作为隐藏文件同步到云端，仅本人可解密">将 AI 配置端到端加密后作为隐藏文件同步到云端，仅本人可解密</span></span></label>
                             </div>
-                            <div class="settings-hint">开启后使用账号密码对配置做 AES 端到端加密，作为隐藏文件（.ai-config.json）存于云端；关闭则删除云端隐藏文件。</div>
+                            <div class="settings-hint"> <span data-i18n="ui:开启后使用账号密码对配置做 AES 端到端加密，作为隐藏文件（.ai-config.json）存于云端；关闭则删除云端隐藏文件。">开启后使用账号密码对配置做 AES 端到端加密，作为隐藏文件（.ai-config.json）存于云端；关闭则删除云端隐藏文件。</span></div>
                         </div>
                     </li>
                 </ul>
@@ -819,15 +819,15 @@
                             <strong id="tokenCountGPT" style="color: #333;" class="token-model-value">0</strong>
                         </div>
                         <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
-                            <span style="color: #555;" class="token-model-label"><i class="fas fa-brain"></i> Claude (Anthropic) <span style="font-size:11px;color:#999;font-weight:normal;">(估算)</span></span>
+                            <span style="color: #555;" class="token-model-label"><i class="fas fa-brain"></i> Claude (Anthropic) <span style="font-size:11px;color:#999;font-weight:normal;"> <span data-i18n="ui:(估算)">(估算)</span></span></span>
                             <strong id="tokenCountClaude" style="color: #333;" class="token-model-value">0</strong>
                         </div>
                         <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
-                            <span style="color: #555;" class="token-model-label"><i class="fas fa-water"></i> DeepSeek <span style="font-size:11px;color:#999;font-weight:normal;">(估算)</span></span>
+                            <span style="color: #555;" class="token-model-label"><i class="fas fa-water"></i> DeepSeek <span style="font-size:11px;color:#999;font-weight:normal;"> <span data-i18n="ui:(估算)">(估算)</span></span></span>
                             <strong id="tokenCountDeepSeek" style="color: #333;" class="token-model-value">0</strong>
                         </div>
                         <div style="display: flex; justify-content: space-between;">
-                            <span style="color: #555;" class="token-model-label"><i class="fas fa-meteor"></i> Gemini (Google) <span style="font-size:11px;color:#999;font-weight:normal;">(估算)</span></span>
+                            <span style="color: #555;" class="token-model-label"><i class="fas fa-meteor"></i> Gemini (Google) <span style="font-size:11px;color:#999;font-weight:normal;"> <span data-i18n="ui:(估算)">(估算)</span></span></span>
                             <strong id="tokenCountGemini" style="color: #333;" class="token-model-value">0</strong>
                         </div>
                     </div>
@@ -861,9 +861,7 @@
                 </div>
             </div>
         </div>
-        <div class="modal-actions" style="flex-shrink:0;margin-top:15px;">
-            <button class="modal-btn secondary" id="closeWordCountModalBtn" data-i18n="close">关闭</button>
-        </div>
+
     </div>
 </div>
 
@@ -1071,21 +1069,21 @@
                 <div id="aiPPTInputSection">
                     <!-- 生成方式选择 -->
                     <div style="margin-bottom:15px;">
-                        <label style="display:block;margin-bottom:8px;font-weight:500;color:inherit;">生成方式</label>
+                        <label style="display:block;margin-bottom:8px;font-weight:500;color:inherit;"> <span data-i18n="ui:生成方式">生成方式</span></label>
                         <div style="display:flex;gap:10px;">
                             <button id="aiPPTFromCurrent" class="ppt-source-btn active">
-                                <i class="fas fa-file-alt"></i> <span>根据本文件内容</span>
+                                <i class="fas fa-file-alt"></i> <span> <span data-i18n="ui:根据本文件内容">根据本文件内容</span></span>
                             </button>
                             <button id="aiPPTFromTopic" class="ppt-source-btn">
-                                <i class="fas fa-lightbulb"></i> <span>输入主题生成</span>
+                                <i class="fas fa-lightbulb"></i> <span> <span data-i18n="ui:输入主题生成">输入主题生成</span></span>
                             </button>
                         </div>
                     </div>
                     
                     <!-- 主题输入 -->
                     <div id="aiPPTTopicSection" style="margin-bottom:15px;display:none;">
-                        <label style="display:block;margin-bottom:8px;font-weight:500;color:inherit;">主题 <span id="topicRequired" style="color:#e74c3c;">*</span></label>
-                        <input type="text" id="aiPPTTopicInput" placeholder="输入PPT主题..." style="width:100%;padding:12px;border:1px solid #ddd;border-radius:8px;font-size:14px;background:inherit;color:inherit;">
+                        <label style="display:block;margin-bottom:8px;font-weight:500;color:inherit;"><span data-i18n="ui:主题">主题</span> <span id="topicRequired" style="color:#e74c3c;">*</span></label>
+                        <input type="text" id="aiPPTTopicInput" data-i18n-placeholder="ui:输入PPT主题..." placeholder="输入PPT主题..." style="width:100%;padding:12px;border:1px solid #ddd;border-radius:8px;font-size:14px;background:inherit;color:inherit;">
                     </div>
                     
                     <div class="ai-ppt-options" style="margin-bottom:15px;">
@@ -1099,20 +1097,20 @@
                     <!-- 页数范围选择 -->
                     <div style="margin-bottom:15px;padding:12px;background:#f0f4f8;border-radius:8px;">
                         <label style="display:block;margin-bottom:10px;font-size:13px;font-weight:500;color:#555;">
-                            <i class="fas fa-file-powerpoint" style="margin-right:6px;color:#4a90e2;"></i>设置页数范围（5-50页）
+                            <i class="fas fa-file-powerpoint" style="margin-right:6px;color:#4a90e2;"></i><span data-i18n="ui:设置页数范围（5-50页）">设置页数范围（5-50页）</span>
                         </label>
                         <div style="display:flex;gap:10px;align-items:center;">
                             <div style="flex:1;">
-                                <label style="font-size:12px;color:#666;display:block;margin-bottom:4px;">最少页数</label>
+                                <label style="font-size:12px;color:#666;display:block;margin-bottom:4px;"> <span data-i18n="ui:最少页数">最少页数</span></label>
                                 <input type="number" id="pptStartPage" value="5" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:14px;">
                             </div>
                             <div style="flex:1;">
-                                <label style="font-size:12px;color:#666;display:block;margin-bottom:4px;">最多页数</label>
+                                <label style="font-size:12px;color:#666;display:block;margin-bottom:4px;"> <span data-i18n="ui:最多页数">最多页数</span></label>
                                 <input type="number" id="pptEndPage" value="30" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:14px;">
                             </div>
                         </div>
                         <div style="margin-top:6px;font-size:11px;color:#999;">
-                            <i class="fas fa-info-circle"></i> AI 将根据此范围生成大纲
+                            <i class="fas fa-info-circle"></i> <span data-i18n="ui:AI 将根据此范围生成大纲">AI 将根据此范围生成大纲</span>
                         </div>
                     </div>
 
@@ -1127,7 +1125,7 @@
                     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;">
                         <h4 style="margin:0;color:inherit;" data-i18n="outlinePreview">大纲预览</h4>
                         <button id="aiPPTEEditOutline" style="padding:6px 12px;background:transparent;border:1px solid #ddd;border-radius:6px;cursor:pointer;font-size:13px;color:inherit;">
-                            <i class="fas fa-edit"></i> <span data-i18n="edit">编辑</span>
+                            <i class="fas fa-edit"></i> <span data-i18n="edit"> <span data-i18n="ui:编辑">编辑</span></span>
                         </button>
                     </div>
                     <div id="aiPPTOutlinePreview" style="max-height:250px;overflow-y:auto;padding:10px;background:#f8f9fa;border-radius:8px;margin-bottom:15px;">
@@ -1137,31 +1135,31 @@
                     <!-- 导出页数范围选择 -->
                     <div style="margin-bottom:15px;padding:12px;background:#f0f4f8;border-radius:8px;">
                         <label style="display:block;margin-bottom:10px;font-size:13px;font-weight:500;color:#555;">
-                            <i class="fas fa-file-export" style="margin-right:6px;color:#4a90e2;"></i>选择导出页数范围
+                            <i class="fas fa-file-export" style="margin-right:6px;color:#4a90e2;"></i><span data-i18n="ui:选择导出页数范围">选择导出页数范围</span>
                         </label>
                         <div style="display:flex;gap:10px;align-items:center;">
                             <div style="flex:1;">
-                                <label style="font-size:12px;color:#666;display:block;margin-bottom:4px;">起始页</label>
+                                <label style="font-size:12px;color:#666;display:block;margin-bottom:4px;"> <span data-i18n="ui:起始页">起始页</span></label>
                                 <input type="number" id="pptExportStartPage" min="1" value="1" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:14px;">
                             </div>
                             <div style="flex:1;">
-                                <label style="font-size:12px;color:#666;display:block;margin-bottom:4px;">结束页</label>
+                                <label style="font-size:12px;color:#666;display:block;margin-bottom:4px;"> <span data-i18n="ui:结束页">结束页</span></label>
                                 <input type="number" id="pptExportEndPage" min="1" value="30" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:14px;">
                             </div>
                             <div style="flex:1;">
-                                <label style="font-size:12px;color:#666;display:block;margin-bottom:4px;">总页数</label>
+                                <label style="font-size:12px;color:#666;display:block;margin-bottom:4px;"> <span data-i18n="ui:总页数">总页数</span></label>
                                 <input type="text" id="pptTotalPages" value="0" readonly style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:14px;background:#f5f5f5;color:#666;">
                             </div>
                         </div>
                         <div id="pptPageRangeError" style="margin-top:8px;font-size:12px;color:#e74c3c;display:none;">
-                            <i class="fas fa-exclamation-triangle"></i> <span>页数范围无效，请选择文稿内的页码</span>
+                            <i class="fas fa-exclamation-triangle"></i> <span> <span data-i18n="ui:页数范围无效，请选择文稿内的页码">页数范围无效，请选择文稿内的页码</span></span>
                         </div>
                     </div>
 
                     <!-- 配色方案选择 -->
                     <div style="margin-bottom:15px;padding:12px;background:#f0f4f8;border-radius:8px;">
                         <label style="display:block;margin-bottom:10px;font-size:13px;font-weight:500;color:#555;">
-                            <i class="fas fa-palette" style="margin-right:6px;color:#4a90e2;"></i>配色方案
+                            <i class="fas fa-palette" style="margin-right:6px;color:#4a90e2;"></i><span data-i18n="ui:配色方案">配色方案</span>
                         </label>
                         <div id="pptColorSchemeSelector" class="ppt-color-scheme-selector" style="margin:0;padding:0;background:transparent;">
                             <!-- 配色方案按钮将由JS动态生成 -->
@@ -1185,7 +1183,7 @@
                 <div class="ai-result-content" id="aiResultContent"></div>
                 <div class="ai-result-actions">
                     <button class="ai-action-btn secondary" id="aiCopyResult"><i class="fas fa-copy"></i> <span data-i18n="copy">复制</span></button>
-                    <button class="ai-action-btn secondary" id="aiRegenerate"><i class="fas fa-redo"></i> <span data-i18n="regenerate">重新生成</span></button>
+                    <button class="ai-action-btn secondary" id="aiRegenerate"><i class="fas fa-redo"></i> <span data-i18n="regenerate"> <span data-i18n="ui:重新生成"><span data-i18n="ui:重新生成">重新生成</span></span></span></button>
                     <button class="ai-action-btn primary" id="aiInsertResult"><i class="fas fa-plus"></i> <span data-i18n="insertToEditor">插入到编辑器</span></button>
                 </div>
             </div>
@@ -1208,7 +1206,7 @@
             <button class="desktop-toolbar-btn" id="desktopAIBtn" data-i18n="aiAssistant">AI助手</button>
 
             <div class="desktop-dropdown">
-                <button class="desktop-toolbar-btn" id="desktopEditBtn" data-i18n="edit">编辑</button>
+                <button class="desktop-toolbar-btn" id="desktopEditBtn" data-i18n="edit"> <span data-i18n="ui:编辑">编辑</span></button>
                 <div class="desktop-dropdown-content" id="desktopEditDropdown">
                     <button class="dropdown-item" id="desktopEditSaveBtn"><span data-i18n="save">保存</span></button>
                     <button class="dropdown-item" id="desktopEditUndoBtn"><span data-i18n="undo">撤销</span></button>
@@ -1237,19 +1235,19 @@
                     <button class="dropdown-item" id="desktopPresentationBtn"><i class="fas fa-chalkboard-teacher"></i><span data-i18n="presentationMode">演示模式</span></button>
 
                     <div class="dropdown-category" data-i18n="others">其他</div>
-                    <button class="dropdown-item" id="desktopToggleFileE2EBtn" aria-pressed="false"><i class="fas fa-lock-open"></i><span class="file-e2e-toggle-text">开启加密</span></button>
+                    <button class="dropdown-item" id="desktopToggleFileE2EBtn" aria-pressed="false"><i class="fas fa-lock-open"></i><span class="file-e2e-toggle-text"> <span data-i18n="ui:开启加密">开启加密</span></span></button>
                     <button class="dropdown-item" id="desktopClearBtn"><i class="fas fa-trash-alt"></i><span data-i18n="clear">清空</span></button>
                     <button class="dropdown-item" id="desktopServiceStatusBtn"><i class="fas fa-signal"></i><span data-i18n="serviceStatus">服务状态</span></button>
                     <button class="dropdown-item" id="desktopAboutBtn"><i class="fas fa-info-circle"></i><span data-i18n="about">关于</span></button>
                 </div>
             </div>
-            <div class="desktop-quick-actions" role="group" aria-label="文档快捷操作">
-                <button class="desktop-quick-btn" id="desktopOutlineToggleBtn" type="button" title="显示/隐藏大纲" aria-label="显示/隐藏大纲" aria-pressed="false"><i class="fas fa-list-ul"></i></button>
-                <button class="desktop-quick-btn" id="desktopQuickShareBtn" type="button" data-i18n-title="share" title="分享" aria-label="分享"><i class="fas fa-share-alt"></i></button>
-                <button class="desktop-quick-btn" id="desktopQuickExportBtn" type="button" data-i18n-title="export" title="导出" aria-label="导出"><i class="fas fa-file-export"></i></button>
-                <button class="desktop-quick-btn" id="desktopThemeToggleBtn" type="button" title="切换日间/夜间模式" aria-label="切换日间/夜间模式"><i class="fas fa-moon"></i></button>
+            <div class="desktop-quick-actions" role="group" data-i18n-aria-label="ui:文档快捷操作" aria-label="文档快捷操作">
+                <button class="desktop-quick-btn" id="desktopOutlineToggleBtn" type="button" data-i18n-title="ui:显示/隐藏大纲" title="显示/隐藏大纲" data-i18n-aria-label="ui:显示/隐藏大纲" aria-label="显示/隐藏大纲" aria-pressed="false"><i class="fas fa-list-ul"></i></button>
+                <button class="desktop-quick-btn" id="desktopQuickShareBtn" type="button" data-i18n-title="share" title="分享" data-i18n-aria-label="ui:分享" aria-label="分享"><i class="fas fa-share-alt"></i></button>
+                <button class="desktop-quick-btn" id="desktopQuickExportBtn" type="button" data-i18n-title="export" title="导出" data-i18n-aria-label="ui:导出" aria-label="导出"><i class="fas fa-file-export"></i></button>
+                <button class="desktop-quick-btn" id="desktopThemeToggleBtn" type="button" data-i18n-title="ui:切换日间/夜间模式" title="切换日间/夜间模式" data-i18n-aria-label="ui:切换日间/夜间模式" aria-label="切换日间/夜间模式"><i class="fas fa-moon"></i></button>
             </div>
-            <span class="current-file-e2e-indicator desktop-e2e-indicator" aria-hidden="true" role="button" tabindex="0" title="此文件已使用端到端加密"><i class="fas fa-lock"></i></span>
+            <span class="current-file-e2e-indicator desktop-e2e-indicator" aria-hidden="true" role="button" tabindex="0" data-i18n-title="ui:此文件已使用端到端加密" title="此文件已使用端到端加密"><i class="fas fa-lock"></i></span>
         </div>
 
         <div class="toolbar-left-actions">
@@ -1268,13 +1266,13 @@
         </div>
         <h1 class="mobile-title" data-i18n="mobileTitle">EasyPocketMD</h1>
         <div class="toolbar-right-actions">
-            <span class="current-file-e2e-indicator mobile-e2e-indicator" aria-hidden="true" role="button" tabindex="0" title="此文件已使用端到端加密"><i class="fas fa-lock"></i></span>
+            <span class="current-file-e2e-indicator mobile-e2e-indicator" aria-hidden="true" role="button" tabindex="0" data-i18n-title="ui:此文件已使用端到端加密" title="此文件已使用端到端加密"><i class="fas fa-lock"></i></span>
             <!-- 保存按钮 -->
-            <button class="mobile-action-btn editor-save-btn" id="saveFileBtn" title="保存文件">
+            <button class="mobile-action-btn editor-save-btn" id="saveFileBtn" data-i18n-title="ui:保存文件" title="保存文件">
                 <i class="fas fa-save"></i>
             </button>
             <!-- 夜间模式切换按钮 -->
-            <button class="mobile-action-btn editor-mode-toggle" id="modeToggle" title="切换夜间模式">
+            <button class="mobile-action-btn editor-mode-toggle" id="modeToggle" data-i18n-title="ui:切换夜间模式" title="切换夜间模式">
                 <i class="fas fa-moon"></i>
             </button>
             <div class="mobile-dropdown">
@@ -1298,7 +1296,7 @@
                     <button class="dropdown-item" id="mobilePresentationBtn"><i class="fas fa-chalkboard-teacher"></i>  <span data-i18n="presentationMode">演示模式</span></button>
 
                     <div class="dropdown-category" data-i18n="others">其他</div>
-                    <button class="dropdown-item" id="mobileToggleFileE2EBtn" aria-pressed="false"><i class="fas fa-lock-open"></i>  <span class="file-e2e-toggle-text">开启加密</span></button>
+                    <button class="dropdown-item" id="mobileToggleFileE2EBtn" aria-pressed="false"><i class="fas fa-lock-open"></i>  <span class="file-e2e-toggle-text"> <span data-i18n="ui:开启加密">开启加密</span></span></button>
                     <button class="dropdown-item" id="mobileClearBtn"><i class="fas fa-trash-alt"></i>  <span data-i18n="clear">清空</span></button>
                     <button class="dropdown-item" id="mobileServiceStatusBtn"><i class="fas fa-signal"></i>  <span data-i18n="serviceStatus">服务状态</span></button>
                     <button class="dropdown-item" id="aboutBtn"><i class="fas fa-info-circle"></i>  <span data-i18n="about">关于</span></button>
@@ -1473,7 +1471,7 @@
                 <button id="pptEditorClose" style="background:none;border:none;color:white;font-size:20px;cursor:pointer;padding:5px;">
                     <i class="fas fa-arrow-left"></i>
                 </button>
-                <span style="font-size:16px;font-weight:500;">编辑</span>
+                <span style="font-size:16px;font-weight:500;"> <span data-i18n="ui:编辑">编辑</span></span>
             </div>
             
             <div style="display:flex;gap:10px;">
@@ -1487,10 +1485,10 @@
             </div>
             <div style="display:flex;gap:10px;">
                 <button id="pptEditorRegen" style="padding:8px 15px;border:none;border-radius:6px;color:white;cursor:pointer;font-size:13px;">
-                    <i class="fas fa-redo"></i> 重新生成
+                    <i class="fas fa-redo"></i> <span data-i18n="ui:重新生成">重新生成</span>
                 </button>
                 <button id="pptEditorDownload" style="padding:8px 15px;border:none;border-radius:6px;color:white;cursor:pointer;font-size:13px;">
-                    <i class="fas fa-download"></i> 下载
+                    <i class="fas fa-download"></i> <span data-i18n="ui:下载">下载</span>
                 </button>
             </div>
         </div>
@@ -1506,16 +1504,16 @@
                 </div>
                 <div id="pptEditorLoading" style="display:none;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;color:white;z-index:10;">
                     <i class="fas fa-spinner fa-spin" style="font-size:40px;margin-bottom:15px;"></i>
-                    <p style="margin:0;font-size:16px;">生成中...</p>
+                    <p style="margin:0;font-size:16px;"> <span data-i18n="ui:生成中...">生成中...</span></p>
                 </div>
             </div>
             
             <!-- 下部：页面列表 -->
             <div class="ppt-pages-panel" style="flex:1;display:flex;flex-direction:column;min-height:150px;max-height:200px;">
                 <div style="padding:10px 15px;display:flex;justify-content:space-between;align-items:center;">
-                    <h4 style="margin:0;font-size:14px;">页面列表</h4>
+                    <h4 style="margin:0;font-size:14px;"> <span data-i18n="ui:页面列表">页面列表</span></h4>
                     <button id="pptEditorAddPage" style="padding:6px 12px;border-radius:6px;cursor:pointer;font-size:12px;">
-                        <i class="fas fa-plus"></i> 添加
+                        <i class="fas fa-plus"></i> <span data-i18n="ui:添加">添加</span>
                     </button>
                 </div>
                 <div id="pptEditorPagesList" style="flex:1;overflow-x:auto;overflow-y:hidden;padding:10px;display:flex;gap:10px;align-items:center;">

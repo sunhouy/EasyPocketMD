@@ -1,3 +1,4 @@
+import { uiText, setUiText } from './i18n-messages';
 import { explainPythonError, pythonErrorLine } from './python-run-diagnostics';
 import { RunnerFilesUi } from './code-runner-files';
 import { floatingRunWindow } from './code-runner-window';
@@ -206,9 +207,9 @@ import { floatingRunWindow } from './code-runner-window';
     };
 
     async function runSandboxCommand(command) {
-        if(runnerUiState.button.disabled || runnerFiles.uploading) return {success:false,error:'请等待当前任务结束'};
+        if(runnerUiState.button.disabled || runnerFiles.uploading) return {success:false,error:uiText('请等待当前任务结束')};
         runnerUiState.button.disabled=true; runnerUiState.runContext=null;refreshErrorHighlight();
-        try {renderOutput({success:true,output:'正在执行命令…'});const result=await codeRunner.runPython('pass',command);renderOutput(result);return result;}
+        try {renderOutput({success:true,output:uiText('正在执行命令…')});const result=await codeRunner.runPython('pass',command);renderOutput(result);return result;}
         finally {runnerUiState.button.disabled=false;}
     }
 
@@ -357,7 +358,7 @@ import { floatingRunWindow } from './code-runner-window';
         const lines = runnerUiState.runContext.code.split('\n');
         if (line < 1 || line > lines.length) return;
         const source = document.createElement('div');
-        source.setAttribute('aria-label', '报错行及上下文');
+        setUiText(source, uiText('报错行及上下文'), 'aria-label');
         source.style.cssText = 'margin-top:10px;overflow:auto;background:rgba(0,0,0,.06);border-radius:4px;';
         for (let i = Math.max(0, line - 4); i < Math.min(lines.length, line + 3); i++) {
             const row = document.createElement('div');
@@ -365,7 +366,7 @@ import { floatingRunWindow } from './code-runner-window';
             row.style.cssText = 'white-space:pre;padding:3px 8px;';
             if (i + 1 === line) {
                 row.style.background = '#991b1b'; row.style.color = '#fff'; row.style.fontWeight = 'bold';
-                row.setAttribute('aria-label', '报错行 ' + line);
+                row.setAttribute('aria-label', uiText('报错行 ') + line);
             }
             source.appendChild(row);
         }
@@ -376,7 +377,8 @@ import { floatingRunWindow } from './code-runner-window';
         const help = runnerUiState.help;
         help.dataset.open = help.dataset.open === 'true' ? 'false' : 'true';
         runnerUiState.minimized = false;
-        help.textContent = '运行方式与环境\n\nPython：服务器隔离 Docker 沙箱，Python 3.12，禁止联网；支持 NumPy、pandas、SciPy、SymPy、Matplotlib、seaborn、scikit-learn、statsmodels、Polars、DuckDB、SQLAlchemy、NetworkX、Pillow、OpenCV、scikit-image、ImageIO、Plotly、openpyxl、XlsxWriter、xlrd、python-docx、python-pptx、pypdf、reportlab、BeautifulSoup、lxml、PyYAML、regex、requests、httpx、dateutil、tabulate、tqdm、Faker、psutil；Matplotlib 支持中文字体。\n\n文件：使用代码块顶部的上传按钮。文件管理显示 /tmp/home 用户目录，支持复制路径、下载、删除；可用相对路径读取文件。代码与命令行共享目录，生成文件在结束后更新到列表。会话空闲 30 分钟后清理，刷新页面或重启服务后可能丢失，请及时下载。最多 64 个文件、总大小 8 MB，上传单文件 5 MB；输出图片/文件提供下载和插入文档按钮。\n\n命令行：在同样的隔离沙箱里执行 shell 命令，例如 ls -la、pwd、cat data.csv、python -c "print(1)"。cd 可切换到用户目录内的文件夹。每条命令是独立进程，不保留 shell 变量、后台任务或软件安装；交互式 Python input() 仍在运行代码时显示输入框。\n\n限制：最多同时运行 5 个任务；计算限时 20 秒，输入等待最长 2 分钟、整次运行最多 5 分钟。单任务内存 256/512 MB，全部沙箱共享服务器容量对应的总资源预算。代码 64 KB，最多 8 张 Matplotlib 图，图片总计 2 MB。\n\n其他语言：JavaScript/TypeScript 在浏览器 Worker 执行（TypeScript 按 JavaScript 语法）；HTML 使用隔离 iframe；C/C++ 通过服务器 Emscripten 编译后运行。\n\n窗口：拖动标题栏移动，拖动边缘调整大小；输出文字可直接选中复制，右上角复制按钮可复制完整运行结果。';
+        help.setAttribute('data-i18n', 'ui:codeEnvironmentHelp');
+        setUiText(help, uiText('codeEnvironmentHelp'));
         updatePanelSize();
     }
 
@@ -401,11 +403,11 @@ import { floatingRunWindow } from './code-runner-window';
                 const input = document.createElement('textarea'); input.value = text;
                 input.style.cssText = 'position:fixed;opacity:0;'; document.body.appendChild(input); input.select();
                 const copied = document.execCommand('copy'); input.remove();
-                if (!copied) throw Error('剪贴板不可用，请手动选择输出内容复制');
+                if (!copied) throw Error(uiText('剪贴板不可用，请手动选择输出内容复制'));
             }
-            button.title = '已复制';
-            if (global.showToast) global.showToast('运行结果已复制', 'success');
-        } catch (error) { if (global.showToast) global.showToast('复制失败：' + error.message, 'error'); }
+            setUiText(button, uiText('已复制'), 'title');
+            if (global.showToast) global.showToast(uiText('运行结果已复制'), 'success');
+        } catch (error) { if (global.showToast) global.showToast(uiText('复制失败：') + error.message, 'error'); }
         finally { button.disabled = false; }
     }
 
@@ -531,22 +533,22 @@ import { floatingRunWindow } from './code-runner-window';
         outputHeader.appendChild(title);
         const actions = document.createElement('div'); actions.style.cssText = 'display:flex;gap:2px;';
         function action(label, icon, callback) {
-            const btn = document.createElement('button'); btn.type = 'button'; btn.title = label; btn.setAttribute('aria-label', label);
+            const btn = document.createElement('button'); btn.type = 'button'; setUiText(btn, label, 'title'); setUiText(btn, label, 'aria-label');
             btn.innerHTML = '<i class="fas fa-' + icon + '" aria-hidden="true"></i>';
             btn.style.cssText = 'border:0;background:transparent;color:inherit;cursor:pointer;width:30px;height:30px;padding:4px;';
             btn.addEventListener('click', () => callback(btn)); actions.appendChild(btn); return btn;
         }
-        action('运行方式与环境', 'question-circle', showEnvironmentHelp);
+        action(uiText('运行方式与环境'), 'question-circle', showEnvironmentHelp);
         runnerFiles = new RunnerFilesUi(global, () => !!runnerUiState.button?.disabled || !!codeRunner.abortRun, runSandboxCommand);
-        action('沙箱命令行', 'terminal', () => runnerFiles.show('terminal'));
-        action('沙箱文件管理', 'folder-open', () => runnerFiles.show('files'));
-        action('复制运行结果', 'copy', copyRunResult);
-        const maximize = action('最大化/恢复', 'expand', () => {
+        action(uiText('沙箱命令行'), 'terminal', () => runnerFiles.show('terminal'));
+        action(uiText('沙箱文件管理'), 'folder-open', () => runnerFiles.show('files'));
+        action(uiText('复制运行结果'), 'copy', copyRunResult);
+        const maximize = action(uiText('最大化/恢复'), 'expand', () => {
             runnerUiState.maximized = !runnerUiState.maximized; runnerUiState.minimized = false; updatePanelSize();
             maximize.innerHTML = '<i class="fas fa-' + (runnerUiState.maximized ? 'compress' : 'expand') + '" aria-hidden="true"></i>';
         });
-        action('最小化/展开', 'window-minimize', () => { runnerUiState.minimized = !runnerUiState.minimized; updatePanelSize(); });
-        action('关闭', 'times', () => { codeRunner.abortRun?.(); outputPanel.style.display = 'none'; refreshErrorHighlight(); });
+        action(uiText('最小化/展开'), 'window-minimize', () => { runnerUiState.minimized = !runnerUiState.minimized; updatePanelSize(); });
+        action(uiText('关闭'), 'times', () => { codeRunner.abortRun?.(); outputPanel.style.display = 'none'; refreshErrorHighlight(); });
         outputHeader.appendChild(actions);
 
         var outputBody = document.createElement('div');

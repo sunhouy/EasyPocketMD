@@ -2,6 +2,7 @@
  * 文件管理 - 加载、保存、同步、历史版本、文件夹
  */
 // @ts-nocheck
+import { floatingRunWindow } from '../code-runner-window';
 import { AutoSaveScheduler } from './autoSave';
 import { persistFile, restoreFiles, restoreFileFromDB, refreshSyncIcons } from './sync/local-state';
 import { saveAfterDialogOpens } from '../ui/dialog-save';
@@ -4450,6 +4451,7 @@ import { createDiffFileWriter } from './conflict/live-files';
         // 如果已存在查找框，先移除
         const existingModal = document.getElementById('findDialogModal');
         if (existingModal) {
+            existingModal.closeFindDialog?.();
             existingModal.remove();
         }
         // 仅窗口本身使用半透明蒙版效果，不遮挡整个页面
@@ -4459,6 +4461,7 @@ import { createDiffFileWriter } from './conflict/live-files';
         dialog.innerHTML =
             '<div id="findDialogHeader" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:' + sectionGap + ';cursor:move;user-select:none;touch-action:none;">' +
                 '<h3 style="margin:0;font-size:' + titleSize + ';">' + (isEn() ? 'Find and Replace' : '查找和替换') + '</h3>' +
+                '<button id="maximizeFindBtn" type="button" title="' + (isEn() ? 'Maximize/restore' : '最大化/恢复') + '" aria-label="' + (isEn() ? 'Maximize/restore' : '最大化/恢复') + '" style="margin-left:auto;background:none;border:none;color:inherit;cursor:pointer;"><i class="fas fa-expand"></i></button>' +
                 '<button id="closeFindBtn" style="background:none;border:none;font-size:18px;cursor:pointer;color:' + secondaryTextColor + ';padding:0;line-height:1;">&times;</button>' +
             '</div>' +
             '<div style="margin-bottom:' + sectionGap + ';display:flex;align-items:center;gap:6px;">' +
@@ -4494,77 +4497,19 @@ import { createDiffFileWriter } from './conflict/live-files';
             '</div>';
         document.body.appendChild(dialog);
         saveAfterDialogOpens(global);
-        // 拖动逻辑（支持鼠标和触摸）
-        const header = dialog.querySelector('#findDialogHeader');
-        let isDragging = false;
-        let startX, startY, startLeft, startTop;
-
-        // 鼠标拖动
-        header.addEventListener('mousedown', function(e) {
-            if (e.target.id === 'closeFindBtn') return;
-            isDragging = true;
-            startX = e.clientX;
-            startY = e.clientY;
-            const rect = dialog.getBoundingClientRect();
-            startLeft = rect.left;
-            startTop = rect.top;
-            document.body.style.userSelect = 'none';
+        const bounds = dialog.getBoundingClientRect();
+        const floating = floatingRunWindow(dialog, dialog.querySelector('#findDialogHeader'), {
+            x: bounds.left, y: bounds.top, width: bounds.width, height: Math.max(bounds.height, 280)
         });
-
-        document.addEventListener('mousemove', function(e) {
-            if (!isDragging) return;
-            const dx = e.clientX - startX;
-            const dy = e.clientY - startY;
-            let newLeft = startLeft + dx;
-            let newTop = startTop + dy;
-            newLeft = Math.max(0, Math.min(newLeft, window.innerWidth - dialog.offsetWidth));
-            newTop = Math.max(0, Math.min(newTop, window.innerHeight - dialog.offsetHeight));
-            dialog.style.left = newLeft + 'px';
-            dialog.style.top = newTop + 'px';
-            dialog.style.right = 'auto';
-        });
-
-        document.addEventListener('mouseup', function() {
-            if (isDragging) {
-                isDragging = false;
-                document.body.style.userSelect = '';
-            }
-        });
-
-        // 触摸拖动（手机支持）
-        header.addEventListener('touchstart', function(e) {
-            if (e.target.id === 'closeFindBtn') return;
-            isDragging = true;
-            const touch = e.touches[0];
-            startX = touch.clientX;
-            startY = touch.clientY;
-            const rect = dialog.getBoundingClientRect();
-            startLeft = rect.left;
-            startTop = rect.top;
-            document.body.style.userSelect = 'none';
-        }, { passive: false });
-
-        document.addEventListener('touchmove', function(e) {
-            if (!isDragging) return;
-            e.preventDefault();
-            const touch = e.touches[0];
-            const dx = touch.clientX - startX;
-            const dy = touch.clientY - startY;
-            let newLeft = startLeft + dx;
-            let newTop = startTop + dy;
-            newLeft = Math.max(0, Math.min(newLeft, window.innerWidth - dialog.offsetWidth));
-            newTop = Math.max(0, Math.min(newTop, window.innerHeight - dialog.offsetHeight));
-            dialog.style.left = newLeft + 'px';
-            dialog.style.top = newTop + 'px';
-            dialog.style.right = 'auto';
-        }, { passive: false });
-
-        document.addEventListener('touchend', function() {
-            if (isDragging) {
-                isDragging = false;
-                document.body.style.userSelect = '';
-            }
-        });
+        floating.update(false, false);
+        let findMaximized = false;
+        const maximizeFindBtn = dialog.querySelector('#maximizeFindBtn');
+        maximizeFindBtn.onclick = () => {
+            findMaximized = !findMaximized;
+            floating.update(findMaximized, false);
+            maximizeFindBtn.innerHTML = '<i class="fas fa-' + (findMaximized ? 'compress' : 'expand') + '"></i>';
+            maximizeFindBtn.setAttribute('aria-pressed', String(findMaximized));
+        };
 
         // 替换区域显示/隐藏控制
         const toggleReplaceBtn = dialog.querySelector('#toggleReplaceBtn');
@@ -5264,8 +5209,11 @@ import { createDiffFileWriter } from './conflict/live-files';
         function closeFindDialog() {
             clearHighlights();
             crossSearchLazyState = null;
+            floating.destroy();
+            document.removeEventListener('keydown', handleEsc);
             dialog.remove();
         }
+        dialog.closeFindDialog = closeFindDialog;
         closeBtn.onclick = closeFindDialog;
         // ESC键关闭
         const handleEsc = function(e) {
