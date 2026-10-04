@@ -6114,8 +6114,7 @@ body.tauri-mobile-safe-area:not(.file-management-mode) .file-list-sidebar {
 /* Optional companion stays below dialogs and above the mobile bottom toolbar. */
 #live2dCompanion { position: fixed; left: 12px; bottom: 12px; width: 180px; z-index: 800; display: flex; flex-direction: column; align-items: center; }
 #live2dCompanion canvas { width: 180px; height: 240px; cursor: pointer; }
-#live2dCompanion button, #live2dCompanion p { max-width: 100%; font-size: 12px; padding: 6px 9px; margin: 0; border-radius: 12px; background: var(--theme-accent, #4a90e2); color: white; border: 0; overflow-wrap: anywhere; }
-#live2dCompanion button { cursor: pointer; }
+#live2dCompanion p { max-width: 100%; font-size: 12px; padding: 6px 9px; margin: 0; border-radius: 12px; background: var(--theme-accent, #4a90e2); color: white; border: 0; overflow-wrap: anywhere; }
 #live2dCompanion canvas:focus-visible { outline: 2px solid var(--theme-accent, #4a90e2); border-radius: 12px; }
 body.file-management-mode #live2dCompanion, body.mobile-keyboard-visible #live2dCompanion { visibility: hidden; }
 @media (max-width: 768px) {

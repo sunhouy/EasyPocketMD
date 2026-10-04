@@ -69,12 +69,37 @@ export function normalizeChatUrl(baseUrl: string): string {
   return url + '/v1/chat/completions';
 }
 
+/** Some compatible gateways send SSE even when stream:false; preserve their text safely. */
+async function readChatResponse(response: Response): Promise<any> {
+  const backup = response.clone?.();
+  try { return await response.json(); }
+  catch (error) {
+    if (!backup) throw error;
+    const text = await backup.text();
+    let content = '', finish: string | null = null, done = false;
+    for (const frame of text.split(/\r?\n\r?\n/)) {
+      const payload = frame.split(/\r?\n/).filter(line => line.startsWith('data:')).map(line => line.slice(5).trimStart()).join('\n').trim();
+      if (!payload) continue;
+      if (payload === '[DONE]') { done = true; continue; }
+      let event: any;
+      try { event = JSON.parse(payload); } catch { continue; } // A truncated final frame cannot erase earlier deltas.
+      if (event.error) throw new Error(event.error.message || 'AI stream failed');
+      const choice = event.choices?.[0];
+      const delta = choice?.delta?.content || choice?.message?.content;
+      if (typeof delta === 'string') content += delta;
+      if (choice?.finish_reason) finish = choice.finish_reason;
+    }
+    if (!content) throw error;
+    return { choices: [{ message: { content }, finish_reason: finish || (done ? 'stop' : 'length') }] };
+  }
+}
+
 /**
  * 前端直连 OpenAI 兼容接口的聊天补全调用。
  * @param messages OpenAI 格式的 messages 数组
  * @returns 模型返回的文本内容
  */
-export async function callChat(messages: Array<{ role: string; content: string }>, opts?: { maxTokens?: number; temperature?: number; signal?: AbortSignal }): Promise<string> {
+async function requestChat(messages: Array<{ role: string; content: string }>, opts?: { maxTokens?: number; temperature?: number; signal?: AbortSignal; recoverTruncation?: boolean }, allowContinuation = true): Promise<string> {
   const config = getAIConfig();
   if (!isAIConfigReady(config)) {
     const err: any = new Error('AI 模型未配置，请在“设置 - AI 模型”中填写 apiKey、baseUrl 与模型名称');
@@ -97,52 +122,66 @@ export async function callChat(messages: Array<{ role: string; content: string }
   if (opts && opts.maxTokens) payload.max_tokens = opts.maxTokens;
   if (opts && opts.temperature !== undefined) payload.temperature = opts.temperature;
 
-  let response: Response;
-  try {
-    response = await fetch(url, {
-      signal: opts?.signal,
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + config.apiKey.trim()
-      },
-      body: JSON.stringify(payload)
-    });
-  } catch (e) {
-    if (opts?.signal?.aborted) throw e;
-    const err: any = new Error('无法连接 AI 服务，请检查 baseUrl 是否正确');
-    err.cause = e;
-    throw err;
-  }
-
-  if (!response.ok) {
-    let detail = '';
+  for (let attempt = 0; attempt < (opts?.recoverTruncation ? 3 : 1); attempt++) {
+    let response: Response;
     try {
-      const data = await response.json();
-      detail = (data && data.error && (data.error.message || data.error.code)) || '';
-    } catch (e) { /* ignore */ }
-    const err: any = new Error('AI 服务请求失败（HTTP ' + response.status + '）' + (detail ? ': ' + detail : ''));
-    err.status = response.status;
-    throw err;
+      response = await fetch(url, { signal: opts?.signal, method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + config.apiKey.trim() },
+        body: JSON.stringify(payload) });
+    } catch (e) {
+      if (opts?.signal?.aborted) throw e;
+      const err: any = new Error('无法连接 AI 服务，请检查 baseUrl 是否正确'); err.cause = e; throw err;
+    }
+    let data: any;
+    try { data = await readChatResponse(response); }
+    catch {
+      if (opts?.recoverTruncation && response.ok && attempt < 1) continue;
+      throw new Error('AI 服务返回了空或无效 JSON，请检查接口并重试 / AI service returned empty or invalid JSON; check the endpoint and retry');
+    }
+    if (!response.ok) {
+      const detail = String(data?.error?.message || '');
+      if (opts?.recoverTruncation && attempt < 2 && response.status === 400) {
+        if (/max_tokens/i.test(detail) && /max_completion_tokens/i.test(detail) && payload.max_tokens) { payload.max_completion_tokens = payload.max_tokens; delete payload.max_tokens; continue; }
+        if (/temperature/i.test(detail) && /unsupported|not support|does not support/i.test(detail) && payload.temperature !== undefined) { delete payload.temperature; continue; }
+      }
+      const error: any = new Error('AI 服务请求失败（HTTP ' + response.status + '）' + (data?.error?.message ? ': ' + data.error.message : ''));
+      error.status = response.status; throw error;
+    }
+    const choice = data?.choices?.[0];
+    const content = choice?.message?.content || data?.output?.choices?.[0]?.text || '';
+    if (choice?.finish_reason === 'length') {
+      if (opts?.recoverTruncation && allowContinuation && typeof content === 'string' && content.trim()) {
+        // Plain text stays usable even when the provider stops at its output limit.
+        try {
+          const continuation = await requestChat([...messages, { role: 'assistant', content }, { role: 'user', content: '从中断处继续完成回答，不重复前文，保留来源编号，最多400字。 / Continue from the cutoff without repeating the previous text; retain source citations.' }], { ...opts, maxTokens: 2048 }, false);
+          return content + '\n' + continuation;
+        } catch (error) {
+          if (opts?.signal?.aborted || error.status === 401 || error.status === 403) throw error;
+          return content + (error.partialContent || '') + '\n\n（回答达到输出上限，以上为已生成内容，可继续提问。）';
+        }
+      }
+      if (opts?.recoverTruncation && !content.trim() && attempt < 2) {
+        const budget = payload.max_completion_tokens !== undefined ? 'max_completion_tokens' : 'max_tokens';
+        payload[budget] = Math.min(16384, (payload[budget] || 1024) * 4); continue;
+      }
+      const error: any = new Error('AI 输出达到长度上限，请检查模型输出额度 / AI output reached the token limit; check the model output budget');
+      error.code = 'AI_OUTPUT_TRUNCATED'; error.partialContent = content; throw error;
+    }
+    if (typeof content !== 'string' || !content.trim()) {
+      if (opts?.recoverTruncation && attempt < 1) continue;
+      throw new Error('AI 返回了空回答，请检查模型配置 / AI returned an empty answer; check the model configuration');
+    }
+    return content;
   }
+  throw new Error('AI 未能生成回答 / AI could not produce an answer');
+}
 
-  let data: any;
-  try { data = await response.json(); }
-  catch { throw new Error('AI 服务返回了空或无效 JSON，请检查接口并重试 / AI service returned empty or invalid JSON; check the endpoint and retry'); }
-  if (data?.choices?.[0]?.finish_reason === 'length') {
-    const error: any = new Error('AI 输出达到长度上限，请缩小问题范围或重试 / AI output reached the token limit; narrow the question or retry');
-    error.code = 'AI_OUTPUT_TRUNCATED'; throw error;
-  }
-  const content = data && data.choices && data.choices[0] && data.choices[0].message
-    ? (data.choices[0].message.content || '')
-    : (data && data.output && data.output.choices && data.output.choices[0] && data.output.choices[0].text
-        ? data.output.choices[0].text
-        : '');
-  return content;
+export async function callChat(messages: Array<{ role: string; content: string }>, opts?: { maxTokens?: number; temperature?: number; signal?: AbortSignal; recoverTruncation?: boolean }): Promise<string> {
+  return requestChat(messages, opts);
 }
 
 /** 便捷方法：按 system / user 两条消息调用。 */
-export async function callText(systemPrompt: string, userPrompt: string, opts?: { maxTokens?: number; temperature?: number; signal?: AbortSignal }): Promise<string> {
+export async function callText(systemPrompt: string, userPrompt: string, opts?: { maxTokens?: number; temperature?: number; signal?: AbortSignal; recoverTruncation?: boolean }): Promise<string> {
   const messages = [
     { role: 'system', content: systemPrompt },
     { role: 'user', content: userPrompt }

@@ -46,30 +46,10 @@
     async function uploadFiles(filesArray, autoInsert) {
         autoInsert = autoInsert !== false;
         
-        // Check storage settings
-        if (!window.userSettings.storageLocation && !window.tempStorageLocation) {
-            const choice = await showStorageChoicePopup();
-            if (!choice) return; // User cancelled or closed
-            
-            if (choice.permanent) {
-                window.userSettings.storageLocation = choice.location;
-                localStorage.setItem('vditor_settings', JSON.stringify(window.userSettings));
-            } else {
-                // Temporary choice for this session
-                window.tempStorageLocation = choice.location;
-            }
-        }
-
-        const location = window.tempStorageLocation || window.userSettings.storageLocation || 'cloud';
-
         if (window.E2EAttachments?.currentFileEncrypted()) {
-            const links = await window.E2EAttachments.uploadEncrypted(filesArray, location === 'local');
+            const links = await window.E2EAttachments.uploadEncrypted(filesArray);
             if (autoInsert && g('vditor')) g('vditor').insertValue(links + '\n\n');
             return links;
-        }
-
-        if (location === 'local') {
-            return await saveFilesLocally(filesArray, autoInsert);
         }
 
         const processedFiles = [];
@@ -133,7 +113,7 @@
     async function uploadImage(dataUrl, useTempDir) {
         if (window.E2EAttachments?.currentFileEncrypted()) {
             const blob = await (await fetch(dataUrl)).blob();
-            const link = await window.E2EAttachments.uploadEncrypted([new File([blob], 'image.png', { type: blob.type })], false);
+            const link = await window.E2EAttachments.uploadEncrypted([new File([blob], 'image.png', { type: blob.type })]);
             return link.match(/\]\(([^)]+)\)$/)?.[1] || null;
         }
         return new Promise(function(resolve, reject) {
@@ -193,131 +173,6 @@
                     console.error('Upload error:', error);
                     resolve(null);
                 });
-        });
-    }
-
-    async function showStorageChoicePopup() {
-        var t = function(key) { return window.i18n ? window.i18n.t(key) : key; };
-        return new Promise<{location: string; permanent: boolean} | null>(resolve => {
-            const nightMode = g('nightMode') === true;
-            const modal = document.createElement('div');
-            modal.className = 'modal-overlay';
-            modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:20000;';
-
-            const bg = nightMode ? '#2d2d2d' : 'white';
-            const textColor = nightMode ? '#eee' : '#333';
-            const cardBg = nightMode ? '#3d3d3d' : '#f8f9fa';
-
-            const content = document.createElement('div');
-            content.style.cssText = `position:relative;background:${bg};color:${textColor};border-radius:12px;padding:25px;width:90%;max-width:450px;text-align:center;box-shadow: 0 4px 20px rgba(0,0,0,0.3);`;
-
-            content.innerHTML = `
-                <button class="modal-close-btn" style="position:absolute;top:15px;right:15px;background:none;border:none;font-size:20px;cursor:pointer;color:${textColor};" id="storage-cancel">&times;</button>
-                <h3 style="margin-top:0;">${t('storageChoiceTitle')}</h3>
-                <p style="margin-bottom:25px;font-size:14px;color:${nightMode ? '#aaa' : '#666'};">${t('storageChoiceMessage')}</p>
-                
-                <div style="display:flex;gap:15px;margin-bottom:25px;">
-                    <div id="choice-local" style="flex:1;padding:15px;background:${cardBg};border:2px solid transparent;border-radius:10px;cursor:pointer;transition:all 0.2s;">
-                        <i class="fas fa-hdd" style="font-size:24px;margin-bottom:10px;color:#2196F3;"></i>
-                        <div style="font-weight:bold;">${t('storageLocal')}</div>
-                        <div style="font-size:11px;margin-top:5px;color:${nightMode ? '#aaa' : '#888'};">${t('storageLocalDesc')}</div>
-                    </div>
-                    <div id="choice-cloud" style="flex:1;padding:15px;background:${cardBg};border:2px solid transparent;border-radius:10px;cursor:pointer;transition:all 0.2s;">
-                        <i class="fas fa-cloud" style="font-size:24px;margin-bottom:10px;color:#4CAF50;"></i>
-                        <div style="font-weight:bold;">${t('storageCloud')}</div>
-                        <div style="font-size:11px;margin-top:5px;color:${nightMode ? '#aaa' : '#888'};">${t('storageCloudDesc')}</div>
-                    </div>
-                </div>
-
-                <div style="display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:20px;font-size:14px;">
-                    <input type="checkbox" id="storage-permanent" style="cursor:pointer;">
-                    <label for="storage-permanent" style="cursor:pointer;">${t('storagePermanent')}</label>
-                </div>
-
-                <button id="storage-confirm" style="width:100%;padding:12px;background:#2196F3;color:white;border:none;border-radius:8px;font-weight:bold;cursor:pointer;">确定</button>
-            `;
-
-            modal.appendChild(content);
-            document.body.appendChild(modal);
-
-            let selectedLocation = 'cloud'; // Default to cloud
-            const localCard = content.querySelector('#choice-local');
-            const cloudCard = content.querySelector('#choice-cloud');
-            const confirmBtn = content.querySelector('#storage-confirm');
-            const permanentCheckbox = content.querySelector('#storage-permanent');
-
-            // Set initial state
-            (cloudCard as HTMLElement).style.borderColor = '#4CAF50';
-            (cloudCard as HTMLElement).style.background = nightMode ? '#2e4a30' : '#e8f5e9';
-
-            (localCard as HTMLElement).onclick = () => {
-                selectedLocation = 'local';
-                (localCard as HTMLElement).style.borderColor = '#2196F3';
-                (localCard as HTMLElement).style.background = nightMode ? '#263d4d' : '#e3f2fd';
-                (cloudCard as HTMLElement).style.borderColor = 'transparent';
-                (cloudCard as HTMLElement).style.background = cardBg;
-            };
-
-            (cloudCard as HTMLElement).onclick = () => {
-                selectedLocation = 'cloud';
-                (cloudCard as HTMLElement).style.borderColor = '#4CAF50';
-                (cloudCard as HTMLElement).style.background = nightMode ? '#2e4a30' : '#e8f5e9';
-                (localCard as HTMLElement).style.borderColor = 'transparent';
-                (localCard as HTMLElement).style.background = cardBg;
-            };
-
-            (content.querySelector('#storage-cancel') as HTMLElement).onclick = () => {
-                document.body.removeChild(modal);
-                resolve({location: 'cloud', permanent: false}); // fallback
-            };
-            
-            (confirmBtn as HTMLElement).onclick = () => {
-                modal.remove();
-                resolve({
-                    location: selectedLocation,
-                    permanent: (permanentCheckbox as HTMLInputElement).checked
-                });
-            };
-
-            modal.onclick = (e) => {
-                if (false && e.target === modal) {
-                    modal.remove();
-                    resolve(null);
-                }
-            };
-        });
-    }
-
-    async function saveFilesLocally(filesArray, autoInsert) {
-        autoInsert = autoInsert !== false;
-        const markdownLinks = [];
-
-        for (const file of filesArray) {
-            try {
-                const fileUrl = await global.ResourceLoader.storeLocalFile(file);
-                const blobUrl = await global.ResourceLoader.getLocalBlobUrl(fileUrl);
-                
-                const link = /\.(jpg|jpeg|png|gif|bmp|webp|svg)$/i.test(file.name) 
-                    ? `![${file.name}](${blobUrl})` 
-                    : `[${file.name}](${blobUrl})`;
-                markdownLinks.push(link);
-            } catch (err) {
-                console.error('Failed to read local file', err);
-            }
-        }
-
-        if (autoInsert && markdownLinks.length > 0 && g('vditor')) {
-            g('vditor').insertValue(markdownLinks.join('\n\n') + '\n\n');
-        }
-        return markdownLinks.join('\n\n');
-    }
-
-    function readFileAsDataURL(file) {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result);
-            reader.onerror = reject;
-            reader.readAsDataURL(file);
         });
     }
 
