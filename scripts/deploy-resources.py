@@ -28,6 +28,27 @@ def container_limits(role):
     return limits[role]
 
 
+def configure_sandbox_budget():
+    # Five independent Python limits must not exhaust a small host together.
+    # The shared slice covers both deployment slots and both site channels.
+    if not shutil.which('systemctl') or not Path('/sys/fs/cgroup/cgroup.controllers').exists():
+        raise RuntimeError('Python concurrency requires systemd/cgroup v2 aggregate resource limits')
+    driver = subprocess.check_output(['docker', 'info', '--format', '{{.CgroupDriver}}'], text=True).strip()
+    if driver != 'systemd':
+        raise RuntimeError('Docker must use the systemd cgroup driver for shared Python resource limits')
+    total = memory()['MemTotal'] // MIB
+    budget = max(256, min(2560, int(total * (.4 if small_host() else .5))))
+    quota = 100 if small_host() else min(500, (os.cpu_count() or 1) * 75)
+    unit = Path('/etc/systemd/system/epmd-python.slice')
+    temporary = unit.with_suffix('.slice.next')
+    temporary.write_text(f'[Unit]\nDescription=EasyPocketMD Python sandbox aggregate budget\n\n[Slice]\nMemoryHigh={int(budget * .9)}M\nMemoryMax={budget}M\nMemorySwapMax=0\nCPUQuota={quota}%\n')
+    temporary.chmod(0o644)
+    temporary.replace(unit)
+    subprocess.run(['systemctl', 'daemon-reload'], check=True)
+    subprocess.run(['systemctl', 'start', 'epmd-python.slice'], check=True)
+    return 'epmd-python.slice'
+
+
 @contextlib.contextmanager
 def deployment_memory(channel):
     if channel not in ('main', 'dev'):

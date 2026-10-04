@@ -10,6 +10,7 @@ export class RunnerFilesUi {
         this.status.setAttribute('role','status');
     }
     attach(panel: HTMLElement) { panel.appendChild(this.list); this.draw(); }
+    setMinimized(value: boolean) { this.list.hidden = value; }
     private endpoint() { return (this.global.getApiBaseUrl?.() || '/api').replace(/\/$/,'') + '/code-runner'; }
     private message(text: string) { this.status.textContent = text; }
     tokens() { return this.uploads.map(f => f.token); }
