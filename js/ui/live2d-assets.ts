@@ -1,9 +1,7 @@
 // Public model assets only: never cache AI requests, credentials or document text here.
 export const LIVE2D_CACHE = 'epmd-live2d-models-v1';
-export const LIVE2D_MODELS = {
-    shizuku: 'https://cdn.jsdelivr.net/npm/live2d-widget-model-shizuku@1.0.5/assets/shizuku.model.json',
-    koharu: 'https://cdn.jsdelivr.net/npm/live2d-widget-model-koharu@1.0.5/assets/koharu.model.json'
-};
+import { LIVE2D_MODELS } from '../main/live2d-models';
+export { LIVE2D_MODELS } from '../main/live2d-models';
 function check(signal: AbortSignal) { if (signal.aborted) throw new DOMException('Cancelled', 'AbortError'); }
 export async function cachedModelAsset(url: string, signal: AbortSignal): Promise<Response> {
     check(signal);

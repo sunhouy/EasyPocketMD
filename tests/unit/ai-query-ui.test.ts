@@ -18,7 +18,7 @@ describe('AI query panel', () => {
             : { code: 200, data: { files: [{ name: '项目/计划.md' }] } } }));
         window.AIConfig = { isReady: () => true, callText: jest.fn(async (_system, input) => {
             const data = JSON.parse(input);
-            return data.chunks ? JSON.stringify({ facts: [{ chunk: data.chunks[0].id, quote: '发布定于10月20日。' }] }) : '发布日期：10月20日。[1]';
+            return '发布日期：10月20日。[1]';
         }) };
         window.initAIAssistant(); window.showAIPanel();
         document.querySelector('[data-ai-action="query"]').click();
@@ -28,7 +28,7 @@ describe('AI query panel', () => {
     it('searches other files using the configured client and shows safe source excerpts', async () => {
         document.getElementById('aiQueryRun').click();
         for (let i = 0; i < 8; i++) await tick();
-        expect(window.AIConfig.callText).toHaveBeenCalledTimes(2);
+        expect(window.AIConfig.callText).toHaveBeenCalledTimes(1);
         expect(document.getElementById('aiQueryAnswer').textContent).toContain('10月20日');
         expect(document.getElementById('aiQuerySources').textContent).toContain('项目/计划.md');
         expect(document.querySelector('#aiQuerySources blockquote').textContent).toBe('发布定于10月20日。');

@@ -353,6 +353,13 @@ import CropperModule from 'cropperjs';
             throw new Error('文件为空');
         }
 
+        if (global.E2EAttachments?.currentFileEncrypted()) {
+            const links = await global.E2EAttachments.uploadEncrypted([file]);
+            const url = /\]\(([^\n]+)\)/.exec(links)?.[1];
+            if (!url) throw new Error('加密附件上传未返回地址');
+            return url;
+        }
+
         var formData = new FormData();
         formData.append('files[]', file);
         if (global.currentUser) {
@@ -398,70 +405,11 @@ import CropperModule from 'cropperjs';
     }
 
     async function uploadBase64Image(dataUrl) {
-        var blob = await (await fetch(dataUrl)).blob();
-        var formData = new FormData();
-        formData.append('files[]', blob, 'image.png');
-        if (global.currentUser) {
-            formData.append('username', global.currentUser.username);
-            if (global.currentUser.token) formData.append('token', global.currentUser.token);
-            else if (global.currentUser.password) formData.append('password', global.currentUser.password);
-        }
-        formData.append('uploadDir', 'uploads');
-
-        var apiUrl = (global.getApiBaseUrl ? global.getApiBaseUrl() : 'api') + '/external/upload';
-        var response = await fetch(apiUrl, { method: 'POST', body: formData });
-        var uploadResult;
-        try {
-            uploadResult = await response.json();
-        } catch (e) {
-            throw new Error('上传返回解析失败');
-        }
-
-        if (!response.ok || !uploadResult || uploadResult.success !== true) {
-            throw new Error((uploadResult && uploadResult.message) ? uploadResult.message : '上传失败');
-        }
-
-        var uploadedUrl = extractUploadedUrl(uploadResult);
-        if (!uploadedUrl) {
-            throw new Error('上传成功但未返回图片地址');
-        }
-        if (uploadedUrl.indexOf(' ') > -1) {
-            uploadedUrl = encodeURI(uploadedUrl);
-        }
-        return uploadedUrl;
+        return uploadImageFile(dataURLToFile(dataUrl, 'image.png'));
     }
 
     async function uploadBlobImage(blob, filename) {
-        var formData = new FormData();
-        formData.append('files[]', blob, filename);
-        if (global.currentUser) {
-            formData.append('username', global.currentUser.username);
-            if (global.currentUser.token) formData.append('token', global.currentUser.token);
-            else if (global.currentUser.password) formData.append('password', global.currentUser.password);
-        }
-        formData.append('uploadDir', 'uploads');
-
-        var apiUrl = (global.getApiBaseUrl ? global.getApiBaseUrl() : 'api') + '/external/upload';
-        var response = await fetch(apiUrl, { method: 'POST', body: formData });
-        var uploadResult;
-        try {
-            uploadResult = await response.json();
-        } catch (e) {
-            throw new Error('上传返回解析失败');
-        }
-
-        if (!response.ok || !uploadResult || uploadResult.success !== true) {
-            throw new Error((uploadResult && uploadResult.message) ? uploadResult.message : '上传失败');
-        }
-
-        var uploadedUrl = extractUploadedUrl(uploadResult);
-        if (!uploadedUrl) {
-            throw new Error('上传成功但未返回图片地址');
-        }
-        if (uploadedUrl.indexOf(' ') > -1) {
-            uploadedUrl = encodeURI(uploadedUrl);
-        }
-        return uploadedUrl;
+        return uploadImageFile(new File([blob], filename, { type: blob.type || 'image/png' }));
     }
 
     function editorContainsImageUrl(url) {
@@ -1159,17 +1107,7 @@ import CropperModule from 'cropperjs';
                 setPanelBusy(modal, true, '正在更换图片...');
 
                 try {
-                    var newSrc;
-                    if (isLocal) {
-                        var fileUrl = await global.ResourceLoader.storeLocalFile(file);
-                        var blobUrl = await global.ResourceLoader.getLocalBlobUrl(fileUrl);
-                        newSrc = blobUrl || fileUrl;
-                        if (global.LocalImageManager && global.LocalImageManager.registerUrlPair) {
-                            global.LocalImageManager.registerUrlPair(fileUrl, newSrc);
-                        }
-                    } else {
-                        newSrc = await uploadImageFile(file);
-                    }
+                    var newSrc = await uploadImageFile(file);
 
                     if (!newSrc) {
                         throw new Error('上传失败');
@@ -1357,19 +1295,8 @@ import CropperModule from 'cropperjs';
                     isLocal: isLocal
                 });
 
-                var newSrc;
-                if (isLocal) {
-                    var file = new File([outputBlob], 'compressed.jpg', { type: 'image/jpeg' });
-                    var fileUrl = await global.ResourceLoader.storeLocalFile(file);
-                    newSrc = await global.ResourceLoader.getLocalBlobUrl(fileUrl);
-                    if (global.LocalImageManager && global.LocalImageManager.registerUrlPair) {
-                        global.LocalImageManager.registerUrlPair(fileUrl, newSrc);
-                    }
-                    appendCompressDebugLog(modal, 'LOCAL_STORED', { fileUrl: fileUrl, newSrc: newSrc });
-                } else {
-                    newSrc = await uploadBlobImage(outputBlob, 'compressed.jpg');
-                    appendCompressDebugLog(modal, 'REMOTE_UPLOADED', { newSrc: newSrc });
-                }
+                var newSrc = await uploadBlobImage(outputBlob, 'compressed.jpg');
+                appendCompressDebugLog(modal, 'REMOTE_UPLOADED', { newSrc: newSrc });
 
                 applyImageStyle(currentEditingImage, meta.width, meta.rotate);
                 var replaced = replaceImageSourceInEditor(oldSrc, newSrc, meta.width, meta.rotate, currentEditingImage.getAttribute('alt'));
@@ -1436,17 +1363,7 @@ import CropperModule from 'cropperjs';
                     canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('Image conversion failed')), format, 0.92);
                 });
 
-                var newSrc;
-                if (isLocal) {
-                    var file = new File([blob], newFilename, { type: format });
-                    var fileUrl = await global.ResourceLoader.storeLocalFile(file);
-                    newSrc = await global.ResourceLoader.getLocalBlobUrl(fileUrl);
-                    if (global.LocalImageManager && global.LocalImageManager.registerUrlPair) {
-                        global.LocalImageManager.registerUrlPair(fileUrl, newSrc);
-                    }
-                } else {
-                    newSrc = await uploadBlobImage(blob, newFilename);
-                }
+                var newSrc = await uploadBlobImage(blob, newFilename);
 
                 applyImageStyle(currentEditingImage, meta.width, meta.rotate);
                 var replaced = replaceImageSourceInEditor(oldSrc, newSrc, meta.width, meta.rotate, currentEditingImage.getAttribute('alt'));
@@ -1508,20 +1425,7 @@ import CropperModule from 'cropperjs';
 
                 var meta = getImageMeta(currentEditingImage);
                 var isLocal = oldSrc.startsWith('local://') || oldSrc.startsWith('blob:') || oldSrc.startsWith('data:image');
-                var newSrc;
-
-                if (isLocal) {
-                    if (!(imageFile instanceof File)) {
-                        imageFile = new File([imageBlob], newFilename, { type: targetMime });
-                    }
-                    var localUrl = await global.ResourceLoader.storeLocalFile(imageFile);
-                    newSrc = await global.ResourceLoader.getLocalBlobUrl(localUrl);
-                    if (global.LocalImageManager && global.LocalImageManager.registerUrlPair) {
-                        global.LocalImageManager.registerUrlPair(localUrl, newSrc);
-                    }
-                } else {
-                    newSrc = await uploadBlobImage(imageBlob, newFilename);
-                }
+                var newSrc = await uploadBlobImage(imageBlob, newFilename);
 
                 applyImageStyle(currentEditingImage, meta.width, meta.rotate);
                 var replaced = replaceImageSourceInEditor(oldSrc, newSrc, meta.width, meta.rotate, currentEditingImage.getAttribute('alt'));

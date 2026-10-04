@@ -198,3 +198,14 @@ it('remembers an explicitly verified login unlock after an older client removed 
     await reopen(); const prompt=jest.fn(async()=>{throw Error('must remember');}); vault.setUI(prompt,jest.fn());
     await vault.ensureUnlocked(); expect(prompt).not.toHaveBeenCalled();
 });
+it('uploads encrypted attachments to cloud storage while legacy local preferences are present', async () => {
+    await setup(); window.currentFileId = 'doc'; window.userSettings = { storageLocation: 'local' };
+    window.ResourceLoader = { storeLocalFile: jest.fn() };
+    fetch.mockResolvedValueOnce({ ok: true, json: async () => ({ success: true, urls: ['/uploads/encrypted.epmd'] }) });
+    const link = await attachments.uploadEncrypted([new File(['private attachment'], 'secret.txt', { type: 'text/plain' })]);
+    const [url, init] = fetch.mock.calls.at(-1);
+    expect(url).toContain('/files/upload'); expect(init.body.get('e2e_attachment')).toBe('1');
+    expect(init.body.get('files[]').name).toMatch(/\.epmd$/);
+    expect(link).toContain('/uploads/encrypted.epmd'); expect(link).not.toContain('local://');
+    expect(window.ResourceLoader.storeLocalFile).not.toHaveBeenCalled();
+});

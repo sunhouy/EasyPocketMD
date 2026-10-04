@@ -1,4 +1,4 @@
-import { buildKnowledgeGraph, parseEvidence, queryDocuments } from '../../js/ui/ai-query';
+import { buildKnowledgeGraph, queryDocuments } from '../../js/ui/ai-query';
 
 describe('Cross-document AI knowledge queries', () => {
     it('connects relative Markdown and wiki links and searches the end of long documents', () => {
@@ -11,15 +11,6 @@ describe('Cross-document AI knowledge queries', () => {
         expect(chunks.at(-1)?.text).toContain('最终截止日是10月20日');
         expect(chunks.at(-1)?.line).toBeGreaterThanOrEqual(1);
     });
-    it('rejects fabricated excerpts and IDs while reporting the actual source line', () => {
-        const chunks = buildKnowledgeGraph([{ path: 'other.md', content: '# Roadmap\nShip on October 20' }]);
-        expect(parseEvidence(JSON.stringify({ facts: [
-            { chunk: '1:1', quote: 'Ship on October 20' },
-            { chunk: '1:1', quote: 'Ship on November 20' },
-            { chunk: '999:1', quote: 'Ship on October 20' }
-        ] }), chunks)).toEqual([{ source: 1, quote: 'Ship on October 20', line: 2 }]);
-        expect(() => parseEvidence('invalid', chunks)).toThrow();
-    });
     it('reads every document in bounded batches instead of only the current file or keyword matches', async () => {
         const docs = Array.from({ length: 14 }, (_, i) => ({ path: `folder${i}/notes.md`, content: 'background '.repeat(240) + (i === 13 ? 'Launch is October 20.' : 'No launch date.') }));
         const read = new Set<number>();
@@ -28,7 +19,7 @@ describe('Cross-document AI knowledge queries', () => {
             if (data.chunks) {
                 data.chunks.forEach(chunk => read.add(chunk.source));
                 expect(input.length).toBeLessThan(12000);
-                return JSON.stringify({ facts: data.chunks.filter(chunk => chunk.text.includes('Launch is October 20.')).map(chunk => ({ chunk: chunk.id, quote: 'Launch is October 20.' })) });
+                return data.chunks.some(chunk => chunk.text.includes('Launch is October 20.')) ? 'Launch is October 20. [14] [999]' : 'NO_EVIDENCE';
             }
             return 'Launch is October 20. [14] [999]';
         });
@@ -40,7 +31,7 @@ describe('Cross-document AI knowledge queries', () => {
         expect(result.files).toBe(14);
     });
     it('does not send hidden configuration files or synthesize an unsupported answer', async () => {
-        const call = jest.fn(async () => '{"facts":[]}');
+        const call = jest.fn(async () => 'NO_EVIDENCE');
         const result = await queryDocuments('What is the secret?', [
             { path: '.ai-config.json', content: 'API secret' }, { path: 'nested/.secret.md', content: 'password' }, { path: 'readme.md', content: 'Notes' }
         ], call);
@@ -50,22 +41,21 @@ describe('Cross-document AI knowledge queries', () => {
         expect(result.sources).toEqual([]);
         expect(result.answer).toContain('未在可读取的文档中找到');
     });
-    it('hierarchically combines all findings without discarding files when evidence is large', async () => {
+    it('combines all batches without requiring JSON model output', async () => {
         const docs = Array.from({ length: 32 }, (_, i) => ({ path: `project${i}.md`, content: `Fact ${i}: ` + 'x'.repeat(900) }));
-        const combined = new Set<number>();
+        const seen = new Set<number>();
         const call = jest.fn(async (_system, input) => {
             const data = JSON.parse(input);
-            if (data.chunks) return JSON.stringify({ facts: data.chunks.map(chunk => ({ chunk: chunk.id, quote: chunk.text })) });
-            if (_system.includes('控制在1200字')) {
-                for (const note of data.notes) for (const fact of JSON.parse(note)) combined.add(fact.source);
-                return 'Combined findings [1]';
+            if (data.chunks) {
+                data.chunks.forEach(chunk => seen.add(chunk.source));
+                return data.chunks.map(chunk => `Fact ${chunk.source}. [${chunk.source}]`).join('\n');
             }
-            return 'Cross-document answer [1]';
+            return docs.map((_doc, i) => `Fact ${i + 1}. [${i + 1}]`).join('\n');
         });
         const result = await queryDocuments('Summarize every project', docs, call);
-        expect(combined.size).toBe(32);
-        expect(result.sources).toHaveLength(32);
-        expect(call.mock.calls.at(-1)[1].length).toBeLessThan(10000);
+        expect(seen.size).toBe(32); expect(result.sources).toHaveLength(32);
+        expect(call.mock.calls.every(([_system, input]) => input.length < 6000)).toBe(true);
+        expect(call.mock.calls.every(([system]) => system.includes('不返回JSON') || system.includes('不要输出JSON'))).toBe(true);
     });
     it('stops before synthesis when cancelled during extraction', async () => {
         const controller = new AbortController();
