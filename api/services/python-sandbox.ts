@@ -22,7 +22,7 @@ export async function runPythonSandbox(code: string, signal?: AbortSignal, onInp
     const name = 'epmd-python-' + randomUUID();
     try {
         return await new Promise(resolve => {
-            let output = '', stderr = '', bytes = 0, settled = false, resultValue: any, waiting = false;
+            let output = '', stderr = '', bytes = 0, settled = false, resultValue: any, waiting = false, protocolReady = false;
             let remaining = TIMEOUT, started = Date.now(), timer: ReturnType<typeof setTimeout>;
             const inputController = new AbortController();
             const child = spawn('docker', [
@@ -37,7 +37,7 @@ export async function runPythonSandbox(code: string, signal?: AbortSignal, onInp
             ], { shell:false, stdio:['pipe','pipe','pipe'] });
             const finish = (result) => {
                 if (settled) return; settled = true;
-                clearTimeout(timer); clearTimeout(lifetime); inputController.abort(); signal?.removeEventListener('abort', abort);
+                clearTimeout(timer); clearTimeout(lifetime); clearTimeout(handshake); inputController.abort(); signal?.removeEventListener('abort', abort);
                 child.kill('SIGKILL');
                 void cleanup(name).finally(() => resolve(result));
             };
@@ -47,6 +47,9 @@ export async function runPythonSandbox(code: string, signal?: AbortSignal, onInp
                 timer = setTimeout(() => finish({success:false,status:408,error:'Python execution timed out (20 seconds of execution)'}), Math.max(1, remaining));
             };
             const lifetime = setTimeout(() => finish({success:false,status:408,error:'Interactive execution session expired (5 minutes)'}), 5 * 60000);
+            const handshake = onInput ? setTimeout(() => {
+                if (!protocolReady) finish({success:false,status:503,error:'Python 沙箱版本过旧或启动失败，不支持交互输入。请部署最新沙箱镜像后重试。'});
+            }, 8000) : undefined;
             arm();
             signal?.addEventListener('abort', abort, {once:true});
             child.stdin.on('error', () => {});
@@ -61,8 +64,10 @@ export async function runPythonSandbox(code: string, signal?: AbortSignal, onInp
                     const line = output.slice(0, newline); output = output.slice(newline + 1);
                     try {
                         const value = JSON.parse(line);
-                        if (value.type === 'input') {
-                            if (!onInput || waiting || typeof value.prompt !== 'string' || typeof value.output !== 'string') throw Error('Invalid input request');
+                        if (value.type === 'ready' && value.protocol === 2) {
+                            protocolReady = true; clearTimeout(handshake);
+                        } else if (value.type === 'input') {
+                            if (!onInput || !protocolReady || waiting || typeof value.prompt !== 'string' || typeof value.output !== 'string') throw Error('Invalid input request');
                             waiting = true; remaining -= Date.now() - started; clearTimeout(timer);
                             timer = setTimeout(() => finish({success:false,status:408,error:'Input timed out (2 minutes)'}), 120000);
                             Promise.resolve(onInput({prompt:value.prompt.slice(0,4096),output:value.output.slice(0,65536)}, inputController.signal)).then(text => {

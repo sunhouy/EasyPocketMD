@@ -1,5 +1,6 @@
 """Bound offline imports on small hosts without stopping unrelated services."""
 import contextlib
+import json
 import os
 from pathlib import Path
 import shutil
@@ -25,11 +26,27 @@ def container_limits(role):
     return limits[role]
 
 
+def required_import_space(manifest):
+    members = {m['sha256']:m for m in manifest['members']}
+    image_ids = subprocess.check_output(['docker','image','ls','--quiet','--no-trunc'], text=True).split()
+    known = set()
+    if image_ids:
+        for image in json.loads(subprocess.check_output(['docker','image','inspect',*sorted(set(image_ids))], text=True)):
+            known.update(image.get('RootFS',{}).get('Layers',[]))
+    growth = sum(m.get('expanded_size',m['size']) for m in members.values() if m.get('layer_diff_id') not in known)
+    status = subprocess.check_output(['docker','info','--format','{{json .DriverStatus}}'], text=True)
+    # containerd streams blobs into its content store and reuses existing layers.
+    # Classic Docker also extracts the full archive to a temporary directory.
+    # Existing DiffIDs may be repacked with a different compressed blob digest.
+    # Reserve one content copy for those blobs, even though their snapshots reuse.
+    existing_content = sum(m['size'] for m in members.values() if m.get('layer_diff_id') in known)
+    temporary = existing_content if 'io.containerd.snapshotter.v1' in status else sum(m['size'] for m in members.values())
+    return temporary + growth * 2 + 512 * MIB
+
+
 @contextlib.contextmanager
 def import_budget(directory, manifest):
-    total = sum(member['size'] for member in manifest['members'])
-    # Docker's content store and unpacked snapshots can coexist during import.
-    required = total * 2 + 1024 * MIB
+    required = required_import_space(manifest)
     free = shutil.disk_usage(directory).free
     if free < required:
         raise RuntimeError(f'Not enough disk for a safe image import: need {required // MIB} MiB free, have {free // MIB} MiB; retained current deployment')
@@ -86,7 +103,7 @@ if __name__ == '__main__':
     if action == 'transfer':
         missing = {m['sha256']:m.get('compressed_size',m['size']) for m in manifest['members']
                    if not (Path(cache) / 'objects' / (m['sha256'] + '.gz')).exists()}
-        reserve = sum(m['size'] for m in manifest['members']) * 2 + 1024 * MIB
+        reserve = required_import_space(manifest)
         needed = sum(missing.values()) + reserve
         if shutil.disk_usage(cache).free < needed:
             raise SystemExit(f'Insufficient disk for transfer + import: need {needed // MIB} MiB free. Current services retained; clean obsolete backups/releases first.')
