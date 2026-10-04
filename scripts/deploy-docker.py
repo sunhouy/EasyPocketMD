@@ -4,6 +4,7 @@
 MySQL/Redis and the existing TLS edge stay in place; application services and
 static delivery run in containers. All images are already loaded offline.
 """
+import fcntl
 import hashlib
 import json
 import os
@@ -88,7 +89,6 @@ def activate(release, channel, slot, current):
     config = json.loads((release / 'config.json').read_text())
     images = manifest['images']
     shared = Path('/www/wwwroot/js_shared' if channel == 'main' else '/www/wwwroot/js_dev_shared')
-    migrate_data(channel, shared)
     static = Path('/www/wwwroot/static'); static.mkdir(parents=True, exist_ok=True)
     base = (3150 if channel == 'main' else 3250) + slot
     app_port, print_port, gateway_port, print_gateway_port = base, base + 10, base + 30, base + 32
@@ -123,11 +123,11 @@ def activate(release, channel, slot, current):
         health(gateway_port, config['wasm'])
         # Probe the exact app-configured sandbox before changing live traffic.
         command('docker', 'exec', names['app'], './node_modules/.bin/tsx',
-                'scripts/check-python-sandbox.ts', '--input-only', stdout=subprocess.DEVNULL)
+                'scripts/check-python-sandbox.ts', '--input-only', stdout=subprocess.DEVNULL, timeout=30)
         # Verify the print service responds to a real WebSocket handshake.
         command('docker', 'exec', names['print'], 'python', '-c',
                 'import asyncio,websockets\nasync def check():\n async with websockets.connect("ws://127.0.0.1:' + str(print_port) + '") as ws: pass\nasyncio.run(check())',
-                stdout=subprocess.DEVNULL)
+                stdout=subprocess.DEVNULL, timeout=10)
         domain = config['domain']
         if not re.fullmatch(r'[A-Za-z0-9.-]+', domain):
             raise RuntimeError('Invalid deployment domain')
@@ -189,6 +189,7 @@ server {{
         command(nginx, '-t')
         command(nginx, '-s', 'reload')
         candidate = {'release': str(release), 'slot': slot, 'containers': names}
+        write_atomic(release / '.activated', 'healthy\n')
         write_atomic(ROOT / ('state-' + channel + '.json'), json.dumps({'current': candidate, 'previous': current}))
         switched = True
         return candidate
@@ -202,6 +203,64 @@ server {{
             subprocess.run([nginx, '-s', 'reload'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             for name in names.values():
                 remove(name)
+
+
+def cleanup_obsolete_releases():
+    """Keep current + previous images/CAS for both channels, but no old containers."""
+    try:
+        releases, active = set(), set()
+        release_root = (ROOT / 'releases').resolve()
+        # A CI upload can run concurrently with cleanup. Protect fresh staged
+        # releases until activation, and failed uploads for one day.
+        for staged in release_root.iterdir():
+            if (staged.is_dir() and not staged.is_symlink()
+                    and not (staged / '.activated').exists()
+                    and time.time() - staged.stat().st_mtime < 86400):
+                releases.add(staged.resolve())
+        for channel in ('main', 'dev'):
+            state_file = ROOT / f'state-{channel}.json'
+            if not state_file.exists():
+                continue
+            state = json.loads(state_file.read_text())
+            for key in ('current', 'previous'):
+                record = state.get(key)
+                if not record:
+                    continue
+                releases.add(Path(record['release']).resolve())
+                if key == 'current':
+                    active.update(record['containers'].values())
+        images, objects = set(), set()
+        # Validate every retained manifest BEFORE deleting any artifacts.
+        for release in releases:
+            manifest = json.loads((release / 'release.json').read_text())
+            images.update(manifest['images'].values())
+            objects.update(member['sha256'] for member in manifest['members'])
+        names = subprocess.check_output(['docker', 'ps', '-a', '--filter',
+            'label=easypocketmd.managed=true', '--format', '{{.Names}}'], text=True).split()
+        for name in names:
+            if name not in active and re.fullmatch(r'epmd-(main|dev)-(app|print|gateway)-[01]', name):
+                if '-app-' in name:
+                    cleanup_sandboxes(name)
+                remove(name)
+        tags = subprocess.check_output(['docker', 'image', 'ls', '--format',
+            '{{.Repository}}:{{.Tag}}'], text=True).split()
+        for image in set(tags) - images:
+            if re.fullmatch(r'easypocketmd-(app|print|gateway|python):[0-9a-f]{40}', image):
+                # No force/prune: images used by another container remain protected.
+                subprocess.run(['docker', 'image', 'rm', image], stdout=subprocess.DEVNULL)
+        release_root = (ROOT / 'releases').resolve()
+        for release in release_root.iterdir():
+            if (release.is_dir() and not release.is_symlink() and release.resolve() not in releases
+                    and re.fullmatch(r'(main|dev)-[0-9]+-[0-9]+', release.name)):
+                shutil.rmtree(release)
+        object_root = ROOT / 'cache' / 'objects'
+        for artifact in object_root.glob('*.gz'):
+            if re.fullmatch(r'[0-9a-f]{64}\.gz', artifact.name) and artifact.stem not in objects:
+                artifact.unlink()
+        print('Cleaned obsolete project containers, image tags, releases and cached layers', flush=True)
+    except Exception as error:
+        # Cleanup must never undo a healthy deployment.
+        print(f'Old deployment cleanup incomplete: {error}', flush=True)
 
 
 def main():
@@ -222,25 +281,31 @@ def main():
     else:
         raise RuntimeError('Invalid action')
     slot = 1 - current['slot'] if current else 0
+    # Copy legacy data before the capacity-dependent activation pause.
+    migrate_data(channel, Path('/www/wwwroot/js_shared' if channel == 'main' else '/www/wwwroot/js_dev_shared'))
     paused = []
     try:
-        if current and resources.small_host():
-            # A small host cannot hold two complete releases safely. Briefly pause
-            # this site's old services, then restore them if activation fails.
+        if current and resources.memory()['MemAvailable'] < 256 * resources.MIB:
+            # Pause only the API, and only for activation when capacity is tight.
+            # The existing gateway still serves the editor/static assets.
             cleanup_sandboxes(current['containers']['app'])
-            for name in current['containers'].values():
-                command('docker', 'stop', '--time', '10', name, stdout=subprocess.DEVNULL)
-                paused.append(name)
+            name = current['containers']['app']
+            paused.append(name)
+            command('docker', 'stop', '--time', '5', name, stdout=subprocess.DEVNULL)
         candidate = activate(release, channel, slot, current)
     except BaseException:
         for name in paused:
-            command('docker', 'start', name, stdout=subprocess.DEVNULL)
+            result = subprocess.run(['docker', 'start', name], stdout=subprocess.DEVNULL)
+            if result.returncode:
+                print(f'Could not restore {name}; manual restart required', flush=True)
         raise
     # Old connections get a grace period; rollback keeps the old immutable release.
     if current:
         for name in current['containers'].values():
-            subprocess.run(['docker', 'stop', '--time', '30', name], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            subprocess.run(['docker', 'stop', '--time', '5', name], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         cleanup_sandboxes(current['containers']['app'])
+        for name in current['containers'].values():
+            remove(name)
     # Stop only this project's legacy PM2 processes, after successful traffic switch.
     pm2 = shutil.which('pm2') or '/www/server/nodejs/v24.14.1/bin/pm2'
     if Path(pm2).is_file():
@@ -254,8 +319,18 @@ def main():
     config = json.loads((release / 'config.json').read_text())
     filename = 'version.txt' if channel == 'main' else 'version-dev.txt'
     write_atomic(Path('/www/wwwroot/static') / filename, config['version'] + '\n', 0o644)
+    cleanup_obsolete_releases()
     print(f'Docker {action} completed: {channel}, slot {slot}')
 
 
 if __name__ == '__main__':
-    main()
+    if os.environ.get('EPMD_DEPLOYMENT_LOCK_HELD') == '1':
+        main()
+    else:
+        ROOT.mkdir(parents=True, exist_ok=True)
+        with (ROOT / 'deployment.lock').open('a') as handle:
+            try:
+                fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                raise SystemExit('Another server deployment is in progress')
+            main()

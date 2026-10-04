@@ -70,7 +70,7 @@
                         scheduleProcessImages();
                         return;
                     }
-                    if (mutation.type === 'attributes' && mutation.target && mutation.target.tagName === 'IMG') {
+                    if (mutation.type === 'attributes' && mutation.target instanceof Element && mutation.target.tagName === 'IMG') {
                         scheduleProcessImages();
                         return;
                     }

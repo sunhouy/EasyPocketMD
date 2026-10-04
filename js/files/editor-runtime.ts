@@ -232,8 +232,8 @@ export function installEditorRuntime(global: any, ctx: Partial<EditorRuntimeCtx>
             '</div>';
         editorContainer.appendChild(host);
 
-        const textarea = document.getElementById('longFileTextarea');
-        const previewToggle = document.getElementById('longFilePreviewToggle');
+        const textarea = (document.getElementById('longFileTextarea') as HTMLTextAreaElement);
+        const previewToggle = (document.getElementById('longFilePreviewToggle') as HTMLButtonElement);
 
         if (textarea) {
             textarea.addEventListener('input', function() {
@@ -279,7 +279,7 @@ export function installEditorRuntime(global: any, ctx: Partial<EditorRuntimeCtx>
 
     function updateLongFileEditorLabels() {
         const hint = document.getElementById('longFileModeHint');
-        const toggle = document.getElementById('longFilePreviewToggle');
+        const toggle = (document.getElementById('longFilePreviewToggle') as HTMLButtonElement);
         const state = getLongFileEditorState();
         const bannerText = window.i18n ? t('longFileModeBanner') : '超长文件模式：高性能文本编辑 + 快速预览';
         const toggleShowText = window.i18n ? t('longFilePreviewShow') : '显示预览';

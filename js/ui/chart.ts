@@ -2,7 +2,7 @@
 (function(global) {
     'use strict';
 
-    function g(name) { return global[name]; }
+    function g<K extends keyof Window>(name: K): Window[K] { return global[name]; }
     function isEn() { return window.i18n && window.i18n.getLanguage() === 'en'; }
     function t(key) { return window.i18n ? window.i18n.t(key) : key; }
 
@@ -579,7 +579,7 @@
                                 var num = parseInt(match[1]);
                                 var fieldContainer = form.querySelector('[data-field-name="' + field.name + '"]');
                                 if (fieldContainer) {
-                                    fieldContainer.style.display = num <= selectedCount ? 'block' : 'none';
+                                    (fieldContainer as HTMLElement).style.display = num <= selectedCount ? 'block' : 'none';
                                 }
                             }
                         }
@@ -728,7 +728,7 @@
 
                         window.EChartsLoader.load(function() {
                             try {
-                                var chart = echarts.init(tempDiv);
+                                var chart = window.echarts.init(tempDiv);
                                 chart.setOption(option);
 
                                 // 等待渲染完成后导出图片
@@ -1055,13 +1055,13 @@ The chart type is: ${chartType}. Return only valid chart code or JSON, no explan
                 };
 
                 chartBtn.onmouseenter = function() {
-                    this.style.background = nightMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)';
-                    this.style.borderColor = '#4a90e2';
+                    (this as HTMLElement).style.background = nightMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)';
+                    (this as HTMLElement).style.borderColor = '#4a90e2';
                 };
 
                 chartBtn.onmouseleave = function() {
-                    this.style.background = nightMode ? '#3d3d3d' : '#f5f5f5';
-                    this.style.borderColor = 'transparent';
+                    (this as HTMLElement).style.background = nightMode ? '#3d3d3d' : '#f5f5f5';
+                    (this as HTMLElement).style.borderColor = 'transparent';
                 };
 
                 chartGrid.appendChild(chartBtn);
@@ -1174,13 +1174,13 @@ The chart type is: ${chartType}. Return only valid chart code or JSON, no explan
                 };
 
                 chartBtn.onmouseenter = function() {
-                    this.style.background = nightMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)';
-                    this.style.borderColor = '#4a90e2';
+                    (this as HTMLElement).style.background = nightMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)';
+                    (this as HTMLElement).style.borderColor = '#4a90e2';
                 };
 
                 chartBtn.onmouseleave = function() {
-                    this.style.background = nightMode ? '#3d3d3d' : '#f5f5f5';
-                    this.style.borderColor = 'transparent';
+                    (this as HTMLElement).style.background = nightMode ? '#3d3d3d' : '#f5f5f5';
+                    (this as HTMLElement).style.borderColor = 'transparent';
                 };
 
                 chartGrid.appendChild(chartBtn);

@@ -83,14 +83,14 @@ import CropperModule from 'cropperjs';
     }
 
     function blurActiveTextInput() {
-        var active = document.activeElement;
-        if (!active || typeof active.blur !== 'function') return;
+        var active = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+        if (!active || typeof (active as HTMLElement).blur !== 'function') return;
 
         var tagName = String(active.tagName || '').toUpperCase();
         var isTextInput = tagName === 'INPUT' || tagName === 'TEXTAREA';
         var isEditable = !!active.isContentEditable;
         if (isTextInput || isEditable) {
-            active.blur();
+            (active as HTMLElement).blur();
         }
     }
 
@@ -1103,12 +1103,12 @@ import CropperModule from 'cropperjs';
 
         var renameInput = modal.querySelector('.epmd-rename-input');
         if (renameInput) {
-            renameInput.value = guessBaseNameFromSrc(currentEditingImage.getAttribute('src') || '');
+            (renameInput as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement).value = guessBaseNameFromSrc(currentEditingImage.getAttribute('src') || '');
         }
         resetCompressDebugLog(modal);
 
         // 绑定按钮事件
-        modal.querySelector('.epmd-size-minus').onclick = function() {
+        (modal.querySelector('.epmd-size-minus') as HTMLElement).onclick = function() {
             if (!currentEditingImage) return;
             var meta = getImageMeta(currentEditingImage);
             var width = Math.max(80, Math.round(meta.width * 0.9));
@@ -1116,7 +1116,7 @@ import CropperModule from 'cropperjs';
             persistImageChange(currentEditingImage, width, meta.rotate);
         };
 
-        modal.querySelector('.epmd-size-plus').onclick = function() {
+        (modal.querySelector('.epmd-size-plus') as HTMLElement).onclick = function() {
             if (!currentEditingImage) return;
             var meta = getImageMeta(currentEditingImage);
             var width = Math.min(2400, Math.round(meta.width * 1.1));
@@ -1125,7 +1125,7 @@ import CropperModule from 'cropperjs';
             persistImageChange(currentEditingImage, width, meta.rotate);
         };
 
-        modal.querySelector('.epmd-rotate-left').onclick = function() {
+        (modal.querySelector('.epmd-rotate-left') as HTMLElement).onclick = function() {
             if (!currentEditingImage) return;
             var meta = getImageMeta(currentEditingImage);
             var normalizedRotate = ((meta.rotate % 360) + 360) % 360;
@@ -1134,7 +1134,7 @@ import CropperModule from 'cropperjs';
             persistImageChange(currentEditingImage, 0, rotate);
         };
 
-        modal.querySelector('.epmd-rotate-right').onclick = function() {
+        (modal.querySelector('.epmd-rotate-right') as HTMLElement).onclick = function() {
             if (!currentEditingImage) return;
             var meta = getImageMeta(currentEditingImage);
             var normalizedRotate = ((meta.rotate % 360) + 360) % 360;
@@ -1143,13 +1143,13 @@ import CropperModule from 'cropperjs';
             persistImageChange(currentEditingImage, 0, rotate);
         };
 
-        modal.querySelector('.epmd-replace-image').onclick = function() {
+        (modal.querySelector('.epmd-replace-image') as HTMLElement).onclick = function() {
             if (!currentEditingImage) return;
             var input = document.createElement('input');
             input.type = 'file';
             input.accept = 'image/*';
             input.onchange = async function(e) {
-                var file = e.target.files && e.target.files[0];
+                var file = (e.target as HTMLInputElement).files && (e.target as HTMLInputElement).files[0];
                 if (!file) return;
 
                 var meta = getImageMeta(currentEditingImage);
@@ -1193,12 +1193,12 @@ import CropperModule from 'cropperjs';
             input.click();
         };
 
-        modal.querySelector('.epmd-crop-open').onclick = function() {
+        (modal.querySelector('.epmd-crop-open') as HTMLElement).onclick = function() {
             if (!currentEditingImage) return;
             openCropTool(currentEditingImage, modal);
         };
 
-        modal.querySelector('.epmd-download-image').onclick = function() {
+        (modal.querySelector('.epmd-download-image') as HTMLElement).onclick = function() {
             if (!currentEditingImage) return;
             var src = currentEditingImage.getAttribute('src') || '';
             if (!src) {
@@ -1219,24 +1219,24 @@ import CropperModule from 'cropperjs';
             document.body.removeChild(link);
         };
 
-        modal.querySelector('.epmd-compress-toggle').onclick = function() {
+        (modal.querySelector('.epmd-compress-toggle') as HTMLElement).onclick = function() {
             var content = modal.querySelector('.epmd-compress-content');
             var arrow = modal.querySelector('.epmd-compress-arrow');
-            if (content.style.display === 'none') {
-                content.style.display = 'block';
-                arrow.style.transform = 'rotate(180deg)';
+            if ((content as HTMLElement).style.display === 'none') {
+                (content as HTMLElement).style.display = 'block';
+                (arrow as HTMLElement).style.transform = 'rotate(180deg)';
             } else {
-                content.style.display = 'none';
-                arrow.style.transform = 'rotate(0deg)';
+                (content as HTMLElement).style.display = 'none';
+                (arrow as HTMLElement).style.transform = 'rotate(0deg)';
             }
         };
 
-        modal.querySelector('.epmd-compress-quality').oninput = function() {
+        (modal.querySelector('.epmd-compress-quality') as HTMLElement).oninput = function() {
             var val = modal.querySelector('.epmd-compress-quality-val');
-            if (val) val.textContent = this.value;
+            if (val) val.textContent = (this as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement).value;
         };
 
-        modal.querySelector('.epmd-compress-run').onclick = async function() {
+        (modal.querySelector('.epmd-compress-run') as HTMLElement).onclick = async function() {
             if (!currentEditingImage) return;
             setPanelBusy(modal, true, '正在压缩...');
             var statusEl = modal.querySelector('.epmd-compress-status');
@@ -1244,9 +1244,9 @@ import CropperModule from 'cropperjs';
             resetCompressDebugLog(modal);
 
             try {
-                var qualityPercent = parseInt(modal.querySelector('.epmd-compress-quality').value, 10);
+                var qualityPercent = parseInt((modal.querySelector('.epmd-compress-quality') as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement).value, 10);
                 var quality = qualityPercent / 100;
-                var maxWidth = parseInt(modal.querySelector('.epmd-compress-maxwidth').value, 10) || 1920;
+                var maxWidth = parseInt((modal.querySelector('.epmd-compress-maxwidth') as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement).value, 10) || 1920;
                 var oldSrc = currentEditingImage.getAttribute('src') || '';
                 appendCompressDebugLog(modal, 'START', {
                     src: oldSrc,
@@ -1390,26 +1390,26 @@ import CropperModule from 'cropperjs';
             }
         };
 
-        modal.querySelector('.epmd-convert-toggle').onclick = function() {
+        (modal.querySelector('.epmd-convert-toggle') as HTMLElement).onclick = function() {
             var content = modal.querySelector('.epmd-convert-content');
             var arrow = modal.querySelector('.epmd-convert-arrow');
-            if (content.style.display === 'none') {
-                content.style.display = 'block';
-                arrow.style.transform = 'rotate(180deg)';
+            if ((content as HTMLElement).style.display === 'none') {
+                (content as HTMLElement).style.display = 'block';
+                (arrow as HTMLElement).style.transform = 'rotate(180deg)';
             } else {
-                content.style.display = 'none';
-                arrow.style.transform = 'rotate(0deg)';
+                (content as HTMLElement).style.display = 'none';
+                (arrow as HTMLElement).style.transform = 'rotate(0deg)';
             }
         };
 
-        modal.querySelector('.epmd-convert-run').onclick = async function() {
+        (modal.querySelector('.epmd-convert-run') as HTMLElement).onclick = async function() {
             if (!currentEditingImage) return;
             setPanelBusy(modal, true, '正在转换...');
             var statusEl = modal.querySelector('.epmd-convert-status');
             if (statusEl) statusEl.textContent = '';
 
             try {
-                var format = modal.querySelector('.epmd-convert-format').value;
+                var format = (modal.querySelector('.epmd-convert-format') as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement).value;
                 var oldSrc = currentEditingImage.getAttribute('src') || '';
                 var isLocal = oldSrc.startsWith('local://') || oldSrc.startsWith('blob:') || oldSrc.startsWith('data:image');
 
@@ -1432,8 +1432,8 @@ import CropperModule from 'cropperjs';
                 var mimeExt = format.split('/')[1];
                 var newFilename = 'converted.' + mimeExt;
 
-                var blob = await new Promise(function(resolve) {
-                    canvas.toBlob(resolve, format, 0.92);
+                var blob = await new Promise<Blob>(function(resolve, reject) {
+                    canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('Image conversion failed')), format, 0.92);
                 });
 
                 var newSrc;
@@ -1467,19 +1467,19 @@ import CropperModule from 'cropperjs';
             }
         };
 
-        modal.querySelector('.epmd-rename-toggle').onclick = function() {
+        (modal.querySelector('.epmd-rename-toggle') as HTMLElement).onclick = function() {
             var content = modal.querySelector('.epmd-rename-content');
             var arrow = modal.querySelector('.epmd-rename-arrow');
-            if (content.style.display === 'none') {
-                content.style.display = 'block';
-                arrow.style.transform = 'rotate(180deg)';
+            if ((content as HTMLElement).style.display === 'none') {
+                (content as HTMLElement).style.display = 'block';
+                (arrow as HTMLElement).style.transform = 'rotate(180deg)';
             } else {
-                content.style.display = 'none';
-                arrow.style.transform = 'rotate(0deg)';
+                (content as HTMLElement).style.display = 'none';
+                (arrow as HTMLElement).style.transform = 'rotate(0deg)';
             }
         };
 
-        modal.querySelector('.epmd-rename-run').onclick = async function() {
+        (modal.querySelector('.epmd-rename-run') as HTMLElement).onclick = async function() {
             if (!currentEditingImage) return;
 
             var statusEl = modal.querySelector('.epmd-rename-status');
@@ -1493,7 +1493,7 @@ import CropperModule from 'cropperjs';
                 }
 
                 var inputEl = modal.querySelector('.epmd-rename-input');
-                var requestedName = inputEl ? inputEl.value : '';
+                var requestedName = inputEl ? (inputEl as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement).value : '';
                 var sanitizedBase = sanitizeFileBaseName(requestedName);
                 if (!sanitizedBase) {
                     throw new Error('请输入有效文件名');
@@ -1540,12 +1540,12 @@ import CropperModule from 'cropperjs';
             }
         };
 
-        modal.querySelector('.epmd-ocr-run').onclick = function() {
+        (modal.querySelector('.epmd-ocr-run') as HTMLElement).onclick = function() {
             if (!currentEditingImage) return;
             runOCR(currentEditingImage, modal);
         };
 
-        modal.querySelector('.epmd-delete-image').onclick = function() {
+        (modal.querySelector('.epmd-delete-image') as HTMLElement).onclick = function() {
             if (!currentEditingImage) return;
             if (typeof global.customConfirm === 'function') {
                 global.customConfirm('确定要删除这张图片吗？此操作无法撤销。').then(function(confirmed) {
@@ -1568,7 +1568,7 @@ import CropperModule from 'cropperjs';
         blurActiveTextInput();
 
         var cropModal = createFullscreenCropModal();
-        var cropTarget = cropModal.querySelector('.epmd-fs-crop-target');
+        var cropTarget = cropModal.querySelector<HTMLImageElement>('.epmd-fs-crop-target');
         var cropStage = cropModal.querySelector('.epmd-fs-crop-stage');
         var cropCloseBtn = cropModal.querySelector('.epmd-fs-crop-close');
         var cropConfirmBtn = cropModal.querySelector('.epmd-fs-crop-confirm');
@@ -1656,11 +1656,11 @@ import CropperModule from 'cropperjs';
             }
         };
 
-        cropCloseBtn.onclick = function() {
+        (cropCloseBtn as HTMLElement).onclick = function() {
             requestCloseFullscreenCropModal(cropModal, submitCropAndClose);
         };
 
-        cropCancelBtn.onclick = function() {
+        (cropCancelBtn as HTMLElement).onclick = function() {
             requestCloseFullscreenCropModal(cropModal, submitCropAndClose);
         };
 
@@ -1688,10 +1688,10 @@ import CropperModule from 'cropperjs';
             cropTarget.crossOrigin = 'anonymous';
 
             try {
-                await new Promise(function(resolve, reject) {
+                await new Promise<void>(function(resolve, reject) {
                     cropTarget.onload = function() { resolve(); };
                     cropTarget.onerror = function() { reject(new Error('图片解析失败')); };
-                    cropTarget.src = resolvedSrc;
+                    (cropTarget as HTMLImageElement).src = resolvedSrc;
                 });
             } catch (loadError) {
                 if (!resolvedSrc || /^(blob:|data:|local:|content:|file:)/i.test(resolvedSrc)) {
@@ -1706,10 +1706,10 @@ import CropperModule from 'cropperjs';
                 var imageBlob = await imageResponse.blob();
                 var objectUrl = URL.createObjectURL(imageBlob);
                 cropModal.dataset.epmdCropObjectUrl = objectUrl;
-                await new Promise(function(resolve, reject) {
+                await new Promise<void>(function(resolve, reject) {
                     cropTarget.onload = function() { resolve(); };
                     cropTarget.onerror = function() { reject(new Error('图片解析失败')); };
-                    cropTarget.src = objectUrl;
+                    (cropTarget as HTMLImageElement).src = objectUrl;
                 });
             }
 
@@ -1762,7 +1762,7 @@ import CropperModule from 'cropperjs';
             return;
         }
 
-        cropConfirmBtn.onclick = submitCropAndClose;
+        (cropConfirmBtn as HTMLElement).onclick = submitCropAndClose;
     }
 
     function deleteImage(img, modal) {
@@ -1922,13 +1922,13 @@ import CropperModule from 'cropperjs';
         if (suspendObserver) return;
         var images = getTargetImages();
         images.forEach(function(img) {
-            if (img.dataset.epmdToolsBound === '1') return;
-            img.dataset.epmdToolsBound = '1';
-            img.style.cursor = 'pointer';
+            if ((img as HTMLElement).dataset.epmdToolsBound === '1') return;
+            (img as HTMLElement).dataset.epmdToolsBound = '1';
+            (img as HTMLElement).style.cursor = 'pointer';
 
             img.addEventListener('click', function(e) {
                 // Only open on an explicit click/tap; avoid non-primary mouse buttons.
-                if (typeof e.button === 'number' && e.button !== 0) {
+                if (e instanceof MouseEvent && e.button !== 0) {
                     return;
                 }
                 openImageToolsFromInteraction(e, img);

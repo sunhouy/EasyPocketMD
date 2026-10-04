@@ -68,7 +68,7 @@ export function createBackgroundControls() {
         } catch (error) { if (request === generation) status.textContent = t('backgroundInvalidImage'); }
         finally { if (request === generation) { loading = false; file.value = ''; } }
     });
-    document.getElementById('backgroundResetBtn')!.addEventListener('click', () => { generation++; loading = false; draft = normalizeBackground(null); file.value = ''; status.textContent = ''; update(); });
+    (document.getElementById('backgroundResetBtn') as HTMLButtonElement)!.addEventListener('click', () => { generation++; loading = false; draft = normalizeBackground(null); file.value = ''; status.textContent = ''; update(); });
     return {
         open(value: unknown) { generation++; loading = false; draft = normalizeBackground(value); file.value = ''; status.textContent = ''; update(); },
         get() { return { ...draft }; },

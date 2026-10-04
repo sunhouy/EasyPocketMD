@@ -6,7 +6,7 @@
 (function(global) {
     'use strict';
 
-    function g(name) { return global[name]; }
+    function g<K extends keyof Window>(name: K): Window[K] { return global[name]; }
     function isEn() { return window.i18n && window.i18n.getLanguage() === 'en'; }
 
     // 当前AI助手状态
@@ -31,10 +31,10 @@
         showAIMenu('main');
 
         // 清空输入
-        document.getElementById('aiWriteInput').value = '';
-        document.getElementById('aiEditInput').value = '';
-        document.getElementById('aiFormatInput').value = '';
-        document.getElementById('aiPPTInput').value = '';
+        (document.getElementById('aiWriteInput') as HTMLTextAreaElement).value = '';
+        (document.getElementById('aiEditInput') as HTMLTextAreaElement).value = '';
+        (document.getElementById('aiFormatInput') as HTMLTextAreaElement).value = '';
+        (document.getElementById('aiPPTInput') as HTMLTextAreaElement).value = '';
 
         // 清除选中状态
         document.querySelectorAll('.ai-option-btn').forEach(function(btn) {
@@ -147,7 +147,7 @@
 
         if (action === 'ppt') {
             var ratio = document.querySelector('input[name="pptRatio"]:checked');
-            var ratioValue = ratio ? ratio.value : '16:9';
+            var ratioValue = ratio ? (ratio as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement).value : '16:9';
             return prompts[action][type] + '\n\nPPT比例：' + ratioValue + '\n\n' + (type === 'current' ? getEditorContent() : input);
         }
 
@@ -279,7 +279,7 @@
     // 初始化事件监听
     function initAIAssistant() {
         // 关闭按钮
-        var closeBtn = document.getElementById('closeAIBtn');
+        var closeBtn = (document.getElementById('closeAIBtn') as HTMLButtonElement);
         if (closeBtn) {
             closeBtn.addEventListener('click', closeAIPanel);
         }
@@ -323,7 +323,7 @@
         });
 
         // 结果返回按钮
-        var resultBackBtn = document.getElementById('aiResultBack');
+        var resultBackBtn = (document.getElementById('aiResultBack') as HTMLButtonElement);
         if (resultBackBtn) {
             resultBackBtn.addEventListener('click', function() {
                 showAIMenu(currentAIState.lastAction || 'main');
@@ -359,7 +359,7 @@
         });
 
         // 生成按钮
-        var writeGenerateBtn = document.getElementById('aiWriteGenerate');
+        var writeGenerateBtn = (document.getElementById('aiWriteGenerate') as HTMLButtonElement);
         if (writeGenerateBtn) {
             writeGenerateBtn.addEventListener('click', function() {
                 // 添加点击动画效果
@@ -368,7 +368,7 @@
                     this.style.transform = '';
                 }.bind(this), 100);
 
-                var input = document.getElementById('aiWriteInput').value.trim();
+                var input = (document.getElementById('aiWriteInput') as HTMLTextAreaElement).value.trim();
                 if (!currentAIState.selectedType) {
                     if (global.showMessage) {
                         global.showMessage(isEn() ? 'Please select a type' : '请选择类型', 'error');
@@ -385,7 +385,7 @@
             });
         }
 
-        var editGenerateBtn = document.getElementById('aiEditGenerate');
+        var editGenerateBtn = (document.getElementById('aiEditGenerate') as HTMLButtonElement);
         if (editGenerateBtn) {
             editGenerateBtn.addEventListener('click', function() {
                 // 添加点击动画效果
@@ -394,7 +394,7 @@
                     this.style.transform = '';
                 }.bind(this), 100);
 
-                var input = document.getElementById('aiEditInput').value.trim();
+                var input = (document.getElementById('aiEditInput') as HTMLTextAreaElement).value.trim();
                 if (!currentAIState.selectedType) {
                     if (global.showMessage) {
                         global.showMessage(isEn() ? 'Please select a style' : '请选择风格', 'error');
@@ -410,13 +410,13 @@
                         }
                         return;
                     }
-                    document.getElementById('aiEditInput').value = input.substring(0, 500) + (input.length > 500 ? '...' : '');
+                    (document.getElementById('aiEditInput') as HTMLTextAreaElement).value = input.substring(0, 500) + (input.length > 500 ? '...' : '');
                 }
                 generateContent('edit', currentAIState.selectedType, input);
             });
         }
 
-        var formatGenerateBtn = document.getElementById('aiFormatGenerate');
+        var formatGenerateBtn = (document.getElementById('aiFormatGenerate') as HTMLButtonElement);
         if (formatGenerateBtn) {
             formatGenerateBtn.addEventListener('click', function() {
                 // 添加点击动画效果
@@ -425,7 +425,7 @@
                     this.style.transform = '';
                 }.bind(this), 100);
 
-                var input = document.getElementById('aiFormatInput').value.trim();
+                var input = (document.getElementById('aiFormatInput') as HTMLTextAreaElement).value.trim();
                 if (!currentAIState.selectedType) {
                     if (global.showMessage) {
                         global.showMessage(isEn() ? 'Please select a format style' : '请选择排版风格', 'error');
@@ -440,14 +440,14 @@
                         }
                         return;
                     }
-                    document.getElementById('aiFormatInput').value = input.substring(0, 500) + (input.length > 500 ? '...' : '');
+                    (document.getElementById('aiFormatInput') as HTMLTextAreaElement).value = input.substring(0, 500) + (input.length > 500 ? '...' : '');
                 }
                 generateContent('format', currentAIState.selectedType, input);
             });
         }
 
         // 结果操作按钮
-        var copyBtn = document.getElementById('aiCopyResult');
+        var copyBtn = (document.getElementById('aiCopyResult') as HTMLButtonElement);
         if (copyBtn) {
             copyBtn.addEventListener('click', function() {
                 // 添加点击动画效果
@@ -459,7 +459,7 @@
             });
         }
 
-        var regenerateBtn = document.getElementById('aiRegenerate');
+        var regenerateBtn = (document.getElementById('aiRegenerate') as HTMLButtonElement);
         if (regenerateBtn) {
             regenerateBtn.addEventListener('click', function() {
                 // 添加点击动画效果
@@ -471,7 +471,7 @@
             });
         }
 
-        var insertBtn = document.getElementById('aiInsertResult');
+        var insertBtn = (document.getElementById('aiInsertResult') as HTMLButtonElement);
         if (insertBtn) {
             insertBtn.addEventListener('click', function() {
                 // 添加点击动画效果

@@ -1,6 +1,6 @@
 const global = window;
 
-function g(name): any { return global[name]; }
+function g<K extends keyof Window>(name: K): Window[K] { return global[name]; }
 function isEn() { return window.i18n && window.i18n.getLanguage() === 'en'; }
 
 /**

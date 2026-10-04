@@ -87,8 +87,8 @@ test('locked encrypted documents show only the lock and resume status after unlo
     let unlocked = false;
     const app={files:[{id:'private',type:'file',e2e_enabled:1,syncBusy:true}],E2EVault:{state:()=>({config:{},loaded:true,unlocked})}};
     refreshSyncIcons(app);
-    expect(document.querySelector('.file-sync-icon').hidden).toBe(true);
+    expect((document.querySelector('.file-sync-icon') as HTMLElement).hidden).toBe(true);
     expect(document.querySelector('.file-e2e-indicator')).not.toBeNull();
     unlocked = true; refreshSyncIcons(app);
-    expect(document.querySelector('.file-sync-icon').hidden).toBe(false);
+    expect((document.querySelector('.file-sync-icon') as HTMLElement).hidden).toBe(false);
 });

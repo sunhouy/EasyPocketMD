@@ -419,21 +419,9 @@
         </div>
         <div class="modal-form" style="flex:1;overflow-y:auto;padding-right:5px;">
 
-            <section class="settings-section" aria-labelledby="settingsEditorGroupTitle">
-                <div class="settings-section-header">
-                    <h3 class="settings-section-title" id="settingsEditorGroupTitle" data-i18n="settingsGroupEditor">   主题/界面样式/语言</h3>
-                </div>
-                <ul class="settings-list" role="list">
-                    <li class="settings-list-item">
-                        <div class="form-group">
-                            <label data-i18n="defaultEditorMode">默认编辑器模式</label>
-                            <div class="radio-group" id="defaultEditorMode">
-                                <label><input type="radio" name="editorMode" value="wysiwyg"> <span data-i18n="wysiwyg">所见即所得</span></label>
-                                <label><input type="radio" name="editorMode" value="ir"> <span data-i18n="instantRender">即时渲染</span></label>
-                                <label><input type="radio" name="editorMode" value="sv"> <span data-i18n="splitPreview">分屏预览</span></label>
-                            </div>
-                        </div>
-                    </li>
+            <section class="settings-section" aria-labelledby="settingsAppearanceGroupTitle">
+                <div class="settings-section-header"><i class="fas fa-palette" aria-hidden="true"></i><h3 class="settings-section-title" id="settingsAppearanceGroupTitle" data-i18n="settingsGroupAppearance">外观与语言</h3></div>
+                <ul class="settings-list settings-grid" role="list">
                     <li class="settings-list-item">
                         <div class="form-group">
                             <label data-i18n="themeMode">主题模式</label>
@@ -445,6 +433,39 @@
                         </div>
                     </li>
                     <li class="settings-list-item">
+                        <div class="form-group">
+                            <label data-i18n="language">语言</label>
+                            <div class="radio-group" id="languageMode">
+                                <label><input type="radio" name="language" value="zh"> <span data-i18n="chinese">中文</span></label>
+                                <label><input type="radio" name="language" value="en"> <span data-i18n="english">English</span></label>
+                            </div>
+                        </div>
+                    </li>
+                    <li class="settings-list-item">
+                        <div class="form-group">
+                            <label data-i18n="interfaceStyleMode">界面样式模式</label>
+                            <div class="radio-group" id="interfaceStyleModeSetting">
+                                <label><input type="radio" name="uiMode" value="auto"> <span data-i18n="interfaceStyleAuto">自动（根据设备）</span></label>
+                                <label><input type="radio" name="uiMode" value="mobile"> <span data-i18n="interfaceStyleMobile">手机样式</span></label>
+                                <label><input type="radio" name="uiMode" value="desktop"> <span data-i18n="interfaceStyleDesktop">电脑样式</span></label>
+                            </div>
+                        </div>
+                    </li>
+                    <li class="settings-list-item">
+                        <div class="form-group">
+                            <label data-i18n="fontSize">字体大小</label>
+                            <div class="select-group" id="fontSizeGroup">
+                                <select id="fontSizeSelect" class="form-control">
+                                    <option value="12px">12px</option>
+                                    <option value="14px">14px</option>
+                                    <option value="16px" selected>16px</option>
+                                    <option value="18px">18px</option>
+                                    <option value="20px">20px</option>
+                                </select>
+                            </div>
+                        </div>
+                    </li>
+                    <li class="settings-list-item settings-wide-item">
                         <details id="appearanceSettings" class="background-settings">
                             <summary data-i18n="appearanceTitle">背景与主题颜色</summary>
                             <div class="form-group appearance-settings-content">
@@ -472,26 +493,7 @@
                             </div>
                         </details>
                     </li>
-                    <li class="settings-list-item">
-                        <div class="form-group">
-                            <label data-i18n="interfaceStyleMode">界面样式模式</label>
-                            <div class="radio-group" id="interfaceStyleModeSetting">
-                                <label><input type="radio" name="uiMode" value="auto"> <span data-i18n="interfaceStyleAuto">自动（根据设备）</span></label>
-                                <label><input type="radio" name="uiMode" value="mobile"> <span data-i18n="interfaceStyleMobile">手机样式</span></label>
-                                <label><input type="radio" name="uiMode" value="desktop"> <span data-i18n="interfaceStyleDesktop">电脑样式</span></label>
-                            </div>
-                        </div>
-                    </li>
-                    <li class="settings-list-item">
-                        <div class="form-group">
-                            <label data-i18n="language">语言</label>
-                            <div class="radio-group" id="languageMode">
-                                <label><input type="radio" name="language" value="zh"> <span data-i18n="chinese">中文</span></label>
-                                <label><input type="radio" name="language" value="en"> <span data-i18n="english">English</span></label>
-                            </div>
-                        </div>
-                    </li>
-                    <li class="settings-list-item">
+                    <li class="settings-list-item settings-wide-item"><details class="settings-collapsible" id="editorThemeDetails"><summary class="settings-collapsible-summary"><span data-i18n="settingsEditorThemes">正文与代码主题</span></summary><ul class="settings-list" role="list"><li class="settings-list-item">
                         <div class="form-group">
                             <label data-i18n="vditorContentTheme">编辑器正文主题</label>
                             <div class="select-group">
@@ -504,8 +506,7 @@
                                 </select>
                             </div>
                         </div>
-                    </li>
-                    <li class="settings-list-item">
+                    </li><li class="settings-list-item">
                         <div class="form-group">
                             <label data-i18n="vditorCodeTheme">代码高亮主题</label>
                             <div class="select-group">
@@ -524,18 +525,19 @@
                                 </select>
                             </div>
                         </div>
-                    </li>
+                    </li></ul></details></li>
+                </ul>
+            </section>
+            <section class="settings-section" aria-labelledby="settingsEditorGroupTitle">
+                <div class="settings-section-header"><i class="fas fa-pen" aria-hidden="true"></i><h3 class="settings-section-title" id="settingsEditorGroupTitle" data-i18n="settingsGroupEditor">编辑与阅读</h3></div>
+                <ul class="settings-list settings-grid" role="list">
                     <li class="settings-list-item">
                         <div class="form-group">
-                            <label data-i18n="fontSize">字体大小</label>
-                            <div class="select-group" id="fontSizeGroup">
-                                <select id="fontSizeSelect" class="form-control">
-                                    <option value="12px">12px</option>
-                                    <option value="14px">14px</option>
-                                    <option value="16px" selected>16px</option>
-                                    <option value="18px">18px</option>
-                                    <option value="20px">20px</option>
-                                </select>
+                            <label data-i18n="defaultEditorMode">默认编辑器模式</label>
+                            <div class="radio-group" id="defaultEditorMode">
+                                <label><input type="radio" name="editorMode" value="wysiwyg"> <span data-i18n="wysiwyg">所见即所得</span></label>
+                                <label><input type="radio" name="editorMode" value="ir"> <span data-i18n="instantRender">即时渲染</span></label>
+                                <label><input type="radio" name="editorMode" value="sv"> <span data-i18n="splitPreview">分屏预览</span></label>
                             </div>
                         </div>
                     </li>
@@ -545,16 +547,12 @@
                             <div class="checkbox-group">
                                 <label><input type="checkbox" id="showOutlineCheckbox"> <span></span></label>
                             </div>
-                            <div class="settings-inline-hint" data-i18n="settingsRequiresRefresh">需刷新后生效</div>
                         </div>
                     </li>
                 </ul>
             </section>
-
-            <section class="settings-section" aria-labelledby="settingsProductivityGroupTitle">
-                <div class="settings-section-header">
-                    <h3 class="settings-section-title" id="settingsProductivityGroupTitle" data-i18n="settingsGroupProductivity">   效率与快捷操作</h3>
-                </div>
+            <details class="settings-section settings-category" aria-labelledby="settingsProductivityGroupTitle">
+                <summary class="settings-section-header"><i class="fas fa-keyboard" aria-hidden="true"></i><h3 class="settings-section-title" id="settingsProductivityGroupTitle" data-i18n="settingsGroupProductivity">效率与快捷操作</h3></summary>
                 <ul class="settings-list" role="list">
                     <li class="settings-list-item">
                         <div class="form-group settings-collapsible-group">
@@ -620,12 +618,9 @@
                         </div>
                     </li>
                 </ul>
-            </section>
-
-            <section class="settings-section" aria-labelledby="settingsFileGroupTitle">
-                <div class="settings-section-header">
-                    <h3 class="settings-section-title" id="settingsFileGroupTitle" data-i18n="settingsGroupFile">   文件与存储</h3>
-                </div>
+            </details>
+            <details class="settings-section settings-category" aria-labelledby="settingsFileGroupTitle">
+                <summary class="settings-section-header"><i class="fas fa-folder-open" aria-hidden="true"></i><h3 class="settings-section-title" id="settingsFileGroupTitle" data-i18n="settingsGroupFile">文件与存储</h3></summary>
                 <ul class="settings-list" role="list">
                     <li class="settings-list-item">
                         <div class="form-group">
@@ -634,16 +629,6 @@
                                 <label><input type="radio" name="storageLocation" value="cloud"> <span data-i18n="storageCloud">云端存储</span></label>
                                 <label><input type="radio" name="storageLocation" value="local"> <span data-i18n="storageLocal">本地存储</span></label>
                             </div>
-                        </div>
-                    </li>
-                    <li class="settings-list-item" id="e2eSettingContainer">
-                        <div class="form-group">
-                            <label data-i18n="e2eDefaultTitle">默认端到端加密</label>
-                            <button type="button" class="modal-btn secondary" id="manageE2E" data-i18n="e2eManage">管理加密解锁方式</button>
-                            <div class="checkbox-group">
-                                <label><input type="checkbox" id="settingsEnableE2E"> <span data-i18n="e2eNewFilesDefault">新建文件默认开启端到端加密</span></label>
-                            </div>
-                            <p class="settings-hint" data-i18n="e2eDefaultHint">此设置只影响之后新建的文件。当前文件请在“更多 - 其他”中单独开启或关闭。</p>
                         </div>
                     </li>
                     <li class="settings-list-item">
@@ -688,12 +673,24 @@
                         </div>
                     </li>
                 </ul>
-            </section>
-
-            <section class="settings-section" aria-labelledby="settingsAIGroupTitle">
-                <div class="settings-section-header">
-                    <h3 class="settings-section-title" id="settingsAIGroupTitle">   <span data-i18n="ui:AI 模型（自备模型）">AI 模型（自备模型）</span></h3>
-                </div>
+            </details>
+            <details class="settings-section settings-category" aria-labelledby="settingsPrivacyGroupTitle">
+                <summary class="settings-section-header"><i class="fas fa-lock" aria-hidden="true"></i><h3 class="settings-section-title" id="settingsPrivacyGroupTitle" data-i18n="settingsGroupPrivacy">隐私与加密</h3></summary>
+                <ul class="settings-list" role="list">
+                    <li class="settings-list-item" id="e2eSettingContainer">
+                        <div class="form-group">
+                            <label data-i18n="e2eDefaultTitle">默认端到端加密</label>
+                            <button type="button" class="modal-btn secondary" id="manageE2E" data-i18n="e2eManage">管理加密解锁方式</button>
+                            <div class="checkbox-group">
+                                <label><input type="checkbox" id="settingsEnableE2E"> <span data-i18n="e2eNewFilesDefault">新建文件默认开启端到端加密</span></label>
+                            </div>
+                            <p class="settings-hint" data-i18n="e2eDefaultHint">此设置只影响之后新建的文件。当前文件请在“更多 - 其他”中单独开启或关闭。</p>
+                        </div>
+                    </li>
+                </ul>
+            </details>
+            <details class="settings-section settings-category" aria-labelledby="settingsAIGroupTitle">
+                <summary class="settings-section-header"><i class="fas fa-robot" aria-hidden="true"></i><h3 class="settings-section-title" id="settingsAIGroupTitle" data-i18n="settingsGroupAI">AI 模型</h3></summary>
                 <ul class="settings-list" role="list">
                     <li class="settings-list-item">
                         <div class="form-group">
@@ -725,12 +722,9 @@
                         </div>
                     </li>
                 </ul>
-            </section>
-
-            <section class="settings-section" aria-labelledby="settingsAdvancedGroupTitle">
-                <div class="settings-section-header">
-                    <h3 class="settings-section-title" id="settingsAdvancedGroupTitle" data-i18n="settingsGroupAdvanced">   高级与维护</h3>
-                </div>
+            </details>
+            <details class="settings-section settings-category" aria-labelledby="settingsAdvancedGroupTitle">
+                <summary class="settings-section-header"><i class="fas fa-sliders-h" aria-hidden="true"></i><h3 class="settings-section-title" id="settingsAdvancedGroupTitle" data-i18n="settingsGroupAdvanced">高级与维护</h3></summary>
                 <ul class="settings-list" role="list">
                     <li class="settings-list-item">
                         <div class="form-group" id="mdAssociationSetting" style="display:none;">
@@ -749,7 +743,7 @@
                         </div>
                     </li>
                 </ul>
-            </section>
+            </details>
             <div class="modal-actions" style="flex-shrink:0;padding-top:10px;">
                 <button class="modal-btn primary" id="saveSettingsBtn" data-i18n="save">保存</button>
             </div>

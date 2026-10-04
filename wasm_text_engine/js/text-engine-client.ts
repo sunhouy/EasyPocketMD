@@ -1,4 +1,18 @@
-function ok(data, message) {
+export interface WasmTextEngine {
+    diff(oldText:string,newText:string):string;
+    merge3(base:string,local:string,remote:string,strategy:string):string;
+    indexDocument(id:string,text:string):void;removeDocument(id:string):void;clearIndex():void;
+    search(query:string,limit:number,caseSensitive:boolean,wholeWord:boolean):string;
+    analyze(text:string):string;findInText(text:string,query:string,caseSensitive:boolean):string;
+    normalizePath(path:string):string;parentPath(path:string):string;basenamePath(path:string):string;pathBasename(path:string):string;
+    compareVersions(left:string,right:string):string;isHiddenCrossSearchFile(filename:string):string;collectFolderPaths(payload:string):string;
+    replaceAllText(text:string,query:string,replacement:string,caseSensitive:boolean):string;
+    similarity(left:string,right:string):string;extractTags(text:string):string;
+    slashPalette(query:string,language:string,limit:number,includeHidden:boolean):string;
+    slashPaletteSettings(language:string):string;
+}
+interface WasmModule {WasmTextEngine: new () => WasmTextEngine}
+function ok<T>(data: T, message?: string) {
     return { code: 200, message: message || 'ok', data: data || {} };
 }
 
@@ -11,6 +25,8 @@ function hasMethod(engine, name) {
 }
 
 export class WasmTextEngineClient {
+    private module: WasmModule | null = null;
+    private engine: WasmTextEngine | null = null;
     constructor() {
         this.module = null;
         this.engine = null;

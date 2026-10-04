@@ -621,9 +621,9 @@ function showFormulaPicker() {
                 `;
                 tab.addEventListener('click', () => {
                     document.querySelectorAll('.formula-tab').forEach(t => {
-                        t.style.background = (window.nightMode === true) ? '#444' : '#f5f5f5';
-                        t.style.color = (window.nightMode === true) ? '#eee' : '#333';
-                        t.style.fontWeight = 'normal';
+                        (t as HTMLElement).style.background = (window.nightMode === true) ? '#444' : '#f5f5f5';
+                        (t as HTMLElement).style.color = (window.nightMode === true) ? '#eee' : '#333';
+                        (t as HTMLElement).style.fontWeight = 'normal';
                     });
                     tab.style.background = 'var(--theme-accent, #4a90e2)';
                     tab.style.color = 'white';
@@ -721,8 +721,8 @@ function showFormulaPicker() {
             symbolBtn.appendChild(latexPreview);
             symbolBtn.addEventListener('click', () => {
                 document.querySelectorAll('#formulaGrid button').forEach(btn => {
-                    btn.style.borderColor = 'transparent';
-                    btn.style.background = 'none';
+                    (btn as HTMLElement).style.borderColor = 'transparent';
+                    (btn as HTMLElement).style.background = 'none';
                 });
                 symbolBtn.style.borderColor = 'var(--theme-accent, #4a90e2)';
                 symbolBtn.style.background = (window.nightMode === true) ? 'rgba(var(--theme-accent-rgb, 74, 144, 226), 0.2)' : 'rgba(var(--theme-accent-rgb, 74, 144, 226), 0.1)';
@@ -755,7 +755,7 @@ function showFormulaPicker() {
             renderCategoryTabs();
             // 默认显示第一个分类
             const firstTab = categoryTabs.querySelector('.formula-tab');
-            if (firstTab) firstTab.click();
+            if (firstTab) (firstTab as HTMLElement).click();
             return;
         }
         // 搜索所有分类下所有公式
@@ -784,7 +784,7 @@ function showFormulaPicker() {
     // 默认显示第一个分类
     if (!searchActive) {
         const firstTab = categoryTabs.querySelector('.formula-tab');
-        if (firstTab) firstTab.click();
+        if (firstTab) (firstTab as HTMLElement).click();
     }
 
     // 获取当前选中的公式（支持本地和AI搜索结果）
@@ -799,36 +799,36 @@ function showFormulaPicker() {
     // 插入按钮点击事件 - 直接插入LaTeX，不加任何包裹
     insertBtn.addEventListener('click', () => {
         const formula = getSelectedFormula();
-        if (formula && vditor) {
-            vditor.insertValue(formula.latex);
+        if (formula && window.vditor) {
+            window.vditor.insertValue(formula.latex);
             closeFormulaPicker();
-            showMessage(isEn() ? 'LaTeX formula inserted' : 'LaTeX公式已插入');
+            window.showMessage(isEn() ? 'LaTeX formula inserted' : 'LaTeX公式已插入');
         } else {
-            showMessage(isEn() ? 'Please select a formula first' : '请先选择一个公式', 'error');
+            window.showMessage(isEn() ? 'Please select a formula first' : '请先选择一个公式', 'error');
         }
     });
 
     // 插入行内公式 - 用$包裹单行公式
     wrapInDollarBtn.addEventListener('click', () => {
         const formula = getSelectedFormula();
-        if (formula && vditor) {
-            vditor.insertValue(`$${formula.latex}$`);
+        if (formula && window.vditor) {
+            window.vditor.insertValue(`$${formula.latex}$`);
             closeFormulaPicker();
-            showMessage(isEn() ? 'Inline formula inserted' : '行内公式已插入');
+            window.showMessage(isEn() ? 'Inline formula inserted' : '行内公式已插入');
         } else {
-            showMessage(isEn() ? 'Please select a formula first' : '请先选择一个公式', 'error');
+            window.showMessage(isEn() ? 'Please select a formula first' : '请先选择一个公式', 'error');
         }
     });
 
     // 插入多行公式 - 用$$包裹多行公式
     wrapInDoubleDollarBtn.addEventListener('click', () => {
         const formula = getSelectedFormula();
-        if (formula && vditor) {
-            vditor.insertValue(`$$\n${formula.latex}\n$$`);
+        if (formula && window.vditor) {
+            window.vditor.insertValue(`$$\n${formula.latex}\n$$`);
             closeFormulaPicker();
-            showMessage(isEn() ? 'Block formula inserted' : '块级公式已插入');
+            window.showMessage(isEn() ? 'Block formula inserted' : '块级公式已插入');
         } else {
-            showMessage(isEn() ? 'Please select a formula first' : '请先选择一个公式', 'error');
+            window.showMessage(isEn() ? 'Please select a formula first' : '请先选择一个公式', 'error');
         }
     });
 
@@ -864,7 +864,7 @@ async function performAISearch(keyword) {
 
     // 检查关键词长度
     if (keyword.length > 10) {
-        showMessage(isEn() ? 'Search keyword too long (max 10 characters)' : '搜索关键词过长（最多10个字）', 'error');
+        window.showMessage(isEn() ? 'Search keyword too long (max 10 characters)' : '搜索关键词过长（最多10个字）', 'error');
         return;
     }
 
@@ -1084,8 +1084,8 @@ function renderAIFormulaResults(formulas, keyword) {
         // 点击选择公式
         symbolBtn.addEventListener('click', () => {
             document.querySelectorAll('#formulaGrid button').forEach(btn => {
-                btn.style.borderColor = 'transparent';
-                btn.style.background = 'none';
+                (btn as HTMLElement).style.borderColor = 'transparent';
+                (btn as HTMLElement).style.background = 'none';
             });
             symbolBtn.style.borderColor = 'var(--theme-accent, #4a90e2)';
             symbolBtn.style.background = (window.nightMode === true) ? 'rgba(var(--theme-accent-rgb, 74, 144, 226), 0.2)' : 'rgba(var(--theme-accent-rgb, 74, 144, 226), 0.1)';

@@ -2,7 +2,7 @@
 (function(global) {
     'use strict';
 
-    function g(name) { return global[name]; }
+    function g<K extends keyof Window>(name: K): Window[K] { return global[name]; }
     function t(key) { return window.i18n ? window.i18n.t(key) : key; }
 
     async function createShareLink(filename, mode, sharePassword, expireDays, editPolicy, editorUsernames, editPassword) {
@@ -11,7 +11,7 @@
         var isEn = window.i18n && window.i18n.getLanguage() === 'en';
         if (!g('currentUser')) throw new Error(isEn ? 'User not logged in' : '用户未登录');
         try {
-            var body = { username: g('currentUser').username, token: g('currentUser').token, password: g('currentUser').password, filename: filename, mode: mode, expire_days: expireDays };
+            var body: {username: string; token?: string; password?: string; filename: string; mode: string; expire_days: number; share_password?: string; edit_policy?: string; editor_usernames?: string[]; edit_password?: string} = { username: g('currentUser').username, token: g('currentUser').token, password: g('currentUser').password, filename: filename, mode: mode, expire_days: expireDays };
             if (sharePassword && sharePassword.trim()) body.share_password = sharePassword.trim();
             if (mode === 'edit') {
                 body.edit_policy = editPolicy || 'all';
@@ -77,12 +77,12 @@
         modalContent.innerHTML = '<div style="text-align:center;margin-bottom:20px;color:#2ecc71;"><i class="fas fa-check-circle" style="font-size:48px;"></i></div><h2 style="text-align:center;margin-bottom:15px;">' + (isEn ? 'Share link created successfully' : '分享链接创建成功') + '</h2><div style="background:' + (nightMode ? '#3d3d3d' : '#f5f5f5') + ';padding:15px;border-radius:8px;margin-bottom:20px;"><div style="font-size:12px;margin-bottom:5px;">' + (isEn ? 'Share link:' : '分享链接：') + '</div><div style="word-break:break-all;font-size:14px;padding:8px;">' + shareData.share_url + '</div></div><div style="display:flex;gap:10px;"><button class="share-copy-btn" style="flex:1;padding:12px;background:var(--theme-accent, #4a90e2);color:white;border:none;border-radius:6px;cursor:pointer;">' + (isEn ? 'Copy Link' : '复制链接') + '</button><button class="share-close-btn" style="flex:1;padding:12px;background:' + (nightMode ? '#555' : '#6c757d') + ';color:white;border:none;border-radius:6px;cursor:pointer;">' + (isEn ? 'Done' : '完成') + '</button></div>';
         resultModal.appendChild(modalContent);
         document.body.appendChild(resultModal);
-        modalContent.querySelector('.share-copy-btn').onclick = function() {
+        (modalContent.querySelector('.share-copy-btn') as HTMLElement).onclick = function() {
             navigator.clipboard.writeText(shareData.share_url).then(function() {
                 global.showMessage(t('linkCopied'));
             });
         };
-        modalContent.querySelector('.share-close-btn').onclick = function() {
+        (modalContent.querySelector('.share-close-btn') as HTMLElement).onclick = function() {
             resultModal.remove();
             // 如果是可编辑模式，刷新页面以进入协作模式
             if (mode === 'edit') {
@@ -163,7 +163,7 @@
                 method: 'GET', 
                 headers: { 'Authorization': 'Bearer ' + g('currentUser').token } 
             });
-            var result = await global.parseJsonResponse(response);
+            var result = await global.parseJsonResponse<{shares: {filename: string}[]}>(response);
 
             if (result.code === 200 && result.data && result.data.shares) {
                 // 查找当前文件的分享链接
@@ -199,7 +199,7 @@
         if (existingShare.expires_at) {
             var now = new Date();
             var expiryDate = new Date(existingShare.expires_at);
-            var daysDiff = Math.ceil((expiryDate - now) / (1000 * 60 * 60 * 24));
+            var daysDiff = Math.ceil((expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
             if (daysDiff <= 7) currentExpiry = 7;
             else if (daysDiff <= 30) currentExpiry = 30;
             else currentExpiry = 0;

@@ -215,7 +215,7 @@
 
     /** 显示速率限制提示 */
     function showRateLimitMessage(message, retryAfter) {
-        const isEn = window.i18n && window.i18n.getCurrentLang && window.i18n.getCurrentLang() === 'en';
+        const isEn = window.i18n && window.i18n.getLanguage && window.i18n.getLanguage() === 'en';
         const title = isEn ? 'Rate Limit Exceeded' : '请求过于频繁';
         const defaultMsg = isEn
             ? 'Too many requests. Please try again later.'
@@ -329,7 +329,7 @@
     }
 
     /** 安全解析接口响应为 JSON，若返回 HTML 或非 JSON 则返回错误对象并附带详情便于排查 */
-    function parseJsonResponse(response) {
+    function parseJsonResponse<T = unknown>(response): Promise<import("../types/global").ApiResponse<T>> {
         return response.text().then(function(text) {
             var t = (text || '').trim();
             var isHtml = t.charAt(0) === '<' || t.toLowerCase().indexOf('<!doctype') === 0;

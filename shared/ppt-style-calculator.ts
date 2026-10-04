@@ -179,3 +179,5 @@ if (typeof module !== 'undefined' && module.exports) {
         getSlideSize
     };
 }
+
+declare global {interface Window {PPTStyleCalculator: {FONT_SIZE_MAP: typeof FONT_SIZE_MAP;MARGIN_MAP: typeof MARGIN_MAP;DECORATION_MAP: typeof DECORATION_MAP;TRANSPARENCY_MAP: typeof TRANSPARENCY_MAP;fitFontByLength: typeof fitFontByLength;getFontSize: typeof getFontSize;getMargin: typeof getMargin;getDecorationSize: typeof getDecorationSize;convertTransparency: typeof convertTransparency;getSlideSize: typeof getSlideSize}}}

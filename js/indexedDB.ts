@@ -1,5 +1,5 @@
 
-(function(global) {
+export const indexedDBApi = (function(global: Window) {
     'use strict';
 
     const DB_NAME = 'MarkdownEditorFiles';
@@ -21,7 +21,7 @@
             };
 
             request.onupgradeneeded = (event) => {
-                const database = event.target.result;
+                const database = request.result;
                 
                 if (!database.objectStoreNames.contains(STORE_NAME)) {
                     const store = database.createObjectStore(STORE_NAME, { keyPath: 'url' });
@@ -55,7 +55,7 @@
 
     async function saveFile(url, data, contentType, lastModified = null, etag = null) {
         await initDB();
-        return new Promise((resolve, reject) => {
+        return new Promise<void>((resolve, reject) => {
             const transaction = db.transaction([STORE_NAME], 'readwrite');
             const store = transaction.objectStore(STORE_NAME);
             
@@ -89,7 +89,7 @@
 
     async function deleteFile(url) {
         await initDB();
-        return new Promise((resolve, reject) => {
+        return new Promise<void>((resolve, reject) => {
             const transaction = db.transaction([STORE_NAME], 'readwrite');
             const store = transaction.objectStore(STORE_NAME);
             const request = store.delete(url);
@@ -101,7 +101,7 @@
 
     async function clearAll() {
         await initDB();
-        return new Promise((resolve, reject) => {
+        return new Promise<void>((resolve, reject) => {
             const transaction = db.transaction([STORE_NAME], 'readwrite');
             const store = transaction.objectStore(STORE_NAME);
             const request = store.clear();
@@ -159,7 +159,7 @@
 
     async function deleteDraft(fileId) {
         await initDB();
-        return new Promise((resolve, reject) => {
+        return new Promise<void>((resolve, reject) => {
             const transaction = db.transaction([DRAFT_STORE_NAME], 'readwrite');
             const store = transaction.objectStore(DRAFT_STORE_NAME);
             const request = store.delete(String(fileId));
@@ -183,7 +183,7 @@
 
     async function clearDrafts() {
         await initDB();
-        return new Promise((resolve, reject) => {
+        return new Promise<void>((resolve, reject) => {
             const transaction = db.transaction([DRAFT_STORE_NAME], 'readwrite');
             const store = transaction.objectStore(DRAFT_STORE_NAME);
             const request = store.clear();
@@ -266,7 +266,7 @@
 
     async function clearSlashHistory() {
         await initDB();
-        return new Promise((resolve, reject) => {
+        return new Promise<void>((resolve, reject) => {
             const transaction = db.transaction([SLASH_HISTORY_STORE_NAME], 'readwrite');
             const store = transaction.objectStore(SLASH_HISTORY_STORE_NAME);
             const request = store.clear();
@@ -285,7 +285,7 @@
         URL.revokeObjectURL(url);
     }
 
-    global.IndexedDBManager = {
+    return global.IndexedDBManager = {
         initDB,
         saveFile,
         getFile,
@@ -305,4 +305,4 @@
         revokeBlobURL
     };
 
-})(typeof window !== 'undefined' ? window : this);
+})(window);

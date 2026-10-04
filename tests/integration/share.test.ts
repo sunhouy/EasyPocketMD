@@ -43,9 +43,9 @@ describe('Share API Integration', () => {
                     .mockResolvedValueOnce([[]]) // Existing share
                     .mockResolvedValueOnce([{ affectedRows: 1 }]) // Insert
                     .mockResolvedValueOnce([{ affectedRows: 0 }]), // Clear share_editors
-                beginTransaction: jest.fn().mockResolvedValue(),
-                commit: jest.fn().mockResolvedValue(),
-                rollback: jest.fn().mockResolvedValue(),
+                beginTransaction: jest.fn().mockResolvedValue(undefined),
+                commit: jest.fn().mockResolvedValue(undefined),
+                rollback: jest.fn().mockResolvedValue(undefined),
                 release: jest.fn()
             };
             db.getConnection

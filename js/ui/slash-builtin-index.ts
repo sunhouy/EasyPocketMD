@@ -215,7 +215,7 @@ export function getBuiltinSlashEntries() {
             descriptionEn: op.descriptionEn,
             action: op.action,
             icon: op.icon,
-            insertText: op.insertText || '',
+            insertText: '',
             keywords: op.keywords,
             aliases: op.aliases,
             score: 0

@@ -27,7 +27,7 @@ function decodeOriginalName(originalname) {
     return decoded.includes('�') ? originalname : decoded;
 }
 
-function safeFileName(originalname, fallbackExt) {
+function safeFileName(originalname, fallbackExt = '') {
     const decoded = decodeOriginalName(originalname);
     const ext = path.extname(decoded) || fallbackExt || '';
     const base = path.basename(decoded, ext)

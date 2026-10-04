@@ -2,7 +2,7 @@ import { afterDialogPaint, saveAfterDialogOpens } from './dialog-save';
 
 const global = window;
 
-function g(name) { return global[name]; }
+function g<K extends keyof Window>(name: K): Window[K] { return global[name]; }
 
 function isEn() { return window.i18n && window.i18n.getLanguage() === 'en'; }
 function t(key) { return window.i18n ? window.i18n.t(key) : key; }
@@ -105,8 +105,8 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
         actionBtn.textContent = isEn() ? 'Cancel' : '取消';
         actionBtn.style.cssText = 'width:100%;padding:12px;background:' + (nightMode ? '#444' : '#6c757d') + ';color:white;border:none;border-radius:6px;cursor:pointer;font-weight:500;transition:background 0.2s;';
         
-        actionBtn.onmouseover = function() { this.style.opacity = '0.9'; };
-        actionBtn.onmouseout = function() { this.style.opacity = '1'; };
+        actionBtn.onmouseover = function() { (this as HTMLElement).style.opacity = '0.9'; };
+        actionBtn.onmouseout = function() { (this as HTMLElement).style.opacity = '1'; };
 
         dialog.appendChild(title);
         dialog.appendChild(statusDiv);
@@ -119,7 +119,7 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
         return {
             modal: modal,
             actionBtn: actionBtn,
-            updateStatus: function(text, detail, isError) {
+            updateStatus: function(text, detail, isError = false) {
                 statusText.textContent = text;
                 statusDetail.textContent = detail || '';
                 if (isError) {
@@ -234,7 +234,7 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
         document.body.appendChild(modal);
 
         modal.addEventListener('click', function(e) {
-            var link = e.target && e.target.closest ? e.target.closest('a.download-link-btn') : null;
+            var link = e.target && (e.target as Element).closest ? (e.target as Element).closest('a.download-link-btn') : null;
             if (!link) return;
             if (!(window.nativeFileOps && window.nativeFileOps.isTauriRuntime && window.nativeFileOps.isTauriRuntime())) {
                 return;
@@ -535,7 +535,7 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
             var exportContent = g('vditor') ? g('vditor').getValue() : '';
             var localConvertBtnEl = modalContent.querySelector('#localConvertBtn');
             if (localConvertBtnEl && shouldHideLocalPdfConvert(exportContent)) {
-                localConvertBtnEl.style.display = 'none';
+                (localConvertBtnEl as HTMLElement).style.display = 'none';
             }
         }
 
@@ -545,13 +545,13 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
         var useCustomHeadingSizes = modalContent.querySelector('#useCustomHeadingSizes');
         var customHeadingInputs = modalContent.querySelector('#customHeadingInputs');
         if (useCustomHeadingSizes) {
-            useCustomHeadingSizes.onchange = function() {
-                if (this.checked) {
-                    customHeadingInputs.style.opacity = '1';
-                    customHeadingInputs.style.pointerEvents = 'auto';
+            (useCustomHeadingSizes as HTMLElement).onchange = function() {
+                if ((this as HTMLInputElement).checked) {
+                    (customHeadingInputs as HTMLElement).style.opacity = '1';
+                    (customHeadingInputs as HTMLElement).style.pointerEvents = 'auto';
                 } else {
-                    customHeadingInputs.style.opacity = '0.5';
-                    customHeadingInputs.style.pointerEvents = 'none';
+                    (customHeadingInputs as HTMLElement).style.opacity = '0.5';
+                    (customHeadingInputs as HTMLElement).style.pointerEvents = 'none';
                     // Re-sync with base title size logic if unchecked? 
                     // No, let's leave values as is, just disabled.
                 }
@@ -561,22 +561,22 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
         // Apply Heading Step
         var applyHeadingStep = modalContent.querySelector('#applyHeadingStep');
         if (applyHeadingStep) {
-            applyHeadingStep.onclick = function() {
-                var h1 = parseFloat(modalContent.querySelector('#h1Size').value) || 36;
-                var step = parseFloat(modalContent.querySelector('#headingStep').value) || 4;
+            (applyHeadingStep as HTMLElement).onclick = function() {
+                var h1 = parseFloat((modalContent.querySelector('#h1Size') as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement).value) || 36;
+                var step = parseFloat((modalContent.querySelector('#headingStep') as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement).value) || 4;
                 
-                modalContent.querySelector('#h2Size').value = Math.max(1, h1 - step);
-                modalContent.querySelector('#h3Size').value = Math.max(1, h1 - step * 2);
-                modalContent.querySelector('#h4Size').value = Math.max(1, h1 - step * 3);
-                modalContent.querySelector('#h5Size').value = Math.max(1, h1 - step * 4);
-                modalContent.querySelector('#h6Size').value = Math.max(1, h1 - step * 5);
+                (modalContent.querySelector('#h2Size') as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement).value = String(Math.max(1, h1 - step));
+                (modalContent.querySelector('#h3Size') as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement).value = String(Math.max(1, h1 - step * 2));
+                (modalContent.querySelector('#h4Size') as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement).value = String(Math.max(1, h1 - step * 3));
+                (modalContent.querySelector('#h5Size') as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement).value = String(Math.max(1, h1 - step * 4));
+                (modalContent.querySelector('#h6Size') as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement).value = String(Math.max(1, h1 - step * 5));
             };
         }
 
         // Download client button event
         var downloadClientBtn = modalContent.querySelector('#downloadClientBtn');
         if (downloadClientBtn) {
-            downloadClientBtn.onclick = function() {
+            (downloadClientBtn as HTMLElement).onclick = function() {
                 showDownloadClientModal();
             };
         }
@@ -603,10 +603,10 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
 
         function updateClientStatus(connected) {
             if (connected) {
-                statusIndicator.style.backgroundColor = '#28a745';
+                (statusIndicator as HTMLElement).style.backgroundColor = '#28a745';
                 statusText.textContent = isEn() ? 'Print client connected' : '打印客户端已连接';
             } else {
-                statusIndicator.style.backgroundColor = '#dc3545';
+                (statusIndicator as HTMLElement).style.backgroundColor = '#dc3545';
                 statusText.textContent = isEn() ? 'Please connect print client' : '请连接打印客户端';
             }
         }
@@ -674,7 +674,7 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
 
         var sendBtn = modalContent.querySelector('#printSendBtn');
         if (sendBtn) {
-            sendBtn.onclick = global.debounce(function() {
+            (sendBtn as HTMLElement).onclick = global.debounce(function() {
                 cleanup();
                 sendToPrint(getPrintSettings(modalContent));
             }, 500);
@@ -684,14 +684,14 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
         var printFileBtn = modalContent.querySelector('#printFileBtn');
         if (printFileBtn) {
             // 移除水波纹效果
-            printFileBtn.onclick = global.debounce(function() {
+            (printFileBtn as HTMLElement).onclick = global.debounce(function() {
                 // 创建文件输入元素
                 var input = document.createElement('input');
                 input.type = 'file';
                 input.multiple = true;
                 input.accept = '.pdf,.doc,.docx,.xls,.xlsx,.txt,.ppt,.pptx,.png,.jpg,.jpeg';
                 input.onchange = async function(e) {
-                    var files = Array.from(e.target.files || []);
+                    var files = Array.from((e.target as HTMLInputElement).files || []);
                     if (files.length > 0) {
                         cleanup();
                         printModal.remove();
@@ -841,8 +841,8 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
             // 重新连接按钮事件
             var retryBtn = modalContent.querySelector('#retryConnectionBtn');
             if (retryBtn) {
-                retryBtn.onclick = async function() {
-                    retryBtn.disabled = true;
+                (retryBtn as HTMLElement).onclick = async function() {
+                    (retryBtn as HTMLButtonElement).disabled = true;
                     retryBtn.textContent = isEn() ? 'Connecting...' : '连接中...';
 
                     var isConnected = await checkPrintClientConnection();
@@ -853,7 +853,7 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
                     } else {
                         // 连接失败，继续显示对话框
                         global.showMessage(isEn() ? 'Connection failed, please ensure print client is running and logged in with correct credentials' : '连接失败，请确保打印客户端已启动并使用正确的账号密码登录', 'error');
-                        retryBtn.disabled = false;
+                        (retryBtn as HTMLButtonElement).disabled = false;
                         retryBtn.textContent = isEn() ? 'Reconnect' : '重新连接';
                     }
                 };
@@ -862,7 +862,7 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
             // 取消按钮事件
             var cancelBtn = modalContent.querySelector('#cancelConnectionBtn');
             if (cancelBtn) {
-                cancelBtn.onclick = function() {
+                (cancelBtn as HTMLElement).onclick = function() {
                     connectionModal.remove();
                 };
             }
@@ -932,7 +932,7 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
                 if (timeout) clearTimeout(timeout);
             }
 
-            return new Promise(function(resolve) {
+            return new Promise<void>(function(resolve) {
                 var wsUrl = 'wss://print.yhsun.cn';
                 ws = new WebSocket(wsUrl);
                 
@@ -1042,16 +1042,16 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
             saveAfterDialogOpens(global);
         };
         var previewBtn = modalContent.querySelector('#printPreviewBtn');
-        if (previewBtn) previewBtn.onclick = openPreview;
+        if (previewBtn) (previewBtn as HTMLElement).onclick = openPreview;
         var exportPdfPreviewBtn = modalContent.querySelector('#exportPdfPreviewBtn');
-        if (exportPdfPreviewBtn) exportPdfPreviewBtn.onclick = openPreview;
+        if (exportPdfPreviewBtn) (exportPdfPreviewBtn as HTMLElement).onclick = openPreview;
 
 
 
         // 取消按钮逻辑 (所有模式通用)
         var cancelBtn = modalContent.querySelector('#printCancelBtn');
         if (cancelBtn) {
-            cancelBtn.onclick = function() {
+            (cancelBtn as HTMLElement).onclick = function() {
                 if (typeof cleanup === 'function') cleanup();
                 printModal.remove();
             };
@@ -1068,7 +1068,7 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
         // Export Button Logic
         var confirmExportBtn = modalContent.querySelector('#confirmExportBtn');
         if (confirmExportBtn) {
-            confirmExportBtn.onclick = function() {
+            (confirmExportBtn as HTMLElement).onclick = function() {
                 if (callback) {
                     var settings = getPrintSettings(modalContent);
                     printModal.remove();
@@ -1080,7 +1080,7 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
         // Local Convert Button Logic
         var localConvertBtn = modalContent.querySelector('#localConvertBtn');
         if (localConvertBtn) {
-            localConvertBtn.onclick = function() {
+            (localConvertBtn as HTMLElement).onclick = function() {
                 if (callback) {
                     var settings = getPrintSettings(modalContent);
                     settings.conversionMethod = 'local';
@@ -1093,7 +1093,7 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
         // Server Convert Button Logic
         var serverConvertBtn = modalContent.querySelector('#serverConvertBtn');
         if (serverConvertBtn) {
-            serverConvertBtn.onclick = function() {
+            (serverConvertBtn as HTMLElement).onclick = function() {
                 if (callback) {
                     var settings = getPrintSettings(modalContent);
                     settings.conversionMethod = 'server';
@@ -1106,43 +1106,43 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
         // 对齐按钮切换
         var alignButtons = modalContent.querySelectorAll('.align-btn');
         alignButtons.forEach(function(btn) {
-            btn.onclick = function() {
+            (btn as HTMLElement).onclick = function() {
                 alignButtons.forEach(function(b) {
                     b.classList.remove('active');
-                    b.style.backgroundColor = nightMode ? '#424242' : '#E0E0E0';
-                    b.style.color = textColor;
+                    (b as HTMLElement).style.backgroundColor = nightMode ? '#424242' : '#E0E0E0';
+                    (b as HTMLElement).style.color = textColor;
                 });
-                this.classList.add('active');
-                this.style.backgroundColor = '#2196F3';
-                this.style.color = 'white';
+                (this as HTMLElement).classList.add('active');
+                (this as HTMLElement).style.backgroundColor = '#2196F3';
+                (this as HTMLElement).style.color = 'white';
             };
         });
 
         // 标题对齐按钮切换
         var titleAlignButtons = modalContent.querySelectorAll('.title-align-btn');
         titleAlignButtons.forEach(function(btn) {
-            btn.onclick = function() {
+            (btn as HTMLElement).onclick = function() {
                 titleAlignButtons.forEach(function(b) {
                     b.classList.remove('active');
-                    b.style.backgroundColor = nightMode ? '#424242' : '#E0E0E0';
-                    b.style.color = textColor;
+                    (b as HTMLElement).style.backgroundColor = nightMode ? '#424242' : '#E0E0E0';
+                    (b as HTMLElement).style.color = textColor;
                 });
-                this.classList.add('active');
-                this.style.backgroundColor = '#2196F3';
-                this.style.color = 'white';
+                (this as HTMLElement).classList.add('active');
+                (this as HTMLElement).style.backgroundColor = '#2196F3';
+                (this as HTMLElement).style.color = 'white';
             };
         });
 
         // AI智能排版按钮点击事件
         var aiLayoutBtn = modalContent.querySelector('#aiLayoutBtn');
         if (aiLayoutBtn) {
-            aiLayoutBtn.onclick = async function() {
+            (aiLayoutBtn as HTMLElement).onclick = async function() {
                 if (global.showAILayoutDialog) {
                     global.showAILayoutDialog(modalContent, cleanup, printModal);
                 } else {
                     // 动态加载 AI 模块
                     try {
-                        aiLayoutBtn.disabled = true;
+                        (aiLayoutBtn as HTMLButtonElement).disabled = true;
                         aiLayoutBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ' + (isEn() ? 'Loading...' : '加载中...');
                         await import('./ai');
                         if (global.showAILayoutDialog) {
@@ -1151,7 +1151,7 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
                     } catch (error) {
                         console.error('Failed to load AI Layout module:', error);
                         global.showMessage((isEn() ? 'Failed to load AI Layout module: ' : '加载AI排版模块失败: ') + error.message, 'error');
-                        aiLayoutBtn.disabled = false;
+                        (aiLayoutBtn as HTMLButtonElement).disabled = false;
                         aiLayoutBtn.innerHTML = '<i class="fas fa-magic"></i> ' + (isEn() ? 'AI Smart Layout' : 'AI智能排版');
                     }
                 }
@@ -1161,7 +1161,7 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
     }
 
     function getPrintSettings(modalContent) {
-        return {
+        const settings = {
             titleFontSize: modalContent.querySelector('#titleFontSize').value,
             bodyFontSize: modalContent.querySelector('#bodyFontSize').value,
             titleFont: modalContent.querySelector('#titleFont') ? modalContent.querySelector('#titleFont').value : 'SimHei',
@@ -1184,6 +1184,7 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
             imgWidth: modalContent.querySelector('#imgWidth') ? modalContent.querySelector('#imgWidth').value : '100%',
             imgHeight: modalContent.querySelector('#imgHeight') ? modalContent.querySelector('#imgHeight').value : 'auto'
         };
+        return settings as typeof settings & {conversionMethod?: 'local'|'server'};
     }
 
     function formatForPrint(markdown, settings) {
@@ -1345,7 +1346,7 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
             // 公式处理 (行内公式，块级已由公式块处理)
             var mathMatch = line.match(/\\\((.*?)\\\)|\\\[(.*?)\\\]/);
             if (mathMatch) {
-                var formula = mathMatch[1] || mathMatch[2];
+                var formula = String(mathMatch[1] || mathMatch[2]);
                 var displayMode = mathMatch[2] !== undefined;
                 if (displayMode) {
                     html += '<div style="text-align:center;margin:1em 0;">\\[' + formula + '\\]</div>';
@@ -1785,7 +1786,7 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
         }
     }
 
-    async function sendToPrint(settings, existingPdfUrl) {
+    async function sendToPrint(settings, existingPdfUrl?: string) {
         // 检查用户是否登录
         if (!g('currentUser')) {
             global.showMessage(isEn() ? 'Please log in first to use cloud print feature' : '请先登录后再使用云打印功能');
@@ -2009,7 +2010,7 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
         var mermaidCodes = tempDiv.querySelectorAll('code.language-mermaid');
         mermaidCodes.forEach(function(code) {
             var pre = code.parentNode;
-            if (pre.tagName === 'PRE') {
+            if (pre instanceof Element && pre.tagName === 'PRE') {
                 var div = document.createElement('div');
                 div.className = 'mermaid';
                 div.setAttribute('data-mermaid', code.textContent);
@@ -2180,7 +2181,7 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
         // Download client button event
         var fileDownloadClientBtn = modalContent.querySelector('#fileDownloadClientBtn');
         if (fileDownloadClientBtn) {
-            fileDownloadClientBtn.onclick = function() {
+            (fileDownloadClientBtn as HTMLElement).onclick = function() {
                 showDownloadClientModal();
             };
         }
@@ -2206,10 +2207,10 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
 
         function updateClientStatus(connected) {
             if (connected) {
-                statusIndicator.style.backgroundColor = '#28a745';
+                (statusIndicator as HTMLElement).style.backgroundColor = '#28a745';
                 statusText.textContent = isEn() ? 'Print client connected' : '打印客户端已连接';
             } else {
-                statusIndicator.style.backgroundColor = '#dc3545';
+                (statusIndicator as HTMLElement).style.backgroundColor = '#dc3545';
                 statusText.textContent = isEn() ? 'Please connect print client' : '请连接打印客户端';
             }
         }
@@ -2280,11 +2281,11 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
         // 打印按钮也需要关闭连接
         var printBtn = modalContent.querySelector('#filePrintBtn');
         if (printBtn) {
-            var originalPrintOnClick = printBtn.onclick;
-            printBtn.onclick = function() {
+            var originalPrintOnClick = (printBtn as HTMLElement).onclick;
+            (printBtn as HTMLElement).onclick = function(event) {
                 cleanup();
                 if (originalPrintOnClick) {
-                    originalPrintOnClick();
+                    originalPrintOnClick.call(printBtn, event);
                 }
             };
         }
@@ -2304,7 +2305,7 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
 
         if (fileUpload) {
             fileUpload.addEventListener('change', function(e) {
-                var files = Array.from(e.target.files || []);
+                var files = Array.from((e.target as HTMLInputElement).files || []);
                 if (files.length > 0) {
                     uploadedFiles = uploadedFiles.concat(files);
                     updateUploadedFilesList();
@@ -2336,10 +2337,10 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
                 removeBtn.innerHTML = '<i class="fas fa-times"></i>';
                 removeBtn.style.cssText = 'background:none;border:none;color:' + (nightMode ? '#dc3545' : '#dc3545') + ';cursor:pointer;font-size:16px;padding:8px;border-radius:50%;transition:all 0.2s ease;';
                 removeBtn.onmouseover = function() {
-                    this.style.backgroundColor = (nightMode ? 'rgba(220, 53, 69, 0.2)' : 'rgba(220, 53, 69, 0.1)');
+                    (this as HTMLElement).style.backgroundColor = (nightMode ? 'rgba(220, 53, 69, 0.2)' : 'rgba(220, 53, 69, 0.1)');
                 };
                 removeBtn.onmouseout = function() {
-                    this.style.backgroundColor = 'transparent';
+                    (this as HTMLElement).style.backgroundColor = 'transparent';
                 };
                 removeBtn.onclick = function() {
                     uploadedFiles.splice(index, 1);
@@ -2361,7 +2362,7 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
         var filePrintBtn = modalContent.querySelector('#filePrintBtn');
         if (filePrintBtn) {
             // 移除水波纹效果
-            filePrintBtn.onclick = global.debounce(async function() {
+            (filePrintBtn as HTMLElement).onclick = global.debounce(async function() {
                 var username = g('currentUser').username;
                 var userPassword = g('currentUser').password;
 
@@ -2439,7 +2440,7 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
                 if (timeout) clearTimeout(timeout);
             }
 
-            return new Promise(function(resolve) {
+            return new Promise<void>(function(resolve) {
                 var wsUrl = 'wss://print.yhsun.cn';
                 ws = new WebSocket(wsUrl);
                 

@@ -53,45 +53,11 @@ def configure_sandbox_budget():
 def deployment_memory(channel):
     if channel not in ('main', 'dev'):
         raise RuntimeError('Invalid deployment channel')
-    stopped = []
-    completed = False
-    try:
-        if small_host() or memory()['MemAvailable'] < 384 * MIB:
-            # Release this channel's memory BEFORE importing, not just before
-            # activation. Match only managed application containers, never DB,
-            # TLS edge, another channel, or unrelated services.
-            names = subprocess.check_output(['docker', 'ps', '--filter',
-                'label=easypocketmd.managed=true', '--format', '{{.Names}}'], text=True).split()
-            names = [name for name in names if re.fullmatch(
-                rf'epmd-{channel}-(app|print|gateway)-[01]', name)]
-            names.sort(key=lambda name: ('-app-' not in name, name))
-            for name in names:
-                print(f'Temporarily stopping {name} to make room for image import', flush=True)
-                # Record before stopping: a failed CLI may still have stopped it.
-                stopped.append(name)
-                subprocess.run(['docker', 'stop', '--time', '10', name], check=True, stdout=subprocess.DEVNULL)
-                if '-app-' in name:
-                    workers = subprocess.check_output(['docker', 'ps', '-q', '--filter',
-                        'label=easypocketmd.sandbox-owner=' + name], text=True).split()
-                    for worker in workers:
-                        # In-flight executions cannot survive stopping their API.
-                        subprocess.run(['docker', 'stop', '--time', '3', worker], check=True, stdout=subprocess.DEVNULL)
-            if stopped:
-                for _ in range(20):
-                    if memory()['MemAvailable'] >= 384 * MIB:
-                        break
-                    time.sleep(.25)
-                print(f"Available memory after stopping old services: {memory()['MemAvailable'] // MIB} MiB", flush=True)
-        yield
-        completed = True
-    finally:
-        if not completed:
-            # Attempt every restart even if one fails; preserve the original
-            # import/activation exception and report rollback failures clearly.
-            for name in stopped:
-                result = subprocess.run(['docker', 'start', name], stdout=subprocess.DEVNULL)
-                if result.returncode:
-                    print(f'Could not restore old container {name}; manual restart required', flush=True)
+    # Image import is streaming and daemon-throttled. Never take the live site
+    # offline for a potentially long import; capacity failures retain the site.
+    if memory()['MemAvailable'] < 192 * MIB:
+        raise RuntimeError('Image import needs 192 MiB available memory; retained current deployment')
+    yield
 
 
 def required_import_space(manifest):
@@ -119,8 +85,8 @@ def import_budget(directory, manifest):
     if free < required:
         raise RuntimeError(f'Not enough disk for a safe image import: need {required // MIB} MiB free, have {free // MIB} MiB; retained current deployment')
     available = memory()['MemAvailable']
-    if available < 384 * MIB:
-        raise RuntimeError(f'Not enough available memory for image import: need 384 MiB, have {available // MIB} MiB; current deployment will be restored')
+    if available < 192 * MIB:
+        raise RuntimeError(f'Not enough available memory for image import: need 192 MiB, have {available // MIB} MiB; current deployment retained')
     changed = []
     docker_guarded = False
     try:
@@ -138,7 +104,7 @@ def import_budget(directory, manifest):
                     raise RuntimeError('Invalid daemon cgroup: ' + unit)
                 if unit == 'docker.service': docker_guarded = True
                 root = Path('/sys/fs/cgroup') / group.lstrip('/')
-                settings = {'memory.high': str(256 * MIB), 'cpu.max': '50000 100000', 'io.weight': 'default 10'}
+                settings = {'memory.high': str((128 if available < 384 * MIB else 256) * MIB), 'cpu.max': '50000 100000', 'io.weight': 'default 10'}
                 for name, value in settings.items():
                     path = root / name
                     old = path.read_text().strip()
@@ -190,7 +156,7 @@ if __name__ == '__main__':
             subprocess.run([sys.executable, str(Path(release) / 'ssl-renewal.py'), 'configure', release, sys.argv[4]], check=True)
             with deployment_memory(sys.argv[4]):
                 subprocess.run([sys.executable, str(Path(release) / 'image-cas.py'), 'load', cache, str(Path(release) / 'release.json')], check=True)
-                subprocess.run([sys.executable, str(Path(release) / 'deploy-docker.py'), 'deploy', sys.argv[4], release], check=True)
+                subprocess.run([sys.executable, str(Path(release) / 'deploy-docker.py'), 'deploy', sys.argv[4], release], check=True, env={**os.environ, 'EPMD_DEPLOYMENT_LOCK_HELD': '1'})
             subprocess.run([sys.executable, str(Path(release) / 'ssl-renewal.py'), 'start', sys.argv[4]], check=True)
     else:
         raise SystemExit('Unknown resource guard action')

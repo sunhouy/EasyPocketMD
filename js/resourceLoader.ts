@@ -1,5 +1,5 @@
 
-(function(global) {
+export const resourceLoaderApi = (function(global: Window) {
     'use strict';
 
     const cache = new Map();
@@ -172,7 +172,7 @@
         elements.forEach(el => {
             if (isImage && el.tagName === 'IMG') {
                 el.setAttribute('data-original-src', url);
-                el.src = newBlobUrl;
+                (el as HTMLImageElement).src = newBlobUrl;
             }
         });
     }
@@ -225,7 +225,7 @@
         pendingRevokes.length = 0;
     }
 
-    global.ResourceLoader = {
+    const api = global.ResourceLoader = {
         loadImage,
         loadFile,
         storeLocalFile,
@@ -236,5 +236,6 @@
     };
 
     setInterval(cleanup, 60000);
+    return api;
 
-})(typeof window !== 'undefined' ? window : this);
+})(window);
