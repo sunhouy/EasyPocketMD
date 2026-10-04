@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { isEditorComposing } from '../editor-composition';
 /**
  * 同步运行时：服务器同步、自动保存、E2E、共享文档（owner 视角）、外部本地文件、
  * 历史版本辅助、token 过期恢复、pendingServerSync 一致性维护、mergeFiles。
@@ -156,6 +157,7 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
     }
 
     async function persistDraftBackup() {
+        if (isEditorComposing(global)) return false;
         const currentFileId = g('currentFileId');
         if (!currentFileId) return false;
 

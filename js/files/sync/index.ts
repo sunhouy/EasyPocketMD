@@ -1,3 +1,4 @@
+import { isEditorComposing, waitForEditorCommit, compositionRevision } from '../../editor-composition';
 import { isUntouchedGuestWelcome } from './revisions';
 import { safeMerge } from '../../../api/utils/safeMerge';
 import { SyncQueue } from './queue';
@@ -88,22 +89,27 @@ export function createSyncRuntimeApi(ctx: any) {
     if (file.id === g('currentFileId')) void resolveConflict(file).catch(console.warn);
   }
   async function reconcileRemote(file: any, remote: any) {
+    const username = g('currentUser')?.username;
+    await waitForEditorCommit(globalRef, file.id);
+    if (!username || g('currentUser')?.username !== username || !g('files').includes(file)) return;
     if (!g('currentUser') || file.e2eTransition || file.syncConflict || globalRef.sharedDocState?.ownerFileId === file.id) return;
     await globalRef.E2EVault?.initialize();
     const vaultState = globalRef.E2EVault?.state();
     if (vaultState?.config && !vaultState.unlocked && isFileE2EEnabled(file)) { file.remoteContentVersion = Number(remote.content_version ?? remote.contentVersion ?? 0); persist(file); return; }
-    const username = g('currentUser').username;
     const version = Number(remote.content_version ?? remote.contentVersion ?? 0);
     if (version < Number(file.contentVersion || 0)) return;
     const e2e = await import('../../e2e');
     const content = await e2e.resolveFileContent(String(remote.content ?? ''), g('currentUser')?.password, isFileE2EEnabled(remote));
     const base = await baseContent(file);
-    if (g('currentUser')?.username !== username) return;
+    await waitForEditorCommit(globalRef, file.id);
+    if (g('currentUser')?.username !== username || version < Number(file.contentVersion || 0)) return;
     const originalLocal = file.id === g('currentFileId') ? getCurrentEditorContent(file.id, file.content) : await e2e.resolveFileContent(String(file.content ?? ''), g('currentUser')?.password, isFileE2EEnabled(file));
     let local = originalLocal;
     if (isExternalLocalFile(file) && ctx.readExternalSourceContent) {
       const disk = await ctx.readExternalSourceContent(file, file.id).catch(() => null);
       if (disk === null) { file.remoteContentVersion = version; persist(file); return; }
+      await waitForEditorCommit(globalRef, file.id);
+      if (file.id === g('currentFileId') && getCurrentEditorContent(file.id, file.content) !== originalLocal) return reconcileRemote(file, remote);
       const combined = safeMerge(base, local, disk);
       if (!combined.clean) { file.syncConflictDiskContent = disk; conflict(file, content, version); return; }
       local = combined.content;
@@ -113,6 +119,8 @@ export function createSyncRuntimeApi(ctx: any) {
     if (!merged.clean) { conflict(file, content, version); return; }
     if (isExternalLocalFile(file) && !(await writeExternalLocalContent(file, merged.content)).success) { file.remoteContentVersion = version; persist(file); return; }
     // Awaiting a physical write can race with typing; don't discard the newer draft.
+    await waitForEditorCommit(globalRef, file.id);
+    if (version < Number(file.contentVersion || 0)) return;
     const live = file.id === g('currentFileId') ? getCurrentEditorContent(file.id, file.content) : file.content;
     const final = live !== originalLocal ? safeMerge(originalLocal, live, merged.content) : merged;
     if (!final.clean) { conflict(file, content, version); return; }
@@ -210,6 +218,8 @@ export function createSyncRuntimeApi(ctx: any) {
         return;
       }
 
+      await waitForEditorCommit(globalRef, file.id);
+      if (Number(payload.content_version) < Number(file.contentVersion || 0)) { acknowledged?.resolve(); return; }
       if (Number.isFinite(Number(payload.content_version))) {
         file.contentVersion = Number(payload.content_version);
       }
@@ -235,6 +245,8 @@ export function createSyncRuntimeApi(ctx: any) {
   }
 
   async function scheduleWebSocketSync(fileId: string) {
+    if (isEditorComposing(globalRef, fileId)) return;
+    const inputRevision = compositionRevision(globalRef, fileId);
     if (globalRef.fileRelocationInProgress) return;
     if (!g('currentUser')) return;
 
@@ -263,7 +275,7 @@ export function createSyncRuntimeApi(ctx: any) {
     }
     if (contentToSend === undefined || globalRef.fileRelocationInProgress || file.e2eTransition || fileE2EEnabled !== isFileE2EEnabled(file)) return;
 
-    if (!globalRef.wsThrottle) return;
+    if (!globalRef.wsThrottle || isEditorComposing(globalRef, fileId) || inputRevision !== compositionRevision(globalRef, fileId)) return;
 
     globalRef.wsThrottle.schedule({
       type: 'file_save',
@@ -280,6 +292,8 @@ export function createSyncRuntimeApi(ctx: any) {
 
     try {
       globalRef.wsThrottle = createSyncThrottle(function(data: any) {
+        const file = g('files').find(f => f.name === data.filename);
+        if (file && isEditorComposing(globalRef, file.id)) return;
         if (globalRef.wsClient && globalRef.wsClient.isConnected()) {
           let resolve: any;
           let reject: any;
@@ -358,6 +372,7 @@ export function createSyncRuntimeApi(ctx: any) {
   }
 
   async function syncFileToServer(fileId: string, options: any) {
+    if (isEditorComposing(globalRef, fileId)) return false;
     if (globalRef.fileRelocationInProgress && !options?.relocation) return false;
     if (!g('currentUser') || navigator.onLine === false) { refreshSyncIcons(globalRef); return false; }
     await globalRef.E2EVault?.initialize();
@@ -387,6 +402,8 @@ export function createSyncRuntimeApi(ctx: any) {
     const syncTask = previousSyncTask
       .catch(function () {})
       .then(async function () {
+        if (isEditorComposing(globalRef, fileId)) return false;
+        const inputRevision = compositionRevision(globalRef, fileId);
         if (g('currentUser')?.username !== requestUser.username || g('currentUser')?.token !== requestUser.token) return false;
         file.syncBusy = true; refreshSyncIcons(globalRef);
         const baseLastModified = baseLastModifiedOption || file.serverLastModified || null;
@@ -402,6 +419,7 @@ export function createSyncRuntimeApi(ctx: any) {
           if (file.contentLoaded === false && !g('pendingServerSync')?.[fileId] && typeof fetchServerFileContent === 'function') {
             await fetchServerFileContent(file);
           }
+          if (isEditorComposing(globalRef, fileId)) return false;
           content =
             overrideContent !== null
               ? overrideContent
@@ -462,6 +480,7 @@ export function createSyncRuntimeApi(ctx: any) {
             }
           }
 
+          if (isEditorComposing(globalRef, fileId) || inputRevision !== compositionRevision(globalRef, fileId)) return false;
           const response = await fetch(api + '/files/save', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + g('currentUser').token },
@@ -469,6 +488,7 @@ export function createSyncRuntimeApi(ctx: any) {
           });
           const result = globalRef.parseJsonResponse ? await globalRef.parseJsonResponse(response) : await response.json();
           if (g('currentUser')?.username !== requestUser.username || g('currentUser')?.token !== requestUser.token) return false;
+          await waitForEditorCommit(globalRef, fileId);
           if (result.code === 409 && result.data) {
             const e2e = await import('../../e2e');
             const remote = await e2e.resolveFileContent(String(result.data.content ?? ''), g('currentUser')?.password, !!result.data.e2e_enabled);
@@ -499,6 +519,7 @@ export function createSyncRuntimeApi(ctx: any) {
                 const e2e = await import('../../e2e');
                 serverContent = await e2e.resolveFileContent(serverContent, g('currentUser')?.password, fileE2EEnabled);
               }
+              await waitForEditorCommit(globalRef, fileId);
               const isActiveFile = fileId === g('currentFileId') && file.type !== 'folder';
               let liveEditorContent = isActiveFile ? getCurrentEditorContent(fileId, files[fileIndex].content) : files[fileIndex].content;
               let hasNewerActiveEditorContent = liveEditorContent !== content;
@@ -520,6 +541,7 @@ export function createSyncRuntimeApi(ctx: any) {
                   localWriteFailed = !(await writeExternalLocalContent(file, serverContent)).success;
                 }
               }
+              await waitForEditorCommit(globalRef, fileId);
               if (isActiveFile) {
                 liveEditorContent = getCurrentEditorContent(fileId, files[fileIndex].content);
                 hasNewerActiveEditorContent = liveEditorContent !== content;
@@ -635,7 +657,7 @@ export function createSyncRuntimeApi(ctx: any) {
   function syncCurrentFileWithBeacon() {
     if (globalRef.fileRelocationInProgress) return false;
     const currentFileId = g('currentFileId');
-    if (!currentFileId) return false;
+    if (!currentFileId || isEditorComposing(globalRef, currentFileId)) return false;
     const files = g('files') || [];
     const file = files.find((f: any) => f.id === currentFileId);
     if (!file || file.type !== 'file' || isExternalLocalFile(file) || file.e2eTransition) return false;
