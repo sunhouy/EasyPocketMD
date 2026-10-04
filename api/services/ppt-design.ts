@@ -1,4 +1,5 @@
 import type PptxGenJS from 'pptxgenjs';
+import { getPPTTemplate } from '../../shared/ppt-templates';
 
 type Bullet = { text: string; subBullets: string[] };
 type Section = { title: string; items: string[] };
@@ -120,13 +121,16 @@ function renderBullets(slide: PptxGenJS.Slide, bullets: Bullet[], x: number, y: 
         y += 0.22;
     }
 }
-export function renderSlideFromSpec(slide: PptxGenJS.Slide, spec: SlideSpec, ratio: string, pageNo: string) {
-    const palette: Palette = THEME_MAP[spec.themeToken as keyof typeof THEME_MAP] || THEME_MAP['white-black'];
+export function renderSlideFromSpec(slide: PptxGenJS.Slide, spec: SlideSpec, ratio: string, pageNo: string, templateId?: string) {
+    const template = getPPTTemplate(templateId);
+    const palette: Palette = template || THEME_MAP[spec.themeToken as keyof typeof THEME_MAP] || THEME_MAP['white-black'];
     const { height, top, available } = geometry(spec, ratio);
     slide.background = { color: palette.bg };
     rule(slide, MARGIN, 0.32, 0.6, palette.accent, 0.06);
     const hero = spec.layout === 'cover' || spec.layout === 'thanks';
-    if (hero) {
+    if (hero && template) {
+        renderTemplateCover(slide, spec, template, height);
+    } else if (hero) {
         const h = textHeight(spec.title, 8.2, 40);
         addText(slide, spec.title, 0.9, Math.max(1.1, (height - h) / 2 - 0.4), 8.2, h, 40, palette.text, { bold: true });
         if (spec.subtitle) addText(slide, spec.subtitle, 0.9, (height + h) / 2,
@@ -169,5 +173,36 @@ export function renderSlideFromSpec(slide: PptxGenJS.Slide, spec: SlideSpec, rat
         } else renderBullets(slide, spec.bullets, MARGIN, top, 8.7, palette, spec.layout === 'timeline' || spec.layout === 'toc');
     }
     rule(slide, MARGIN, height - 0.4, 8.7, palette.sub, 0.008);
-    addText(slide, pageNo, 8.7, height - 0.32, 0.65, 0.2, 9, palette.sub, { align: 'right' });
+    addText(slide, pageNo, 8.7, height - 0.32, 0.65, 0.2, 9, hero && template?.style === 'split' ? 'FFFFFF' : palette.sub, { align: 'right' });
+}
+
+/** MIT-adapted SplitScreen / MinimalistGradient / LayeredDepth cover designs. */
+function renderTemplateCover(slide: PptxGenJS.Slide, spec: SlideSpec,
+    template: NonNullable<ReturnType<typeof getPPTTemplate>>, height: number) {
+    const shape = (x: number, y: number, w: number, h: number, color: string, transparency = 0) => {
+        slide.addShape('rect', { x, y, w, h, line: { color, transparency: 100 }, fill: { color, transparency } });
+    };
+    let x = 0.75, w = 4.0, textColor = template.text, subColor = template.sub;
+    if (template.style === 'split') {
+        shape(5, 0, 5, height, template.accent);
+        const diameter = Math.min(3.3, height * 0.55);
+        slide.addShape('ellipse', { x: 5.85, y: (height - diameter) / 2, w: diameter, h: diameter,
+            line: { color: template.secondary, transparency: 100 }, fill: { color: template.secondary, transparency: 60 } });
+        shape(5, 0.45, 0.04, height - 0.9, template.secondary);
+    } else if (template.style === 'gradient') {
+        shape(0, 0, 5, height, template.accent);
+        shape(5.8, height * 0.2, 3.3, height * 0.6, template.secondary, 88);
+        rule(slide, x, height * 0.27, 3.5, 'FFFFFF');
+        textColor = 'FFFFFF'; subColor = 'FFFFFF';
+    } else {
+        [0.38, 0.75, 1.12].forEach((inset, i) => shape(inset, inset, 10 - inset * 2,
+            height - inset * 2, i === 1 ? template.secondary : template.accent, 90 - i * 5));
+        x = 1.4; w = 7.2;
+    }
+    const y = height * 0.32;
+    // Fixed generous title area with shrink-to-fit handles long document names.
+    addText(slide, spec.title, x, y, w, height * 0.3, 36, textColor,
+        { bold: true, align: template.style === 'layered' ? 'center' : 'left', valign: 'middle' });
+    if (spec.subtitle) addText(slide, spec.subtitle, x, height * 0.65, w, height * 0.18, 17, subColor,
+        { align: template.style === 'layered' ? 'center' : 'left' });
 }

@@ -1,6 +1,11 @@
+import { PPT_TEMPLATES } from '../../shared/ppt-templates';
+import { buildDocumentPPTPrompt, parseDocumentPPTReply, generateDocumentPPT } from './ppt-document';
+import { downloadGeneratedFile } from './export';
+
 /** Generate a document-specific prompt, then import an external model's reply. */
 export function showManualPPTExport(content: string, filename: string) {
-    const global = window as any;
+    const global = window;
+    let activeRequest: AbortController | undefined;
     const en = global.i18n?.getLanguage() === 'en';
     const text = (zh: string, english: string) => en ? english : zh;
     const previousFocus = document.activeElement as HTMLElement;
@@ -23,6 +28,7 @@ export function showManualPPTExport(content: string, filename: string) {
         element.onclick = action; parent.appendChild(element); return element;
     }
     const close = (restoreFocus = true) => {
+        activeRequest?.abort();
         overlay.remove(); document.removeEventListener('keydown', onKeydown);
         if (restoreFocus && previousFocus?.isConnected) previousFocus.focus();
     };
@@ -39,41 +45,78 @@ export function showManualPPTExport(content: string, filename: string) {
         wrapper.appendChild(input); panel.appendChild(wrapper); return input;
     }
     const prompt = textarea(text('1. 复制提示词（已包含当前文件全文）', '1. Copy prompt (includes the complete current document)'), true, 7);
-    prompt.value = text('正在准备提示词…', 'Preparing prompt…');
+    prompt.value = buildDocumentPPTPrompt(content, filename);
     const status = document.createElement('p'); status.setAttribute('role', 'status'); status.style.cssText = 'font-size:13px;min-height:18px;';
     const copy = button(text('复制提示词', 'Copy prompt'), panel, async () => {
         try { await navigator.clipboard.writeText(prompt.value); status.textContent = text('提示词已复制', 'Prompt copied'); }
         catch { prompt.focus(); prompt.select(); status.textContent = text('无法自动复制，请手动复制已选中的提示词。', 'Please manually copy the selected prompt.'); }
-    }); copy.disabled = true;
+    }); copy.disabled = !content.trim();
     const reply = textarea(text('2. 在此粘贴大模型完整输出', '2. Paste the complete model response here'), false, 8);
     reply.placeholder = text('粘贴完整 JSON 或包含 JSON 的回复…', 'Paste the full JSON or response containing JSON…');
     panel.appendChild(status);
-    const generate = button(text('解析并生成 PPT', 'Parse and generate PPT'), panel, async () => {
-        if (!reply.value.trim()) {
-            status.textContent = text('请先粘贴大模型的完整输出。', 'Paste the complete model response first.'); reply.focus(); return;
+    const templates = document.createElement('fieldset');
+    templates.className = 'ppt-template-picker';
+    const legend = document.createElement('legend'); legend.textContent = text('3. 选择模板', '3. Choose a template');
+    templates.appendChild(legend);
+    let templateId = PPT_TEMPLATES[0].id;
+    const grid = document.createElement('div'); grid.className = 'ppt-template-grid'; templates.appendChild(grid);
+    PPT_TEMPLATES.forEach((template, index) => {
+        const label = document.createElement('label'); label.className = 'ppt-template-option';
+        const radio = document.createElement('input'); radio.type = 'radio'; radio.name = 'ppt-export-template';
+        radio.value = template.id; radio.checked = index === 0;
+        radio.onchange = () => { templateId = radio.value; };
+        const sample = document.createElement('span'); sample.className = 'ppt-template-swatch';
+        sample.style.background = template.style === 'layered'
+            ? `linear-gradient(135deg,#${template.bg},#${template.secondary}55,#${template.accent}88)`
+            : `linear-gradient(90deg,#${template.style === 'split' ? template.bg : template.accent} 50%,#${template.style === 'split' ? template.accent : template.bg} 50%)`;
+        sample.setAttribute('aria-hidden', 'true');
+        const name = document.createElement('span'); name.textContent = en ? template.nameEn : template.name;
+        label.append(radio, sample, name); grid.appendChild(label);
+    });
+    panel.insertBefore(templates, status);
+    const credit = document.createElement('p'); credit.className = 'ppt-template-credit';
+    credit.textContent = text('模板改编自开源 ppt-templates（MIT 授权），已内置，无需联网下载模板。', 'Adapted from open-source ppt-templates (MIT). Bundled locally; no template download needed.');
+    const source = document.createElement('a'); source.href = 'https://github.com/wuhua2026/ppt-templates';
+    source.target = '_blank'; source.rel = 'noopener noreferrer'; source.textContent = text('查看来源', 'View source');
+    credit.append(' ', source); panel.insertBefore(credit, status);
+    const filenameLabel = document.createElement('label'); filenameLabel.textContent = text('文件名', 'File name');
+    filenameLabel.style.cssText = 'display:flex;align-items:center;gap:8px;margin:14px 0;';
+    const filenameInput = document.createElement('input'); filenameInput.type = 'text'; filenameInput.value = filename.replace(/\.md$/i, '');
+    filenameInput.style.cssText = 'min-width:0;flex:1;padding:8px;border:1px solid #888;border-radius:6px;background:transparent;color:inherit;';
+    filenameLabel.append(filenameInput, '.pptx'); panel.insertBefore(filenameLabel, status);
+    const generateLabel = text('生成并下载 PPT', 'Generate and download PPT');
+    const generate = button(generateLabel, panel, async () => {
+        let documentPPT;
+        try { documentPPT = parseDocumentPPTReply(reply.value, filename); }
+        catch {
+            status.textContent = text('解析不成功，请重试：让大模型重新生成完整 JSON，再完整粘贴。', 'Parsing failed. Retry with the complete JSON from the model.');
+            status.style.color = '#e74c3c'; global.showMessage?.(status.textContent, 'error'); reply.focus(); return;
         }
-        generate.disabled = true; generate.textContent = text('正在解析…', 'Parsing…');
-        status.textContent = ''; status.style.color = '';
-        // Paint the busy state before normalizing and rendering slides.
-        await new Promise<void>(resolve => requestAnimationFrame(() => setTimeout(resolve, 0)));
-        if (!overlay.isConnected) return;
+        generate.disabled = true; templates.disabled = true;
+        generate.textContent = text('正在生成…', 'Generating…');
+        status.textContent = text('正在生成 PPT，完成后直接下载…', 'Generating PPT. The file will download directly…'); status.style.color = '';
+        activeRequest = new AbortController(); const timer = setTimeout(() => activeRequest?.abort(), 120000);
         try {
-            global.PPTGenerator.importDocumentReply(reply.value, filename);
+            const blob = await generateDocumentPPT(documentPPT, templateId, activeRequest.signal);
+            if (!overlay.isConnected) return;
+            const name = (filenameInput.value.trim().replace(/\.pptx$/i, '') || filename || 'PPT').replace(/[\\/:*?"<>|\u0000-\u001f]/g, '_').slice(0, 120);
+            await downloadGeneratedFile(blob, name + '.pptx', 'application/vnd.openxmlformats-officedocument.presentationml.presentation');
             close(false);
         } catch (error) {
-            const message = text('解析不成功，请重试：请让大模型按提示词重新生成完整 JSON，再完整粘贴。', 'Parsing failed. Please retry: ask the model to regenerate the complete JSON following the prompt, then paste the full response.');
-            status.textContent = message; status.style.color = '#e74c3c';
-            global.showMessage?.(message, 'error');
-            reply.focus();
+            if (!overlay.isConnected) return;
+            status.textContent = text('PPT 导出失败，请重试：', 'PPT export failed. Please retry: ') + (error instanceof Error ? error.message : String(error));
+            status.style.color = '#e74c3c'; global.showMessage?.(status.textContent, 'error');
         } finally {
-            generate.disabled = false; generate.textContent = text('解析并生成 PPT', 'Parse and generate PPT');
+            clearTimeout(timer); activeRequest = undefined;
+            generate.disabled = false; templates.disabled = false; generate.textContent = generateLabel;
         }
-    }); generate.disabled = true;
+    });
+    generate.disabled = !content.trim();
     generate.style.background = 'var(--theme-accent,#4a90e2)'; generate.style.color = 'white';
     function onKeydown(event: KeyboardEvent) {
         if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); close(); }
         if (event.key === 'Tab') {
-            const controls = [...panel.querySelectorAll<HTMLElement>('button:not(:disabled),textarea')];
+            const controls = [...panel.querySelectorAll<HTMLElement>('button:not(:disabled),textarea,input:not(:disabled)')];
             const first = controls[0], last = controls[controls.length - 1];
             if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
             else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
@@ -84,13 +127,4 @@ export function showManualPPTExport(content: string, filename: string) {
         prompt.value = ''; status.textContent = text('当前文件为空，请添加内容后重试。', 'The document is empty. Add content and retry.');
         return;
     }
-    import('./ppt-generator').then(() => {
-        if (!overlay.isConnected) return;
-        prompt.value = global.PPTGenerator.buildDocumentPrompt(content, filename);
-        copy.disabled = false; generate.disabled = false;
-    }).catch(() => {
-        if (!overlay.isConnected) return;
-        prompt.value = ''; status.textContent = text('PPT 功能加载失败，请关闭后重试。', 'PPT could not load. Close and retry.');
-        global.showMessage?.(status.textContent, 'error');
-    });
 }

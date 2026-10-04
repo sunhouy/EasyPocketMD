@@ -2,23 +2,20 @@ import JSZip from 'jszip';
 import { DOMParser, XMLSerializer } from '@xmldom/xmldom';
 
 const W = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
-const headingScales = [1.5, 1.3, 1.1, 1, 0.9, 0.8];
+import { exportHeadingSizes } from '../../shared/export-typography';
 
 export function normalizeDocxSettings(settings: any = {}) {
     const positive = (value: unknown, fallback: number) => {
         const number = Number(value);
         return Number.isFinite(number) && number > 0 && number <= 200 ? number : fallback;
     };
-    const titleFontSize = positive(settings.titleFontSize, 24);
+    const titleFontSize = positive(settings.titleFontSize, 12);
     const normalized: any = {
         ...settings, titleFont: settings.titleFont || 'SimHei', bodyFont: settings.bodyFont || 'SimSun',
+        englishFont: settings.englishFont || 'Times New Roman', titleAlignment: settings.titleAlignment || 'left',
         titleFontSize, bodyFontSize: positive(settings.bodyFontSize, 12)
     };
-    headingScales.forEach((scale, index) => {
-        const key = 'h' + (index + 1) + 'Size';
-        normalized[key] = settings.useCustomHeadingSizes === true
-            ? positive(settings[key], titleFontSize * scale) : titleFontSize * scale;
-    });
+    for (const [level, size] of Object.entries(exportHeadingSizes(normalized))) normalized['h' + level + 'Size'] = size;
     return normalized;
 }
 
@@ -45,7 +42,8 @@ export async function applyDocxTypography(buffer: Buffer, rawSettings: any) {
         const fonts = ensure(rPr, 'rFonts', true);
         // Theme font references override literal font names in Word.
         for (const theme of ['asciiTheme', 'hAnsiTheme', 'eastAsiaTheme', 'cstheme', 'csTheme']) fonts.removeAttributeNS(W, theme);
-        for (const slot of ['ascii', 'hAnsi', 'eastAsia', 'cs']) fonts.setAttributeNS(W, 'w:' + slot, font);
+        fonts.setAttributeNS(W, 'w:eastAsia', font);
+        for (const slot of ['ascii', 'hAnsi', 'cs']) fonts.setAttributeNS(W, 'w:' + slot, settings.englishFont);
         for (const name of ['sz', 'szCs']) ensure(rPr, name).setAttributeNS(W, 'w:val', String(Math.round(size * 2)));
     };
     const styleMap = new Map<string, any>();
@@ -71,6 +69,11 @@ export async function applyDocxTypography(buffer: Buffer, rawSettings: any) {
         if (style.getAttributeNS(W, 'type') !== 'paragraph' || /SourceCode|Verbatim|Code/i.test(id)) continue;
         const { font, size } = fontFor(id);
         typography(ensure(style, 'rPr'), font, size);
+        if (id === 'Title' || headingLevel(id)) {
+            const pPr = ensure(style, 'pPr');
+            style.insertBefore(pPr, direct(style, 'rPr'));
+            ensure(pPr, 'jc').setAttributeNS(W, 'w:val', settings.titleAlignment);
+        }
     }
     zip.file('word/styles.xml', serializer.serializeToString(styles));
     for (const file of Object.values(zip.files)) {
@@ -80,6 +83,7 @@ export async function applyDocxTypography(buffer: Buffer, rawSettings: any) {
             const id = direct(direct(paragraph, 'pPr') || { childNodes: [] }, 'pStyle')?.getAttributeNS(W, 'val') || 'Normal';
             if (/SourceCode|Verbatim|Code/i.test(id)) continue;
             const { font, size } = fontFor(id);
+            if (id === 'Title' || headingLevel(id)) ensure(ensure(paragraph, 'pPr', true), 'jc').setAttributeNS(W, 'w:val', settings.titleAlignment);
             for (const run of Array.from(paragraph.getElementsByTagNameNS(W, 'r'))) {
                 const rPr = ensure(run, 'rPr', true);
                 const characterStyle = direct(rPr, 'rStyle')?.getAttributeNS(W, 'val') || '';
