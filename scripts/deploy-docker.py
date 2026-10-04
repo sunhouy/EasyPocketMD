@@ -107,7 +107,7 @@ def activate(release, channel, slot, current):
     # Mount only into the trusted API orchestrator, never submitted-code sandboxes.
     mounts.extend(['-v', f'{socket}:{socket}', '-v', f'{static}:/www/wwwroot/static:ro'])
     backups = {}
-    nginx = shutil.which('nginx') or '/www/server/nginx/sbin/nginx'
+    nginx = '/www/server/nginx/sbin/nginx' if Path('/www/server/nginx/sbin/nginx').is_file() else shutil.which('nginx') or '/usr/bin/nginx'
     switched = False
     try:
         docker(*common, '--name', names['app'], '--env-file', str(release / 'app.env'),
@@ -131,9 +131,12 @@ def activate(release, channel, slot, current):
             raise RuntimeError('Invalid deployment domain')
         cert = Path('/www/server/panel/vhost/cert') / domain
         cert.mkdir(parents=True, exist_ok=True)
+        managed_cert = ((cert / '.epmd-auto-renew').is_file()
+                        and (cert / 'privkey.pem').is_file()
+                        and (cert / 'fullchain.pem').is_file())
         for source, target in [('tls.key', 'privkey.pem'), ('tls.pem', 'fullchain.pem')]:
             supplied = release / source
-            if supplied.exists() and (channel == 'main' or not (cert / target).exists()):
+            if not managed_cert and supplied.exists() and (channel == 'main' or not (cert / target).exists()):
                 destination = cert / target
                 backups[destination] = destination.read_bytes() if destination.exists() else None
                 shutil.copy2(supplied, destination); destination.chmod(0o600 if target.endswith('key.pem') else 0o644)
@@ -141,11 +144,12 @@ def activate(release, channel, slot, current):
             raise RuntimeError('TLS certificate missing; existing service retained')
         vhost = Path('/www/server/panel/vhost/nginx') / (domain + '.conf')
         backups[vhost] = vhost.read_bytes() if vhost.exists() else None
-        domains = domain + (' www.' + domain if channel == 'main' else '')
+        # Only advertise the hostname covered by this channel's certificate.
+        domains = domain
         contents = f'''server {{
     listen 80;
     server_name {domains};
-    location /.well-known/acme-challenge/ {{ root /www/wwwroot/static; }}
+    location ^~ /.well-known/acme-challenge/ {{ root /www/wwwroot/static; try_files $uri =404; }}
     location / {{ return 301 https://$host$request_uri; }}
 }}
 server {{

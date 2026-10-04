@@ -116,6 +116,7 @@ jobs:
         BASE_URL: ${{ inputs.channel == 'dev' && (secrets.DEV_BASE_URL || 'https://dev.yhsun.cn') || (secrets.BASE_URL || 'https://md.yhsun.cn') }}
         TLS_KEY: ${{ inputs.channel == 'main' && secrets.KEY || '' }}
         TLS_PEM: ${{ inputs.channel == 'main' && secrets.PEM || '' }}
+        SSL_EMAIL: ${{ secrets.SSL_EMAIL }}
       run: |
         python3 scripts/prepare-docker-release.py
         if [ '${{ inputs.channel }}' = dev ]; then
