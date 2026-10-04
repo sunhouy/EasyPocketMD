@@ -56,6 +56,8 @@ export function installEditorRuntime(global: any, ctx: Partial<EditorRuntimeCtx>
 
     let markedParserPromise: Promise<(source: string) => string> | null = null;
     let longFilePreviewTimer: any = null;
+    let appliedEditorFileId = g('currentFileId');
+    let pendingVditorValue: { fileId: unknown; content: string } | null = null;
 
     function formatDiffTime(value) {
         if (value === undefined || value === null || value === '') {
@@ -416,6 +418,7 @@ export function installEditorRuntime(global: any, ctx: Partial<EditorRuntimeCtx>
 
     function setEditorContentForFile(fileId, content, options?) {
         const opts = options || {};
+        pendingVditorValue = null;
         const normalizedContent = String(content || '');
         const currentFileId = g('currentFileId');
         const isCurrentFile = String(fileId || '') === String(currentFileId || '');
@@ -458,6 +461,7 @@ export function installEditorRuntime(global: any, ctx: Partial<EditorRuntimeCtx>
             }
 
             try {
+                appliedEditorFileId = fileId;
                 if (isCurrentFile && typeof vditor.getValue === 'function' && vditor.getValue() === normalizedContent) {
                     return;
                 }
@@ -493,11 +497,14 @@ export function installEditorRuntime(global: any, ctx: Partial<EditorRuntimeCtx>
     }
 
     function scheduleDeferredVditorValueApply(fileId, content) {
+        const pending = { fileId, content: String(content || '') };
+        pendingVditorValue = pending;
         if (typeof global.ensureVditorInitialized !== 'function') {
             return;
         }
 
         Promise.resolve(global.ensureVditorInitialized()).then(function(instance: any) {
+            if (pendingVditorValue !== pending) return;
             const activeFileId = g('currentFileId');
             if (String(activeFileId || '') !== String(fileId || '')) {
                 return;
@@ -508,7 +515,9 @@ export function installEditorRuntime(global: any, ctx: Partial<EditorRuntimeCtx>
             if (!isVditorValueBridgeReady(instance)) {
                 return;
             }
-            instance.setValue(String(content || ''));
+            instance.setValue(pending.content);
+            appliedEditorFileId = fileId;
+            pendingVditorValue = null;
         }).catch(function(error) {
             console.warn('延迟设置编辑器内容失败:', error);
         });
@@ -534,12 +543,15 @@ export function installEditorRuntime(global: any, ctx: Partial<EditorRuntimeCtx>
 
     function getCurrentEditorContent(fileId, fallbackContent?) {
         const fallback = String(fallbackContent || '');
+        if (String(fileId || '') !== String(g('currentFileId') || '')) return fallback;
+        if (pendingVditorValue && pendingVditorValue.fileId === fileId) return pendingVditorValue.content;
 
         if (isLongFileEditorActiveFor(fileId)) {
             const textarea = getLongFileTextarea();
             return textarea ? String(textarea.value || '') : fallback;
         }
 
+        if (fileId !== appliedEditorFileId || g('files')?.find(file => file.id === fileId)?.contentLoaded === false) return fallback;
         const vditor = g('vditor');
         if (!vditor || typeof vditor.getValue !== 'function') {
             return fallback;
