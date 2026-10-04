@@ -26,11 +26,11 @@ it('runs code without network, host mounts or secret environment and validates r
     expect(spawn).toHaveBeenCalledWith('docker',['rm','-f',runs[0].args[runs[0].args.indexOf('--name')+1]],expect.any(Object));
 });
 it('kills timed-out containers and frees the execution slot',async()=>{
-    const first=runPythonSandbox('while True: pass'); const second=runPythonSandbox('while True: pass');
+    const requests=Array.from({length:5},()=>runPythonSandbox('while True: pass'));
     expect((await runPythonSandbox('print(1)')).status).toBe(429);
     await jest.advanceTimersByTimeAsync(20000);
-    expect((await first).status).toBe(408); expect((await second).status).toBe(408);
-    const next=runPythonSandbox('print(2)');finish(2,{success:true,output:'2',images:[]});
+    for (const request of requests) expect((await request).status).toBe(408);
+    const next=runPythonSandbox('print(2)');finish(5,{success:true,output:'2',images:[]});
     expect((await next).success).toBe(true);
 });
 it('cancels disconnected requests and rejects arbitrary image URLs',async()=>{
