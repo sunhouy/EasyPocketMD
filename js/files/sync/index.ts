@@ -93,6 +93,12 @@ export function createSyncRuntimeApi(ctx: any) {
     await waitForEditorCommit(globalRef, file.id);
     if (!username || g('currentUser')?.username !== username || !g('files').includes(file)) return;
     if (!g('currentUser') || file.e2eTransition || file.syncConflict || globalRef.sharedDocState?.ownerFileId === file.id) return;
+    if (typeof remote.content !== 'string') {
+      file.remoteContentVersion = Number(remote.content_version ?? remote.contentVersion ?? 0);
+      persist(file);
+      return;
+    }
+    const wasContentLoaded = file.contentLoaded !== false;
     await globalRef.E2EVault?.initialize();
     const vaultState = globalRef.E2EVault?.state();
     if (vaultState?.config && !vaultState.unlocked && isFileE2EEnabled(file)) { file.remoteContentVersion = Number(remote.content_version ?? remote.contentVersion ?? 0); persist(file); return; }
@@ -130,7 +136,7 @@ export function createSyncRuntimeApi(ctx: any) {
     if (isExternalLocalFile(file)) { file.localSyncedContent = content; file.localCloudUsername = g('currentUser').username; if (final.content !== merged.content) file.localPendingWrite = true; }
     g('lastSyncedContent')[file.id] = content; file.isSynced = final.content === content;
     g('unsavedChanges')[file.id] = !file.isSynced; markPendingServerSync(file.id, !file.isSynced);
-    if (file.id === g('currentFileId') && live !== final.content) setEditorContentForFile(file.id, final.content, { preserveCursor: true });
+    if (file.id === g('currentFileId') && (!wasContentLoaded || live !== final.content)) setEditorContentForFile(file.id, final.content, { preserveCursor: true });
     persist(file);
   }
   globalRef.reconcileRemoteFile = reconcileRemote;
@@ -229,11 +235,18 @@ export function createSyncRuntimeApi(ctx: any) {
       globalRef.lastSyncedContent = lastSyncedContent;
       const live = file.id === g('currentFileId') ? getCurrentEditorContent(file.id, file.content) : file.content;
       const dirty = live !== plaintext;
+      // Acknowledged content and its version are one merge base. Keeping an older
+      // crdtBaseContent makes the next HTTP save conflict with our own WS save.
+      file.crdtBaseContent = plaintext;
+      file.crdtBaseContentVersion = file.contentVersion;
+      if (file.content !== live) file.lastModified = Date.now();
+      file.content = live;
       file.isSynced = !dirty;
       file.contentLoaded = true;
       file.contentFetchedAt = Date.now();
       g('unsavedChanges')[file.id] = dirty;
       markPendingServerSync(file.id, dirty);
+      persist(file);
       acknowledged?.resolve();
       localStorage.setItem('vditor_files', window.e2eSerializeFiles ? window.e2eSerializeFiles(files) : JSON.stringify(files));
     } catch (error) {
@@ -391,7 +404,23 @@ export function createSyncRuntimeApi(ctx: any) {
       return f.id === fileId;
     });
     if (!file) return;
-    if (file.syncConflict && !options?.resolveConflict) return false;
+    if (file.syncConflict && !options?.resolveConflict) {
+      // Older clients could mark their own acknowledged WS revision as a conflict.
+      // Only recover that exact known version; newer remote revisions still need review.
+      const knownVersion = Number(file.contentVersion);
+      if (!(knownVersion > 0 && Number(file.syncConflictVersion) === knownVersion
+        && Number(file.crdtBaseContentVersion) < knownVersion
+        && typeof file.syncConflictRemoteContent === 'string' && file.syncConflictDiskContent === undefined)) return false;
+      const e2e = await import('../../e2e');
+      const remote = await e2e.resolveFileContent(file.syncConflictRemoteContent, requestUser.password, isFileE2EEnabled(file));
+      const draft = fileId === g('currentFileId') ? getCurrentEditorContent(fileId, file.content) : file.content;
+      if (draft === '' && remote !== '') return false; // An already-lost snapshot cannot prove an intentional deletion.
+      file.crdtBaseContent = remote; file.crdtBaseContentVersion = knownVersion;
+      g('lastSyncedContent')[fileId] = remote;
+      delete file.syncConflict; delete file.syncConflictRemoteContent; delete file.syncConflictVersion;
+      if (fileId === g('currentFileId')) document.getElementById('syncConflictPanel')?.remove();
+      persist(file);
+    }
     if (globalRef.sharedDocState?.ownerFileId === fileId && globalRef.sharedDocState.canEdit && !options?.relocation && !options?.encryptionTransition) return globalRef.scheduleSharedDocSync?.({ manualSave: true });
     if (file.e2eTransition && !options?.encryptionTransition) return false;
     if (isExternalLocalFile(file) && !['ready', 'copy'].includes(file.localAccessState)) return false;
@@ -520,6 +549,8 @@ export function createSyncRuntimeApi(ctx: any) {
                 serverContent = await e2e.resolveFileContent(serverContent, g('currentUser')?.password, fileE2EEnabled);
               }
               await waitForEditorCommit(globalRef, fileId);
+              const acknowledgedVersion = Number(result.data?.content_version);
+              if (Number.isFinite(acknowledgedVersion) && acknowledgedVersion < Number(file.contentVersion || 0)) return true;
               const isActiveFile = fileId === g('currentFileId') && file.type !== 'folder';
               let liveEditorContent = isActiveFile ? getCurrentEditorContent(fileId, files[fileIndex].content) : files[fileIndex].content;
               let hasNewerActiveEditorContent = liveEditorContent !== content;
