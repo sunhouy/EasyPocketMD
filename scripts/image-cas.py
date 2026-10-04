@@ -22,7 +22,7 @@ def portable_identity(image):
     spec = importlib.util.spec_from_file_location('image_identity', Path(__file__).with_name('sandbox-image-identity.py'))
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    return module.identity(json.loads(subprocess.check_output(['docker', 'image', 'inspect', image])))
+    return module.identity(json.loads(subprocess.check_output(['docker', 'image', 'inspect', image], stderr=subprocess.DEVNULL)))
 
 
 def export(directory, image_pairs):

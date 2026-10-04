@@ -3,8 +3,10 @@ import contextlib
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
+import time
 
 MIB = 1024 * 1024
 
@@ -24,6 +26,51 @@ def small_host():
 def container_limits(role):
     limits = {'app': 512, 'print': 96, 'gateway': 48} if small_host() else {'app': 1024, 'print': 256, 'gateway': 128}
     return limits[role]
+
+
+@contextlib.contextmanager
+def deployment_memory(channel):
+    if channel not in ('main', 'dev'):
+        raise RuntimeError('Invalid deployment channel')
+    stopped = []
+    completed = False
+    try:
+        if small_host() or memory()['MemAvailable'] < 384 * MIB:
+            # Release this channel's memory BEFORE importing, not just before
+            # activation. Match only managed application containers, never DB,
+            # TLS edge, another channel, or unrelated services.
+            names = subprocess.check_output(['docker', 'ps', '--filter',
+                'label=easypocketmd.managed=true', '--format', '{{.Names}}'], text=True).split()
+            names = [name for name in names if re.fullmatch(
+                rf'epmd-{channel}-(app|print|gateway)-[01]', name)]
+            names.sort(key=lambda name: ('-app-' not in name, name))
+            for name in names:
+                print(f'Temporarily stopping {name} to make room for image import', flush=True)
+                # Record before stopping: a failed CLI may still have stopped it.
+                stopped.append(name)
+                subprocess.run(['docker', 'stop', '--time', '10', name], check=True, stdout=subprocess.DEVNULL)
+                if '-app-' in name:
+                    workers = subprocess.check_output(['docker', 'ps', '-q', '--filter',
+                        'label=easypocketmd.sandbox-owner=' + name], text=True).split()
+                    for worker in workers:
+                        # In-flight executions cannot survive stopping their API.
+                        subprocess.run(['docker', 'stop', '--time', '3', worker], check=True, stdout=subprocess.DEVNULL)
+            if stopped:
+                for _ in range(20):
+                    if memory()['MemAvailable'] >= 384 * MIB:
+                        break
+                    time.sleep(.25)
+                print(f"Available memory after stopping old services: {memory()['MemAvailable'] // MIB} MiB", flush=True)
+        yield
+        completed = True
+    finally:
+        if not completed:
+            # Attempt every restart even if one fails; preserve the original
+            # import/activation exception and report rollback failures clearly.
+            for name in stopped:
+                result = subprocess.run(['docker', 'start', name], stdout=subprocess.DEVNULL)
+                if result.returncode:
+                    print(f'Could not restore old container {name}; manual restart required', flush=True)
 
 
 def required_import_space(manifest):
@@ -50,8 +97,9 @@ def import_budget(directory, manifest):
     free = shutil.disk_usage(directory).free
     if free < required:
         raise RuntimeError(f'Not enough disk for a safe image import: need {required // MIB} MiB free, have {free // MIB} MiB; retained current deployment')
-    if memory()['MemAvailable'] < 384 * MIB:
-        raise RuntimeError('Not enough available memory for image import (384 MiB minimum); retained current deployment')
+    available = memory()['MemAvailable']
+    if available < 384 * MIB:
+        raise RuntimeError(f'Not enough available memory for image import: need 384 MiB, have {available // MIB} MiB; current deployment will be restored')
     changed = []
     docker_guarded = False
     try:
@@ -112,7 +160,12 @@ if __name__ == '__main__':
         with lock.open('a') as handle:
             try: fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
             except BlockingIOError: raise SystemExit('Another server deployment is in progress')
-            subprocess.run([sys.executable, str(Path(release) / 'image-cas.py'), 'load', cache, str(Path(release) / 'release.json')], check=True)
-            subprocess.run([sys.executable, str(Path(release) / 'deploy-docker.py'), 'deploy', sys.argv[4], release], check=True)
+            # Check disk before taking the current service offline.
+            required = required_import_space(manifest)
+            if shutil.disk_usage(cache).free < required:
+                raise RuntimeError(f'Not enough disk for image import: need {required // MIB} MiB free; current services retained')
+            with deployment_memory(sys.argv[4]):
+                subprocess.run([sys.executable, str(Path(release) / 'image-cas.py'), 'load', cache, str(Path(release) / 'release.json')], check=True)
+                subprocess.run([sys.executable, str(Path(release) / 'deploy-docker.py'), 'deploy', sys.argv[4], release], check=True)
     else:
         raise SystemExit('Unknown resource guard action')
