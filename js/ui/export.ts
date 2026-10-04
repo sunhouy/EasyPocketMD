@@ -185,7 +185,7 @@ function showFilenameDialog(defaultName, ext, callback) {
 
     var modal = document.createElement('div');
     modal.className = 'modal-overlay';
-    modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:10000;';
+    modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:100110;';
 
     var container = document.createElement('div');
     container.style.cssText = 'background:' + bg + ';color:' + textColor + ';border-radius:12px;padding:25px;width:90%;max-width:400px;position:relative;';
