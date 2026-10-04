@@ -1,6 +1,7 @@
 /**
  * Vditor 初始化、界面与功能绑定
  */
+import { installFileListLayout } from './main/file-list-layout';
 import { applyEditorNightMode, applyEditorOutline } from './main/view-settings';
 import { uiText } from './i18n-messages';
 import { applyNativeModalLayout } from './main/modal-layout';
@@ -382,6 +383,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function initializeAppShellOnce() {
         if (shellInitialized) return;
         shellInitialized = true;
+        installFileListLayout();
         initUserInterface();
         initMobileFeatures();
         initDesktopOpenFileBridge();

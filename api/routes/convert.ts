@@ -1,6 +1,7 @@
+const { exportFontStack } = require('../../shared/export-typography');
 interface DocxStyleSettings {
     pageMargin?:number|string;bodyFontSize?:number|string;lineHeight?:number|string;paragraphSpacing?:number|string;titleFontSize?:number|string;
-    useCustomHeadingSizes?:boolean;alignment?:string;titleAlignment?:string;imgWidth?:string;imgHeight?:string;titleFont?:string;bodyFont?:string;
+    useCustomHeadingSizes?:boolean;alignment?:string;titleAlignment?:string;imgWidth?:string;imgHeight?:string;titleFont?:string;bodyFont?:string;englishFont?:string;
     h1Size?:number|string;h2Size?:number|string;h3Size?:number|string;h4Size?:number|string;h5Size?:number|string;h6Size?:number|string;
 }
 const { normalizePdfResources } = require('../utils/pdfResources');
@@ -216,8 +217,8 @@ router.post('/pdf', async (req, res) => {
         const titleFont = String(settings?.titleFont || 'SimHei').replace(/["\\<>]/g, '');
         const bodyFont = String(settings?.bodyFont || 'SimSun').replace(/["\\<>]/g, '');
         html = html.replace(/<style>/i, `<style>
-            h1, h2, h3, h4, h5, h6 { font-family: "${titleFont}", sans-serif !important; }
-            body, p, li, td, th { font-family: "${bodyFont}", serif !important; }
+            h1, h2, h3, h4, h5, h6 { font-family: ${exportFontStack(settings || {}, true)} !important; }
+            body, p, li, td, th { font-family: ${exportFontStack(settings || {})} !important; }
         `);
         const filename = `${uuidv4()}.pdf`;
         const uploadDir = path.join(__dirname, '../../uploads');
@@ -387,7 +388,7 @@ async function buildDocxStyledHtml(markdown: string, settings: DocxStyleSettings
             color: #000000 !important;
         }
         body {
-            font-family: "${bodyFont}", "Noto Serif CJK SC", "SimSun", "Microsoft YaHei", serif;
+            font-family: ${exportFontStack(settings)};
             font-size: ${bodyFontSize}pt;
             line-height: ${lineHeight};
             text-align: ${bodyAlignment};
@@ -396,12 +397,12 @@ async function buildDocxStyledHtml(markdown: string, settings: DocxStyleSettings
         }
         p {
             margin: 0 0 ${paragraphSpacing}em 0;
-            font-family: "${bodyFont}", "Noto Serif CJK SC", "SimSun", "Microsoft YaHei", serif;
+            font-family: ${exportFontStack(settings)};
             font-size: ${bodyFontSize}pt;
             color: #000000;
         }
         h1, h2, h3, h4, h5, h6 {
-            font-family: "${titleFont}", "SimHei", "Microsoft YaHei", sans-serif;
+            font-family: ${exportFontStack(settings, true)};
             text-align: ${headingAlignment};
             margin: 1em 0 0.6em 0;
             font-weight: 700;
@@ -439,7 +440,7 @@ async function buildDocxStyledHtml(markdown: string, settings: DocxStyleSettings
         th, td {
             border: 1px solid #333;
             padding: 6px 8px;
-            font-family: "${bodyFont}", "Noto Serif CJK SC", "SimSun", "Microsoft YaHei", serif;
+            font-family: ${exportFontStack(settings)};
             font-size: ${bodyFontSize}pt;
             color: #000000;
         }
@@ -448,7 +449,7 @@ async function buildDocxStyledHtml(markdown: string, settings: DocxStyleSettings
             font-weight: 700;
         }
         li {
-            font-family: "${bodyFont}", "Noto Serif CJK SC", "SimSun", "Microsoft YaHei", serif;
+            font-family: ${exportFontStack(settings)};
             font-size: ${bodyFontSize}pt;
             color: #000000;
         }

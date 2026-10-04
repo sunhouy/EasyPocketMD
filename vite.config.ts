@@ -241,6 +241,8 @@ export default defineConfig({
     },
     viteStaticCopy({
       targets: [
+        { src: ['assets/fonts/liberation/LICENSE', 'assets/fonts/liberation/NOTICE.md'], dest: 'licenses/liberation' },
+        { src: ['vendor/ppt-templates/LICENSE', 'vendor/ppt-templates/NOTICE.md'], dest: 'licenses/ppt-templates' },
         {
           src: 'node_modules/echarts/dist/echarts.min.js',
           dest: 'echarts'

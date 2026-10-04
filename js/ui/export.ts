@@ -76,6 +76,7 @@ async function exportContent() {
         { name: isEn() ? 'HTML File (.html)' : 'HTML文件 (.html)', ext: 'html', icon: '<i class="fab fa-html5"></i>' },
         { name: isEn() ? 'Word File (.docx)' : 'Word文档 (.docx)', ext: 'docx', icon: '<i class="fas fa-file-word"></i>' },
         { name: isEn() ? 'PowerPoint (.pptx)' : '导出 PPT (.pptx)', ext: 'pptx', icon: '<i class="fas fa-file-powerpoint"></i>' },
+        { name: isEn() ? 'Excel Workbook (.xlsx)' : 'Excel工作簿 (.xlsx)', ext: 'xlsx', icon: '<i class="fas fa-file-excel"></i>' },
         { name: isEn() ? 'PDF File (.pdf)' : 'PDF文件 (.pdf)', ext: 'pdf', icon: '<i class="fas fa-file-pdf"></i>' }
     ];
 
@@ -91,7 +92,7 @@ async function exportContent() {
 
     // 创建内容容器
     var container = document.createElement('div');
-    container.style.cssText = 'background:' + bg + ';color:' + textColor + ';border-radius:12px;padding:25px;width:90%;max-width:400px;position:relative;';
+    container.style.cssText = 'background:' + bg + ';color:' + textColor + ';border-radius:12px;padding:25px;width:90%;max-width:400px;max-height:90dvh;overflow:auto;box-sizing:border-box;position:relative;';
 
     // 右上角关闭按钮
     var closeBtn = document.createElement('button');
@@ -112,7 +113,7 @@ async function exportContent() {
         optionBtn.style.cssText = 'display:flex;align-items:center;width:100%;padding:15px 20px;background:' + (nightMode ? '#3d3d3d' : '#f5f5f5') + ';border:none;border-radius:8px;margin-bottom:10px;text-align:left;font-size:16px;color:' + textColor + ';cursor:pointer;transition:background 0.2s;';
         optionBtn.innerHTML = '<span style="font-size:20px;margin-right:15px;width:30px;text-align:center;color:var(--theme-accent, #4a90e2);">' + f.icon + '</span><span>' + f.name + '</span>';
 
-        if (f.ext === 'pptx') {
+        if (f.ext === 'pptx' || f.ext === 'xlsx') {
             optionBtn.style.position = 'relative';
             const badge = document.createElement('span'); badge.textContent = 'NEW';
             badge.style.cssText = 'position:absolute;right:8px;top:5px;font-size:10px;font-weight:700;padding:2px 5px;border-radius:4px;background:#e74c3c;color:white;';
@@ -273,6 +274,20 @@ async function exportFile(content, ext) {
         } catch (error) {
             global.showMessage((isEn() ? 'Unable to open PPT export. Please retry: ' : '无法打开 PPT 导出，请重试：') + error.message, 'error');
         }
+        return;
+    }
+
+    if (ext === 'xlsx') {
+        showFilenameDialog(defaultFileName, 'xlsx', async function(filename) {
+            try {
+                global.showMessage(isEn() ? 'Generating Excel workbook…' : '正在生成 Excel 工作簿…');
+                const { createMarkdownXLSX } = await import('./xlsx-export');
+                const bytes = createMarkdownXLSX(content, isEn());
+                await downloadGeneratedFile(bytes, filename + '.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+            } catch (error) {
+                global.showMessage((isEn() ? 'XLSX export failed: ' : 'XLSX 导出失败：') + error.message, 'error');
+            }
+        });
         return;
     }
 
@@ -496,7 +511,7 @@ async function exportFile(content, ext) {
     });
 }
 
-async function downloadGeneratedFile(payload, filename, mimeType) {
+export async function downloadGeneratedFile(payload, filename, mimeType) {
     if (window.nativeFileOps && window.nativeFileOps.isTauriRuntime()) {
         return window.nativeFileOps.saveFile(payload, {
             filename: filename,

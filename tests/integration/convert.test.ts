@@ -152,7 +152,7 @@ describe('Convert API Integration', () => {
             const document = await zip.file('word/document.xml').async('string');
             expect(styles).toContain('w:eastAsia="Custom Heading"');
             expect(styles).toContain('w:eastAsia="Custom Body"');
-            expect(styles).toContain('<w:sz w:val="60"');
+            expect(styles).toContain('<w:sz w:val="80"');
             expect(document).toContain('<w:sz w:val="30"');
         });
         it('should export docx binary successfully', async () => {

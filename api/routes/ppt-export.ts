@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const { getPPTTemplate } = require('../../shared/ppt-templates');
 const PptxGenJS = require('pptxgenjs');
 
 // 引入共享模块
@@ -32,13 +33,17 @@ const MAX_HIGHLIGHTS = COUNT_LIMITS.highlights;
 // POST /api/ppt-export - 导出可编辑 PPT
 router.post('/', async (req, res) => {
     try {
-        const { topic, pages, outline, ratio = '16:9' } = req.body || {};
+        const { topic, pages, outline, templateId, ratio = '16:9' } = req.body || {};
 
         if (!Array.isArray(pages) || pages.length === 0) {
             return res.status(400).json({
                 code: 400,
                 message: 'PPT 页面数据不能为空'
             });
+        }
+
+        if (templateId != null && !getPPTTemplate(templateId)) {
+            return res.status(400).json({ code: 400, message: 'Unknown PPT template' });
         }
 
         // 预验证所有图片数据
@@ -100,7 +105,7 @@ router.post('/', async (req, res) => {
             chunks.forEach((chunk, chunkIndex) => {
                 const slide = pptx.addSlide();
                 const pageNo = `${pageOutline.number || i + 1}${chunkIndex > 0 ? '-' + (chunkIndex + 1) : ''}`;
-                renderSlideFromSpec(slide, chunk, ratio, pageNo);
+                renderSlideFromSpec(slide, chunk, ratio, pageNo, templateId);
             });
         }
 

@@ -36,11 +36,10 @@ describe('Editable PPT layout', () => {
         const xml = execFileSync(process.execPath, ['-e', `
             const fs = require('fs'), ts = require('typescript'), Module = require('module');
             const file = require('path').resolve('api/services/ppt-design.ts');
-            const mod = new Module(file, module); mod.filename = file;
-            mod.paths = Module._nodeModulePaths(require('path').dirname(file));
-            mod._compile(ts.transpileModule(fs.readFileSync(file, 'utf8'), {
+            require.extensions['.ts'] = (mod, name) => mod._compile(ts.transpileModule(fs.readFileSync(name, 'utf8'), {
                 compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 }
-            }).outputText, file);
+            }).outputText, name);
+            const mod = {exports: require(file)};
             const Pptx = require('pptxgenjs'), ppt = new Pptx();
             ppt.defineLayout({name:'wide',width:10,height:5.625}); ppt.layout='wide';
             mod.exports.renderSlideFromSpec(ppt.addSlide(), ${JSON.stringify({ ...base, bullets: [{ text: '可编辑的结论', subBullets: ['真实数据支持结论'] }] })}, '16:9', '1');

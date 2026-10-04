@@ -117,5 +117,15 @@ describe('PPT Export Integration', () => {
         const text = pptInstance.addSlide.mock.results.flatMap(result => result.value.addText.mock.calls.map(call => call[0])).join('\n');
         longBullets.forEach(bullet => expect(text).toContain(bullet.text));
     });
+    it('rejects untrusted template names and applies a selected built-in design', async () => {
+        const data = { pages: [{ title: '模板封面', layout: 'cover' }] };
+        await request(app).post('/api/ppt-export').send({ ...data, templateId: '../template' }).expect(400);
+        await request(app).post('/api/ppt-export').send({ ...data, templateId: 'dark-gold' }).expect(200);
+        const pptInstance = PptxGenJS.mock.results[PptxGenJS.mock.results.length - 1].value;
+        const slide = pptInstance.addSlide.mock.results[0].value;
+        expect(slide.background.color).toBe('1A1A2E');
+        expect(slide.addText).toHaveBeenCalledWith('模板封面', expect.objectContaining({ color: 'F0F0F0' }));
+    });
+
 });
 
