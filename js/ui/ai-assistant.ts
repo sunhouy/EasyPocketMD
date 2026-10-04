@@ -1,6 +1,6 @@
 /**
  * AI助手功能模块
- * 包含：帮我写、帮我改、帮我排版、生成PPT
+ * 包含：帮我写、帮我改、帮我排版、生成PPT、AI查询
  */
 
 (function(global) {
@@ -9,9 +9,13 @@
     function g<K extends keyof Window>(name: K): Window[K] { return global[name]; }
     function isEn() { return window.i18n && window.i18n.getLanguage() === 'en'; }
 
+    let queryController: AbortController | null = null;
+    let queryAnswer = '';
+    const queryText = (key: string, zh: string, en: string) => global.i18n?.t(key) || (isEn() ? en : zh);
+
     // 当前AI助手状态
     var currentAIState = {
-        currentMenu: 'main', // main, write, edit, format, ppt
+        currentMenu: 'main', // main, write, edit, format, ppt, query
         selectedType: null,
         lastResult: null,
         lastAction: null,
@@ -23,6 +27,7 @@
         var modal = document.getElementById('aiModalOverlay');
         if (!modal) return;
 
+        clearQuery();
         // 重置状态
         currentAIState.currentMenu = 'main';
         currentAIState.selectedType = null;
@@ -46,12 +51,16 @@
 
     // 关闭AI助手面板
     function closeAIPanel() {
+        cancelQuery(true);
         var modal = document.getElementById('aiModalOverlay');
         if (modal) modal.style.display = 'none';
     }
 
     // 显示指定菜单
     function showAIMenu(menuName) {
+        if (menuName !== 'query') cancelQuery(true);
+        const queryMenu = document.getElementById('aiQueryMenu');
+        if (queryMenu) queryMenu.style.display = menuName === 'query' ? 'block' : 'none';
         // 隐藏所有菜单
         document.getElementById('aiMainMenu').style.display = 'none';
         document.getElementById('aiWriteMenu').style.display = 'none';
@@ -276,8 +285,114 @@
         }, 500);
     }
 
+    function cancelQuery(markCancelled = false) {
+        if (markCancelled && queryController) {
+            const status = document.getElementById('aiQueryStatus');
+            if (status) status.textContent = queryText('aiQueryCancelled', '查询已取消', 'Query cancelled');
+        }
+        queryController?.abort();
+        queryController = null;
+        const run = document.getElementById('aiQueryRun') as HTMLButtonElement;
+        const cancel = document.getElementById('aiQueryCancel') as HTMLButtonElement;
+        if (run) run.disabled = false;
+        if (cancel) cancel.hidden = true;
+    }
+
+    function clearQuery() {
+        cancelQuery(); queryAnswer = '';
+        for (const id of ['aiQueryStatus', 'aiQueryAnswer', 'aiQuerySources']) document.getElementById(id)?.replaceChildren();
+        const input = document.getElementById('aiQueryInput') as HTMLTextAreaElement;
+        if (input) input.value = '';
+        const copy = document.getElementById('aiQueryCopy') as HTMLButtonElement;
+        if (copy) copy.hidden = true;
+    }
+
+    async function runQuery() {
+        if (queryController) return;
+        const input = document.getElementById('aiQueryInput') as HTMLTextAreaElement;
+        const status = document.getElementById('aiQueryStatus');
+        const answer = document.getElementById('aiQueryAnswer');
+        const sources = document.getElementById('aiQuerySources');
+        const question = input.value.trim();
+        if (!question || question.length > 2000) {
+            status.textContent = queryText('aiQueryQuestionRequired', '请输入 1–2000 字的问题', 'Enter a question of 1–2000 characters'); return;
+        }
+        if (!global.AIConfig?.isReady()) {
+            status.textContent = queryText('aiQueryConfigure', '请先在设置中填写 AI API 地址、密钥和模型', 'Configure your AI API URL, key and model in Settings first'); return;
+        }
+        const controller = new AbortController(); queryController = controller;
+        const user = global.currentUser;
+        const username = user?.username, token = user?.token;
+        const checkSession = () => {
+            if (controller.signal.aborted) throw new DOMException('Cancelled', 'AbortError');
+            if (global.currentUser?.username !== username || global.currentUser?.token !== token) throw new Error(isEn() ? 'Account changed; retry the query' : '账号已切换，请重新查询');
+        };
+        queryAnswer = ''; answer.replaceChildren(); sources.replaceChildren();
+        (document.getElementById('aiQueryCopy') as HTMLButtonElement).hidden = true;
+        (document.getElementById('aiQueryRun') as HTMLButtonElement).disabled = true;
+        (document.getElementById('aiQueryCancel') as HTMLButtonElement).hidden = false;
+        status.textContent = queryText('aiQueryReading', '正在读取全部文档…', 'Reading all documents…');
+        try {
+            const [{ collectQueryDocuments }, { queryDocuments }] = await Promise.all([import('./ai-query-files'), import('./ai-query')]);
+            checkSession();
+            const corpus = await collectQueryDocuments({ signal: controller.signal,
+                includeEncrypted: (document.getElementById('aiQueryEncrypted') as HTMLInputElement).checked,
+                progress: (done, total) => { if (queryController === controller) status.textContent = (isEn() ? 'Reading documents: ' : '正在读取文档：') + done + '/' + total; }
+            });
+            checkSession();
+            const result = await queryDocuments(question, corpus.documents, async (system, prompt, options) => {
+                checkSession();
+                const response = await global.AIConfig.callText(system, prompt, options);
+                checkSession(); return response;
+            }, { signal: controller.signal, progress: (done, total) => {
+                if (queryController === controller) status.textContent = (isEn() ? 'Searching all documents: ' : '正在检索全部文档：') + done + '/' + total + (done === total ? (isEn() ? ' · Combining findings…' : ' · 正在整理答案…') : '');
+            } });
+            checkSession();
+            if (queryController !== controller) return;
+            queryAnswer = result.answer; answer.textContent = result.answer;
+            status.textContent = (isEn() ? 'Searched documents: ' : '已检索文档：') + result.files;
+            if (corpus.skipped.length) {
+                status.textContent += (isEn() ? ' · Not searched (encrypted or unreadable): ' : ' · 未参与检索（加密或读取失败）：') + corpus.skipped.length;
+                const skipped = document.createElement('details'); const title = document.createElement('summary');
+                title.textContent = isEn() ? 'Documents not searched' : '未参与检索的文档';
+                const list = document.createElement('p'); list.textContent = corpus.skipped.join('、'); skipped.append(title, list); sources.append(skipped);
+            }
+            if (result.sources.length) {
+                const title = document.createElement('h4'); title.textContent = queryText('aiQuerySources', '来源与原文摘录', 'Sources and excerpts'); sources.append(title);
+                for (const source of result.sources) {
+                    const details = document.createElement('details'); const summary = document.createElement('summary');
+                    summary.textContent = '[' + source.number + '] ' + source.path; details.append(summary);
+                    for (const excerpt of source.excerpts) {
+                        const label = document.createElement('small'); label.textContent = (isEn() ? 'Line ' : '行 ') + excerpt.line;
+                        const quote = document.createElement('blockquote'); quote.textContent = excerpt.quote;
+                        details.append(label, quote);
+                    }
+                    sources.append(details);
+                }
+            }
+            (document.getElementById('aiQueryCopy') as HTMLButtonElement).hidden = false;
+        } catch (error) {
+            if (queryController === controller) status.textContent = error.name === 'AbortError' ? queryText('aiQueryCancelled', '查询已取消', 'Query cancelled') : error.message;
+        } finally {
+            if (queryController === controller) cancelQuery();
+        }
+    }
+
     // 初始化事件监听
     function initAIAssistant() {
+        document.getElementById('aiQueryRun')?.addEventListener('click', runQuery);
+        document.getElementById('aiQueryCancel')?.addEventListener('click', () => {
+            cancelQuery();
+            document.getElementById('aiQueryStatus').textContent = queryText('aiQueryCancelled', '查询已取消', 'Query cancelled');
+        });
+        document.getElementById('aiQueryCopy')?.addEventListener('click', async () => {
+            if (!queryAnswer) return;
+            const sourceTitles = [...document.querySelectorAll('#aiQuerySources summary')].map(node => node.textContent).filter(text => /^\[\d+\]/.test(text));
+            try { await navigator.clipboard.writeText(queryAnswer + (sourceTitles.length ? '\n\n' + sourceTitles.join('\n') : '')); }
+            catch { global.showMessage?.(isEn() ? 'Could not copy answer' : '复制失败，请手动选择答案复制', 'error'); }
+        });
+        window.addEventListener('e2e-account-reset', clearQuery);
+        window.addEventListener('e2e-locked', clearQuery);
         // 关闭按钮
         var closeBtn = (document.getElementById('closeAIBtn') as HTMLButtonElement);
         if (closeBtn) {

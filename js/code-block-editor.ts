@@ -1,3 +1,4 @@
+import { recordCodeBlockExit } from './code-block-focus';
 import { uiText, setUiText } from './i18n-messages';
 import { basicSetup } from 'codemirror';
 import { EditorState, StateEffect, StateField, Compartment } from '@codemirror/state';
@@ -221,7 +222,7 @@ function createEditor(block: HTMLElement, source: HTMLElement, preview: HTMLElem
     // CodeMirror maintains local undo while typing; snapshot the document on exit,
     // avoiding Vditor's full-DOM diff on every short pause in code input.
     host.addEventListener('focusout', event => {
-        if (source.isConnected && !host.contains(event.relatedTarget as Node)) instance?.vditor?.undo?.addToUndoStack(instance.vditor);
+        if (source.isConnected && !host.contains(event.relatedTarget as Node)) recordCodeBlockExit(host, instance);
     });
     const description = languageExtension(language);
     description?.load().then(support => { if (entries.get(block) === entry) view.dispatch({effects:syntax.reconfigure(support)}); }).catch(console.warn);
