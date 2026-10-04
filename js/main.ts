@@ -2218,6 +2218,34 @@ document.addEventListener('DOMContentLoaded', function() {
             showPrimaryFileInterface();
         });
         bindDesktopButton('desktopLoginBtn', function() { window.handleLoginButtonClick(); });
+        const syncQuickActions = () => {
+            const theme = document.getElementById('desktopThemeToggleBtn');
+            if (theme) { theme.innerHTML = '<i class="fas fa-' + (window.nightMode ? 'sun' : 'moon') + '"></i>'; theme.setAttribute('aria-label', window.nightMode ? '切换到日间模式' : '切换到夜间模式'); theme.title = theme.getAttribute('aria-label'); }
+            document.getElementById('desktopOutlineToggleBtn')?.setAttribute('aria-pressed', String(!!window.userSettings.showOutline));
+        };
+        bindDesktopButton('desktopThemeToggleBtn', function() { window.toggleNightMode(); syncQuickActions(); });
+        bindDesktopButton('desktopQuickShareBtn', async function() { if (typeof window.showShareDialog !== 'function') await import('./ui/share'); window.showShareDialog(); });
+        bindDesktopButton('desktopQuickExportBtn', async function() { if (typeof window.exportContent !== 'function') await import('./ui/export'); window.exportContent(); });
+        bindDesktopButton('desktopOutlineToggleBtn', function() {
+            if (window.isLongFileMode || !window.vditor) return;
+            const editor = window.vditor.vditor;
+            const show = editor?.outline?.element ? editor.outline.element.style.display !== 'block' : !window.userSettings.showOutline;
+            if (typeof editor?.outline?.toggle === 'function') {
+                editor.outline.toggle(editor, show, false);
+                window.userSettings.showOutline = show;
+                editor.options.outline.enable = show;
+                localStorage.setItem('vditor_settings', JSON.stringify(window.userSettings));
+            } else applyOutline(show);
+            const checkbox = document.getElementById('showOutlineCheckbox') as HTMLInputElement;
+            if (checkbox) checkbox.checked = window.userSettings.showOutline;
+            syncQuickActions();
+        });
+        syncQuickActions();
+        if (!document.body.dataset.quickThemeObserver) {
+            document.body.dataset.quickThemeObserver = 'true';
+            new MutationObserver(syncQuickActions).observe(document.body, {attributes:true,attributeFilter:['class']});
+        }
+
         bindDesktopButton('desktopInsertBtn', function() {
             if (typeof window.showInsertPicker === 'function') window.showInsertPicker();
             else window.showInsertMenu();

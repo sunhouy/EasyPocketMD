@@ -7,3 +7,33 @@ seaborn>=0.13,<0.14
 scikit-learn>=1.5,<2
 Pillow>=11,<13
 openpyxl>=3.1,<4
+# Text, structured data and HTTP clients (runtime networking stays disabled)
+requests>=2.32,<3
+httpx>=0.28,<1
+beautifulsoup4>=4.12,<5
+lxml>=5.3,<7
+PyYAML>=6,<7
+regex>=2024.11
+python-dateutil>=2.9,<3
+# Tables, databases and statistics
+polars>=1.20,<2
+duckdb>=1.2,<2
+SQLAlchemy>=2,<3
+statsmodels>=0.14,<0.15
+networkx>=3.4,<4
+tabulate>=0.9,<1
+# Documents, spreadsheets and PDF
+XlsxWriter>=3.2,<4
+xlrd>=2,<3
+python-docx>=1.1,<2
+python-pptx>=1,<2
+pypdf>=5,<7
+reportlab>=4,<5
+# Imaging, charts and utilities
+scikit-image>=0.25,<1
+opencv-python-headless>=4.10,<5
+imageio>=2.36,<3
+plotly>=6,<7
+tqdm>=4.67,<5
+Faker>=33,<40
+psutil>=6,<8

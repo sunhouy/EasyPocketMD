@@ -1,7 +1,7 @@
 // Never execute submitted Python on the application host or fall back to host Python.
 const { spawn } = require('child_process');
 const { randomUUID } = require('crypto');
-const MAX_CAPTURE = 10 * 1024 * 1024;
+const MAX_CAPTURE = 16 * 1024 * 1024;
 const TIMEOUT = 20000;
 const smallHost = require('os').totalmem() < 3 * 1024 * 1024 * 1024;
 const MEMORY_MB = smallHost ? 256 : 512;
@@ -17,7 +17,7 @@ function cleanup(name) {
     });
 }
 
-export async function runPythonSandbox(code: string, signal?: AbortSignal, onInput?: (event: any, signal: AbortSignal) => Promise<string>, files: {name:string; data:string}[] = []): Promise<any> {
+export async function runPythonSandbox(code: string, signal?: AbortSignal, onInput?: (event: any, signal: AbortSignal) => Promise<string>, files: {name:string; data:string}[] = [], options: {workspace?:boolean;cwd?:string;directories?:string[]} = {}): Promise<any> {
     if (active >= MAX_CONCURRENT) return { success:false, status:429, error:'已有 5 个 Python 任务正在运行，请稍后重试。' };
     active++;
     const name = 'epmd-python-' + randomUUID();
@@ -67,6 +67,7 @@ export async function runPythonSandbox(code: string, signal?: AbortSignal, onInp
                     try {
                         const value = JSON.parse(line);
                         if (value.type === 'ready' && value.protocol === 2) {
+                            if (options.workspace && value.workspace !== true) return finish({success:false,status:503,error:'请更新 Python 沙箱镜像以启用命令行和文件管理'});
                             if (files.length && value.files !== true) return finish({success:false,status:503,error:'沙箱镜像不支持上传文件，请部署最新版本后重试'});
                             protocolReady = true; clearTimeout(handshake);
                         } else if (value.type === 'input') {
@@ -100,20 +101,20 @@ export async function runPythonSandbox(code: string, signal?: AbortSignal, onInp
                         return {mime:'image/png',data:image.data};
                     });
                     let fileBytes = 0;
-                    if (value.files !== undefined && (!Array.isArray(value.files) || value.files.length > 16)) throw Error('Invalid files');
+                    if (value.files !== undefined && (!Array.isArray(value.files) || value.files.length > (options.workspace?64:16))) throw Error('Invalid files');
                     const artifacts = (value.files || []).map(file => {
                         if (typeof file.name !== 'string' || !file.name || file.name.length > 512 || /[\x00-\x1f\\\\]/.test(file.name) || file.name.startsWith('/') || file.name.split('/').some(p => p === '..' || p === '.')) throw Error('Invalid filename');
                         if (typeof file.data !== 'string' || file.data.length % 4 !== 0 || !/^[A-Za-z0-9+/]*={0,2}$/.test(file.data)) throw Error('Invalid file');
                         const raw = Buffer.from(file.data,'base64'); fileBytes += raw.length;
-                        if (fileBytes > 4*1024*1024) throw Error('File output exceeds limit');
+                        if (fileBytes > (options.workspace?8:4)*1024*1024) throw Error('File output exceeds limit');
                         return {name:file.name,data:file.data,size:raw.length};
                     });
-                    finish({success:value.success,errorLine:Number.isSafeInteger(value.errorLine) && value.errorLine > 0 && value.errorLine <= code.split("\n").length ? value.errorLine : undefined,output:value.output.slice(0,65536),error:value.success ? undefined : String(value.error || 'Python failed').slice(0,65536),images,files:artifacts,fileWarning:typeof value.fileWarning === 'string' ? value.fileWarning.slice(0,1024) : undefined});
+                    finish({success:value.success,errorLine:Number.isSafeInteger(value.errorLine) && value.errorLine > 0 && value.errorLine <= code.split("\n").length ? value.errorLine : undefined,output:value.output.slice(0,65536),error:value.success ? undefined : String(value.error || 'Python failed').slice(0,65536),images,files:artifacts,directories:Array.isArray(value.directories) && value.directories.length <= 128 && value.directories.every(d => typeof d === 'string' && d.length <= 512 && !d.startsWith('/') && !d.split('/').some(p => p === '..' || p === '.' || !p)) ? value.directories : undefined,cwd:typeof value.cwd === 'string' ? value.cwd.slice(0,512) : undefined,fileWarning:typeof value.fileWarning === 'string' ? value.fileWarning.slice(0,1024) : undefined});
                 } catch { finish({success:false,status:500,error:'Invalid Python sandbox response'}); }
             });
             if (signal?.aborted) abort();
-            else if (onInput) child.stdin.write(JSON.stringify({code,interactive:true,files}) + '\n');
-            else child.stdin.end(JSON.stringify({code,files}));
+            else if (onInput) child.stdin.write(JSON.stringify({code,interactive:true,files,...options}) + '\n');
+            else child.stdin.end(JSON.stringify({code,files,...options}));
         });
     } finally { active--; }
 }

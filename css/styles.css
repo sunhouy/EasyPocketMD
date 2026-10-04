@@ -6014,3 +6014,37 @@ body.tauri-mobile-safe-area #historyModalOverlay .modal {
 .epmd-code-header button:disabled { opacity:.5;cursor:default; }
 .epmd-code-header .epmd-code-language-input { min-width:70px;width:130px;max-width:40%;padding:3px 5px;border:1px solid var(--border-color,#d7deea);border-radius:4px;background:var(--editor-background,transparent);color:inherit;font:inherit; }
 .epmd-code-header .epmd-code-delete:hover:not(:disabled) { color:#dc2626;border-color:#dc2626; }
+
+/* Output selection stays available even in mobile/native app shells. */
+.code-runner-ui-host .code-output,
+.code-runner-ui-host .code-output pre,
+.code-runner-ui-host .code-output code,
+.code-runner-ui-host .code-output p,
+.code-runner-ui-host .code-output input {
+    -webkit-user-select: text !important;
+    user-select: text !important;
+    -webkit-touch-callout: default !important;
+}
+
+/* Compact file actions keep most sidebar space available for documents. */
+.file-list-sidebar { width:min(340px,calc(100vw - 24px)); }
+.file-list-header { padding:12px 14px;gap:8px; }
+.file-list-title { margin:0;font-size:15px;white-space:nowrap; }
+.file-list-header-actions { gap:2px;margin:0; }
+.file-list-header-actions button { width:30px;height:30px;border-radius:6px; }
+.file-list-actions { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;padding:12px; }
+.file-list-actions .add-file-btn { margin:0;min-height:36px;padding:8px 5px;font-size:13px;gap:6px; }
+.file-list-actions .add-file-btn.folder,
+.file-list-source-btn { margin:0;min-height:36px;padding:8px 5px;background:#f3f5f8;color:#374151;border:1px solid #d9dfe8;border-radius:6px;font-size:12px;display:flex;align-items:center;justify-content:center;gap:6px;cursor:pointer; }
+.file-list-actions .add-file-btn.folder:hover,
+.file-list-source-btn:hover { background:#e9eef5; }
+#fileList { padding:8px 12px;min-height:0; }
+#fileList .jstree-anchor { min-height:30px;line-height:30px; }
+body.night-mode .file-list-source-btn,
+body.night-mode .file-list-actions .add-file-btn.folder { background:#343840;color:#e5e7eb;border-color:#50545e; }
+.desktop-quick-actions { display:flex;align-items:center;gap:4px;margin-left:auto;padding-left:12px;position:sticky;right:0;background:#f4f6fb; }
+.desktop-quick-btn { width:30px;height:30px;border:0;border-radius:6px;background:transparent;color:inherit;display:inline-flex;align-items:center;justify-content:center;cursor:pointer; }
+.desktop-quick-btn:hover,
+.desktop-quick-btn[aria-pressed="true"] { background:rgba(74,144,226,.12);color:var(--theme-accent,#4a90e2); }
+.desktop-quick-btn:focus-visible { outline:2px solid var(--theme-accent,#4a90e2);outline-offset:1px; }
+body.night-mode .desktop-quick-actions { background:#252830; }

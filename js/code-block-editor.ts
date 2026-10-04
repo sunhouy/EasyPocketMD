@@ -112,6 +112,12 @@ function createEditor(block: HTMLElement, source: HTMLElement, preview: HTMLElem
             await global.runCodeBlock?.({language, code: view.state.doc.toString(), block: source, editor: view});
         });
     }
+    if (['python','py'].includes(language)) {
+        for (const [text,tab] of [['上传','upload'],['文件','files'],['命令行','terminal']]) {
+            const control=button(text, async()=>{const global=window as any;await global.ensureCodeRunnerLoaded?.();await global.openCodeSandboxTools?.(tab,control);});
+            control.title=text==='上传'?'上传文件到 Python 沙箱用户目录':text==='文件'?'打开沙箱文件管理':'打开沙箱命令行';
+        }
+    }
     button('复制', () => navigator.clipboard?.writeText(view.state.doc.toString()).catch(() => (window as any).showToast?.('复制失败，请手动选择代码复制', 'error')));
     const editorParent = document.createElement('div'); host.append(header, editorParent);
     const renderDiagram = () => {
