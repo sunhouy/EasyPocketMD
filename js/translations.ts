@@ -1,3 +1,4 @@
+import { uiMessages } from './i18n-messages';
 /**
  * 翻译管理器 - 统一管理所有中英文翻译文本
  */
@@ -1918,6 +1919,13 @@
     // 当前语言
     let currentLanguage = 'zh';
 
+    for (const [source, english] of Object.entries(uiMessages)) {
+        translations.zh['ui:' + source] = source === 'codeEnvironmentHelp' ? '运行方式与环境\n\nPython：服务器隔离 Docker 沙箱，Python 3.12，禁止联网；支持 NumPy、pandas、SciPy、SymPy、Matplotlib、seaborn、scikit-learn、statsmodels、Polars、DuckDB、SQLAlchemy、NetworkX、Pillow、OpenCV、scikit-image、ImageIO、Plotly、openpyxl、XlsxWriter、xlrd、python-docx、python-pptx、pypdf、reportlab、BeautifulSoup、lxml、PyYAML、regex、requests、httpx、dateutil、tabulate、tqdm、Faker、psutil；Matplotlib 支持中文字体。\n\n文件：使用代码块顶部的上传按钮。文件管理显示 /tmp/home 用户目录，支持复制路径、下载、删除；可用相对路径读取文件。代码与命令行共享目录，生成文件在结束后更新到列表。会话空闲 30 分钟后清理，刷新页面或重启服务后可能丢失，请及时下载。最多 64 个文件、总大小 8 MB，上传单文件 5 MB；输出图片/文件提供下载和插入文档按钮。\n\n命令行：在同样的隔离沙箱里执行 shell 命令，例如 ls -la、pwd、cat data.csv、python -c "print(1)"。cd 可切换到用户目录内的文件夹。每条命令是独立进程，不保留 shell 变量、后台任务或软件安装；交互式 Python input() 仍在运行代码时显示输入框。\n\n限制：最多同时运行 5 个任务；计算限时 20 秒，输入等待最长 2 分钟、整次运行最多 5 分钟。单任务内存 256/512 MB，全部沙箱共享服务器容量对应的总资源预算。代码 64 KB，最多 8 张 Matplotlib 图，图片总计 2 MB。\n\n其他语言：JavaScript/TypeScript 在浏览器 Worker 执行（TypeScript 按 JavaScript 语法）；HTML 使用隔离 iframe；C/C++ 通过服务器 Emscripten 编译后运行。\n\n窗口：拖动标题栏移动，拖动边缘调整大小；输出文字可直接选中复制，右上角复制按钮可复制完整运行结果。' : source;
+        translations.en['ui:' + source] = english;
+    }
+    Object.assign(translations.zh, { resizeWindow: '调整窗口大小（方向键）', pressAgainToExit: '再按一次返回键退出' });
+    Object.assign(translations.en, { resizeWindow: 'Resize window (arrow keys)', pressAgainToExit: 'Press Back again to exit' });
+
     // 语言管理器
     // 暴露到全局
     window.i18n = {
@@ -1950,6 +1958,23 @@
             currentLanguage = lang;
             localStorage.setItem('vditor_language', lang);
             document.documentElement.lang = lang === 'zh' ? 'zh-CN' : 'en';
+            this.translate(document);
+            window.dispatchEvent(new Event('languagechange'));
+        },
+
+        // Use the same attribute contract on static pages and dynamically created dialogs.
+        translate: function(root: Document | Element = document) {
+            for (const [attribute, target] of [['data-i18n', 'textContent'], ['data-i18n-title','title'],
+                ['data-i18n-placeholder','placeholder'], ['data-i18n-aria-label','aria-label']]) {
+                const elements = [...(root instanceof Element && root.matches('['+attribute+']') ? [root] : []), ...root.querySelectorAll('['+attribute+']')];
+                for (const element of elements) {
+                    const key = element.getAttribute(attribute);
+                    if (!this.has(key)) continue;
+                    const value = this.t(key);
+                    if (target === 'textContent') element.textContent = value;
+                    else element.setAttribute(target, value);
+                }
+            }
         },
 
         // 获取翻译文本

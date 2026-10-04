@@ -1,298 +1,96 @@
+<p align="center"><img src="assets/readme/logo.png" alt="EasyPocketMD" width="160"></p>
+
 # EasyPocketMD
 
-![EasyPocketMD](assets/readme/logo.png)
+**从一段灵感，到一份可以分享的文档。**
 
-**🤖 AI 驱动 · ⚡ 极速启动 · 📱 全平台 · ✨ 零学习成本**
+写笔记、整理报告、插入公式和图表，或者把分析代码与结果放在同一份 Markdown 中：EasyPocketMD 将这些工作放进一个编辑器。你可以直接编辑排版后的内容，也可以随时切回源码；在浏览器中开始，在桌面或 Android 应用中继续。
 
-<p align="center"><a href="README_EN.md">English</a> &nbsp;|&nbsp; <a href="https://md.yhsun.cn/">DEMO</a> </p>
+[在线体验](https://md.yhsun.cn/) · [English](README_EN.md) · [版本发布](https://github.com/sunhouy/EasyPocketMD/releases) · [反馈问题](https://github.com/sunhouy/EasyPocketMD/issues)
 
-## 🚀 让 Markdown 创作从未如此简单！
+![CI](https://github.com/sunhouy/EasyPocketMD/actions/workflows/deploy.yml/badge.svg)
+![License](https://img.shields.io/github/license/sunhouy/EasyPocketMD)
 
-EasyPocketMD 是一款几乎零学习成本的智能 Markdown 编辑器，无需记忆语法，通过 `/` 斜杠命令即可轻松插入格式化文本、LaTeX 公式和精美图表。配合全文智能搜索与强大 AI 助手，让复杂任务几步完成！
+## 写作、分析、协作，连成一条工作流
 
-从个人写作、多人实时协作，再到多格式发布，EasyPocketMD 将繁琐流程压缩成顺手的创作体验。你可以把它当作一个更聪明的 Markdown 工作台：
+- **让 Markdown 更容易写。** Vditor 提供所见即所得、即时渲染和分屏预览。插入菜单支持公式、表格、Mermaid 和 ECharts；代码块带行号和语法高亮，可直接编辑、切换语言、折叠和删除。
+- **把代码结果留在文档里。** Python 在服务器 Docker 沙箱中运行，支持交互输入、中文 Matplotlib 图表和常用数据分析库。代码块工具栏可上传文件、打开文件管理和命令行；结果可复制，生成的图片或文件可下载、插入文档。运行窗口支持拖动、缩放、最大化和最小化。
+- **离线也能继续写。** 文件支持本地保存与云端同步，列表显示同步状态及本地文件标记。发生无法自动合并的修改时，用双栏差异视图处理冲突；历史版本可用于比较和恢复。本机文件的访问能力取决于浏览器或应用权限。
+- **分享时保留控制权。** 分享文档可设置仅查看或允许编辑，协作支持编辑者光标及编辑记录。需要保护私密内容时，可启用端到端加密，并管理账号密码、专用密码或通行密钥等解锁方式。
+- **让 AI 帮你整理，而不是替你决定。** 配置自己的兼容模型接口，辅助写作、公式和图表生成。文档可导出 PPT：复制生成提示给文本大模型，将完整 JSON 结果粘贴回来，解析后预览、修改并下载演示文稿。
+- **按你的习惯阅读。** 支持日间/夜间模式、编辑器背景和主题色、大纲、字数与 Token 统计，以及可拖动、缩放的查找替换窗口。界面支持中文和英文。
 
-- ✨ **`/` 斜杠命令**直达任意操作，告别菜单查找和鼠标切换
-- 🔍 **智能文件搜索**同时支持标题和全文检索，毫秒级定位知识
-- 🖥️ **轻量级桌面端**基于 Tauri 构建，安装包仅十几 MB，秒级启动
-- 🧠 **与其他格式文件无缝支持**，支持导入本地 Markdown、DOCX 等，导出为 TXT、DOC、PDF、PPT 等格式，完美支持公式和图表，支持自定义字体字号段落等导出样式
-- 📁 **完美兼容本地文件**，延续你已有的文件组织方式
+### 从编辑器带走你的成果
 
-实时协作、AI 辅助写作与流畅编辑体验，全部整合在美观的 Material Design 界面中。支持 Windows、Linux、macOS、Android 与 Web，全平台覆盖。
+导入 Markdown、文本或 Word 文档；导出 Markdown、文本、PDF、Word 和 PPT。PDF/Word 导出由服务端转换工具支持；公式、图表及字体的具体效果取决于格式和转换引擎，建议导出后检查排版。AI、云同步、协作、Python 和部分导出功能需要相应服务或配置。
 
----
+## Docker 部署：构建在 CI，运行在服务器
 
-### ⭐ 支持这个项目
+生产部署使用 Docker。GitHub Actions 构建前端及 app、print、gateway、Python 沙箱镜像，再通过 SSH/rsync 将镜像内容传到服务器。**服务器无需访问 Docker Hub/GHCR 下载基础镜像，也无需现场安装 npm/pip 依赖**，适合外网下载不稳定的环境。
 
-如果 EasyPocketMD 对你有帮助，欢迎点一个 Star，这是对我最大的鼓励！
+镜像按内容摘要拆分、压缩和缓存，后续发布只传输新增或变化的对象；依赖层未改变时可以复用。首次部署仍需完整传输，删除服务器对象缓存会增加下次传输量。
 
-![Build and Deploy](https://github.com/sunhouy/EasyPocketMD/actions/workflows/deploy.yml/badge.svg)
-![codecov](https://codecov.io/gh/sunhouy/EasyPocketMD/graph/badge.svg?token=8E02GDKIKQ)
+部署流程包含摘要校验、空间和内存检查、健康检查、发布切换及回滚。小内存机器导入/切换时可能短暂停止本项目服务以释放资源；不要将其理解为保证无停机。MySQL、Redis 和宿主 TLS 入口复用已有服务，用户文件持久化在镜像之外。
 
----
+### 部署前准备
 
-## 📖 目录
+1. 准备 Linux amd64 服务器、Docker Engine、Python、rsync，以及 MySQL、Redis 和 Nginx TLS 入口。沙箱总资源控制需要 systemd、cgroup v2 和 Docker 的 systemd cgroup 驱动。
+2. 按 [环境变量清单](.env.example) 配置数据库、Redis、JWT、站点地址和管理员账号；将 SSH 连接及 TLS 配置放入 GitHub Actions secrets。可选 `SSL_EMAIL` 用于证书续签通知。
+3. 在 Actions 中运行 **CI/CD** 工作流，选择 `deploy`；需要回退时选择 `rollback`。回滚需要已保留的上一份成功发布及其镜像。
+4. 保留当前/上一发布的持久化文件、镜像和缓存对象，定期备份数据库与用户文件。TLS 自动续签仍要求域名解析及 HTTP 验证入口可达。
 
-- [✨ 功能特性](#-功能特性)
-- [🚀 快速开始](#-快速开始)
-- [📊 对比说明](#-对比说明)
-- [🏗️ 项目架构](#-项目架构)
-- [💻 开发指引](#-开发指引)
-- [🎬 演示](#-演示)
-- [📧 联系方式](#-联系方式)
+完整服务器约定、secret 名称、增量传输、资源预算和证书说明见 [部署指南](deploy/README.md)。该流程按仓库现有服务器布局设计；首次部署到其他环境时，需要调整路径和 Nginx 入口。
 
----
+### Python 沙箱
 
-## ✨ 功能特性
+Python 3.12 环境预装数据处理、科学计算、机器学习、图像处理及办公文档库，完整清单见 [requirements.txt](sandbox/python/requirements.txt)。支持最多 5 个并发任务，并通过共享资源预算限制总占用。执行容器不联网，也不挂载业务数据或 Docker socket；可信 API 服务负责调度。
 
-### 🤖 AI 集成 - 让创作更智能
+上传文件和代码共享临时 `/tmp/home` 目录。会话空闲 30 分钟后会清理，刷新页面或重启服务可能丢失文件，重要结果请及时下载。增加 Python 包需要修改依赖清单、重新构建并发布沙箱镜像。详情见 [沙箱说明](sandbox/python/README.md)。
 
-- **AI 写作助手**：支持写作、改写、自动排版，甚至一键根据文档生成精美 PPT！
-![AI Writing Assistant](assets/readme/aigenppt.gif)
-- **智能图表与公式**：通过 AI 提示词生成 LaTeX 公式和图表，无需手写代码！
-![AI Charts & Formulas](assets/readme/aigenformula.gif)
-- **AI 快速生成 PPT**：基于文档内容自动分析结构，一键生成专业演示文稿
+## 本地开发
 
-### 👥 协作与沟通
+使用 **Node.js 24**（与 CI 一致）。后端完整功能还需要 MySQL、Redis；原生应用需要 Rust/Tauri 对应平台工具链，完整 WASM 构建需要 Emscripten。
 
-- **实时协作编辑**：共享文档链接，邀请多人流畅协同编辑
-![Real-time Collaboration](assets/readme/share.gif)
-- **端到端加密视频通话**：内置双人视频通话，支持 IPv6 双栈网络
-![Encrypted Video Call](assets/readme/videocall.gif)
-- **在线 Presence**：实时显示协作者状态，随时沟通高效协作
-
-### ✍️ 编辑体验
-
-- **三种预览模式**：所见即所得 (WYSIWYG)、即时渲染 (Instant Render)、分屏预览 (Split Preview)
-- **高效快捷编辑**：快速插入 Markdown、LaTeX 公式和图表；支持全文检索与文件差异对比
-![Editing Experience](assets/readme/insert.gif)
-- **完整版本控制**：浏览历史记录并比较不同版本差异，支持批量管理历史
-![Version Control](assets/readme/history.gif)
-- **自动保存与冲突处理**：支持本地自动保存，智能处理多设备同步冲突
-
-### 🔗 兼容性与设计
-
-- **跨平台无缝体验**：Web、Windows、Linux、macOS、Android 五端覆盖
-![Cross Platform](assets/readme/1_1.png)
-- **强大文件导入/导出**：支持导入本地 Markdown、DOCX 等，导出为 TXT、DOC、PDF、PPT 等格式
-- **云打印**：通过云打印客户端实现远程打印
-![Cloud Print](assets/readme/cloudprint.gif)
-- **现代化界面**：简洁的 Material Design，完美支持日间/夜间模式，美观优雅
-
----
-
-## 🚀 快速开始
-
-### 环境要求
-
-- **Node.js** ≥ 18.0
-- **Python** ≥ 3.6 (云打印服务)
-- **MySQL** ≥ 5.7 (数据存储)
-- **Redis** ≥ 6.0 (缓存与协作)
-- **npm** ≥ 9.0
-
-### 安装
-
-1. **克隆仓库**
 ```bash
 git clone https://github.com/sunhouy/EasyPocketMD.git
-cd easypocketmd
-```
-或者从 npm 安装：
-```bash
-npm i easypocketmd
-```
-
-2. **安装依赖**
-```bash
-npm install
-```
-
-服务器导出 DOCX 需要 **Pandoc**，导出 PDF 需要 **wkhtmltopdf**。Debian/Ubuntu 可运行以下脚本安装并检查转换器；自动部署流程也会在切换服务前执行此检查。
-```bash
-bash api/utils/ensure-export-tools.sh
-```
-其他系统需自行安装这两个工具。服务进程的 PATH 不包含安装目录时，可在 `.env` 中配置绝对路径 `PANDOC_PATH`、`WKHTMLTOPDF_PATH`。npm 的 `wkhtmltopdf` 包不包含转换器二进制。
-
-Python 代码执行需要 Docker 沙箱。自动部署由 GitHub Actions 构建、测试并上传镜像，国内服务器只执行离线 `docker load`，不会从官方镜像仓库拉取。镜像压缩包和内容描述均校验 SHA-256；导入后比较有序文件系统层、架构和运行配置，再检查 Python/Matplotlib。不同 Docker 存储后端的 `.Id` 可能不同，不能作为跨机器校验依据。CI 另用独立的 Docker 27 引擎验证离线导入。
-
-生产部署使用 Docker，镜像由 CI 构建并通过 SSH 增量上传，服务器无需访问国外镜像仓库。详见 [Docker 部署说明](deploy/README.md)。
-
-3. **配置环境**
-```bash
-cp .env.example .env
-# 编辑 .env 文件，配置数据库、Redis、端口等
-```
-
-4. **初始化数据库**
-创建 MySQL 数据库和数据表（结构见 [db.sql](file:///workspace/db.sql)，并确保 Redis 已启动。
-
-5. **构建前端**
-```bash
-npm run build
-```
-
-6. **启动应用**
-```bash
-npm start
-```
-
-生产环境推荐使用 PM2：
-```bash
-npm install -g pm2
-pm2 start api/server.ts --name "easypocketmd"
-```
-
-### 📱 Tauri 桌面应用开发与构建
-
-安装好 Tauri 依赖后，可直接开发和构建各平台应用：
-
-**桌面开发：**
-```bash
-# Windows/macOS/Linux
-npm run tauri:dev
-
-# 构建桌面应用
-npm run build:tauri:win   # Windows
-npm run build:tauri:linux  # Linux
-npm run build:tauri:mac    # macOS
-```
-
-**Android 开发与构建：**
-```bash
-# 初始化 Android 项目
-npm run tauri:android:init
-
-# Android 开发模式
-npm run tauri:android:dev
-
-# 构建 Android APK
-npm run tauri:android:build
-```
-
-### 🎯 开发模式快速启动
-
-如果你只是想快速体验前端：
-```bash
+cd EasyPocketMD
+npm ci
 npm run dev
 ```
 
----
+`npm run dev` 启动前端开发服务。后端配置位于 `api/config/`，环境变量参考 `.env.example`，数据库结构见 [db.sql](db.sql)；配置完成后另开终端执行 `npm start`。
 
-## 📊 对比说明
+| 命令 | 用途 |
+| --- | --- |
+| `npm run dev` | 前端开发 |
+| `npm start` | API 服务 |
+| `npm run build:web` | Web 构建（使用已有 WASM 产物） |
+| `npm run build` | 完整 Web/WASM 构建 |
+| `npm test` | Jest 单元及集成测试 |
+| `npm run typecheck` | TypeScript 类型检查 |
+| `npm run tauri:dev` | 桌面应用开发 |
+| `npm run build:tauri:win` / `build:tauri:linux` / `build:tauri:mac` | 对应平台打包 |
+| `npm run tauri:android:build` | Android APK 构建 |
 
-| 功能                         | **EasyPocketMD** | Typora | Obsidian | Notion | VS Code | Joplin                 |
-|-----------------------------|-------------------|--------|----------|--------|---------|------------------------|
-| **数据隐私**                 | 🔒 本地 + 云端 | 本地 | 本地 | 仅云端 | 本地 | 本地 + 可选云同步 |
-| **AI 写作助手**              | ✅ 原生支持 | ❌ | ❌（插件） | ❌ | ❌（插件） | ❌                      |
-| **AI 图表与公式**            | ✅ 原生支持 | ❌ | ❌ | ❌ | ❌ | ❌                      |
-| **AI 一键生成 PPT**         | ✅ 原生支持 | ❌ | ❌ | ❌ | ❌ | ❌                      |
-| **移动端体验**               | 📱 一流体验 | 基础 | 基础 | 良好 | 无 | 基础                  |
-| **实时协作**                 | ✅ E2EE 加密 | ❌ | ❌ | ✅ | ✅（Live Share） | ❌                      |
-| **加密视频通话**             | ✅ 内置 | ❌ | ❌ | ❌ | ❌ | ❌                      |
-| **云打印**                   | ✅ 原生支持 | ❌ | ❌ | ❌ | ❌ | ❌                      |
-| **知识图谱**                 | ✅ 内置 WebAssembly | ❌ | ❌ | ❌ | ❌ | ❌                      |
-| **价格**                     | 完全免费 / MIT 开源 | 一次性 $15 | 免费 / $50/年同步 | 免费版 | 免费 | 免费                   |
+## 代码导航
 
----
+| 目录 | 内容 |
+| --- | --- |
+| `js/files/` | 文件、同步、历史版本及差异编辑 |
+| `js/ui/` | 分享、导出、图表和 AI 界面 |
+| `js/code-*.ts` | 代码块编辑器和运行工作台 |
+| `js/translations.ts`、`js/i18n-messages.ts` | 中英文文案与统一翻译接口 |
+| `api/`、`shared/` | Express API、协作和共享协议 |
+| `sandbox/python/` | Python 执行协议、镜像和依赖 |
+| `deploy/`、`scripts/` | Docker 构建、增量发布、资源控制及 SSL |
+| `src-tauri/` | 桌面/Android 应用 |
+| `wasm_text_engine/` | 文本和图片处理 WASM |
+| `tests/` | 自动化回归测试 |
 
-## 🏗️ 项目架构
+更多说明见 [CODE_WIKI.md](CODE_WIKI.md)，依赖与许可证见 [DEPENDENCIES.md](DEPENDENCIES.md)。
 
-项目采用混合架构：
+## 参与项目
 
-- 前端：JavaScript + Vite + WebAssembly (C/C++)
-- 后端：Node.js + Express + MySQL + Redis
-- 实时协作：WebSocket
-- 跨平台：Tauri (桌面/Android)
-- 云打印：Python
+欢迎提交问题、改进建议和 Pull Request。反馈时请附上平台、操作步骤及错误信息；涉及加密文档时，请使用可公开的最小示例。
 
-```
-api/                    # 后端 API 服务
-├── config/             # 数据库/缓存配置
-├── middleware/       # 中间件 (限流、认证等)
-├── models/           # 核心业务模型
-├── realtime/        # WebSocket 实时协作
-├── routes/           # API 路由
-└── utils/            # 工具函数
-
-js/                     # 前端源码
-├── files/            # 文件管理
-├── ui/               # UI 组件
-└── page/             # 页面逻辑
-
-wasm_text_engine/      # WebAssembly 高性能模块
-
-src-tauri/          # Tauri 跨平台应用
-
-tests/                  # 测试代码
-```
-
-详细架构与开发文档请查阅 [CODE_WIKI.md](file:///workspace/CODE_WIKI.md)
-
----
-
-## 💻 开发指引
-
-### 核心技术栈
-
-- **前端构建**：Vite
-- **Markdown 编辑器**：Vditor
-- **图表库**：ECharts
-- **WebAssembly**：C/C++ 高性能计算
-- **后端框架**：Express.js
-- **数据库**：MySQL (持久化 + Redis 缓存
-- **实时通讯**：WebSocket (ws)
-- **跨平台**：Tauri
-- **测试**：Jest + Supertest
-
-### 常用命令
-
-```bash
-# 前端开发
-npm run dev
-
-# 构建前端
-npm run build:web
-
-# 完整构建 (含 WASM)
-npm run build
-
-# 运行后端服务
-npm start
-
-# 运行测试
-npm test
-
-# WASM 文本引擎构建
-npm run wasm:text:build
-
-# WASM 图片压缩构建
-npm run wasm:image:build
-```
-
----
-
-## 🎬 演示
-
-立即在线体验：<https://md.yhsun.cn/>
-
----
-
-## 📧 联系方式
-`sunhouyun@emails.bjut.edu.cn`
-
-## 📄 许可证
-
-本项目基于 MIT License 开源。
-
----
-
-## 🙌 致谢
-
-基于现代 Web 技术与开源工具构建，向所有贡献者致敬！
-
-完整依赖与许可证清单请见 [DEPENDENCIES.md](file:///workspace/DEPENDENCIES.md)
-
----
-
-> 💡 如果你喜欢这个项目，别忘了 Star ⭐ 哦！
+EasyPocketMD 采用 [MIT 许可证](LICENSE)。感谢 Vditor、CodeMirror、Tauri 及其他开源项目，让写作工具可以持续改进。

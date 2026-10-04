@@ -1,8 +1,8 @@
 // Pointer-based controls work with mouse, pen and touch. Geometry survives
 // output updates, minimize/maximize toggles, and viewport/keyboard changes.
-export function floatingRunWindow(panel: HTMLElement, header: HTMLElement) {
+export function floatingRunWindow(panel: HTMLElement, header: HTMLElement, initialRect?: {x:number;y:number;width:number;height:number}) {
     type Rect = {x:number;y:number;width:number;height:number};
-    let rect: Rect | null = null, maximized = false, minimized = false;
+    let rect: Rect | null = initialRect || null, maximized = false, minimized = false;
     const handles: HTMLElement[] = [];
     function viewport() {
         const v = window.visualViewport;
@@ -67,7 +67,8 @@ export function floatingRunWindow(panel: HTMLElement, header: HTMLElement) {
     }
     panel.style.boxSizing = 'border-box';
     header.style.touchAction = 'none';
-    header.addEventListener('pointerdown',event => gesture(event));
+    const drag = (event: PointerEvent) => gesture(event);
+    header.addEventListener('pointerdown',drag);
     const edges: Record<string,string> = {
         n:'top:0;left:18px;right:18px;height:8px',s:'bottom:0;left:18px;right:18px;height:8px',
         w:'left:0;top:18px;bottom:18px;width:8px',e:'right:0;top:18px;bottom:18px;width:8px',
@@ -80,7 +81,7 @@ export function floatingRunWindow(panel: HTMLElement, header: HTMLElement) {
         handle.addEventListener('pointerdown',event => gesture(event,direction));
         if (direction === 'se') {
             handle.textContent = '◢'; handle.style.color = '#8993a3'; handle.style.textAlign = 'right';
-            handle.tabIndex = 0; handle.setAttribute('role','button'); handle.setAttribute('aria-label','调整运行窗口大小（方向键）');
+            handle.tabIndex = 0; handle.setAttribute('role','button'); handle.setAttribute('data-i18n-aria-label','resizeWindow'); handle.setAttribute('aria-label', window.i18n?.t('resizeWindow') || 'Resize window (arrow keys)');
             handle.addEventListener('keydown',event => {
                 if (!rect || !['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(event.key)) return;
                 event.preventDefault(); const step = event.shiftKey ? 40 : 10;
@@ -92,5 +93,9 @@ export function floatingRunWindow(panel: HTMLElement, header: HTMLElement) {
     window.addEventListener('resize',apply);
     window.visualViewport?.addEventListener('resize',apply);
     window.visualViewport?.addEventListener('scroll',apply);
-    return {update(full: boolean, collapsed: boolean) { maximized = full; minimized = collapsed; apply(); }};
+    return {update(full: boolean, collapsed: boolean) { maximized = full; minimized = collapsed; apply(); },
+        destroy() { header.removeEventListener('pointerdown',drag); window.removeEventListener('resize',apply);
+            window.visualViewport?.removeEventListener('resize',apply); window.visualViewport?.removeEventListener('scroll',apply);
+            handles.forEach(handle => handle.remove()); }
+    };
 }

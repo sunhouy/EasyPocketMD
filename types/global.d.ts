@@ -39,7 +39,11 @@ export interface ToolbarButtonDef {
 }
 
 export interface I18nApi {
-  init: () => void;
+  init: () => string;
+  setLanguage: (language: string) => void;
+  has: (key: string) => boolean;
+  tOr: (key: string, fallback?: string) => string;
+  translate: (root?: Document | Element) => void;
   t: (key: string, params?: Record<string, string | number>) => string;
   getLanguage: () => string;
   translations?: Record<string, string>;
