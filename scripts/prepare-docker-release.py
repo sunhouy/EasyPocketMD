@@ -27,12 +27,19 @@ for key in keys:
 domain = urlparse(os.environ['BASE_URL']).hostname
 if not domain:
     raise SystemExit('BASE_URL must contain the deployment domain')
-wasm = {}
-for name in ('text_engine.js', 'text_engine.wasm', 'image_compressor.js', 'image_compressor.wasm'):
-    relative = 'wasm_text_engine/' + name
-    wasm[relative] = hashlib.sha256((Path('dist') / relative).read_bytes()).hexdigest()
-(root / 'config.json').write_text(json.dumps({'domain': domain, 'wasm': wasm, 'ssl_email': os.environ.get('SSL_EMAIL', ''),
-    'version': json.loads(Path('package.json').read_text())['version']}))
+if (Path('image-cas') / 'config.json').is_file():
+    # A rollback downloads public metadata and images, then uses current secrets.
+    config = json.loads((Path('image-cas') / 'config.json').read_text())
+    config.update(domain=domain, ssl_email=os.environ.get('SSL_EMAIL', ''))
+else:
+    wasm = {}
+    for name in ('text_engine.js', 'text_engine.wasm', 'image_compressor.js', 'image_compressor.wasm'):
+        relative = 'wasm_text_engine/' + name
+        wasm[relative] = hashlib.sha256((Path('dist') / relative).read_bytes()).hexdigest()
+    config = {'domain': domain, 'wasm': wasm, 'ssl_email': os.environ.get('SSL_EMAIL', ''),
+              'version': json.loads(Path('package.json').read_text())['version'],
+              'github_run_id': os.environ['GITHUB_RUN_ID']}
+(root / 'config.json').write_text(json.dumps(config))
 for variable, name in [('TLS_KEY', 'tls.key'), ('TLS_PEM', 'tls.pem')]:
     value = os.environ.get(variable)
     if value:

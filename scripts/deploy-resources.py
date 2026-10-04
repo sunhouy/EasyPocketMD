@@ -135,18 +135,24 @@ if __name__ == '__main__':
     import sys
     action, cache, release = sys.argv[1:4]
     manifest = json.loads((Path(release) / 'release.json').read_text())
-    if action == 'transfer':
-        missing = {m['sha256']:m.get('compressed_size',m['size']) for m in manifest['members']
-                   if not (Path(cache) / 'objects' / (m['sha256'] + '.gz')).exists()}
-        reserve = required_import_space(manifest)
-        needed = sum(missing.values()) + reserve
-        if shutil.disk_usage(cache).free < needed:
-            raise SystemExit(f'Insufficient disk for transfer + import: need {needed // MIB} MiB free. Current services retained; clean obsolete backups/releases first.')
-    elif action == 'deploy':
-        lock = Path(cache).parent / 'deployment.lock'
-        with lock.open('a') as handle:
-            try: fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            except BlockingIOError: raise SystemExit('Another server deployment is in progress')
+    if action not in ('transfer', 'deploy'):
+        raise SystemExit('Unknown resource guard action')
+    lock = Path(cache).parent / 'deployment.lock'
+    with lock.open('a') as handle:
+        try: fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError: raise SystemExit('Another server deployment is in progress')
+        # Free obsolete project artifacts before both the large upload and import.
+        # Retain this candidate even when retrying an upload older than one day.
+        subprocess.run([sys.executable, str(Path(release) / 'deploy-docker.py'), 'cleanup', sys.argv[4], release],
+                       check=True, env={**os.environ, 'EPMD_DEPLOYMENT_LOCK_HELD': '1'})
+        if action == 'transfer':
+            missing = {m['sha256']:m.get('compressed_size',m['size']) for m in manifest['members']
+                       if not (Path(cache) / 'objects' / (m['sha256'] + '.gz')).exists()}
+            reserve = required_import_space(manifest)
+            needed = sum(missing.values()) + reserve
+            if shutil.disk_usage(cache).free < needed:
+                raise SystemExit(f'Insufficient disk for transfer + import after cleanup: need {needed // MIB} MiB free. Current services retained.')
+        else:
             # Check disk before taking the current service offline.
             required = required_import_space(manifest)
             if shutil.disk_usage(cache).free < required:
@@ -158,5 +164,3 @@ if __name__ == '__main__':
                 subprocess.run([sys.executable, str(Path(release) / 'image-cas.py'), 'load', cache, str(Path(release) / 'release.json')], check=True)
                 subprocess.run([sys.executable, str(Path(release) / 'deploy-docker.py'), 'deploy', sys.argv[4], release], check=True, env={**os.environ, 'EPMD_DEPLOYMENT_LOCK_HELD': '1'})
             subprocess.run([sys.executable, str(Path(release) / 'ssl-renewal.py'), 'start', sys.argv[4]], check=True)
-    else:
-        raise SystemExit('Unknown resource guard action')

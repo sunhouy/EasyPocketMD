@@ -213,7 +213,7 @@ jobs:
         target: "/www/wwwroot/static"
         strip_components: 1
 
-  # Docker rollback reuses the retained previous immutable release.
+  # Docker rollback downloads the previous immutable images from GitHub.
   rollback:
     if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'rollback'
     uses: ./.github/workflows/docker-deploy.yml
