@@ -11,6 +11,7 @@ it('uses the server endpoint instead of loading a browser Python interpreter',as
 it('displays matplotlib images with text in the runner panel',async()=>{
     document.body.innerHTML='<pre><code class="language-python">print(1)</code></pre>';
     const code=document.querySelector('code');code.getBoundingClientRect=()=>({top:0,width:300,height:100,right:300});
+    fetch.mockResolvedValueOnce({ok:true,json:async()=>({success:true,token:'test-workspace'})});
     fetch.mockResolvedValueOnce({ok:true,json:async()=>({success:true,output:'图表结果',images:[{mime:'image/png',data:'iVBORw0KGgo='}]})});
     window.addRunButtons(document);code.dispatchEvent(new MouseEvent('mousemove',{bubbles:true}));
     document.querySelector('.code-run-button').click();

@@ -228,6 +228,8 @@
         <button class="add-file-btn folder" id="addFolderBtn">
             <i class="fas fa-folder-plus"></i> <span data-i18n="newFolder">新建文件夹</span>
         </button>
+        <button class="file-list-source-btn" id="desktopOpenLocalFileBtn" type="button"><i class="fas fa-folder-open"></i><span data-i18n="openLocalFile">打开本地文件</span></button>
+        <button class="file-list-source-btn" id="desktopImportBtn" type="button"><i class="fas fa-file-import"></i><span data-i18n="import">导入</span></button>
     </div>
 </div>
 
@@ -1221,8 +1223,6 @@
                 <div class="desktop-dropdown-content" id="desktopMoreDropdown">
                     <div class="dropdown-category" data-i18n="fileManagement">文件管理</div>
                     <button class="dropdown-item" id="desktopFileManagerBtn"><i class="fas fa-folder"></i><span data-i18n="myFiles">我的文件</span></button>
-                    <button class="dropdown-item" id="desktopOpenLocalFileBtn"><i class="fas fa-folder-open"></i><span data-i18n="openLocalFile">打开本地文件</span></button>
-                    <button class="dropdown-item" id="desktopImportBtn"><i class="fas fa-file-import"></i><span data-i18n="import">导入</span></button>
                     <button class="dropdown-item" id="desktopExportBtn"><i class="fas fa-file-export"></i><span data-i18n="export">导出</span></button>
 
                     <div class="dropdown-category" data-i18n="editingAndHistory">编辑与版本</div>
@@ -1242,6 +1242,12 @@
                     <button class="dropdown-item" id="desktopServiceStatusBtn"><i class="fas fa-signal"></i><span data-i18n="serviceStatus">服务状态</span></button>
                     <button class="dropdown-item" id="desktopAboutBtn"><i class="fas fa-info-circle"></i><span data-i18n="about">关于</span></button>
                 </div>
+            </div>
+            <div class="desktop-quick-actions" role="group" aria-label="文档快捷操作">
+                <button class="desktop-quick-btn" id="desktopOutlineToggleBtn" type="button" title="显示/隐藏大纲" aria-label="显示/隐藏大纲" aria-pressed="false"><i class="fas fa-list-ul"></i></button>
+                <button class="desktop-quick-btn" id="desktopQuickShareBtn" type="button" data-i18n-title="share" title="分享" aria-label="分享"><i class="fas fa-share-alt"></i></button>
+                <button class="desktop-quick-btn" id="desktopQuickExportBtn" type="button" data-i18n-title="export" title="导出" aria-label="导出"><i class="fas fa-file-export"></i></button>
+                <button class="desktop-quick-btn" id="desktopThemeToggleBtn" type="button" title="切换日间/夜间模式" aria-label="切换日间/夜间模式"><i class="fas fa-moon"></i></button>
             </div>
             <span class="current-file-e2e-indicator desktop-e2e-indicator" aria-hidden="true" role="button" tabindex="0" title="此文件已使用端到端加密"><i class="fas fa-lock"></i></span>
         </div>
@@ -1278,8 +1284,6 @@
                 <div class="mobile-dropdown-content" id="mobileDropdown">
                     <div class="dropdown-category" data-i18n="fileManagement">文件管理</div>
                     <button class="dropdown-item" id="mobileFileManagerBtn"><i class="fas fa-folder"></i>  <span data-i18n="myFiles">我的文件</span></button>
-                    <button class="dropdown-item" id="mobileOpenLocalFileBtn"><i class="fas fa-folder-open"></i>  <span data-i18n="openLocalFile">打开本地文件</span></button>
-                    <button class="dropdown-item" id="mobileImportBtn"><i class="fas fa-file-import"></i>  <span data-i18n="import">导入</span></button>
                     <button class="dropdown-item" id="mobileExportBtn"><i class="fas fa-file-export"></i>  <span data-i18n="export">导出</span></button>
 
                     <div class="dropdown-category" data-i18n="editingAndHistory">编辑与版本</div>

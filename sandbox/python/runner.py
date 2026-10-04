@@ -17,22 +17,22 @@ MAX_TOTAL_IMAGE_BYTES = 2 * 1024 * 1024
 MAX_FILE_BYTES = 4 * 1024 * 1024
 
 
-def collect_files():
+def collect_files(root_dir='/tmp/output', max_bytes=MAX_FILE_BYTES, max_count=16, include_hidden=False):
     files, total, scanned, warning = [], 0, 0, ''
-    for root, directories, names in os.walk('/tmp/output', followlinks=False):
+    for root, directories, names in os.walk(root_dir, followlinks=False):
         scanned += 1 + len(directories)
         if scanned > 1024:
             return files, '输出文件过多，仅返回前面符合限制的文件。'
-        directories[:] = sorted(d for d in directories if not d.startswith('.') and d != '__pycache__')
-        if len(Path(root).relative_to('/tmp/output').parts) >= 8:
+        directories[:] = sorted(d for d in directories if (include_hidden or not d.startswith('.')) and d != '__pycache__')
+        if len(Path(root).relative_to(root_dir).parts) >= 8:
             directories[:] = []
         for name in sorted(names):
             scanned += 1
             if scanned > 1024:
                 return files, '输出文件过多，仅返回前面符合限制的文件。'
             path = Path(root) / name
-            relative = path.relative_to('/tmp/output').as_posix()
-            if name.startswith('.') or len(relative) > 512 or any(ord(c) < 32 for c in relative) or '\\' in relative:
+            relative = path.relative_to(root_dir).as_posix()
+            if (not include_hidden and name.startswith('.')) or len(relative) > 512 or any(ord(c) < 32 for c in relative) or '\\' in relative:
                 continue
             fd = None
             try:
@@ -40,14 +40,14 @@ def collect_files():
                 info = os.fstat(fd)
                 if not stat.S_ISREG(info.st_mode):
                     continue
-                if len(files) >= 16 or total + info.st_size > MAX_FILE_BYTES:
-                    warning = '输出文件最多返回 16 个、总大小 4 MB；部分文件超过限制，未返回。'
+                if len(files) >= max_count or total + info.st_size > max_bytes:
+                    warning = f'文件最多返回 {max_count} 个、总大小 {max_bytes // (1024 * 1024)} MB；部分文件超过限制，未返回。'
                     continue
                 with os.fdopen(fd, 'rb') as stream:
                     fd = None
-                    raw = stream.read(MAX_FILE_BYTES - total + 1)
-                if total + len(raw) > MAX_FILE_BYTES:
-                    warning = '输出文件总大小超过 4 MB，部分文件未返回。'
+                    raw = stream.read(max_bytes - total + 1)
+                if total + len(raw) > max_bytes:
+                    warning = '文件总大小超过限制，部分文件未返回。'
                     continue
                 total += len(raw)
                 files.append({'name': relative, 'data': base64.b64encode(raw).decode('ascii')})
@@ -116,25 +116,49 @@ def install_chinese_font_fallback(matplotlib):
 def main():
     wire_in, wire_out = sys.stdin, sys.stdout
     request = json.loads(wire_in.readline(12 * 1024 * 1024))
+    workspace = request.get('workspace') is True
+    home = Path('/tmp/home')
+    if workspace:
+        home.mkdir(exist_ok=True)
+        Path('/tmp/output').symlink_to(home, target_is_directory=True)
+        os.environ['HOME'] = str(home)
+        directories = request.get('directories', [])
+        if not isinstance(directories, list) or len(directories) > 128:
+            raise ValueError('Invalid directories')
+        for directory in directories:
+            target = (home / directory).resolve()
+            if not target.is_relative_to(home):
+                raise ValueError('Invalid directory')
+            target.mkdir(parents=True, exist_ok=True)
     uploads = Path('/tmp/uploads')
     uploads.mkdir(exist_ok=True)
     total_upload = 0
-    if not isinstance(request.get('files', []), list) or len(request.get('files', [])) > 8:
+    if not isinstance(request.get('files', []), list) or len(request.get('files', [])) > (64 if workspace else 8):
         raise ValueError('Invalid uploaded files')
     for file in request.get('files', []):
         name = file['name']
-        if not isinstance(name, str) or not name or name in ('.', '..') or '/' in name or '\\' in name or len(name) > 150:
+        if not isinstance(name, str) or not name or name in ('.', '..') or (not workspace and '/' in name) or '\\' in name or len(name) > 512 or name.startswith('/') or any(p in ('.', '..') for p in name.split('/')):
             raise ValueError('Invalid uploaded filename')
         data = base64.b64decode(file['data'], validate=True)
         total_upload += len(data)
         if total_upload > 8 * 1024 * 1024:
             raise ValueError('Uploaded files exceed 8 MB')
-        (uploads / name).write_bytes(data)
+        destination = uploads / name
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_bytes(data)
+        if workspace:
+            destination = home / name
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            destination.write_bytes(data)
     Path('/tmp/output').mkdir(exist_ok=True)
-    os.chdir('/tmp/output')
+    os.chdir(home if workspace else '/tmp/output')
+    if workspace and request.get('cwd'):
+        target = (home / request['cwd']).resolve()
+        if target.is_relative_to(home) and target.is_dir():
+            os.chdir(target)
     output = Output()
     if request.get('interactive'):
-        wire_out.write(json.dumps({'type':'ready', 'protocol':2, 'files':True}) + '\n')
+        wire_out.write(json.dumps({'type':'ready', 'protocol':2, 'files':True, 'workspace':True}) + '\n')
         wire_out.flush()
         calls = 0
         def ask(prompt=''):
@@ -207,8 +231,22 @@ def main():
             user_lines = [frame.lineno for frame in frames if frame.filename == '/tmp/main.py']
             line = error.lineno if isinstance(error, SyntaxError) and error.filename == '/tmp/main.py' else (user_lines[-1] if user_lines else None)
             result = {"success": False, "phase": "runtime", "error": traceback.format_exc(limit=12)[-MAX_TEXT:], "errorLine": line}
-    files, warning = collect_files()
-    result.update(output=output.getvalue(), images=images, files=files, fileWarning=warning)
+    files, warning = collect_files(str(home), 8 * 1024 * 1024, 64, True) if workspace else collect_files()
+    directories = []
+    if workspace:
+        for root, children, _ in os.walk(home, followlinks=False):
+            children[:] = [d for d in sorted(children) if not (Path(root) / d).is_symlink()]
+            for child in children:
+                directories.append((Path(root) / child).relative_to(home).as_posix())
+            if len(directories) > 128:
+                directories = directories[:128]
+                warning = '文件夹数量超过 128，部分文件夹未保留。'
+                break
+    try:
+        cwd = os.getcwd() if workspace else None
+    except OSError:
+        cwd = '/tmp/home'
+    result.update(output=output.getvalue(), images=images, files=files, fileWarning=warning, cwd=cwd, directories=directories)
     wire_out.write(json.dumps(dict(type='result', **result)) + '\n')
     wire_out.flush()
 

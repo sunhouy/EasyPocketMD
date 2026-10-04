@@ -20,18 +20,23 @@ import { floatingRunWindow } from './code-runner-window';
     class CodeRunner {
         abortRun: (() => void) | null = null;
         constructor() { this.cCompilerEndpoint = '/api/code-runner/run'; }
-        async runPython(code) {
+        async runPython(code, command?: string) {
             const controller = new AbortController();
             this.abortRun = () => controller.abort();
             const timeout = setTimeout(() => controller.abort(), 310000);
             try {
                 const base = global.getApiBaseUrl ? global.getApiBaseUrl() : '/api';
                 const endpoint = base.replace(/\/$/, '') + '/code-runner';
+                const workspace = runnerFiles ? await runnerFiles.workspace() : undefined;
                 const response = await fetch(endpoint + '/run', {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ language: 'python', code, interactive:true, ...(runnerFiles?.tokens().length ? {files:runnerFiles.tokens()} : {}) }), signal: controller.signal
+                    body: JSON.stringify({ language: 'python', code, interactive:true, ...(workspace ? {workspace} : {}), ...(command !== undefined ? {command} : {}) }), signal: controller.signal
                 });
-                if (!response.ok || !response.headers?.get?.('content-type')?.includes('ndjson')) return await response.json();
+                if (!response.ok || !response.headers?.get?.('content-type')?.includes('ndjson')) {
+                    const result=await response.json();
+                    if(String(result.error||'').includes('沙箱文件会话已过期'))runnerFiles?.resetExpired();
+                    return result;
+                }
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder(); let buffer = '';
                 for (;;) {
@@ -193,6 +198,19 @@ import { floatingRunWindow } from './code-runner-window';
             if (runnerUiState.outputPanel.style.display !== 'none') renderOutput(result);
         } finally { runnerUiState.button.disabled = false; }
     };
+
+    global.openCodeSandboxTools = async function(tab, button) {
+        ensureRunnerUi(); runnerUiState.outputPanel.style.display='flex';runnerUiState.minimized=false;updatePanelSize();
+        if(tab==='upload') await runnerFiles.pick(button);
+        else await runnerFiles.show(tab==='terminal'?'terminal':'files');
+    };
+
+    async function runSandboxCommand(command) {
+        if(runnerUiState.button.disabled || runnerFiles.uploading) return {success:false,error:'请等待当前任务结束'};
+        runnerUiState.button.disabled=true; runnerUiState.runContext=null;refreshErrorHighlight();
+        try {renderOutput({success:true,output:'正在执行命令…'});const result=await codeRunner.runPython('pass',command);renderOutput(result);return result;}
+        finally {runnerUiState.button.disabled=false;}
+    }
 
     // 初始化代码运行器
     const codeRunner = new CodeRunner();
@@ -358,7 +376,7 @@ import { floatingRunWindow } from './code-runner-window';
         const help = runnerUiState.help;
         help.dataset.open = help.dataset.open === 'true' ? 'false' : 'true';
         runnerUiState.minimized = false;
-        help.textContent = '运行方式与环境\n\nPython：在服务器隔离 Docker 沙箱中运行，Python 3.12。已安装 NumPy、pandas、SciPy、SymPy、Matplotlib、seaborn、scikit-learn、Pillow、openpyxl，支持中文字体及图表图片返回。禁止联网、只允许 /tmp 临时写入；每次运行独立容器。右上角上传文件后复制 /tmp/uploads/ 路径，使用 open()、pandas.read_csv() 等读取；最多 8 个文件，单文件 5 MB，总大小 8 MB，暂存 30 分钟。当前工作目录为 /tmp/output，代码以相对路径写入的文件（如 result.csv、plot.png）会自动返回，最多 16 个文件、总大小 4 MB；输出提供下载及插入当前文档按钮，插入沿用附件存储/加密设置。每次运行完成会销毁容器，请及时下载或插入输出文件。计算限时 20 秒（等待输入不计入）；input() 或 stdin.readline() 会在此窗口请求输入，单次等待最多 2 分钟、整次运行最多 5 分钟。最多同时运行 5 个 Python 任务；单任务内存按服务器容量限制为 256/512 MB，全部沙箱共享与服务器容量匹配的总资源预算、代码 64 KB，最多返回 8 张图，图片总计不超过 2 MB。\n\nJavaScript：在浏览器 Worker 中执行，没有页面 DOM。TypeScript 当前按 JavaScript 语法执行，不支持类型标注。HTML：在隔离 iframe 中预览。C/C++：在服务器通过 Emscripten 编译成 WebAssembly，再由 Node.js 执行；编译最长 30 秒，运行最长 15 秒。\n\n窗口：拖动标题栏移动，拖动边缘或右下角调整大小；最大化后恢复保留原位置与大小。\n\n复制：复制文字、原始错误及中文解释；支持富文本剪贴板时同时复制图表。报错行对应本次运行的代码，编辑代码后原位置高亮自动清除。';
+        help.textContent = '运行方式与环境\n\nPython：服务器隔离 Docker 沙箱，Python 3.12，禁止联网；支持 NumPy、pandas、SciPy、SymPy、Matplotlib、seaborn、scikit-learn、statsmodels、Polars、DuckDB、SQLAlchemy、NetworkX、Pillow、OpenCV、scikit-image、ImageIO、Plotly、openpyxl、XlsxWriter、xlrd、python-docx、python-pptx、pypdf、reportlab、BeautifulSoup、lxml、PyYAML、regex、requests、httpx、dateutil、tabulate、tqdm、Faker、psutil；Matplotlib 支持中文字体。\n\n文件：使用代码块顶部的上传按钮。文件管理显示 /tmp/home 用户目录，支持复制路径、下载、删除；可用相对路径读取文件。代码与命令行共享目录，生成文件在结束后更新到列表。会话空闲 30 分钟后清理，刷新页面或重启服务后可能丢失，请及时下载。最多 64 个文件、总大小 8 MB，上传单文件 5 MB；输出图片/文件提供下载和插入文档按钮。\n\n命令行：在同样的隔离沙箱里执行 shell 命令，例如 ls -la、pwd、cat data.csv、python -c "print(1)"。cd 可切换到用户目录内的文件夹。每条命令是独立进程，不保留 shell 变量、后台任务或软件安装；交互式 Python input() 仍在运行代码时显示输入框。\n\n限制：最多同时运行 5 个任务；计算限时 20 秒，输入等待最长 2 分钟、整次运行最多 5 分钟。单任务内存 256/512 MB，全部沙箱共享服务器容量对应的总资源预算。代码 64 KB，最多 8 张 Matplotlib 图，图片总计 2 MB。\n\n其他语言：JavaScript/TypeScript 在浏览器 Worker 执行（TypeScript 按 JavaScript 语法）；HTML 使用隔离 iframe；C/C++ 通过服务器 Emscripten 编译后运行。\n\n窗口：拖动标题栏移动，拖动边缘调整大小；输出文字可直接选中复制，右上角复制按钮可复制完整运行结果。';
         updatePanelSize();
     }
 
@@ -395,6 +413,7 @@ import { floatingRunWindow } from './code-runner-window';
         if (!runnerUiState.outputPanel || !runnerUiState.outputBody) return;
 
         runnerUiState.lastResult = result;
+        if(result.workspace) runnerFiles?.accept(result);
         runnerUiState.explanation = '';
         runnerUiState.errorLine = null;
         runnerUiState.outputPanel.style.display = 'flex';
@@ -518,8 +537,9 @@ import { floatingRunWindow } from './code-runner-window';
             btn.addEventListener('click', () => callback(btn)); actions.appendChild(btn); return btn;
         }
         action('运行方式与环境', 'question-circle', showEnvironmentHelp);
-        runnerFiles = new RunnerFilesUi(global, () => !!runnerUiState.button?.disabled || !!codeRunner.abortRun);
-        action('上传运行文件（Python）', 'file-upload', btn => runnerFiles.pick(btn));
+        runnerFiles = new RunnerFilesUi(global, () => !!runnerUiState.button?.disabled || !!codeRunner.abortRun, runSandboxCommand);
+        action('沙箱命令行', 'terminal', () => runnerFiles.show('terminal'));
+        action('沙箱文件管理', 'folder-open', () => runnerFiles.show('files'));
         action('复制运行结果', 'copy', copyRunResult);
         const maximize = action('最大化/恢复', 'expand', () => {
             runnerUiState.maximized = !runnerUiState.maximized; runnerUiState.minimized = false; updatePanelSize();
@@ -530,7 +550,7 @@ import { floatingRunWindow } from './code-runner-window';
         outputHeader.appendChild(actions);
 
         var outputBody = document.createElement('div');
-        outputBody.style.cssText = 'white-space:pre-wrap;word-break:break-word;overflow:auto;min-height:0;flex:1;';
+        outputBody.style.cssText = 'white-space:pre-wrap;word-break:break-word;overflow:auto;min-height:0;flex:1;user-select:text;-webkit-user-select:text;cursor:text;';
         const help = document.createElement('div');
         help.hidden = true; help.style.cssText = 'white-space:pre-wrap;font-family:system-ui;font-size:13px;overflow:auto;max-height:55%;padding:10px;background:rgba(0,0,0,.05);margin-bottom:8px;flex-shrink:0;';
         runnerUiState.help = help;
