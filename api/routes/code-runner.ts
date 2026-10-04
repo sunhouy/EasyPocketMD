@@ -6,6 +6,21 @@ const { spawn } = require('child_process');
 
 const router = express.Router();
 const { runPythonSandbox } = require('../services/python-sandbox');
+const { stageRunnerFiles, resolveRunnerFiles, removeRunnerFile } = require('../services/code-runner-files');
+const runnerUpload = require('multer')({storage:require('multer').memoryStorage(),limits:{fileSize:5*1024*1024,files:8,parts:8}}).array('files',8);
+let uploading = false;
+router.post('/files', (req,res) => {
+    if (uploading) return res.status(429).json({success:false,error:'正在处理其他上传，请稍后重试'});
+    uploading = true;
+    runnerUpload(req,res,error => {
+        uploading = false;
+        try {
+            if (error) throw Error(error.code === 'LIMIT_FILE_SIZE' ? '单个文件不能超过 5 MB' : '文件上传失败或超过数量限制');
+            return res.json({success:true,files:stageRunnerFiles(req.files || [])});
+        } catch (e) { return res.status(400).json({success:false,error:toErrorMessage(e)}); }
+    });
+});
+router.post('/files/remove', (req,res) => { removeRunnerFile(req.body?.token); res.json({success:true}); });
 
 function toErrorMessage(error) {
     if (!error) return 'Unknown error';
@@ -179,6 +194,9 @@ router.post('/run', async (req, res) => {
 
         if (language === 'python' || language === 'py') {
             if (Buffer.byteLength(code, 'utf8') > 64 * 1024) return res.status(413).json({success:false,error:'Code exceeds 64 KB limit'});
+            let files;
+            try { files = resolveRunnerFiles(req.body.files); }
+            catch (error) { return res.status(400).json({success:false,error:toErrorMessage(error)}); }
             const controller = new AbortController();
             const cancel = () => { if (!res.writableEnded) controller.abort(); };
             res.once('close', cancel);
@@ -198,7 +216,7 @@ router.post('/run', async (req, res) => {
                     res.write(JSON.stringify({type:'input',token,...event}) + '\n');
                     if (signal.aborted) cancelInput();
                 }) : undefined;
-                const result = interactive
+                const result = files.length ? await runPythonSandbox(code, controller.signal, input, files) : interactive
                     ? await runPythonSandbox(code, controller.signal, input)
                     : await runPythonSandbox(code, controller.signal);
                 if (interactive) {
