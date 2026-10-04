@@ -1,5 +1,6 @@
 import { explainPythonError, pythonErrorLine } from './python-run-diagnostics';
 import { RunnerFilesUi } from './code-runner-files';
+import { floatingRunWindow } from './code-runner-window';
 (function(global) {
     'use strict';
 
@@ -196,6 +197,7 @@ import { RunnerFilesUi } from './code-runner-files';
     // 初始化代码运行器
     const codeRunner = new CodeRunner();
     let runnerFiles: RunnerFilesUi;
+    let floatingPanel: ReturnType<typeof floatingRunWindow>;
     const runnerUiState = {
         initialized: false,
         activeCodeBlock: null,
@@ -294,9 +296,8 @@ import { RunnerFilesUi } from './code-runner-files';
     function updatePanelSize() {
         const panel = runnerUiState.outputPanel;
         if (!panel) return;
-        panel.style.inset = runnerUiState.maximized && !runnerUiState.minimized ? 'max(8px, env(safe-area-inset-top)) 8px max(8px, env(safe-area-inset-bottom)) 8px' : 'auto 12px max(12px, env(safe-area-inset-bottom)) auto';
-        panel.style.width = runnerUiState.maximized && !runnerUiState.minimized ? 'auto' : 'min(560px, calc(100vw - 24px))';
-        panel.style.maxHeight = runnerUiState.maximized && !runnerUiState.minimized ? 'none' : 'min(45dvh, 380px)';
+        floatingPanel?.update(runnerUiState.maximized, runnerUiState.minimized);
+        runnerFiles?.setMinimized(runnerUiState.minimized);
         runnerUiState.outputBody.hidden = runnerUiState.minimized;
         if (runnerUiState.help) runnerUiState.help.hidden = runnerUiState.minimized || runnerUiState.help.dataset.open !== 'true';
     }
@@ -357,7 +358,7 @@ import { RunnerFilesUi } from './code-runner-files';
         const help = runnerUiState.help;
         help.dataset.open = help.dataset.open === 'true' ? 'false' : 'true';
         runnerUiState.minimized = false;
-        help.textContent = '运行方式与环境\n\nPython：在服务器隔离 Docker 沙箱中运行，Python 3.12。已安装 NumPy、pandas、SciPy、SymPy、Matplotlib、seaborn、scikit-learn、Pillow、openpyxl，支持中文字体及图表图片返回。禁止联网、只允许 /tmp 临时写入；每次运行独立容器。右上角上传文件后复制 /tmp/uploads/ 路径，使用 open()、pandas.read_csv() 等读取；最多 8 个文件，单文件 5 MB，总大小 8 MB，暂存 30 分钟。当前工作目录为 /tmp/output，代码以相对路径写入的文件（如 result.csv、plot.png）会自动返回，最多 16 个文件、总大小 4 MB；输出提供下载及插入当前文档按钮，插入沿用附件存储/加密设置。每次运行完成会销毁容器，请及时下载或插入输出文件。计算限时 20 秒（等待输入不计入）；input() 或 stdin.readline() 会在此窗口请求输入，单次等待最多 2 分钟、整次运行最多 5 分钟。内存按服务器容量限制为 256/512 MB、代码 64 KB，最多返回 8 张图，图片总计不超过 2 MB。\n\nJavaScript：在浏览器 Worker 中执行，没有页面 DOM。TypeScript 当前按 JavaScript 语法执行，不支持类型标注。HTML：在隔离 iframe 中预览。C/C++：在服务器通过 Emscripten 编译成 WebAssembly，再由 Node.js 执行；编译最长 30 秒，运行最长 15 秒。\n\n复制：复制文字、原始错误及中文解释；支持富文本剪贴板时同时复制图表。报错行对应本次运行的代码，编辑代码后原位置高亮自动清除。';
+        help.textContent = '运行方式与环境\n\nPython：在服务器隔离 Docker 沙箱中运行，Python 3.12。已安装 NumPy、pandas、SciPy、SymPy、Matplotlib、seaborn、scikit-learn、Pillow、openpyxl，支持中文字体及图表图片返回。禁止联网、只允许 /tmp 临时写入；每次运行独立容器。右上角上传文件后复制 /tmp/uploads/ 路径，使用 open()、pandas.read_csv() 等读取；最多 8 个文件，单文件 5 MB，总大小 8 MB，暂存 30 分钟。当前工作目录为 /tmp/output，代码以相对路径写入的文件（如 result.csv、plot.png）会自动返回，最多 16 个文件、总大小 4 MB；输出提供下载及插入当前文档按钮，插入沿用附件存储/加密设置。每次运行完成会销毁容器，请及时下载或插入输出文件。计算限时 20 秒（等待输入不计入）；input() 或 stdin.readline() 会在此窗口请求输入，单次等待最多 2 分钟、整次运行最多 5 分钟。最多同时运行 5 个 Python 任务；单任务内存按服务器容量限制为 256/512 MB，全部沙箱共享与服务器容量匹配的总资源预算、代码 64 KB，最多返回 8 张图，图片总计不超过 2 MB。\n\nJavaScript：在浏览器 Worker 中执行，没有页面 DOM。TypeScript 当前按 JavaScript 语法执行，不支持类型标注。HTML：在隔离 iframe 中预览。C/C++：在服务器通过 Emscripten 编译成 WebAssembly，再由 Node.js 执行；编译最长 30 秒，运行最长 15 秒。\n\n窗口：拖动标题栏移动，拖动边缘或右下角调整大小；最大化后恢复保留原位置与大小。\n\n复制：复制文字、原始错误及中文解释；支持富文本剪贴板时同时复制图表。报错行对应本次运行的代码，编辑代码后原位置高亮自动清除。';
         updatePanelSize();
     }
 
@@ -541,6 +542,7 @@ import { RunnerFilesUi } from './code-runner-files';
         outputPanel.appendChild(help);
         runnerFiles.attach(outputPanel);
         outputPanel.appendChild(outputBody);
+        floatingPanel = floatingRunWindow(outputPanel, outputHeader);
         host.appendChild(button);
         host.appendChild(outputPanel);
         document.body.appendChild(host);

@@ -93,6 +93,7 @@ def activate(release, channel, slot, current):
     base = (3150 if channel == 'main' else 3250) + slot
     app_port, print_port, gateway_port, print_gateway_port = base, base + 10, base + 30, base + 32
     names = {role: f'epmd-{channel}-{role}-{slot}' for role in ('app', 'print', 'gateway')}
+    sandbox_group = resources.configure_sandbox_budget()
     cleanup_sandboxes(names['app'])
     for name in names.values():
         remove(name)
@@ -112,6 +113,7 @@ def activate(release, channel, slot, current):
     try:
         docker(*common, '--name', names['app'], '--env-file', str(release / 'app.env'),
                '-e', f'PORT={app_port}', '-e', 'HOST=127.0.0.1', '-e', f"EPMD_SANDBOX_OWNER={names['app']}", '-e', f"PYTHON_SANDBOX_IMAGE={images['python']}",
+               '-e', f'PYTHON_SANDBOX_CGROUP={sandbox_group}',
                f"--memory={resources.container_limits('app')}m", f"--memory-swap={resources.container_limits('app')}m", '-e', f"NODE_OPTIONS=--max-old-space-size={resources.container_limits('app') // 2}", '--pids-limit=256', '--cpus=1', *mounts, images['app'])
         docker(*common, '--name', names['print'], f"--memory={resources.container_limits('print')}m", f"--memory-swap={resources.container_limits('print')}m", '--cpus=.5', '--pids-limit=64', images['print'], '--port', str(print_port))
         docker(*common, '--name', names['gateway'], f"--memory={resources.container_limits('gateway')}m", f"--memory-swap={resources.container_limits('gateway')}m", '--cpus=.5', '--pids-limit=64',

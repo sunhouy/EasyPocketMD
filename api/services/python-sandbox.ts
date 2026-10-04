@@ -5,6 +5,7 @@ const MAX_CAPTURE = 10 * 1024 * 1024;
 const TIMEOUT = 20000;
 const smallHost = require('os').totalmem() < 3 * 1024 * 1024 * 1024;
 const MEMORY_MB = smallHost ? 256 : 512;
+const MAX_CONCURRENT = 5;
 let active = 0;
 
 function cleanup(name) {
@@ -17,7 +18,7 @@ function cleanup(name) {
 }
 
 export async function runPythonSandbox(code: string, signal?: AbortSignal, onInput?: (event: any, signal: AbortSignal) => Promise<string>, files: {name:string; data:string}[] = []): Promise<any> {
-    if (active >= (smallHost ? 1 : 2)) return { success:false, status:429, error:'Python sandbox is busy. Please retry shortly.' };
+    if (active >= MAX_CONCURRENT) return { success:false, status:429, error:'已有 5 个 Python 任务正在运行，请稍后重试。' };
     active++;
     const name = 'epmd-python-' + randomUUID();
     try {
@@ -33,6 +34,7 @@ export async function runPythonSandbox(code: string, signal?: AbortSignal, onInp
                 `--memory=${MEMORY_MB}m`, `--memory-swap=${MEMORY_MB}m`, '--cpus=1', '--pids-limit=64',
                 '--ulimit=nofile=128:128', '--ulimit=core=0', '--log-driver=none',
                 '--tmpfs=/tmp:rw,noexec,nosuid,size=64m,mode=1777',
+                ...(process.env.PYTHON_SANDBOX_CGROUP ? ['--cgroup-parent=' + process.env.PYTHON_SANDBOX_CGROUP] : []),
                 process.env.PYTHON_SANDBOX_IMAGE || 'easypocketmd-python:1'
             ], { shell:false, stdio:['pipe','pipe','pipe'] });
             const finish = (result) => {
