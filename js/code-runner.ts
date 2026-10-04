@@ -1,4 +1,5 @@
 import { explainPythonError, pythonErrorLine } from './python-run-diagnostics';
+import { RunnerFilesUi } from './code-runner-files';
 (function(global) {
     'use strict';
 
@@ -27,7 +28,7 @@ import { explainPythonError, pythonErrorLine } from './python-run-diagnostics';
                 const endpoint = base.replace(/\/$/, '') + '/code-runner';
                 const response = await fetch(endpoint + '/run', {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ language: 'python', code, interactive:true }), signal: controller.signal
+                    body: JSON.stringify({ language: 'python', code, interactive:true, ...(runnerFiles?.tokens().length ? {files:runnerFiles.tokens()} : {}) }), signal: controller.signal
                 });
                 if (!response.ok || !response.headers?.get?.('content-type')?.includes('ndjson')) return await response.json();
                 const reader = response.body.getReader();
@@ -181,7 +182,7 @@ import { explainPythonError, pythonErrorLine } from './python-run-diagnostics';
 
     global.runCodeBlock = async function(context) {
         ensureRunnerUi();
-        if (runnerUiState.button.disabled) return;
+        if (runnerUiState.button.disabled || runnerFiles?.uploading) return;
         runnerUiState.button.disabled = true;
         if (runnerUiState.runContext?.editor) global.highlightCodeError?.(runnerUiState.runContext.editor, null);
         runnerUiState.runContext = context; runnerUiState.minimized = false;
@@ -194,6 +195,7 @@ import { explainPythonError, pythonErrorLine } from './python-run-diagnostics';
 
     // 初始化代码运行器
     const codeRunner = new CodeRunner();
+    let runnerFiles: RunnerFilesUi;
     const runnerUiState = {
         initialized: false,
         activeCodeBlock: null,
@@ -280,12 +282,13 @@ import { explainPythonError, pythonErrorLine } from './python-run-diagnostics';
         if (!Array.isArray(images)) return;
         images.slice(0, 8).forEach((image, index) => {
             if (image.mime !== 'image/png' || typeof image.data !== 'string' || image.data.length > 2800000 || !/^[A-Za-z0-9+/=]+$/.test(image.data)) return;
-            const img = document.createElement('img');
-            img.src = 'data:image/png;base64,' + image.data;
-            img.alt = 'Python figure ' + (index + 1);
-            img.style.cssText = 'display:block;max-width:100%;height:auto;margin:12px auto;background:#fff;';
-            runnerUiState.outputBody.appendChild(img);
+            runnerFiles?.appendArtifact(runnerUiState.outputBody,'figure-' + (index + 1) + '.png',image.data,'image/png',true);
         });
+    }
+
+    function appendFiles(result) {
+        if (Array.isArray(result.files)) result.files.slice(0,16).forEach(file => runnerFiles?.appendArtifact(runnerUiState.outputBody,file.name,file.data));
+        if (result.fileWarning) { const warning = document.createElement('p'); warning.textContent = result.fileWarning; runnerUiState.outputBody.append(warning); }
     }
 
     function updatePanelSize() {
@@ -354,7 +357,7 @@ import { explainPythonError, pythonErrorLine } from './python-run-diagnostics';
         const help = runnerUiState.help;
         help.dataset.open = help.dataset.open === 'true' ? 'false' : 'true';
         runnerUiState.minimized = false;
-        help.textContent = '运行方式与环境\n\nPython：在服务器隔离 Docker 沙箱中运行，Python 3.12。已安装 NumPy、pandas、SciPy、SymPy、Matplotlib、seaborn、scikit-learn、Pillow、openpyxl，支持中文字体及图表图片返回。禁止联网、只允许 /tmp 临时写入；每次运行独立容器，文件不会保留。计算限时 20 秒（等待输入不计入）；input() 或 stdin.readline() 会在此窗口请求输入，单次等待最多 2 分钟、整次运行最多 5 分钟。内存按服务器容量限制为 256/512 MB、代码 64 KB，最多返回 8 张图，图片总计不超过 2 MB。\n\nJavaScript：在浏览器 Worker 中执行，没有页面 DOM。TypeScript 当前按 JavaScript 语法执行，不支持类型标注。HTML：在隔离 iframe 中预览。C/C++：在服务器通过 Emscripten 编译成 WebAssembly，再由 Node.js 执行；编译最长 30 秒，运行最长 15 秒。\n\n复制：复制文字、原始错误及中文解释；支持富文本剪贴板时同时复制图表。报错行对应本次运行的代码，编辑代码后原位置高亮自动清除。';
+        help.textContent = '运行方式与环境\n\nPython：在服务器隔离 Docker 沙箱中运行，Python 3.12。已安装 NumPy、pandas、SciPy、SymPy、Matplotlib、seaborn、scikit-learn、Pillow、openpyxl，支持中文字体及图表图片返回。禁止联网、只允许 /tmp 临时写入；每次运行独立容器。右上角上传文件后复制 /tmp/uploads/ 路径，使用 open()、pandas.read_csv() 等读取；最多 8 个文件，单文件 5 MB，总大小 8 MB，暂存 30 分钟。当前工作目录为 /tmp/output，代码以相对路径写入的文件（如 result.csv、plot.png）会自动返回，最多 16 个文件、总大小 4 MB；输出提供下载及插入当前文档按钮，插入沿用附件存储/加密设置。每次运行完成会销毁容器，请及时下载或插入输出文件。计算限时 20 秒（等待输入不计入）；input() 或 stdin.readline() 会在此窗口请求输入，单次等待最多 2 分钟、整次运行最多 5 分钟。内存按服务器容量限制为 256/512 MB、代码 64 KB，最多返回 8 张图，图片总计不超过 2 MB。\n\nJavaScript：在浏览器 Worker 中执行，没有页面 DOM。TypeScript 当前按 JavaScript 语法执行，不支持类型标注。HTML：在隔离 iframe 中预览。C/C++：在服务器通过 Emscripten 编译成 WebAssembly，再由 Node.js 执行；编译最长 30 秒，运行最长 15 秒。\n\n复制：复制文字、原始错误及中文解释；支持富文本剪贴板时同时复制图表。报错行对应本次运行的代码，编辑代码后原位置高亮自动清除。';
         updatePanelSize();
     }
 
@@ -424,6 +427,7 @@ import { explainPythonError, pythonErrorLine } from './python-run-diagnostics';
             pre.textContent = result.output !== undefined ? String(result.output) : 'Execution completed successfully';
             runnerUiState.outputBody.appendChild(pre);
             appendImages(result.images);
+            appendFiles(result);
             return;
         }
 
@@ -445,6 +449,7 @@ import { explainPythonError, pythonErrorLine } from './python-run-diagnostics';
         }
         if (result.output) { const output = document.createElement('pre'); output.textContent = result.output; runnerUiState.outputBody.appendChild(output); }
         appendImages(result.images);
+        appendFiles(result);
     }
 
     function ensureRunnerUi() {
@@ -512,6 +517,8 @@ import { explainPythonError, pythonErrorLine } from './python-run-diagnostics';
             btn.addEventListener('click', () => callback(btn)); actions.appendChild(btn); return btn;
         }
         action('运行方式与环境', 'question-circle', showEnvironmentHelp);
+        runnerFiles = new RunnerFilesUi(global, () => !!runnerUiState.button?.disabled || !!codeRunner.abortRun);
+        action('上传运行文件（Python）', 'file-upload', btn => runnerFiles.pick(btn));
         action('复制运行结果', 'copy', copyRunResult);
         const maximize = action('最大化/恢复', 'expand', () => {
             runnerUiState.maximized = !runnerUiState.maximized; runnerUiState.minimized = false; updatePanelSize();
@@ -532,6 +539,7 @@ import { explainPythonError, pythonErrorLine } from './python-run-diagnostics';
 
         outputPanel.appendChild(outputHeader);
         outputPanel.appendChild(help);
+        runnerFiles.attach(outputPanel);
         outputPanel.appendChild(outputBody);
         host.appendChild(button);
         host.appendChild(outputPanel);
@@ -544,7 +552,7 @@ import { explainPythonError, pythonErrorLine } from './python-run-diagnostics';
 
         button.addEventListener('click', async function() {
             if (!runnerUiState.activeCodeBlock) return;
-            if (button.disabled) return;
+            if (button.disabled || runnerFiles?.uploading) return;
             button.disabled = true;
             try {
                 const block = runnerUiState.activeCodeBlock;
