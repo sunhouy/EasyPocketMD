@@ -164,8 +164,12 @@ if __name__ == '__main__':
             required = required_import_space(manifest)
             if shutil.disk_usage(cache).free < required:
                 raise RuntimeError(f'Not enough disk for image import: need {required // MIB} MiB free; current services retained')
+            # Validate the existing TLS edge and prepare renewal before stopping
+            # any services. Issuance starts only after the new HTTP route is live.
+            subprocess.run([sys.executable, str(Path(release) / 'ssl-renewal.py'), 'configure', release, sys.argv[4]], check=True)
             with deployment_memory(sys.argv[4]):
                 subprocess.run([sys.executable, str(Path(release) / 'image-cas.py'), 'load', cache, str(Path(release) / 'release.json')], check=True)
                 subprocess.run([sys.executable, str(Path(release) / 'deploy-docker.py'), 'deploy', sys.argv[4], release], check=True)
+            subprocess.run([sys.executable, str(Path(release) / 'ssl-renewal.py'), 'start', sys.argv[4]], check=True)
     else:
         raise SystemExit('Unknown resource guard action')
