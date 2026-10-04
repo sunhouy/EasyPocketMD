@@ -15,6 +15,7 @@ import { applyBackground, createBackgroundControls } from './main/background';
 import { applyThemeColor, createThemeColorControls } from './main/theme-color';
 import { readThemeMode, rememberThemeMode, isNightTheme } from './main/theme-preference';
 import { createLive2DControls, applyLive2D } from './main/live2d-settings';
+import { clientDownloadLinks } from './client-downloads';
 import { bindFileListDrop } from './files/external/drop';
 
 document.addEventListener('DOMContentLoaded', function() {
@@ -3297,13 +3298,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (typeof window.getClientDownloadLinks === 'function') {
             return window.getClientDownloadLinks();
         }
-        return {
-            android: 'https://static.yhsun.cn/android/easypocketmd_android.apk',
-            windows: 'https://static.yhsun.cn/tauri/win/easypocketmd_windows.exe',
-            macos: 'https://static.yhsun.cn/tauri/macos/easypocketmd_macos.dmg',
-            linuxAppImage: 'https://static.yhsun.cn/tauri/linux/easypocketmd_linux.appimage',
-            linuxDeb: 'https://static.yhsun.cn/tauri/linux/easypocketmd_linux.deb'
-        };
+        return clientDownloadLinks(typeof __APP_PACKAGE_VERSION__ === 'string' ? __APP_PACKAGE_VERSION__ : '');
     }
 
     function getRecommendedDownloadKey() {
@@ -3432,6 +3427,9 @@ document.addEventListener('DOMContentLoaded', function() {
         updateAboutRuntimeSection();
         updateAboutVersionDisplay();
         if (modal) modal.classList.add('show');
+        if (typeof window.refreshClientDownloadLinks === 'function') {
+            Promise.resolve(window.refreshClientDownloadLinks()).then(updateAboutRuntimeSection).catch(() => {});
+        }
     };
 
     var closeAboutBtn = (document.getElementById('closeAboutBtn') as HTMLButtonElement);
