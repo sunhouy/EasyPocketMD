@@ -5,7 +5,7 @@ from pathlib import Path
 import subprocess
 import tempfile
 import unittest
-from unittest.mock import patch
+from unittest.mock import call, patch
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -56,7 +56,7 @@ class Lifecycle(unittest.TestCase):
                     self.fail('unsafe import was allowed')
             run.assert_not_called()
 
-    def test_cleanup_keeps_rollback_other_channel_and_in_progress_upload(self):
+    def test_cleanup_removes_previous_and_abandoned_upload_but_keeps_current_channels(self):
         current, previous = self.release('main-3-1', 'a'), self.release('main-2-1', 'b')
         stale = self.release('main-1-1', 'c')
         dev = self.release('dev-4-1', 'd')
@@ -70,12 +70,30 @@ class Lifecycle(unittest.TestCase):
             deploy.cleanup_obsolete_releases()
             remove.assert_called_once_with('epmd-main-app-1')
             sandbox.assert_called_once_with('epmd-main-app-1')
-            run.assert_called_once_with(['docker', 'image', 'rm', f'easypocketmd-app:{"c" * 40}'], stdout=subprocess.DEVNULL)
-        self.assertFalse(Path(stale['release']).exists())
-        for record in (current, previous, dev, staged):
+            self.assertEqual(run.call_count, 3)
+            run.assert_has_calls([call(['docker', 'image', 'rm', f'easypocketmd-app:{digest * 40}'], stdout=subprocess.DEVNULL) for digest in 'bce'], any_order=True)
+        for record in (previous, stale, staged):
+            self.assertFalse(Path(record['release']).exists())
+        for record in (current, dev):
             self.assertTrue(Path(record['release']).exists())
-        self.assertFalse((self.root / 'cache' / 'objects' / ('c' * 64 + '.gz')).exists())
-        for digest in 'abde':
+        for digest in 'bce':
+            self.assertFalse((self.root / 'cache' / 'objects' / (digest * 64 + '.gz')).exists())
+        for digest in 'ad':
+            self.assertTrue((self.root / 'cache' / 'objects' / (digest * 64 + '.gz')).exists())
+
+    def test_cleanup_keeps_explicit_incoming_candidate_before_transfer_and_import(self):
+        current = self.release('main-1-1', 'a')
+        candidate = self.release('main-2-1', 'b', False)
+        self.state(current)
+        names = ' '.join(current['containers'].values())
+        tags = ' '.join(f'easypocketmd-app:{digest * 40}' for digest in 'ab')
+        with patch.object(subprocess, 'check_output', side_effect=[names, tags]), patch.object(deploy, 'remove') as remove, patch.object(subprocess, 'run') as run:
+            deploy.cleanup_obsolete_releases([candidate['release']])
+            remove.assert_not_called()
+            run.assert_not_called()
+        for record in (current, candidate):
+            self.assertTrue(Path(record['release']).exists())
+        for digest in 'ab':
             self.assertTrue((self.root / 'cache' / 'objects' / (digest * 64 + '.gz')).exists())
 
     def test_invalid_retained_manifest_prevents_deletion(self):
