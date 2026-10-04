@@ -3,7 +3,7 @@
  * 实现测量数据的不确定度计算，包括平均值、合成不确定度、相对不确定度等
  */
 
-function g(name) { return window[name]; }
+function g<K extends keyof Window>(name: K): Window[K] { return window[name]; }
 
 /**
  * 计算平均值
@@ -190,7 +190,7 @@ function formatRelativeUncertainty(relative) {
     const percent = relative * 100;
     let formatted = percent.toPrecision(2);
     if (formatted.includes('e')) {
-        formatted = parseFloat(percent).toPrecision(2);
+        formatted = percent.toPrecision(2);
     }
     if (formatted.includes('.') && formatted.endsWith('.0')) {
         formatted = formatted.slice(0, -2);
@@ -391,11 +391,11 @@ function showUncertaintyCalculator() {
     document.body.insertAdjacentHTML('beforeend', dialogHTML);
     updateMeasurementInputs();
     
-    document.getElementById('measurementCount').addEventListener('change', updateMeasurementInputs);
+    (document.getElementById('measurementCount') as HTMLInputElement).addEventListener('change', updateMeasurementInputs);
     
     // 输入方式切换
-    const tableInputBtn = document.getElementById('tableInputBtn');
-    const commaInputBtn = document.getElementById('commaInputBtn');
+    const tableInputBtn = (document.getElementById('tableInputBtn') as HTMLButtonElement);
+    const commaInputBtn = (document.getElementById('commaInputBtn') as HTMLButtonElement);
     const tableInputMode = document.getElementById('tableInputMode');
     const commaInputMode = document.getElementById('commaInputMode');
     
@@ -417,8 +417,8 @@ function showUncertaintyCalculator() {
         tableInputBtn.style.color = secondaryBtnColor;
     });
     
-    document.getElementById('calculateUncertaintyBtn').addEventListener('click', function() {
-        const typeBInput = document.getElementById('typeBInput');
+    (document.getElementById('calculateUncertaintyBtn') as HTMLButtonElement).addEventListener('click', function() {
+        const typeBInput = (document.getElementById('typeBInput') as HTMLInputElement);
         const typeB = parseFloat(typeBInput.value);
         if (isNaN(typeB) || typeB <= 0) {
             g('customAlert')('请输入有效的B类不确定度');
@@ -432,7 +432,7 @@ function showUncertaintyCalculator() {
             // 表格输入模式
             const measurementInputs = document.querySelectorAll('#measurementsContainer input');
             for (const input of measurementInputs) {
-                const value = parseFloat(input.value);
+                const value = parseFloat((input as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement).value);
                 if (isNaN(value)) {
                     g('customAlert')('请输入有效的测量值');
                     return;
@@ -441,7 +441,7 @@ function showUncertaintyCalculator() {
             }
         } else {
             // 逗号分割输入模式
-            const commaInput = document.getElementById('commaInput');
+            const commaInput = (document.getElementById('commaInput') as HTMLTextAreaElement);
             const inputText = commaInput.value;
             
             // 支持中英文逗号，自动去除空格
@@ -476,8 +476,8 @@ function showUncertaintyCalculator() {
         closeUncertaintyCalculator();
     });
     
-    document.getElementById('cancelUncertaintyBtn').addEventListener('click', closeUncertaintyCalculator);
-    document.getElementById('closeUncertaintyCalculator').addEventListener('click', closeUncertaintyCalculator);
+    (document.getElementById('cancelUncertaintyBtn') as HTMLButtonElement).addEventListener('click', closeUncertaintyCalculator);
+    (document.getElementById('closeUncertaintyCalculator') as HTMLButtonElement).addEventListener('click', closeUncertaintyCalculator);
     document.getElementById('uncertaintyCalculatorOverlay').addEventListener('click', function(e) {
         if (false && e.target === this) closeUncertaintyCalculator();
     });
@@ -487,7 +487,7 @@ function showUncertaintyCalculator() {
  * 更新测量值输入框
  */
 function updateMeasurementInputs() {
-    const count = parseInt(document.getElementById('measurementCount').value) || 5;
+    const count = parseInt((document.getElementById('measurementCount') as HTMLInputElement).value) || 5;
     const container = document.getElementById('measurementsContainer');
     const existingInputs = container.querySelectorAll('.measurement-input-group');
     existingInputs.forEach(group => group.remove());

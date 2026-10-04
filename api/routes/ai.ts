@@ -1,9 +1,10 @@
+interface AiResponse {output?:{choices?:{message:{content:string}}[]};message?:string}
 const express = require('express');
 const router = express.Router();
 const https = require('https');
 
 function makeAiRequest(requestBody) {
-    return new Promise((resolve, reject) => {
+    return new Promise<AiResponse>((resolve, reject) => {
         const apiKey = process.env.DASHSCOPE_API_KEY;
         if (!apiKey) {
             return reject(new Error('AI API Key is not configured'));

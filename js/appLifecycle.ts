@@ -98,7 +98,7 @@
     /**
      * 切后台/退出时统一调度一次保存，避免 pause 与 appStateChange 重复触发。
      */
-    function scheduleLeaveSave(reason, options) {
+    function scheduleLeaveSave(reason: string, options: {skipAsyncFlush?:boolean;allowRemoteSync?:boolean} = {}) {
         const opts = options || {};
         const skipAsyncFlush = !!opts.skipAsyncFlush;
         const allowRemoteSync = !!opts.allowRemoteSync;
@@ -289,14 +289,14 @@
         if (!global.electron && !global.__TAURI__) return;
 
         // 监听桌面壳的关闭事件
-        if (global.electron.ipcRenderer) {
+        if (global.electron?.ipcRenderer) {
             // 应用即将关闭
-            global.electron.ipcRenderer.on('app-before-close', function() {
+            global.electron?.ipcRenderer.on('app-before-close', function() {
                 scheduleLeaveSave('desktop-app-before-close');
             });
 
             // 窗口即将关闭
-            global.electron.ipcRenderer.on('window-before-close', function() {
+            global.electron?.ipcRenderer.on('window-before-close', function() {
                 scheduleLeaveSave('desktop-window-before-close');
             });
         }
@@ -463,7 +463,7 @@
      */
     function showDraftConflictDialog(draftInfo, cloudModified) {
         const env = detectEnvironment();
-        const isEn = global.i18n && global.i18n.getCurrentLanguage && global.i18n.getCurrentLanguage() === 'en';
+        const isEn = global.i18n && global.i18n.getLanguage && global.i18n.getLanguage() === 'en';
         
         const draftTime = new Date(draftInfo.timestamp).toLocaleString();
         const serverTime = cloudModified ? new Date(cloudModified).toLocaleString() : (isEn ? 'Unknown' : '未知');

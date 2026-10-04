@@ -2,7 +2,7 @@
     'use strict';
 
     function t(key) { return window.i18n ? window.i18n.t(key) : key; }
-    function g(name) { return global[name]; }
+    function g<K extends keyof Window>(name: K): Window[K] { return global[name]; }
 
     let dialogQueue = [];
     let isDialogShowing = false;
@@ -19,7 +19,7 @@
     }
 
     function showDialog(type, options) {
-        return new Promise((resolve) => {
+        return new Promise<string | boolean | void | null>((resolve) => {
             dialogQueue.push({ type, options, resolve });
             processDialogQueue();
         });
@@ -124,7 +124,7 @@
         let closed = false;
         let onKeydown = null;
 
-        const closeDialog = (result) => {
+        const closeDialog = (result?: string | boolean | null) => {
             if (closed) return;
             closed = true;
             if (onKeydown) {
@@ -137,7 +137,7 @@
 
         confirmBtn.addEventListener('click', () => {
             if (type === 'prompt') {
-                closeDialog(input.value);
+                closeDialog((input as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement).value);
             } else if (type === 'confirm') {
                 closeDialog(true);
             } else {
@@ -159,11 +159,11 @@
 
         if (input) {
             input.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') {
-                    closeDialog(input.value);
+                if (e instanceof KeyboardEvent && e.key === 'Enter') {
+                    closeDialog((input as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement).value);
                 }
             });
-            setTimeout(() => input.focus(), 100);
+            setTimeout(() => (input as HTMLElement).focus(), 100);
         }
 
         if (closeOnEsc) {
@@ -183,12 +183,12 @@
         });
     }
 
-    function customAlert(message, options = {}) {
-        return showDialog('alert', { ...options, message });
+    async function customAlert(message, options = {}) {
+        await showDialog('alert', { ...options, message });
     }
 
-    function customConfirm(message, options = {}) {
-        return showDialog('confirm', { ...options, message });
+    async function customConfirm(message, options = {}) {
+        return (await showDialog('confirm', { ...options, message })) === true;
     }
 
     function customPrompt(message, options = {}) {

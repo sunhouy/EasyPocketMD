@@ -1,7 +1,7 @@
 (function(global) {
     'use strict';
 
-    function g(name) { return global[name]; }
+    function g<K extends keyof Window>(name: K): Window[K] { return global[name]; }
     function isEn() { return window.i18n && window.i18n.getLanguage() === 'en'; }
     function t(key) { return window.i18n ? window.i18n.t(key) : key; }
 
@@ -66,8 +66,8 @@
         `;
         content.appendChild(settingsDiv);
         const select = settingsDiv.querySelector('#storage-location-select');
-        select.onchange = (e) => {
-            window.userSettings.storageLocation = e.target.value;
+        (select as HTMLElement).onchange = (e) => {
+            window.userSettings.storageLocation = (e.target as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement).value;
             localStorage.setItem('vditor_settings', JSON.stringify(window.userSettings));
             // global.showMessage(t('saveSuccess') || '保存成功', 'success');
         };
@@ -191,7 +191,7 @@
 
                         // Events
                         const copyBtn = item.querySelector('.copy-btn');
-                        copyBtn.onclick = () => {
+                        (copyBtn as HTMLElement).onclick = () => {
                             let link = file.url;
                             if (/\.(jpg|jpeg|png|gif|webp|svg)$/i.test(file.name)) {
                                 link = `![${displayName}](${file.url})`;
@@ -204,7 +204,7 @@
                         };
 
                         const delBtn = item.querySelector('.del-btn');
-                        delBtn.onclick = async () => {
+                        (delBtn as HTMLElement).onclick = async () => {
                             const confirmed = await g('customConfirm')(t('confirmDeleteFile').replace('{name}', displayName));
                             if (confirmed) {
                                 if (file.isLocal) {
@@ -252,7 +252,7 @@
 
                         if (file.isLocal) {
                             const convertBtn = item.querySelector('.convert-btn');
-                            convertBtn.onclick = async () => {
+                            (convertBtn as HTMLElement).onclick = async () => {
                                 try {
                                     global.showMessage(isEn() ? 'Uploading...' : '正在上传...', 'info');
                                     

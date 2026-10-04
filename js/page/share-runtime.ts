@@ -283,7 +283,7 @@ declare global { interface Window { sharedDocState: SharedDocumentState | null; 
             '</div>';
         document.body.appendChild(modal);
 
-        var hangupBtn = document.getElementById('shareVideoCallHangupBtn');
+        var hangupBtn = (document.getElementById('shareVideoCallHangupBtn') as HTMLButtonElement);
         if (hangupBtn) {
             hangupBtn.addEventListener('click', function() {
                 cleanupShareVideoCall(true, 'hangup');
@@ -339,9 +339,9 @@ declare global { interface Window { sharedDocState: SharedDocumentState | null; 
         stopStreamTracks(video.localStream);
         stopStreamTracks(video.remoteStream);
 
-        var localVideo = document.getElementById('shareVideoLocal');
+        var localVideo = (document.getElementById('shareVideoLocal') as HTMLVideoElement);
         if (localVideo) localVideo.srcObject = null;
-        var remoteVideo = document.getElementById('shareVideoRemote');
+        var remoteVideo = (document.getElementById('shareVideoRemote') as HTMLVideoElement);
         if (remoteVideo) remoteVideo.srcObject = null;
 
         window.sharedDocState.videoCall = {
@@ -364,7 +364,7 @@ declare global { interface Window { sharedDocState: SharedDocumentState | null; 
             throw new Error(window.i18n ? window.i18n.t('videoCallUnsupported') : '当前浏览器不支持视频通话');
         }
         video.localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-        var localVideo = document.getElementById('shareVideoLocal');
+        var localVideo = (document.getElementById('shareVideoLocal') as HTMLVideoElement);
         if (localVideo) {
             localVideo.srcObject = video.localStream;
             localVideo.play().catch(function() {});
@@ -402,7 +402,7 @@ declare global { interface Window { sharedDocState: SharedDocumentState | null; 
             var current = getShareVideoState();
             if (!current) return;
             current.remoteStream = event.streams && event.streams[0] ? event.streams[0] : null;
-            var remoteVideo = document.getElementById('shareVideoRemote');
+            var remoteVideo = (document.getElementById('shareVideoRemote') as HTMLVideoElement);
             if (remoteVideo) {
                 remoteVideo.srcObject = current.remoteStream;
                 remoteVideo.play().catch(function() {});
@@ -686,7 +686,7 @@ declare global { interface Window { sharedDocState: SharedDocumentState | null; 
             '</div>';
         document.body.appendChild(modal);
 
-        var leaveBtn = document.getElementById('shareVideoRoomLeaveBtn');
+        var leaveBtn = (document.getElementById('shareVideoRoomLeaveBtn') as HTMLButtonElement);
         if (leaveBtn) {
             leaveBtn.addEventListener('click', function() {
                 cleanupShareVideoRoom(true);
@@ -724,7 +724,7 @@ declare global { interface Window { sharedDocState: SharedDocumentState | null; 
         });
 
         grid.innerHTML = html;
-        var localVideo = document.getElementById('shareVideoRoomLocal');
+        var localVideo = (document.getElementById('shareVideoRoomLocal') as HTMLVideoElement);
         if (localVideo && room.localStream) {
             localVideo.srcObject = room.localStream;
         }
@@ -732,7 +732,7 @@ declare global { interface Window { sharedDocState: SharedDocumentState | null; 
             var peer = room.peers[peerId] || {};
             var el = document.getElementById('shareVideoRoomPeer-' + peerId);
             if (el && peer.remoteStream) {
-                el.srcObject = peer.remoteStream;
+                (el as HTMLVideoElement).srcObject = peer.remoteStream;
             }
         });
     }
@@ -994,7 +994,7 @@ declare global { interface Window { sharedDocState: SharedDocumentState | null; 
         sharedReadOnlyGuard?.destroy(); sharedReadOnlyGuard = null;
         for (const [element, style] of hiddenEditStyles) element.setAttribute('style', style);
         hiddenEditStyles.clear();
-        const collabButton = document.getElementById('historyCollabBtn'); if (collabButton) collabButton.hidden = true;
+        const collabButton = (document.getElementById('historyCollabBtn') as HTMLButtonElement); if (collabButton) collabButton.hidden = true;
         window.sharedDocState = null;
         var bar = document.getElementById('sharePresenceBar');
         if (bar) bar.remove();
@@ -1005,7 +1005,7 @@ declare global { interface Window { sharedDocState: SharedDocumentState | null; 
         options = options || {};
         var targetShareId = options.shareId || shareData.share_id;
         var targetOwnerFileId = options.ownerFileId || null;
-        const collabButton = document.getElementById('historyCollabBtn');
+        const collabButton = (document.getElementById('historyCollabBtn') as HTMLButtonElement);
         if (collabButton) { collabButton.hidden = false; collabButton.onclick = showHistoryModal; }
         var sameSession =
             window.sharedDocState &&
@@ -1562,7 +1562,7 @@ declare global { interface Window { sharedDocState: SharedDocumentState | null; 
             bar.innerHTML =
                 '<button id="restoreSharePresenceBtn" title="恢复连接状态" style="width:16px;height:16px;padding:0;border:none;border-radius:50%;background:#2da44e;cursor:pointer;box-shadow:0 4px 10px rgba(0,0,0,0.22);"></button>';
 
-            var restoreBtn = document.getElementById('restoreSharePresenceBtn');
+            var restoreBtn = (document.getElementById('restoreSharePresenceBtn') as HTMLButtonElement);
             if (restoreBtn) {
                 restoreBtn.onclick = function() {
                     if (!window.sharedDocState) return;
@@ -1601,7 +1601,7 @@ declare global { interface Window { sharedDocState: SharedDocumentState | null; 
             '<button id="minimizeSharePresenceBtn" title="最小化" style="border:none;background:transparent;color:#fff;padding:0 4px;line-height:1;cursor:pointer;font-size:16px;opacity:0.85;">-</button>' +
             '</div>';
 
-        var minimizeBtn = document.getElementById('minimizeSharePresenceBtn');
+        var minimizeBtn = (document.getElementById('minimizeSharePresenceBtn') as HTMLButtonElement);
         if (minimizeBtn) {
             minimizeBtn.onclick = function() {
                 if (!window.sharedDocState) return;
@@ -1610,14 +1610,14 @@ declare global { interface Window { sharedDocState: SharedDocumentState | null; 
             };
         }
 
-        var historyBtn = document.getElementById('showHistoryBtn');
+        var historyBtn = (document.getElementById('showHistoryBtn') as HTMLButtonElement);
         if (historyBtn) {
             historyBtn.onclick = function() {
                 showHistoryModal();
             };
         }
 
-        var toggleBtn = document.getElementById('toggleShareVideoUsers');
+        var toggleBtn = (document.getElementById('toggleShareVideoUsers') as HTMLButtonElement);
         if (toggleBtn) {
             toggleBtn.onclick = function() {
                 var panel = document.getElementById('shareVideoUserPanel');
@@ -1656,7 +1656,7 @@ declare global { interface Window { sharedDocState: SharedDocumentState | null; 
             };
         }
 
-        var roomBtn = document.getElementById('toggleShareVideoRoom');
+        var roomBtn = (document.getElementById('toggleShareVideoRoom') as HTMLButtonElement);
         if (roomBtn) {
             roomBtn.onclick = function() {
                 var room = getShareVideoRoomState();
@@ -1753,41 +1753,41 @@ declare global { interface Window { sharedDocState: SharedDocumentState | null; 
         // 隐藏顶部工具栏
         const mobileToolbar = document.querySelector('.mobile-toolbar-container');
         if (mobileToolbar) {
-            mobileToolbar.style.display = 'none';
+            (mobileToolbar as HTMLElement).style.display = 'none';
         }
 
         // 隐藏底部操作栏
         const mobileBottomBar = document.querySelector('.mobile-bottom-bar');
         if (mobileBottomBar) {
-            mobileBottomBar.style.display = 'none';
+            (mobileBottomBar as HTMLElement).style.display = 'none';
         }
 
         // 隐藏文件列表按钮
-        const mobileFileBtn = document.getElementById('mobileFileBtn');
+        const mobileFileBtn = (document.getElementById('mobileFileBtn') as HTMLButtonElement);
         if (mobileFileBtn) {
             mobileFileBtn.style.display = 'none';
         }
 
         // 隐藏登录按钮
-        const mobileLoginBtn = document.getElementById('mobileLoginBtn');
+        const mobileLoginBtn = (document.getElementById('mobileLoginBtn') as HTMLButtonElement);
         if (mobileLoginBtn) {
             mobileLoginBtn.style.display = 'none';
         }
 
         // 隐藏菜单按钮
-        const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+        const mobileMenuBtn = (document.getElementById('mobileMenuBtn') as HTMLButtonElement);
         if (mobileMenuBtn) {
             mobileMenuBtn.style.display = 'none';
         }
 
         // 隐藏夜间模式切换按钮
-        const modeToggle = document.getElementById('modeToggle');
+        const modeToggle = (document.getElementById('modeToggle') as HTMLButtonElement);
         if (modeToggle) {
             modeToggle.style.display = 'none';
         }
 
         // 隐藏保存按钮
-        const saveFileBtn = document.getElementById('saveFileBtn');
+        const saveFileBtn = (document.getElementById('saveFileBtn') as HTMLButtonElement);
         if (saveFileBtn) {
             saveFileBtn.style.display = 'none';
         }
@@ -1795,8 +1795,8 @@ declare global { interface Window { sharedDocState: SharedDocumentState | null; 
         // 调整编辑器容器高度
         const editorContainer = document.querySelector('.editor-container');
         if (editorContainer) {
-            editorContainer.style.top = '0';
-            editorContainer.style.height = '100vh';
+            (editorContainer as HTMLElement).style.top = '0';
+            (editorContainer as HTMLElement).style.height = '100vh';
         }
     }
 

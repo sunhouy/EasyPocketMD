@@ -12,6 +12,7 @@
     let _accountSwitching = false;
 
     // 辅助函数：获取翻译
+    function g<K extends keyof Window>(name: K): Window[K] {return global[name];}
     function t(key) {
         return global.i18n ? global.i18n.t(key) : key;
     }
@@ -38,7 +39,7 @@
         });
     }
 
-    async function runAccountSwitchStep(label, task, timeoutMs) {
+    async function runAccountSwitchStep(label, task, timeoutMs?: number) {
         try {
             return await runWithTimeout(task, timeoutMs || ACCOUNT_SWITCH_STEP_TIMEOUT_MS, label);
         } catch (error) {
@@ -84,7 +85,7 @@
     }
 
     // 辅助函数：设置按钮加载状态
-    function setButtonLoading(buttonId, loading, loadingTextKey) {
+    function setButtonLoading(buttonId: string, loading: boolean, loadingTextKey?: string) {
         const btn = document.getElementById(buttonId);
         if (!btn) return;
         
@@ -98,10 +99,10 @@
                 btn.dataset.originalText = btnLabel.getAttribute('data-i18n');
             }
             btn.classList.add('is-loading');
-            btn.disabled = true;
+            (btn as HTMLButtonElement).disabled = true;
             btn.setAttribute('aria-busy', 'true');
             if (btnSpinner) {
-                btnSpinner.style.display = 'inline-block';
+                (btnSpinner as HTMLElement).style.display = 'inline-block';
             }
             if (btnLabel && loadingTextKey) {
                 btnLabel.textContent = t(loadingTextKey);
@@ -109,10 +110,10 @@
         } else {
             // 恢复原始状态
             btn.classList.remove('is-loading');
-            btn.disabled = false;
+            (btn as HTMLButtonElement).disabled = false;
             btn.removeAttribute('aria-busy');
             if (btnSpinner) {
-                btnSpinner.style.display = 'none';
+                (btnSpinner as HTMLElement).style.display = 'none';
             }
             if (btnLabel && btn.dataset.originalText) {
                 btnLabel.textContent = t(btn.dataset.originalText);
@@ -313,7 +314,7 @@
      * @param {Object} options - fetch 选项
      * @returns {Promise<Object>} API 响应
      */
-    async function authenticatedFetch(url, options = {}) {
+    async function authenticatedFetch(url: string, options: RequestInit = {}) {
         // 确保 headers 存在
         if (!options.headers) options.headers = {};
 
@@ -345,7 +346,7 @@
     }
 
     function showUserInfo() {
-        const mobileLoginBtn = document.getElementById('mobileLoginBtn');
+        const mobileLoginBtn = (document.getElementById('mobileLoginBtn') as HTMLButtonElement);
         if (mobileLoginBtn) {
             if (global.currentUser) {
                 mobileLoginBtn.classList.add('logged-in');
@@ -361,7 +362,7 @@
         const modal = document.getElementById('userSettingsModalOverlay');
         if (!modal) return;
         modal.classList.add('show');
-        const defaultE2E = document.getElementById('settingsEnableE2E');
+        const defaultE2E = (document.getElementById('settingsEnableE2E') as HTMLInputElement);
         if (defaultE2E) defaultE2E.checked = [true, 1, '1', 'true'].includes(global.currentUser?.e2e_enabled);
         bindUserSettingsModalEvents();
         document.addEventListener('keydown', handleUserSettingsModalKeydown);
@@ -379,16 +380,16 @@
     }
 
     function bindUserSettingsModalEvents() {
-        const closeBtn = document.getElementById('closeUserSettingsBtn');
+        const closeBtn = (document.getElementById('closeUserSettingsBtn') as HTMLButtonElement);
         if (closeBtn) closeBtn.onclick = hideUserSettingsModal;
 
-        const openChangePasswordBtn = document.getElementById('openChangePasswordBtn');
+        const openChangePasswordBtn = (document.getElementById('openChangePasswordBtn') as HTMLButtonElement);
         if (openChangePasswordBtn) openChangePasswordBtn.onclick = function() {
             hideUserSettingsModal();
             showChangePasswordModal();
         };
 
-        const openDeleteAccountBtn = document.getElementById('openDeleteAccountBtn');
+        const openDeleteAccountBtn = (document.getElementById('openDeleteAccountBtn') as HTMLButtonElement);
         if (openDeleteAccountBtn) openDeleteAccountBtn.onclick = function() {
             hideUserSettingsModal();
             showDeleteAccountModal();
@@ -415,20 +416,20 @@
     }
 
     function bindChangePasswordModalEvents() {
-        const closeBtn = document.getElementById('closeChangePasswordBtn');
+        const closeBtn = (document.getElementById('closeChangePasswordBtn') as HTMLButtonElement);
         if (closeBtn) closeBtn.onclick = hideChangePasswordModal;
 
-        const cancelBtn = document.getElementById('cancelChangePasswordBtn');
+        const cancelBtn = (document.getElementById('cancelChangePasswordBtn') as HTMLButtonElement);
         if (cancelBtn) cancelBtn.onclick = hideChangePasswordModal;
 
-        const changePasswordBtn = document.getElementById('changePasswordBtn');
+        const changePasswordBtn = (document.getElementById('changePasswordBtn') as HTMLButtonElement);
         if (changePasswordBtn) changePasswordBtn.onclick = changePassword;
     }
 
     async function changePassword() {
-        const currentPassword = document.getElementById('currentPassword')?.value.trim();
-        const newPassword = document.getElementById('newPassword')?.value.trim();
-        const confirmNewPassword = document.getElementById('confirmNewPassword')?.value.trim();
+        const currentPassword = (document.getElementById('currentPassword') as HTMLInputElement)?.value.trim();
+        const newPassword = (document.getElementById('newPassword') as HTMLInputElement)?.value.trim();
+        const confirmNewPassword = (document.getElementById('confirmNewPassword') as HTMLInputElement)?.value.trim();
         const message = document.getElementById('changePasswordMessage');
 
         if (!currentPassword || !newPassword || !confirmNewPassword) {
@@ -474,9 +475,9 @@
                     localStorage.setItem('vditor_user', window.e2eSerializeUser ? window.e2eSerializeUser(global.currentUser) : JSON.stringify(global.currentUser));
                     
                     // Clear password fields
-                    document.getElementById('currentPassword').value = '';
-                    document.getElementById('newPassword').value = '';
-                    document.getElementById('confirmNewPassword').value = '';
+                    (document.getElementById('currentPassword') as HTMLInputElement).value = '';
+                    (document.getElementById('newPassword') as HTMLInputElement).value = '';
+                    (document.getElementById('confirmNewPassword') as HTMLInputElement).value = '';
                 } else {
                     message.textContent = result.message_key ? t(result.message_key) : result.message || t('passwordChangedFailed');
                     message.className = 'modal-message error';
@@ -511,18 +512,18 @@
     }
 
     function bindDeleteAccountModalEvents() {
-        const closeBtn = document.getElementById('closeDeleteAccountBtn');
+        const closeBtn = (document.getElementById('closeDeleteAccountBtn') as HTMLButtonElement);
         if (closeBtn) closeBtn.onclick = hideDeleteAccountModal;
 
-        const cancelBtn = document.getElementById('cancelDeleteAccountBtn');
+        const cancelBtn = (document.getElementById('cancelDeleteAccountBtn') as HTMLButtonElement);
         if (cancelBtn) cancelBtn.onclick = hideDeleteAccountModal;
 
-        const deleteAccountBtn = document.getElementById('deleteAccountBtn');
+        const deleteAccountBtn = (document.getElementById('deleteAccountBtn') as HTMLButtonElement);
         if (deleteAccountBtn) deleteAccountBtn.onclick = deleteAccount;
     }
 
     async function deleteAccount() {
-        const confirmUsername = document.getElementById('deleteAccountConfirmUsername')?.value.trim();
+        const confirmUsername = (document.getElementById('deleteAccountConfirmUsername') as HTMLInputElement)?.value.trim();
         const message = document.getElementById('deleteAccountMessage');
 
         if (!confirmUsername) {
@@ -604,22 +605,22 @@
     }
 
     function bindModalEvents() {
-        const loginModalCloseBtn = document.getElementById('loginModalCloseBtn');
+        const loginModalCloseBtn = (document.getElementById('loginModalCloseBtn') as HTMLButtonElement);
         if (loginModalCloseBtn) loginModalCloseBtn.onclick = hideLoginModal;
 
-        const loginSubmitBtn = document.getElementById('loginSubmitBtn');
+        const loginSubmitBtn = (document.getElementById('loginSubmitBtn') as HTMLButtonElement);
         if (loginSubmitBtn) loginSubmitBtn.onclick = login;
 
-        const registerSubmitBtn = document.getElementById('registerSubmitBtn');
+        const registerSubmitBtn = (document.getElementById('registerSubmitBtn') as HTMLButtonElement);
         if (registerSubmitBtn) registerSubmitBtn.onclick = register;
 
-        const loginTabBtn = document.getElementById('loginTabBtn');
-        const registerTabBtn = document.getElementById('registerTabBtn');
+        const loginTabBtn = (document.getElementById('loginTabBtn') as HTMLButtonElement);
+        const registerTabBtn = (document.getElementById('registerTabBtn') as HTMLButtonElement);
         if (loginTabBtn) loginTabBtn.onclick = switchToLoginTab;
         if (registerTabBtn) registerTabBtn.onclick = switchToRegisterTab;
 
         // 绑定用户名输入事件
-        const registerUsernameInput = document.getElementById('registerUsername');
+        const registerUsernameInput = (document.getElementById('registerUsername') as HTMLInputElement);
         if (registerUsernameInput) {
             registerUsernameInput.addEventListener('input', function() {
                 validateUsernameInput(this.value);
@@ -627,7 +628,7 @@
         }
 
         // 绑定密码输入事件
-        const registerPasswordInput = document.getElementById('registerPassword');
+        const registerPasswordInput = (document.getElementById('registerPassword') as HTMLInputElement);
         if (registerPasswordInput) {
             registerPasswordInput.addEventListener('input', function() {
                 validatePasswordInput(this.value);
@@ -692,8 +693,8 @@
     }
 
     function switchToLoginTab() {
-        const loginTabBtn = document.getElementById('loginTabBtn');
-        const registerTabBtn = document.getElementById('registerTabBtn');
+        const loginTabBtn = (document.getElementById('loginTabBtn') as HTMLButtonElement);
+        const registerTabBtn = (document.getElementById('registerTabBtn') as HTMLButtonElement);
         const loginForm = document.getElementById('loginForm');
         const registerForm = document.getElementById('registerForm');
         const modalTitle = document.getElementById('modalTitle');
@@ -713,8 +714,8 @@
     }
 
     function switchToRegisterTab() {
-        const loginTabBtn = document.getElementById('loginTabBtn');
-        const registerTabBtn = document.getElementById('registerTabBtn');
+        const loginTabBtn = (document.getElementById('loginTabBtn') as HTMLButtonElement);
+        const registerTabBtn = (document.getElementById('registerTabBtn') as HTMLButtonElement);
         const loginForm = document.getElementById('loginForm');
         const registerForm = document.getElementById('registerForm');
         const modalTitle = document.getElementById('modalTitle');
@@ -738,8 +739,8 @@
         if (_loginSubmitting) return;
         _loginSubmitting = true;
 
-        const username = document.getElementById('loginUsername')?.value.trim();
-        const password = document.getElementById('loginPassword')?.value.trim();
+        const username = (document.getElementById('loginUsername') as HTMLInputElement)?.value.trim();
+        const password = (document.getElementById('loginPassword') as HTMLInputElement)?.value.trim();
         const message = document.getElementById('loginMessage');
 
         if (!username || !password) {
@@ -846,10 +847,10 @@
         if (_registerSubmitting) return;
         _registerSubmitting = true;
 
-        const username = document.getElementById('registerUsername')?.value.trim();
-        const password = document.getElementById('registerPassword')?.value.trim();
-        const inviteCode = document.getElementById('registerInviteCode')?.value.trim();
-        const e2eEnabled = document.getElementById('registerEnableE2E')?.checked || false;
+        const username = (document.getElementById('registerUsername') as HTMLInputElement)?.value.trim();
+        const password = (document.getElementById('registerPassword') as HTMLInputElement)?.value.trim();
+        const inviteCode = (document.getElementById('registerInviteCode') as HTMLInputElement)?.value.trim();
+        const e2eEnabled = (document.getElementById('registerEnableE2E') as HTMLInputElement)?.checked || false;
         const message = document.getElementById('registerMessage');
 
         if (!username || !password) {
@@ -884,7 +885,7 @@
         setButtonLoading('registerSubmitBtn', true, 'registerLoading');
 
         try {
-            const requestBody = { username: username, password: password, e2e_enabled: e2eEnabled };
+            const requestBody: {username: string; password: string; e2e_enabled: boolean; invite_code?: string} = { username: username, password: password, e2e_enabled: e2eEnabled };
             if (inviteCode) requestBody.invite_code = inviteCode;
 
             const apiUrl = (global.getApiBaseUrl ? global.getApiBaseUrl() : 'api') + '/auth/register';
@@ -1175,11 +1176,11 @@
 
         // 绑定点击事件（点击账户名切换账户）
         container.querySelectorAll('.account-item').forEach(function(item) {
-            item.onclick = function(e) {
+            (item as HTMLElement).onclick = function(e) {
                 // 如果点击的是按钮，不触发切换
-                if (e.target.closest('.remove-account-btn') || e.target.closest('.account-settings-btn')) return;
+                if ((e.target as Element).closest('.remove-account-btn') || (e.target as Element).closest('.account-settings-btn')) return;
 
-                const username = this.getAttribute('data-username');
+                const username = (this as HTMLElement).getAttribute('data-username');
                 if (username && username !== currentUsername) {
                     showSwitchAccountConfirm(username);
                 }
@@ -1188,9 +1189,9 @@
 
         // 绑定设置按钮事件
         container.querySelectorAll('.account-settings-btn').forEach(function(btn) {
-            btn.onclick = function(e) {
+            (btn as HTMLElement).onclick = function(e) {
                 e.stopPropagation();
-                const username = this.getAttribute('data-username');
+                const username = (this as HTMLElement).getAttribute('data-username');
                 // 如果点击的是当前账户，直接打开设置
                 if (username === currentUsername) {
                     showUserSettingsModal();
@@ -1205,9 +1206,9 @@
 
         // 绑定移除按钮事件
         container.querySelectorAll('.remove-account-btn').forEach(function(btn) {
-            btn.onclick = function(e) {
+            (btn as HTMLElement).onclick = function(e) {
                 e.stopPropagation();
-                const username = this.getAttribute('data-username');
+                const username = (this as HTMLElement).getAttribute('data-username');
                 confirmRemoveAccount(username);
             };
         });
@@ -1218,9 +1219,9 @@
     let reauthSwitchUsername = null;
 
     function setSwitchAccountControlsLoading(loading) {
-        const confirmBtn = document.getElementById('confirmSwitchAccountBtn');
-        const cancelBtn = document.getElementById('cancelSwitchAccountBtn');
-        const closeBtn = document.getElementById('closeSwitchAccountConfirmBtn');
+        const confirmBtn = (document.getElementById('confirmSwitchAccountBtn') as HTMLButtonElement);
+        const cancelBtn = (document.getElementById('cancelSwitchAccountBtn') as HTMLButtonElement);
+        const closeBtn = (document.getElementById('closeSwitchAccountConfirmBtn') as HTMLButtonElement);
 
         if (confirmBtn) {
             if (loading) {
@@ -1359,7 +1360,7 @@
             if (result.code !== 200) {
                 if (result.code === 401 && !targetAccount.password) {
                     showAddAccountModal(); reauthSwitchUsername = targetAccount.username;
-                    const input = document.getElementById('addAccountUsername'); if (input) { input.value = targetAccount.username; input.readOnly = true; }
+                    const input = (document.getElementById('addAccountUsername') as HTMLInputElement); if (input) { input.value = targetAccount.username; input.readOnly = true; }
                     const message = document.getElementById('addAccountMessage'); if (message) message.textContent = t('accountLoginRequired');
                     return;
                 }
@@ -1441,8 +1442,8 @@
         if (modal) {
             modal.classList.add('show');
             // 清空输入
-            const usernameInput = document.getElementById('addAccountUsername');
-            const passwordInput = document.getElementById('addAccountPassword');
+            const usernameInput = (document.getElementById('addAccountUsername') as HTMLInputElement);
+            const passwordInput = (document.getElementById('addAccountPassword') as HTMLInputElement);
             const messageEl = document.getElementById('addAccountMessage');
             if (usernameInput) { usernameInput.value = ''; usernameInput.readOnly = false; }
             if (passwordInput) passwordInput.value = '';
@@ -1483,7 +1484,7 @@
         try {
             const apiUrl = (global.getApiBaseUrl ? global.getApiBaseUrl() : 'api') + '/auth/login';
             const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
-            const options = {
+            const options: RequestInit = {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ username: username, password: password })
@@ -1512,8 +1513,8 @@
 
     // 处理添加账户
     async function handleAddAccount() {
-        const usernameInput = document.getElementById('addAccountUsername');
-        const passwordInput = document.getElementById('addAccountPassword');
+        const usernameInput = (document.getElementById('addAccountUsername') as HTMLInputElement);
+        const passwordInput = (document.getElementById('addAccountPassword') as HTMLInputElement);
         const messageEl = document.getElementById('addAccountMessage');
 
         const username = usernameInput ? usernameInput.value.trim() : '';
@@ -1647,16 +1648,16 @@
 
     // 绑定添加账户模态窗口事件
     function bindAddAccountModalEvents() {
-        const closeBtn = document.getElementById('closeAddAccountBtn');
-        const cancelBtn = document.getElementById('cancelAddAccountBtn');
-        const confirmBtn = document.getElementById('confirmAddAccountBtn');
+        const closeBtn = (document.getElementById('closeAddAccountBtn') as HTMLButtonElement);
+        const cancelBtn = (document.getElementById('cancelAddAccountBtn') as HTMLButtonElement);
+        const confirmBtn = (document.getElementById('confirmAddAccountBtn') as HTMLButtonElement);
 
         if (closeBtn) closeBtn.onclick = hideAddAccountModal;
         if (cancelBtn) cancelBtn.onclick = hideAddAccountModal;
         if (confirmBtn) confirmBtn.onclick = handleAddAccount;
 
         // 回车键提交
-        const passwordInput = document.getElementById('addAccountPassword');
+        const passwordInput = (document.getElementById('addAccountPassword') as HTMLInputElement);
         if (passwordInput) {
             passwordInput.onkeydown = function(e) {
                 if (e.key === 'Enter') {
@@ -1668,16 +1669,16 @@
 
     // 绑定切换账户确认模态窗口事件
     function bindSwitchAccountConfirmModalEvents() {
-        const closeBtn = document.getElementById('closeSwitchAccountConfirmBtn');
-        const cancelBtn = document.getElementById('cancelSwitchAccountBtn');
-        const confirmBtn = document.getElementById('confirmSwitchAccountBtn');
+        const closeBtn = (document.getElementById('closeSwitchAccountConfirmBtn') as HTMLButtonElement);
+        const cancelBtn = (document.getElementById('cancelSwitchAccountBtn') as HTMLButtonElement);
+        const confirmBtn = (document.getElementById('confirmSwitchAccountBtn') as HTMLButtonElement);
 
         if (closeBtn) closeBtn.onclick = hideSwitchAccountConfirm;
         if (cancelBtn) cancelBtn.onclick = hideSwitchAccountConfirm;
         if (confirmBtn) confirmBtn.onclick = confirmSwitchAccount;
     }
 
-    function handleLoginButtonClick(e) {
+    function handleLoginButtonClick(e?: Event) {
         if (global.currentUser) {
             const dropdown = document.getElementById('userMenuDropdown');
             if (dropdown) {
@@ -1697,13 +1698,13 @@
                         showUserSettingsModal();
                     };
                 }
-                const logoutItem = document.getElementById('logoutItem');
+                const logoutItem = (document.getElementById('logoutItem') as HTMLButtonElement);
                 if (logoutItem) {
                     logoutItem.onclick = logout;
                 }
 
                 // 绑定添加账户按钮
-                const addAccountItem = document.getElementById('addAccountItem');
+                const addAccountItem = (document.getElementById('addAccountItem') as HTMLButtonElement);
                 if (addAccountItem) {
                     addAccountItem.onclick = function(e) {
                         e.stopPropagation();
@@ -1754,7 +1755,7 @@
 
     // 初始化时监听端到端加密设置更改
     function initializeE2ESettings() {
-        const e2eCheckbox = document.getElementById('settingsEnableE2E');
+        const e2eCheckbox = (document.getElementById('settingsEnableE2E') as HTMLInputElement);
         if (e2eCheckbox && !e2eCheckbox.dataset.e2eBound) {
             e2eCheckbox.dataset.e2eBound = 'true';
             e2eCheckbox.addEventListener('change', async function() {
@@ -1800,7 +1801,7 @@
         }
         
         // 每次打开设置弹窗时同步状态
-        const settingsBtn = document.getElementById('desktopSettingsBtn');
+        const settingsBtn = (document.getElementById('desktopSettingsBtn') as HTMLButtonElement);
         if (settingsBtn) {
             settingsBtn.addEventListener('click', () => {
                 if (e2eCheckbox && global.currentUser) {

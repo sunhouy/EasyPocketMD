@@ -242,9 +242,9 @@ function showEmojiPicker() {
 
     function setTabActiveStyles(tab) {
         document.querySelectorAll('.emoji-tab').forEach((t) => {
-            t.style.background = (window.nightMode === true) ? '#444' : '#f5f5f5';
-            t.style.color = (window.nightMode === true) ? '#eee' : '#333';
-            t.style.fontWeight = 'normal';
+            (t as HTMLElement).style.background = (window.nightMode === true) ? '#444' : '#f5f5f5';
+            (t as HTMLElement).style.color = (window.nightMode === true) ? '#eee' : '#333';
+            (t as HTMLElement).style.fontWeight = 'normal';
         });
         tab.style.background = 'var(--theme-accent, #4a90e2)';
         tab.style.color = 'white';
@@ -350,8 +350,8 @@ function showEmojiPicker() {
 
             emojiBtn.addEventListener('click', () => {
                 document.querySelectorAll('#emojiGrid button').forEach((btn) => {
-                    btn.style.borderColor = 'transparent';
-                    btn.style.background = 'none';
+                    (btn as HTMLElement).style.borderColor = 'transparent';
+                    (btn as HTMLElement).style.background = 'none';
                 });
                 emojiBtn.style.borderColor = 'var(--theme-accent, #4a90e2)';
                 emojiBtn.style.background = (window.nightMode === true) ? 'rgba(74, 144, 226, 0.2)' : 'rgba(74, 144, 226, 0.1)';
@@ -412,7 +412,7 @@ function showEmojiPicker() {
             renderCategoryTabs();
             const firstTab = categoryTabs.querySelector('.emoji-tab');
             if (firstTab) {
-                firstTab.click();
+                (firstTab as HTMLElement).click();
             }
             return;
         }
@@ -437,9 +437,9 @@ function showEmojiPicker() {
         if (picked && window.vditor) {
             window.vditor.insertValue(picked.emoji);
             closeEmojiPicker();
-            showMessage(isEn() ? 'Emoji inserted' : '表情已插入');
+            window.showMessage(isEn() ? 'Emoji inserted' : '表情已插入');
         } else {
-            showMessage(isEn() ? 'Please select an emoji first' : '请先选择一个表情', 'error');
+            window.showMessage(isEn() ? 'Please select an emoji first' : '请先选择一个表情', 'error');
         }
     });
 
@@ -469,7 +469,7 @@ function showEmojiPicker() {
     renderCategoryTabs();
     const firstTab = categoryTabs.querySelector('.emoji-tab');
     if (firstTab) {
-        firstTab.click();
+        (firstTab as HTMLElement).click();
     }
 }
 
@@ -630,8 +630,8 @@ function renderAIEmojiResults(items) {
 
         btn.addEventListener('click', () => {
             document.querySelectorAll('#emojiGrid button').forEach((node) => {
-                node.style.borderColor = 'transparent';
-                node.style.background = 'none';
+                (node as HTMLElement).style.borderColor = 'transparent';
+                (node as HTMLElement).style.background = 'none';
             });
             btn.style.borderColor = 'var(--theme-accent, #4a90e2)';
             btn.style.background = (window.nightMode === true) ? 'rgba(74, 144, 226, 0.2)' : 'rgba(74, 144, 226, 0.1)';

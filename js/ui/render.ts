@@ -3,7 +3,7 @@ import { exportMermaidSvg } from './mermaid-export';
 (function(global: any) {
     'use strict';
 
-    function g(name) { return global[name]; }
+    function g<K extends keyof Window>(name: K): Window[K] { return global[name]; }
 
     function generateFormulaDataUrl(latex, displayMode) {
         try {

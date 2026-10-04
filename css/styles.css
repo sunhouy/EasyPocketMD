@@ -1054,6 +1054,30 @@ body.mobile-fullscreen .editor-container {
     padding-left: 10px;
 }
 
+/* Settings: common choices stay visible; detailed configuration folds by category. */
+#settingsModalOverlay .settings-section { margin-bottom: 12px; }
+#settingsModalOverlay .settings-section-header { display: flex; align-items: center; gap: 10px; padding: 12px 16px; }
+#settingsModalOverlay .settings-section-header > i { color: var(--theme-accent, #4a90e2); width: 18px; text-align: center; }
+#settingsModalOverlay .settings-section-title { padding: 0; }
+#settingsModalOverlay .settings-list-item { padding: 12px 16px; min-width: 0; }
+#settingsModalOverlay .settings-category > summary { cursor: pointer; list-style: none; user-select: none; border-bottom: none; }
+#settingsModalOverlay .settings-category > summary::-webkit-details-marker { display: none; }
+#settingsModalOverlay .settings-category > summary::after { content: '▾'; margin-left: auto; transition: transform .15s; }
+#settingsModalOverlay .settings-category[open] > summary { border-bottom: 1px solid #e8edf3; }
+#settingsModalOverlay .settings-category[open] > summary::after { transform: rotate(180deg); }
+#settingsModalOverlay summary:focus-visible { outline: 2px solid var(--theme-accent, #4a90e2); outline-offset: -3px; }
+#settingsModalOverlay .settings-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+#settingsModalOverlay .settings-wide-item { grid-column: 1 / -1; }
+#settingsModalOverlay .radio-group { display: flex; flex-wrap: wrap; gap: 8px 16px; }
+#settingsModalOverlay .radio-group label { margin: 0; }
+#settingsModalOverlay .show-outline-setting .form-group { flex-direction: row; align-items: center; justify-content: space-between; gap: 12px; }
+#settingsModalOverlay .show-outline-setting label { margin-bottom: 0; }
+#settingsModalOverlay .settings-collapsible-summary { padding: 10px 12px; }
+body.night-mode #settingsModalOverlay .settings-category[open] > summary { border-bottom-color: #484848; }
+@media (max-width: 640px) {
+    #settingsModalOverlay .settings-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
 .settings-section-hint {
     margin: 8px 0 0;
     font-size: 12px;

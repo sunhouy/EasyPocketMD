@@ -10,7 +10,7 @@
 
     Promise.resolve()
         .then(function() {
-            return import('./files/index.ts');
+            return import('./files/index');
         })
         .catch(function(error) {
             console.error('[files.js] Failed to load new files runtime:', error);

@@ -1,3 +1,5 @@
+interface FileSaveBase {base_content_version?: number|string;base_last_modified?:string|number|Date;base_hash?:string;base_content?:string}
+interface FileSaveOptions {e2e_enabled?:boolean|number|string;conflict_strategy?:'strict'|'merge'}
 const { safeMerge } = require('../utils/safeMerge');
 const db = require('../config/db');
 const historyManager = require('./HistoryManager');
@@ -139,7 +141,7 @@ class FileManager {
         return value === true || value === 1 || value === '1' || value === 'true' ? 1 : 0;
     }
 
-    async saveFile(username, filename, content = '', optimisticLock = {}, fileOptions = {}) {
+    async saveFile(username: string, filename: string, content = '', optimisticLock: FileSaveBase = {}, fileOptions: FileSaveOptions = {}) {
         try {
             const connection = await db.getConnection();
             try {

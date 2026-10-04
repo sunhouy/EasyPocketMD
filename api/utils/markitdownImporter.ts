@@ -1,3 +1,5 @@
+class ConversionError extends Error {code?: string}
+interface ImportOptions {timeoutMs?:number;originalName?:string}
 const path = require('path');
 const fs = require('fs');
 const { spawn } = require('child_process');
@@ -55,7 +57,7 @@ function normalizePythonError(stderr, exitCode) {
     };
 }
 
-function convertFileToMarkdown(filePath, options = {}) {
+function convertFileToMarkdown(filePath: string, options: ImportOptions = {}) {
     return new Promise((resolve, reject) => {
         const python = getPythonExecutable();
         const args = [SCRIPT_PATH, filePath];
@@ -77,7 +79,7 @@ function convertFileToMarkdown(filePath, options = {}) {
             if (finished) return;
             finished = true;
             child.kill('SIGKILL');
-            const err = new Error('文档转换超时，请稍后重试或拆分文件');
+            const err = new ConversionError('文档转换超时，请稍后重试或拆分文件');
             err.code = 'CONVERT_TIMEOUT';
             reject(err);
         }, options.timeoutMs || DEFAULT_TIMEOUT_MS);
@@ -89,7 +91,7 @@ function convertFileToMarkdown(filePath, options = {}) {
                     finished = true;
                     clearTimeout(timeout);
                     child.kill('SIGKILL');
-                    const err = new Error('转换后的 Markdown 内容过大，请拆分文件后重试');
+                    const err = new ConversionError('转换后的 Markdown 内容过大，请拆分文件后重试');
                     err.code = 'OUTPUT_TOO_LARGE';
                     reject(err);
                 }
@@ -106,7 +108,7 @@ function convertFileToMarkdown(filePath, options = {}) {
             if (finished) return;
             finished = true;
             clearTimeout(timeout);
-            const err = new Error(`无法启动 Python 转换进程: ${error.message}`);
+            const err = new ConversionError(`无法启动 Python 转换进程: ${error.message}`);
             err.code = error.code === 'ENOENT' ? 'PYTHON_NOT_FOUND' : 'CONVERT_FAILED';
             reject(err);
         });
@@ -118,7 +120,7 @@ function convertFileToMarkdown(filePath, options = {}) {
 
             if (exitCode !== 0) {
                 const normalized = normalizePythonError(stderr, exitCode);
-                const err = new Error(normalized.message);
+                const err = new ConversionError(normalized.message);
                 err.code = normalized.code;
                 reject(err);
                 return;
@@ -126,7 +128,7 @@ function convertFileToMarkdown(filePath, options = {}) {
 
             const markdown = stdout.trim();
             if (!markdown) {
-                const err = new Error('未从文档中提取到可导入内容');
+                const err = new ConversionError('未从文档中提取到可导入内容');
                 err.code = 'EMPTY_OUTPUT';
                 reject(err);
                 return;

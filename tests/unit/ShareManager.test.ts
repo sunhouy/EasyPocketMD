@@ -24,9 +24,9 @@ describe('ShareManager', () => {
                     .mockResolvedValueOnce([[]]) // Existing share check
                     .mockResolvedValueOnce([{ affectedRows: 1 }]) // Insert share
                     .mockResolvedValueOnce([{ affectedRows: 0 }]), // Clear share_editors
-                beginTransaction: jest.fn().mockResolvedValue(),
-                commit: jest.fn().mockResolvedValue(),
-                rollback: jest.fn().mockResolvedValue(),
+                beginTransaction: jest.fn().mockResolvedValue(undefined),
+                commit: jest.fn().mockResolvedValue(undefined),
+                rollback: jest.fn().mockResolvedValue(undefined),
                 release: jest.fn()
             };
             db.getConnection.mockResolvedValue(mockConnection);
@@ -48,9 +48,9 @@ describe('ShareManager', () => {
         it('should return 401 if authentication fails', async () => {
             const mockConnection = {
                 execute: jest.fn().mockResolvedValueOnce([[{ id: 1, password: 'hashed' }]]),
-                beginTransaction: jest.fn().mockResolvedValue(),
-                commit: jest.fn().mockResolvedValue(),
-                rollback: jest.fn().mockResolvedValue(),
+                beginTransaction: jest.fn().mockResolvedValue(undefined),
+                commit: jest.fn().mockResolvedValue(undefined),
+                rollback: jest.fn().mockResolvedValue(undefined),
                 release: jest.fn()
             };
             db.getConnection.mockResolvedValue(mockConnection);

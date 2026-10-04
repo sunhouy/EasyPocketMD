@@ -1,13 +1,13 @@
 (function(global) {
     'use strict';
 
-    function g(name) { return global[name]; }
+    function g<K extends keyof Window>(name: K): Window[K] { return global[name]; }
     function isEn() { return window.i18n && window.i18n.getLanguage() === 'en'; }
 
     // AI智能排版历史记录
     var aiLayoutHistory = [];
     // 当前AI排版设置
-    var currentAISettings = {
+    var currentAISettings: {style: string; format: string; requirements?: string} = {
         style: 'academic',
         format: 'standard'
     };
@@ -87,27 +87,27 @@
         // 样式选择交互
         var styleOptions = modalContent.querySelectorAll('.ai-style-option');
         styleOptions.forEach(function(option) {
-            option.onclick = function() {
+            (option as HTMLElement).onclick = function() {
                 styleOptions.forEach(function(opt) {
                     opt.classList.remove('selected');
-                    opt.style.border = '1px solid ' + borderColor;
-                    opt.style.background = 'transparent';
+                    (opt as HTMLElement).style.border = '1px solid ' + borderColor;
+                    (opt as HTMLElement).style.background = 'transparent';
                 });
-                this.classList.add('selected');
-                this.style.border = '2px solid #4a90e2';
-                this.style.background = nightMode ? '#3d3d3d' : '#f0f4ff';
-                currentAISettings.style = this.getAttribute('data-value');
+                (this as HTMLElement).classList.add('selected');
+                (this as HTMLElement).style.border = '2px solid #4a90e2';
+                (this as HTMLElement).style.background = nightMode ? '#3d3d3d' : '#f0f4ff';
+                currentAISettings.style = (this as HTMLElement).getAttribute('data-value');
             };
         });
         
         // 取消按钮
-        modalContent.querySelector('#cancelAIBtn').onclick = function() {
+        (modalContent.querySelector('#cancelAIBtn') as HTMLElement).onclick = function() {
             aiModal.remove();
         };
         
         // 开始排版按钮
-        modalContent.querySelector('#startAILayoutBtn').onclick = function() {
-            var requirements = modalContent.querySelector('#aiRequirements').value;
+        (modalContent.querySelector('#startAILayoutBtn') as HTMLElement).onclick = function() {
+            var requirements = (modalContent.querySelector('#aiRequirements') as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement).value;
             currentAISettings.requirements = requirements;
             
             // 关闭当前对话框
@@ -397,7 +397,7 @@
         
         // 填充之前的要求
         setTimeout(function() {
-            var reqInput = document.getElementById('aiRequirements');
+            var reqInput = (document.getElementById('aiRequirements') as HTMLTextAreaElement);
             if (reqInput && currentAISettings.requirements) {
                 reqInput.value = currentAISettings.requirements;
             }
@@ -406,7 +406,7 @@
             var styleOptions = document.querySelectorAll('.ai-style-option');
             styleOptions.forEach(function(opt) {
                 if (opt.getAttribute('data-value') === currentAISettings.style) {
-                    opt.click();
+                    (opt as HTMLElement).click();
                 }
             });
         }, 100);

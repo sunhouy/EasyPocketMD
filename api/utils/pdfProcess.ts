@@ -24,7 +24,7 @@ export function renderPdf(html: string, options: Record<string, unknown>, filePa
     if (activeExports >= MAX_ACTIVE_EXPORTS) return Promise.reject(pdfError('PDF export is busy; please retry shortly', 503));
     if (signal?.aborted) return Promise.reject(pdfError('PDF export cancelled', 499));
     activeExports++;
-    return new Promise((resolve, reject) => {
+    return new Promise<void>((resolve, reject) => {
         let child: ReturnType<typeof spawn> | null = null;
         let timer: ReturnType<typeof setTimeout>;
         let resourceTimer: ReturnType<typeof setInterval>;

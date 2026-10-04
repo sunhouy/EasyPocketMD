@@ -257,3 +257,5 @@ if (typeof module !== 'undefined' && module.exports) {
         normalizeImage
     };
 }
+
+declare global {interface Window {PPTDataNormalizer: {LENGTH_LIMITS: typeof LENGTH_LIMITS;COUNT_LIMITS: typeof COUNT_LIMITS;FIELD_ALIASES: typeof FIELD_ALIASES;sanitizeText: typeof sanitizeText;normalizeBullets: typeof normalizeBullets;normalizeStats: typeof normalizeStats;normalizeSections: typeof normalizeSections;normalizeHighlights: typeof normalizeHighlights;normalizeQuote: typeof normalizeQuote;normalizeImage: typeof normalizeImage}}}

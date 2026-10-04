@@ -1,12 +1,14 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "lib": ["ES2022"],
+    "lib": [
+      "ES2022"
+    ],
     "module": "CommonJS",
     "moduleResolution": "node",
     "moduleDetection": "force",
     "outDir": "./api-dist",
-    "rootDir": "./api",
+    "rootDir": ".",
     "strict": false,
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
@@ -15,8 +17,16 @@
     "declaration": false,
     "noUnusedLocals": false,
     "noUnusedParameters": false,
-    "types": ["node"]
+    "types": [
+      "node"
+    ]
   },
-  "include": ["api/**/*.ts", "types/api.d.ts"],
-  "exclude": ["node_modules", "api-dist"]
+  "include": [
+    "api/**/*.ts",
+    "shared/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "api-dist"
+  ]
 }

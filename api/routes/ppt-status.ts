@@ -61,7 +61,7 @@ function limitUserTasks(actor) {
     }
 
     userEntries
-        .sort((a, b) => new Date(b[1].updatedAt || 0) - new Date(a[1].updatedAt || 0))
+        .sort((a, b) => new Date(b[1].updatedAt || 0).getTime() - new Date(a[1].updatedAt || 0).getTime())
         .slice(MAX_TASKS_PER_USER)
         .forEach(([key]) => taskStore.delete(key));
 }

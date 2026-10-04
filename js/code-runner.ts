@@ -2,10 +2,10 @@ import { uiText, setUiText } from './i18n-messages';
 import { explainPythonError, pythonErrorLine } from './python-run-diagnostics';
 import { RunnerFilesUi } from './code-runner-files';
 import { floatingRunWindow } from './code-runner-window';
-(function(global) {
+export const CodeRunnerConstructor = (function(global) {
     'use strict';
 
-    function g(name) { return global[name]; }
+    function g<K extends keyof Window>(name: K): Window[K] { return global[name]; }
 
     function t(key, zhFallback, enFallback) {
         if (global.i18n && typeof global.i18n.t === 'function') {
@@ -19,6 +19,7 @@ import { floatingRunWindow } from './code-runner-window';
     var SUPPORTED_LANGUAGES = new Set(['python', 'py', 'javascript', 'js', 'typescript', 'ts', 'html', 'htm', 'c', 'cpp', 'c++']);
     // Python runs in the server's isolated container; no browser interpreter is loaded.
     class CodeRunner {
+        cCompilerEndpoint: string;
         abortRun: (() => void) | null = null;
         constructor() { this.cCompilerEndpoint = '/api/code-runner/run'; }
         async runPython(code, command?: string) {
@@ -606,7 +607,7 @@ import { floatingRunWindow } from './code-runner-window';
                 return;
             }
 
-            if (!event.target.closest || !event.target.closest('.code-run-button')) {
+            if (!(event.target as Element).closest || !(event.target as Element).closest('.code-run-button')) {
                 hideRunnerButton();
                 runnerUiState.activeCodeBlock = null;
             }
@@ -621,9 +622,9 @@ import { floatingRunWindow } from './code-runner-window';
         return !!codeBlock.closest('.vditor-ir__input, textarea, input');
     }
 
-    function getCodeBlocks(root) {
+    function getCodeBlocks(root?: Document | Element) {
         var scope = root && root.querySelectorAll ? root : document;
-        return Array.from(scope.querySelectorAll('pre code'));
+        return Array.from(scope.querySelectorAll<HTMLElement>('pre code'));
     }
 
     function getRunnableCodeBlocks(root) {
@@ -652,10 +653,10 @@ import { floatingRunWindow } from './code-runner-window';
         mutations.forEach(function(mutation) {
             if (mutation.type === 'childList') {
                 mutation.addedNodes.forEach(function(node) {
-                    if (node.nodeType === 1) {
-                        if (node.tagName === 'PRE' && node.querySelector('code')) {
+                    if (node instanceof Element) {
+                        if (node.tagName === 'PRE' && (node as Element).querySelector('code')) {
                             addRunButtons(node.parentNode || document);
-                        } else if (node.querySelectorAll) {
+                        } else if ((node as Element).querySelectorAll) {
                             const codeBlocks = getRunnableCodeBlocks(node);
                             if (codeBlocks.length > 0) {
                                 addRunButtons(node);
@@ -677,5 +678,6 @@ import { floatingRunWindow } from './code-runner-window';
     global.CodeRunner = CodeRunner;
     global.codeRunner = codeRunner;
     global.addRunButtons = addRunButtons;
+    return CodeRunner;
 
 })(typeof window !== 'undefined' ? window : this);

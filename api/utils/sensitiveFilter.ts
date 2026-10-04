@@ -110,7 +110,7 @@ function filterSensitiveWords(text, replacement = '***') {
 
   let filteredText = text;
   for (const word of checkResult.words) {
-    const regex = new RegExp(word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
+    const regex = new RegExp(String(word).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
     filteredText = filteredText.replace(regex, replacement);
   }
 

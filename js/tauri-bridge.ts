@@ -1,3 +1,4 @@
+import type { NativeCommandMap } from '../types/native-host';
 (function(global) {
     'use strict';
 
@@ -153,7 +154,7 @@
         };
     }
 
-    function invokeCommand(command, payload) {
+    function invokeCommand<K extends keyof NativeCommandMap>(command: K, payload?: Record<string, unknown>): Promise<NativeCommandMap[K]> {
         var invoke = getInvoke();
         if (!invoke) {
             return Promise.reject(new Error('Tauri runtime is unavailable'));
