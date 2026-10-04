@@ -28,6 +28,7 @@
         notificationShownForTask: false
     };
 
+    var lastExportPageCount = 0;
     var pptEventsBound = false;
     var pptLifecycleEventsBound = false;
 
@@ -1073,7 +1074,7 @@ ${isAcademic ? '倒数第2页：参考资料\n要点1：文献1\n要点2：文�
 
         if (!pptState.outline || pptState.outline.length === 0) {
             container.innerHTML = '<p style="color:#999;text-align:center;padding:20px;">无大纲数据</p>';
-            updatePageRangeInputs();
+            updatePageRangeInputs(true);
             return;
         }
 
@@ -1094,64 +1095,53 @@ ${isAcademic ? '倒数第2页：参考资料\n要点1：文献1\n要点2：文�
         }
         container.innerHTML = html;
 
-        // 更新页数范围输入框
-        updatePageRangeInputs();
+        updatePageRangeInputs(true);
     }
 
-    // 更新页数范围输入框
-    function updatePageRangeInputs() {
+    // Keep an explicit subset, or extend the full-document selection when pages change.
+    function updatePageRangeInputs(reset = false) {
         var totalPages = pptState.outline ? pptState.outline.length : 0;
-        var startPageInput = document.getElementById('pptExportStartPage');
-        var endPageInput = document.getElementById('pptExportEndPage');
-        var totalPagesInput = document.getElementById('pptTotalPages');
-
+        var startPageInput = document.getElementById('pptExportStartPage') as HTMLInputElement;
+        var endPageInput = document.getElementById('pptExportEndPage') as HTMLInputElement;
+        var totalPagesInput = document.getElementById('pptTotalPages') as HTMLInputElement;
         if (startPageInput) {
-            startPageInput.max = totalPages;
-            if (parseInt(startPageInput.value) > totalPages) {
-                startPageInput.value = 1;
-            }
+            startPageInput.max = String(totalPages);
+            var start = Number(startPageInput.value);
+            if (reset || !Number.isInteger(start) || start < 1 || start > totalPages) startPageInput.value = '1';
         }
-
         if (endPageInput) {
-            endPageInput.max = totalPages;
-            endPageInput.value = totalPages;
+            endPageInput.max = String(totalPages);
+            var end = Number(endPageInput.value);
+            if (reset || !lastExportPageCount || end === lastExportPageCount || !Number.isInteger(end) || end < 1 || end > totalPages) endPageInput.value = String(totalPages);
         }
-
-        if (totalPagesInput) {
-            totalPagesInput.value = totalPages;
-        }
-
+        if (totalPagesInput) totalPagesInput.value = String(totalPages);
+        lastExportPageCount = totalPages;
         validatePageRange();
     }
 
-    // 验证页数范围
-    function validatePageRange() {
-        var startPageInput = document.getElementById('pptExportStartPage');
-        var endPageInput = document.getElementById('pptExportEndPage');
-        var errorDiv = document.getElementById('pptPageRangeError');
-
-        if (!startPageInput || !endPageInput || !errorDiv) return true;
-
-        var startPage = parseInt(startPageInput.value) || 1;
-        var endPage = parseInt(endPageInput.value) || 1;
+    function getPPTExportRange() {
         var totalPages = pptState.outline ? pptState.outline.length : 0;
+        var start = document.getElementById('pptExportStartPage') as HTMLInputElement;
+        var end = document.getElementById('pptExportEndPage') as HTMLInputElement;
+        return {
+            startPage: start?.value.trim() ? Number(start.value) : 1,
+            endPage: end?.value.trim() ? Number(end.value) : totalPages,
+            totalPages
+        };
+    }
 
-        var isValid = startPage >= 1 &&
-                      endPage <= totalPages &&
-                      startPage <= endPage &&
-                      (endPage - startPage + 1) <= 30;
-
-        if (isValid) {
-            errorDiv.style.display = 'none';
-            startPageInput.style.borderColor = '#ddd';
-            endPageInput.style.borderColor = '#ddd';
-        } else {
-            errorDiv.style.display = 'block';
-            startPageInput.style.borderColor = '#e74c3c';
-            endPageInput.style.borderColor = '#e74c3c';
-        }
-
-        return isValid;
+    function validatePageRange() {
+        var start = document.getElementById('pptExportStartPage') as HTMLInputElement;
+        var end = document.getElementById('pptExportEndPage') as HTMLInputElement;
+        var errorDiv = document.getElementById('pptPageRangeError');
+        var range = getPPTExportRange();
+        var valid = Number.isInteger(range.startPage) && Number.isInteger(range.endPage)
+            && range.startPage >= 1 && range.endPage <= range.totalPages
+            && range.startPage <= range.endPage;
+        if (errorDiv) errorDiv.style.display = valid ? 'none' : 'block';
+        if (start) start.style.borderColor = valid ? '#ddd' : '#e74c3c';
+        if (end) end.style.borderColor = valid ? '#ddd' : '#e74c3c';
+        return valid;
     }
 
     // 生成所有页面 - 并行批量生成以节省时间
@@ -2055,6 +2045,7 @@ JSON 结构：
 
     // 渲染编辑器页面列表 - 水平排列
     function renderEditorPagesList() {
+        updatePageRangeInputs();
         var container = document.getElementById('pptEditorPagesList');
         if (!container) return;
         
@@ -2363,6 +2354,10 @@ JSON 结构：
 
     // 下载PPT
     async function downloadPPT() {
+        if (!validatePageRange()) {
+            global.showMessage?.(isEn() ? 'Invalid page range. Choose pages within this presentation.' : '页数范围无效，请选择文稿内的页码', 'error');
+            return;
+        }
         var ungeneratedPages = [];
         for (var i = 0; i < pptState.pages.length; i++) {
             if (!pptState.pages[i]) {
@@ -2438,10 +2433,7 @@ JSON 结构：
         }
 
         // 获取页数范围（导出用）
-        var startPageInput = document.getElementById('pptExportStartPage');
-        var endPageInput = document.getElementById('pptExportEndPage');
-        var startPage = startPageInput ? parseInt(startPageInput.value) || 1 : 1;
-        var endPage = endPageInput ? parseInt(endPageInput.value) || pptState.pages.length : pptState.pages.length;
+        var { startPage, endPage } = getPPTExportRange();
 
         // 调整为0-based索引
         var startIdx = startPage - 1;
@@ -2842,7 +2834,7 @@ JSON 结构：
         pptState.userSelectedPage = false; pptState.notificationShownForTask = false;
         var startInput = document.getElementById('pptExportStartPage') as HTMLInputElement;
         if (startInput) startInput.value = '1';
-        updatePageRangeInputs();
+        updatePageRangeInputs(true);
         document.getElementById('pptEditorModal').style.display = 'flex';
         showEditorLoading(false); renderEditorPagesList(); selectPage(0, false); saveDraft();
     }
