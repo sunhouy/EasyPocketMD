@@ -3556,97 +3556,96 @@ import { createDiffFileWriter } from './conflict/live-files';
         fileInput.accept = '.md,.markdown,.txt,.pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,text/markdown,text/plain,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 
         fileInput.addEventListener('change', async function(e) {
-            const files = Array.from(e.target.files || []);
-            if (files.length === 0) {
-                fileInput.remove();
-                return;
-            }
+            try { await importFileCollection(Array.from(e.target.files || []), targetFolder); }
+            finally { fileInput.remove(); }
+        });
+        fileInput.click();
+    }
 
-            global.showMessage((isEn() ? `Importing ${files.length} files...` : `正在导入 ${files.length} 个文件...`), 'info');
+    async function importFileCollection(files, targetFolder) {
+        if (!files.length) return;
+        global.showMessage((isEn() ? `Importing ${files.length} files...` : `正在导入 ${files.length} 个文件...`), 'info');
 
-            let importedCount = 0;
-            let skippedCount = 0;
-            const newFiles = [];
-            const existingNames = new Set(g('files').map(function(f) { return f.name; }));
+        let importedCount = 0;
+        let skippedCount = 0;
+        const newFiles = [];
+        const existingNames = new Set(g('files').map(function(f) { return f.name; }));
 
-            for (const file of files) {
-                try {
-                    let content;
-                    // 检查文件大小，如果是大文档，使用上传接口
-                    if (file.size > 100000 && /\.(md|markdown|txt)$/i.test(file.name)) { // 100KB 作为大文档的标准
-                        if (typeof global.uploadFiles === 'function') {
-                            try {
-                                // 上传文件并获取链接
-                                const markdownLink = await global.uploadFiles([file], false);
-                                // 返回一个特殊标记，指示这是一个上传的大文档
-                                content = `[${file.name}](${markdownLink})`;
-                            } catch (error) {
-                                console.error('上传大文档失败:', error);
-                                // 上传失败时，回退到直接读取
-                                content = await convertImportedFileToMarkdown(file);
-                            }
-                        } else {
-                            // 如果 uploadFiles 函数不可用，回退到直接读取
+        for (const file of files) {
+            try {
+                let content;
+                // 检查文件大小，如果是大文档，使用上传接口
+                if (file.size > 100000 && /\.(md|markdown|txt)$/i.test(file.name)) { // 100KB 作为大文档的标准
+                    if (typeof global.uploadFiles === 'function') {
+                        try {
+                            // 上传文件并获取链接
+                            const markdownLink = await global.uploadFiles([file], false);
+                            // 返回一个特殊标记，指示这是一个上传的大文档
+                            content = `[${file.name}](${markdownLink})`;
+                        } catch (error) {
+                            console.error('上传大文档失败:', error);
+                            // 上传失败时，回退到直接读取
                             content = await convertImportedFileToMarkdown(file);
                         }
                     } else {
-                        // 小文档直接读取
+                        // 如果 uploadFiles 函数不可用，回退到直接读取
                         content = await convertImportedFileToMarkdown(file);
                     }
-                    const importName = buildImportedFilePath(file.name, targetFolder, existingNames);
-
-                    const newFile = {
-                        id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-                        name: importName,
-                        type: 'file',
-                        content: content,
-                        lastModified: Date.now(),
-                        isSynced: false
-                    };
-
-                    newFiles.push(newFile);
-                    existingNames.add(importName);
-                    importedCount++;
-                } catch (error) {
-                    console.error('读取文件失败:', file.name, error);
-                    global.showMessage((isEn() ? 'Failed to import file ' : '导入文件失败 ') + file.name + ': ' + error.message, 'error');
-                    skippedCount++;
+                } else {
+                    // 小文档直接读取
+                    content = await convertImportedFileToMarkdown(file);
                 }
+                const importName = buildImportedFilePath(file.name, targetFolder, existingNames);
+
+                const newFile = {
+                    id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+                    name: importName,
+                    type: 'file',
+                    content: content,
+                    lastModified: Date.now(),
+                    isSynced: false
+                };
+
+                newFiles.push(newFile);
+                existingNames.add(importName);
+                importedCount++;
+            } catch (error) {
+                console.error('读取文件失败:', file.name, error);
+                global.showMessage((isEn() ? 'Failed to import file ' : '导入文件失败 ') + file.name + ': ' + error.message, 'error');
+                skippedCount++;
             }
+        }
 
-            if (newFiles.length > 0) {
-                newFiles.forEach(function(f) { ensureParentFolders(f.name); });
-                g('files').push.apply(g('files'), newFiles);
-                localStorage.setItem('vditor_files', window.e2eSerializeFiles ? window.e2eSerializeFiles(g('files')) : JSON.stringify(g('files')));
+        if (newFiles.length > 0) {
+            newFiles.forEach(function(f) { ensureParentFolders(f.name); });
+            g('files').push.apply(g('files'), newFiles);
+            localStorage.setItem('vditor_files', window.e2eSerializeFiles ? window.e2eSerializeFiles(g('files')) : JSON.stringify(g('files')));
 
-                newFiles.forEach(function(file) {
-                    g('lastSyncedContent')[file.id] = file.content;
-                    g('unsavedChanges')[file.id] = false;
-                });
+            newFiles.forEach(function(file) {
+                g('lastSyncedContent')[file.id] = file.content;
+                g('unsavedChanges')[file.id] = false;
+            });
 
-                loadFiles();
-                openFile(newFiles[0].id);
+            loadFiles();
+            openFile(newFiles[0].id);
 
-                if (g('currentUser')) {
-                    for (const file of newFiles) {
-                        try {
-                            await global.syncFileToServer(file.id);
-                        } catch (syncError) {
-                            console.warn('同步文件失败:', file.name, syncError);
-                        }
+            if (g('currentUser')) {
+                for (const file of newFiles) {
+                    try {
+                        await global.syncFileToServer(file.id);
+                    } catch (syncError) {
+                        console.warn('同步文件失败:', file.name, syncError);
                     }
                 }
-
-                global.showMessage((isEn() ? `Successfully imported ${importedCount} file${importedCount !== 1 ? 's' : ''}${skippedCount > 0 ? `, skipped ${skippedCount}` : ''}` : `成功导入 ${importedCount} 个文件${skippedCount > 0 ? `，跳过 ${skippedCount} 个` : ''}`), 'success');
-            } else {
-                global.showMessage(isEn() ? 'No files imported' : '没有导入任何文件', 'warning');
             }
 
-            fileInput.remove();
-        });
+            global.showMessage((isEn() ? `Successfully imported ${importedCount} file${importedCount !== 1 ? 's' : ''}${skippedCount > 0 ? `, skipped ${skippedCount}` : ''}` : `成功导入 ${importedCount} 个文件${skippedCount > 0 ? `，跳过 ${skippedCount} 个` : ''}`), 'success');
+        } else {
+            global.showMessage(isEn() ? 'No files imported' : '没有导入任何文件', 'warning');
+        }
 
-        fileInput.click();
     }
+    global.importDroppedFiles = (files, targetFolder = getSelectedFolderPath()) => importFileCollection(files, normalizePath(targetFolder));
 
     function stripKnownExtension(fileName) {
         return fileName
@@ -4438,7 +4437,6 @@ import { createDiffFileWriter } from './conflict/live-files';
         const buttonPadding = isCompactMobile ? '5px 10px' : '6px 10px';
         const sectionGap = isCompactMobile ? '8px' : '10px';
         const compactRadius = isCompactMobile ? '5px' : '6px';
-        const wasmResultMaxHeight = isCompactMobile ? '130px' : '160px';
         // 如果已存在查找框，先移除
         const existingModal = document.getElementById('findDialogModal');
         if (existingModal) {
@@ -4448,13 +4446,14 @@ import { createDiffFileWriter } from './conflict/live-files';
         // 仅窗口本身使用半透明蒙版效果，不遮挡整个页面
         const dialog = document.createElement('div');
         dialog.id = 'findDialogModal';
-        dialog.style.cssText = 'position:fixed;top:' + dialogTop + 'px;right:' + dialogRight + 'px;background:' + (nightMode ? 'rgba(45,45,45,0.92)' : 'rgba(255,255,255,0.9)') + ';color:' + textColor + ';border-radius:10px;padding:' + dialogPadding + ';width:' + dialogWidth + ';max-height:78vh;overflow:auto;box-shadow:0 6px 22px rgba(0,0,0,0.24);z-index:10001;border:1px solid ' + borderColor + ';display:flex;flex-direction:column;';
+        dialog.style.cssText = 'position:fixed;top:' + dialogTop + 'px;right:' + dialogRight + 'px;background:' + (nightMode ? 'rgba(45,45,45,0.92)' : 'rgba(255,255,255,0.9)') + ';color:' + textColor + ';border-radius:10px;padding:' + dialogPadding + ';width:' + dialogWidth + ';max-height:78vh;overflow:hidden;box-shadow:0 6px 22px rgba(0,0,0,0.24);z-index:10001;border:1px solid ' + borderColor + ';display:flex;flex-direction:column;';
         dialog.innerHTML =
             '<div id="findDialogHeader" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:' + sectionGap + ';cursor:move;user-select:none;touch-action:none;">' +
                 '<h3 style="margin:0;font-size:' + titleSize + ';">' + (isEn() ? 'Find and Replace' : '查找和替换') + '</h3>' +
                 '<button id="maximizeFindBtn" type="button" title="' + (isEn() ? 'Maximize/restore' : '最大化/恢复') + '" aria-label="' + (isEn() ? 'Maximize/restore' : '最大化/恢复') + '" style="margin-left:auto;background:none;border:none;color:inherit;cursor:pointer;"><i class="fas fa-expand"></i></button>' +
                 '<button id="closeFindBtn" style="background:none;border:none;font-size:18px;cursor:pointer;color:' + secondaryTextColor + ';padding:0;line-height:1;">&times;</button>' +
             '</div>' +
+            '<div class="find-dialog-controls">' +
             '<div style="margin-bottom:' + sectionGap + ';display:flex;align-items:center;gap:6px;">' +
                 '<button id="toggleReplaceBtn" style="background:none;border:none;cursor:pointer;color:' + secondaryTextColor + ';padding:2px;font-size:13px;transition:transform 0.2s;">' +
                     '<i class="fas fa-chevron-right" id="toggleReplaceIcon"></i>' +
@@ -4476,6 +4475,7 @@ import { createDiffFileWriter } from './conflict/live-files';
                 '<button id="findNextBtn" style="padding:' + buttonPadding + ';background:' + (nightMode ? 'var(--theme-accent, #4a90e2)' : 'var(--theme-accent, #4a90e2)') + ';color:white;border:none;border-radius:' + compactRadius + ';cursor:pointer;font-size:12px;">' + (isEn() ? 'Next' : '下一个') + '</button>' +
             '</div>' +
             '<div id="findStatus" style="font-size:' + statusFontSize + ';color:' + secondaryTextColor + ';"></div>' +
+            '</div>' +
             '<div id="wasmSearchPanel" style="margin-top:' + sectionGap + ';border-top:1px solid ' + borderColor + ';padding-top:' + sectionGap + ';display:none;">' +
                 '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">' +
                     '<span style="font-size:' + statusFontSize + ';color:' + secondaryTextColor + ';">' + (isEn() ? 'Cross-file search' : '跨文件搜索') + '</span>' +
@@ -4484,13 +4484,13 @@ import { createDiffFileWriter } from './conflict/live-files';
                         '<button id="wasmSearchBtn" style="padding:4px 10px;background:' + (nightMode ? '#3d3d3d' : '#f0f0f0') + ';color:' + textColor + ';border:1px solid ' + borderColor + ';border-radius:' + compactRadius + ';cursor:pointer;font-size:12px;">' + (isEn() ? 'Search Files' : '搜索文件') + '</button>' +
                     '</div>' +
                 '</div>' +
-                '<div id="wasmSearchResults" style="max-height:' + wasmResultMaxHeight + ';overflow:auto;font-size:' + statusFontSize + ';"></div>' +
+                '<div id="wasmSearchResults" style="font-size:' + statusFontSize + ';"></div>' +
             '</div>';
         document.body.appendChild(dialog);
         saveAfterDialogOpens(global);
         const bounds = dialog.getBoundingClientRect();
         const floating = floatingRunWindow(dialog, dialog.querySelector('#findDialogHeader'), {
-            x: bounds.left, y: bounds.top, width: bounds.width, height: Math.max(bounds.height, 280)
+            x: bounds.left, y: bounds.top, width: bounds.width, height: Math.max(bounds.height, Math.min(520, window.innerHeight - dialogTop - 24))
         });
         floating.update(false, false);
         let findMaximized = false;
@@ -4546,7 +4546,7 @@ import { createDiffFileWriter } from './conflict/live-files';
         const shouldAutoFocusFindInput = !/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
         const gateway = global.wasmTextEngineGateway;
-        if (wasmSearchPanel) wasmSearchPanel.style.display = 'block';
+        if (wasmSearchPanel) wasmSearchPanel.style.display = 'flex';
 
         function getCurrentEditorText() {
             const currentFileId = g('currentFileId');
@@ -4798,7 +4798,7 @@ import { createDiffFileWriter } from './conflict/live-files';
                     (isEn() ? 'Matched files: ' : '匹配文件数：') + rows.length + '，' +
                     (isEn() ? 'total matches: ' : '总匹配数：') + totalMatches +
                 '</div>' +
-                '<div id="crossSearchLazyList" style="max-height:260px;overflow:auto;padding-right:2px;"></div>' +
+                '<div id="crossSearchLazyList"></div>' +
                 '<div id="crossSearchLazyStatus" style="margin-top:6px;color:' + secondaryTextColor + ';font-size:12px;"></div>';
 
             const listEl = wasmSearchResults.querySelector('#crossSearchLazyList');
@@ -5190,7 +5190,8 @@ import { createDiffFileWriter } from './conflict/live-files';
         if (toggleCrossSearchBtn) {
             toggleCrossSearchBtn.onclick = function() {
                 isCrossSearchCollapsed = !isCrossSearchCollapsed;
-                if (wasmSearchResults) wasmSearchResults.style.display = isCrossSearchCollapsed ? 'none' : 'block';
+                if (wasmSearchResults) wasmSearchResults.style.display = isCrossSearchCollapsed ? 'none' : 'flex';
+                wasmSearchPanel?.classList.toggle('cross-search-collapsed', isCrossSearchCollapsed);
                 toggleCrossSearchBtn.textContent = isCrossSearchCollapsed
                     ? (isEn() ? 'Expand' : '展开')
                     : (isEn() ? 'Collapse' : '收起');

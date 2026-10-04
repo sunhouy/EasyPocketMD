@@ -11,9 +11,15 @@ interface ViewRuntime {
 export function applyEditorNightMode(runtime: ViewRuntime, enabled: boolean) {
     runtime.nightMode = enabled;
     document.body.classList.toggle('night-mode', enabled);
-    localStorage.setItem('vditor_night_mode', String(enabled));
+    try { localStorage.setItem('vditor_night_mode', String(enabled)); } catch { /* The explicit preference is also stored in a cookie. */ }
     const button = (document.getElementById('modeToggle') as HTMLButtonElement);
     if (button) button.innerHTML = '<i class="fas fa-' + (enabled ? 'sun' : 'moon') + '"></i>';
+    const desktopButton = document.getElementById('desktopThemeToggleBtn');
+    if (desktopButton) {
+        desktopButton.innerHTML = '<i class="fas fa-' + (enabled ? 'sun' : 'moon') + '"></i>';
+        const label = window.i18n?.t(enabled ? 'switchToDayMode' : 'switchToNightMode') || (enabled ? '切换到日间模式' : '切换到夜间模式');
+        desktopButton.setAttribute('aria-label', label); desktopButton.title = label;
+    }
     if (runtime.applyVditorThemes) runtime.applyVditorThemes(runtime.userSettings);
     else runtime.vditor?.setTheme?.(enabled ? 'dark' : 'classic');
     runtime.syncThemeColor?.();

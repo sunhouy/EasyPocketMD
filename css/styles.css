@@ -6110,3 +6110,31 @@ body.tauri-mobile-safe-area:not(.file-management-mode) .file-list-sidebar {
 .ai-query-sources blockquote { white-space: pre-wrap; border-left: 3px solid var(--theme-accent, #4a90e2); margin: 8px 0; padding: 6px 10px; user-select: text; }
 #aiQueryStatus { font-size: 13px; overflow-wrap: anywhere; }
 #aiQueryRun:disabled { opacity: .6; cursor: wait; }
+
+/* Optional companion stays below dialogs and above the mobile bottom toolbar. */
+#live2dCompanion { position: fixed; left: 12px; bottom: 12px; width: 180px; z-index: 800; display: flex; flex-direction: column; align-items: center; }
+#live2dCompanion canvas { width: 180px; height: 240px; cursor: pointer; }
+#live2dCompanion button, #live2dCompanion p { max-width: 100%; font-size: 12px; padding: 6px 9px; margin: 0; border-radius: 12px; background: var(--theme-accent, #4a90e2); color: white; border: 0; overflow-wrap: anywhere; }
+#live2dCompanion button { cursor: pointer; }
+#live2dCompanion canvas:focus-visible { outline: 2px solid var(--theme-accent, #4a90e2); border-radius: 12px; }
+body.file-management-mode #live2dCompanion, body.mobile-keyboard-visible #live2dCompanion { visibility: hidden; }
+@media (max-width: 768px) {
+    #live2dCompanion { left: 8px; bottom: calc(72px + env(safe-area-inset-bottom)); width: 105px; }
+    #live2dCompanion canvas { width: 105px; height: 140px; }
+}
+
+/* The result list owns scrolling and fills the floating window, including maximized mode. */
+#findDialogModal > #findDialogHeader { flex: 0 0 auto; }
+#findDialogModal .find-dialog-controls { flex: 0 1 auto; min-height: 0; max-height: 60%; overflow-y: auto; overflow-x: hidden; }
+#findDialogModal input { min-width: 0; }
+#wasmSearchPanel { flex: 1 1 0; min-height: 0; flex-direction: column; overflow: hidden; }
+#wasmSearchPanel > :first-child { flex: 0 0 auto; }
+#wasmSearchPanel.cross-search-collapsed { flex: 0 0 auto; }
+#wasmSearchResults { flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; overflow-wrap: anywhere; }
+#wasmSearchResults > :not(#crossSearchLazyList) { flex: 0 0 auto; }
+#crossSearchLazyList { flex: 1 1 0; min-height: 0; overflow-y: auto; overflow-x: hidden; padding-right: 3px; overscroll-behavior: contain; }
+
+.file-list-sidebar.external-file-drag { outline: 3px dashed var(--theme-accent, #4a90e2); outline-offset: -4px; }
+.file-drop-choice { max-width: 460px; width: min(92vw, 460px); overflow-wrap: anywhere; }
+.file-drop-choice button { margin: 6px 8px 0 0; padding: 9px 12px; cursor: pointer; }
+.file-drop-choice button:disabled { opacity: .5; cursor: default; }

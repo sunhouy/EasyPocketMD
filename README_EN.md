@@ -26,9 +26,19 @@ Import Markdown, text or Word documents; export Markdown, text, HTML, PDF, Word,
 
 ## Query all documents with AI
 
-Choose **AI Query** in the AI assistant to search cloud documents in every folder, local documents and unsaved editor drafts without opening each file. Answers combine findings across documents and show numbered sources with original excerpts. Each query builds an in-memory document graph using Markdown/wiki links, reads all available text in bounded batches and combines large sets of findings hierarchically.
+Choose **AI Query** to search cloud documents in every folder, local documents and unsaved drafts. Answers include numbered sources and original excerpts. The default builds an in-memory chunk index across all available documents, then retrieves relevant passages using Chinese/English keywords, query expansion and Markdown/wiki links. Up to three extraction requests run concurrently. Select **Full scan** to read every chunk; questions requesting summaries of all documents also trigger full scanning.
 
-The feature uses the API URL, key and model already configured in Settings. Document text is sent to that AI service. Encrypted documents are excluded unless selected and unlocked; their decrypted text is then sent to the same service. Hidden configuration files are excluded, and decrypted text and query indexes are never persisted. Progress, cancellation and unreadable files are displayed. Larger document collections require more time and API usage; missing evidence is reported.
+Use the existing API URL, key and chat model in Settings. An optional **embedding model** supported by the same service enables hybrid keyword/semantic retrieval. The first vector index sends all participating chunks and incurs API usage; later queries update changed chunks only. Without embeddings, the existing chat interface works directly. Cloud text is cached by revision. Indexes and vectors stay in memory and are cleared on account changes or vault locking. Empty, invalid or truncated responses produce actionable errors; failed extraction retries with smaller batches.
+
+Document text is sent to the configured AI service. Encrypted documents are excluded unless selected and unlocked; decrypted text then goes to the same service. Hidden configuration files are excluded, and decrypted text is never persisted. Progress, cancellation and unreadable files are displayed. Chunking and incremental indexing are inspired by [Notion's vector search practice](https://www.notion.com/blog/two-years-of-vector-search-at-notion); this application uses a browser memory index, not a separately deployed vector database.
+
+## Companion, theme and local files
+
+The optional **Live2D companion** in Settings is off by default, with Shizuku and Koharu choices. SDK and selected model load only after enabling it; model assets use browser Cache Storage. Disabling removes the character and releases runtime resources. Clicking the character opens the all-document AI query input. The implementation references [l2d-widget](https://github.com/hacxy/l2d-widget); observe the upstream model licenses.
+
+Desktop and mobile theme controls remember light, dark or system mode in a Cookie. Cross-file find results fill the remaining window height and scroll within the result list.
+
+Drag desktop files onto the file list and choose **Import files** to create copies or **Manage local files** to automatically write edits back to originals. Local management supports Markdown/text and requires browser write permission or desktop integration. Some browsers require selecting the same files again to authorize access. The existing autosave debounce and disk conflict checks apply. Other formats use import conversion and do not modify originals when edited.
 
 ## Docker deployment: build in CI, run on your server
 

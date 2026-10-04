@@ -322,10 +322,12 @@
         }
         const controller = new AbortController(); queryController = controller;
         const user = global.currentUser;
+        const queryConfig = global.AIConfig.get?.();
         const username = user?.username, token = user?.token;
         const checkSession = () => {
             if (controller.signal.aborted) throw new DOMException('Cancelled', 'AbortError');
             if (global.currentUser?.username !== username || global.currentUser?.token !== token) throw new Error(isEn() ? 'Account changed; retry the query' : '账号已切换，请重新查询');
+            if (queryConfig && JSON.stringify(global.AIConfig.get?.()) !== JSON.stringify(queryConfig)) throw new Error(isEn() ? 'AI settings changed; retry the query' : 'AI 配置已修改，请重新查询');
         };
         queryAnswer = ''; answer.replaceChildren(); sources.replaceChildren();
         (document.getElementById('aiQueryCopy') as HTMLButtonElement).hidden = true;
@@ -344,13 +346,17 @@
                 checkSession();
                 const response = await global.AIConfig.callText(system, prompt, options);
                 checkSession(); return response;
-            }, { signal: controller.signal, progress: (done, total) => {
+            }, { signal: controller.signal,
+                embed: queryConfig?.embeddingModel ? async (texts, opts) => { checkSession(); const vectors = await global.AIConfig.callEmbeddings(texts, opts); checkSession(); return vectors; } : undefined,
+                embeddingKey: JSON.stringify([username, token, queryConfig?.baseUrl, queryConfig?.embeddingModel]),
+                mode: (document.getElementById('aiQueryFullScan') as HTMLInputElement)?.checked ? 'full' : 'fast', progress: (done, total) => {
                 if (queryController === controller) status.textContent = (isEn() ? 'Searching all documents: ' : '正在检索全部文档：') + done + '/' + total + (done === total ? (isEn() ? ' · Combining findings…' : ' · 正在整理答案…') : '');
             } });
             checkSession();
             if (queryController !== controller) return;
             queryAnswer = result.answer; answer.textContent = result.answer;
             status.textContent = (isEn() ? 'Searched documents: ' : '已检索文档：') + result.files;
+            status.textContent += (isEn() ? ' · Passages read by AI: ' : ' · AI 读取片段：') + result.examined + '/' + result.chunks + (result.mode === 'full' ? (isEn() ? ' · Full scan' : ' · 完整扫描') : (isEn() ? ' · Fast retrieval' : ' · 快速检索'));
             if (corpus.skipped.length) {
                 status.textContent += (isEn() ? ' · Not searched (encrypted or unreadable): ' : ' · 未参与检索（加密或读取失败）：') + corpus.skipped.length;
                 const skipped = document.createElement('details'); const title = document.createElement('summary');
@@ -611,6 +617,12 @@
 
     // 导出到全局
     global.showAIPanel = showAIPanel;
+    global.showAIQueryPanel = function() {
+        showAIPanel();
+        showAIMenu('query');
+        (document.getElementById('aiQueryEncrypted') as HTMLInputElement).checked = false;
+        (document.getElementById('aiQueryInput') as HTMLTextAreaElement).focus();
+    };
     global.closeAIPanel = closeAIPanel;
     global.initAIAssistant = initAIAssistant;
 

@@ -1,4 +1,5 @@
 import { pinyin } from 'pinyin-pro';
+import { rememberThemeMode } from '../main/theme-preference';
 
 const SLASH_PANEL_ID = 'slashCommandPanel';
 
@@ -639,10 +640,9 @@ async function runAction(action) {
         case 'setLightMode':
         case 'setDarkMode':
         case 'setSystemMode': {
-            var theme = action === 'setLightMode' ? 'light' : (action === 'setDarkMode' ? 'dark' : 'system');
+            var theme: 'light' | 'dark' | 'system' = action === 'setLightMode' ? 'light' : (action === 'setDarkMode' ? 'dark' : 'system');
             window.userSettings = window.userSettings || {};
-            window.userSettings.themeMode = theme;
-            localStorage.setItem('vditor_settings', JSON.stringify(window.userSettings));
+            rememberThemeMode(window.userSettings, theme);
             window.location.reload();
             return true;
         }

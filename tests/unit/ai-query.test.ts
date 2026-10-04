@@ -32,7 +32,7 @@ describe('Cross-document AI knowledge queries', () => {
             }
             return 'Launch is October 20. [14] [999]';
         });
-        const result = await queryDocuments('When do we ship?', docs, call);
+        const result = await queryDocuments('When do we ship?', docs, call, { mode: 'full' });
         expect([...read].sort((a, b) => a - b)).toEqual(Array.from({ length: 14 }, (_, i) => i + 1));
         expect(result.sources).toMatchObject([{ number: 14, path: 'folder13/notes.md' }]);
         expect(result.answer).toContain('[14]');
