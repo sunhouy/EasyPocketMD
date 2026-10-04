@@ -119,6 +119,9 @@ def activate(release, channel, slot, current):
                '-e', f'PRINT_PORT={print_port}', '-e', f'GATEWAY_PORT={gateway_port}',
                '-e', f'PRINT_GATEWAY_PORT={print_gateway_port}', images['gateway'])
         health(gateway_port, config['wasm'])
+        # Probe the exact app-configured sandbox before changing live traffic.
+        command('docker', 'exec', names['app'], './node_modules/.bin/tsx',
+                'scripts/check-python-sandbox.ts', '--input-only', stdout=subprocess.DEVNULL)
         # Verify the print service responds to a real WebSocket handshake.
         command('docker', 'exec', names['print'], 'python', '-c',
                 'import asyncio,websockets\nasync def check():\n async with websockets.connect("ws://127.0.0.1:' + str(print_port) + '") as ws: pass\nasyncio.run(check())',

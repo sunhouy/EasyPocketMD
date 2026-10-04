@@ -72,6 +72,8 @@ def main():
     request = json.loads(wire_in.readline(128 * 1024))
     output = Output()
     if request.get('interactive'):
+        wire_out.write(json.dumps({'type':'ready', 'protocol':2}) + '\n')
+        wire_out.flush()
         calls = 0
         def ask(prompt=''):
             nonlocal calls

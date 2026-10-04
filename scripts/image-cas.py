@@ -30,6 +30,8 @@ def export(directory, image_pairs):
     objects = directory / 'objects'
     objects.mkdir(parents=True, exist_ok=True)
     images = dict(pair.split('=', 1) for pair in image_pairs)
+    identities = {role: portable_identity(image) for role, image in images.items()}
+    layer_ids = {layer for identity in identities.values() for layer in identity['layers']}
     process = subprocess.Popen(['docker', 'save', *images.values()], stdout=subprocess.PIPE)
     members = []
     try:
@@ -49,7 +51,22 @@ def export(directory, image_pairs):
                         raw.seek(0)
                         with target.open('wb') as output, gzip.GzipFile(fileobj=output, mode='wb', mtime=0, compresslevel=1) as compressed:
                             shutil.copyfileobj(raw, compressed, length=1024 * 1024)
-                    members.append({'name': member.name, 'size': member.size, 'sha256': key, 'mode': member.mode, 'compressed_size': target.stat().st_size})
+                    entry = {'name': member.name, 'size': member.size, 'sha256': key, 'mode': member.mode, 'compressed_size': target.stat().st_size}
+                    # OCI archives may contain gzip-compressed layer blobs; classic
+                    # archives contain raw layer.tar. Record verified expanded IDs
+                    # so the server can budget only layers it actually lacks.
+                    layer_id, expanded = 'sha256:' + key, member.size
+                    if layer_id not in layer_ids:
+                        raw.seek(0)
+                        if raw.read(2) == b'\x1f\x8b':
+                            raw.seek(0); expanded_digest = hashlib.sha256(); expanded = 0
+                            with gzip.GzipFile(fileobj=raw, mode='rb') as stream:
+                                while chunk := stream.read(1024 * 1024):
+                                    expanded_digest.update(chunk); expanded += len(chunk)
+                            layer_id = 'sha256:' + expanded_digest.hexdigest()
+                    if layer_id in layer_ids:
+                        entry.update(layer_diff_id=layer_id, expanded_size=expanded)
+                    members.append(entry)
         if process.wait() != 0:
             raise RuntimeError('docker save failed')
     finally:
@@ -57,7 +74,7 @@ def export(directory, image_pairs):
             process.kill()
         process.wait()
     manifest = {'version': 1, 'members': members, 'images': images,
-                'identities': {role: portable_identity(image) for role, image in images.items()}}
+                'identities': identities}
     content = json.dumps(manifest, sort_keys=True, separators=(',', ':')).encode()
     (directory / 'release.json').write_bytes(content)
     (directory / 'release.sha256').write_text(hashlib.sha256(content).hexdigest() + '\n')
