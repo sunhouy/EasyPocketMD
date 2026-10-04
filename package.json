@@ -81,6 +81,7 @@
     "jspdf": "^4.2.1",
     "jstree": "^3.3.17",
     "jszip": "^3.10.1",
+    "l2d": "2.1.1",
     "mammoth": "^1.12.0",
     "markdown-it": "^14.1.1",
     "markdown-it-footnote": "^4.0.0",

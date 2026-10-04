@@ -13,6 +13,9 @@ import { initBackNavigation } from './main/back-navigation';
 import { installMobileChromeScroll } from './main/mobile-chrome-scroll';
 import { applyBackground, createBackgroundControls } from './main/background';
 import { applyThemeColor, createThemeColorControls } from './main/theme-color';
+import { readThemeMode, rememberThemeMode, isNightTheme } from './main/theme-preference';
+import { createLive2DControls, applyLive2D } from './main/live2d-settings';
+import { bindFileListDrop } from './files/external/drop';
 
 document.addEventListener('DOMContentLoaded', function() {
     'use strict';
@@ -943,6 +946,7 @@ document.addEventListener('DOMContentLoaded', function() {
         return {
             editorMode: getCheckedRadioValue('editorMode', 'wysiwyg'),
             themeMode: getCheckedRadioValue('themeMode', 'system'),
+            live2d: live2dControls.get(),
             background: backgroundControls.get(),
             themeColor: themeColorControls.get(),
             uiMode: getCheckedRadioValue('uiMode', 'auto'),
@@ -1177,6 +1181,10 @@ document.addEventListener('DOMContentLoaded', function() {
     // 加载用户配置
     window.userSettings = JSON.parse(localStorage.getItem('vditor_settings') || '{}');
     const backgroundControls = createBackgroundControls();
+    const live2dControls = createLive2DControls();
+    window.userSettings.themeMode = readThemeMode(window.userSettings);
+    void applyLive2D(window.userSettings.live2d);
+    bindFileListDrop(window);
     const themeColorControls = createThemeColorControls();
     applyThemeColor(window.userSettings.themeColor);
     applyBackground(window.userSettings.background);
@@ -1367,23 +1375,7 @@ document.addEventListener('DOMContentLoaded', function() {
     initTheme();
 
     function initTheme() {
-        var mode = window.userSettings.themeMode;
-        if (mode === 'system') {
-            if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-                window.nightMode = true;
-            } else {
-                window.nightMode = false;
-            }
-        } else if (mode === 'dark') {
-            window.nightMode = true;
-        } else {
-            window.nightMode = false;
-        }
-
-        // 兼容旧的 localStorage 设置
-        if (localStorage.getItem('vditor_night_mode') === 'true') {
-            // 忽略旧设置
-        }
+        window.nightMode = isNightTheme(readThemeMode(window.userSettings));
     }
 
     if (window.nightMode) {
@@ -2589,6 +2581,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!modal) return;
 
         backgroundControls.open(window.userSettings.background);
+        live2dControls.open(window.userSettings.live2d);
         themeColorControls.open(window.userSettings.themeColor);
         (document.getElementById('appearanceSettings') as HTMLDetailsElement)?.removeAttribute('open');
 
@@ -2725,6 +2718,7 @@ document.addEventListener('DOMContentLoaded', function() {
             aiApiKeyInput.value = aiCfg.apiKey || '';
             aiBaseUrlInput.value = aiCfg.baseUrl || '';
             aiModelInput.value = aiCfg.model || '';
+            (document.getElementById('aiEmbeddingModelInput') as HTMLInputElement).value = aiCfg.embeddingModel || '';
             aiSyncToCloudCheckbox.checked = !!aiCfg.syncToCloud;
         }
 
@@ -3047,6 +3041,7 @@ document.addEventListener('DOMContentLoaded', function() {
             background: backgroundControls.get(),
             themeColor: themeColorControls.get(),
             themeMode: 'system',
+            live2d: live2dControls.get(),
             uiMode: 'auto',
             fontSize: '16px',
             vditorContentTheme: 'auto',
@@ -3211,6 +3206,8 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         window.userSettings = newSettings;
+        rememberThemeMode(newSettings, newSettings.themeMode as 'light' | 'dark' | 'system');
+        void applyLive2D(newSettings.live2d);
         settingsDialogInitialSnapshot = null;
         document.getElementById('settingsModalOverlay').classList.remove('show');
         window.showMessage(window.i18n ? window.i18n.t('settingsSaved') : '设置已保存', 'success');
@@ -3228,6 +3225,7 @@ document.addEventListener('DOMContentLoaded', function() {
             aiCfg.apiKey = (aiApiKeyInput.value || '').trim();
             aiCfg.baseUrl = (aiBaseUrlInput.value || '').trim();
             aiCfg.model = (aiModelInput.value || '').trim();
+            aiCfg.embeddingModel = ((document.getElementById('aiEmbeddingModelInput') as HTMLInputElement).value || '').trim();
             var newSync = !!aiSyncToCloudCheckbox.checked;
             var syncChanged = aiCfg.syncToCloud !== newSync;
             aiCfg.syncToCloud = newSync;

@@ -1,4 +1,5 @@
 import { applyEditorNightMode } from '../main/view-settings';
+import { rememberThemeMode } from '../main/theme-preference';
 
 (function(global) {
     'use strict';
@@ -71,6 +72,7 @@ import { applyEditorNightMode } from '../main/view-settings';
     }
 
     function toggleNightMode() {
+        rememberThemeMode(global.userSettings ||= {}, global.nightMode ? 'light' : 'dark');
         applyEditorNightMode(global, !global.nightMode);
         global.showMessage(window.i18n ? window.i18n.t(global.nightMode ? 'switchedToNight' : 'switchedToDay')
             : (global.nightMode ? '已切换到夜间模式' : '已切换到日间模式'));

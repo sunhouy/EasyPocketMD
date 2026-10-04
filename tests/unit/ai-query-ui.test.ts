@@ -59,3 +59,13 @@ describe('AI query panel', () => {
         expect(document.getElementById('aiQueryAnswer').textContent).toBe('');
     });
 });
+
+it('opens the query input from the companion with fresh encryption consent and waits for the user question', () => {
+    document.body.innerHTML = html; window.initAIAssistant();
+    document.getElementById('aiQueryEncrypted').checked = true;
+    window.showAIQueryPanel();
+    expect(document.getElementById('aiQueryMenu').style.display).toBe('block');
+    expect(document.activeElement.id).toBe('aiQueryInput');
+    expect(document.getElementById('aiQueryEncrypted').checked).toBe(false);
+    expect(document.getElementById('aiQueryRun').disabled).toBe(false);
+});

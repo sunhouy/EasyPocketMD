@@ -11,6 +11,8 @@ export interface AIConfig {
   apiKey: string;
   baseUrl: string;
   model: string;
+  /** Optional embeddings model on the same API; chat-only providers remain supported. */
+  embeddingModel?: string;
   /** 是否将配置端到端加密后同步到云端隐藏文件 */
   syncToCloud: boolean;
 }
@@ -37,6 +39,7 @@ export function getAIConfig(): AIConfig {
     if (parsed.apiKey) base.apiKey = String(parsed.apiKey);
     if (parsed.baseUrl) base.baseUrl = String(parsed.baseUrl);
     if (parsed.model) base.model = String(parsed.model);
+    if (parsed.embeddingModel) base.embeddingModel = String(parsed.embeddingModel);
     base.syncToCloud = !!parsed.syncToCloud;
     return base;
   } catch (e) {
@@ -123,7 +126,13 @@ export async function callChat(messages: Array<{ role: string; content: string }
     throw err;
   }
 
-  const data = await response.json();
+  let data: any;
+  try { data = await response.json(); }
+  catch { throw new Error('AI 服务返回了空或无效 JSON，请检查接口并重试 / AI service returned empty or invalid JSON; check the endpoint and retry'); }
+  if (data?.choices?.[0]?.finish_reason === 'length') {
+    const error: any = new Error('AI 输出达到长度上限，请缩小问题范围或重试 / AI output reached the token limit; narrow the question or retry');
+    error.code = 'AI_OUTPUT_TRUNCATED'; throw error;
+  }
   const content = data && data.choices && data.choices[0] && data.choices[0].message
     ? (data.choices[0].message.content || '')
     : (data && data.output && data.output.choices && data.output.choices[0] && data.output.choices[0].text
@@ -139,6 +148,23 @@ export async function callText(systemPrompt: string, userPrompt: string, opts?: 
     { role: 'user', content: userPrompt }
   ];
   return callChat(messages, opts);
+}
+
+export async function callEmbeddings(input: string[], options: { signal?: AbortSignal } = {}): Promise<number[][]> {
+  const config = getAIConfig();
+  if (!config.embeddingModel || !isAIConfigReady(config)) throw new Error('请配置检索向量模型 / Configure a retrieval embedding model');
+  const url = normalizeChatUrl(config.baseUrl).replace(/\/chat\/completions$/i, '/embeddings');
+  const response = await fetch(url, { method: 'POST', signal: options.signal,
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + config.apiKey.trim() },
+    body: JSON.stringify({ model: config.embeddingModel.trim(), input, encoding_format: 'float' }) });
+  let data: any;
+  try { data = await response.json(); } catch { throw new Error('向量接口返回空或无效 JSON / Embeddings API returned empty or invalid JSON'); }
+  if (!response.ok) { const error: any = new Error(data?.error?.message || '向量接口请求失败 / Embeddings request failed'); error.status = response.status; throw error; }
+  const rows = Array.isArray(data?.data) ? [...data.data].sort((a, b) => a.index - b.index) : [];
+  if (rows.length !== input.length || rows.some((row, index) => row.index !== index || !Array.isArray(row.embedding) || !row.embedding.length || row.embedding.some(value => typeof value !== 'number' || !Number.isFinite(value)))) throw new Error('向量接口结果无效 / Invalid embeddings response');
+  const dimension = rows[0]?.embedding.length;
+  if (rows.some(row => row.embedding.length !== dimension)) throw new Error('向量维度不一致 / Inconsistent embedding dimensions');
+  return rows.map(row => row.embedding);
 }
 
 /* ------------------- 端到端加密同步（隐藏文件） ------------------- */
@@ -157,7 +183,8 @@ export async function syncAIConfigToCloud(config: AIConfig): Promise<void> {
   const json = JSON.stringify({
     apiKey: config.apiKey,
     baseUrl: config.baseUrl,
-    model: config.model
+    model: config.model,
+    embeddingModel: config.embeddingModel || ''
   });
 
   // 端到端加密
@@ -233,6 +260,7 @@ export async function loadAIConfigFromCloud(): Promise<AIConfig | null> {
     if (parsed.apiKey) cfg.apiKey = String(parsed.apiKey);
     if (parsed.baseUrl) cfg.baseUrl = String(parsed.baseUrl);
     if (parsed.model) cfg.model = String(parsed.model);
+    cfg.embeddingModel = parsed.embeddingModel ? String(parsed.embeddingModel) : '';
     cfg.syncToCloud = true;
     return cfg;
   } catch (e) {
@@ -249,6 +277,7 @@ if (typeof window !== 'undefined') {
     isReady: isAIConfigReady,
     callChat,
     callText,
+    callEmbeddings,
     syncToCloud: syncAIConfigToCloud,
     loadFromCloud: loadAIConfigFromCloud,
     deleteFromCloud: deleteAIConfigFromCloud,

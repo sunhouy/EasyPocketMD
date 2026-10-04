@@ -528,6 +528,19 @@
                     </li></ul></details></li>
                 </ul>
             </section>
+            <section class="settings-section" aria-labelledby="settingsLive2DTitle">
+                <div class="settings-section-header"><h3 class="settings-section-title" id="settingsLive2DTitle" data-i18n="live2dTitle">Live2D 看板娘</h3></div>
+                <ul class="settings-list settings-grid" role="list">
+                    <li class="settings-list-item"><div class="form-group">
+                        <label><input type="checkbox" id="live2dEnabled"> <span data-i18n="live2dEnabled">启用看板娘</span></label>
+                        <p class="settings-hint" data-i18n="live2dHint">默认关闭；启用后才加载所选形象，资源缓存在本机。点击形象可查询全部文档，使用已配置的 AI API。</p>
+                    </div></li>
+                    <li class="settings-list-item"><div class="form-group">
+                        <label for="live2dModel" data-i18n="live2dModel">选择形象</label>
+                        <select id="live2dModel" disabled><option value="shizuku">Shizuku · 雫</option><option value="koharu">Koharu · 小春</option></select>
+                    </div></li>
+                </ul>
+            </section>
             <section class="settings-section" aria-labelledby="settingsEditorGroupTitle">
                 <div class="settings-section-header"><i class="fas fa-pen" aria-hidden="true"></i><h3 class="settings-section-title" id="settingsEditorGroupTitle" data-i18n="settingsGroupEditor">编辑与阅读</h3></div>
                 <ul class="settings-list settings-grid" role="list">
@@ -712,6 +725,11 @@
                             <input type="text" id="aiModelInput" class="form-control" placeholder="gpt-4o-mini / deepseek-v4-flash" />
                         </div>
                     </li>
+                    <li class="settings-list-item"><div class="form-group">
+                        <label for="aiEmbeddingModelInput" data-i18n="aiEmbeddingModel">检索向量模型（可选）</label>
+                        <input type="text" id="aiEmbeddingModelInput" class="form-control" placeholder="text-embedding-3-small / text-embedding-v4" />
+                        <p class="settings-hint" data-i18n="aiEmbeddingHint">填写后使用同一 API 的 embeddings 接口做语义检索，首次建立索引会发送正文，之后只更新变化片段。留空则使用关键词与 AI 查询扩展，无需向量接口。</p>
+                    </div></li>
                     <li class="settings-list-item">
                         <div class="form-group">
                             <label for="aiSyncToCloudCheckbox"> <span data-i18n="ui:端到端加密同步到云端">端到端加密同步到云端</span></label>
@@ -1011,8 +1029,9 @@
             <div id="aiQueryMenu" class="ai-submenu" style="display:none;">
                 <button class="ai-back-btn" data-back="main"><i class="fas fa-arrow-left"></i> <span data-i18n="back">返回</span></button>
                 <h3 data-i18n="aiQuery">AI查询</h3>
-                <p class="ai-query-hint" data-i18n="aiQueryHint">检索你的全部文档，结合跨文档信息回答并标明来源。查询会分批将正文发送到你配置的 AI 服务；文档较多时耗时更长。</p>
+                <p class="ai-query-hint" data-i18n="aiQueryHint">在全部文档中快速检索相关片段，结合跨文档信息回答并标明来源。相关正文发送到你配置的 AI 服务；完整扫描可覆盖全部正文。</p>
                 <label class="ai-query-encrypted"><input type="checkbox" id="aiQueryEncrypted"> <span data-i18n="aiQueryEncrypted">包括加密文档（需解锁，正文将发送到所配置的 AI 服务）</span></label>
+                <label class="ai-query-encrypted"><input type="checkbox" id="aiQueryFullScan"> <span data-i18n="aiQueryFullScan">完整扫描全部正文（汇总全部信息时使用，耗时更多）</span></label>
                 <div class="ai-input-area">
                     <label for="aiQueryInput" data-i18n="aiQueryQuestion">你想从文档中了解什么？</label>
                     <textarea id="aiQueryInput" maxlength="2000" placeholder="例如：汇总所有项目的待办事项，并说明来源。" data-i18n-placeholder="aiQueryPlaceholder"></textarea>
