@@ -1,7 +1,7 @@
 // Never execute submitted Python on the application host or fall back to host Python.
 const { spawn } = require('child_process');
 const { randomUUID } = require('crypto');
-const MAX_CAPTURE = 4 * 1024 * 1024;
+const MAX_CAPTURE = 10 * 1024 * 1024;
 const TIMEOUT = 20000;
 const smallHost = require('os').totalmem() < 3 * 1024 * 1024 * 1024;
 const MEMORY_MB = smallHost ? 256 : 512;
@@ -16,7 +16,7 @@ function cleanup(name) {
     });
 }
 
-export async function runPythonSandbox(code: string, signal?: AbortSignal, onInput?: (event: any, signal: AbortSignal) => Promise<string>): Promise<any> {
+export async function runPythonSandbox(code: string, signal?: AbortSignal, onInput?: (event: any, signal: AbortSignal) => Promise<string>, files: {name:string; data:string}[] = []): Promise<any> {
     if (active >= (smallHost ? 1 : 2)) return { success:false, status:429, error:'Python sandbox is busy. Please retry shortly.' };
     active++;
     const name = 'epmd-python-' + randomUUID();
@@ -65,6 +65,7 @@ export async function runPythonSandbox(code: string, signal?: AbortSignal, onInp
                     try {
                         const value = JSON.parse(line);
                         if (value.type === 'ready' && value.protocol === 2) {
+                            if (files.length && value.files !== true) return finish({success:false,status:503,error:'沙箱镜像不支持上传文件，请部署最新版本后重试'});
                             protocolReady = true; clearTimeout(handshake);
                         } else if (value.type === 'input') {
                             if (!onInput || !protocolReady || waiting || typeof value.prompt !== 'string' || typeof value.output !== 'string') throw Error('Invalid input request');
@@ -96,12 +97,21 @@ export async function runPythonSandbox(code: string, signal?: AbortSignal, onInp
                         if (imageBytes > 2 * 1024 * 1024 || !png.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10]))) throw Error('Invalid image');
                         return {mime:'image/png',data:image.data};
                     });
-                    finish({success:value.success,errorLine:Number.isSafeInteger(value.errorLine) && value.errorLine > 0 && value.errorLine <= code.split("\n").length ? value.errorLine : undefined,output:value.output.slice(0,65536),error:value.success ? undefined : String(value.error || 'Python failed').slice(0,65536),images});
+                    let fileBytes = 0;
+                    if (value.files !== undefined && (!Array.isArray(value.files) || value.files.length > 16)) throw Error('Invalid files');
+                    const artifacts = (value.files || []).map(file => {
+                        if (typeof file.name !== 'string' || !file.name || file.name.length > 512 || /[\x00-\x1f\\\\]/.test(file.name) || file.name.startsWith('/') || file.name.split('/').some(p => p === '..' || p === '.')) throw Error('Invalid filename');
+                        if (typeof file.data !== 'string' || file.data.length % 4 !== 0 || !/^[A-Za-z0-9+/]*={0,2}$/.test(file.data)) throw Error('Invalid file');
+                        const raw = Buffer.from(file.data,'base64'); fileBytes += raw.length;
+                        if (fileBytes > 4*1024*1024) throw Error('File output exceeds limit');
+                        return {name:file.name,data:file.data,size:raw.length};
+                    });
+                    finish({success:value.success,errorLine:Number.isSafeInteger(value.errorLine) && value.errorLine > 0 && value.errorLine <= code.split("\n").length ? value.errorLine : undefined,output:value.output.slice(0,65536),error:value.success ? undefined : String(value.error || 'Python failed').slice(0,65536),images,files:artifacts,fileWarning:typeof value.fileWarning === 'string' ? value.fileWarning.slice(0,1024) : undefined});
                 } catch { finish({success:false,status:500,error:'Invalid Python sandbox response'}); }
             });
             if (signal?.aborted) abort();
-            else if (onInput) child.stdin.write(JSON.stringify({code,interactive:true}) + '\n');
-            else child.stdin.end(JSON.stringify({code}));
+            else if (onInput) child.stdin.write(JSON.stringify({code,interactive:true,files}) + '\n');
+            else child.stdin.end(JSON.stringify({code,files}));
         });
     } finally { active--; }
 }
