@@ -17,5 +17,6 @@ export function exportFontStack(settings: Record<string, unknown> = {}, heading 
     // Liberation Serif is metric-compatible with Times on Linux. It has no CJK
     // glyphs, allowing the independently selected Chinese font to take over.
     const latinFallback = english === 'Times New Roman' ? '"Liberation Serif", ' : '';
-    return `"${english}", ${latinFallback}"${chinese}", "Noto Serif CJK SC", "Microsoft YaHei", serif`;
+    const cjkFallback = chinese === 'SimHei' ? 'Noto Sans CJK SC' : 'Noto Serif CJK SC';
+    return `"${english}", ${latinFallback}"${chinese}", "${cjkFallback}", "Microsoft YaHei", serif`;
 }
