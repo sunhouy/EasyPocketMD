@@ -3,9 +3,10 @@
 jest.mock('../../css/share-collaboration.css', () => ({}));
 jest.mock('../../js/page/share-history', () => ({ showSharedEditHistory: jest.fn() }));
 require('../../js/page/share-runtime');
+import { installEditorComposition } from '../../js/editor-composition';
 
 describe('Shared document acknowledgement and session isolation', () => {
-    let socket, editor;
+    let socket, editor, removeComposition;
     class FakeSocket {
         static OPEN = 1;
         readyState = 1;
@@ -28,8 +29,22 @@ describe('Shared document acknowledgement and session isolation', () => {
         window.vditor = editor; window.WebSocket = FakeSocket; window.currentUser = null;
         window.getApiBaseUrl = () => '/api';
         activate();
+        removeComposition = installEditorComposition(window);
     });
-    afterEach(() => { window.deactivateSharedDocumentSession(); jest.useRealTimers(); });
+    afterEach(() => { removeComposition(); window.deactivateSharedDocumentSession(); jest.useRealTimers(); });
+    it('waits for the final IME input before sending a shared-document update', async () => {
+        window.fetch = jest.fn(async () => ({ json: async () => ({ code: 200, data: { changed: false } }) }));
+        const root = document.querySelector('pre');
+        root.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }));
+        editor.setValue('A lie biao\nB');
+        await expect(window.scheduleSharedDocSync({ manualSave: true })).resolves.toBe(false);
+        await jest.advanceTimersByTimeAsync(6000);
+        expect(socket.sent.filter(item => item.type === 'update_content')).toHaveLength(0);
+        root.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true }));
+        editor.setValue('A 列表\nB'); root.dispatchEvent(new InputEvent('input', { bubbles: true }));
+        await jest.advanceTimersByTimeAsync(1000);
+        expect(socket.sent.find(item => item.type === 'update_content').content).toBe('A 列表\nB');
+    });
     it('rebases continued typing over a merged acknowledgement instead of losing either editor’s text', async () => {
         editor.setValue('A local\nB');
         const saved = window.scheduleSharedDocSync({ manualSave: true });
