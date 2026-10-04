@@ -172,18 +172,18 @@ document.addEventListener('DOMContentLoaded', function() {
                     mutation.addedNodes.forEach(function(node) {
                         if (!node || node.nodeType !== 1) return;
 
-                        if (node.matches && (node.matches('.modal-overlay') || node.matches('.mobile-action-sheet-overlay'))) {
+                        if ((node as Element).matches && ((node as Element).matches('.modal-overlay') || (node as Element).matches('.mobile-action-sheet-overlay'))) {
                             applySafeAreaToOverlay(node);
                         }
 
-                        if (node.querySelectorAll) {
-                            node.querySelectorAll('.modal-overlay, .mobile-action-sheet-overlay').forEach(applySafeAreaToOverlay);
+                        if ((node as Element).querySelectorAll) {
+                            (node as Element).querySelectorAll('.modal-overlay, .mobile-action-sheet-overlay').forEach(applySafeAreaToOverlay);
                         }
                     });
                 }
 
                 if (mutation.type === 'attributes' && mutation.target) {
-                    if (mutation.target.matches && (mutation.target.matches('.modal-overlay') || mutation.target.matches('.mobile-action-sheet-overlay'))) {
+                    if ((mutation.target as Element).matches && ((mutation.target as Element).matches('.modal-overlay') || (mutation.target as Element).matches('.mobile-action-sheet-overlay'))) {
                         applySafeAreaToOverlay(mutation.target);
                     }
                 }
@@ -220,7 +220,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         if (overlay.id === 'videoCallModalOverlay') {
-            var iframe = document.getElementById('videoCallIframe');
+            var iframe = (document.getElementById('videoCallIframe') as HTMLIFrameElement);
             if (iframe) iframe.src = '';
         }
 
@@ -438,7 +438,7 @@ document.addEventListener('DOMContentLoaded', function() {
             window.__resolveVditorInit = resolve;
             window.__rejectVditorInit = reject;
             try {
-                window.vditor = new Vditor('vditor', editorConfig);
+                window.vditor = new window.Vditor('vditor', editorConfig);
             } catch (error) {
                 window.vditorInitPromise = null;
                 window.__resolveVditorInit = null;
@@ -848,7 +848,7 @@ document.addEventListener('DOMContentLoaded', function() {
         for (var i = 0; i < shortcutInputs.length; i++) {
             var input = shortcutInputs[i];
             var actionId = input.getAttribute('data-shortcut-action-id');
-            var rawValue = String(input.value || '').trim();
+            var rawValue = String((input as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement).value || '').trim();
             if (!actionId || !keyboardShortcutActionsById[actionId]) continue;
 
             if (!rawValue) {
@@ -860,16 +860,16 @@ document.addEventListener('DOMContentLoaded', function() {
             if (!normalized) {
                 var invalidTemplate = window.i18n ? window.i18n.t('keyboardShortcutInvalid') : '快捷键格式无效：{value}';
                 window.customAlert(invalidTemplate.replace('{value}', rawValue));
-                input.focus();
-                input.select();
+                (input as HTMLElement).focus();
+                (input as HTMLInputElement).select();
                 return null;
             }
 
             if (usedShortcuts[normalized]) {
                 var conflictTemplate = window.i18n ? window.i18n.t('keyboardShortcutConflict') : '快捷键冲突：{shortcut} 已用于多个操作';
                 window.customAlert(conflictTemplate.replace('{shortcut}', normalized));
-                input.focus();
-                input.select();
+                (input as HTMLElement).focus();
+                (input as HTMLInputElement).select();
                 return null;
             }
 
@@ -896,8 +896,8 @@ document.addEventListener('DOMContentLoaded', function() {
     function getCheckedRadioValue(name, fallbackValue) {
         var radios = document.getElementsByName(name);
         for (var i = 0; i < radios.length; i++) {
-            if (radios[i].checked) {
-                return radios[i].value;
+            if ((radios[i] as HTMLInputElement).checked) {
+                return (radios[i] as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement).value;
             }
         }
         return fallbackValue;
@@ -907,8 +907,8 @@ document.addEventListener('DOMContentLoaded', function() {
         var toolbarButtons = [];
         var toolbarCheckboxes = document.querySelectorAll('#toolbarButtonsSettings input[type="checkbox"]');
         toolbarCheckboxes.forEach(function(cb) {
-            if (cb.checked) {
-                toolbarButtons.push(cb.value);
+            if ((cb as HTMLInputElement).checked) {
+                toolbarButtons.push((cb as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement).value);
             }
         });
 
@@ -919,7 +919,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 var input = shortcutInputs[i];
                 var actionId = input.getAttribute('data-shortcut-action-id');
                 if (!actionId || !keyboardShortcutActionsById[actionId]) continue;
-                draftShortcuts[actionId] = normalizeShortcutForDirtyCheck(input.value);
+                draftShortcuts[actionId] = normalizeShortcutForDirtyCheck((input as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement).value);
             }
         }
 
@@ -930,13 +930,13 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
 
-        var fontSizeSelect = document.getElementById('fontSizeSelect');
-        var showOutlineCheckbox = document.getElementById('showOutlineCheckbox');
-        var debugModeCheckbox = document.getElementById('debugModeCheckbox');
-        var slashCommandEnabledCheckbox = document.getElementById('slashCommandEnabledCheckbox');
-        var slashCommandActivationKeySelect = document.getElementById('slashCommandActivationKeySelect');
-        var mdAssociationCheckbox = document.getElementById('mdAssociationCheckbox');
-        var hideBottomToolbarOnKeyboardCheckbox = document.getElementById('hideBottomToolbarOnKeyboardCheckbox');
+        var fontSizeSelect = (document.getElementById('fontSizeSelect') as HTMLSelectElement);
+        var showOutlineCheckbox = (document.getElementById('showOutlineCheckbox') as HTMLInputElement);
+        var debugModeCheckbox = (document.getElementById('debugModeCheckbox') as HTMLInputElement);
+        var slashCommandEnabledCheckbox = (document.getElementById('slashCommandEnabledCheckbox') as HTMLInputElement);
+        var slashCommandActivationKeySelect = (document.getElementById('slashCommandActivationKeySelect') as HTMLSelectElement);
+        var mdAssociationCheckbox = (document.getElementById('mdAssociationCheckbox') as HTMLInputElement);
+        var hideBottomToolbarOnKeyboardCheckbox = (document.getElementById('hideBottomToolbarOnKeyboardCheckbox') as HTMLInputElement);
 
         return {
             editorMode: getCheckedRadioValue('editorMode', 'wysiwyg'),
@@ -946,8 +946,8 @@ document.addEventListener('DOMContentLoaded', function() {
             uiMode: getCheckedRadioValue('uiMode', 'auto'),
             language: getCheckedRadioValue('language', window.i18n ? window.i18n.getLanguage() : 'zh'),
             fontSize: fontSizeSelect ? fontSizeSelect.value : '16px',
-            vditorContentTheme: (document.getElementById('vditorContentThemeSelect') || {}).value || 'auto',
-            vditorCodeTheme: (document.getElementById('vditorCodeThemeSelect') || {}).value || 'auto',
+            vditorContentTheme: ((document.getElementById('vditorContentThemeSelect') as HTMLSelectElement) || {}).value || 'auto',
+            vditorCodeTheme: ((document.getElementById('vditorCodeThemeSelect') as HTMLSelectElement) || {}).value || 'auto',
             showOutline: !!(showOutlineCheckbox && showOutlineCheckbox.checked),
             hideBottomToolbarOnKeyboard: !!(hideBottomToolbarOnKeyboardCheckbox && hideBottomToolbarOnKeyboardCheckbox.checked),
             enableDebugMode: !!(debugModeCheckbox && debugModeCheckbox.checked),
@@ -996,7 +996,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
 
-            var saveButton = document.getElementById('saveSettingsBtn');
+            var saveButton = (document.getElementById('saveSettingsBtn') as HTMLButtonElement);
             if (saveButton) {
                 saveButton.click();
             }
@@ -1386,7 +1386,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     if (window.nightMode) {
         document.body.classList.add('night-mode');
-        var modeToggleEl = document.getElementById('modeToggle');
+        var modeToggleEl = (document.getElementById('modeToggle') as HTMLButtonElement);
         if (modeToggleEl) modeToggleEl.innerHTML = '<i class="fas fa-sun"></i>';
     }
     if (typeof window.syncThemeColor === 'function') {
@@ -1454,13 +1454,13 @@ document.addEventListener('DOMContentLoaded', function() {
         return theme;
     }
 
-    var vditorMathPreviewConfig = {
+    var vditorMathPreviewConfig: IMath = {
         inlineDigit: true,
         engine: 'KaTeX',
         macros: {},
     };
 
-    function buildVditorPreviewConfig(settings) {
+    function buildVditorPreviewConfig(settings?: import("../types/global").UserSettings): IPreview {
         return {
             math: vditorMathPreviewConfig,
             theme: {
@@ -1475,7 +1475,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function applyVditorThemes(settings) {
         if (!window.vditor || typeof window.vditor.setTheme !== 'function') return;
-        var editorTheme = window.nightMode ? 'dark' : 'classic';
+        const editorTheme = window.nightMode ? 'dark' : 'classic';
         window.vditor.setTheme(
             editorTheme,
             resolveVditorContentTheme(settings),
@@ -1575,12 +1575,13 @@ document.addEventListener('DOMContentLoaded', function() {
         sel.removeAllRanges();
         sel.addRange(range);
 
-        if (ctx.mode === 'wysiwyg') {
+        if (ctx.mode === 'wysiwyg' && ctx.modeState === window.vditor.vditor.wysiwyg) {
             // insertNode 通常会同步触发 input；若未触发则手动同步
-            if (ctx.modeState.preventInput && typeof ctx.modeState.afterRenderEvent === 'function') {
+            const modeState = ctx.modeState as typeof ctx.modeState & {afterRenderEvent?: (options: {enableAddUndoStack: boolean; enableHint: boolean; enableInput: boolean}) => void};
+            if (modeState.preventInput && typeof modeState.afterRenderEvent === 'function') {
                 ctx.modeState.preventInput = false;
                 try {
-                    ctx.modeState.afterRenderEvent({ enableAddUndoStack: true, enableHint: false, enableInput: true });
+                    modeState.afterRenderEvent({ enableAddUndoStack: true, enableHint: false, enableInput: true });
                 } catch (_) { /* noop */ }
             }
         } else if (ctx.mode === 'ir') {
@@ -1640,7 +1641,11 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    var editorConfig = {
+    function getStoredEditorMode(): 'ir'|'sv'|'wysiwyg' {
+        const mode = localStorage.getItem('vditor_editor_mode');
+        return mode === 'ir' || mode === 'sv' ? mode : 'wysiwyg';
+    }
+    var editorConfig: IOptions = {
         height: '100%',
         width: '100%',
         placeholder: window.i18n ? window.i18n.t('startEditing') : '开始编辑...支持 Markdown 语法',
@@ -1649,11 +1654,11 @@ document.addEventListener('DOMContentLoaded', function() {
         toolbar: ['emoji', 'br', 'bold', 'italic', 'strike', '|', 'line', 'quote', 'list', 'ordered-list', 'check', 'outdent', 'indent', 'code', 'inline-code', 'insert-after', 'insert-before', 'upload', 'link', 'table', 'record', 'edit-mode', 'both', 'preview', 'fullscreen', 'outline', 'code-theme', 'content-theme', 'export', 'info', 'help', 'br'],
         customWysiwygToolbar: function() {}, // 修复报错
         theme: window.nightMode ? 'dark' : 'classic',
-        mode: localStorage.getItem('vditor_editor_mode') || 'wysiwyg',
+        mode: getStoredEditorMode(),
         // Per-file journals own recovery; Vditor's shared cache duplicates conversion and storage.
         cache: { enable: false, id: 'vditor-mobile-optimized' },
         undoDelay: 1000,
-        outline: { enable: window.userSettings.showOutline },
+        outline: { enable: window.userSettings.showOutline, position: 'right' },
         hint: { emoji: {} },
         preview: buildVditorPreviewConfig(),
         upload: {
@@ -1695,21 +1700,22 @@ document.addEventListener('DOMContentLoaded', function() {
                 hasBoundGlobalClickGuard = true;
                 document.addEventListener('click', function(e) {
                     var dropdown = document.getElementById('mobileDropdown');
-                    var menuBtn = document.getElementById('mobileMenuBtn');
+                    var menuBtn = (document.getElementById('mobileMenuBtn') as HTMLButtonElement);
                     var overlay = document.getElementById('mobileActionSheetOverlay');
                     var userMenu = document.getElementById('userMenuDropdown');
 
                     var desktopDropdown = document.getElementById('desktopMoreDropdown');
-                    var desktopMoreBtn = document.getElementById('desktopMoreBtn');
+                    var desktopMoreBtn = (document.getElementById('desktopMoreBtn') as HTMLButtonElement);
                     var desktopEditDropdown = document.getElementById('desktopEditDropdown');
-                    var desktopEditBtn = document.getElementById('desktopEditBtn');
+                    var desktopEditBtn = (document.getElementById('desktopEditBtn') as HTMLButtonElement);
 
+                    if (!(e.target instanceof Node)) return;
                     if (menuBtn && dropdown && !menuBtn.contains(e.target) && !dropdown.contains(e.target)) dropdown.classList.remove('show');
                     if (desktopDropdown && desktopMoreBtn && !desktopMoreBtn.contains(e.target) && !desktopDropdown.contains(e.target)) desktopDropdown.classList.remove('show');
                     if (desktopEditDropdown && desktopEditBtn && !desktopEditBtn.contains(e.target) && !desktopEditDropdown.contains(e.target)) desktopEditDropdown.classList.remove('show');
                     if (overlay && false && e.target === overlay) window.hideMobileActionSheet();
-                    var mobileLoginBtn = document.getElementById('mobileLoginBtn');
-                    var desktopLoginBtn = document.getElementById('desktopLoginBtn');
+                    var mobileLoginBtn = (document.getElementById('mobileLoginBtn') as HTMLButtonElement);
+                    var desktopLoginBtn = (document.getElementById('desktopLoginBtn') as HTMLButtonElement);
                     var loginTriggerClicked = (mobileLoginBtn && mobileLoginBtn.contains(e.target)) || (desktopLoginBtn && desktopLoginBtn.contains(e.target));
                     if (userMenu && !loginTriggerClicked && !userMenu.contains(e.target)) userMenu.classList.remove('show');
                 });
@@ -1802,7 +1808,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function initTopNoticeBanner() {
         const banner = document.getElementById('topNoticeBanner');
-        const closeBtn = document.getElementById('topNoticeClose');
+        const closeBtn = (document.getElementById('topNoticeClose') as HTMLButtonElement);
         if (banner) observeNoticeHeight(banner);
 
         if (closeBtn) {
@@ -1838,7 +1844,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    function showTopNoticeBanner(type, text, icon, isHtml) {
+    function showTopNoticeBanner(type, text, icon, isHtml = false) {
         const banner = document.getElementById('topNoticeBanner');
         if (!banner) return;
 
@@ -1901,7 +1907,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // 添加登录链接的点击事件
         setTimeout(function() {
-            const loginLink = document.getElementById('guestBannerLoginLink');
+            const loginLink = (document.getElementById('guestBannerLoginLink') as HTMLAnchorElement);
             if (loginLink) {
                 loginLink.addEventListener('click', function(e) {
                     e.preventDefault();
@@ -1911,7 +1917,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
             }
 
-            const dismissLink = document.getElementById('guestBannerDismissLink');
+            const dismissLink = (document.getElementById('guestBannerDismissLink') as HTMLAnchorElement);
             if (dismissLink) {
                 dismissLink.addEventListener('click', function(e) {
                     e.preventDefault();
@@ -1999,7 +2005,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (window.bindAddAccountModalEvents) window.bindAddAccountModalEvents();
         if (window.bindSwitchAccountConfirmModalEvents) window.bindSwitchAccountConfirmModalEvents();
 
-        var fileListClose = document.getElementById('fileListClose');
+        var fileListClose = (document.getElementById('fileListClose') as HTMLButtonElement);
         if (fileListClose) fileListClose.addEventListener('click', function() { document.getElementById('fileListSidebar').classList.remove('show'); });
 
         // 文件列表帮助图标
@@ -2010,15 +2016,15 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
 
-        var addFileBtn = document.getElementById('addFileBtn');
+        var addFileBtn = (document.getElementById('addFileBtn') as HTMLButtonElement);
         if (addFileBtn) addFileBtn.addEventListener('click', window.createNewFile);
-        var addFolderBtn = document.getElementById('addFolderBtn');
+        var addFolderBtn = (document.getElementById('addFolderBtn') as HTMLButtonElement);
         if (addFolderBtn) addFolderBtn.addEventListener('click', window.createNewFolder);
-        var mobileFileBtn = document.getElementById('mobileFileBtn');
+        var mobileFileBtn = (document.getElementById('mobileFileBtn') as HTMLButtonElement);
         if (mobileFileBtn) mobileFileBtn.addEventListener('click', showPrimaryFileInterface);
 
         // 演示模式按钮仅在桌面端显示
-        var mobilePresentationBtn = document.getElementById('mobilePresentationBtn');
+        var mobilePresentationBtn = (document.getElementById('mobilePresentationBtn') as HTMLButtonElement);
         if (mobilePresentationBtn) {
             if (window.editorInterfaceMode === 'mobile') {
                 mobilePresentationBtn.style.display = 'none';
@@ -2049,7 +2055,7 @@ document.addEventListener('DOMContentLoaded', function() {
             neu.addEventListener('click', fn);
         }
 
-        var mobileShareBtn = document.getElementById('mobileShareBtn');
+        var mobileShareBtn = (document.getElementById('mobileShareBtn') as HTMLButtonElement);
         if (mobileShareBtn) mobileShareBtn.addEventListener('click', async function() {
             if (typeof window.showShareDialog !== 'function') {
                 await import('./ui/share');
@@ -2057,11 +2063,11 @@ document.addEventListener('DOMContentLoaded', function() {
             window.showShareDialog();
             closeDrop();
         });
-        var mobileFileManagerBtn = document.getElementById('mobileFileManagerBtn');
+        var mobileFileManagerBtn = (document.getElementById('mobileFileManagerBtn') as HTMLButtonElement);
         if (mobileFileManagerBtn) mobileFileManagerBtn.addEventListener('click', function() { window.showFileManager(); closeDrop(); });
 
         // 文件对比按钮
-        var mobileFileDiffBtn = document.getElementById('mobileFileDiffBtn');
+        var mobileFileDiffBtn = (document.getElementById('mobileFileDiffBtn') as HTMLButtonElement);
         if (mobileFileDiffBtn) mobileFileDiffBtn.addEventListener('click', function() {
             if (typeof window.showFileDiffDialog === 'function') {
                 window.showFileDiffDialog();
@@ -2070,7 +2076,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
 
         // 全文查找按钮
-        var mobileFindBtn = document.getElementById('mobileFindBtn');
+        var mobileFindBtn = (document.getElementById('mobileFindBtn') as HTMLButtonElement);
         if (mobileFindBtn) mobileFindBtn.addEventListener('click', function() {
             if (typeof window.showFindDialog === 'function') {
                 window.showFindDialog();
@@ -2079,18 +2085,18 @@ document.addEventListener('DOMContentLoaded', function() {
         });
 
         // 字数统计按钮
-        var mobileWordCountBtn = document.getElementById('mobileWordCountBtn');
+        var mobileWordCountBtn = (document.getElementById('mobileWordCountBtn') as HTMLButtonElement);
         if (mobileWordCountBtn) mobileWordCountBtn.addEventListener('click', function() {
             window.showWordCountDialog();
             closeDrop();
         });
-        var mobileCreateHistoryVersionBtn = document.getElementById('mobileCreateHistoryVersionBtn');
+        var mobileCreateHistoryVersionBtn = (document.getElementById('mobileCreateHistoryVersionBtn') as HTMLButtonElement);
         if (mobileCreateHistoryVersionBtn) mobileCreateHistoryVersionBtn.addEventListener('click', async function() {
             await handleCreateHistoryVersionSnapshot();
             closeDrop();
         });
 
-        var mobilePrintBtn = document.getElementById('mobilePrintBtn');
+        var mobilePrintBtn = (document.getElementById('mobilePrintBtn') as HTMLButtonElement);
         if (mobilePrintBtn) mobilePrintBtn.addEventListener('click', async function() {
             if (typeof window.showPrintDialog !== 'function') {
                 await import('./ui/print');
@@ -2099,10 +2105,10 @@ document.addEventListener('DOMContentLoaded', function() {
             closeDrop();
         });
 
-        var mobilePresentationBtn = document.getElementById('mobilePresentationBtn');
+        var mobilePresentationBtn = (document.getElementById('mobilePresentationBtn') as HTMLButtonElement);
         if (mobilePresentationBtn) mobilePresentationBtn.addEventListener('click', function() { enterPresentationMode(); closeDrop(); });
 
-        var mobileMenuBtn = document.getElementById('mobileMenuBtn');
+        var mobileMenuBtn = (document.getElementById('mobileMenuBtn') as HTMLButtonElement);
         if (mobileMenuBtn) {
             var neuMenuBtn = mobileMenuBtn.cloneNode(true);
             if (mobileMenuBtn.parentNode) mobileMenuBtn.parentNode.replaceChild(neuMenuBtn, mobileMenuBtn);
@@ -2123,7 +2129,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             closeDrop();
         });
-        var mobileExportBtn = document.getElementById('mobileExportBtn');
+        var mobileExportBtn = (document.getElementById('mobileExportBtn') as HTMLButtonElement);
         if (mobileExportBtn) mobileExportBtn.addEventListener('click', async function() {
             if (typeof window.exportContent !== 'function') {
                 await import('./ui/export');
@@ -2135,9 +2141,9 @@ document.addEventListener('DOMContentLoaded', function() {
         var mobileImportBtn = document.getElementById('mobileImportBtn');
         if (mobileImportBtn) mobileImportBtn.addEventListener('click', function() { window.importFiles(); closeDrop(); });
 
-        var aboutBtn = document.getElementById('aboutBtn');
+        var aboutBtn = (document.getElementById('aboutBtn') as HTMLButtonElement);
         if (aboutBtn) aboutBtn.addEventListener('click', function() { window.showAboutDialog(); closeDrop(); });
-        var mobileToggleFileE2EBtn = document.getElementById('mobileToggleFileE2EBtn');
+        var mobileToggleFileE2EBtn = (document.getElementById('mobileToggleFileE2EBtn') as HTMLButtonElement);
         if (mobileToggleFileE2EBtn) mobileToggleFileE2EBtn.addEventListener('click', async function() {
             if (typeof window.toggleCurrentFileE2E === 'function') {
                 await window.toggleCurrentFileE2E();
@@ -2147,15 +2153,15 @@ document.addEventListener('DOMContentLoaded', function() {
 
         var serviceStatusBtn = document.getElementById('serviceStatusBtn');
         if (serviceStatusBtn) serviceStatusBtn.addEventListener('click', function() { window.showServiceStatusDialog(); closeDrop(); });
-        var desktopServiceStatusBtn = document.getElementById('desktopServiceStatusBtn');
+        var desktopServiceStatusBtn = (document.getElementById('desktopServiceStatusBtn') as HTMLButtonElement);
         if (desktopServiceStatusBtn) desktopServiceStatusBtn.addEventListener('click', function() { window.showServiceStatusDialog(); closeDrop(); });
-        var mobileServiceStatusBtn = document.getElementById('mobileServiceStatusBtn');
+        var mobileServiceStatusBtn = (document.getElementById('mobileServiceStatusBtn') as HTMLButtonElement);
         if (mobileServiceStatusBtn) mobileServiceStatusBtn.addEventListener('click', function() { window.showServiceStatusDialog(); closeDrop(); });
 
         var mobileVideoCallBtn = document.getElementById('mobileVideoCallBtn');
         if (mobileVideoCallBtn) mobileVideoCallBtn.addEventListener('click', function() {
             var modal = document.getElementById('videoCallModalOverlay');
-            var iframe = document.getElementById('videoCallIframe');
+            var iframe = (document.getElementById('videoCallIframe') as HTMLIFrameElement);
             if (modal && iframe) {
                 // 传递夜间模式参数
                 var isDarkMode = window.nightMode || document.body.classList.contains('night-mode');
@@ -2166,7 +2172,7 @@ document.addEventListener('DOMContentLoaded', function() {
             closeDrop();
         });
 
-        var mobileClearBtn = document.getElementById('mobileClearBtn');
+        var mobileClearBtn = (document.getElementById('mobileClearBtn') as HTMLButtonElement);
         if (mobileClearBtn) mobileClearBtn.addEventListener('click', async function() {
             const confirmed = await window.customConfirm(window.i18n ? window.i18n.t('clearConfirm') : '确定要清空当前文件的内容吗？');
             if (confirmed) {
@@ -2176,14 +2182,14 @@ document.addEventListener('DOMContentLoaded', function() {
             closeDrop();
         });
 
-        var mobileSettingsBtn = document.getElementById('mobileSettingsBtn');
+        var mobileSettingsBtn = (document.getElementById('mobileSettingsBtn') as HTMLButtonElement);
         if (mobileSettingsBtn) mobileSettingsBtn.addEventListener('click', function() { window.showSettingsDialog(); });
-        var saveFileBtn = document.getElementById('saveFileBtn');
+        var saveFileBtn = (document.getElementById('saveFileBtn') as HTMLButtonElement);
         if (saveFileBtn) saveFileBtn.addEventListener('click', handleBottomSave);
 
-        var mobileLoginBtn = document.getElementById('mobileLoginBtn');
+        var mobileLoginBtn = (document.getElementById('mobileLoginBtn') as HTMLButtonElement);
         if (mobileLoginBtn) mobileLoginBtn.addEventListener('click', window.handleLoginButtonClick);
-        var modeToggle = document.getElementById('modeToggle');
+        var modeToggle = (document.getElementById('modeToggle') as HTMLButtonElement);
         if (modeToggle) modeToggle.addEventListener('click', window.toggleNightMode);
 
         bindDesktopButton('desktopFileBtn', function() {
@@ -2191,9 +2197,9 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         bindDesktopButton('desktopLoginBtn', function() { window.handleLoginButtonClick(); });
         const syncQuickActions = () => {
-            const theme = document.getElementById('desktopThemeToggleBtn');
+            const theme = (document.getElementById('desktopThemeToggleBtn') as HTMLButtonElement);
             if (theme) { theme.innerHTML = '<i class="fas fa-' + (window.nightMode ? 'sun' : 'moon') + '"></i>'; theme.setAttribute('aria-label', window.nightMode ? uiText('切换到日间模式') : uiText('切换到夜间模式')); theme.title = theme.getAttribute('aria-label'); }
-            document.getElementById('desktopOutlineToggleBtn')?.setAttribute('aria-pressed', String(!!window.userSettings.showOutline));
+            (document.getElementById('desktopOutlineToggleBtn') as HTMLButtonElement)?.setAttribute('aria-pressed', String(!!window.userSettings.showOutline));
         };
         bindDesktopButton('desktopThemeToggleBtn', function() { window.toggleNightMode(); syncQuickActions(); });
         bindDesktopButton('desktopQuickShareBtn', async function() { if (typeof window.showShareDialog !== 'function') await import('./ui/share'); window.showShareDialog(); });
@@ -2384,7 +2390,7 @@ document.addEventListener('DOMContentLoaded', function() {
             var currentContent = window.vditor.getValue();
             localStorage.setItem('vditor_editor_mode', mode);
             if (window.vditor.destroy) window.vditor.destroy();
-            var newConfig = {
+            var newConfig: IOptions = {
                 height: editorConfig.height,
                 width: editorConfig.width,
                 placeholder: window.i18n ? window.i18n.t('startEditing') : '开始编辑...支持 Markdown 语法',
@@ -2415,14 +2421,14 @@ document.addEventListener('DOMContentLoaded', function() {
                     mobileChromeScroll.bind();
                 }
             };
-            window.vditor = new Vditor('vditor', newConfig);
+            window.vditor = new window.Vditor('vditor', newConfig);
             window.showMessage((window.i18n ? window.i18n.t('switchedTo') : '已切换到') + modeMap[mode].name, 'success');
             var mobileModeBtn = document.getElementById('mobileModeBtn');
             if (mobileModeBtn) mobileModeBtn.innerHTML = '<i class="' + modeMap[mode].icon + '"></i> <span>当前: ' + modeMap[mode].name + '</span>';
         } catch (error) {
             console.error('切换编辑器模式失败', error);
             window.showMessage((window.i18n ? window.i18n.t('switchFailed') : '切换失败: ') + error.message, 'error');
-            window.vditor = new Vditor('vditor', editorConfig);
+            window.vditor = new window.Vditor('vditor', editorConfig);
         }
     }
 
@@ -2487,7 +2493,7 @@ document.addEventListener('DOMContentLoaded', function() {
             } },
             { id: 'mobileVideoCallBtn', fn: function() {
                 var modal = document.getElementById('videoCallModalOverlay');
-                var iframe = document.getElementById('videoCallIframe');
+                var iframe = (document.getElementById('videoCallIframe') as HTMLIFrameElement);
                 if (modal && iframe) {
                     // 传递夜间模式参数
                     var isDarkMode = window.nightMode || document.body.classList.contains('night-mode');
@@ -2515,7 +2521,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
 
         // 演示模式按钮仅在桌面端显示
-        var mobilePresentationBtn = document.getElementById('mobilePresentationBtn');
+        var mobilePresentationBtn = (document.getElementById('mobilePresentationBtn') as HTMLButtonElement);
         if (mobilePresentationBtn) {
             if (window.editorInterfaceMode === 'mobile') {
                 mobilePresentationBtn.style.display = 'none';
@@ -2547,7 +2553,7 @@ document.addEventListener('DOMContentLoaded', function() {
         renderDesktopToolbarShortcutLabels();
     }
 
-    var closeHistoryBtn = document.getElementById('closeHistoryBtn');
+    var closeHistoryBtn = (document.getElementById('closeHistoryBtn') as HTMLButtonElement);
     if (closeHistoryBtn) closeHistoryBtn.addEventListener('click', function() { var m = document.getElementById('historyModalOverlay'); if (m) m.classList.remove('show'); });
 
     // 页面离开/切后台相关保存逻辑统一由 appLifecycle 管理，避免重复触发。
@@ -2582,14 +2588,14 @@ document.addEventListener('DOMContentLoaded', function() {
 
         backgroundControls.open(window.userSettings.background);
         themeColorControls.open(window.userSettings.themeColor);
-        document.getElementById('appearanceSettings')?.removeAttribute('open');
+        (document.getElementById('appearanceSettings') as HTMLDetailsElement)?.removeAttribute('open');
 
         // 设置当前编辑器模式
         var currentEditorMode = localStorage.getItem('vditor_editor_mode') || 'wysiwyg';
         var modeRadios = document.getElementsByName('editorMode');
         for (var i = 0; i < modeRadios.length; i++) {
-            if (modeRadios[i].value === currentEditorMode) {
-                modeRadios[i].checked = true;
+            if ((modeRadios[i] as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement).value === currentEditorMode) {
+                (modeRadios[i] as HTMLInputElement).checked = true;
             }
         }
 
@@ -2597,8 +2603,8 @@ document.addEventListener('DOMContentLoaded', function() {
         var currentThemeMode = window.userSettings.themeMode || 'system';
         var themeRadios = document.getElementsByName('themeMode');
         for (var i = 0; i < themeRadios.length; i++) {
-            if (themeRadios[i].value === currentThemeMode) {
-                themeRadios[i].checked = true;
+            if ((themeRadios[i] as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement).value === currentThemeMode) {
+                (themeRadios[i] as HTMLInputElement).checked = true;
             }
         }
 
@@ -2606,8 +2612,8 @@ document.addEventListener('DOMContentLoaded', function() {
         var currentUiMode = window.userSettings.uiMode || 'auto';
         var uiModeRadios = document.getElementsByName('uiMode');
         for (var i = 0; i < uiModeRadios.length; i++) {
-            if (uiModeRadios[i].value === currentUiMode) {
-                uiModeRadios[i].checked = true;
+            if ((uiModeRadios[i] as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement).value === currentUiMode) {
+                (uiModeRadios[i] as HTMLInputElement).checked = true;
             }
         }
 
@@ -2616,50 +2622,50 @@ document.addEventListener('DOMContentLoaded', function() {
             var currentLang = window.i18n.getLanguage();
             var langRadios = document.getElementsByName('language');
             for (var i = 0; i < langRadios.length; i++) {
-                if (langRadios[i].value === currentLang) {
-                    langRadios[i].checked = true;
+                if ((langRadios[i] as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement).value === currentLang) {
+                    (langRadios[i] as HTMLInputElement).checked = true;
                 }
             }
         }
 
         // 设置字体大小
-        var fontSizeSelect = document.getElementById('fontSizeSelect');
+        var fontSizeSelect = (document.getElementById('fontSizeSelect') as HTMLSelectElement);
         if (fontSizeSelect) {
             fontSizeSelect.value = window.userSettings.fontSize || '16px';
         }
 
-        var vditorContentThemeSelect = document.getElementById('vditorContentThemeSelect');
+        var vditorContentThemeSelect = (document.getElementById('vditorContentThemeSelect') as HTMLSelectElement);
         if (vditorContentThemeSelect) {
             vditorContentThemeSelect.value = window.userSettings.vditorContentTheme || 'auto';
         }
 
-        var vditorCodeThemeSelect = document.getElementById('vditorCodeThemeSelect');
+        var vditorCodeThemeSelect = (document.getElementById('vditorCodeThemeSelect') as HTMLSelectElement);
         if (vditorCodeThemeSelect) {
             vditorCodeThemeSelect.value = window.userSettings.vditorCodeTheme || 'auto';
         }
 
         // 设置大纲视图
-        var showOutlineCheckbox = document.getElementById('showOutlineCheckbox');
+        var showOutlineCheckbox = (document.getElementById('showOutlineCheckbox') as HTMLInputElement);
         if (showOutlineCheckbox) {
             showOutlineCheckbox.checked = window.userSettings.showOutline || false;
         }
 
-        var hideBottomToolbarOnKeyboardCheckbox = document.getElementById('hideBottomToolbarOnKeyboardCheckbox');
+        var hideBottomToolbarOnKeyboardCheckbox = (document.getElementById('hideBottomToolbarOnKeyboardCheckbox') as HTMLInputElement);
         if (hideBottomToolbarOnKeyboardCheckbox) {
             hideBottomToolbarOnKeyboardCheckbox.checked = window.userSettings.hideBottomToolbarOnKeyboard === true;
         }
 
-        var debugModeCheckbox = document.getElementById('debugModeCheckbox');
+        var debugModeCheckbox = (document.getElementById('debugModeCheckbox') as HTMLInputElement);
         if (debugModeCheckbox) {
             debugModeCheckbox.checked = window.userSettings.enableDebugMode === true;
         }
 
-        var slashCommandEnabledCheckbox = document.getElementById('slashCommandEnabledCheckbox');
+        var slashCommandEnabledCheckbox = (document.getElementById('slashCommandEnabledCheckbox') as HTMLInputElement);
         if (slashCommandEnabledCheckbox) {
             slashCommandEnabledCheckbox.checked = window.userSettings.enableSlashCommand !== false;
         }
 
-        var slashCommandActivationKeySelect = document.getElementById('slashCommandActivationKeySelect');
+        var slashCommandActivationKeySelect = (document.getElementById('slashCommandActivationKeySelect') as HTMLSelectElement);
         if (slashCommandActivationKeySelect) {
             slashCommandActivationKeySelect.value = window.userSettings.slashCommandActivationKey || 'Tab';
         }
@@ -2668,8 +2674,8 @@ document.addEventListener('DOMContentLoaded', function() {
         var currentStorageLoc = window.userSettings.storageLocation || 'cloud';
         var storageRadios = document.getElementsByName('storageLocation');
         for (var i = 0; i < storageRadios.length; i++) {
-            if (storageRadios[i].value === currentStorageLoc) {
-                storageRadios[i].checked = true;
+            if ((storageRadios[i] as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement).value === currentStorageLoc) {
+                (storageRadios[i] as HTMLInputElement).checked = true;
             }
         }
 
@@ -2677,8 +2683,8 @@ document.addEventListener('DOMContentLoaded', function() {
         var currentDefaultFileOpening = window.userSettings.defaultFileOpening || 'lastEdited';
         var defaultFileOpeningRadios = document.getElementsByName('defaultFileOpening');
         for (var i = 0; i < defaultFileOpeningRadios.length; i++) {
-            if (defaultFileOpeningRadios[i].value === currentDefaultFileOpening) {
-                defaultFileOpeningRadios[i].checked = true;
+            if ((defaultFileOpeningRadios[i] as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement).value === currentDefaultFileOpening) {
+                (defaultFileOpeningRadios[i] as HTMLInputElement).checked = true;
             }
         }
 
@@ -2686,13 +2692,13 @@ document.addEventListener('DOMContentLoaded', function() {
         var currentDefaultSorting = window.userSettings.defaultSorting || 'modifiedTime';
         var defaultSortingRadios = document.getElementsByName('defaultSorting');
         for (var i = 0; i < defaultSortingRadios.length; i++) {
-            if (defaultSortingRadios[i].value === currentDefaultSorting) {
-                defaultSortingRadios[i].checked = true;
+            if ((defaultSortingRadios[i] as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement).value === currentDefaultSorting) {
+                (defaultSortingRadios[i] as HTMLInputElement).checked = true;
             }
         }
 
         var mdAssociationSetting = document.getElementById('mdAssociationSetting');
-        var mdAssociationCheckbox = document.getElementById('mdAssociationCheckbox');
+        var mdAssociationCheckbox = (document.getElementById('mdAssociationCheckbox') as HTMLInputElement);
         if (mdAssociationSetting && mdAssociationCheckbox) {
             if (window.electron) {
                 mdAssociationSetting.style.display = '';
@@ -2707,10 +2713,10 @@ document.addEventListener('DOMContentLoaded', function() {
         renderKeyboardShortcutSettings();
 
         // 填充 AI 模型配置
-        var aiApiKeyInput = document.getElementById('aiApiKeyInput');
-        var aiBaseUrlInput = document.getElementById('aiBaseUrlInput');
-        var aiModelInput = document.getElementById('aiModelInput');
-        var aiSyncToCloudCheckbox = document.getElementById('aiSyncToCloudCheckbox');
+        var aiApiKeyInput = (document.getElementById('aiApiKeyInput') as HTMLInputElement);
+        var aiBaseUrlInput = (document.getElementById('aiBaseUrlInput') as HTMLInputElement);
+        var aiModelInput = (document.getElementById('aiModelInput') as HTMLInputElement);
+        var aiSyncToCloudCheckbox = (document.getElementById('aiSyncToCloudCheckbox') as HTMLInputElement);
         var aiConfigApi = (window as any).AIConfig;
         if (aiConfigApi && aiApiKeyInput && aiBaseUrlInput && aiModelInput && aiSyncToCloudCheckbox) {
             var aiCfg = aiConfigApi.get();
@@ -2721,21 +2727,21 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         // 每次打开设置都默认折叠空间管理详情
-        var slashCommandDetails = document.getElementById('slashCommandDetails');
+        var slashCommandDetails = (document.getElementById('slashCommandDetails') as HTMLDetailsElement);
         if (slashCommandDetails) {
             slashCommandDetails.open = false;
         }
-        var keyboardShortcutsDetails = document.getElementById('keyboardShortcutsDetails');
+        var keyboardShortcutsDetails = (document.getElementById('keyboardShortcutsDetails') as HTMLDetailsElement);
         if (keyboardShortcutsDetails) {
             keyboardShortcutsDetails.open = false;
         }
-        var toolbarButtonsDetails = document.getElementById('toolbarButtonsDetails');
+        var toolbarButtonsDetails = (document.getElementById('toolbarButtonsDetails') as HTMLDetailsElement);
         if (toolbarButtonsDetails) {
             toolbarButtonsDetails.open = false;
         }
 
         // 每次打开设置都默认折叠空间管理详情
-        var storageManagementDetails = document.getElementById('storageManagementDetails');
+        var storageManagementDetails = (document.getElementById('storageManagementDetails') as HTMLDetailsElement);
         var storageUsagePanel = document.getElementById('storageUsagePanel');
         if (storageManagementDetails) {
             storageManagementDetails.open = false;
@@ -2901,7 +2907,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function initStorageManagementPanel() {
-        var detailsEl = document.getElementById('storageManagementDetails');
+        var detailsEl = (document.getElementById('storageManagementDetails') as HTMLDetailsElement);
         if (!detailsEl) return;
 
         detailsEl.addEventListener('toggle', function() {
@@ -2921,7 +2927,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if ('serviceWorker' in navigator) {
             var registration = await navigator.serviceWorker.getRegistration('/');
             if (registration && registration.active) {
-                await new Promise(function(resolve, reject) {
+                await new Promise<void>(function(resolve, reject) {
                     var channel = new MessageChannel();
                     var timeoutId = setTimeout(function() {
                         reject(new Error('Service Worker clear cache timeout'));
@@ -2954,7 +2960,7 @@ document.addEventListener('DOMContentLoaded', function() {
             var dbs = await indexedDB.databases();
             await Promise.all((dbs || []).map(function(dbInfo) {
                 if (!dbInfo || !dbInfo.name) return Promise.resolve();
-                return new Promise(function(resolve, reject) {
+                return new Promise<void>(function(resolve, reject) {
                     var request = indexedDB.deleteDatabase(dbInfo.name);
                     request.onsuccess = function() { resolve(); };
                     request.onerror = function() { reject(request.error || new Error('Delete IndexedDB failed')); };
@@ -2964,7 +2970,7 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        await new Promise(function(resolve, reject) {
+        await new Promise<void>(function(resolve, reject) {
             var fallbackRequest = indexedDB.deleteDatabase('MarkdownEditorFiles');
             fallbackRequest.onsuccess = function() { resolve(); };
             fallbackRequest.onerror = function() { reject(fallbackRequest.error || new Error('Delete IndexedDB failed')); };
@@ -3013,7 +3019,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 await actionFn();
                 window.showMessage(window.i18n ? window.i18n.t(successKey) : '操作成功', 'success');
-                var detailsEl = document.getElementById('storageManagementDetails');
+                var detailsEl = (document.getElementById('storageManagementDetails') as HTMLDetailsElement);
                 if (detailsEl && detailsEl.open) {
                     updateStorageUsageDetails();
                 }
@@ -3031,10 +3037,10 @@ document.addEventListener('DOMContentLoaded', function() {
     initStorageManagementPanel();
 
     // 保存设置
-    var saveSettingsBtn = document.getElementById('saveSettingsBtn');
+    var saveSettingsBtn = (document.getElementById('saveSettingsBtn') as HTMLButtonElement);
     if(saveSettingsBtn) saveSettingsBtn.addEventListener('click', function() {
         if (backgroundControls.isLoading()) { window.showMessage(window.i18n.t('backgroundProcessing'), 'info'); return; }
-        var newSettings = {
+        var newSettings: import("../types/global").UserSettings = {
             toolbarButtons: [],
             background: backgroundControls.get(),
             themeColor: themeColorControls.get(),
@@ -3057,8 +3063,8 @@ document.addEventListener('DOMContentLoaded', function() {
         var modeToApply = null;
         var modeRadios = document.getElementsByName('editorMode');
         for (var i = 0; i < modeRadios.length; i++) {
-            if (modeRadios[i].checked) {
-                var newMode = modeRadios[i].value;
+            if ((modeRadios[i] as HTMLInputElement).checked) {
+                var newMode = (modeRadios[i] as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement).value;
                 if (newMode !== localStorage.getItem('vditor_editor_mode')) {
                     modeToApply = newMode;
                 }
@@ -3069,8 +3075,8 @@ document.addEventListener('DOMContentLoaded', function() {
         // 获取选中的主题模式
         var themeRadios = document.getElementsByName('themeMode');
         for (var i = 0; i < themeRadios.length; i++) {
-            if (themeRadios[i].checked) {
-                newSettings.themeMode = themeRadios[i].value;
+            if ((themeRadios[i] as HTMLInputElement).checked) {
+                newSettings.themeMode = (themeRadios[i] as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement).value;
                 break;
             }
         }
@@ -3078,8 +3084,8 @@ document.addEventListener('DOMContentLoaded', function() {
         // 获取界面样式模式
         var uiModeRadios = document.getElementsByName('uiMode');
         for (var i = 0; i < uiModeRadios.length; i++) {
-            if (uiModeRadios[i].checked) {
-                newSettings.uiMode = uiModeRadios[i].value;
+            if ((uiModeRadios[i] as HTMLInputElement).checked) {
+                newSettings.uiMode = (uiModeRadios[i] as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement).value;
                 break;
             }
         }
@@ -3090,8 +3096,8 @@ document.addEventListener('DOMContentLoaded', function() {
         if (window.i18n) {
             var langRadios = document.getElementsByName('language');
             for (var i = 0; i < langRadios.length; i++) {
-                if (langRadios[i].checked) {
-                    newLanguage = langRadios[i].value;
+                if ((langRadios[i] as HTMLInputElement).checked) {
+                    newLanguage = (langRadios[i] as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement).value;
                     if (newLanguage !== window.i18n.getLanguage()) {
                         languageChanged = true;
                     }
@@ -3103,54 +3109,54 @@ document.addEventListener('DOMContentLoaded', function() {
         // 获取选中的工具栏按钮
         var toolbarCheckboxes = document.querySelectorAll('#toolbarButtonsSettings input[type="checkbox"]');
         toolbarCheckboxes.forEach(function(cb) {
-            if (cb.checked) {
-                newSettings.toolbarButtons.push(cb.value);
+            if ((cb as HTMLInputElement).checked) {
+                newSettings.toolbarButtons.push((cb as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement).value);
             }
         });
 
         // 获取字体大小
-        var fontSizeSelect = document.getElementById('fontSizeSelect');
+        var fontSizeSelect = (document.getElementById('fontSizeSelect') as HTMLSelectElement);
         if (fontSizeSelect) {
             newSettings.fontSize = fontSizeSelect.value;
         }
 
-        var vditorContentThemeSelect = document.getElementById('vditorContentThemeSelect');
+        var vditorContentThemeSelect = (document.getElementById('vditorContentThemeSelect') as HTMLSelectElement);
         if (vditorContentThemeSelect) {
             newSettings.vditorContentTheme = vditorContentThemeSelect.value || 'auto';
         }
 
-        var vditorCodeThemeSelect = document.getElementById('vditorCodeThemeSelect');
+        var vditorCodeThemeSelect = (document.getElementById('vditorCodeThemeSelect') as HTMLSelectElement);
         if (vditorCodeThemeSelect) {
             newSettings.vditorCodeTheme = vditorCodeThemeSelect.value || 'auto';
         }
 
         // 获取大纲视图设置
-        var showOutlineCheckbox = document.getElementById('showOutlineCheckbox');
+        var showOutlineCheckbox = (document.getElementById('showOutlineCheckbox') as HTMLInputElement);
         if (showOutlineCheckbox) {
             newSettings.showOutline = showOutlineCheckbox.checked;
         }
 
-        var hideBottomToolbarOnKeyboardCheckbox = document.getElementById('hideBottomToolbarOnKeyboardCheckbox');
+        var hideBottomToolbarOnKeyboardCheckbox = (document.getElementById('hideBottomToolbarOnKeyboardCheckbox') as HTMLInputElement);
         if (hideBottomToolbarOnKeyboardCheckbox) {
             newSettings.hideBottomToolbarOnKeyboard = hideBottomToolbarOnKeyboardCheckbox.checked;
         }
 
-        var debugModeCheckbox = document.getElementById('debugModeCheckbox');
+        var debugModeCheckbox = (document.getElementById('debugModeCheckbox') as HTMLInputElement);
         if (debugModeCheckbox) {
             newSettings.enableDebugMode = debugModeCheckbox.checked;
         }
 
-        var slashCommandEnabledCheckbox = document.getElementById('slashCommandEnabledCheckbox');
+        var slashCommandEnabledCheckbox = (document.getElementById('slashCommandEnabledCheckbox') as HTMLInputElement);
         if (slashCommandEnabledCheckbox) {
             newSettings.enableSlashCommand = slashCommandEnabledCheckbox.checked;
         }
 
-        var slashCommandActivationKeySelect = document.getElementById('slashCommandActivationKeySelect');
+        var slashCommandActivationKeySelect = (document.getElementById('slashCommandActivationKeySelect') as HTMLSelectElement);
         if (slashCommandActivationKeySelect) {
             newSettings.slashCommandActivationKey = slashCommandActivationKeySelect.value || 'Tab';
         }
 
-        var mdAssociationCheckbox = document.getElementById('mdAssociationCheckbox');
+        var mdAssociationCheckbox = (document.getElementById('mdAssociationCheckbox') as HTMLInputElement);
         if (mdAssociationCheckbox) {
             newSettings.mdFileAssociationEnabled = mdAssociationCheckbox.checked;
         }
@@ -3158,8 +3164,8 @@ document.addEventListener('DOMContentLoaded', function() {
         // 获取选中的存储位置
         var storageRadios = document.getElementsByName('storageLocation');
         for (var i = 0; i < storageRadios.length; i++) {
-            if (storageRadios[i].checked) {
-                newSettings.storageLocation = storageRadios[i].value;
+            if ((storageRadios[i] as HTMLInputElement).checked) {
+                newSettings.storageLocation = (storageRadios[i] as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement).value;
                 break;
             }
         }
@@ -3167,8 +3173,8 @@ document.addEventListener('DOMContentLoaded', function() {
         // 获取选中的默认文件打开方式
         var defaultFileOpeningRadios = document.getElementsByName('defaultFileOpening');
         for (var i = 0; i < defaultFileOpeningRadios.length; i++) {
-            if (defaultFileOpeningRadios[i].checked) {
-                newSettings.defaultFileOpening = defaultFileOpeningRadios[i].value;
+            if ((defaultFileOpeningRadios[i] as HTMLInputElement).checked) {
+                newSettings.defaultFileOpening = (defaultFileOpeningRadios[i] as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement).value;
                 break;
             }
         }
@@ -3176,8 +3182,8 @@ document.addEventListener('DOMContentLoaded', function() {
         // 获取选中的默认排序方式
         var defaultSortingRadios = document.getElementsByName('defaultSorting');
         for (var i = 0; i < defaultSortingRadios.length; i++) {
-            if (defaultSortingRadios[i].checked) {
-                newSettings.defaultSorting = defaultSortingRadios[i].value;
+            if ((defaultSortingRadios[i] as HTMLInputElement).checked) {
+                newSettings.defaultSorting = (defaultSortingRadios[i] as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement).value;
                 break;
             }
         }
@@ -3211,10 +3217,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // 保存 AI 模型配置
         var aiConfigApi = (window as any).AIConfig;
-        var aiApiKeyInput = document.getElementById('aiApiKeyInput');
-        var aiBaseUrlInput = document.getElementById('aiBaseUrlInput');
-        var aiModelInput = document.getElementById('aiModelInput');
-        var aiSyncToCloudCheckbox = document.getElementById('aiSyncToCloudCheckbox');
+        var aiApiKeyInput = (document.getElementById('aiApiKeyInput') as HTMLInputElement);
+        var aiBaseUrlInput = (document.getElementById('aiBaseUrlInput') as HTMLInputElement);
+        var aiModelInput = (document.getElementById('aiModelInput') as HTMLInputElement);
+        var aiSyncToCloudCheckbox = (document.getElementById('aiSyncToCloudCheckbox') as HTMLInputElement);
         if (aiConfigApi && aiApiKeyInput && aiBaseUrlInput && aiModelInput && aiSyncToCloudCheckbox) {
             var aiCfg = aiConfigApi.get();
             aiCfg.apiKey = (aiApiKeyInput.value || '').trim();
@@ -3294,7 +3300,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     });
 
-    var cancelSettingsBtn = document.getElementById('cancelSettingsBtn');
+    var cancelSettingsBtn = (document.getElementById('cancelSettingsBtn') as HTMLButtonElement);
     if(cancelSettingsBtn) cancelSettingsBtn.addEventListener('click', function() {
         requestCloseSettingsDialog();
     });
@@ -3379,7 +3385,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         var preferredKey = getRecommendedDownloadKey();
         var preferredHref = links[preferredKey] || links.windows;
-        var recommendedBtn = document.getElementById('aboutRecommendedDownloadBtn');
+        var recommendedBtn = (document.getElementById('aboutRecommendedDownloadBtn') as HTMLAnchorElement);
         if (recommendedBtn) {
             recommendedBtn.setAttribute('href', preferredHref);
             var textSpan = recommendedBtn.querySelector('span');
@@ -3404,7 +3410,7 @@ document.addEventListener('DOMContentLoaded', function() {
         versionLabel.textContent = version || '0.0.0';
     }
 
-    var checkUpdateBtn = document.getElementById('checkUpdateBtn');
+    var checkUpdateBtn = (document.getElementById('checkUpdateBtn') as HTMLButtonElement);
     if (checkUpdateBtn) {
         checkUpdateBtn.addEventListener('click', async function() {
             var btn = this;
@@ -3447,7 +3453,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (modal) modal.classList.add('show');
     };
 
-    var closeAboutBtn = document.getElementById('closeAboutBtn');
+    var closeAboutBtn = (document.getElementById('closeAboutBtn') as HTMLButtonElement);
     if (closeAboutBtn) closeAboutBtn.addEventListener('click', function() {
         document.getElementById('aboutModalOverlay').classList.remove('show');
     });
@@ -3475,19 +3481,19 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function renderTokenCounts(tokens) {
         var tokensElement = document.getElementById('wordCountTokens');
-        if (tokensElement) tokensElement.textContent = tokens;
+        if (tokensElement) tokensElement.textContent = String(tokens);
 
         var elGPT = document.getElementById('tokenCountGPT');
-        if (elGPT) elGPT.textContent = tokens;
+        if (elGPT) elGPT.textContent = String(tokens);
 
         var elClaude = document.getElementById('tokenCountClaude');
-        if (elClaude) elClaude.textContent = Math.ceil(tokens * 1.05); // Claude typically 5% more overhead
+        if (elClaude) elClaude.textContent = String(Math.ceil(tokens * 1.05)); // Claude typically 5% more overhead
 
         var elDeepSeek = document.getElementById('tokenCountDeepSeek');
-        if (elDeepSeek) elDeepSeek.textContent = tokens; // DeepSeek v2/v3 very close to cl100k_base
+        if (elDeepSeek) elDeepSeek.textContent = String(tokens); // DeepSeek v2/v3 very close to cl100k_base
 
         var elGemini = document.getElementById('tokenCountGemini');
-        if (elGemini) elGemini.textContent = Math.ceil(tokens * 1.02); // Gemini somewhat close
+        if (elGemini) elGemini.textContent = String(Math.ceil(tokens * 1.02)); // Gemini somewhat close
     }
 
     // Sequence id ensures stale async token results don't overwrite newer ones.
@@ -3498,10 +3504,10 @@ document.addEventListener('DOMContentLoaded', function() {
         var rawText = window.vditor.getValue() || '';
         var text = rawText;
 
-        var includeFormatting = document.getElementById('wcIncludeFormatting').checked;
-        var includePunctuation = document.getElementById('wcIncludePunctuation').checked;
-        var includeSpaces = document.getElementById('wcIncludeSpaces').checked;
-        var includeEmptyLines = document.getElementById('wcIncludeEmptyLines').checked;
+        var includeFormatting = (document.getElementById('wcIncludeFormatting') as HTMLInputElement).checked;
+        var includePunctuation = (document.getElementById('wcIncludePunctuation') as HTMLInputElement).checked;
+        var includeSpaces = (document.getElementById('wcIncludeSpaces') as HTMLInputElement).checked;
+        var includeEmptyLines = (document.getElementById('wcIncludeEmptyLines') as HTMLInputElement).checked;
 
         if (!includeFormatting) {
             // Remove markdown formatting robustly
@@ -3568,10 +3574,10 @@ document.addEventListener('DOMContentLoaded', function() {
         // Standardize newlines before length
         text = text.replace(/\r\n/g, '\n');
         
-        document.getElementById('wordCountTotal').textContent = text.length;
-        document.getElementById('wordCountChinese').textContent = chineseCharacters;
-        document.getElementById('wordCountLines').textContent = lineCount;
-        document.getElementById('wordCountWords').textContent = englishWords;
+        document.getElementById('wordCountTotal').textContent = String(text.length);
+        document.getElementById('wordCountChinese').textContent = String(chineseCharacters);
+        document.getElementById('wordCountLines').textContent = String(lineCount);
+        document.getElementById('wordCountWords').textContent = String(englishWords);
 
         // Show an approximation immediately so the modal isn't blank while the
         // gpt-tokenizer package is being lazy-loaded.
@@ -3628,12 +3634,12 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    var closeWordCountBtn = document.getElementById('closeWordCountBtn');
+    var closeWordCountBtn = (document.getElementById('closeWordCountBtn') as HTMLButtonElement);
     if (closeWordCountBtn) closeWordCountBtn.addEventListener('click', function() {
         document.getElementById('wordCountModalOverlay').classList.remove('show');
     });
 
-    var closeServiceStatusBtn = document.getElementById('closeServiceStatusBtn');
+    var closeServiceStatusBtn = (document.getElementById('closeServiceStatusBtn') as HTMLButtonElement);
     if (closeServiceStatusBtn) closeServiceStatusBtn.addEventListener('click', function() {
         document.getElementById('serviceStatusModalOverlay').classList.remove('show');
     });
@@ -3793,38 +3799,38 @@ document.addEventListener('DOMContentLoaded', function() {
 
             if (isHealthy) {
                 iconEl.innerHTML = '<i class="fas fa-check-circle"></i>';
-                iconEl.style.color = '#28a745';
+                (iconEl as HTMLElement).style.color = '#28a745';
                 badgeEl.textContent = (window.i18n ? window.i18n.t('statusHealthy') : '正常') + ' (' + responseTime + 'ms)';
-                badgeEl.style.background = '#d4edda';
-                badgeEl.style.color = '#155724';
+                (badgeEl as HTMLElement).style.background = '#d4edda';
+                (badgeEl as HTMLElement).style.color = '#155724';
             } else {
                 iconEl.innerHTML = '<i class="fas fa-times-circle"></i>';
-                iconEl.style.color = '#dc3545';
+                (iconEl as HTMLElement).style.color = '#dc3545';
                 badgeEl.textContent = (window.i18n ? window.i18n.t('statusUnhealthy') : '异常') + ' (' + response.status + ')';
-                badgeEl.style.background = '#f8d7da';
-                badgeEl.style.color = '#721c24';
+                (badgeEl as HTMLElement).style.background = '#f8d7da';
+                (badgeEl as HTMLElement).style.color = '#721c24';
             }
         } catch (error) {
             iconEl.innerHTML = '<i class="fas fa-times-circle"></i>';
-            iconEl.style.color = '#dc3545';
+            (iconEl as HTMLElement).style.color = '#dc3545';
             badgeEl.textContent = window.i18n ? window.i18n.t('statusOffline') : '离线';
-            badgeEl.style.background = '#f8d7da';
-            badgeEl.style.color = '#721c24';
+            (badgeEl as HTMLElement).style.background = '#f8d7da';
+            (badgeEl as HTMLElement).style.color = '#721c24';
         }
     }
 
     // 视频通话模态框关闭
-    var closeVideoCallBtn = document.getElementById('closeVideoCallBtn');
+    var closeVideoCallBtn = (document.getElementById('closeVideoCallBtn') as HTMLButtonElement);
     if (closeVideoCallBtn) closeVideoCallBtn.addEventListener('click', function() {
         var modal = document.getElementById('videoCallModalOverlay');
-        var iframe = document.getElementById('videoCallIframe');
+        var iframe = (document.getElementById('videoCallIframe') as HTMLIFrameElement);
         if (modal) modal.classList.remove('show');
         if (iframe) iframe.src = ''; // 清空iframe以停止视频流
     });
 
     // 应用字体大小设置
     function applyFontSize(fontSize) {
-        var longFileTextarea = document.getElementById('longFileTextarea');
+        var longFileTextarea = (document.getElementById('longFileTextarea') as HTMLTextAreaElement);
         if (longFileTextarea) {
             longFileTextarea.style.fontSize = fontSize;
             longFileTextarea.style.lineHeight = '1.6';
@@ -3843,14 +3849,14 @@ document.addEventListener('DOMContentLoaded', function() {
             // 设置编辑器整体字体大小
             var contentElements = vditorElement.querySelectorAll('.vditor-wysiwyg__pre, .vditor-ir__preview, .vditor-reset, .vditor-ir__input, .vditor-sv');
             contentElements.forEach(function(el) {
-                el.style.fontSize = fontSize;
-                el.style.lineHeight = '1.6';
+                (el as HTMLElement).style.fontSize = fontSize;
+                (el as HTMLElement).style.lineHeight = '1.6';
             });
 
             // 设置输入区字体大小
             var inputElements = vditorElement.querySelectorAll('.vditor-ir__input, textarea, .vditor-wysiwyg');
             inputElements.forEach(function(el) {
-                el.style.fontSize = fontSize;
+                (el as HTMLElement).style.fontSize = fontSize;
             });
 
             // 添加样式标签来覆盖默认样式

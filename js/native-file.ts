@@ -1,4 +1,4 @@
-(function(global) {
+export const nativeFileApi = (function(global: Window) {
     'use strict';
 
     function getTauriRoot() {
@@ -223,7 +223,7 @@
             if (isBlobLike(payload)) {
                 blobPayload = payload;
             } else if (isArrayBufferLike(payload)) {
-                blobPayload = new Blob([payload], { type: (options && options.mimeType) || 'application/octet-stream' });
+                blobPayload = new Blob([payload instanceof ArrayBuffer ? payload : Uint8Array.from(new Uint8Array(payload.buffer, payload.byteOffset, payload.byteLength))], { type: (options && options.mimeType) || 'application/octet-stream' });
             } else if (isTextPayload(payload)) {
                 blobPayload = new Blob([String(payload)], { type: (options && options.mimeType) || 'text/plain' });
             } else {
@@ -335,7 +335,7 @@
         if (isBlobLike(payload)) {
             blob = payload;
         } else if (isArrayBufferLike(payload)) {
-            blob = new Blob([payload], { type: mimeType || 'application/octet-stream' });
+            blob = new Blob([payload instanceof ArrayBuffer ? payload : Uint8Array.from(new Uint8Array(payload.buffer, payload.byteOffset, payload.byteLength))], { type: mimeType || 'application/octet-stream' });
         } else if (isTextPayload(payload)) {
             blob = new Blob([String(payload)], { type: mimeType || 'text/plain' });
         } else if (payload && typeof payload.url === 'string') {
@@ -365,7 +365,7 @@
         return { canceled: false, path: null };
     }
 
-    global.nativeFileOps = {
+    return global.nativeFileOps = {
         isTauriRuntime: isTauriRuntime,
         isAndroidTauriRuntime: isAndroidTauriRuntime,
         saveFile: saveFile,
@@ -378,4 +378,4 @@
         },
         getFileExt: getFileExt
     };
-})(typeof window !== 'undefined' ? window : this);
+})(window);

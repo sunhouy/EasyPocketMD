@@ -6,7 +6,7 @@ import { applyEditorNightMode } from '../main/view-settings';
     var DAY_THEME_COLOR = '#f3f4f6';
     var NIGHT_THEME_COLOR = '#2d2d2d';
 
-    function g(name) { return global[name]; }
+    function g<K extends keyof Window>(name: K): Window[K] { return global[name]; }
 
     function hideMobileActionSheet() {
         var actionSheet = document.getElementById('mobileActionSheet');

@@ -9,7 +9,7 @@
     }
 
     function decodeImageFromFile(file) {
-        return new Promise((resolve, reject) => {
+        return new Promise<HTMLImageElement>((resolve, reject) => {
             const url = URL.createObjectURL(file);
             const img = new Image();
 
@@ -77,7 +77,7 @@
             });
         }
 
-        return new Promise((resolve, reject) => {
+        return new Promise<Blob>((resolve, reject) => {
             surface.toBlob((result) => {
                 if (result) {
                     resolve(result);
@@ -138,7 +138,7 @@
         return outputSurface;
     }
 
-    async function compressImageWithCanvas(file, options = {}) {
+    async function compressImageWithCanvas(file, options: {quality?: number; maxDimension?: number} = {}) {
         const quality = options.quality || 75;
         const maxDimension = options.maxDimension || 4096;
         console.info('[ImageCompressor] 使用 Canvas 压缩:', {
@@ -162,7 +162,7 @@
         );
         const blob = await surfaceToBlob(surface, quality);
 
-        if (decoded && typeof decoded.close === 'function') {
+        if (decoded && 'close' in decoded && typeof decoded.close === 'function') {
             decoded.close();
         }
 
@@ -179,15 +179,15 @@
         };
     }
 
-    function compressImage(file, options = {}) {
+    function compressImage(file, options: {quality?: number; maxDimension?: number} = {}) {
         if (!shouldCompress(file)) {
             return Promise.resolve(null);
         }
         return compressImageWithCanvas(file, options);
     }
 
-    function showCompressConfirm(file, compressCallback, skipCallback) {
-        return new Promise((resolve) => {
+    function showCompressConfirm(file, compressCallback?: () => void, skipCallback?: () => void) {
+        return new Promise<"skip" | "compress">((resolve) => {
             const nightMode = global.nightMode;
             const sizeInMB = (file.size / (1024 * 1024)).toFixed(2);
 
@@ -226,12 +226,12 @@
             const skipBtn = content.querySelector('#compress-skip');
             const confirmBtn = content.querySelector('#compress-confirm');
 
-            skipBtn.onclick = () => {
+            (skipBtn as HTMLElement).onclick = () => {
                 overlay.remove();
                 resolve('skip');
             };
 
-            confirmBtn.onclick = () => {
+            (confirmBtn as HTMLElement).onclick = () => {
                 overlay.remove();
                 resolve('compress');
             };
@@ -245,7 +245,7 @@
         });
     }
 
-    async function handleLargeImageUpload(file, options = {}) {
+    async function handleLargeImageUpload(file, options: {quality?: number; maxDimension?: number} = {}) {
         if (!shouldCompress(file)) {
             return { action: 'upload', file };
         }

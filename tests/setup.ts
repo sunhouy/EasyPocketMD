@@ -30,13 +30,13 @@ jest.mock('mysql2/promise', () => ({
 jest.mock('ioredis', () => {
     return jest.fn().mockImplementation(() => ({
         on: jest.fn(),
-        connect: jest.fn().mockResolvedValue(),
+        connect: jest.fn().mockResolvedValue(undefined),
         get: jest.fn().mockResolvedValue(null),
         setex: jest.fn().mockResolvedValue('OK'),
         del: jest.fn().mockResolvedValue(1),
         keys: jest.fn().mockResolvedValue([]),
         ttl: jest.fn().mockResolvedValue(-1),
-        quit: jest.fn().mockResolvedValue()
+        quit: jest.fn().mockResolvedValue(undefined)
     }));
 });
 

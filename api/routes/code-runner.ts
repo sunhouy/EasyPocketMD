@@ -56,7 +56,7 @@ function runCommand(command, args, options) {
     const cwd = options && options.cwd ? options.cwd : process.cwd();
     const env = options && options.env ? options.env : process.env;
 
-    return new Promise(function(resolve) {
+    return new Promise<{code: number; stdout: string; stderr: string; error?: NodeJS.ErrnoException}>(function(resolve) {
         let settled = false;
         let stdout = '';
         let stderr = '';

@@ -41,7 +41,7 @@ if (existsSync(scopedVditorPackagePath)) {
   }
 }
 
-function localizeVditorAssets(code) {
+function localizeVditorAssets(code: string) {
   return useVditorVectorCharts(code)
     .replace(
       /public static readonly CDN = `https:\/\/unpkg\.com\/vditor@\$\{VDITOR_VERSION\}`;/,
@@ -289,7 +289,7 @@ export default defineConfig({
               fs.mkdirSync(targetDir, { recursive: true });
             }
             
-            function copyDir(src, dest) {
+            function copyDir(src: string, dest: string) {
               const entries = fs.readdirSync(src, { withFileTypes: true });
               for (const entry of entries) {
                 const srcPath = path.join(src, entry.name);

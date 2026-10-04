@@ -1,20 +1,24 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "lib": ["ES2022"],
+    "lib": [
+      "ES2022"
+    ],
     "module": "ESNext",
     "moduleResolution": "bundler",
     "strict": true,
     "noEmit": true,
     "skipLibCheck": true,
     "esModuleInterop": true,
-    "types": ["node"]
+    "types": [
+      "node"
+    ],
+    "moduleDetection": "force"
   },
   "include": [
     "vite.config.ts",
     "version.ts",
     "scripts/**/*.ts",
-    "jest.config.cjs",
-    "tests/**/*.ts"
+    "jest.config.cjs"
   ]
 }

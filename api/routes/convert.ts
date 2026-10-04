@@ -1,3 +1,8 @@
+interface DocxStyleSettings {
+    pageMargin?:number|string;bodyFontSize?:number|string;lineHeight?:number|string;paragraphSpacing?:number|string;titleFontSize?:number|string;
+    useCustomHeadingSizes?:boolean;alignment?:string;titleAlignment?:string;imgWidth?:string;imgHeight?:string;titleFont?:string;bodyFont?:string;
+    h1Size?:number|string;h2Size?:number|string;h3Size?:number|string;h4Size?:number|string;h5Size?:number|string;h6Size?:number|string;
+}
 const { normalizePdfResources } = require('../utils/pdfResources');
 const { nativeTool, isMissingPandoc } = require('../utils/nativeTools');
 const express = require('express');
@@ -342,7 +347,7 @@ function toSafeAlign(value, fallback) {
     return fallback;
 }
 
-async function buildDocxStyledHtml(markdown, settings = {}) {
+async function buildDocxStyledHtml(markdown: string, settings: DocxStyleSettings = {}) {
     settings = normalizeDocxSettings(settings);
     const pageMargin = toFiniteNumber(settings.pageMargin, 25);
     const bodyFontSize = toFiniteNumber(settings.bodyFontSize, 12);
@@ -583,7 +588,7 @@ async function runPandocDocx(inputContent, options: any = {}) {
             args.push('--wrap=preserve');
         }
 
-        await new Promise((resolve, reject) => {
+        await new Promise<void>((resolve, reject) => {
             const child = spawn(nativeTool('pandoc'), args, {
                 windowsHide: true
             });

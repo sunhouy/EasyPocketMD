@@ -13,7 +13,7 @@ let pdfMakeInitialized = false;
  * 动态加载 script 文件
  */
 function loadScript(url) {
-    return new Promise((resolve, reject) => {
+    return new Promise<void>((resolve, reject) => {
         const script = document.createElement('script');
         script.src = url;
         script.onload = () => {
@@ -129,7 +129,7 @@ async function generatePDFLocal(htmlContent, settings) {
     const imagePromises = [];
     images.forEach((img, index) => {
         imagePromises.push(
-            new Promise((resolve) => {
+            new Promise<void>((resolve) => {
                 // 如果已经是 data URL，直接使用
                 if (img.src.startsWith('data:')) {
                     resolve();
@@ -261,7 +261,7 @@ async function generatePDFLocal(htmlContent, settings) {
 
     try {
         const pdfDoc = currentPdfMake.createPdf(docDefinition);
-        const buffer = await new Promise((resolve, reject) => {
+        const buffer = await new Promise<Uint8Array<ArrayBuffer>>((resolve, reject) => {
             pdfDoc.getBuffer((buffer) => {
                 resolve(buffer);
             }, (error) => {
@@ -285,7 +285,7 @@ async function generatePDFLocal(htmlContent, settings) {
  * @param {string} [filename] - Optional filename (not used for generation, but for download context)
  * @returns {Promise<string>} - Returns PDF URL
  */
-export async function generatePDF(htmlContent, settings, filename) {
+export async function generatePDF(htmlContent, settings, filename?: string) {
     if (settings && settings.conversionMethod === 'local') {
         return await generatePDFLocal(htmlContent, settings);
     }

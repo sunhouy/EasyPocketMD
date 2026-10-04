@@ -12,7 +12,7 @@ export function applyEditorNightMode(runtime: ViewRuntime, enabled: boolean) {
     runtime.nightMode = enabled;
     document.body.classList.toggle('night-mode', enabled);
     localStorage.setItem('vditor_night_mode', String(enabled));
-    const button = document.getElementById('modeToggle');
+    const button = (document.getElementById('modeToggle') as HTMLButtonElement);
     if (button) button.innerHTML = '<i class="fas fa-' + (enabled ? 'sun' : 'moon') + '"></i>';
     if (runtime.applyVditorThemes) runtime.applyVditorThemes(runtime.userSettings);
     else runtime.vditor?.setTheme?.(enabled ? 'dark' : 'classic');
@@ -30,5 +30,5 @@ export function applyEditorOutline(runtime: ViewRuntime, enabled: boolean) {
     }
     const checkbox = document.getElementById('showOutlineCheckbox') as HTMLInputElement | null;
     if (checkbox) checkbox.checked = enabled;
-    document.getElementById('desktopOutlineToggleBtn')?.setAttribute('aria-pressed', String(enabled));
+    (document.getElementById('desktopOutlineToggleBtn') as HTMLButtonElement)?.setAttribute('aria-pressed', String(enabled));
 }

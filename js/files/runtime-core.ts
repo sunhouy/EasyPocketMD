@@ -26,7 +26,7 @@ import { createDiffFileWriter } from './conflict/live-files';
 (function(global) {
     'use strict';
 
-    function g(name) { return global[name]; }
+    function g<K extends keyof Window>(name: K): Window[K] { return global[name]; }
     
     function isEn() { return window.i18n && window.i18n.getLanguage() === 'en'; }
     function t(key) { return window.i18n ? window.i18n.t(key) : key; }
@@ -280,7 +280,7 @@ import { createDiffFileWriter } from './conflict/live-files';
     }
 
     function closeFileManagementFabRing() {
-        const fab = document.getElementById('fileManagementFab');
+        const fab = (document.getElementById('fileManagementFab') as HTMLButtonElement);
         const ring = document.getElementById('fileManagementFabRing');
         if (fab) fab.classList.remove('open');
         if (ring) {
@@ -290,7 +290,7 @@ import { createDiffFileWriter } from './conflict/live-files';
     }
 
     function toggleFileManagementFabRing() {
-        const fab = document.getElementById('fileManagementFab');
+        const fab = (document.getElementById('fileManagementFab') as HTMLButtonElement);
         const ring = document.getElementById('fileManagementFabRing');
         if (!fab || !ring) return;
 
@@ -306,10 +306,10 @@ import { createDiffFileWriter } from './conflict/live-files';
     }
 
     function bindFileManagementFabIfNeeded() {
-        const fab = document.getElementById('fileManagementFab');
+        const fab = (document.getElementById('fileManagementFab') as HTMLButtonElement);
         const ring = document.getElementById('fileManagementFabRing');
-        const newFileBtn = document.getElementById('fileManagementFabNewFile');
-        const newFolderBtn = document.getElementById('fileManagementFabNewFolder');
+        const newFileBtn = (document.getElementById('fileManagementFabNewFile') as HTMLButtonElement);
+        const newFolderBtn = (document.getElementById('fileManagementFabNewFolder') as HTMLButtonElement);
         if (!fab || fab.dataset.bound === '1') return;
 
         fab.dataset.bound = '1';
@@ -344,7 +344,7 @@ import { createDiffFileWriter } from './conflict/live-files';
         if (!hasBoundFabRingDismiss) {
             hasBoundFabRingDismiss = true;
             document.addEventListener('click', function(e) {
-                const fabEl = document.getElementById('fileManagementFab');
+                const fabEl = (document.getElementById('fileManagementFab') as HTMLButtonElement);
                 const ringEl = document.getElementById('fileManagementFabRing');
                 if (!ringEl || !ringEl.classList.contains('open')) return;
 
@@ -549,10 +549,10 @@ import { createDiffFileWriter } from './conflict/live-files';
     }
 
     function bindFileListSearchIfNeeded() {
-        const toggleBtn = document.getElementById('fileListSearchBtn');
+        const toggleBtn = (document.getElementById('fileListSearchBtn') as HTMLButtonElement);
         const panel = document.getElementById('fileListSearchPanel');
-        const input = document.getElementById('fileListSearchInput');
-        const scopeSelect = document.getElementById('fileListSearchScope');
+        const input = (document.getElementById('fileListSearchInput') as HTMLInputElement);
+        const scopeSelect = (document.getElementById('fileListSearchScope') as HTMLSelectElement);
         if (!toggleBtn || !panel || !input || !scopeSelect || toggleBtn.dataset.bound === '1') return;
 
         toggleBtn.dataset.bound = '1';
@@ -2084,7 +2084,7 @@ import { createDiffFileWriter } from './conflict/live-files';
                 throw new Error(kgText('knowledgeGraphWasmRequired', '知识图谱需要 WASM 引擎，请先构建并启用 WASM'));
             }
 
-            await new Promise(function(resolve) {
+            await new Promise<void>(function(resolve) {
                 window.EChartsLoader.load(function() { resolve(); });
             });
             if (token !== knowledgeGraphBuildToken) return;
@@ -2218,10 +2218,10 @@ import { createDiffFileWriter } from './conflict/live-files';
     }
 
     function bindKnowledgeGraphControls() {
-        const groupSelect = document.getElementById('knowledgeGraphGroupBy');
-        const relationSelect = document.getElementById('knowledgeGraphRelationFilter');
-        const searchInput = document.getElementById('knowledgeGraphSearchInput');
-        const exportBtn = document.getElementById('knowledgeGraphExportBtn');
+        const groupSelect = (document.getElementById('knowledgeGraphGroupBy') as HTMLSelectElement);
+        const relationSelect = (document.getElementById('knowledgeGraphRelationFilter') as HTMLSelectElement);
+        const searchInput = (document.getElementById('knowledgeGraphSearchInput') as HTMLInputElement);
+        const exportBtn = (document.getElementById('knowledgeGraphExportBtn') as HTMLButtonElement);
 
         if (groupSelect) {
             groupSelect.addEventListener('change', function() {
@@ -2256,10 +2256,10 @@ import { createDiffFileWriter } from './conflict/live-files';
     function initKnowledgeGraphPanel() {
         if (knowledgeGraphPanelBound) return;
         const panel = document.getElementById('knowledgeGraphPanel');
-        const toggleBtn = document.getElementById('knowledgeGraphBtn');
-        const collapseBtn = document.getElementById('knowledgeGraphCollapseBtn');
-        const refreshBtn = document.getElementById('knowledgeGraphRefreshBtn');
-        const buildBtn = document.getElementById('knowledgeGraphBuildBtn');
+        const toggleBtn = (document.getElementById('knowledgeGraphBtn') as HTMLButtonElement);
+        const collapseBtn = (document.getElementById('knowledgeGraphCollapseBtn') as HTMLButtonElement);
+        const refreshBtn = (document.getElementById('knowledgeGraphRefreshBtn') as HTMLButtonElement);
+        const buildBtn = (document.getElementById('knowledgeGraphBuildBtn') as HTMLButtonElement);
 
         if (!panel || !toggleBtn) return;
         knowledgeGraphPanelBound = true;
@@ -3088,10 +3088,10 @@ import { createDiffFileWriter } from './conflict/live-files';
 
     function bindHistoryBatchEvents(fileId, filename) {
         // 全选/取消全选
-        const selectAllCheckbox = document.getElementById('historySelectAllCheckbox');
+        const selectAllCheckbox = (document.getElementById('historySelectAllCheckbox') as HTMLInputElement);
         const selectAllText = document.getElementById('historySelectAllText');
-        const batchDeleteBtn = document.getElementById('historyBatchDeleteBtn');
-        const clearAllBtn = document.getElementById('historyClearAllBtn');
+        const batchDeleteBtn = (document.getElementById('historyBatchDeleteBtn') as HTMLButtonElement);
+        const clearAllBtn = (document.getElementById('historyClearAllBtn') as HTMLButtonElement);
 
         if (selectAllCheckbox) {
             selectAllCheckbox.checked = false;
@@ -3139,7 +3139,7 @@ import { createDiffFileWriter } from './conflict/live-files';
 
     function updateHistoryBatchToolbar() {
         const selectedCountEl = document.getElementById('historySelectedCount');
-        const batchDeleteBtn = document.getElementById('historyBatchDeleteBtn');
+        const batchDeleteBtn = (document.getElementById('historyBatchDeleteBtn') as HTMLButtonElement);
         const selectAllText = document.getElementById('historySelectAllText');
 
         if (selectedHistoryVersions.size > 0) {
@@ -4567,7 +4567,7 @@ import { createDiffFileWriter } from './conflict/live-files';
         // 获取编辑器可搜索的DOM节点
         function getEditorElement() {
             if (isLongFileEditorActiveFor(g('currentFileId'))) {
-                return document.getElementById('longFileTextarea');
+                return (document.getElementById('longFileTextarea') as HTMLTextAreaElement);
             }
 
             const vditor = g('vditor');
@@ -4981,7 +4981,7 @@ import { createDiffFileWriter } from './conflict/live-files';
 
         function centerCurrentSelectionViaVditor() {
             if (isLongFileEditorActiveFor(g('currentFileId'))) {
-                const textarea = document.getElementById('longFileTextarea');
+                const textarea = (document.getElementById('longFileTextarea') as HTMLTextAreaElement);
                 if (!textarea) return false;
 
                 const before = textarea.value.slice(0, textarea.selectionStart || 0);

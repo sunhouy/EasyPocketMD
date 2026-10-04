@@ -2,7 +2,7 @@
 (function(global) {
     'use strict';
 
-    function g(name) { return global[name]; }
+    function g<K extends keyof Window>(name: K): Window[K] { return global[name]; }
     function isEn() { return window.i18n && window.i18n.getLanguage() === 'en'; }
 
     var currentModal = null;
@@ -316,13 +316,13 @@ Provide 5-10 most relevant Markdown examples. Only return the list, no explanati
             };
 
             btn.onmouseenter = function() {
-                this.style.background = window.nightMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)';
-                this.style.borderColor = 'var(--theme-accent, #4a90e2)';
+                (this as HTMLElement).style.background = window.nightMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)';
+                (this as HTMLElement).style.borderColor = 'var(--theme-accent, #4a90e2)';
             };
 
             btn.onmouseleave = function() {
-                this.style.background = window.nightMode ? '#3d3d3d' : '#f5f5f5';
-                this.style.borderColor = 'transparent';
+                (this as HTMLElement).style.background = window.nightMode ? '#3d3d3d' : '#f5f5f5';
+                (this as HTMLElement).style.borderColor = 'transparent';
             };
 
             grid.appendChild(btn);
@@ -454,13 +454,13 @@ Provide 5-10 most relevant Markdown examples. Only return the list, no explanati
                 };
 
                 btn.onmouseenter = function() {
-                    this.style.background = nightMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)';
-                    this.style.borderColor = 'var(--theme-accent, #4a90e2)';
+                    (this as HTMLElement).style.background = nightMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)';
+                    (this as HTMLElement).style.borderColor = 'var(--theme-accent, #4a90e2)';
                 };
 
                 btn.onmouseleave = function() {
-                    this.style.background = nightMode ? '#3d3d3d' : '#f5f5f5';
-                    this.style.borderColor = 'transparent';
+                    (this as HTMLElement).style.background = nightMode ? '#3d3d3d' : '#f5f5f5';
+                    (this as HTMLElement).style.borderColor = 'transparent';
                 };
 
                 itemGrid.appendChild(btn);

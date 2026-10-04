@@ -1,5 +1,5 @@
 
-(function(global) {
+export const localImageApi = (function(global: Window) {
     'use strict';
 
     const localToBlobMap = new Map();
@@ -58,10 +58,10 @@
         return result;
     }
 
-    global.LocalImageManager = {
+    return global.LocalImageManager = {
         convertLocalToBlob,
         convertBlobToLocal,
         registerUrlPair
     };
 
-})(typeof window !== 'undefined' ? window : this);
+})(window);

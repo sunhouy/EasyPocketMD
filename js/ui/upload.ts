@@ -2,7 +2,7 @@
 (function(global) {
     'use strict';
 
-    function g(name) { return global[name]; }
+    function g<K extends keyof Window>(name: K): Window[K] { return global[name]; }
     function isEn() { return window.i18n && window.i18n.getLanguage() === 'en'; }
     function t(key) { return window.i18n ? window.i18n.t(key) : key; }
 
@@ -11,7 +11,7 @@
         input.type = 'file';
         input.multiple = true;
         input.onchange = async function(e) {
-            var files = Array.from(e.target.files || []);
+            var files = Array.from((e.target as HTMLInputElement).files || []);
             if (files.length > 0) {
                 global.hideMobileActionSheet();
                 try {
@@ -30,7 +30,7 @@
         input.accept = 'image/*';
         input.multiple = true;
         input.onchange = async function(e) {
-            var files = Array.from(e.target.files || []);
+            var files = Array.from((e.target as HTMLInputElement).files || []);
             if (files.length > 0) {
                 global.hideMobileActionSheet();
                 try {
@@ -198,7 +198,7 @@
 
     async function showStorageChoicePopup() {
         var t = function(key) { return window.i18n ? window.i18n.t(key) : key; };
-        return new Promise(resolve => {
+        return new Promise<{location: string; permanent: boolean} | null>(resolve => {
             const nightMode = g('nightMode') === true;
             const modal = document.createElement('div');
             modal.className = 'modal-overlay';
@@ -247,35 +247,35 @@
             const permanentCheckbox = content.querySelector('#storage-permanent');
 
             // Set initial state
-            cloudCard.style.borderColor = '#4CAF50';
-            cloudCard.style.background = nightMode ? '#2e4a30' : '#e8f5e9';
+            (cloudCard as HTMLElement).style.borderColor = '#4CAF50';
+            (cloudCard as HTMLElement).style.background = nightMode ? '#2e4a30' : '#e8f5e9';
 
-            localCard.onclick = () => {
+            (localCard as HTMLElement).onclick = () => {
                 selectedLocation = 'local';
-                localCard.style.borderColor = '#2196F3';
-                localCard.style.background = nightMode ? '#263d4d' : '#e3f2fd';
-                cloudCard.style.borderColor = 'transparent';
-                cloudCard.style.background = cardBg;
+                (localCard as HTMLElement).style.borderColor = '#2196F3';
+                (localCard as HTMLElement).style.background = nightMode ? '#263d4d' : '#e3f2fd';
+                (cloudCard as HTMLElement).style.borderColor = 'transparent';
+                (cloudCard as HTMLElement).style.background = cardBg;
             };
 
-            cloudCard.onclick = () => {
+            (cloudCard as HTMLElement).onclick = () => {
                 selectedLocation = 'cloud';
-                cloudCard.style.borderColor = '#4CAF50';
-                cloudCard.style.background = nightMode ? '#2e4a30' : '#e8f5e9';
-                localCard.style.borderColor = 'transparent';
-                localCard.style.background = cardBg;
+                (cloudCard as HTMLElement).style.borderColor = '#4CAF50';
+                (cloudCard as HTMLElement).style.background = nightMode ? '#2e4a30' : '#e8f5e9';
+                (localCard as HTMLElement).style.borderColor = 'transparent';
+                (localCard as HTMLElement).style.background = cardBg;
             };
 
-            content.querySelector('#storage-cancel').onclick = () => {
+            (content.querySelector('#storage-cancel') as HTMLElement).onclick = () => {
                 document.body.removeChild(modal);
-                resolve('cloud'); // fallback
+                resolve({location: 'cloud', permanent: false}); // fallback
             };
             
-            confirmBtn.onclick = () => {
+            (confirmBtn as HTMLElement).onclick = () => {
                 modal.remove();
                 resolve({
                     location: selectedLocation,
-                    permanent: permanentCheckbox.checked
+                    permanent: (permanentCheckbox as HTMLInputElement).checked
                 });
             };
 

@@ -2,6 +2,29 @@
   "extends": "./tsconfig.api.json",
   "compilerOptions": {
     "noEmit": true,
-    "isolatedModules": true
-  }
+    "isolatedModules": true,
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    "types": [
+      "node",
+      "jest"
+    ],
+    "rootDir": ".",
+    "moduleDetection": "force",
+    "moduleResolution": "bundler",
+    "module": "ESNext",
+    "allowImportingTsExtensions": true
+  },
+  "include": [
+    "tests/**/*.ts",
+    "types/**/*.d.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "api-dist"
+  ]
 }

@@ -3,6 +3,9 @@ const path = require('path');
 const crypto = require('crypto');
 
 class ApiManager {
+    declare apiFile: string;
+    declare encryptionKey: string;
+    declare algorithm: string;
     constructor() {
         this.apiFile = path.join(__dirname, '../api_info.json');
         this.encryptionKey = 'educoder_api_encryption_key_2025';

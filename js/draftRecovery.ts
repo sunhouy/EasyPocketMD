@@ -2,7 +2,7 @@
  * 草稿恢复模块
  * 仅用于“异常退出/重启后恢复”，不会在当前会话中反向覆盖正在编辑的内容。
  */
-(function(global) {
+export const draftRecoveryApi = (function(global: Window) {
     'use strict';
 
     const DRAFT_KEY = 'vditor_draft_backup';
@@ -335,7 +335,7 @@
         });
     }
 
-    global.draftRecovery = {
+    return global.draftRecovery = {
         init: init,
         markDirty: markDirty,
         backupNow: backupNow,

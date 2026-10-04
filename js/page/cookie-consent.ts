@@ -41,7 +41,7 @@
             }
 
             // 绑定“接受”按钮事件
-            const acceptBtn = document.getElementById('acceptCookiesBtn');
+            const acceptBtn = (document.getElementById('acceptCookiesBtn') as HTMLButtonElement);
             if (acceptBtn) {
                 acceptBtn.addEventListener('click', function() {
                     localStorage.setItem('cookieConsent', 'true');

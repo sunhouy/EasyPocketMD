@@ -22,7 +22,7 @@ export function applyThemeColor(value: unknown) {
 
 export function createThemeColorControls() {
     const input = document.getElementById('themeColorInput') as HTMLInputElement;
-    document.getElementById('themeColorResetBtn')!.addEventListener('click', () => { input.value = DEFAULT_THEME_COLOR; });
+    (document.getElementById('themeColorResetBtn') as HTMLButtonElement)!.addEventListener('click', () => { input.value = DEFAULT_THEME_COLOR; });
     return {
         open(value: unknown) { input.value = normalizeThemeColor(value); },
         get() { return normalizeThemeColor(input.value); }

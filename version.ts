@@ -15,7 +15,7 @@ function getCurrentVersion() {
   return 'v1';
 }
 
-function incrementVersion(currentVersion) {
+function incrementVersion(currentVersion: string) {
   const match = currentVersion.match(/v(\d+)/);
   if (match) {
     const num = parseInt(match[1], 10);

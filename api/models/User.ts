@@ -10,6 +10,8 @@ const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-producti
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
 
 class User {
+    declare adminConfig: {username:string;password:string};
+    declare baseUrl: string;
     constructor() {
         this.adminConfig = {
             username: process.env.ADMIN_USER || 'admin',
@@ -321,7 +323,7 @@ class User {
             const result = {
                 code: 200,
                 message: needUpdate ? '有新版本' : '不需要更新',
-                data: { need_update: needUpdate, force_update: forceUpdate }
+                data: { need_update: needUpdate, force_update: forceUpdate } as {need_update:number;force_update:number;latest_version?:string;update_content?:string;download_url?:string}
             };
 
             if (needUpdate) {

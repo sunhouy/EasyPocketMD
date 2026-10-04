@@ -686,7 +686,7 @@ async function runAction(action) {
 
         case 'videoCall': {
             var modal = document.getElementById('videoCallModalOverlay');
-            var iframe = document.getElementById('videoCallIframe');
+            var iframe = (document.getElementById('videoCallIframe') as HTMLIFrameElement);
             if (modal && iframe) {
                 var isDarkMode = window.nightMode || document.body.classList.contains('night-mode');
                 iframe.src = 'https://webrtc.yhsun.cn/' + (isDarkMode ? '?darkMode=true' : '');
@@ -765,8 +765,8 @@ function createPanel() {
     list.addEventListener('mousedown', function(event) {
         if (event.button !== 0) return;
 
-        var target = event.target;
-        var start = target && target.nodeType === 3 ? target.parentElement : target;
+        var target = event.target instanceof Node ? event.target : null;
+        var start = target instanceof Element ? target : target?.parentElement;
         var row = start && start.closest ? start.closest('.slash-command-item') : null;
         if (!row) return;
 
@@ -779,8 +779,8 @@ function createPanel() {
     var activateByEvent = function(event) {
         if (!event) return;
 
-        var target = event.target;
-        var start = target && target.nodeType === 3 ? target.parentElement : target;
+        var target = event.target instanceof Node ? event.target : null;
+        var start = target instanceof Element ? target : target?.parentElement;
         var row = start && start.closest ? start.closest('.slash-command-item') : null;
         if (!row) return;
 
@@ -860,7 +860,7 @@ function hidePanel() {
     state.slashContext = null;
 }
 
-function scheduleRefresh(delay) {
+function scheduleRefresh(delay?: number) {
     if (state.refreshTimer) {
         clearTimeout(state.refreshTimer);
     }
@@ -1409,7 +1409,7 @@ function bindDocumentEventsOnce() {
 
     document.addEventListener('pointerdown', function(event) {
         if (!state.visible) return;
-        var target = event.target;
+        var target = event.target instanceof Node ? event.target : null;
         if (state.panel && state.panel.contains(target)) return;
         if (state.editorElement && state.editorElement.contains(target)) return;
         hidePanel();

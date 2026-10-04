@@ -1,4 +1,4 @@
-(function(global) {
+export const wasmGatewayApi = (function(global: Window) {
     'use strict';
 
     const state = {
@@ -98,7 +98,7 @@
         return null;
     }
 
-    async function init(options) {
+    async function init(options: {modulePath?: string; moduleOptions?: Record<string, unknown>} = {}) {
         if (state.disabledByError) {
             return { code: 500, message: state.initError || 'text engine disabled' };
         }
@@ -207,12 +207,6 @@
         const left = Math.max(0, start - radius);
         const right = Math.min(source.length, end + radius);
         return source.slice(left, right);
-    }
-
-    function isHiddenCrossSearchFile(filename) {
-        const name = String(filename || '').trim();
-        if (!name) return false;
-        return /(^|[\/])\.[^\/]/.test(name);
     }
 
     function diff(leftText, rightText) {
@@ -439,7 +433,7 @@
         }
     }
 
-    global.wasmTextEngineGateway = {
+    return global.wasmTextEngineGateway = {
         init: init,
         ensureReady: ensureReady,
         diff: diff,
@@ -469,5 +463,5 @@
             };
         }
     };
-})(typeof window !== 'undefined' ? window : this);
+})(window);
 
