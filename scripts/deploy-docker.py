@@ -188,7 +188,8 @@ server {{
             write_atomic(print_vhost, new, 0o644)
         command(nginx, '-t')
         command(nginx, '-s', 'reload')
-        candidate = {'release': str(release), 'slot': slot, 'containers': names}
+        candidate = {'release': str(release), 'slot': slot, 'containers': names,
+                     'github_run_id': config.get('github_run_id')}
         write_atomic(release / '.activated', 'healthy\n')
         write_atomic(ROOT / ('state-' + channel + '.json'), json.dumps({'current': candidate, 'previous': current}))
         switched = True
@@ -205,30 +206,20 @@ server {{
                 remove(name)
 
 
-def cleanup_obsolete_releases():
-    """Keep current + previous images/CAS for both channels, but no old containers."""
+def cleanup_obsolete_releases(retained_releases=()):
+    """Keep only current images/CAS for both channels and explicit candidates."""
     try:
-        releases, active = set(), set()
+        releases, active = {Path(path).resolve() for path in retained_releases}, set()
         release_root = (ROOT / 'releases').resolve()
-        # A CI upload can run concurrently with cleanup. Protect fresh staged
-        # releases until activation, and failed uploads for one day.
-        for staged in release_root.iterdir():
-            if (staged.is_dir() and not staged.is_symlink()
-                    and not (staged / '.activated').exists()
-                    and time.time() - staged.stat().st_mtime < 86400):
-                releases.add(staged.resolve())
         for channel in ('main', 'dev'):
             state_file = ROOT / f'state-{channel}.json'
             if not state_file.exists():
                 continue
             state = json.loads(state_file.read_text())
-            for key in ('current', 'previous'):
-                record = state.get(key)
-                if not record:
-                    continue
+            record = state.get('current')
+            if record:
                 releases.add(Path(record['release']).resolve())
-                if key == 'current':
-                    active.update(record['containers'].values())
+                active.update(record['containers'].values())
         images, objects = set(), set()
         # Validate every retained manifest BEFORE deleting any artifacts.
         for release in releases:
@@ -268,15 +259,13 @@ def main():
     if channel not in ('main', 'dev'):
         raise RuntimeError('Invalid channel')
     ROOT.mkdir(parents=True, exist_ok=True)
+    if action == 'cleanup':
+        cleanup_obsolete_releases(sys.argv[3:])
+        return
     state_file = ROOT / ('state-' + channel + '.json')
     state = json.loads(state_file.read_text()) if state_file.exists() else {}
     current = state.get('current')
-    if action == 'rollback':
-        previous = state.get('previous')
-        if not previous:
-            raise RuntimeError('No previous Docker release available')
-        release = Path(previous['release'])
-    elif action == 'deploy':
+    if action == 'deploy':
         release = Path(sys.argv[3]).resolve()
     else:
         raise RuntimeError('Invalid action')
@@ -299,7 +288,7 @@ def main():
             if result.returncode:
                 print(f'Could not restore {name}; manual restart required', flush=True)
         raise
-    # Old connections get a grace period; rollback keeps the old immutable release.
+    # Rollback images live in GitHub artifacts; remove the old server containers.
     if current:
         for name in current['containers'].values():
             subprocess.run(['docker', 'stop', '--time', '5', name], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)

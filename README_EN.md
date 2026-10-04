@@ -36,8 +36,8 @@ Deployment verifies digests, checks disk and memory, runs health checks and swit
 
 1. Prepare a Linux amd64 server with Docker Engine, Python, rsync, MySQL, Redis and an Nginx TLS entry point. Aggregate sandbox resource limits require systemd, cgroup v2 and Docker's systemd cgroup driver.
 2. Configure database, Redis, JWT, site URL and administrator settings using the [environment variable list](.env.example). Store SSH connection and TLS settings in GitHub Actions secrets. Optional `SSL_EMAIL` supplies a renewal contact address.
-3. Run the **CI/CD** workflow with `deploy`; choose `rollback` to return to a retained previous successful Docker release and its images.
-4. Keep current and previous persistent data, images and cache objects. Back up the database and user files. Automatic TLS renewal still requires working DNS and a reachable HTTP validation endpoint.
+3. Run the **CI/CD** workflow with `deploy`; choose `rollback` to download the previous successful release from GitHub Actions artifacts. Each deployment archives images and public metadata as `docker-release-main` / `docker-release-dev` for 90 days; runtime secrets are excluded and regenerated from current Secrets. Expired artifacts or older deployments without an artifact require redeploying the desired Git commit.
+4. Obsolete server containers, images, releases and cached layers are cleaned before transfer/import and after activation; only each channel’s current release and its shared layers remain. Back up the database and user files. Automatic TLS renewal still requires working DNS and a reachable HTTP validation endpoint.
 
 See the [deployment guide](deploy/README.md) for server conventions, secrets, incremental transfer, resource budgets and certificates. This workflow targets the repository's existing server layout; adapt paths and Nginx routing for a different environment.
 

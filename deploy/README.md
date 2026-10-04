@@ -25,7 +25,9 @@ up your own deployment environment.
    images, checks artifacts and transfers the release.
 3. Verify the application's health, persistent files and HTTPS endpoint after
    switching to the new release.
-4. Retain a previous successful release and its required images for rollback.
+4. Images and public release metadata are archived in GitHub Actions artifacts
+   (`docker-release-main` / `docker-release-dev`, retained for 90 days).
+   Runtime secrets and TLS keys are excluded.
    Back up database and uploaded-file data separately.
 
 The Python sandbox is built and checked in CI as part of the release. To change its
@@ -40,8 +42,10 @@ reused across releases. The first deployment requires a complete transfer.
 Deleting the cache increases subsequent transfer size.
 
 Import verifies object digests and loaded image identity. Corrupt or missing
-objects stop deployment; retry after repairing or retransferring them. Keep the
-objects required by retained releases when cleaning disk space.
+objects stop deployment; retry after repairing or retransferring them. Cleanup runs under the deployment lock before transfer and import, then again
+after switching. Only current releases for both channels and the incoming
+candidate are protected; obsolete containers, image tags, releases and cache
+objects are removed. Previous releases occupy no server disk space.
 
 ## Resource limits and switching
 
@@ -51,9 +55,12 @@ servers may briefly stop this application's services to make room; deployment
 is not guaranteed to be interruption-free.
 
 Candidate services pass health and protocol checks before activation. Failure
-attempts to restore the previous release. The rollback action requires a retained
-successful Docker deployment; the first deployment has no earlier Docker release
-to restore. Check deployment logs if recovery cannot complete automatically.
+keeps the currently running release available. The rollback action reads the
+previous successful release’s GitHub run ID from server metadata, downloads its
+artifact in CI and transfers the images again, using current runtime Secrets.
+If the artifact has expired, or the previous deployment predates artifact
+archiving, redeploy the desired Git commit. The first deployment has no previous
+release to restore. Check deployment logs if recovery cannot complete automatically.
 
 ## TLS renewal
 
