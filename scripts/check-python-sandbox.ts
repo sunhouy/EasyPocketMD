@@ -2,6 +2,16 @@ import { runPythonSandbox } from '../api/services/python-sandbox';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 async function main() {
+    const prompts: string[] = [];
+    const interactive = await runPythonSandbox("name=input('姓名：')\nprint('你好',name)\nimport sys\nprint('下一行',sys.stdin.readline().strip())", undefined, async event => {
+        prompts.push(event.prompt);
+        return prompts.length === 1 ? '小明' : '第二行';
+    });
+    assert.equal(interactive.success, true, JSON.stringify(interactive));
+    assert.deepEqual(prompts, ['姓名：','']);
+    assert.match(interactive.output, /你好 小明/);
+    assert.match(interactive.output, /下一行 第二行/);
+    if (process.argv.includes('--input-only')) return;
     const result = await runPythonSandbox("import numpy, pandas, scipy, sympy, sklearn, seaborn, PIL, openpyxl\nimport matplotlib.pyplot as plt\nplt.plot([1,2],[3,4]); plt.title('中文图表'); plt.show()\nplt.figure(); plt.plot([3,2,1]); print('ok')");
     assert.equal(result.success, true, JSON.stringify(result));
     assert.equal(result.output.trim(), 'ok'); assert.equal(result.images.length, 2);
