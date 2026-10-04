@@ -66,7 +66,7 @@ export interface ActionSheetItem {
 export interface UserSettings {
     toolbarButtons?: string[];
     themeMode?: string;
-    live2d?: { enabled: boolean; model: 'shizuku' | 'koharu' };
+    live2d?: import('../js/main/live2d-models').Live2DPreference;
     uiMode?: string;
     fontSize?: string;
     vditorContentTheme?: string;
@@ -77,7 +77,6 @@ export interface UserSettings {
     enableSlashCommand?: boolean;
     slashCommandActivationKey?: string;
     mdFileAssociationEnabled?: boolean;
-    storageLocation?: string;
     defaultFileOpening?: string;
     defaultSorting?: string;
     keyboardShortcuts?: Record<string, string>;

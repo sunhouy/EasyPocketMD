@@ -959,7 +959,6 @@ document.addEventListener('DOMContentLoaded', function() {
             enableDebugMode: !!(debugModeCheckbox && debugModeCheckbox.checked),
             enableSlashCommand: slashCommandEnabledCheckbox ? slashCommandEnabledCheckbox.checked : true,
             slashCommandActivationKey: slashCommandActivationKeySelect ? (slashCommandActivationKeySelect.value || 'Tab') : 'Tab',
-            storageLocation: getCheckedRadioValue('storageLocation', 'cloud'),
             defaultFileOpening: getCheckedRadioValue('defaultFileOpening', 'lastEdited'),
             defaultSorting: getCheckedRadioValue('defaultSorting', 'modifiedTime'),
             mdFileAssociationEnabled: !!(mdAssociationCheckbox && mdAssociationCheckbox.checked),
@@ -1180,6 +1179,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // 加载用户配置
     window.userSettings = JSON.parse(localStorage.getItem('vditor_settings') || '{}');
+    delete (window.userSettings as any).storageLocation; // Retired setting: uploads always use the server.
     const backgroundControls = createBackgroundControls();
     const live2dControls = createLive2DControls();
     window.userSettings.themeMode = readThemeMode(window.userSettings);
@@ -2665,15 +2665,6 @@ document.addEventListener('DOMContentLoaded', function() {
             slashCommandActivationKeySelect.value = window.userSettings.slashCommandActivationKey || 'Tab';
         }
 
-        // 设置存储位置
-        var currentStorageLoc = window.userSettings.storageLocation || 'cloud';
-        var storageRadios = document.getElementsByName('storageLocation');
-        for (var i = 0; i < storageRadios.length; i++) {
-            if ((storageRadios[i] as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement).value === currentStorageLoc) {
-                (storageRadios[i] as HTMLInputElement).checked = true;
-            }
-        }
-
         // 设置默认文件打开方式
         var currentDefaultFileOpening = window.userSettings.defaultFileOpening || 'lastEdited';
         var defaultFileOpeningRadios = document.getElementsByName('defaultFileOpening');
@@ -3052,8 +3043,7 @@ document.addEventListener('DOMContentLoaded', function() {
             enableSlashCommand: window.userSettings.enableSlashCommand !== false,
             slashCommandActivationKey: window.userSettings.slashCommandActivationKey || 'Tab',
             keyboardShortcuts: getEffectiveKeyboardShortcuts(window.userSettings),
-            mdFileAssociationEnabled: window.userSettings.mdFileAssociationEnabled,
-            storageLocation: 'cloud'
+            mdFileAssociationEnabled: window.userSettings.mdFileAssociationEnabled
         };
 
         // Apply mode after settings are persisted and the dialog is closed.
@@ -3156,15 +3146,6 @@ document.addEventListener('DOMContentLoaded', function() {
         var mdAssociationCheckbox = (document.getElementById('mdAssociationCheckbox') as HTMLInputElement);
         if (mdAssociationCheckbox) {
             newSettings.mdFileAssociationEnabled = mdAssociationCheckbox.checked;
-        }
-
-        // 获取选中的存储位置
-        var storageRadios = document.getElementsByName('storageLocation');
-        for (var i = 0; i < storageRadios.length; i++) {
-            if ((storageRadios[i] as HTMLInputElement).checked) {
-                newSettings.storageLocation = (storageRadios[i] as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement).value;
-                break;
-            }
         }
 
         // 获取选中的默认文件打开方式

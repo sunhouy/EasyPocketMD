@@ -53,25 +53,6 @@
         usageInfo.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ' + t('loading');
         content.appendChild(usageInfo);
 
-        // Settings (Default Storage)
-        const settingsDiv = document.createElement('div');
-        settingsDiv.style.cssText = `margin-bottom:15px;padding:10px;background:${nightMode ? '#3d3d3d' : '#f8f9fa'};border-radius:8px;display:flex;align-items:center;justify-content:space-between;font-size:14px;`;
-        const currentLoc = window.userSettings.storageLocation || 'cloud';
-        settingsDiv.innerHTML = `
-            <span>${t('defaultStorageLocation')}:</span>
-            <select id="storage-location-select" style="background:${bg};color:${textColor};border:1px solid ${borderColor};border-radius:4px;padding:3px 8px;">
-                <option value="cloud" ${currentLoc === 'cloud' ? 'selected' : ''}>${t('storageCloud')}</option>
-                <option value="local" ${currentLoc === 'local' ? 'selected' : ''}>${t('storageLocal')}</option>
-            </select>
-        `;
-        content.appendChild(settingsDiv);
-        const select = settingsDiv.querySelector('#storage-location-select');
-        (select as HTMLElement).onchange = (e) => {
-            window.userSettings.storageLocation = (e.target as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement).value;
-            localStorage.setItem('vditor_settings', JSON.stringify(window.userSettings));
-            // global.showMessage(t('saveSuccess') || '保存成功', 'success');
-        };
-
         // File List
         const fileListContainer = document.createElement('div');
         fileListContainer.style.cssText = 'flex:1;overflow-y:auto;min-height:200px;border:1px solid ' + borderColor + ';border-radius:8px;padding:10px;';
@@ -269,12 +250,9 @@
                                         fileToUpload = new File([blob], file.originalName || file.name, { type: file.type });
                                     }
                                     
-                                    const oldTemp = window.tempStorageLocation;
-                                    window.tempStorageLocation = 'cloud';
                                     
                                     const cloudLink = await global.uploadFiles([fileToUpload], false);
                                     
-                                    window.tempStorageLocation = oldTemp;
                                     
                                     if (cloudLink) {
                                         const cloudUrl = cloudLink.match(/\((.*?)\)/)[1];

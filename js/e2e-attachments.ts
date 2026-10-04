@@ -100,30 +100,24 @@ export async function migrateMarkdown(content: string) {
         const response = await fetch(source); if (!response.ok) throw e2eError('e2eMigrationDownloadFailed');
         const blob = await response.blob();
         const name = decodeURIComponent(url.split(/[?#]/)[0].split('/').pop()) || 'attachment';
-        const link = await uploadEncrypted([new File([blob], name, { type:blob.type })],false);
+        const link = await uploadEncrypted([new File([blob], name, { type:blob.type })]);
         const newUrl = link.match(/\]\(([^)]+)\)$/)?.[1]; if (!newUrl) throw e2eError('e2eAttachmentEncryptFailed');
         converted.set(url,newUrl);
     }
     return content.replace(pattern, (match,url) => converted.has(url) ? match.replace(url,converted.get(url)) : match);
 }
-export async function uploadEncrypted(files: File[], local: boolean): Promise<string> {
+export async function uploadEncrypted(files: File[]): Promise<string> {
     const owner = window.currentUser?.username, fileId = window.currentFileId;
     const encrypted = [];
     for (const file of files) encrypted.push(await encryptFile(file));
-    let urls: string[];
-    if (local) {
-        urls = [];
-        for (const file of encrypted) urls.push(await (window.ResourceLoader as any).storeLocalFile(file));
-    } else {
-        const form = new FormData();
-        form.append('e2e_attachment','1');
-        form.append('username', window.currentUser.username); form.append('token', window.currentUser.token);
-        for (const file of encrypted) form.append('files[]',file);
-        const response = await fetch((window.getApiBaseUrl?.() || 'api') + '/files/upload', { method:'POST', body:form });
-        const result = await response.json();
-        if (!response.ok || !result.success || result.urls?.length !== files.length) throw e2eError('e2eAttachmentUploadFailed');
-        urls = result.urls;
-    }
+    const form = new FormData();
+    form.append('e2e_attachment','1');
+    form.append('username', window.currentUser.username); form.append('token', window.currentUser.token);
+    for (const file of encrypted) form.append('files[]',file);
+    const response = await fetch((window.getApiBaseUrl?.() || 'api') + '/files/upload', { method:'POST', body:form });
+    const result = await response.json();
+    if (!response.ok || !result.success || result.urls?.length !== files.length) throw e2eError('e2eAttachmentUploadFailed');
+    const urls: string[] = result.urls;
     if (window.currentUser?.username !== owner || window.currentFileId !== fileId) throw e2eError('e2eUploadTargetChanged');
     if (vault.state().config) vault.secrets();
     return urls.map((url,i) => markdown(files[i],url)).join('\n\n');
