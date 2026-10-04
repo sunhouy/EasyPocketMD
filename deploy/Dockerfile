@@ -5,7 +5,7 @@ FROM node:24-bookworm-slim AS app
 ENV NODE_ENV=production QT_QPA_PLATFORM=offscreen MARKITDOWN_PYTHON=/opt/python/bin/python
 WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends python3 python3-venv \
-    pandoc wkhtmltopdf fonts-noto-cjk ca-certificates curl libgomp1 libxml2 libtinfo6 \
+    pandoc wkhtmltopdf fonts-noto-cjk fonts-liberation ca-certificates curl libgomp1 libxml2 libtinfo6 \
     && rm -rf /var/lib/apt/lists/*
 COPY requirements.txt /tmp/requirements.txt
 RUN python3 -m venv /opt/python && /opt/python/bin/pip install --no-cache-dir -r /tmp/requirements.txt

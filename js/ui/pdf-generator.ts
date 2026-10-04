@@ -1,3 +1,5 @@
+import { applyMixedPdfFonts } from './pdf-text-fonts';
+import { exportFontStack, exportHeadingSizes } from '../../shared/export-typography';
 import { preparePdfResources } from './pdf-resources';
 import { cleanExportMath } from './export-math';
 import * as pdfjsLib from 'pdfjs-dist';
@@ -100,6 +102,8 @@ async function initPdfMakeWithChineseFonts() {
  */
 async function generatePDFLocal(htmlContent, settings) {
     const currentPdfMake = await initPdfMakeWithChineseFonts();
+    const { loadLatinPdfFont } = await import('./pdf-latin-fonts');
+    const latinFont = await loadLatinPdfFont(currentPdfMake, settings.englishFont);
 
     // 获取字体设置
     const titleFont = settings.titleFont || 'fangzhen';
@@ -203,13 +207,16 @@ async function generatePDFLocal(htmlContent, settings) {
         </div>
     `;
 
+    const headingSizes = exportHeadingSizes(settings);
     const pdfMakeContent = htmlToPdfmake(fullHtml, {
         defaultStyles: {
-            p: { fontSize: 12, lineHeight: 1.2, font: bodyFont },
-            h1: { fontSize: 24, bold: true, margin: [0, 0, 0, 10], font: titleFont },
-            h2: { fontSize: 20, bold: true, margin: [0, 0, 0, 8], font: titleFont },
-            h3: { fontSize: 16, bold: true, margin: [0, 0, 0, 6], font: titleFont },
-            h4: { fontSize: 14, bold: true, margin: [0, 0, 0, 4], font: titleFont },
+            p: { fontSize: Number(settings.bodyFontSize) || 12, lineHeight: Number(settings.lineHeight) || 1.5, font: bodyFont, alignment: settings.alignment || 'left' },
+            h1: { fontSize: headingSizes[1], alignment: settings.titleAlignment || 'left', bold: true, margin: [0, 0, 0, 10], font: titleFont },
+            h2: { fontSize: headingSizes[2], alignment: settings.titleAlignment || 'left', bold: true, margin: [0, 0, 0, 8], font: titleFont },
+            h3: { fontSize: headingSizes[3], alignment: settings.titleAlignment || 'left', bold: true, margin: [0, 0, 0, 6], font: titleFont },
+            h4: { fontSize: headingSizes[4], alignment: settings.titleAlignment || 'left', bold: true, margin: [0, 0, 0, 4], font: titleFont },
+            h5: { fontSize: headingSizes[5], bold: true, font: titleFont, alignment: settings.titleAlignment || 'left' },
+            h6: { fontSize: headingSizes[6], bold: true, font: titleFont, alignment: settings.titleAlignment || 'left' },
             img: { maxWidth: 500 } // 500pt 大约是 A4 页面去掉边距的宽度
         }
     });
@@ -245,10 +252,10 @@ async function generatePDFLocal(htmlContent, settings) {
     limitImageWidth(pdfMakeContent);
 
     const docDefinition = {
-        content: pdfMakeContent,
+        content: applyMixedPdfFonts(pdfMakeContent, latinFont, bodyFont),
         defaultStyle: {
             font: bodyFont,
-            fontSize: 12
+            fontSize: Number(settings.bodyFontSize) || 12
         },
         pageMargins: [
             (settings.pageMargin || 15) * 2.83465,
@@ -309,8 +316,8 @@ export async function generatePDF(htmlContent, settings, filename?: string) {
         <head>
             <meta charset="UTF-8">
             <style>
-                body { font-family: "${bodyFont}", "宋体", serif; }
-                h1, h2, h3, h4, h5, h6 { font-family: "${titleFont}", "黑体", sans-serif; }
+                body { font-family: ${exportFontStack(settings || {})}; }
+                h1, h2, h3, h4, h5, h6 { font-family: ${exportFontStack(settings || {}, true)}; }
                 img { max-width: 100%; height: auto; page-break-inside: avoid; display: block; margin: 10px auto; }
                 table { border-collapse: collapse; width: 100%; page-break-inside: avoid; }
                 tr { page-break-inside: avoid; page-break-after: auto; }

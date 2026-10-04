@@ -1,3 +1,4 @@
+import { exportHeadingSizes, exportFontStack } from '../../shared/export-typography';
 import { afterDialogPaint, saveAfterDialogOpens } from './dialog-save';
 
 const global = window;
@@ -338,7 +339,7 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
                     <div>
                         <label style="display:block;margin-bottom:5px;font-size:14px;">${isEn() ? 'Base Title Font Size (H4)' : '基础标题字号 (H4)'}</label>
                         <div style="position:relative;">
-                            <input type="number" id="titleFontSize" value="24" min="8" max="72" style="width:100%;padding:8px;border:1px solid ` + borderColor + `;border-radius:6px;background:` + (nightMode ? '#3d3d3d' : 'white') + `;color:` + textColor + `;">
+                            <input type="number" id="titleFontSize" value="12" min="8" max="72" style="width:100%;padding:8px;border:1px solid ` + borderColor + `;border-radius:6px;background:` + (nightMode ? '#3d3d3d' : 'white') + `;color:` + textColor + `;">
                             <span style="position:absolute;right:10px;top:50%;transform:translateY(-50%);color:` + (nightMode ? '#aaa' : '#666') + `;">pt</span>
                         </div>
                     </div>
@@ -350,7 +351,7 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
                         </div>
                     </div>
                     <div>
-                        <label style="display:block;margin-bottom:5px;font-size:14px;">${isEn() ? 'Title Font' : '标题字体'}</label>
+                        <label style="display:block;margin-bottom:5px;font-size:14px;">${isEn() ? 'Chinese Heading Font' : '中文标题字体'}</label>
                         <select id="titleFont" style="width:100%;padding:8px;border:1px solid ` + borderColor + `;border-radius:6px;background:` + (nightMode ? '#3d3d3d' : 'white') + `;color:` + textColor + `;">
                             <option value="SimHei">${isEn() ? 'SimHei (Bold)' : '黑体'}</option>
                             <option value="SimSun">${isEn() ? 'SimSun (Serif)' : '宋体'}</option>
@@ -358,11 +359,18 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
                         </select>
                     </div>
                     <div>
-                        <label style="display:block;margin-bottom:5px;font-size:14px;">${isEn() ? 'Body Font' : '正文字体'}</label>
+                        <label style="display:block;margin-bottom:5px;font-size:14px;">${isEn() ? 'Chinese Body Font' : '中文正文字体'}</label>
                         <select id="bodyFont" style="width:100%;padding:8px;border:1px solid ` + borderColor + `;border-radius:6px;background:` + (nightMode ? '#3d3d3d' : 'white') + `;color:` + textColor + `;">
                             <option value="SimHei">${isEn() ? 'SimHei (Bold)' : '黑体'}</option>
                             <option value="SimSun" selected>${isEn() ? 'SimSun (Serif)' : '宋体'}</option>
                             <option value="SimKai">${isEn() ? 'SimKai (Cursive)' : '楷体'}</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="display:block;margin-bottom:5px;font-size:14px;">${isEn() ? 'English Font' : '英文字体'}</label>
+                        <select id="englishFont" style="width:100%;padding:8px;border:1px solid ${borderColor};border-radius:6px;background:${nightMode ? '#3d3d3d' : 'white'};color:${textColor};">
+                            <option value="Times New Roman" selected>Times New Roman</option>
+                            <option value="Arial">Arial</option>
                         </select>
                     </div>
                     <div>
@@ -378,9 +386,9 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
                         <label style="display:block;margin-bottom:5px;font-size:14px;">${isEn() ? 'Line Height' : '行距'}</label>
                         <select id="lineHeight" style="width:100%;padding:8px;border:1px solid ` + borderColor + `;border-radius:6px;background:` + (nightMode ? '#3d3d3d' : 'white') + `;color:` + textColor + `;">
                             <option value="1.0">1.0${isEn() ? 'x' : '倍'}</option>
-                            <option value="1.2" selected>1.2${isEn() ? 'x' : '倍'} (${isEn() ? 'Default' : '默认'})</option>
+                            <option value="1.2">1.2${isEn() ? 'x' : '倍'}</option>
                             <option value="1.4">1.4${isEn() ? 'x' : '倍'}</option>
-                            <option value="1.5">1.5${isEn() ? 'x' : '倍'}</option>
+                            <option value="1.5" selected>1.5${isEn() ? 'x' : '倍'} (${isEn() ? 'Default' : '默认'})</option>
                             <option value="2.0">2.0${isEn() ? 'x' : '倍'}</option>
                         </select>
                     </div>
@@ -407,8 +415,8 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
                     <div>
         <label style="display:block;margin-bottom:5px;font-size:14px;">${isEn() ? 'Title Alignment' : '标题对齐'}</label>
         <div style="display:flex;gap:8px;">
-            <button class="title-align-btn" data-align="left" style="flex:1;padding:8px;background:${nightMode ? '#424242' : '#E0E0E0'};color:${textColor};border:none;border-radius:6px;cursor:pointer;">${isEn() ? 'Left' : '居左'}</button>
-            <button class="title-align-btn active" data-align="center" style="flex:1;padding:8px;background:#2196F3;color:white;border:none;border-radius:6px;cursor:pointer;">${isEn() ? 'Center' : '居中'}</button>
+            <button class="title-align-btn active" data-align="left" style="flex:1;padding:8px;background:#2196F3;color:white;border:none;border-radius:6px;cursor:pointer;">${isEn() ? 'Left' : '居左'}</button>
+            <button class="title-align-btn" data-align="center" style="flex:1;padding:8px;background:${nightMode ? '#424242' : '#E0E0E0'};color:${textColor};border:none;border-radius:6px;cursor:pointer;">${isEn() ? 'Center' : '居中'}</button>
             <button class="title-align-btn" data-align="right" style="flex:1;padding:8px;background:${nightMode ? '#424242' : '#E0E0E0'};color:${textColor};border:none;border-radius:6px;cursor:pointer;">${isEn() ? 'Right' : '居右'}</button>
         </div>
     </div>
@@ -439,27 +447,27 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
                     <div id="customHeadingInputs" style="display:grid;grid-template-columns:repeat(3, 1fr);gap:15px;opacity:0.5;pointer-events:none;transition:opacity 0.2s;">
                         <div>
                             <label style="display:block;margin-bottom:5px;font-size:12px;">H1 ${isEn() ? 'Font Size' : '字号'} (pt)</label>
-                            <input type="number" id="h1Size" value="36" style="width:100%;padding:6px;border:1px solid ${borderColor};border-radius:4px;background:${nightMode ? '#3d3d3d' : 'white'};color:${textColor};">
+                            <input type="number" id="h1Size" value="24" style="width:100%;padding:6px;border:1px solid ${borderColor};border-radius:4px;background:${nightMode ? '#3d3d3d' : 'white'};color:${textColor};">
                         </div>
                         <div>
                             <label style="display:block;margin-bottom:5px;font-size:12px;">H2 ${isEn() ? 'Font Size' : '字号'} (pt)</label>
-                            <input type="number" id="h2Size" value="31" style="width:100%;padding:6px;border:1px solid ${borderColor};border-radius:4px;background:${nightMode ? '#3d3d3d' : 'white'};color:${textColor};">
+                            <input type="number" id="h2Size" value="18" style="width:100%;padding:6px;border:1px solid ${borderColor};border-radius:4px;background:${nightMode ? '#3d3d3d' : 'white'};color:${textColor};">
                         </div>
                         <div>
                             <label style="display:block;margin-bottom:5px;font-size:12px;">H3 ${isEn() ? 'Font Size' : '字号'} (pt)</label>
-                            <input type="number" id="h3Size" value="26" style="width:100%;padding:6px;border:1px solid ${borderColor};border-radius:4px;background:${nightMode ? '#3d3d3d' : 'white'};color:${textColor};">
+                            <input type="number" id="h3Size" value="15" style="width:100%;padding:6px;border:1px solid ${borderColor};border-radius:4px;background:${nightMode ? '#3d3d3d' : 'white'};color:${textColor};">
                         </div>
                         <div>
                             <label style="display:block;margin-bottom:5px;font-size:12px;">H4 ${isEn() ? 'Font Size' : '字号'} (pt)</label>
-                            <input type="number" id="h4Size" value="24" style="width:100%;padding:6px;border:1px solid ${borderColor};border-radius:4px;background:${nightMode ? '#3d3d3d' : 'white'};color:${textColor};">
+                            <input type="number" id="h4Size" value="12" style="width:100%;padding:6px;border:1px solid ${borderColor};border-radius:4px;background:${nightMode ? '#3d3d3d' : 'white'};color:${textColor};">
                         </div>
                         <div>
                             <label style="display:block;margin-bottom:5px;font-size:12px;">H5 ${isEn() ? 'Font Size' : '字号'} (pt)</label>
-                            <input type="number" id="h5Size" value="21" style="width:100%;padding:6px;border:1px solid ${borderColor};border-radius:4px;background:${nightMode ? '#3d3d3d' : 'white'};color:${textColor};">
+                            <input type="number" id="h5Size" value="12" style="width:100%;padding:6px;border:1px solid ${borderColor};border-radius:4px;background:${nightMode ? '#3d3d3d' : 'white'};color:${textColor};">
                         </div>
                         <div>
                             <label style="display:block;margin-bottom:5px;font-size:12px;">H6 ${isEn() ? 'Font Size' : '字号'} (pt)</label>
-                            <input type="number" id="h6Size" value="19" style="width:100%;padding:6px;border:1px solid ${borderColor};border-radius:4px;background:${nightMode ? '#3d3d3d' : 'white'};color:${textColor};">
+                            <input type="number" id="h6Size" value="12" style="width:100%;padding:6px;border:1px solid ${borderColor};border-radius:4px;background:${nightMode ? '#3d3d3d' : 'white'};color:${textColor};">
                         </div>
                         <div style="grid-column:1/-1;margin-top:10px;display:flex;align-items:center;gap:10px;">
                             <label style="font-size:12px;">${isEn() ? 'Quick set decrement (pt)' : '快速设置递减量 (pt)'}:</label>
@@ -1164,6 +1172,7 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
         const settings = {
             titleFontSize: modalContent.querySelector('#titleFontSize').value,
             bodyFontSize: modalContent.querySelector('#bodyFontSize').value,
+            englishFont: modalContent.querySelector('#englishFont')?.value || 'Times New Roman',
             titleFont: modalContent.querySelector('#titleFont') ? modalContent.querySelector('#titleFont').value : 'SimHei',
             bodyFont: modalContent.querySelector('#bodyFont') ? modalContent.querySelector('#bodyFont').value : 'SimSun',
             pageMargin: modalContent.querySelector('#pageMargin').value,
@@ -1172,7 +1181,7 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
             titleSpacing: modalContent.querySelector('#titleSpacing').value,
             // 使用 active 类选择器
             alignment: (modalContent.querySelector('.align-btn.active')?.getAttribute('data-align')) || 'left',
-            titleAlignment: (modalContent.querySelector('.title-align-btn.active')?.getAttribute('data-align')) || 'center',
+            titleAlignment: (modalContent.querySelector('.title-align-btn.active')?.getAttribute('data-align')) || 'left',
             // New settings
             useCustomHeadingSizes: modalContent.querySelector('#useCustomHeadingSizes') ? modalContent.querySelector('#useCustomHeadingSizes').checked : false,
             h1Size: modalContent.querySelector('#h1Size') ? modalContent.querySelector('#h1Size').value : 36,
@@ -1197,37 +1206,17 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
         var tableHeaders = [];
         var tableRows = [];
         var alignment = settings.alignment || 'left';
-        var titleAlignment = settings.titleAlignment || 'center';
+        var titleAlignment = settings.titleAlignment || 'left';
 
         // 从 settings 中获取并计算打印尺寸
-        var bodyFontSize = parseInt(settings.bodyFontSize);
-        var titleFontSize = parseInt(settings.titleFontSize);
-        var lineHeight = parseFloat(settings.lineHeight || '1.2');
+        var bodyFontSize = parseFloat(settings.bodyFontSize) || 12;
+        var titleFontSize = parseFloat(settings.titleFontSize) || 12;
+        var lineHeight = parseFloat(settings.lineHeight || '1.5');
         var paragraphSpacing = parseFloat(settings.paragraphSpacing || '0.5');
         var titleSpacing = parseFloat(settings.titleSpacing || '0.8');
         var codeBlockLang = '';   // 声明变量用于保存代码块语言
 
-        // Calculate heading sizes
-        var headingSizes = {};
-        if (settings.useCustomHeadingSizes) {
-            headingSizes = {
-                1: parseInt(settings.h1Size),
-                2: parseInt(settings.h2Size),
-                3: parseInt(settings.h3Size),
-                4: parseInt(settings.h4Size),
-                5: parseInt(settings.h5Size),
-                6: parseInt(settings.h6Size)
-            };
-        } else {
-            headingSizes = {
-                1: titleFontSize * 1.5,
-                2: titleFontSize * 1.3,
-                3: titleFontSize * 1.1,
-                4: titleFontSize,
-                5: titleFontSize * 0.9,
-                6: titleFontSize * 0.8
-            };
-        }
+        var headingSizes = exportHeadingSizes(settings);
 
         function convertMarkdownElements(text) {
             text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
@@ -1426,36 +1415,20 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
     }
 
     function getPrintStyles(settings) {
-        var margin = settings.pageMargin + 'mm';
-        var bodyFontSize = parseInt(settings.bodyFontSize);
-        var titleFontSize = parseInt(settings.titleFontSize);
-        var lineHeight = parseFloat(settings.lineHeight || '1.2');
+        var margin = (Number(settings.pageMargin) || 15) + 'mm';
+        var bodyFontSize = parseFloat(settings.bodyFontSize) || 12;
+        var titleFontSize = parseFloat(settings.titleFontSize) || 12;
+        var lineHeight = parseFloat(settings.lineHeight || '1.5');
         var paragraphSpacing = parseFloat(settings.paragraphSpacing || '0.5');
         var titleSpacing = parseFloat(settings.titleSpacing || '0.8');
-        var titleAlignment = settings.titleAlignment || 'center';
+        var titleAlignment = settings.titleAlignment || 'left';
 
-        // Calculate heading sizes for CSS
-        var h1Size, h2Size, h3Size, h4Size, h5Size, h6Size;
-        if (settings.useCustomHeadingSizes) {
-            h1Size = parseInt(settings.h1Size);
-            h2Size = parseInt(settings.h2Size);
-            h3Size = parseInt(settings.h3Size);
-            h4Size = parseInt(settings.h4Size);
-            h5Size = parseInt(settings.h5Size);
-            h6Size = parseInt(settings.h6Size);
-        } else {
-            h1Size = titleFontSize * 1.5;
-            h2Size = titleFontSize * 1.3;
-            h3Size = titleFontSize * 1.1;
-            h4Size = titleFontSize;
-            h5Size = titleFontSize * 0.9;
-            h6Size = titleFontSize * 0.8;
-        }
+        const { 1: h1Size, 2: h2Size, 3: h3Size, 4: h4Size, 5: h5Size, 6: h6Size } = exportHeadingSizes(settings);
 
         return `
             @page { size: A4; margin: ${margin}; }
             body { 
-                font-family: "SimSun", "宋体", serif;
+                font-family: ${exportFontStack(settings)};
                 font-size: ${bodyFontSize}pt;
                 line-height: ${lineHeight};
                 color: #333;
@@ -1463,6 +1436,7 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
             }
             h1, h2, h3, h4, h5, h6 { 
                 text-align: ${titleAlignment};
+                font-family: ${exportFontStack(settings, true)};
                 font-weight: bold;
                 margin-top: ${titleSpacing}em;
                 margin-bottom: ${titleSpacing}em;
@@ -1493,7 +1467,7 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
             }
             li {
                 margin-bottom: 8px;
-                text-align: ${settings.alignment || 'center'};
+                text-align: ${settings.alignment || 'left'};
             }
             table {
                 width: 100%;

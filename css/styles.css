@@ -6078,3 +6078,24 @@ body.night-mode .desktop-quick-btn,
 body.night-mode .desktop-quick-btn:hover,
 body.night-mode .desktop-quick-btn[aria-pressed="true"],
 body.night-mode .desktop-quick-btn i { color: #fff; }
+
+/* Export templates: compact choices, no generated-slide preview. */
+.ppt-template-picker { border:0;padding:0;margin:18px 0 10px;min-width:0; }
+.ppt-template-picker legend { font-size:14px;margin-bottom:8px; }
+.ppt-template-grid { display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px; }
+.ppt-template-option { display:flex;align-items:center;gap:7px;padding:9px;border:1px solid #888;border-radius:8px;cursor:pointer;font-size:12px; }
+.ppt-template-option:has(input:checked) { outline:2px solid var(--theme-accent,#4a90e2);outline-offset:-2px; }
+.ppt-template-option input { margin:0;accent-color:var(--theme-accent,#4a90e2); }
+.ppt-template-swatch { width:34px;height:25px;border-radius:3px;flex-shrink:0;border:1px solid #888; }
+.ppt-template-credit { font-size:12px;opacity:.8; }
+.ppt-template-credit a { color:var(--theme-accent,#4a90e2); }
+
+/* The tree shrinks and scrolls; actions stay inside the available viewport. */
+body.ui-mode-mobile:not(.file-management-mode) .file-list-sidebar,
+body.tauri-mobile-safe-area:not(.file-management-mode) .file-list-sidebar {
+    max-height:calc(100dvh - var(--top-toolbar-offset) - var(--top-toolbar-height) - 80px - var(--safe-area-bottom,0px));
+}
+.file-list-sidebar #fileList { flex:1 1 auto;min-height:0;overscroll-behavior:contain; }
+.file-list-header-actions { gap:4px;margin:0; }
+.file-list-header-actions > * { width:30px;height:30px;min-width:30px;box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;margin:0;padding:0;flex-shrink:0; }
+.file-list-actions { max-height:40dvh;overflow-y:auto; }

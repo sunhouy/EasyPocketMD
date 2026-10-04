@@ -17,12 +17,12 @@ Write notes, assemble a report, add formulas and diagrams, or keep analysis code
 - **Keep results with the code.** Run Python in an isolated server Docker sandbox with interactive input, Chinese Matplotlib fonts and common scientific libraries. Upload files or open the file manager and terminal from the code block toolbar. Copy output, download artifacts or insert them into your document. Move, resize, maximize or minimize the output window.
 - **Keep writing offline.** Local saving and cloud sync include file status icons and local-file labels. Resolve changes that cannot merge automatically in a two-column diff view; compare and restore history. Access to native local files depends on browser or app permissions.
 - **Control how you share.** Choose view-only or editable links, follow collaborator cursors and review editing history. End-to-end encryption protects private documents, with account password, dedicated password or passkey unlock options.
-- **Bring your own AI.** Configure a compatible model endpoint for writing, formulas and diagrams. Export a document as a presentation: send the generated prompt to a text model, paste its complete JSON response back, then preview, edit and download the slides.
+- **Bring your own AI.** Configure a compatible model endpoint for writing, formulas and diagrams. Export a document as a presentation: send the generated prompt to a text model, paste its complete JSON response back, then choose a bundled template and directly download the slides.
 - **Make the workspace yours.** Light/dark mode, editor backgrounds, accent colors, outline navigation, word/Token counts and a movable, resizable find-and-replace window. The interface supports Chinese and English.
 
 ### Take your work with you
 
-Import Markdown, text or Word documents; export Markdown, text, PDF, Word and PPT. Server conversion tools support PDF/Word export. Formula, diagram and font rendering depends on the format and conversion engine; review exported layouts. AI, cloud sync, collaboration, Python and some export features require configured services.
+Import Markdown, text or Word documents; export Markdown, text, HTML, PDF, Word, PPT and XLSX. XLSX extracts Markdown tables into separate sheets and preserves the source document. PPT offers seven bundled designs adapted from MIT-licensed templates, with direct download after JSON import. HTML/PDF/Word use left-aligned headings and independent Chinese/English fonts; English defaults to Times New Roman with compatible fallbacks. Server conversion tools support PDF/Word export. Formula, diagram and font rendering depends on the format and conversion engine; review exported layouts. AI, cloud sync, collaboration, Python and some export features require configured services.
 
 ## Docker deployment: build in CI, run on your server
 
