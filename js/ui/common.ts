@@ -1,3 +1,4 @@
+import { applyEditorNightMode } from '../main/view-settings';
 
 (function(global) {
     'use strict';
@@ -70,36 +71,9 @@
     }
 
     function toggleNightMode() {
-        global.nightMode = !global.nightMode;
-        if (global.nightMode) {
-            document.body.classList.add('night-mode');
-            // var modeToggle = document.getElementById('modeToggle');
-            // if (modeToggle) modeToggle.innerHTML = '<i class="fas fa-sun"></i>'; // Managed by UI elsewhere usually?
-            // Re-enabling as per original code logic if element exists
-            var modeToggle = document.getElementById('modeToggle');
-            if (modeToggle) modeToggle.innerHTML = '<i class="fas fa-sun"></i>';
-
-            localStorage.setItem('vditor_night_mode', 'true');
-            if (typeof global.applyVditorThemes === 'function') {
-                global.applyVditorThemes(global.userSettings);
-            } else if (g('vditor')) {
-                g('vditor').setTheme('dark');
-            }
-            syncThemeColor();
-            global.showMessage(window.i18n ? window.i18n.t('switchedToNight') : '已切换到夜间模式');
-        } else {
-            document.body.classList.remove('night-mode');
-            var modeToggle = document.getElementById('modeToggle');
-            if (modeToggle) modeToggle.innerHTML = '<i class="fas fa-moon"></i>';
-            localStorage.setItem('vditor_night_mode', 'false');
-            if (typeof global.applyVditorThemes === 'function') {
-                global.applyVditorThemes(global.userSettings);
-            } else if (g('vditor')) {
-                g('vditor').setTheme('classic');
-            }
-            syncThemeColor();
-            global.showMessage(window.i18n ? window.i18n.t('switchedToDay') : '已切换到日间模式');
-        }
+        applyEditorNightMode(global, !global.nightMode);
+        global.showMessage(window.i18n ? window.i18n.t(global.nightMode ? 'switchedToNight' : 'switchedToDay')
+            : (global.nightMode ? '已切换到夜间模式' : '已切换到日间模式'));
     }
 
     function getCurrentThemeColor() {

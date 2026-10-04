@@ -36,7 +36,7 @@ docs/
 emsdk/
 
 # Generated TypeScript app compilation cache
-tsconfig.app.tsbuildinfo
+*.tsbuildinfo
 
 # Python interpreter caches and Docker build/transfer intermediates
 **/__pycache__/

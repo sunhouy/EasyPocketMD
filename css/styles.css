@@ -6048,3 +6048,9 @@ body.night-mode .file-list-actions .add-file-btn.folder { background:#343840;col
 .desktop-quick-btn[aria-pressed="true"] { background:rgba(74,144,226,.12);color:var(--theme-accent,#4a90e2); }
 .desktop-quick-btn:focus-visible { outline:2px solid var(--theme-accent,#4a90e2);outline-offset:1px; }
 body.night-mode .desktop-quick-actions { background:#252830; }
+
+/* Desktop quick actions keep readable white icons in every dark-mode state. */
+body.night-mode .desktop-quick-btn,
+body.night-mode .desktop-quick-btn:hover,
+body.night-mode .desktop-quick-btn[aria-pressed="true"],
+body.night-mode .desktop-quick-btn i { color: #fff; }

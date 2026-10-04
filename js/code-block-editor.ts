@@ -1,3 +1,4 @@
+import { uiText, setUiText } from './i18n-messages';
 import { basicSetup } from 'codemirror';
 import { EditorState, StateEffect, StateField, Compartment } from '@codemirror/state';
 import { EditorView, Decoration, DecorationSet, keymap } from '@codemirror/view';
@@ -55,22 +56,22 @@ function createEditor(block: HTMLElement, source: HTMLElement, preview: HTMLElem
     const header = document.createElement('div'); header.className = 'epmd-code-header';
     const label = document.createElement('button');
     label.type = 'button'; label.className = 'epmd-code-language';
-    label.textContent = language || '纯文本'; label.title = '修改代码语言';
-    label.setAttribute('aria-label', '修改代码语言'); header.appendChild(label);
+    label.textContent = language || uiText('纯文本'); setUiText(label, uiText('修改代码语言'), 'title');
+    setUiText(label, uiText('修改代码语言'), 'aria-label'); header.appendChild(label);
     const editControls: HTMLButtonElement[] = [label];
     const snapshot = () => instance?.vditor?.undo?.addToUndoStack(instance.vditor);
     label.addEventListener('click', () => {
         if (readonlyBlock(block) || header.querySelector('input')) return;
         const input = document.createElement('input');
         input.className = 'epmd-code-language-input'; input.value = language;
-        input.placeholder = '语言名称（留空为纯文本）'; input.setAttribute('aria-label', '代码语言');
+        setUiText(input, uiText('语言名称（留空为纯文本）'), 'placeholder'); setUiText(input, uiText('代码语言'), 'aria-label');
         label.hidden = true; label.after(input); input.focus(); input.select();
         let finished = false;
         const finish = (commit: boolean) => {
             if (finished) return;
             const next = input.value.trim().toLowerCase();
             if (commit && !/^[a-z0-9_+#.-]*$/.test(next)) {
-                (window as any).showToast?.('语言名称只能包含字母、数字及 _ + # . -', 'error');
+                (window as any).showToast?.(uiText('语言名称只能包含字母、数字及 _ + # . -'), 'error');
                 input.focus(); return;
             }
             finished = true; input.remove(); label.hidden = false;
@@ -102,23 +103,25 @@ function createEditor(block: HTMLElement, source: HTMLElement, preview: HTMLElem
     });
     const actions = document.createElement('div'); header.appendChild(actions);
     function button(text: string, callback: () => void) {
-        const element = document.createElement('button'); element.type = 'button'; element.textContent = text;
+        const element = document.createElement('button'); element.type = 'button'; setUiText(element, text);
         element.addEventListener('click', callback); actions.appendChild(element); return element;
     }
     if (['python','py','javascript','js','typescript','ts','c','cpp','c++','html','htm'].includes(language)) {
-        button('运行', async () => {
+        button(uiText('运行'), async () => {
             const global = window as any;
             await global.ensureCodeRunnerLoaded?.();
             await global.runCodeBlock?.({language, code: view.state.doc.toString(), block: source, editor: view});
         });
     }
     if (['python','py'].includes(language)) {
-        for (const [text,tab] of [['上传','upload'],['文件','files'],['命令行','terminal']]) {
-            const control=button(text, async()=>{const global=window as any;await global.ensureCodeRunnerLoaded?.();await global.openCodeSandboxTools?.(tab,control);});
-            control.title=text==='上传'?'上传文件到 Python 沙箱用户目录':text==='文件'?'打开沙箱文件管理':'打开沙箱命令行';
-        }
+        const upload = button(uiText('上传'), async () => {
+            const global = window as any;
+            await global.ensureCodeRunnerLoaded?.();
+            await global.openCodeSandboxTools?.('upload', upload);
+        });
+        setUiText(upload, uiText('上传文件到 Python 沙箱用户目录'), 'title');
     }
-    button('复制', () => navigator.clipboard?.writeText(view.state.doc.toString()).catch(() => (window as any).showToast?.('复制失败，请手动选择代码复制', 'error')));
+    button(uiText('复制'), () => navigator.clipboard?.writeText(view.state.doc.toString()).catch(() => (window as any).showToast?.(uiText('复制失败，请手动选择代码复制'), 'error')));
     const editorParent = document.createElement('div'); host.append(header, editorParent);
     const renderDiagram = () => {
         const global = window as any;
@@ -132,11 +135,11 @@ function createEditor(block: HTMLElement, source: HTMLElement, preview: HTMLElem
     };
     let diagramToggle: HTMLButtonElement | undefined;
     if (diagram) {
-        const toggle = button('编辑代码', () => {
+        const toggle = button(uiText('编辑代码'), () => {
             const editing = editorParent.hidden;
             editorParent.hidden = !editing;
             preview.hidden = editing;
-            toggle.textContent = editing ? '查看图表' : '编辑代码';
+            setUiText(toggle, editing ? uiText('查看图表') : uiText('编辑代码'));
             if (editing) { view.requestMeasure(); view.focus(); }
             else renderDiagram();
         });
@@ -149,7 +152,7 @@ function createEditor(block: HTMLElement, source: HTMLElement, preview: HTMLElem
         preview.replaceChildren(host); preview.hidden = false; preview.dataset.render = '1';
     }
     let collapsed = false, editorWasHidden = editorParent.hidden, previewWasHidden = preview.hidden;
-    const fold = button('折叠', () => {
+    const fold = button(uiText('折叠'), () => {
         collapsed = !collapsed;
         if (collapsed) {
             editorWasHidden = editorParent.hidden; previewWasHidden = preview.hidden;
@@ -161,11 +164,11 @@ function createEditor(block: HTMLElement, source: HTMLElement, preview: HTMLElem
             view.requestMeasure();
         }
         if (diagramToggle) diagramToggle.hidden = collapsed;
-        fold.textContent = collapsed ? '展开' : '折叠';
+        setUiText(fold, collapsed ? uiText('展开') : uiText('折叠'));
         fold.setAttribute('aria-expanded', String(!collapsed));
     });
-    fold.setAttribute('aria-expanded', 'true'); fold.title = '折叠或展开代码';
-    const remove = button('删除', () => {
+    fold.setAttribute('aria-expanded', 'true'); setUiText(fold, uiText('折叠或展开代码'), 'title');
+    const remove = button(uiText('删除'), () => {
         if (readonlyBlock(block)) return;
         snapshot();
         const parent = block.parentElement;
@@ -187,7 +190,7 @@ function createEditor(block: HTMLElement, source: HTMLElement, preview: HTMLElem
         }
         notifyChanged(parent, instance); snapshot();
     });
-    remove.title = '删除整个代码块（可撤销）'; remove.className = 'epmd-code-delete';
+    setUiText(remove, uiText('删除整个代码块（可撤销）'), 'title'); remove.className = 'epmd-code-delete';
     editControls.push(remove);
     editControls.forEach(control => { control.disabled = readonlyBlock(block); });
     block.classList.add('epmd-custom-code-block');
