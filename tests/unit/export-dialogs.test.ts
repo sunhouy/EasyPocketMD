@@ -80,3 +80,20 @@ describe('immediate dialogs and PDF preview feedback', () => {
         expect(document.querySelector('.modal-overlay')).toBeNull();
     });
 });
+
+it('lets the cross-file result list own scrolling in normal and maximized find windows', async () => {
+    const fs = jest.requireActual('fs'); const path = require('node:path');
+    const layoutCss = fs.readFileSync(path.resolve(__dirname, '../../css/styles.css'), 'utf8');
+    const style = document.createElement('style'); style.textContent = layoutCss.slice(layoutCss.indexOf('/* The result list owns scrolling')); document.head.append(style);
+    app.currentFileId = 'a'; app.files = [{ id: 'a', name: 'a.md', type: 'file', content: 'needle' }];
+    app.vditor = { getValue: () => 'needle' }; app.showMessage = jest.fn();
+    app.wasmTextEngineGateway = { ensureReady: async () => ({ code: 200 }), searchFilesDetailed: () => ({ code: 200, data: { files: [{ doc_id: 'a', filename: 'a.md', matches: [{ start: 0, end: 6, snippet: 'needle' }], match_count: 1 }] } }) };
+    await app.showFindDialog();
+    const panel = document.getElementById('findDialogModal'), results = document.getElementById('wasmSearchResults');
+    expect(panel.style.overflow).toBe('hidden');
+    expect(results.style.maxHeight).toBe(''); expect(getComputedStyle(results).overflow).toBe('hidden');
+    document.getElementById('maximizeFindBtn').click();
+    expect(panel.style.height).toBe((window.innerHeight - 16) + 'px');
+    expect(getComputedStyle(document.getElementById('wasmSearchPanel')).flex).toBe('1 1 0px');
+    panel.closeFindDialog(); document.head.innerHTML = '';
+});

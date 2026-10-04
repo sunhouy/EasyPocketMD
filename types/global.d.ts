@@ -66,6 +66,7 @@ export interface ActionSheetItem {
 export interface UserSettings {
     toolbarButtons?: string[];
     themeMode?: string;
+    live2d?: { enabled: boolean; model: 'shizuku' | 'koharu' };
     uiMode?: string;
     fontSize?: string;
     vditorContentTheme?: string;
@@ -123,6 +124,8 @@ declare global {
         };
     }
     interface Window {
+        showAIQueryPanel: () => void;
+        importDroppedFiles: (files: File[], targetFolder?: string) => Promise<void>;
         Vditor: typeof Vditor;
         CodeRunner: typeof import("../js/code-runner").CodeRunnerConstructor;
         loginModalTimer?: ReturnType<typeof setTimeout>;
@@ -154,6 +157,7 @@ declare global {
         echarts?: typeof import('echarts');
         AIConfig: {
             get: typeof import('../js/ai-config').getAIConfig;
+            callEmbeddings: typeof import('../js/ai-config').callEmbeddings;
             save: typeof import('../js/ai-config').saveAIConfig;
             isReady: typeof import('../js/ai-config').isAIConfigReady;
             callChat: typeof import('../js/ai-config').callChat;

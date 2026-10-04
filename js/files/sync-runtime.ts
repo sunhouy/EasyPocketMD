@@ -842,7 +842,13 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
             return false;
         }
 
-        const resolvedPath = fileData.path || filePath || createBrowserLocalPath(fileData.name);
+        let resolvedPath = fileData.path || filePath || createBrowserLocalPath(fileData.name);
+        if (fileData.browserFileHandle?.isSameEntry) {
+            for (const existing of g('files').filter(f => f.localFileMode === 'browser-fsa')) {
+                const previous = browserFileHandleMap.get(existing.id) || await localHandleStore.get(existing.id).catch(() => null);
+                if (previous && await fileData.browserFileHandle.isSameEntry(previous)) { resolvedPath = existing.localFilePath; break; }
+            }
+        }
         const localFileMode = fileData.localFileMode || (global.electron ? 'electron' : 'browser-file');
 
         const files = g('files');

@@ -64,3 +64,19 @@ describe('User-wide document collection', () => {
         await expect(collectQueryDocuments({}, app)).rejects.toThrow('sign in again');
     });
 });
+
+it('reuses unchanged authorized cloud revisions and invalidates edited, deleted and account-switched content', async () => {
+    const { clearQueryFilesCache } = await import('../../js/ui/ai-query-files'); clearQueryFilesCache();
+    const app = { files: [], currentUser: { username: 'cache-owner', token: 'cache-token' } };
+    let revision = 1, exists = true, reads = 0;
+    global.fetch = jest.fn(async url => ({ ok: true, json: async () => {
+        if (url.includes('/content?')) { reads++; return { code: 200, data: { content: 'revision ' + revision } }; }
+        return { code: 200, data: { files: exists ? [{ name: 'a.md', content_version: revision }] : [] } };
+    } }));
+    await collectQueryDocuments({}, app); await collectQueryDocuments({}, app); expect(reads).toBe(1);
+    revision = 2; expect((await collectQueryDocuments({}, app)).documents[0].content).toBe('revision 2'); expect(reads).toBe(2);
+    exists = false; expect((await collectQueryDocuments({}, app)).documents).toEqual([]);
+    exists = true; await collectQueryDocuments({}, app); expect(reads).toBe(3);
+    app.currentUser = { username: 'another-owner', token: 'another-token' }; await collectQueryDocuments({}, app); expect(reads).toBe(4);
+    window.dispatchEvent(new Event('e2e-locked')); await collectQueryDocuments({}, app); expect(reads).toBe(5);
+});
