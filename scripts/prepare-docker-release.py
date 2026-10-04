@@ -9,7 +9,7 @@ from urllib.parse import urlparse
 
 root = Path('docker-control')
 root.mkdir(mode=0o700, exist_ok=True)
-for name in ('image-cas.py', 'sandbox-image-identity.py', 'deploy-docker.py', 'deploy-resources.py'):
+for name in ('image-cas.py', 'sandbox-image-identity.py', 'deploy-docker.py', 'deploy-resources.py', 'ssl-renewal.py'):
     shutil.copy2(Path('scripts') / name, root / name)
 for name in ('release.json', 'release.sha256'):
     shutil.copy2(Path('image-cas') / name, root / name)
@@ -31,7 +31,7 @@ wasm = {}
 for name in ('text_engine.js', 'text_engine.wasm', 'image_compressor.js', 'image_compressor.wasm'):
     relative = 'wasm_text_engine/' + name
     wasm[relative] = hashlib.sha256((Path('dist') / relative).read_bytes()).hexdigest()
-(root / 'config.json').write_text(json.dumps({'domain': domain, 'wasm': wasm,
+(root / 'config.json').write_text(json.dumps({'domain': domain, 'wasm': wasm, 'ssl_email': os.environ.get('SSL_EMAIL', ''),
     'version': json.loads(Path('package.json').read_text())['version']}))
 for variable, name in [('TLS_KEY', 'tls.key'), ('TLS_PEM', 'tls.pem')]:
     value = os.environ.get(variable)
