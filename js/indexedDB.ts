@@ -70,8 +70,9 @@ export const indexedDBApi = (function(global: Window) {
             
             const request = store.put(fileData);
             
-            request.onsuccess = () => resolve();
-            request.onerror = () => reject(request.error);
+            transaction.oncomplete = () => resolve();
+            transaction.onerror = () => reject(transaction.error || request.error);
+            transaction.onabort = () => reject(transaction.error || new Error("IndexedDB transaction aborted"));
         });
     }
 
@@ -140,8 +141,9 @@ export const indexedDBApi = (function(global: Window) {
             };
 
             const request = store.put(draftData);
-            request.onsuccess = () => resolve(draftData);
-            request.onerror = () => reject(request.error);
+            transaction.oncomplete = () => resolve(draftData);
+            transaction.onerror = () => reject(transaction.error || request.error);
+            transaction.onabort = () => reject(transaction.error || new Error("IndexedDB transaction aborted"));
         });
     }
 

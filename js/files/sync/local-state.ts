@@ -19,7 +19,7 @@ export function syncStatus(file: any, online: boolean, dirty: boolean): SyncStat
 }
 /** A small per-file journal avoids serializing the whole workspace for every edit. */
 const snapshotFields = ['content','lastModified','contentVersion','serverLastModified','crdtBaseContent','crdtBaseContentVersion','isSynced','contentLoaded','contentFetchedAt','e2e_enabled','e2eEnabled','localSyncedContent','localPendingWrite','remoteContentVersion','syncConflict','syncConflictRemoteContent','syncConflictVersion','syncConflictDiskContent'];
-export function persistFile(file: any, serialize?: (files: any[]) => string): void {
+export function persistFile(file: any, serialize?: (files: any[]) => string): boolean {
     const snapshot = { ...file }; delete snapshot.syncBusy;
     const data = serialize ? serialize([snapshot]) : JSON.stringify([snapshot]);
     let error: unknown;
@@ -29,6 +29,7 @@ export function persistFile(file: any, serialize?: (files: any[]) => string): vo
         if (error) (window as any).showMessage?.('本地保存失败，请导出备份：' + String(reason), 'error');
     });
     else if (error) throw error;
+    return !error;
 }
 function timestamp(value: any) { return typeof value === 'number' ? value : Date.parse(value || '') || 0; }
 function applySnapshot(file: any, saved: any) {

@@ -8,6 +8,7 @@
  *  - 取入 hooks 中由 runtime-core 提供的延迟回调（loadFiles/openFile 等），
  *    因为它们的定义仍位于 runtime-core 内部。
  */
+import { materializeParentFolders } from './tree/parent-folders';
 import { persistFile, restoreFiles, refreshSyncIcons, deviceId } from './sync/local-state';
 import {
     isExternalLocalFile as isExternalLocalFileCore,
@@ -335,22 +336,15 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
     }
 
     function ensureParentFolders(path) {
-        if (!path) return;
-        const files = g('files');
-        const parent = getParentPath(path);
-        if (parent === '') return;
-        const exists = files.some(f => f.name === parent && f.type === 'folder');
-        if (!exists) {
-            ensureParentFolders(parent);
-            const folder = {
-                id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-                name: parent,
-                type: 'folder',
-                content: '',
-                lastModified: Date.now(),
-                isSynced: false
-            };
-            files.push(folder);
+        try {
+            const created = materializeParentFolders(g('files'), path);
+            for (const folder of created) {
+                persistFile(folder, window.e2eSerializeFiles);
+                if (g('currentUser')) void global.syncFileToServer?.(folder.id);
+            }
+            return true;
+        } catch (error) {
+            global.customAlert?.(error.message); return false;
         }
     }
 
