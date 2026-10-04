@@ -1,3 +1,4 @@
+import { isEditorComposing, waitForEditorCommit, editorCompositionId } from '../editor-composition';
 import { mergeTextWithCrdt } from '../../shared/text-crdt';
 import '../../css/share-collaboration.css';
 import { createSharedReadOnlyGuard } from './share-readonly';
@@ -1171,7 +1172,7 @@ declare global { interface Window { sharedDocState: SharedDocumentState | null; 
     async function syncSharedDocContent(options: { manualSave?: boolean } = {}) {
         options = options || {};
         if (!window.sharedDocState || !window.sharedDocState.canEdit || !window.vditor) return false;
-        if (window.sharedDocState.isSaving) return false;
+        if (window.sharedDocState.isSaving || isEditorComposing(window)) return false;
 
         var currentContent = window.vditor.getValue();
         var manualSave = options.manualSave === true;
@@ -1238,6 +1239,7 @@ declare global { interface Window { sharedDocState: SharedDocumentState | null; 
                 })
             });
             const result = await response.json();
+            await waitForEditorCommit(window, editorCompositionId(window));
             if (window.sharedDocState !== savingState) return false;
             if (result.code === 200 && result.data) {
                 const draft = window.vditor?.getValue();
@@ -1281,6 +1283,7 @@ declare global { interface Window { sharedDocState: SharedDocumentState | null; 
     function scheduleSharedDocSync(options: { manualSave?: boolean } = {}) {
         options = options || {};
         if (!window.sharedDocState || !window.sharedDocState.canEdit) return options.manualSave ? Promise.resolve(false) : undefined;
+        if (isEditorComposing(window)) return options.manualSave ? Promise.resolve(false) : false;
         window.sharedDocState.lastLocalEditAt = Date.now();
         if (window.sharedDocState.saveTimer) {
             clearTimeout(window.sharedDocState.saveTimer);
@@ -1297,6 +1300,7 @@ declare global { interface Window { sharedDocState: SharedDocumentState | null; 
 
     async function pollSharedDocContent() {
         if (!window.sharedDocState) return;
+        const pollingState = window.sharedDocState;
         try {
             var apiUrl = (window.getApiBaseUrl ? window.getApiBaseUrl() : 'api') + '/share/poll';
             const response = await fetch(apiUrl, {
@@ -1312,7 +1316,8 @@ declare global { interface Window { sharedDocState: SharedDocumentState | null; 
                 })
             });
             const result = await response.json();
-            if (result.code !== 200 || !result.data) return;
+            await waitForEditorCommit(window, editorCompositionId(window));
+            if (window.sharedDocState !== pollingState || result.code !== 200 || !result.data) return;
             if (result.data.mode) window.sharedDocState.shareMode = result.data.mode;
             if (result.data.can_edit !== undefined && result.data.can_edit !== window.sharedDocState.canEdit) setSharePermission(result.data.can_edit);
 
@@ -1385,7 +1390,7 @@ declare global { interface Window { sharedDocState: SharedDocumentState | null; 
             }
         };
 
-        socket.onmessage = function(event) {
+        socket.onmessage = async function(event) {
             if (window.sharedDocState?.ws !== socket) return;
             var payload;
             try {
@@ -1467,6 +1472,11 @@ declare global { interface Window { sharedDocState: SharedDocumentState | null; 
                 return;
             }
 
+            if (payload.type === 'ready' || payload.type === 'doc_updated' || payload.type === 'conflict') {
+                const state = window.sharedDocState;
+                await waitForEditorCommit(window, editorCompositionId(window));
+                if (!state || window.sharedDocState !== state) return;
+            }
             if (payload.type === 'ready' || payload.type === 'doc_updated') {
                 if (payload.mode) window.sharedDocState.shareMode = payload.mode;
                 if (payload.can_edit !== undefined) setSharePermission(payload.can_edit === true);

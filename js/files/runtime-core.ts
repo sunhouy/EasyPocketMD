@@ -3,6 +3,7 @@
  */
 // @ts-nocheck
 import { floatingRunWindow } from '../code-runner-window';
+import { installEditorComposition, isEditorComposing, waitForEditorCommit } from '../editor-composition';
 import { AutoSaveScheduler } from './autoSave';
 import { persistFile, restoreFiles, restoreFileFromDB, refreshSyncIcons } from './sync/local-state';
 import { saveAfterDialogOpens } from '../ui/dialog-save';
@@ -25,6 +26,7 @@ import { createDiffFileWriter } from './conflict/live-files';
 
 (function(global) {
     'use strict';
+    installEditorComposition(global);
 
     function g<K extends keyof Window>(name: K): Window[K] { return global[name]; }
     
@@ -2759,6 +2761,11 @@ import { createDiffFileWriter } from './conflict/live-files';
 
     async function saveCurrentFile(isManual) {
         if (global.fileRelocationInProgress) return false;
+        if (isEditorComposing(global)) {
+            const composingFileId = g('currentFileId');
+            await waitForEditorCommit(global, composingFileId);
+            if (g('currentFileId') !== composingFileId) return false;
+        }
         isManual = isManual !== false;
         const currentFileId = g('currentFileId');
         const vditor = g('vditor');
@@ -3267,7 +3274,7 @@ import { createDiffFileWriter } from './conflict/live-files';
     const autoSaveScheduler = new AutoSaveScheduler({
         current: () => g('currentFileId'), dirty: isCurrentFileDirty,
         persist: persistDraftBackup, save: () => global.saveCurrentFile(false),
-        debounceMs: AUTO_SAVE_DEBOUNCE_MS, forceMs: AUTO_SAVE_FORCE_MS
+        debounceMs: AUTO_SAVE_DEBOUNCE_MS, forceMs: AUTO_SAVE_FORCE_MS, blocked: () => isEditorComposing(global)
     });
     function startAutoSave() { autoSaveScheduler.trigger(); }
     function clearAutoSave() { autoSaveScheduler.clear(); }
