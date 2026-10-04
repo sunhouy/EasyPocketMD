@@ -1582,10 +1582,10 @@ import { createDiffFileWriter } from './conflict/live-files';
 
     function createFileAtPath(path) {
         path = normalizePath(path);
-        ensureParentFolders(path);
+        if (!ensureParentFolders(path)) return;
         
         const files = g('files');
-        if (files.some(f => f.name === path && f.type === 'file')) {
+        if (files.some(f => f.name === path)) {
             g('customAlert')(isEn() ? 'File with the same name already exists' : '已存在同名文件');
             return;
         }
@@ -1611,7 +1611,7 @@ import { createDiffFileWriter } from './conflict/live-files';
     
     function createFolderAtPath(path) {
         path = normalizePath(path);
-        ensureParentFolders(path);
+        if (!ensureParentFolders(path)) return;
         const files = g('files');
         if (files.some(f => f.name === path)) {
             g('customAlert')(isEn() ? 'This path already exists' : '该路径已存在');
@@ -2441,24 +2441,15 @@ import { createDiffFileWriter } from './conflict/live-files';
         const parentPath = getSelectedFolderPath().replace(/\/$/, '');
         const defaultName = getNextAvailableName(baseName, parentPath);
         const defaultPath = parentPath ? parentPath + '/' + defaultName : defaultName;
-        g('customPrompt')(isEn() ? 'Please enter filename (to create in a folder, ensure the folder exists, e.g., docs/note)' : '请输入文件名（如需在文件夹中创建，请确保文件夹已存在，例如 docs/note）', { defaultValue: defaultPath }).then(function(input) {
+        g('customPrompt')(isEn() ? 'Please enter filename (e.g., docs/note; missing folders are created automatically)' : '请输入文件名（例如 docs/note，缺失的文件夹将自动创建）', { defaultValue: defaultPath }).then(function(input) {
             if (!input) return;
 
             let path = normalizePath(input);
             
-            // 检查父文件夹是否存在
-            const parentPath = getParentPath(path);
             const files = g('files');
-            
-            if (parentPath) {
-                const parentExists = files.some(f => f.name === parentPath && f.type === 'folder');
-                if (!parentExists) {
-                    g('customAlert')(isEn() ? 'Parent folder "' + parentPath + '" does not exist, please create it first using "New Folder"' : '父文件夹 "' + parentPath + '" 不存在，请先使用“新建文件夹”功能创建');
-                    return;
-                }
-            }
+            if (!ensureParentFolders(path)) return;
 
-            if (files.some(f => f.name === path && f.type === 'file')) {
+            if (files.some(f => f.name === path)) {
                 g('customAlert')(isEn() ? 'File with the same name already exists, please use another name' : '已存在同名文件，请使用其他名称');
                 return;
             }
@@ -2494,7 +2485,7 @@ import { createDiffFileWriter } from './conflict/live-files';
             if (!input) return;
 
             let path = normalizePath(input);
-            ensureParentFolders(path);
+            if (!ensureParentFolders(path)) return;
 
             const files = g('files');
             if (files.some(f => f.name === path)) {
@@ -4082,7 +4073,7 @@ import { createDiffFileWriter } from './conflict/live-files';
                             );
                             if (!input) { resolve(false); return; }
                             const path = normalizePath(input);
-                            ensureParentFolders(path);
+                            if (!ensureParentFolders(path)) { resolve(false); return; }
                             const files = g('files');
                             if (files.some(function(f) { return f.name === path && f.type === 'file'; })) {
                                 g('customAlert')(isEn() ? 'File already exists' : '文件已存在');

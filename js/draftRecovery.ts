@@ -11,12 +11,13 @@ export const draftRecoveryApi = (function(global: Window) {
 
     let backupTimer = null;
     let isDirty = false;
+    let fallbackDraft: any = null;
 
     function readDraft() {
         try {
             const raw = localStorage.getItem(DRAFT_KEY);
-            if (!raw) return null;
-            const draft = JSON.parse(raw);
+            const stored = raw ? JSON.parse(raw) : null;
+            const draft = fallbackDraft && (!stored || fallbackDraft.timestamp > stored.timestamp) ? { ...fallbackDraft } : stored;
             if (!draft || !draft.fileId || typeof draft.content !== 'string') {
                 return null;
             }
@@ -25,6 +26,16 @@ export const draftRecoveryApi = (function(global: Window) {
         } catch (error) {
             return null;
         }
+    }
+
+    async function loadIndexedDraft() {
+        if (!global.IndexedDBManager?.getAllDrafts) return;
+        const username = global.currentUser?.username;
+        try {
+            const drafts = await global.IndexedDBManager.getAllDrafts();
+            if (global.currentUser?.username !== username) return;
+            fallbackDraft = drafts.filter(draft => draft?.fileId && typeof draft.content === 'string').sort((a, b) => b.timestamp - a.timestamp)[0] || null;
+        } catch { /* Keep the synchronous draft available if IndexedDB is unavailable. */ }
     }
 
     function isCurrentSessionDraft(draft) {
@@ -79,22 +90,24 @@ export const draftRecoveryApi = (function(global: Window) {
             return;
         }
 
+        const snapshotContent = draft.content;
         try {
             const currentFile = getCurrentFileRecord();
             if (window.E2EVault?.state().config && [true,1,'1','true'].includes((currentFile?.e2e_enabled ?? currentFile?.e2eEnabled) as any)) draft.content = (window.e2eEncryptSync as any)(draft.content, null);
-            localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
-            localStorage.setItem(DRAFT_META_KEY, JSON.stringify({
-                lastBackupTime: Date.now(),
-                fileId: draft.fileId,
-                fileName: draft.fileName,
-                sessionId: draft.sessionId
-            }));
-            if (global.IndexedDBManager && typeof global.IndexedDBManager.saveDraft === 'function') {
-                Promise.resolve(global.IndexedDBManager.saveDraft(draft)).catch(function(error) {
-                    console.warn('[Draft] Failed to persist IndexedDB backup:', error);
-                });
+            let synchronous = false;
+            try {
+                localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+                synchronous = true;
+                localStorage.setItem(DRAFT_META_KEY, JSON.stringify({ lastBackupTime: Date.now(), fileId: draft.fileId, fileName: draft.fileName, sessionId: draft.sessionId }));
+            } catch (error) {
+                if (!global.IndexedDBManager?.saveDraft) throw error;
             }
-            isDirty = false;
+            if (global.IndexedDBManager?.saveDraft) {
+                Promise.resolve(global.IndexedDBManager.saveDraft(draft)).then(() => {
+                    if (getCurrentFileRecord()?.id === draft.fileId && getCurrentEditorSnapshot()?.content === snapshotContent) isDirty = false;
+                }).catch(error => { if (!synchronous) global.showMessage?.('草稿保存失败，请导出备份：' + error.message, 'error'); });
+            }
+            if (synchronous) isDirty = false;
         } catch (error) {
             console.error('[Draft] Failed to save draft:', error);
         }
@@ -181,6 +194,7 @@ export const draftRecoveryApi = (function(global: Window) {
     }
 
     async function checkDraftRecoveryStatus() {
+        await loadIndexedDraft();
         try {
             const draft = readDraft();
             if (!draft || isCurrentSessionDraft(draft)) {
@@ -290,6 +304,7 @@ export const draftRecoveryApi = (function(global: Window) {
     function clearDraft() {
         try {
             const draft = readDraft();
+            fallbackDraft = null;
             localStorage.removeItem(DRAFT_KEY);
             localStorage.removeItem(DRAFT_META_KEY);
             if (global.IndexedDBManager) {

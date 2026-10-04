@@ -984,7 +984,7 @@
             <h2 data-i18n="aiAssistant">AI助手</h2>
         </div>
         <div class="ai-main-content" style="flex:1;overflow-y:auto">
-            <!-- 主界面：四个功能按钮 -->
+            <!-- AI助手功能入口 -->
             <div id="aiMainMenu" class="ai-menu-grid">
                 <button class="ai-menu-btn" data-ai-action="write">
                     <i class="fas fa-pen-fancy"></i>
@@ -998,10 +998,31 @@
                     <i class="fas fa-magic"></i>
                     <span data-i18n="aiFormat">帮我排版</span>
                 </button>
+                <button class="ai-menu-btn" data-ai-action="query">
+                    <i class="fas fa-magnifying-glass"></i>
+                    <span data-i18n="aiQuery">AI查询</span>
+                </button>
                 <button class="ai-menu-btn" data-ai-action="ppt">
                     <i class="fas fa-file-powerpoint"></i>
                     <span data-i18n="aiPPT">生成PPT</span>
                 </button>
+            </div>
+            <!-- 跨文档 AI 查询 -->
+            <div id="aiQueryMenu" class="ai-submenu" style="display:none;">
+                <button class="ai-back-btn" data-back="main"><i class="fas fa-arrow-left"></i> <span data-i18n="back">返回</span></button>
+                <h3 data-i18n="aiQuery">AI查询</h3>
+                <p class="ai-query-hint" data-i18n="aiQueryHint">检索你的全部文档，结合跨文档信息回答并标明来源。查询会分批将正文发送到你配置的 AI 服务；文档较多时耗时更长。</p>
+                <label class="ai-query-encrypted"><input type="checkbox" id="aiQueryEncrypted"> <span data-i18n="aiQueryEncrypted">包括加密文档（需解锁，正文将发送到所配置的 AI 服务）</span></label>
+                <div class="ai-input-area">
+                    <label for="aiQueryInput" data-i18n="aiQueryQuestion">你想从文档中了解什么？</label>
+                    <textarea id="aiQueryInput" maxlength="2000" placeholder="例如：汇总所有项目的待办事项，并说明来源。" data-i18n-placeholder="aiQueryPlaceholder"></textarea>
+                    <button class="ai-generate-btn" id="aiQueryRun" data-i18n="aiQueryRun">查询全部文档</button>
+                    <button class="ai-action-btn secondary" id="aiQueryCancel" hidden data-i18n="cancel">取消</button>
+                </div>
+                <p id="aiQueryStatus" role="status" aria-live="polite"></p>
+                <div id="aiQueryAnswer" class="ai-query-answer"></div>
+                <div id="aiQuerySources" class="ai-query-sources"></div>
+                <button class="ai-action-btn secondary" id="aiQueryCopy" hidden data-i18n="copy">复制</button>
             </div>
             <!-- 帮我写子菜单 -->
             <div id="aiWriteMenu" class="ai-submenu" style="display:none;">

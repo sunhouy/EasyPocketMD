@@ -71,7 +71,7 @@ export function normalizeChatUrl(baseUrl: string): string {
  * @param messages OpenAI 格式的 messages 数组
  * @returns 模型返回的文本内容
  */
-export async function callChat(messages: Array<{ role: string; content: string }>, opts?: { maxTokens?: number; temperature?: number }): Promise<string> {
+export async function callChat(messages: Array<{ role: string; content: string }>, opts?: { maxTokens?: number; temperature?: number; signal?: AbortSignal }): Promise<string> {
   const config = getAIConfig();
   if (!isAIConfigReady(config)) {
     const err: any = new Error('AI 模型未配置，请在“设置 - AI 模型”中填写 apiKey、baseUrl 与模型名称');
@@ -97,6 +97,7 @@ export async function callChat(messages: Array<{ role: string; content: string }
   let response: Response;
   try {
     response = await fetch(url, {
+      signal: opts?.signal,
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -105,6 +106,7 @@ export async function callChat(messages: Array<{ role: string; content: string }
       body: JSON.stringify(payload)
     });
   } catch (e) {
+    if (opts?.signal?.aborted) throw e;
     const err: any = new Error('无法连接 AI 服务，请检查 baseUrl 是否正确');
     err.cause = e;
     throw err;
@@ -131,7 +133,7 @@ export async function callChat(messages: Array<{ role: string; content: string }
 }
 
 /** 便捷方法：按 system / user 两条消息调用。 */
-export async function callText(systemPrompt: string, userPrompt: string, opts?: { maxTokens?: number; temperature?: number }): Promise<string> {
+export async function callText(systemPrompt: string, userPrompt: string, opts?: { maxTokens?: number; temperature?: number; signal?: AbortSignal }): Promise<string> {
   const messages = [
     { role: 'system', content: systemPrompt },
     { role: 'user', content: userPrompt }

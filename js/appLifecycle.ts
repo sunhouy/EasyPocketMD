@@ -1,3 +1,4 @@
+import { persistFile } from './files/sync/local-state';
 /**
  * 应用生命周期管理模块
  * 处理 Web 与桌面壳环境（Tauri）应用生命周期事件
@@ -57,6 +58,7 @@
     function emergencySave(options) {
         const opts = options || {};
         const allowRemoteSync = !!opts.allowRemoteSync;
+        let safelySaved = true;
         try {
             // 1. 立即备份当前草稿
             if (global.draftRecovery) {
@@ -75,7 +77,15 @@
                 if (fileIndex !== -1) {
                     files[fileIndex].content = content;
                     files[fileIndex].lastModified = Date.now();
-                    localStorage.setItem('vditor_files', window.e2eSerializeFiles ? window.e2eSerializeFiles(files) : JSON.stringify(files));
+                    const locallySaved = persistFile(files[fileIndex], window.e2eSerializeFiles);
+                    if (!locallySaved) {
+                        safelySaved = false;
+                        global.unsavedChanges ||= {}; global.unsavedChanges[currentFileId] = true;
+                    }
+                    if (locallySaved && global.unsavedChanges?.[currentFileId]) {
+                        // The journal is durable; remote synchronization remains pending.
+                        global.unsavedChanges[currentFileId] = false;
+                    }
                     if (global.currentUser && typeof global.markPendingServerSync === 'function') {
                         global.markPendingServerSync(currentFileId, true);
                     }
@@ -87,8 +97,7 @@
                 global.syncCurrentFileWithBeacon();
             }
 
-            // console.log('[Lifecycle] Emergency save completed');
-            return true;
+            return safelySaved;
         } catch (e) {
             console.error('[Lifecycle] Emergency save failed:', e);
             return false;
@@ -140,7 +149,7 @@
             // 2. 保存所有未保存的文件到 localStorage
             const files = global.files || [];
             const currentFileId = global.currentFileId;
-            let hasChanges = false;
+            let fullySaved = true;
 
             files.forEach(function(file) {
                 if (file.type !== 'file') return;
@@ -155,24 +164,22 @@
 
                 file.content = content;
                 file.lastModified = Date.now();
-                global.unsavedChanges[file.id] = false;
+                const locallySaved = persistFile(file, window.e2eSerializeFiles);
+                if (locallySaved) global.unsavedChanges[file.id] = false;
+                else fullySaved = false;
                 if (global.currentUser && typeof global.markPendingServerSync === 'function') {
                     global.markPendingServerSync(file.id, true);
                 }
-                hasChanges = true;
             });
 
-            if (hasChanges) {
-                localStorage.setItem('vditor_files', window.e2eSerializeFiles ? window.e2eSerializeFiles(files) : JSON.stringify(files));
-            }
 
             // 3. 清除草稿（因为已经正式保存）
-            if (global.draftRecovery) {
+            if (fullySaved && global.draftRecovery) {
                 global.draftRecovery.clearDraft();
             }
 
-            // console.log('[Lifecycle] Force save completed');
-            return true;
+            // IndexedDB fallback is asynchronous; retain the draft/leave guard until saved.
+            return fullySaved;
         } catch (e) {
             console.error('[Lifecycle] Force save failed:', e);
             return false;

@@ -6099,3 +6099,14 @@ body.tauri-mobile-safe-area:not(.file-management-mode) .file-list-sidebar {
 .file-list-header-actions { gap:4px;margin:0; }
 .file-list-header-actions > * { width:30px;height:30px;min-width:30px;box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;margin:0;padding:0;flex-shrink:0; }
 .file-list-actions { max-height:40dvh;overflow-y:auto; }
+
+/* Cross-document AI query: readable answers and expandable evidence. */
+.ai-query-hint { font-size: 13px; line-height: 1.6; opacity: .8; }
+.ai-query-encrypted { display: flex; align-items: flex-start; gap: 8px; font-size: 13px; line-height: 1.5; }
+.ai-query-answer { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.7; margin: 16px 0; user-select: text; }
+.ai-query-sources { overflow-wrap: anywhere; font-size: 13px; margin: 12px 0; }
+.ai-query-sources details { margin: 8px 0; }
+.ai-query-sources summary { cursor: pointer; }
+.ai-query-sources blockquote { white-space: pre-wrap; border-left: 3px solid var(--theme-accent, #4a90e2); margin: 8px 0; padding: 6px 10px; user-select: text; }
+#aiQueryStatus { font-size: 13px; overflow-wrap: anywhere; }
+#aiQueryRun:disabled { opacity: .6; cursor: wait; }

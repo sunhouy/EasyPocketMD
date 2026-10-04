@@ -24,6 +24,12 @@ Write notes, assemble a report, add formulas and diagrams, or keep analysis code
 
 Import Markdown, text or Word documents; export Markdown, text, HTML, PDF, Word, PPT and XLSX. XLSX extracts Markdown tables into separate sheets and preserves the source document. PPT offers seven bundled designs adapted from MIT-licensed templates, with direct download after JSON import. HTML/PDF/Word use left-aligned headings and independent Chinese/English fonts; English defaults to Times New Roman with compatible fallbacks. Server conversion tools support PDF/Word export. Formula, diagram and font rendering depends on the format and conversion engine; review exported layouts. AI, cloud sync, collaboration, Python and some export features require configured services.
 
+## Query all documents with AI
+
+Choose **AI Query** in the AI assistant to search cloud documents in every folder, local documents and unsaved editor drafts without opening each file. Answers combine findings across documents and show numbered sources with original excerpts. Each query builds an in-memory document graph using Markdown/wiki links, reads all available text in bounded batches and combines large sets of findings hierarchically.
+
+The feature uses the API URL, key and model already configured in Settings. Document text is sent to that AI service. Encrypted documents are excluded unless selected and unlocked; their decrypted text is then sent to the same service. Hidden configuration files are excluded, and decrypted text and query indexes are never persisted. Progress, cancellation and unreadable files are displayed. Larger document collections require more time and API usage; missing evidence is reported.
+
 ## Docker deployment: build in CI, run on your server
 
 Production deployment uses Docker. GitHub Actions builds the frontend and app, print, gateway and Python images, then transfers image content over SSH/rsync. **The deployment server does not fetch base images from Docker Hub/GHCR or install npm/pip dependencies**, useful when international downloads are unreliable.
