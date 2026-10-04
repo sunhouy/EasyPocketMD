@@ -1,3 +1,4 @@
+import { clientDownloadLinks, releaseVersion } from './client-downloads';
 (function(global) {
     'use strict';
 
@@ -5,13 +6,8 @@
     var VERSION_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
     var LAST_CHECK_AT_KEY = 'vditor_native_version_check_at';
     var LAST_DISMISSED_VERSION_KEY = 'vditor_native_version_dismissed';
-    var CLIENT_DOWNLOAD_LINKS = {
-        android: 'https://static.yhsun.cn/android/easypocketmd_android.apk',
-        windows: 'https://static.yhsun.cn/tauri/win/easypocketmd_windows.exe',
-        macos: 'https://static.yhsun.cn/tauri/macos/easypocketmd_macos.dmg',
-        linuxAppImage: 'https://static.yhsun.cn/tauri/linux/easypocketmd_linux.appimage',
-        linuxDeb: 'https://static.yhsun.cn/tauri/linux/easypocketmd_linux.deb'
-    };
+    let latestDownloadVersion = '';
+    let refreshingDownloads: Promise<any> | null = null;
 
     function isDesktopRuntime() {
         return !!(global.electron || global.__TAURI__ || (global.process && global.process.type));
@@ -65,35 +61,27 @@
         return '0.0.0';
     }
 
-    function getPreferredDownloadUrl() {
-        if (isDesktopRuntime()) {
-            var ua = (navigator.userAgent || '').toLowerCase();
-            if (ua.indexOf('android') !== -1) {
-                return CLIENT_DOWNLOAD_LINKS.android;
-            }
-            if (ua.indexOf('win') !== -1) {
-                return CLIENT_DOWNLOAD_LINKS.windows;
-            }
-            if (ua.indexOf('mac') !== -1) {
-                return CLIENT_DOWNLOAD_LINKS.macos;
-            }
-            if (ua.indexOf('linux') !== -1) {
-                return CLIENT_DOWNLOAD_LINKS.linuxDeb;
-            }
-            return CLIENT_DOWNLOAD_LINKS.windows;
-        }
-
-        return 'https://md.yhsun.cn/intro.html';
+    function getPreferredDownloadUrl(version) {
+        const links = getClientDownloadLinks(version);
+        const ua = (navigator.userAgent || '').toLowerCase();
+        if (ua.includes('android')) return links.android;
+        if (ua.includes('win')) return links.windows;
+        if (ua.includes('mac')) return links.macos;
+        if (ua.includes('linux')) return links.linuxDeb;
+        return links.windows;
     }
 
-    function getClientDownloadLinks() {
-        return {
-            android: CLIENT_DOWNLOAD_LINKS.android,
-            windows: CLIENT_DOWNLOAD_LINKS.windows,
-            macos: CLIENT_DOWNLOAD_LINKS.macos,
-            linuxAppImage: CLIENT_DOWNLOAD_LINKS.linuxAppImage,
-            linuxDeb: CLIENT_DOWNLOAD_LINKS.linuxDeb
-        };
+    function getClientDownloadLinks(version?) {
+        return clientDownloadLinks(version || latestDownloadVersion || getCurrentVersion());
+    }
+
+    function refreshClientDownloadLinks() {
+        if (!refreshingDownloads) {
+            refreshingDownloads = fetchRemoteVersion()
+                .then(version => getClientDownloadLinks(version))
+                .finally(() => { refreshingDownloads = null; });
+        }
+        return refreshingDownloads;
     }
 
     function getLanguage() {
@@ -147,7 +135,10 @@
             throw new Error('Version fetch failed: ' + response.status);
         }
         var text = await response.text();
-        return normalizeVersion(text);
+        const version = releaseVersion(text);
+        if (!version) throw new Error('Invalid release version');
+        latestDownloadVersion = version;
+        return version;
     }
 
     function buildPromptTexts(currentVersion, latestVersion) {
@@ -168,8 +159,8 @@
         };
     }
 
-    function openDownloadPage() {
-        var url = getPreferredDownloadUrl();
+    function openDownloadPage(version) {
+        var url = getPreferredDownloadUrl(version);
         try {
             if (global.nativeFileOps && typeof global.nativeFileOps.openExternalUrl === 'function') {
                 Promise.resolve(global.nativeFileOps.openExternalUrl(url)).catch(function() {
@@ -287,7 +278,7 @@
         var confirmed = await promptUserForUpdate(currentVersion, latestVersion);
         if (confirmed) {
             removeStorageItem(LAST_DISMISSED_VERSION_KEY);
-            openDownloadPage();
+            openDownloadPage(latestVersion);
             return {
                 code: 200,
                 message: 'update accepted',
@@ -314,4 +305,5 @@
     global.getCurrentAppVersion = getCurrentVersion;
     global.checkNativeAppVersionUpdate = checkNativeAppVersionUpdate;
     global.getClientDownloadLinks = getClientDownloadLinks;
+    global.refreshClientDownloadLinks = refreshClientDownloadLinks;
 })(typeof window !== 'undefined' ? window : this);

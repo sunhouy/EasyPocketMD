@@ -1,4 +1,5 @@
 import { defineConfig } from 'vite';
+import { clientDownloadLinks } from './js/client-downloads';
 import { useVditorVectorCharts } from './scripts/vditor-vector-charts';
 import { viteStaticCopy } from 'vite-plugin-static-copy';
 import { readFileSync, existsSync, writeFileSync, readFile, cpSync } from 'node:fs';
@@ -226,6 +227,17 @@ export default defineConfig({
     }
   },
   plugins: [
+    {
+      name: 'client-download-links',
+      transformIndexHtml(html) {
+        const links = clientDownloadLinks(appPackageVersion);
+        return html.replace(/__CLIENT_DOWNLOAD_(\w+)__/g, (_match, platform: string) => {
+          const url = links[platform as keyof typeof links];
+          if (!url) throw new Error('Unknown client download platform: ' + platform);
+          return url;
+        });
+      }
+    },
     {
       name: 'localize-scoped-vditor-assets',
       enforce: 'pre',
