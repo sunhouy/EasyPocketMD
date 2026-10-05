@@ -88,3 +88,16 @@ describe('Storage quota and code block focus regressions', () => {
         expect(document.activeElement).toBe(input);
     });
 });
+
+it('keeps the menu immediately after current status and lock after unlocking', () => {
+    const {refreshSyncIcons}=require('../../js/files/sync/local-state');
+    document.body.innerHTML='<div id="current_anchor"><span class="file-node-name">文件</span><button class="file-menu-btn">菜单</button></div>';
+    const globalRef={files:[{id:'current',type:'file',e2e_enabled:true}],E2EVault:{state:()=>({unlocked:true})}};
+    refreshSyncIcons(globalRef);
+    const anchor=document.getElementById('current_anchor');
+    expect(anchor.lastElementChild.className).toBe('file-menu-btn');
+    expect(anchor.lastElementChild.previousElementSibling.className).toBe('file-e2e-indicator');
+    globalRef.files[0].e2e_enabled=false;
+    refreshSyncIcons(globalRef);
+    expect(anchor.lastElementChild.previousElementSibling.className).toContain('file-sync-icon');
+});

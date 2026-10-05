@@ -1,7 +1,8 @@
+import { RUNNABLE_LANGUAGES } from '../shared/code-runner-languages';
 (function(global) {
     'use strict';
 
-    var SUPPORTED_LANGUAGES = new Set(['python', 'py', 'javascript', 'js', 'typescript', 'ts', 'html', 'htm', 'c', 'cpp', 'c++']);
+    var SUPPORTED_LANGUAGES = new Set<string>(RUNNABLE_LANGUAGES);
     var loadPromise = null;
     var lazyLoadInitialized = false;
 

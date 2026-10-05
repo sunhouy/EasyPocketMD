@@ -44,9 +44,24 @@ it('shows and copies Chinese error guidance without a Chinese explanation label'
     expect(writeText).toHaveBeenCalledWith(expect.stringContaining('“missing”'));
     expect(writeText.mock.calls[0][0]).not.toContain('中文解释');
 });
-it.each(['java','bash','shell','sh'])('sends %s code to the sandbox endpoint',async language=>{
+it.each(['c','cpp','c++','java','bash','shell','sh'])('sends %s code to the sandbox endpoint',async language=>{
     jest.mocked(fetch).mockImplementation(async()=>response({success:true,output:'hello',images:[]}));
     expect((await new window.CodeRunner().runCode(language,'source code')).success).toBe(true);
     const call=jest.mocked(fetch).mock.calls.find(([url])=>String(url).endsWith('/run'));
     expect(JSON.parse(call[1].body as string)).toMatchObject({language,code:'source code'});
+});
+
+it.each(['java','bash','shell','sh'])('offers a run button and current-language help for %s',async language=>{
+    document.querySelector('body > pre')?.remove();
+    document.body.insertAdjacentHTML('afterbegin',`<pre><code class="language-${language}">source code</code></pre>`);
+    const code=document.querySelector('body > pre code');code.getBoundingClientRect=()=>new DOMRect(0,0,300,100);
+    jest.mocked(fetch).mockImplementation(async url=>String(url).endsWith('/run')?response({success:true,output:'hello',images:[]}):response({success:true,token:'native-workspace'}));
+    window.addRunButtons(document);code.dispatchEvent(new MouseEvent('mousemove',{bubbles:true}));
+    (document.querySelector('.code-run-button') as HTMLElement).click();
+    await new Promise(resolve=>setTimeout(resolve,0));
+    (document.querySelector('[title="运行方式与环境"]') as HTMLElement).click();
+    const help=document.querySelector('.code-output').textContent;
+    expect(help).toContain('支持的语言：');
+    expect(help).not.toContain('Python 3.12');
+    expect(help).toContain(language==='java'?'Scanner':'read 等命令');
 });

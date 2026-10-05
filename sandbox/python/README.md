@@ -76,6 +76,10 @@ switching releases.
 
 Java 自动识别顶层公开类名，生成同名 `.java` 文件；支持 package，UTF-8 编译后按完整类名运行。源码与 class 放在临时编译目录，不作为用户文件返回。工作目录仍是用户的沙箱文件目录，上传文件和生成文件沿用现有机制。
 
-Bash/Shell 脚本由解释器读取，无需在 `/tmp` 执行文件。`bash`、`shell` 使用 Bash，`sh` 使用 POSIX Shell；当前这些语言为非交互运行，标准输入关闭，不通过 Python 的 input() 对话框提供输入。
+Bash/Shell 脚本由解释器读取，无需在 `/tmp` 执行文件。`bash`、`shell` 使用 Bash，`sh` 使用 POSIX Shell；这些语言支持在运行面板中交互输入，沿用现有输入协议。
 
 Actions 的 `check-python-sandbox.ts` 在新镜像中实际验证 Java 公开类、package、中文输出以及三个 Shell 别名，再按现有镜像流程发布。旧镜像缺少语言能力时拒绝执行，不回退到服务器宿主机。
+
+### C/C++ 与原生语言交互输入
+
+同一镜像包含 GCC/G++，C/C++ 使用 C17/C++17 原生编译，在单独的 32 MB 临时编译目录执行，源码和二进制不会成为用户文件。C/C++/Java/Bash/Shell 共享现有上传、文件管理和流式输入协议，支持 scanf、cin、Scanner、read 等连续输入。等待输入时暂停计算计时，输入仍受两分钟等待和五分钟会话上限限制，取消或断开连接会销毁容器及子进程。帮助仅展示当前代码块语言的说明和支持语言列表。
