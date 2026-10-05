@@ -189,10 +189,11 @@ test('encryption session expiry does not invalidate the account token', async()=
 test('clean cached content accepts a newer cloud revision without becoming a conflict',async()=>{
     const {installSyncRuntime}=await import('../../js/files/sync-runtime');
     const local={id:'note',name:'note.md',type:'file',content:'old',contentVersion:1,isSynced:true};
-    const app={files:[local],lastSyncedContent:{note:'old'},unsavedChanges:{},pendingServerSync:{}};
+    const app={currentUser:{username:'user',token:'token'},files:[local],lastSyncedContent:{note:'old'},unsavedChanges:{},pendingServerSync:{}};
     const rt=installSyncRuntime(app,{},{});
     rt.mergeFiles([local],[{name:'note.md',type:'file',content:'new',contentVersion:2,contentLoaded:true}]);
-    expect(app.files[0].content).toBe('new');expect(app.files[0].isSynced).toBe(true);expect(app.pendingServerSync.note).toBeUndefined();expect(app.files[0].syncConflict).not.toBe(true);
+    await rt.syncRuntimeApi.waitForFileSync();
+    expect(app.files[0].content).toBe('new');expect(app.files[0].isSynced).toBe(true);expect(app.pendingServerSync.note).not.toBe(true);expect(app.files[0].syncConflict).not.toBe(true);
 });
 
 test('metadata refresh preserves real local edits and their merge base',async()=>{

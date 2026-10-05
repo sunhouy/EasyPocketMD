@@ -18,22 +18,45 @@ export function syncStatus(file: any, online: boolean, dirty: boolean): SyncStat
     return dirty ? 'pending' : 'synced';
 }
 /** A small per-file journal avoids serializing the whole workspace for every edit. */
-const snapshotFields = ['content','createdAt','pendingCloudContent','pendingCloudBaseVersion','previousCloudContent','previousCloudBaseVersion','lastModified','contentVersion','serverLastModified','crdtBaseContent','crdtBaseContentVersion','isSynced','contentLoaded','contentFetchedAt','e2e_enabled','e2eEnabled','localSyncedContent','localPendingWrite','remoteContentVersion','syncConflict','syncConflictRemoteContent','syncConflictVersion','syncConflictDiskContent'];
+const snapshotFields = ['localCheckpointRevision','cloudSaveReceipts','content','createdAt','pendingCloudContent','pendingCloudBaseVersion','previousCloudContent','previousCloudBaseVersion','lastModified','contentVersion','serverLastModified','crdtBaseContent','crdtBaseContentVersion','isSynced','contentLoaded','contentFetchedAt','e2e_enabled','e2eEnabled','localSyncedContent','localPendingWrite','remoteContentVersion','syncConflict','syncConflictRemoteContent','syncConflictVersion','syncConflictDiskContent'];
+const journalWrites = new Map<string, Promise<any>>();
 export function persistFile(file: any, serialize?: (files: any[]) => string): boolean {
+    file.localCheckpointRevision = Number(file.localCheckpointRevision || 0) + 1;
     const snapshot = { ...file }; delete snapshot.syncBusy;
     const data = serialize ? serialize([snapshot]) : JSON.stringify([snapshot]);
     let error: unknown;
     try { localStorage.setItem('epm-file:' + file.id, data); } catch (reason) { error = reason; }
     const manager = (window as any).IndexedDBManager;
-    if (manager?.saveFile) void manager.saveFile('epm-file:' + file.id, data, 'application/json').catch((reason: unknown) => {
-        if (error) (window as any).showMessage?.('本地保存失败，请导出备份：' + String(reason), 'error');
-    });
+    if (manager?.saveFile) {
+        const key = 'epm-file:' + file.id;
+        const write = () => manager.saveFile(key, data, 'application/json');
+        // Start the first write immediately; subsequent writes must commit in order.
+        const previous = journalWrites.get(key);
+        const task = (previous ? previous.catch(() => {}).then(write) : Promise.resolve(write())).then(() => true).catch((reason: unknown) => {
+            if (error) (window as any).showMessage?.('本地保存失败，请导出备份：' + String(reason), 'error');
+            return false;
+        });
+        journalWrites.set(key, task);
+        void task.finally(() => { if (journalWrites.get(key) === task) journalWrites.delete(key); });
+    }
     else if (error) throw error;
     return !error;
 }
+/** Normal network saves may wait for DB durability when the synchronous cache is full. */
+export async function persistFileDurably(file: any, serialize?: (files: any[]) => string): Promise<boolean> {
+    try {
+        if (persistFile(file, serialize)) return true;
+        const task = journalWrites.get('epm-file:' + file.id);
+        return task ? (await task) === true : false;
+    } catch { return false; }
+}
 function timestamp(value: any) { return typeof value === 'number' ? value : Date.parse(value || '') || 0; }
 function applySnapshot(file: any, saved: any) {
-    if (!saved || timestamp(saved.lastModified) < timestamp(file.lastModified)) return;
+    if (!saved) return;
+    const savedRevision = Number(saved.localCheckpointRevision || 0);
+    const liveRevision = Number(file.localCheckpointRevision || 0);
+    if (savedRevision || liveRevision) { if (savedRevision <= liveRevision) return; }
+    else if (timestamp(saved.lastModified) < timestamp(file.lastModified)) return;
     for (const key of snapshotFields) {
         if (key in saved) file[key] = saved[key]; else if (key.startsWith('syncConflict')) delete file[key];
     }
@@ -45,9 +68,22 @@ export function restoreFiles(files: any[]): void {
     }
 }
 export async function restoreFileFromDB(file: any, manager: any): Promise<void> {
+    // Restore the synchronous checkpoint immediately, then compare DB's sequence.
+    // DB can be newer if localStorage ran out of space; it can also still be older.
+    try {
+        const local = JSON.parse(localStorage.getItem('epm-file:' + file.id) || 'null')?.[0];
+        if (local) applySnapshot(file, local);
+    } catch {}
     if (!manager?.getFile) return;
-    try { const saved = await manager.getFile('epm-file:' + file.id); if (saved?.data) applySnapshot(file, JSON.parse(saved.data)?.[0]); }
-    catch { /* The synchronous cache still remains available. */ }
+    const revision = file.localCheckpointRevision;
+    const content = file.content;
+    const modified = file.lastModified;
+    try {
+        const saved = await manager.getFile('epm-file:' + file.id);
+        if (file.localCheckpointRevision !== revision || file.content !== content || file.lastModified !== modified) return;
+        if (saved?.data) applySnapshot(file, JSON.parse(saved.data)?.[0]);
+    } catch { /* The in-memory draft still remains available. */ }
+
 }
 export function refreshSyncIcons(globalRef: any): void {
     for (const file of globalRef.files || []) {

@@ -7,7 +7,7 @@ import { floatingRunWindow } from '../code-runner-window';
 import { installEditorComposition, isEditorComposing, waitForEditorCommit } from '../editor-composition';
 import { AutoSaveScheduler } from './autoSave';
 import { checkpointCurrentFile } from './sync/checkpoint';
-import { persistFile, restoreFiles, restoreFileFromDB, refreshSyncIcons } from './sync/local-state';
+import { persistFile, persistFileDurably, restoreFiles, restoreFileFromDB, refreshSyncIcons } from './sync/local-state';
 import { saveAfterDialogOpens } from '../ui/dialog-save';
 import {
     computeDiff as computeDiffCore,
@@ -2812,7 +2812,16 @@ import { createDiffFileWriter } from './conflict/live-files';
             file.lastModified = Date.now();
         }
         if (isExternalLocalFile(file)) file.localPendingWrite = true;
-        localStorage.setItem('vditor_files', window.e2eSerializeFiles ? window.e2eSerializeFiles(files) : JSON.stringify(files));
+        if (contentChanged) {
+            g('unsavedChanges')[currentFileId] = true;
+            if (g('currentUser')) { file.isSynced = false; markPendingServerSync(currentFileId, true); }
+        }
+        if (!await persistFileDurably(file, window.e2eSerializeFiles)) {
+            if (isManual) showSaveStatus('failed');
+            return false;
+        }
+        try { localStorage.setItem('vditor_files', window.e2eSerializeFiles ? window.e2eSerializeFiles(files) : JSON.stringify(files)); }
+        catch { /* The current file is already durable in its journal/IndexedDB. */ }
         if (isManual) {
             showSaveStatus('saving');
         }

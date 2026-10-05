@@ -662,3 +662,13 @@ describe('strict offline conflict policy', () => {
         expect(result.code).toBe(409); expect(conn.execute).toHaveBeenCalledTimes(1);
     });
 });
+
+describe('idempotent strict save acknowledgements', () => {
+    it.each(['same text', ''])('does not increment versions for repeated content %j with a stale base', async content => {
+        const conn = {beginTransaction:jest.fn(async()=>{}),commit:jest.fn(async()=>{}),rollback:jest.fn(),release:jest.fn(),execute:jest.fn(async()=>[[{id:1,content,e2e_enabled:0,content_version:7,last_modified:'2026-10-05T00:00:00Z'}]])};
+        db.getConnection.mockResolvedValue(conn);
+        const result=await fileManager.saveFile('user','a.md',content,{base_content_version:1,base_content:'old'},{e2e_enabled:0,conflict_strategy:'strict'});
+        expect(result.code).toBe(200);expect(result.data.content_version).toBe(7);expect(result.data.content).toBe(content);
+        expect(conn.execute).toHaveBeenCalledTimes(1);expect(conn.commit).toHaveBeenCalled();expect(conn.rollback).not.toHaveBeenCalled();
+    });
+});

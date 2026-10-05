@@ -24,35 +24,28 @@ describe('move waits for background saves', () => {
         };
         api = createSyncRuntimeApi({
             globalRef: state, g: key => state[key], isExternalLocalFile: () => false,
-            getCurrentEditorContent: () => 'text', markPendingServerSync: jest.fn()
+            getCurrentEditorContent: () => 'text', markPendingServerSync: jest.fn(), tryHandleTokenExpired:async()=>false, isEn:()=>false
         });
         api.startAutoSync();
     });
     afterEach(() => { api.stopAutoSync(); jest.useRealTimers(); });
 
-    it('waits for websocket acknowledgement before allowing a move', async () => {
+    it('waits for the realtime HTTP acknowledgement before allowing a move', async () => {
+        let reply;
+        global.fetch = jest.fn(() => new Promise(resolve => { reply = resolve; }));
         await api.scheduleWebSocketSync('file');
         let completed = false;
         const waiting = api.waitForFileSync().then(() => { completed = true; });
-        await Promise.resolve();
+        for(let i=0;i<50&&!reply;i++) await Promise.resolve();
         expect(completed).toBe(false);
-        mockCallbacks.onFileSaved({ filename: 'a/note', content: 'text', code: 200 });
+        reply({json:async()=>({code:200,data:{content:'text',content_version:1}})});
         await waiting;
         expect(completed).toBe(true);
     });
-
-    it('does not move files whose websocket save has timed out', async () => {
+    it('rejects a failed realtime save and keeps the file pending', async () => {
+        global.fetch = jest.fn(async()=>({json:async()=>({code:500,message:'failed'})}));
         await api.scheduleWebSocketSync('file');
-        const failed = expect(api.waitForFileSync()).rejects.toThrow('保存尚未确认');
-        jest.advanceTimersByTime(15000);
-        await failed;
-    });
-
-    it('rejects a failed save and keeps the file pending', async () => {
-        await api.scheduleWebSocketSync('file');
-        const failed = expect(api.waitForFileSync()).rejects.toThrow('failed');
-        mockCallbacks.onFileSaved({ filename: 'a/note', code: 500, message: 'failed' });
-        await failed;
+        await expect(api.waitForFileSync()).rejects.toThrow('保存尚未确认');
         expect(state.files[0].isSynced).toBe(false);
         expect(state.unsavedChanges.file).toBe(true);
     });

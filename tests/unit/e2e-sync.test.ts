@@ -26,18 +26,21 @@ function fixture(enabled = 1) {
 }
 
 describe('E2E save representations', () => {
+    beforeEach(() => { localStorage.clear(); global.fetch = jest.fn(async (_, options) => ({json:async()=>({code:200,data:{content:JSON.parse(options.body).content,content_version:2,e2e_enabled:JSON.parse(options.body).e2e_enabled}})})); });
     afterEach(() => jest.restoreAllMocks());
-    it('encrypts the first websocket save and keeps its acknowledgement plaintext', async () => {
+    it('encrypts the first realtime HTTP save and keeps its acknowledgement plaintext', async () => {
         const { api, app } = fixture();
         api.startAutoSync();
         try {
             await api.scheduleWebSocketSync('note');
-            const sent = app.wsClient.send.mock.calls[0][0];
+            await api.waitForFileSync();
+            const sent = JSON.parse(fetch.mock.calls[0][1].body);
+            expect(app.wsClient.send).not.toHaveBeenCalled();
             expect(sent.content).not.toContain('正文');
             expect(sent.localSnapshot).toBeUndefined();
             expect(await e2e.decrypt(sent.content, 'secret')).toBe('# 正文');
             expect(sent.base_content).toBeUndefined();
-            await mockCallbacks.onFileSaved({ filename: 'note.md', content: sent.content, code: 200, content_version: 2, e2e_enabled: 1 });
+
             await api.waitForFileSync();
             expect(app.lastSyncedContent.note).toBe('# 正文');
             expect(app.files[0].contentLoaded).toBe(true);
@@ -47,7 +50,7 @@ describe('E2E save representations', () => {
     });
     it('decrypts inactive remote documents and never stores ciphertext as display content', async () => {
         const { api, app, file } = fixture();
-        app.currentFileId = 'another';
+        app.currentFileId = 'another'; app.lastSyncedContent.note = file.content; file.isSynced = true;
         api.startAutoSync();
         try {
             const cipher = await e2e.encrypt('remote plaintext', 'secret');
@@ -56,14 +59,18 @@ describe('E2E save representations', () => {
             expect(JSON.parse(localStorage.getItem('epm-file:note'))[0].content).toBe('remote plaintext');
         } finally { api.stopAutoSync(); }
     });
-    it('retains edits made after an encrypted websocket save', async () => {
+    it('retains edits made after an encrypted realtime save', async () => {
         const { api, app, edit } = fixture();
+        let reply;
+        fetch.mockImplementation(() => new Promise(resolve => { reply = resolve; }));
         api.startAutoSync();
         try {
             await api.scheduleWebSocketSync('note');
-            const sent = app.wsClient.send.mock.calls[0][0];
+            for (let i = 0; i < 50 && !reply; i++) await Promise.resolve();
+            const sent = JSON.parse(fetch.mock.calls[0][1].body);
             edit('newer draft');
-            await mockCallbacks.onFileSaved({ filename: 'note.md', content: sent.content, code: 200 });
+            reply({json:async()=>({code:200,data:{content:sent.content,content_version:2,e2e_enabled:1}})});
+            await api.waitForFileSync();
             expect(app.unsavedChanges.note).toBe(true);
             expect(app.pendingServerSync.note).toBe(true);
         } finally { api.stopAutoSync(); }

@@ -29,7 +29,7 @@ import {
     normalizeServerFileRecord as normalizeServerFileRecordCore,
     createSyncRuntimeApi
 } from './sync/index';
-import { isUntouchedGuestWelcome, hasLocalTextChanges } from './sync/revisions';
+import { isUntouchedGuestWelcome } from './sync/revisions';
 import { createLocalHandleStore, ensureHandlePermission } from './external/handles';
 import type { EditorRuntimeCtx } from './editor-runtime';
 
@@ -673,7 +673,7 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
     async function syncFileAfterSaveIfNeeded(currentFileId, file, content, isManual, contentChanged) {
         if (!g('currentUser')) {
             g('lastSyncedContent')[currentFileId] = content;
-            localStorage.setItem('vditor_files', window.e2eSerializeFiles ? window.e2eSerializeFiles(g('files')) : JSON.stringify(g('files')));
+            try { localStorage.setItem('vditor_files', window.e2eSerializeFiles ? window.e2eSerializeFiles(g('files')) : JSON.stringify(g('files'))); } catch { /* Current file has already been durably checkpointed. */ }
             return true;
         }
 
@@ -687,7 +687,7 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
                 const live = getCurrentEditorContent(currentFileId, file.content);
                 if (live !== g('lastSyncedContent')[currentFileId] || (isExternalLocalFile(file) && !['ready', 'copy'].includes(file.localAccessState))) return false;
                 if (isExternalLocalFile(file)) { file.localSyncedContent = g('lastSyncedContent')[currentFileId]; file.localCloudUsername = g('currentUser')?.username; }
-                localStorage.setItem('vditor_files', window.e2eSerializeFiles ? window.e2eSerializeFiles(g('files')) : JSON.stringify(g('files')));
+                try { localStorage.setItem('vditor_files', window.e2eSerializeFiles ? window.e2eSerializeFiles(g('files')) : JSON.stringify(g('files'))); } catch { /* Current file has already been durably checkpointed. */ }
                 markPendingServerSync(currentFileId, false);
                 return true;
             }
@@ -1095,7 +1095,7 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
                 });
 
                 const localFiles = (g('files')?.length ? g('files').map(f => ({ ...f })) : JSON.parse(localStorage.getItem('vditor_files') || '[]'));
-                restoreFiles(localFiles);
+                if (!g('files')?.length) restoreFiles(localFiles);
                 const pendingServerSyncState = g('pendingServerSync') || {};
                 const unsavedChangesState = g('unsavedChanges') || {};
                 global.pendingServerSync = pendingServerSyncState;
@@ -1575,131 +1575,13 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
 
         let hasLocalUpdate = false;
         const localByName = {};
-        files.forEach(function(file) {
-            if (!file || !file.name) return;
-            localByName[file.name] = file;
-        });
-
-        serverFiles.forEach(function(serverFile) {
-            if (!serverFile || !serverFile.name || localByName[serverFile.name]) return;
-            const serverLastModified = serverFile.serverLastModified || serverFile.lastModified || null;
-            const newFile = {
-                id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-                name: serverFile.name,
-                type: serverFile.type || 'file',
-                content: serverFile.type === 'folder' ? '' : (serverFile.content ?? ''),
-                contentLoaded: serverFile.type === 'folder' ? true : !isServerListContentMissing(serverFile.content),
-                contentFetchedAt: !isServerListContentMissing(serverFile.content) ? Date.now() : undefined,
-                createdAt: serverFile.createdAt ?? serverFile.created_at ?? null,
-                lastModified: serverLastModified,
-                serverLastModified: serverLastModified,
-                contentVersion: serverFile.contentVersion !== null && serverFile.contentVersion !== undefined
-                    ? Number(serverFile.contentVersion)
-                    : null,
-                e2e_enabled: isFileE2EEnabled(serverFile) ? 1 : 0,
-                e2eEnabled: isFileE2EEnabled(serverFile),
-                isSynced: true
-            };
-            files.push(newFile);
-            if (newFile.contentLoaded !== false) {
-                lastSyncedContent[newFile.id] = newFile.content;
-            }
-            unsavedChanges[newFile.id] = false;
-            hasLocalUpdate = true;
-        });
-
-        for (let i = files.length - 1; i >= 0; i--) {
-            const file = files[i];
-            if (!file || !file.name) continue;
-            if (isExternalLocalFile(file)) continue;
-            if (serverMap[file.name]) continue;
-
-            const editorContent = file.id === currentFileId
-                ? getCurrentEditorContent(currentFileId, file.content)
-                : file.content;
-            if (pendingServerSync[file.id] || unsavedChanges[file.id] || file.isSynced === false) continue;
-            if (String(file.id || '') === String(currentFileId || '') && file.type === 'file') {
-                // Keep consistent with initial load behavior: server deletion wins, remove locally.
-                if (file.id) {
-                    delete lastSyncedContent[file.id];
-                    delete unsavedChanges[file.id];
-                    delete pendingServerSync[file.id];
-                }
-                files.splice(i, 1);
-                global.currentFileId = null;
-                hasLocalUpdate = true;
-                if (typeof global.showMessage === 'function') {
-                    global.showMessage(getServerDeletedEditingMessage(file), 'warning');
-                } else if (typeof global.showSyncStatus === 'function') {
-                    global.showSyncStatus(getServerDeletedEditingMessage(file), 'warning');
-                }
-                continue;
-            }
-
-            if (pendingServerSync[file.id]) continue;
-            const baseContent = lastSyncedContent[file.id];
-            const hasLocalChanges = file.type === 'file'
-                ? (!file.isSynced || unsavedChanges[file.id] || editorContent !== baseContent)
-                : (!file.isSynced || unsavedChanges[file.id]);
-
-            if (hasLocalChanges) continue;
-
-            delete lastSyncedContent[file.id];
-            delete unsavedChanges[file.id];
-            delete pendingServerSync[file.id];
-            files.splice(i, 1);
-            if (file.id === currentFileId) {
-                global.currentFileId = null;
-            }
-            hasLocalUpdate = true;
+        for (const file of files) {
+            if (!file || file.type !== 'file' || isExternalLocalFile(file)) continue;
+            const remote = serverMap[file.name];
+            if (!remote) continue;
+            if (Number(remote.contentVersion) > Number(file.contentVersion || 0)) file.remoteContentVersion = remote.contentVersion;
+            if (remote.contentLoaded !== false) await global.reconcileRemoteFile(file, remote);
         }
-
-        files.forEach(function(file) {
-            if (!file || file.type !== 'file') return;
-            const meta = serverMap[file.name];
-            if (meta && Number(meta.contentVersion) > Number(file.contentVersion || 0)) {
-                file.remoteContentVersion = Number(meta.contentVersion);
-                if (!isExternalLocalFile(file) && meta.contentLoaded !== false) void global.reconcileRemoteFile?.(file, meta).catch(console.warn);
-            }
-            if (isExternalLocalFile(file)) return;
-            if (pendingServerSync[file.id]) return;
-
-            const serverFile = serverMap[file.name];
-            if (!serverFile || serverFile.type !== 'file') return;
-
-            const editorContent = file.id === currentFileId
-                ? getCurrentEditorContent(currentFileId, file.content)
-                : file.content;
-            const baseContent = lastSyncedContent[file.id];
-            const hasLocalChanges = !file.isSynced || unsavedChanges[file.id] || editorContent !== baseContent;
-            if (hasLocalChanges) return;
-
-            const e2eChanged = isFileE2EEnabled(file) !== isFileE2EEnabled(serverFile);
-            if (serverFile.contentLoaded === false || isServerListContentMissing(serverFile.content)) {
-                return;
-            }
-            if (serverFile.content !== editorContent || e2eChanged) {
-                file.content = serverFile.content;
-                file.contentLoaded = true;
-                file.contentFetchedAt = Date.now();
-                file.lastModified = serverFile.lastModified || file.lastModified || null;
-                file.serverLastModified = serverFile.serverLastModified || serverFile.lastModified || file.serverLastModified || null;
-                file.contentVersion = serverFile.contentVersion !== null && serverFile.contentVersion !== undefined
-                    ? Number(serverFile.contentVersion)
-                    : file.contentVersion;
-                file.e2e_enabled = isFileE2EEnabled(serverFile) ? 1 : 0;
-                file.e2eEnabled = isFileE2EEnabled(serverFile);
-                file.isSynced = true;
-                delete file.serverDeleted;
-                delete file.serverDeletedNotified;
-                lastSyncedContent[file.id] = serverFile.content;
-                unsavedChanges[file.id] = false;
-                if (file.id === currentFileId) {
-                    setEditorContentForFile(currentFileId, serverFile.content, { preserveCursor: true });
-                }
-                hasLocalUpdate = true;
-            }
-        });
 
         if (hasLocalUpdate) {
             localStorage.setItem('vditor_files', window.e2eSerializeFiles ? window.e2eSerializeFiles(files) : JSON.stringify(files));
@@ -1767,12 +1649,12 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
                     const index = mergedFiles.indexOf(cloud); if (index >= 0) mergedFiles.splice(index, 1);
                     // Preserve the old content base so the server can merge concurrent edits.
                     if (typeof localFile.localSyncedContent === 'string') lastSyncedContent[localFile.id] = localFile.localSyncedContent;
-                    else { lastSyncedContent[localFile.id] = ''; localFile.contentVersion = 0; localFile.serverLastModified = null; }
+                    else { delete lastSyncedContent[localFile.id]; }
                     if (localFile.content !== cloud.content || cloud.contentLoaded === false) {
                         localFile.isSynced = false; markPendingServerSync(localFile.id, true);
                     }
                 }
-                mergedFiles.push(Object.assign({}, localFile));
+                mergedFiles.push((g('files') || []).find(file => file.id === localFile.id) || localFile);
                 return;
             }
             const mergedServerFile = fileMap[localFile.name];
@@ -1781,48 +1663,22 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
                     mergedServerFile.id = localFile.id;
                     mergedServerFile.createdAt ||= localFile.createdAt ?? localFile.created_at;
                 }
-                const localBaseContent = localFile && localFile.id ? (localFile.crdtBaseContent ?? lastSyncedContent[localFile.id] ?? (localFile.isSynced ? localFile.content : undefined)) : undefined;
                 if (localFile.type === 'file' && mergedServerFile.type === 'file') {
-                    const e2eChanged = isFileE2EEnabled(localFile) !== isFileE2EEnabled(mergedServerFile);
-                    const dirty = hasLocalTextChanges(localFile, localBaseContent, !!(pendingServerSync[localFile.id] || unsavedChanges[localFile.id]));
-                    if (Number(mergedServerFile.contentVersion || 0) < Number(localFile.contentVersion || 0)) {
-                        Object.assign(mergedServerFile, localFile);
-                    } else if (!dirty && mergedServerFile.contentLoaded !== false) {
-                        mergedServerFile.isSynced = true;
-                        mergedServerFile.crdtBaseContent = mergedServerFile.content;
-                        mergedServerFile.crdtBaseContentVersion = mergedServerFile.contentVersion;
-                        if (localFile.id === g('currentFileId') && localFile.content !== mergedServerFile.content) setEditorContentForFile(localFile.id, mergedServerFile.content, { preserveCursor: true });
-                        delete pendingServerSync[localFile.id]; delete unsavedChanges[localFile.id];
-                    } else if (mergedServerFile.contentLoaded === false) {
-                        const remoteVersion = mergedServerFile.contentVersion;
-                        Object.assign(mergedServerFile, localFile);
-                        mergedServerFile.remoteContentVersion = remoteVersion;
-                        if (typeof localBaseContent === 'string') mergedServerFile.crdtBaseContent = localBaseContent;
-                        mergedServerFile.crdtBaseContentVersion = localFile.crdtBaseContentVersion ?? localFile.contentVersion;
-                        mergedServerFile.contentLoaded = localFile.contentLoaded !== false;
-                        if (Number(remoteVersion) > Number(localFile.contentVersion || 0)) mergedServerFile.remoteContentVersion = remoteVersion;
-                        if (pendingServerSync[localFile.id] || unsavedChanges[localFile.id] || localFile.isSynced === false) {
-                            mergedServerFile.isSynced = false; markPendingServerSync(localFile.id, true);
-                        }
-                    } else if (localFile.content !== mergedServerFile.content || e2eChanged) {
-                        const baseContent = typeof localBaseContent === 'string' ? localBaseContent : '';
-                        const baseVersionRaw = Number(localFile.contentVersion);
-                        mergedServerFile.content = localFile.content;
-                        mergedServerFile.lastModified = localFile.lastModified || Date.now();
-                        mergedServerFile.serverLastModified = mergedServerFile.serverLastModified || null;
-                        mergedServerFile.contentVersion = Number.isFinite(baseVersionRaw) ? baseVersionRaw : 0;
-                        mergedServerFile.e2e_enabled = isFileE2EEnabled(localFile) ? 1 : 0;
-                        mergedServerFile.e2eEnabled = isFileE2EEnabled(localFile);
-                        mergedServerFile.isSynced = false;
-                        mergedServerFile.crdtBaseContent = baseContent;
-                        mergedServerFile.crdtBaseContentVersion = Number.isFinite(baseVersionRaw) ? baseVersionRaw : 0;
-                        g('unsavedChanges')[mergedServerFile.id] = true;
-                        markPendingServerSync(mergedServerFile.id, true);
-                    } else {
-                        mergedServerFile.isSynced = true;
-                        delete mergedServerFile.crdtBaseContent;
-                        delete mergedServerFile.crdtBaseContentVersion;
-                    }
+                    const remote = { ...mergedServerFile };
+                    const canonical = (g('files') || []).find(file => file.id === localFile.id) || localFile;
+                    // A running save owns this record. A metadata response must not
+                    // replace its draft, receipts, or confirmed content/version pair.
+                    const index = mergedFiles.indexOf(mergedServerFile);
+                    mergedFiles[index] = canonical;
+                    fileMap[localFile.name] = canonical;
+                    canonical.createdAt ||= remote.createdAt;
+                    if (Number(remote.contentVersion) > Number(canonical.contentVersion || 0)) canonical.remoteContentVersion = remote.contentVersion;
+                    if (remote.contentLoaded !== false) void global.reconcileRemoteFile(canonical, remote).catch(console.warn);
+                } else {
+                    const index = mergedFiles.indexOf(mergedServerFile);
+                    const canonical = (g('files') || []).find(file => file.id === localFile.id) || localFile;
+                    Object.assign(canonical, mergedServerFile);
+                    mergedFiles[index] = canonical;
                 }
                 return;
             }
@@ -1834,7 +1690,7 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
                 : (!localFile.isSynced || unsavedChanges[localFile.id]);
 
             if (String(localFile.id || '') === String(g('currentFileId') || '') && localFile.type === 'file' && (localFile.isSynced || Number(localFile.contentVersion) > 0 || localFile.serverLastModified)) {
-                const localCopy = Object.assign({}, localFile);
+                const localCopy = (g('files') || []).find(file => file.id === localFile.id) || localFile;
                 markOpenFileDeletedOnServer(localCopy, getCurrentEditorContent(localCopy.id, localCopy.content));
                 mergedFiles.push(localCopy);
                 return;
@@ -1852,12 +1708,14 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
                 return;
             }
 
-            mergedFiles.push(Object.assign({}, localFile, { isSynced: false }));
+            localFile.isSynced = false; mergedFiles.push((g('files') || []).find(file => file.id === localFile.id) || localFile);
         });
         if (removedCurrentFile) {
             global.currentFileId = null;
         }
-        global.files = mergedFiles;
+        const existing = g('files');
+        if (Array.isArray(existing)) { existing.splice(0, existing.length, ...mergedFiles); global.files = existing; }
+        else global.files = mergedFiles;
         localStorage.setItem('vditor_files', window.e2eSerializeFiles ? window.e2eSerializeFiles(global.files) : JSON.stringify(global.files));
         mergedFiles.forEach(function(file) {
             if (!file || !file.id || isExternalLocalFile(file)) return;
