@@ -93,6 +93,8 @@ export function refreshSyncIcons(globalRef: any): void {
         let icon = anchor.querySelector<HTMLButtonElement>('.file-sync-icon');
         if (!icon) { icon = document.createElement('button'); icon.type = 'button'; icon.className = 'file-sync-icon';
             icon.addEventListener('click', event => { event.preventDefault(); event.stopPropagation(); if (file.syncConflict) globalRef.openSyncConflict?.(file.id); }); anchor.appendChild(icon); }
+        const name = anchor.querySelector('.file-node-name');
+        if (name) name.after(icon);
         const encrypted = [true, 1, '1', 'true'].includes(file.e2e_enabled ?? file.e2eEnabled);
         const vault = globalRef.E2EVault?.state();
         icon.hidden = !!(encrypted && !vault?.unlocked && (vault?.config || vault?.loaded !== true));
@@ -102,11 +104,13 @@ export function refreshSyncIcons(globalRef: any): void {
         if (encrypted) {
             if (!lock) { lock = document.createElement('span'); lock.className = 'file-e2e-indicator'; lock.innerHTML = '<i class="fas fa-lock" aria-hidden="true"></i>'; anchor.appendChild(lock); }
             const label = globalRef.i18n?.getLanguage?.() === 'en' ? 'This file is end-to-end encrypted' : '此文件已使用端到端加密';
+            icon.after(lock);
             lock.setAttribute('aria-label', label); lock.setAttribute('title', label);
         } else lock?.remove();
         let tag = anchor.querySelector('.file-local-label');
         if (file.isExternalLocal || file.localOriginDeviceId) {
             if (!tag) { tag = document.createElement('small'); tag.className = 'file-local-label'; anchor.appendChild(tag); }
+            (lock || icon).after(tag);
             tag.textContent = file.localFileMode === 'remote' ? '本地非本机' : '本地';
         } else tag?.remove();
     }

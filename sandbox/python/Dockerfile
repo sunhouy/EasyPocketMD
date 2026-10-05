@@ -1,5 +1,5 @@
 FROM python:3.12-slim
-RUN apt-get update && apt-get install -y --no-install-recommends fonts-noto-cjk \
+RUN apt-get update && apt-get install -y --no-install-recommends fonts-noto-cjk default-jdk-headless bash \
     && rm -rf /var/lib/apt/lists/*
 COPY requirements.txt /runner/requirements.txt
 RUN pip install --no-cache-dir -r /runner/requirements.txt

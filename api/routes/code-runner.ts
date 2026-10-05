@@ -207,7 +207,7 @@ router.post('/run', async (req, res) => {
             });
         }
 
-        if (language === 'python' || language === 'py') {
+        if (['python','py','java','bash','shell','sh'].includes(language)) {
             if (Buffer.byteLength(code, 'utf8') > 64 * 1024) return res.status(413).json({success:false,error:'Code exceeds 64 KB limit'});
             let files;
             try { files = resolveRunnerFiles(req.body.files); }
@@ -236,7 +236,9 @@ router.post('/run', async (req, res) => {
                     res.write(JSON.stringify({type:'input',token,...event}) + '\n');
                     if (signal.aborted) cancelInput();
                 }) : undefined;
-                const result = workspace ? await runPythonSandbox(code, controller.signal, input, files, {workspace:true,cwd:workspace.cwd,directories:workspace.directories}) : files.length ? await runPythonSandbox(code, controller.signal, input, files) : interactive
+                const nativeLanguage = ['java','bash','shell','sh'].includes(language) ? language : undefined;
+                const options = { ...(workspace ? {workspace:true,cwd:workspace.cwd,directories:workspace.directories} : {}), ...(nativeLanguage ? {language:nativeLanguage} : {}) };
+                const result = (workspace || nativeLanguage) ? await runPythonSandbox(code, controller.signal, input, files, options) : files.length ? await runPythonSandbox(code, controller.signal, input, files) : interactive
                     ? await runPythonSandbox(code, controller.signal, input)
                     : await runPythonSandbox(code, controller.signal);
                 workspace?.finish(result);

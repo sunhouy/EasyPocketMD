@@ -69,3 +69,13 @@ Verify an image with `npx tsx scripts/check-python-sandbox.ts`. CI checks plotti
 interactive input, network isolation, host-secret isolation, timeout cleanup and
 subsequent execution. Deployment includes an interactive protocol check before
 switching releases.
+
+## Java 与 Bash/Shell
+
+同一镜像包含 JDK 和 Bash。代码块语言支持 `java`、`bash`、`shell`、`sh`，共用 Python 沙箱的无网络、只读根目录、非 root、CPU/内存/进程数、超时与输出限制。
+
+Java 自动识别顶层公开类名，生成同名 `.java` 文件；支持 package，UTF-8 编译后按完整类名运行。源码与 class 放在临时编译目录，不作为用户文件返回。工作目录仍是用户的沙箱文件目录，上传文件和生成文件沿用现有机制。
+
+Bash/Shell 脚本由解释器读取，无需在 `/tmp` 执行文件。`bash`、`shell` 使用 Bash，`sh` 使用 POSIX Shell；当前这些语言为非交互运行，标准输入关闭，不通过 Python 的 input() 对话框提供输入。
+
+Actions 的 `check-python-sandbox.ts` 在新镜像中实际验证 Java 公开类、package、中文输出以及三个 Shell 别名，再按现有镜像流程发布。旧镜像缺少语言能力时拒绝执行，不回退到服务器宿主机。

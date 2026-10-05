@@ -6140,7 +6140,8 @@ body.file-management-mode #live2dCompanion, body.mobile-keyboard-visible #live2d
 
 /* Keep names within the sidebar while preserving status and menu controls. */
 #fileList .jstree-anchor { min-width:0; width:calc(100% - 28px) !important; overflow:hidden; }
-#fileList .file-node-name { min-width:0; flex:1 1 auto; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+#fileList .file-node-name { min-width:0; flex:0 1 auto; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+#fileList .file-menu-btn { margin-left:auto !important; }
 #fileList .file-sync-icon, #fileList .file-menu-btn, #fileList .file-e2e-indicator, #fileList .file-local-label { flex-shrink:0; }
 .file-details-overlay { position:fixed; inset:0; z-index:10010; display:flex; align-items:center; justify-content:center; background:#0009; padding:16px; }
 .file-details-dialog { width:min(100%,460px); max-height:85dvh; overflow:auto; border-radius:12px; padding:20px; background:var(--bg-color,#fff); color:var(--text-color,#333); }

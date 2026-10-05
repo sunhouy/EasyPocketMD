@@ -16,13 +16,13 @@ export const CodeRunnerConstructor = (function(global) {
         return isEn ? (enFallback || zhFallback) : zhFallback;
     }
 
-    var SUPPORTED_LANGUAGES = new Set(['python', 'py', 'javascript', 'js', 'typescript', 'ts', 'html', 'htm', 'c', 'cpp', 'c++']);
+    var SUPPORTED_LANGUAGES = new Set(['python', 'py', 'javascript', 'js', 'typescript', 'ts', 'html', 'htm', 'c', 'cpp', 'c++', 'java', 'bash', 'shell', 'sh']);
     // Python runs in the server's isolated container; no browser interpreter is loaded.
     class CodeRunner {
         cCompilerEndpoint: string;
         abortRun: (() => void) | null = null;
         constructor() { this.cCompilerEndpoint = '/api/code-runner/run'; }
-        async runPython(code, command?: string) {
+        async runPython(code, command?: string, language = 'python') {
             const controller = new AbortController();
             this.abortRun = () => controller.abort();
             const timeout = setTimeout(() => controller.abort(), 310000);
@@ -32,7 +32,7 @@ export const CodeRunnerConstructor = (function(global) {
                 const workspace = runnerFiles ? await runnerFiles.workspace() : undefined;
                 const response = await fetch(endpoint + '/run', {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ language: 'python', code, interactive:true, ...(workspace ? {workspace} : {}), ...(command !== undefined ? {command} : {}) }), signal: controller.signal
+                    body: JSON.stringify({ language, code, interactive:true, ...(workspace ? {workspace} : {}), ...(command !== undefined ? {command} : {}) }), signal: controller.signal
                 });
                 if (!response.ok || !response.headers?.get?.('content-type')?.includes('ndjson')) {
                     const result=await response.json();
@@ -138,6 +138,11 @@ export const CodeRunnerConstructor = (function(global) {
                 case 'python':
                 case 'py':
                     return this.runPython(code);
+                case 'java':
+                case 'bash':
+                case 'shell':
+                case 'sh':
+                    return this.runPython(code, undefined, normalizedLanguage);
                 case 'javascript':
                 case 'js':
                 case 'typescript':
@@ -460,8 +465,14 @@ export const CodeRunnerConstructor = (function(global) {
         err.style.cssText = 'margin:0;white-space:pre-wrap;word-break:break-word;color:#a93131;';
         err.textContent = 'Error: ' + (result.error || 'Unknown error');
         runnerUiState.outputBody.appendChild(err);
-        if (['python', 'py'].includes(runnerUiState.runContext?.language)) {
-            runnerUiState.explanation = explainPythonError(result.error);
+        if (['python', 'py', 'java', 'bash', 'shell', 'sh'].includes(runnerUiState.runContext?.language)) {
+            const language = runnerUiState.runContext.language;
+            runnerUiState.explanation = ['python', 'py'].includes(language) ? explainPythonError(result.error)
+                : language === 'java' ? (/Main method not found/.test(result.error || '')
+                    ? '请在类中声明 public static void main(String[] args) 作为程序入口。'
+                    : /cannot find symbol/.test(result.error || '') ? 'Java 找不到引用的变量、类或方法。请检查拼写、作用域和 import。'
+                    : 'Java 编译或运行失败。请检查上方提示中的行号、类型、括号和分号；公开类的文件名会自动匹配类名。')
+                : 'Shell 脚本执行失败。请检查命令名称、引号和语法；沙箱禁止联网，不能访问宿主机文件，标准输入为非交互模式。';
             const explanation = document.createElement('p');
             explanation.style.cssText = 'margin:10px 0;color:#a93131;';
             explanation.textContent = runnerUiState.explanation;

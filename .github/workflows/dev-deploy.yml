@@ -91,5 +91,4 @@ jobs:
     uses: ./.github/workflows/docker-deploy.yml
     with:
       channel: dev
-      action: deploy
     secrets: inherit

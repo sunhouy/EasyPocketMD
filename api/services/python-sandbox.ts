@@ -21,7 +21,7 @@ function cleanup(name: string) {
     });
 }
 
-export async function runPythonSandbox(code: string, signal?: AbortSignal, onInput?: (event: any, signal: AbortSignal) => Promise<string>, files: {name:string; data:string}[] = [], options: {workspace?:boolean;cwd?:string;directories?:string[]} = {}): Promise<any> {
+export async function runPythonSandbox(code: string, signal?: AbortSignal, onInput?: (event: any, signal: AbortSignal) => Promise<string>, files: {name:string; data:string}[] = [], options: {workspace?:boolean;cwd?:string;directories?:string[];language?:string} = {}): Promise<any> {
     if (active >= MAX_CONCURRENT) return { success:false, status:429, error:'已有 5 个 Python 任务正在运行，请稍后重试。' };
     active++;
     const name = 'epmd-python-' + randomUUID();
@@ -53,7 +53,7 @@ export async function runPythonSandbox(code: string, signal?: AbortSignal, onInp
                 timer = setTimeout(() => finish({success:false,status:408,error:'Python execution timed out (20 seconds of execution)'}), Math.max(1, remaining));
             };
             const lifetime = setTimeout(() => finish({success:false,status:408,error:'Interactive execution session expired (5 minutes)'}), 5 * 60000);
-            const handshake = onInput ? setTimeout(() => {
+            const handshake = (onInput || options.language) ? setTimeout(() => {
                 if (!protocolReady) finish({success:false,status:503,error:'Python 沙箱版本过旧或启动失败，不支持交互输入。请部署最新沙箱镜像后重试。'});
             }, 8000) : undefined;
             arm();
@@ -73,6 +73,7 @@ export async function runPythonSandbox(code: string, signal?: AbortSignal, onInp
                         if (value.type === 'ready' && value.protocol === 2) {
                             if (options.workspace && value.workspace !== true) return finish({success:false,status:503,error:'请更新 Python 沙箱镜像以启用命令行和文件管理'});
                             if (files.length && value.files !== true) return finish({success:false,status:503,error:'沙箱镜像不支持上传文件，请部署最新版本后重试'});
+                            if (options.language && !value.languages?.includes(options.language)) return finish({success:false,status:503,error:'沙箱镜像尚不支持该语言，请等待最新版本部署后重试。'});
                             protocolReady = true; clearTimeout(handshake);
                         } else if (value.type === 'input') {
                             if (!onInput || !protocolReady || waiting || typeof value.prompt !== 'string' || typeof value.output !== 'string') throw Error('Invalid input request');
@@ -93,6 +94,7 @@ export async function runPythonSandbox(code: string, signal?: AbortSignal, onInp
             child.once('error', () => finish({success:false,status:503,error:'Python sandbox unavailable. Install Docker and build the sandbox image.'}));
             child.once('close', exit => {
                 if (settled) return;
+                if (options.language && !protocolReady) return finish({success:false,status:503,error:'沙箱镜像尚不支持该语言，请等待最新版本部署后重试。'});
                 if (exit !== 0) return finish({success:false,status:503,error:exit === 137 ? 'Python exceeded its memory limit' : 'Python sandbox failed. Check its image and Docker service.', details:stderr});
                 try {
                     const value = resultValue || JSON.parse(output);
