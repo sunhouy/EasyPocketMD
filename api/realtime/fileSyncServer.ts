@@ -17,6 +17,18 @@ function safeJsonParse(raw) {
     }
 }
 
+const userSockets = new Map();
+function broadcastToUser(username, payload, excludeSocket = undefined) {
+    const room = userSockets.get(username);
+    if (!room) return;
+    const message = JSON.stringify(payload);
+    room.forEach(client => {
+        if (client !== excludeSocket && client.readyState === 1) {
+            try { client.send(message); } catch { /* A disconnected peer must not fail a committed save. */ }
+        }
+    });
+}
+
 function initFileSyncServer(httpServer) {
     if (!httpServer) return null;
 
@@ -33,7 +45,7 @@ function initFileSyncServer(httpServer) {
         console.error('[fileSyncServer] Failed to create WebSocketServer:', e.message);
         return null;
     }
-    const userSockets = new Map();
+
     const HEARTBEAT_INTERVAL = 25000;
 
     function getUserRoom(username) {
@@ -52,16 +64,6 @@ function initFileSyncServer(httpServer) {
         if (!room) return;
         room.delete(socket);
         if (room.size === 0) userSockets.delete(username);
-    }
-
-    function broadcastToUser(username, payload, excludeSocket) {
-        const room = userSockets.get(username);
-        if (!room) return;
-        const message = JSON.stringify(payload);
-        room.forEach(function(client) {
-            if (client === excludeSocket) return;
-            if (client.readyState === 1) client.send(message);
-        });
     }
 
     wss.on('connection', function(socket, request) {
@@ -122,13 +124,13 @@ function initFileSyncServer(httpServer) {
                 }
 
                 try {
-                    const result = await fileManager.saveFile(username, filename, content, optimisticLock, { e2e_enabled: e2eEnabled });
+                    const result = await fileManager.saveFile(username, filename, content, optimisticLock, { e2e_enabled: e2eEnabled, conflict_strategy: 'strict' });
 
                     socket.send(JSON.stringify({
                         type: 'file_saved',
                         e2e_enabled: result.data?.e2e_enabled,
                         filename: filename,
-                        content: result.data && result.data.content ? result.data.content : content,
+                        content: result.data && typeof result.data.content === 'string' ? result.data.content : content,
                         content_version: result.data && result.data.content_version ? result.data.content_version : null,
                         last_modified: result.data && result.data.last_modified ? result.data.last_modified : null,
                         merged_by_crdt: result.data && result.data.merged_by_crdt ? true : false,
@@ -200,4 +202,4 @@ function initFileSyncServer(httpServer) {
     return wss;
 }
 
-module.exports = { initFileSyncServer };
+module.exports = { initFileSyncServer, broadcastToUser };

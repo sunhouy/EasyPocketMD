@@ -73,6 +73,10 @@ router.post('/save', verifyUser, async (req, res) => {
         return res.status(409).json(result);
     }
 
+    if (result.code === 200 && result.data) {
+        const { broadcastToUser } = require('../realtime/fileSyncServer');
+        broadcastToUser(req.user.username, { type: 'file_updated', filename, ...result.data });
+    }
     res.json(result);
 });
 

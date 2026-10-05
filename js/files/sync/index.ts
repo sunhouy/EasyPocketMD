@@ -1,8 +1,9 @@
+import SHA256 from 'crypto-js/sha256';
 import { isEditorComposing, waitForEditorCommit, compositionRevision } from '../../editor-composition';
 import { isUntouchedGuestWelcome } from './revisions';
 import { safeMerge } from '../../../api/utils/safeMerge';
 import { SyncQueue } from './queue';
-import { persistFile, restoreFileFromDB, refreshSyncIcons, deviceId } from './local-state';
+import { persistFile, persistFileDurably, restoreFileFromDB, refreshSyncIcons, deviceId } from './local-state';
 import { showSyncConflict } from './conflict';
 import { createWebSocketClient, createSyncThrottle } from '../websocket-sync';
 
@@ -70,9 +71,17 @@ export function createSyncRuntimeApi(ctx: any) {
       file.previousCloudBaseVersion = file.pendingCloudBaseVersion;
     }
     file.pendingCloudContent = content; file.pendingCloudBaseVersion = version;
+    file.cloudSaveReceipts ||= [];
+    if (!file.cloudSaveReceipts.some((receipt: any) => receipt.hash === SHA256(content).toString() && receipt.baseVersion === version)) {
+      file.cloudSaveReceipts.push({ hash: SHA256(content).toString(), baseVersion: version });
+    }
   }
   async function mergeBaseForRemote(file: any, remote: string, version: number, fallback: string | undefined) {
     const e2e = await import('../../e2e');
+    for (const receipt of file.cloudSaveReceipts || []) {
+      if (version <= Number(receipt.baseVersion ?? 0)) continue;
+      if (receipt.hash === SHA256(remote).toString()) return remote;
+    }
     for (const [field, baseVersion] of [['pendingCloudContent', 'pendingCloudBaseVersion'], ['previousCloudContent', 'previousCloudBaseVersion']]) {
       if (typeof file[field] !== 'string' || version <= Number(file[baseVersion] || 0)) continue;
       const sent = await e2e.resolveFileContent(file[field], g('currentUser')?.password, isFileE2EEnabled(file));
@@ -101,11 +110,14 @@ export function createSyncRuntimeApi(ctx: any) {
   }
   globalRef.openSyncConflict = (id: string) => { const file = g('files').find((f: any) => f.id === id); if (file) void resolveConflict(file).catch(console.warn); };
   function conflict(file: any, remote: string, version: number) {
+    if (file.id === g('currentFileId')) file.content = getCurrentEditorContent(file.id, file.content);
+    file.contentLoaded = true; file.lastModified = Date.now();
+    g('unsavedChanges')[file.id] = true;
     file.syncConflict = true; file.syncConflictRemoteContent = remote; file.syncConflictVersion = version;
     file.isSynced = false; markPendingServerSync(file.id, true); persist(file);
     if (file.id === g('currentFileId')) void resolveConflict(file).catch(console.warn);
   }
-  async function reconcileRemote(file: any, remote: any) {
+  async function reconcileRemoteNow(file: any, remote: any) {
     const username = g('currentUser')?.username;
     await waitForEditorCommit(globalRef, file.id);
     if (!username || g('currentUser')?.username !== username || !g('files').includes(file)) return;
@@ -132,12 +144,12 @@ export function createSyncRuntimeApi(ctx: any) {
       const disk = await ctx.readExternalSourceContent(file, file.id).catch(() => null);
       if (disk === null) { file.remoteContentVersion = version; persist(file); return; }
       await waitForEditorCommit(globalRef, file.id);
-      if (file.id === g('currentFileId') && getCurrentEditorContent(file.id, file.content) !== originalLocal) return reconcileRemote(file, remote);
+      if (file.id === g('currentFileId') && getCurrentEditorContent(file.id, file.content) !== originalLocal) return reconcileRemoteNow(file, remote);
       const combined = safeMerge(base, local, disk);
       if (!combined.clean) { file.syncConflictDiskContent = disk; conflict(file, content, version); return; }
       local = combined.content;
     }
-    const dirty = local !== originalLocal || !!(g('pendingServerSync')?.[file.id] || g('unsavedChanges')?.[file.id] || file.isSynced === false || (file.id === g('currentFileId') && local !== file.content));
+    const dirty = local !== originalLocal || (typeof base === 'string' && local !== base) || !!(g('pendingServerSync')?.[file.id] || g('unsavedChanges')?.[file.id] || file.isSynced === false || (file.id === g('currentFileId') && local !== file.content));
     const merged = dirty ? safeMerge(base, local, content) : { clean: true as const, content };
     if (!merged.clean) { conflict(file, content, version); return; }
     if (isExternalLocalFile(file) && !(await writeExternalLocalContent(file, merged.content)).success) { file.remoteContentVersion = version; persist(file); return; }
@@ -152,10 +164,16 @@ export function createSyncRuntimeApi(ctx: any) {
     file.serverLastModified = remote.last_modified ?? remote.serverLastModified; file.lastModified = Date.now();
     if (isExternalLocalFile(file)) { file.localSyncedContent = content; file.localCloudUsername = g('currentUser').username; if (final.content !== merged.content) file.localPendingWrite = true; }
     g('lastSyncedContent')[file.id] = content; file.isSynced = final.content === content;
-    if (file.isSynced) { delete file.pendingCloudContent; delete file.pendingCloudBaseVersion; delete file.previousCloudContent; delete file.previousCloudBaseVersion; }
+    if (file.isSynced) { delete file.pendingCloudContent; delete file.pendingCloudBaseVersion; delete file.previousCloudContent; delete file.previousCloudBaseVersion; file.cloudSaveReceipts = (file.cloudSaveReceipts || []).filter((receipt: any) => receipt.hash !== SHA256(file.crdtBaseContent || '').toString()); }
     g('unsavedChanges')[file.id] = !file.isSynced; markPendingServerSync(file.id, !file.isSynced);
     if (file.id === g('currentFileId') && (!wasContentLoaded || live !== final.content)) setEditorContentForFile(file.id, final.content, { preserveCursor: true });
     persist(file);
+  }
+  function reconcileRemote(file: any, remote: any) {
+    const previous = fileSyncLocks.get(file.id) || Promise.resolve();
+    const task = previous.catch(() => {}).then(() => reconcileRemoteNow(file, remote));
+    fileSyncLocks.set(file.id, task);
+    return task.finally(() => { if (fileSyncLocks.get(file.id) === task) fileSyncLocks.delete(file.id); });
   }
   globalRef.reconcileRemoteFile = reconcileRemote;
   globalRef.queueBackgroundFileSync = (selectedId?: string) => {
@@ -177,8 +195,6 @@ export function createSyncRuntimeApi(ctx: any) {
         else if (file.contentLoaded === false || Number(file.remoteContentVersion || 0) > Number(file.contentVersion || 0)) {
           const clone = { ...file };
           await fetchServerFileContent(clone);
-          // A file not yet cached has no local draft to merge.
-          if (!file.contentLoaded && !g('unsavedChanges')?.[file.id] && !file.content) { file.content = clone.content; file.crdtBaseContent = clone.content; }
           await reconcileRemote(file, clone); if (file.contentVersion === clone.contentVersion) delete file.remoteContentVersion;
         }
       }).catch(console.warn);
@@ -189,8 +205,7 @@ export function createSyncRuntimeApi(ctx: any) {
   globalRef.addEventListener?.('online', online);
   globalRef.addEventListener?.('offline', () => refreshSyncIcons(globalRef));
   const fileSyncLocks = new Map<string, Promise<any>>();
-  const webSocketSaves = new Map<string, any[]>();
-  const acknowledgingSaves = new Set<any>();
+  const scheduledSaves = new Set<Promise<any>>();
 
   function isFileE2EEnabled(file: any) {
     if (!file) return false;
@@ -208,151 +223,21 @@ export function createSyncRuntimeApi(ctx: any) {
     await reconcileRemote(file, payload);
   }
 
-  async function handleRemoteFileSaved(payload: any) {
-    const pending = webSocketSaves.get(payload.filename);
-    const acknowledged = pending?.shift();
-    if (acknowledged) {
-      clearTimeout(acknowledged.timer);
-      acknowledgingSaves.add(acknowledged);
-      if (!pending.length) webSocketSaves.delete(payload.filename);
-    }
-    try {
-      const files = g('files');
-      const file = files.find(function(f: any) { return f.name === payload.filename; });
-      if (!file) { acknowledged?.resolve(); return; }
-      if (payload.code !== undefined && payload.code !== 200) {
-        file.isSynced = false;
-        g('unsavedChanges')[file.id] = true;
-        markPendingServerSync(file.id, true);
-        acknowledged?.reject(new Error(payload.message || '保存失败'));
-        return;
-      }
-
-      const e2e = await import('../../e2e');
-      let plaintext;
-      try {
-        plaintext = await e2e.resolveFileContent(String(payload.content ?? file.content ?? ''), g('currentUser')?.password, true);
-      } catch (error) {
-        acknowledged?.reject(error);
-        markPendingServerSync(file.id, true);
-        return;
-      }
-      if (acknowledged && acknowledged.e2eEnabled !== isFileE2EEnabled(file)) {
-        acknowledged.resolve();
-        return;
-      }
-
-      await waitForEditorCommit(globalRef, file.id);
-      if (Number(payload.content_version) < Number(file.contentVersion || 0)) { acknowledged?.resolve(); return; }
-      if (Number.isFinite(Number(payload.content_version))) {
-        file.contentVersion = Number(payload.content_version);
-      }
-      file.serverLastModified = payload.last_modified || null;
-      const lastSyncedContent = g('lastSyncedContent') || {};
-      lastSyncedContent[file.id] = plaintext;
-      globalRef.lastSyncedContent = lastSyncedContent;
-      const live = file.id === g('currentFileId') ? getCurrentEditorContent(file.id, file.content) : file.content;
-      const dirty = live !== plaintext;
-      // Acknowledged content and its version are one merge base. Keeping an older
-      // crdtBaseContent makes the next HTTP save conflict with our own WS save.
-      if (!dirty) { delete file.pendingCloudContent; delete file.pendingCloudBaseVersion; delete file.previousCloudContent; delete file.previousCloudBaseVersion; }
-      file.crdtBaseContent = plaintext;
-      file.crdtBaseContentVersion = file.contentVersion;
-      if (file.content !== live) file.lastModified = Date.now();
-      file.content = live;
-      file.isSynced = !dirty;
-      file.contentLoaded = true;
-      file.contentFetchedAt = Date.now();
-      g('unsavedChanges')[file.id] = dirty;
-      markPendingServerSync(file.id, dirty);
-      persist(file);
-      acknowledged?.resolve();
-      localStorage.setItem('vditor_files', window.e2eSerializeFiles ? window.e2eSerializeFiles(files) : JSON.stringify(files));
-    } catch (error) {
-      acknowledged?.reject(error);
-      throw error;
-    } finally {
-      if (acknowledged) acknowledgingSaves.delete(acknowledged);
-    }
-  }
-
   async function scheduleWebSocketSync(fileId: string) {
-    if (isEditorComposing(globalRef, fileId)) return;
-    const inputRevision = compositionRevision(globalRef, fileId);
-    if (globalRef.fileRelocationInProgress) return;
-    if (!g('currentUser')) return;
-
-    const files = g('files');
-    const file = files.find(function(f: any) { return f.id === fileId; });
+    if (isEditorComposing(globalRef, fileId) || globalRef.fileRelocationInProgress || !g('currentUser')) return;
+    const file = g('files').find((item: any) => item.id === fileId);
     if (!file || file.type !== 'file' || isExternalLocalFile(file) || file.e2eTransition) return;
-
-    const content = file.id === g('currentFileId')
-      ? getCurrentEditorContent(fileId, file.content)
-      : file.content;
-
-    if (!content && content !== '') return;
-
-    const lastSyncedContent = g('lastSyncedContent') || {};
-
-    let contentToSend = content;
-    let localSnapshot = content;
-    const fileE2EEnabled = isFileE2EEnabled(file);
-    try {
-      const e2e = await import('../../e2e');
-      contentToSend = await e2e.resolveFileContent(contentToSend, g('currentUser')?.password, fileE2EEnabled);
-      localSnapshot = contentToSend;
-      if (fileE2EEnabled) contentToSend = await e2e.encrypt(contentToSend, g('currentUser')?.password);
-    } catch (error) {
-      markPendingServerSync(fileId, true);
-      console.error('[WS] E2E prepare error', error);
-      return;
-    }
-    if (contentToSend === undefined || globalRef.fileRelocationInProgress || file.e2eTransition || fileE2EEnabled !== isFileE2EEnabled(file)) return;
-
-    if (!globalRef.wsThrottle || isEditorComposing(globalRef, fileId) || inputRevision !== compositionRevision(globalRef, fileId)) return;
-
-    globalRef.wsThrottle.schedule({
-      type: 'file_save',
-      localSnapshot,
-      filename: file.name,
-      content: contentToSend,
-      base_content: fileE2EEnabled ? undefined : lastSyncedContent[fileId],
-      base_content_version: file.contentVersion,
-      e2e_enabled: fileE2EEnabled ? 1 : 0,
-    });
+    globalRef.wsThrottle?.schedule({ fileId });
   }
 
   function initWebSocketClient() {
     if (globalRef.wsClient) return;
 
     try {
-      globalRef.wsThrottle = createSyncThrottle(function(data: any) {
-        const file = g('files').find(f => f.name === data.filename);
-        if (file && isEditorComposing(globalRef, file.id)) return;
-        if (globalRef.wsClient && globalRef.wsClient.isConnected()) {
-          const { localSnapshot, ...request } = data;
-          if (file) {
-            recordSentContent(file, localSnapshot, data.base_content_version);
-            file.content = file.id === g('currentFileId') ? getCurrentEditorContent(file.id, file.content) : file.content;
-            file.lastModified = Date.now(); file.isSynced = false;
-            markPendingServerSync(file.id, true);
-            try { if (!persistFile(file, window.e2eSerializeFiles)) return; } catch { return; }
-          }
-          let resolve: any;
-          let reject: any;
-          const promise = new Promise<void>((ok, fail) => { resolve = ok; reject = fail; });
-          // Retain unacknowledged saves, even after timeout: moving their source
-          // before confirmation could let a late save recreate the old path.
-          const task = {
-            promise, resolve, reject, e2eEnabled: !!data.e2e_enabled,
-            timer: setTimeout(() => reject(new Error('保存尚未确认，已保留原路径，请稍后重试')), 15000)
-          };
-          promise.catch(() => {});
-          const pending = webSocketSaves.get(data.filename) || [];
-          pending.push(task);
-          webSocketSaves.set(data.filename, pending);
-          globalRef.wsClient.send(request);
-        }
+      globalRef.wsThrottle = createSyncThrottle((data: any) => {
+        const pending = syncFileToServer(data.fileId, { background: true });
+        scheduledSaves.add(pending);
+        void pending.finally(() => scheduledSaves.delete(pending));
       });
 
       globalRef.wsClient = createWebSocketClient({
@@ -367,7 +252,8 @@ export function createSyncRuntimeApi(ctx: any) {
           return handleRemoteFileUpdate(payload).catch(error => console.error('[WS] Cannot decrypt remote file', error));
         },
         onFileSaved: function(payload: any) {
-          return handleRemoteFileSaved(payload).catch(error => console.error('[WS] Cannot apply save acknowledgement', error));
+          // Legacy acknowledgements cannot identify a request; reconcile as a remote revision.
+          return handleRemoteFileUpdate(payload).catch(console.warn);
         },
         onFileList: function(_payload: any) {},
         onDisconnected: function() {},
@@ -428,7 +314,7 @@ export function createSyncRuntimeApi(ctx: any) {
     const overrideContent = options && typeof options.overrideContent === 'string' ? options.overrideContent : null;
     const baseLastModifiedOption = options && options.baseLastModified ? options.baseLastModified : null;
     const forcedBaseContentVersion =
-      options && Number.isFinite(Number(options.baseContentVersion)) ? Number(options.baseContentVersion) : null;
+      options && options.baseContentVersion != null && options.baseContentVersion !== '' && Number.isFinite(Number(options.baseContentVersion)) ? Number(options.baseContentVersion) : null;
     const files = g('files');
     const file = files.find(function (f: any) {
       return f.id === fileId;
@@ -456,12 +342,11 @@ export function createSyncRuntimeApi(ctx: any) {
     if (isExternalLocalFile(file) && !['ready', 'copy'].includes(file.localAccessState)) return false;
     if (isExternalLocalFile(file)) file.localOriginDeviceId ||= deviceId();
 
-    if (fileSyncLocks.has(fileId) && backgroundSync && overrideContent === null) return fileSyncLocks.get(fileId);
     const previousSyncTask = fileSyncLocks.get(fileId) || Promise.resolve();
     const syncTask = previousSyncTask
       .catch(function () {})
       .then(async function () {
-        if (isEditorComposing(globalRef, fileId)) return false;
+        if (!g('files').includes(file) || isEditorComposing(globalRef, fileId) || file.syncConflict) return false;
         const inputRevision = compositionRevision(globalRef, fileId);
         if (g('currentUser')?.username !== requestUser.username || g('currentUser')?.token !== requestUser.token) return false;
         file.syncBusy = true; refreshSyncIcons(globalRef);
@@ -508,6 +393,7 @@ export function createSyncRuntimeApi(ctx: any) {
                   globalRef.currentUser.password,
                   false,
                 );
+                content = contentToSend;
               }
             } catch (e) {
               // Stop the save; falling back would upload plaintext with the E2E flag.
@@ -530,22 +416,39 @@ export function createSyncRuntimeApi(ctx: any) {
           }
           if (forcedBaseContentVersion !== null) {
             requestBody.base_content_version = forcedBaseContentVersion;
-          } else if (Number.isFinite(Number(file.crdtBaseContentVersion))) {
+          } else if (file.crdtBaseContentVersion != null && file.crdtBaseContentVersion !== '' && Number.isFinite(Number(file.crdtBaseContentVersion))) {
             requestBody.base_content_version = Number(file.crdtBaseContentVersion);
           } else {
             const currentVersion = Number(file.contentVersion);
-            if (Number.isFinite(currentVersion)) {
+            if (file.contentVersion != null && file.contentVersion !== '' && Number.isFinite(currentVersion)) {
               requestBody.base_content_version = currentVersion;
             }
           }
 
           if (isEditorComposing(globalRef, fileId) || inputRevision !== compositionRevision(globalRef, fileId)) return false;
-          const response = await fetch(api + '/files/save', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + g('currentUser').token },
-            body: JSON.stringify(requestBody),
-          });
-          const result = globalRef.parseJsonResponse ? await globalRef.parseJsonResponse(response) : await response.json();
+          recordSentContent(file, content, requestBody.base_content_version);
+          file.content = content; file.contentLoaded = true; file.isSynced = false;
+          g('unsavedChanges')[fileId] = true; markPendingServerSync(fileId, true);
+          if (!await persistFileDurably(file, window.e2eSerializeFiles)) return false;
+          const controller = new AbortController();
+          let timeout: ReturnType<typeof setTimeout>;
+          let result: any;
+          try {
+            const request = (async () => {
+              const response = await fetch(api + '/files/save', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + requestUser.token },
+                body: JSON.stringify(requestBody), signal: controller.signal,
+              });
+              return globalRef.parseJsonResponse ? await globalRef.parseJsonResponse(response) : await response.json();
+            })();
+            result = await Promise.race([request, new Promise((_, reject) => {
+              timeout = setTimeout(() => {
+                controller.abort();
+                reject(new Error('保存尚未确认，本地草稿已保留，请稍后重试'));
+              }, 30000);
+            })]);
+          } finally { clearTimeout(timeout!); }
           if (g('currentUser')?.username !== requestUser.username || g('currentUser')?.token !== requestUser.token) return false;
           await waitForEditorCommit(globalRef, fileId);
           if (result.code === 409 && result.data) {
@@ -621,10 +524,10 @@ export function createSyncRuntimeApi(ctx: any) {
               files[fileIndex].e2eEnabled = !!files[fileIndex].e2e_enabled;
               delete files[fileIndex].serverDeleted;
               delete files[fileIndex].serverDeletedNotified;
-              if (!hasNewerActiveEditorContent) { delete file.pendingCloudContent; delete file.pendingCloudBaseVersion; delete file.previousCloudContent; delete file.previousCloudBaseVersion; }
+              if (!hasNewerActiveEditorContent) { delete file.pendingCloudContent; delete file.pendingCloudBaseVersion; delete file.previousCloudContent; delete file.previousCloudBaseVersion; file.cloudSaveReceipts = (file.cloudSaveReceipts || []).filter((receipt: any) => receipt.hash !== SHA256(file.crdtBaseContent || '').toString()); }
               files[fileIndex].crdtBaseContent = serverContent;
               files[fileIndex].crdtBaseContentVersion = Number(result.data?.content_version ?? file.contentVersion ?? 0);
-              files[fileIndex].lastModified = result.data && result.data.last_modified ? result.data.last_modified : Date.now();
+              files[fileIndex].lastModified = Date.now();
               files[fileIndex].serverLastModified =
                 result.data && result.data.last_modified ? result.data.last_modified : files[fileIndex].lastModified;
               files[fileIndex].contentVersion = Number(
@@ -636,12 +539,12 @@ export function createSyncRuntimeApi(ctx: any) {
               if (isExternalLocalFile(file) && file.localOriginDeviceId) {
                 void fetch(api + '/files/local-origin', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + g('currentUser').token }, body: JSON.stringify({ username: g('currentUser').username, filename: file.name, device_id: file.localOriginDeviceId }) }).catch(console.warn);
               }
-              persistFile(file, window.e2eSerializeFiles);
               if (hasNewerActiveEditorContent || localWriteFailed) {
                 files[fileIndex].isSynced = false;
                 g('unsavedChanges')[fileId] = true;
                 markPendingServerSync(fileId, true);
-                localStorage.setItem('vditor_files', window.e2eSerializeFiles ? window.e2eSerializeFiles(files) : JSON.stringify(files));
+                try { localStorage.setItem('vditor_files', window.e2eSerializeFiles ? window.e2eSerializeFiles(files) : JSON.stringify(files)); } catch { /* The per-file journal is authoritative when the workspace cache is full. */ }
+                if (!await persistFileDurably(file, window.e2eSerializeFiles)) return false;
                 setTimeout(function () {
                   g('unsavedChanges')[fileId] = true;
                   markPendingServerSync(fileId, true);
@@ -651,9 +554,11 @@ export function createSyncRuntimeApi(ctx: any) {
                 }, 0);
                 return true;
               }
+              file.cloudSaveReceipts = [];
               g('unsavedChanges')[fileId] = false;
               markPendingServerSync(fileId, false);
-              localStorage.setItem('vditor_files', window.e2eSerializeFiles ? window.e2eSerializeFiles(files) : JSON.stringify(files));
+              try { localStorage.setItem('vditor_files', window.e2eSerializeFiles ? window.e2eSerializeFiles(files) : JSON.stringify(files)); } catch { /* The per-file journal is authoritative when the workspace cache is full. */ }
+              if (!await persistFileDurably(file, window.e2eSerializeFiles)) return false;
               if (typeof globalRef.refreshE2EUi === 'function') {
                 globalRef.refreshE2EUi();
               }
@@ -669,7 +574,7 @@ export function createSyncRuntimeApi(ctx: any) {
         } catch (error: any) {
           await tryHandleTokenExpired(error);
           if (!backgroundSync) {
-            globalRef.showMessage((isEn() ? 'Sync failed: ' : '同步失败: ') + (error.message || ''), 'error');
+            globalRef.showMessage?.((isEn() ? 'Sync failed: ' : '同步失败: ') + (error.message || ''), 'error');
           }
           return false;
         }
@@ -728,7 +633,8 @@ export function createSyncRuntimeApi(ctx: any) {
     const content = getCurrentEditorContent(currentFileId, file.content);
 
     try {
-      file.content = content;
+      file.content = content; file.contentLoaded = true; file.isSynced = false;
+      g('unsavedChanges')[currentFileId] = true; markPendingServerSync(currentFileId, true);
       file.lastModified = Date.now();
       if (!persistFile(file, window.e2eSerializeFiles)) return false;
     } catch { return false; }
@@ -769,9 +675,9 @@ export function createSyncRuntimeApi(ctx: any) {
       body.base_content = beaconBaseContent;
     }
 
-    const beaconContentVersion = Number.isFinite(Number(file.crdtBaseContentVersion))
+    const beaconContentVersion = file.crdtBaseContentVersion != null && file.crdtBaseContentVersion !== '' && Number.isFinite(Number(file.crdtBaseContentVersion))
       ? Number(file.crdtBaseContentVersion)
-      : Number(file.contentVersion);
+      : file.contentVersion != null && file.contentVersion !== '' ? Number(file.contentVersion) : NaN;
     if (Number.isFinite(beaconContentVersion)) {
       body.base_content_version = beaconContentVersion;
     }
@@ -801,11 +707,14 @@ export function createSyncRuntimeApi(ctx: any) {
   }
 
   return {
-    waitForFileSync: () => Promise.all([
-      ...fileSyncLocks.values(),
-      ...[...acknowledgingSaves].map(task => task.promise),
-      ...[...webSocketSaves.values()].flatMap(tasks => tasks.map(task => task.promise))
-    ]),
+    waitForFileSync: async () => {
+      // Flush the latest edit before a rename/move changes its cloud path.
+      globalRef.wsThrottle?.flush?.();
+      while (fileSyncLocks.size || scheduledSaves.size) {
+        const results = await Promise.all([...fileSyncLocks.values(), ...scheduledSaves]);
+        if (results.some(result => result === false)) throw new Error('保存尚未确认，已保留原路径，请稍后重试');
+      }
+    },
     startAutoSync,
     stopAutoSync,
     syncAllFiles,

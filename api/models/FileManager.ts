@@ -178,6 +178,17 @@ class FileManager {
                 let contentToSave = String(content || '');
                 let mergedByCrdt = false;
 
+                // Repeated autosave/beacon delivery of identical content is an
+                // acknowledgement, not a new revision (including encrypted blobs).
+                if (rows.length && String(rows[0].content ?? '') === contentToSave && Number(rows[0].e2e_enabled || 0) === fileE2E) {
+                    if (commit) await commit();
+                    return { code: 200, message: '文件已同步', data: {
+                        username, filename, content: contentToSave, content_length: Buffer.byteLength(contentToSave, 'utf8'),
+                        content_version: rows[0].content_version, last_modified: rows[0].last_modified,
+                        e2e_enabled: fileE2E, merged_by_crdt: false
+                    } };
+                }
+
                 if (rows.length && fileOptions.conflict_strategy === 'strict') {
                     const row = rows[0];
                     const changed = hasBaseVersion ? Number(optimisticLock.base_content_version) !== Number(row.content_version || 0)

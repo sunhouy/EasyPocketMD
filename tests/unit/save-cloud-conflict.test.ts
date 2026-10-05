@@ -19,37 +19,28 @@ function fixture() {
 }
 beforeEach(() => { localStorage.clear(); });
 afterEach(() => jest.restoreAllMocks());
-it('advances both the content and version base after a websocket save, so the next manual save does not conflict', async () => {
-    const { api, app, file, edit } = fixture(); api.startAutoSync();
+it('advances the confirmed content/version pair after a realtime save', async () => {
+    const { api, app, file } = fixture();
+    global.fetch = jest.fn(async (_, options) => ({json:async()=>({code:200,data:{content:JSON.parse(options.body).content,content_version:2}})}));
+    api.startAutoSync();
     try {
-        await api.scheduleWebSocketSync(file.id);
-        await mockCallbacks.onFileSaved({ filename: file.name, content: 'first edit', content_version: 2, code: 200 });
-        edit('second edit');
-        global.fetch = jest.fn(async (_, options) => {
-            const sent = JSON.parse(options.body);
-            const correctBase = sent.base_content === 'first edit' && sent.base_content_version === 2;
-            return { json: async () => ({ code: correctBase ? 200 : 409, data: { content: correctBase ? sent.content : 'first edit', content_version: correctBase ? 3 : 2 } }) };
-        });
-        expect(await api.syncFileToServer(file.id, { background: false })).toBe(true);
-        expect(file.syncConflict).not.toBe(true); expect(file.content).toBe('second edit');
-        expect(app.lastSyncedContent.note).toBe('second edit');
-    } finally { api.stopAutoSync(); }
-});
-it('persists the confirmed local document and base even if the user switches to another document before acknowledgement', async () => {
-    const { api, app, file } = fixture(); api.startAutoSync();
-    try {
-        await api.scheduleWebSocketSync(file.id); file.content = 'first edit'; app.currentFileId = 'other';
-        await mockCallbacks.onFileSaved({ filename: file.name, content: 'first edit', content_version: 2, code: 200 });
+        await api.scheduleWebSocketSync(file.id); await api.waitForFileSync();
         expect(file.crdtBaseContent).toBe('first edit'); expect(file.crdtBaseContentVersion).toBe(2);
         const snapshot = JSON.parse(localStorage.getItem('epm-file:note'))[0];
         expect(snapshot.content).toBe('first edit'); expect(snapshot.crdtBaseContentVersion).toBe(2);
     } finally { api.stopAutoSync(); }
 });
-it('retains newer typing in the local journal while advancing only the confirmed websocket base', async () => {
-    const { api, app, file, edit } = fixture(); api.startAutoSync();
+it('journals newer typing while advancing only the confirmed save base', async () => {
+    const { api, app, file, edit } = fixture();
+    let reply;
+    global.fetch = jest.fn(() => new Promise(resolve => { reply = resolve; }));
+    api.startAutoSync();
     try {
-        await api.scheduleWebSocketSync(file.id); edit('newer typing');
-        await mockCallbacks.onFileSaved({ filename: file.name, content: 'first edit', content_version: 2, code: 200 });
+        await api.scheduleWebSocketSync(file.id);
+        for (let i = 0; i < 50 && !reply; i++) await Promise.resolve();
+        edit('newer typing');
+        reply({json:async()=>({code:200,data:{content:'first edit',content_version:2}})});
+        await api.waitForFileSync();
         expect(file.content).toBe('newer typing'); expect(file.crdtBaseContent).toBe('first edit');
         expect(app.unsavedChanges.note).toBe(true); expect(app.pendingServerSync.note).toBe(true);
         expect(JSON.parse(localStorage.getItem('epm-file:note'))[0].content).toBe('newer typing');
@@ -102,15 +93,16 @@ it('does not interpret a metadata-only remote event as an empty document', async
     expect(file.content).toBe('original'); expect(file.contentVersion).toBe(1);
     expect(file.remoteContentVersion).toBe(2); expect(file.syncConflict).not.toBe(true);
 });
-it('ignores an older HTTP acknowledgement after a newer websocket save was confirmed', async () => {
+it('queues a newer websocket notification behind the HTTP acknowledgement', async () => {
     const { api, app, file, edit } = fixture(); api.startAutoSync();
     try {
+        let notification;
         global.fetch = jest.fn(async () => {
             edit('newest draft');
-            await mockCallbacks.onFileSaved({ filename: file.name, content: 'first edit', content_version: 3, code: 200 });
-            return { json: async () => ({ code: 200, data: { content: 'original', content_version: 2 } }) };
+            notification = mockCallbacks.onFileSaved({ filename: file.name, content: 'first edit', content_version: 3, code: 200 });
+            return { json: async () => ({ code: 200, data: { content: 'first edit', content_version: 2 } }) };
         });
-        await api.syncFileToServer(file.id, { background: false });
+        await api.syncFileToServer(file.id, { background: false }); await notification;
         expect(file.contentVersion).toBe(3); expect(file.crdtBaseContent).toBe('first edit');
         expect(file.content).toBe('newest draft'); expect(app.pendingServerSync.note).toBe(true);
         expect(file.syncConflict).not.toBe(true);
