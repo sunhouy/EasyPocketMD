@@ -1,3 +1,5 @@
+import { checkpointCurrentFile } from './files/sync/checkpoint';
+import { isEditorComposing } from './editor-composition';
 import { persistFile } from './files/sync/local-state';
 /**
  * 应用生命周期管理模块
@@ -60,40 +62,12 @@ import { persistFile } from './files/sync/local-state';
         const allowRemoteSync = !!opts.allowRemoteSync;
         let safelySaved = true;
         try {
-            // 1. 立即备份当前草稿
-            if (global.draftRecovery) {
-                global.draftRecovery.backupNow();
-            }
-
-            // 2. 保存当前文件到 localStorage
-            const currentFileId = global.currentFileId;
-            if (currentFileId) {
-                const content = typeof global.getCurrentEditorContent === 'function'
-                    ? global.getCurrentEditorContent(currentFileId, '')
-                    : (global.vditor && typeof global.vditor.getValue === 'function' ? global.vditor.getValue() : '');
-                const files = global.files || [];
-                const fileIndex = files.findIndex(f => f.id === currentFileId);
-
-                if (fileIndex !== -1) {
-                    files[fileIndex].content = content;
-                    files[fileIndex].lastModified = Date.now();
-                    const locallySaved = persistFile(files[fileIndex], window.e2eSerializeFiles);
-                    if (!locallySaved) {
-                        safelySaved = false;
-                        global.unsavedChanges ||= {}; global.unsavedChanges[currentFileId] = true;
-                    }
-                    if (locallySaved && global.unsavedChanges?.[currentFileId]) {
-                        // The journal is durable; remote synchronization remains pending.
-                        global.unsavedChanges[currentFileId] = false;
-                    }
-                    if (global.currentUser && typeof global.markPendingServerSync === 'function') {
-                        global.markPendingServerSync(currentFileId, true);
-                    }
-                }
-            }
+            // A synchronous per-file checkpoint always comes before cloud work.
+            safelySaved = checkpointCurrentFile(global);
+            if (!isEditorComposing(global)) global.draftRecovery?.backupNow();
 
             // 3. 需要时才同步到服务器，避免与常规保存链路并发冲突。
-            if (allowRemoteSync && global.currentUser && global.syncCurrentFileWithBeacon) {
+            if (safelySaved && allowRemoteSync && global.currentUser && global.syncCurrentFileWithBeacon) {
                 global.syncCurrentFileWithBeacon();
             }
 
@@ -112,6 +86,7 @@ import { persistFile } from './files/sync/local-state';
         const skipAsyncFlush = !!opts.skipAsyncFlush;
         const allowRemoteSync = !!opts.allowRemoteSync;
         const now = Date.now();
+        emergencySave({ allowRemoteSync: false });
         if (leaveSaveInFlight) return;
         if (now - lastLeaveSaveAt < LEAVE_SAVE_COOLDOWN_MS) return;
 
@@ -119,7 +94,7 @@ import { persistFile } from './files/sync/local-state';
         lastLeaveSaveAt = now;
 
         try {
-            // 先尝试回写当前文件（异步），再执行兜底紧急保存。
+            // Snapshot already persisted; asynchronous flush can now begin.
             if (!skipAsyncFlush) {
                 Promise.resolve(flushCurrentFileOnLeave(reason)).catch(function() {});
             }
@@ -142,20 +117,20 @@ import { persistFile } from './files/sync/local-state';
     function forceSaveToLocalStorage() {
         try {
             // 1. 立即备份当前草稿
-            if (global.draftRecovery) {
+            if (global.draftRecovery && !isEditorComposing(global)) {
                 global.draftRecovery.backupNow();
             }
 
             // 2. 保存所有未保存的文件到 localStorage
             const files = global.files || [];
             const currentFileId = global.currentFileId;
-            let fullySaved = true;
+            let fullySaved = checkpointCurrentFile(global);
 
             files.forEach(function(file) {
                 if (file.type !== 'file') return;
 
                 const isDirty = !!(global.unsavedChanges && global.unsavedChanges[file.id]);
-                if (!isDirty) return;
+                if (!isDirty || file.id === currentFileId) return;
 
                 let content = file.content;
                 if (file.id === currentFileId && typeof global.getCurrentEditorContent === 'function') {
@@ -165,7 +140,7 @@ import { persistFile } from './files/sync/local-state';
                 file.content = content;
                 file.lastModified = Date.now();
                 const locallySaved = persistFile(file, window.e2eSerializeFiles);
-                if (locallySaved) global.unsavedChanges[file.id] = false;
+                if (locallySaved && !global.currentUser) global.unsavedChanges[file.id] = false;
                 else fullySaved = false;
                 if (global.currentUser && typeof global.markPendingServerSync === 'function') {
                     global.markPendingServerSync(file.id, true);
@@ -191,33 +166,7 @@ import { persistFile } from './files/sync/local-state';
      * 在 beforeunload 等同步事件中使用
      */
     function syncSaveToServer() {
-        if (!global.currentUser) return;
-
-        const currentFileId = global.currentFileId;
-        const vditor = global.vditor;
-        if (!currentFileId || !vditor) return;
-
-        const files = global.files || [];
-        const file = files.find(f => f.id === currentFileId);
-        if (!file) return;
-
-        const content = vditor.getValue();
-        const body = {
-            username: global.currentUser.username,
-            token: global.currentUser.token,
-            filename: file.name,
-            content: content
-        };
-
-        try {
-            const api = global.getApiBaseUrl ? global.getApiBaseUrl() : 'api';
-            const xhr = new XMLHttpRequest();
-            xhr.open('POST', api + '/files/save', false); // 同步请求
-            xhr.setRequestHeader('Content-Type', 'application/json');
-            xhr.send(JSON.stringify(body));
-        } catch (e) {
-            console.warn('[Lifecycle] Sync save failed:', e);
-        }
+        if (checkpointCurrentFile(global)) global.syncCurrentFileWithBeacon?.();
     }
 
     /**
@@ -226,7 +175,7 @@ import { persistFile } from './files/sync/local-state';
     function initWebLifecycle() {
         // beforeunload: 强制保存，如果保存失败则阻止退出
         window.addEventListener('beforeunload', function(e) {
-            scheduleLeaveSave('beforeunload', { skipAsyncFlush: true, allowRemoteSync: false });
+            scheduleLeaveSave('beforeunload', { skipAsyncFlush: true, allowRemoteSync: true });
             const unsaved = global.unsavedChanges || {};
             const hasUnsaved = (global.files || []).some(f => unsaved[f.id]);
 
@@ -240,8 +189,7 @@ import { persistFile } from './files/sync/local-state';
                 }
                 
                 // 检查是否保存成功（再次检查 unsavedChanges）
-                const stillUnsaved = (global.files || []).some(f => global.unsavedChanges[f.id]);
-                if (stillUnsaved) {
+                if (!saveSuccess) {
                     // 保存失败，阻止用户退出
                     e.preventDefault();
                     e.returnValue = global.i18n ? global.i18n.t('savingPleaseWait') : '正在保存，请稍候...';

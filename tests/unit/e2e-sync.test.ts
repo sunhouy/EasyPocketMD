@@ -34,6 +34,7 @@ describe('E2E save representations', () => {
             await api.scheduleWebSocketSync('note');
             const sent = app.wsClient.send.mock.calls[0][0];
             expect(sent.content).not.toContain('正文');
+            expect(sent.localSnapshot).toBeUndefined();
             expect(await e2e.decrypt(sent.content, 'secret')).toBe('# 正文');
             expect(sent.base_content).toBeUndefined();
             await mockCallbacks.onFileSaved({ filename: 'note.md', content: sent.content, code: 200, content_version: 2, e2e_enabled: 1 });

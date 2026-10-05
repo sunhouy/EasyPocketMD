@@ -118,6 +118,7 @@ describe('FileManager', () => {
             const mockFiles = [
                 {
                     filename: 'test.md',
+                    created_at: '2022-12-01',
                     last_modified: '2023-01-01',
                     content_version: 1,
                     e2e_enabled: 0
@@ -131,10 +132,11 @@ describe('FileManager', () => {
             expect(result.data.files).toHaveLength(1);
             expect(result.data.files[0].name).toBe('test.md');
             expect(result.data.files[0].content_version).toBe(1);
+            expect(result.data.files[0].created_at).toBe('2022-12-01');
             expect(result.data.files[0].e2e_enabled).toBe(0);
             expect(result.data.files[0]).not.toHaveProperty('content');
             expect(db.execute).toHaveBeenCalledWith(
-                expect.stringContaining('SELECT filename, last_modified, content_version, e2e_enabled FROM user_files'),
+                expect.stringContaining('SELECT filename, created_at, last_modified, content_version, e2e_enabled FROM user_files'),
                 ['testuser']
             );
             expect(Cache.setUserFiles).toHaveBeenCalled();

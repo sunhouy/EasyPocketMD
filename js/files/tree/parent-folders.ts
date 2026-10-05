@@ -6,7 +6,7 @@ export function materializeParentFolders(files: any[], path: string) {
     const created: any[] = [];
     for (const parent of parents) {
         if (!parent || files.some(file => file.name === parent && file.type === 'folder')) continue;
-        const folder = { id: crypto.randomUUID(), name: parent, type: 'folder', content: '', lastModified: Date.now(), isSynced: false };
+        const folder = { id: crypto.randomUUID(), name: parent, type: 'folder', content: '', createdAt: Date.now(), lastModified: Date.now(), isSynced: false };
         files.push(folder); created.push(folder);
     }
     return created;

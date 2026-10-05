@@ -55,7 +55,7 @@ class FileManager {
             }
 
             const [rows] = await db.execute(
-                'SELECT filename, last_modified, content_version, e2e_enabled FROM user_files WHERE username = ? ORDER BY last_modified DESC',
+                'SELECT filename, created_at, last_modified, content_version, e2e_enabled FROM user_files WHERE username = ? ORDER BY last_modified DESC',
                 [username]
             );
 
@@ -64,6 +64,7 @@ class FileManager {
                 name: row.filename,
                 content_version: row.content_version,
                 e2e_enabled: row.e2e_enabled ? 1 : 0,
+                created_at: row.created_at ?? null,
                 last_modified: row.last_modified
             })).filter(f => !f.name.startsWith('.'));
 
@@ -100,7 +101,7 @@ class FileManager {
             }
 
             const [rows] = await db.execute(
-                'SELECT filename, content, last_modified, content_version, e2e_enabled FROM user_files WHERE username = ? AND filename = ?',
+                'SELECT filename, content, created_at, last_modified, content_version, e2e_enabled FROM user_files WHERE username = ? AND filename = ?',
                 [username, filename]
             );
 
@@ -114,6 +115,7 @@ class FileManager {
                 content: row.content,
                 content_version: row.content_version,
                 e2e_enabled: row.e2e_enabled ? 1 : 0,
+                created_at: row.created_at ?? null,
                 last_modified: row.last_modified
             };
 
@@ -241,7 +243,7 @@ class FileManager {
                     };
                 } else {
                     await connection.execute(
-                        'INSERT INTO user_files (username, filename, content, content_version, e2e_enabled, last_modified) VALUES (?, ?, ?, 1, ?, NOW())',
+                        'INSERT INTO user_files (username, filename, content, content_version, e2e_enabled, created_at, last_modified) VALUES (?, ?, ?, 1, ?, NOW(), NOW())',
                         [username, filename, contentToSave, fileE2E]
                     );
                     message = '文件保存成功';
@@ -466,7 +468,7 @@ class FileManager {
                         );
                     } else {
                         await connection.execute(
-                            'INSERT INTO user_files (username, filename, content, content_version, e2e_enabled, last_modified) VALUES (?, ?, ?, 1, ?, NOW())',
+                            'INSERT INTO user_files (username, filename, content, content_version, e2e_enabled, created_at, last_modified) VALUES (?, ?, ?, 1, ?, NOW(), NOW())',
                             [username, filename, content, fileE2E]
                         );
                     }

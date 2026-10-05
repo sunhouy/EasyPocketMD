@@ -34,6 +34,7 @@ export function normalizeServerFileRecord(f: any): any {
     contentLoaded,
     e2e_enabled: e2eEnabled,
     e2eEnabled: !!e2eEnabled,
+    createdAt: f.created_at ?? f.createdAt ?? null,
     lastModified: f.last_modified || f.lastModified || null,
     serverLastModified: f.last_modified || f.lastModified || null,
     contentVersion: hasContentVersion ? Number(f.content_version ?? f.contentVersion) : null,
@@ -62,6 +63,22 @@ export function createSyncRuntimeApi(ctx: any) {
     const stored = file.crdtBaseContent ?? (g('lastSyncedContent') || {})[file.id] ?? file.localSyncedContent;
     if (typeof stored !== 'string') return undefined;
     const e2e = await import('../../e2e'); return e2e.resolveFileContent(stored, g('currentUser')?.password, isFileE2EEnabled(file));
+  }
+  function recordSentContent(file: any, content: string, version: any) {
+    if (file.pendingCloudContent !== content) {
+      file.previousCloudContent = file.pendingCloudContent;
+      file.previousCloudBaseVersion = file.pendingCloudBaseVersion;
+    }
+    file.pendingCloudContent = content; file.pendingCloudBaseVersion = version;
+  }
+  async function mergeBaseForRemote(file: any, remote: string, version: number, fallback: string | undefined) {
+    const e2e = await import('../../e2e');
+    for (const [field, baseVersion] of [['pendingCloudContent', 'pendingCloudBaseVersion'], ['previousCloudContent', 'previousCloudBaseVersion']]) {
+      if (typeof file[field] !== 'string' || version <= Number(file[baseVersion] || 0)) continue;
+      const sent = await e2e.resolveFileContent(file[field], g('currentUser')?.password, isFileE2EEnabled(file));
+      if (sent === remote) return remote;
+    }
+    return fallback;
   }
   async function resolveConflict(file: any) {
     if (!file.syncConflict) return;
@@ -106,7 +123,7 @@ export function createSyncRuntimeApi(ctx: any) {
     if (version < Number(file.contentVersion || 0)) return;
     const e2e = await import('../../e2e');
     const content = await e2e.resolveFileContent(String(remote.content ?? ''), g('currentUser')?.password, isFileE2EEnabled(remote));
-    const base = await baseContent(file);
+    const base = await mergeBaseForRemote(file, content, version, await baseContent(file));
     await waitForEditorCommit(globalRef, file.id);
     if (g('currentUser')?.username !== username || version < Number(file.contentVersion || 0)) return;
     const originalLocal = file.id === g('currentFileId') ? getCurrentEditorContent(file.id, file.content) : await e2e.resolveFileContent(String(file.content ?? ''), g('currentUser')?.password, isFileE2EEnabled(file));
@@ -135,6 +152,7 @@ export function createSyncRuntimeApi(ctx: any) {
     file.serverLastModified = remote.last_modified ?? remote.serverLastModified; file.lastModified = Date.now();
     if (isExternalLocalFile(file)) { file.localSyncedContent = content; file.localCloudUsername = g('currentUser').username; if (final.content !== merged.content) file.localPendingWrite = true; }
     g('lastSyncedContent')[file.id] = content; file.isSynced = final.content === content;
+    if (file.isSynced) { delete file.pendingCloudContent; delete file.pendingCloudBaseVersion; delete file.previousCloudContent; delete file.previousCloudBaseVersion; }
     g('unsavedChanges')[file.id] = !file.isSynced; markPendingServerSync(file.id, !file.isSynced);
     if (file.id === g('currentFileId') && (!wasContentLoaded || live !== final.content)) setEditorContentForFile(file.id, final.content, { preserveCursor: true });
     persist(file);
@@ -237,6 +255,7 @@ export function createSyncRuntimeApi(ctx: any) {
       const dirty = live !== plaintext;
       // Acknowledged content and its version are one merge base. Keeping an older
       // crdtBaseContent makes the next HTTP save conflict with our own WS save.
+      if (!dirty) { delete file.pendingCloudContent; delete file.pendingCloudBaseVersion; delete file.previousCloudContent; delete file.previousCloudBaseVersion; }
       file.crdtBaseContent = plaintext;
       file.crdtBaseContentVersion = file.contentVersion;
       if (file.content !== live) file.lastModified = Date.now();
@@ -276,10 +295,12 @@ export function createSyncRuntimeApi(ctx: any) {
     const lastSyncedContent = g('lastSyncedContent') || {};
 
     let contentToSend = content;
+    let localSnapshot = content;
     const fileE2EEnabled = isFileE2EEnabled(file);
     try {
       const e2e = await import('../../e2e');
       contentToSend = await e2e.resolveFileContent(contentToSend, g('currentUser')?.password, fileE2EEnabled);
+      localSnapshot = contentToSend;
       if (fileE2EEnabled) contentToSend = await e2e.encrypt(contentToSend, g('currentUser')?.password);
     } catch (error) {
       markPendingServerSync(fileId, true);
@@ -292,6 +313,7 @@ export function createSyncRuntimeApi(ctx: any) {
 
     globalRef.wsThrottle.schedule({
       type: 'file_save',
+      localSnapshot,
       filename: file.name,
       content: contentToSend,
       base_content: fileE2EEnabled ? undefined : lastSyncedContent[fileId],
@@ -308,6 +330,14 @@ export function createSyncRuntimeApi(ctx: any) {
         const file = g('files').find(f => f.name === data.filename);
         if (file && isEditorComposing(globalRef, file.id)) return;
         if (globalRef.wsClient && globalRef.wsClient.isConnected()) {
+          const { localSnapshot, ...request } = data;
+          if (file) {
+            recordSentContent(file, localSnapshot, data.base_content_version);
+            file.content = file.id === g('currentFileId') ? getCurrentEditorContent(file.id, file.content) : file.content;
+            file.lastModified = Date.now(); file.isSynced = false;
+            markPendingServerSync(file.id, true);
+            try { if (!persistFile(file, window.e2eSerializeFiles)) return; } catch { return; }
+          }
           let resolve: any;
           let reject: any;
           const promise = new Promise<void>((ok, fail) => { resolve = ok; reject = fail; });
@@ -321,7 +351,7 @@ export function createSyncRuntimeApi(ctx: any) {
           const pending = webSocketSaves.get(data.filename) || [];
           pending.push(task);
           webSocketSaves.set(data.filename, pending);
-          globalRef.wsClient.send(data);
+          globalRef.wsClient.send(request);
         }
       });
 
@@ -522,7 +552,8 @@ export function createSyncRuntimeApi(ctx: any) {
             const e2e = await import('../../e2e');
             const remote = await e2e.resolveFileContent(String(result.data.content ?? ''), g('currentUser')?.password, !!result.data.e2e_enabled);
             const live = file.id === g('currentFileId') ? getCurrentEditorContent(file.id, file.content) : file.content;
-            const merged = safeMerge(baseContentForCrdt, live, remote);
+            const mergeBase = await mergeBaseForRemote(file, remote, Number(result.data.content_version), baseContentForCrdt);
+            const merged = safeMerge(mergeBase, live, remote);
             if (!merged.clean) { conflict(file, remote, Number(result.data.content_version)); return false; }
             file.content = merged.content; file.contentLoaded = true; file.crdtBaseContent = remote;
             file.contentVersion = Number(result.data.content_version); file.crdtBaseContentVersion = file.contentVersion;
@@ -590,6 +621,7 @@ export function createSyncRuntimeApi(ctx: any) {
               files[fileIndex].e2eEnabled = !!files[fileIndex].e2e_enabled;
               delete files[fileIndex].serverDeleted;
               delete files[fileIndex].serverDeletedNotified;
+              if (!hasNewerActiveEditorContent) { delete file.pendingCloudContent; delete file.pendingCloudBaseVersion; delete file.previousCloudContent; delete file.previousCloudBaseVersion; }
               files[fileIndex].crdtBaseContent = serverContent;
               files[fileIndex].crdtBaseContentVersion = Number(result.data?.content_version ?? file.contentVersion ?? 0);
               files[fileIndex].lastModified = result.data && result.data.last_modified ? result.data.last_modified : Date.now();
@@ -698,9 +730,8 @@ export function createSyncRuntimeApi(ctx: any) {
     try {
       file.content = content;
       file.lastModified = Date.now();
-      localStorage.setItem('vditor_files', window.e2eSerializeFiles ? window.e2eSerializeFiles(files) : JSON.stringify(files));
-      persistFile(file, window.e2eSerializeFiles);
-    } catch {}
+      if (!persistFile(file, window.e2eSerializeFiles)) return false;
+    } catch { return false; }
 
     if (isExternalLocalFile(file) && !['ready', 'copy'].includes(file.localAccessState)) return false;
     if (!g('currentUser')) return true;
@@ -744,6 +775,9 @@ export function createSyncRuntimeApi(ctx: any) {
     if (Number.isFinite(beaconContentVersion)) {
       body.base_content_version = beaconContentVersion;
     }
+
+    recordSentContent(file, content, body.base_content_version);
+    try { if (!persistFile(file, window.e2eSerializeFiles)) return false; } catch { return false; }
 
     try {
       const payload = new Blob([JSON.stringify(body)], { type: 'application/json' });

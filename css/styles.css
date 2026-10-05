@@ -6137,3 +6137,14 @@ body.file-management-mode #live2dCompanion, body.mobile-keyboard-visible #live2d
 .file-drop-choice { max-width: 460px; width: min(92vw, 460px); overflow-wrap: anywhere; }
 .file-drop-choice button { margin: 6px 8px 0 0; padding: 9px 12px; cursor: pointer; }
 .file-drop-choice button:disabled { opacity: .5; cursor: default; }
+
+/* Keep names within the sidebar while preserving status and menu controls. */
+#fileList .jstree-anchor { min-width:0; width:calc(100% - 28px) !important; overflow:hidden; }
+#fileList .file-node-name { min-width:0; flex:1 1 auto; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+#fileList .file-sync-icon, #fileList .file-menu-btn, #fileList .file-e2e-indicator, #fileList .file-local-label { flex-shrink:0; }
+.file-details-overlay { position:fixed; inset:0; z-index:10010; display:flex; align-items:center; justify-content:center; background:#0009; padding:16px; }
+.file-details-dialog { width:min(100%,460px); max-height:85dvh; overflow:auto; border-radius:12px; padding:20px; background:var(--bg-color,#fff); color:var(--text-color,#333); }
+body.night-mode .file-details-dialog { background:#2d2d2d; color:#eee; }
+.file-details-dialog dl { display:grid; grid-template-columns:auto minmax(0,1fr); gap:12px; }
+.file-details-dialog dd { margin:0; overflow-wrap:anywhere; }
+.file-details-dialog button { padding:6px 12px; border:1px solid #8885; border-radius:6px; background:transparent; color:inherit; cursor:pointer; }

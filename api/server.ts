@@ -368,10 +368,12 @@ if (isDirectServerRun()) {
         socket.destroy();
     });
 
-    server.listen(port, process.env.HOST || '0.0.0.0', () => {
-        console.log(`Server is running on port ${port}`);
-        console.log(`Local: http://localhost:${port}`);
-    });
+    require('./utils/file-created-at').ensureFileCreatedAt().then(() => {
+        server.listen(port, process.env.HOST || '0.0.0.0', () => {
+            console.log(`Server is running on port ${port}`);
+            console.log(`Local: http://localhost:${port}`);
+        });
+    }).catch(error => { console.error('File metadata schema migration failed:', error); process.exit(1); });
 }
 
 module.exports = app;

@@ -2,9 +2,11 @@
  * 文件管理 - 加载、保存、同步、历史版本、文件夹
  */
 // @ts-nocheck
+import { showFileDetails, foldFileName, bindFileTreeLongPress } from './tree/details';
 import { floatingRunWindow } from '../code-runner-window';
 import { installEditorComposition, isEditorComposing, waitForEditorCommit } from '../editor-composition';
 import { AutoSaveScheduler } from './autoSave';
+import { checkpointCurrentFile } from './sync/checkpoint';
 import { persistFile, restoreFiles, restoreFileFromDB, refreshSyncIcons } from './sync/local-state';
 import { saveAfterDialogOpens } from '../ui/dialog-save';
 import {
@@ -184,11 +186,10 @@ import { createDiffFileWriter } from './conflict/live-files';
             try {
                 const currentFileId = g('currentFileId');
                 if (currentFileId && isCurrentFileDirty(currentFileId)) {
+                    const savedLocally = checkpointCurrentFile(global);
                     tryPersistDraft();
                     tryBeaconSync();
-                    e.preventDefault();
-                    e.returnValue = '';
-                    return '';
+                    if (!savedLocally) { e.preventDefault(); e.returnValue = ''; return ''; }
                 }
             } catch (err) {}
             return undefined;
@@ -1016,6 +1017,7 @@ import { createDiffFileWriter } from './conflict/live-files';
                 name: '.easypocketmd_orders',
                 type: 'file',
                 content: '{}',
+                createdAt: Date.now(),
                 lastModified: Date.now(),
                 isSynced: false
             };
@@ -1092,6 +1094,7 @@ import { createDiffFileWriter } from './conflict/live-files';
                 name: '.easypocketmd_orders',
                 type: 'file',
                 content: '{}',
+                createdAt: Date.now(),
                 lastModified: Date.now(),
                 isSynced: false
             };
@@ -1288,6 +1291,14 @@ import { createDiffFileWriter } from './conflict/live-files';
                 'shortcut_all': false,
                 'items': function(node) {
                     const items = {
+                        'details': {
+                            label: isEn() ? 'Details' : '详情',
+                            action: () => {
+                                const file = (g('files') || []).find(f => f.id === node.id) || { name: node.data.path, type: 'folder' };
+                                showFileDetails(global, file);
+                            }
+                        },
+                        'import': { label: isEn() ? 'Import into folder' : '导入文件', action: () => pickAndImportFiles(normalizePath(node.data.path)) },
                         'rename': {
                             'label': isEn() ? 'Rename' : '重命名',
                             'action': function(data) {
@@ -1409,6 +1420,7 @@ import { createDiffFileWriter } from './conflict/live-files';
                     if (node.type === 'file') {
                         delete items.new_file;
                         delete items.new_folder;
+                        delete items.import;
                     } else {
                         delete items.history;
                     }
@@ -1476,6 +1488,8 @@ import { createDiffFileWriter } from './conflict/live-files';
             window.$('#fileList .jstree-anchor').each(function() {
                 const anchorId = window.$(this).attr('id');
                 const nodeId = resolveNodeIdFromAnchorId(anchorId);
+                const node = window.$('#fileList').jstree(true).get_node(nodeId);
+                if (node) foldFileName(this, getBasename(node.data.path));
                 renderFileNodeInlineMeta(this, nodeId);
 
                 if (isFileListMultiSelectMode()) {
@@ -1573,11 +1587,10 @@ import { createDiffFileWriter } from './conflict/live-files';
             if (isFileListMultiSelectMode()) {
                 refreshFileListMultiSelectUi();
             }
-            // 禁用长按和右键菜单，统一使用右侧三个点
-            window.$('#fileList').on('contextmenu', function(e) {
-                e.preventDefault();
-                e.stopImmediatePropagation();
-                return false;
+            bindFileTreeLongPress(document.getElementById('fileList'), (anchor, x, y) => {
+                const tree = window.$('#fileList').jstree(true);
+                const node = tree.get_node(resolveNodeIdFromAnchorId(anchor.id));
+                if (node) tree.show_contextmenu(node, x, y);
             });
         });
     }
@@ -1597,7 +1610,8 @@ import { createDiffFileWriter } from './conflict/live-files';
             name: path,
             type: 'file',
             content: '# ' + getBasename(path) + '\n\n',
-            lastModified: Date.now(),
+            createdAt: Date.now(),
+                lastModified: Date.now(),
             e2e_enabled: isFileE2EEnabled(g('currentUser')) ? 1 : 0,
             e2eEnabled: isFileE2EEnabled(g('currentUser')),
             isSynced: false
@@ -1624,7 +1638,8 @@ import { createDiffFileWriter } from './conflict/live-files';
             name: path,
             type: 'folder',
             content: '',
-            lastModified: Date.now(),
+            createdAt: Date.now(),
+                lastModified: Date.now(),
             isSynced: false
         };
         files.push(newFolder);
@@ -2399,7 +2414,8 @@ import { createDiffFileWriter } from './conflict/live-files';
             name: isEn() ? 'Untitled' : '未命名文档', // 无前导斜杠
             type: 'file',
             content: isEn() ? '# Welcome to EasyPocketMD\n\nThis is a new document. \n\nStart writing!' : '# 欢迎使用 EasyPocketMD\n\n这是一个新的文档。\n\n开始编写吧！',
-            lastModified: Date.now(),
+            createdAt: Date.now(),
+                lastModified: Date.now(),
             e2e_enabled: isFileE2EEnabled(g('currentUser')) ? 1 : 0,
             e2eEnabled: isFileE2EEnabled(g('currentUser')),
             isSynced: false
@@ -2461,6 +2477,7 @@ import { createDiffFileWriter } from './conflict/live-files';
                 name: path,
                 type: 'file',
                 content: '# ' + getBasename(path) + '\n\n开始编写您的内容...',
+                createdAt: Date.now(),
                 lastModified: Date.now(),
                 e2e_enabled: isFileE2EEnabled(g('currentUser')) ? 1 : 0,
                 e2eEnabled: isFileE2EEnabled(g('currentUser')),
@@ -2500,6 +2517,7 @@ import { createDiffFileWriter } from './conflict/live-files';
                 name: path,
                 type: 'folder',
                 content: '',
+                createdAt: Date.now(),
                 lastModified: Date.now(),
                 isSynced: false,
                 order: 0
@@ -3566,6 +3584,9 @@ import { createDiffFileWriter } from './conflict/live-files';
             try { await importFileCollection(Array.from(e.target.files || []), targetFolder); }
             finally { fileInput.remove(); }
         });
+        fileInput.style.display = 'none';
+        document.body.appendChild(fileInput);
+        fileInput.addEventListener('cancel', () => fileInput.remove(), { once: true });
         fileInput.click();
     }
 
@@ -3609,7 +3630,8 @@ import { createDiffFileWriter } from './conflict/live-files';
                     name: importName,
                     type: 'file',
                     content: content,
-                    lastModified: Date.now(),
+                    createdAt: Date.now(),
+                lastModified: Date.now(),
                     isSynced: false
                 };
 
@@ -4033,11 +4055,21 @@ import { createDiffFileWriter } from './conflict/live-files';
         }
 
         const writer = createDiffFileWriter(global, (id, value) => setEditorContentForFile(id, value), loadFiles);
-        function writeContentToFile(targetFile, content) { return writer.write(targetFile, content); }
+        function writeContentToFile(targetFile, content) {
+            if (options.syncConflict) {
+                if (targetFile.diffReadonly) return false;
+                targetFile.content = content; return true; // Stage edits until explicit conflict resolution.
+            }
+            return writer.write(targetFile, content);
+        }
         let editors = null;
         function leaveEditing() { editors?.setEditable(false); state.editing = false; writer.flush(); modalContent.querySelector('#fileDiffEditBtn').textContent = isEn() ? 'Edit' : '编辑模式'; }
 
-        function promptSaveMergedContent(mergedText) {
+        async function promptSaveMergedContent(mergedText) {
+            if (options.syncConflict) {
+                try { await options.syncConflict.resolve(mergedText); closeComparison(); return true; }
+                catch (error) { global.showMessage(error.message || String(error), 'error'); return false; }
+            }
             const saveTitle = isEn() ? 'Save merged result' : '保存合并结果';
             const msg = isEn()
                 ? 'Choose where to save the merged content:'
@@ -4091,7 +4123,8 @@ import { createDiffFileWriter } from './conflict/live-files';
                                 name: path,
                                 type: 'file',
                                 content: mergedText,
-                                lastModified: Date.now(),
+                                createdAt: Date.now(),
+                lastModified: Date.now(),
                                 e2e_enabled: isFileE2EEnabled(g('currentUser')) ? 1 : 0,
                                 e2eEnabled: isFileE2EEnabled(g('currentUser')),
                                 isSynced: false
@@ -4126,6 +4159,7 @@ import { createDiffFileWriter } from './conflict/live-files';
         const modal = document.createElement('div');
         modal.className = 'modal-overlay file-diff-modal-overlay';
         modal.id = 'fileDiffResultModal';
+        if (options.syncConflict) modal.dataset.syncConflictFileId = options.syncConflict.fileId;
         modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;z-index:10002;';
 
         const modalContent = document.createElement('div');
@@ -4135,7 +4169,7 @@ import { createDiffFileWriter } from './conflict/live-files';
         modalContent.innerHTML =
             '<div class="diff-titlebar" style="padding:4px 8px;border-bottom:1px solid ' + borderColor + ';display:flex;justify-content:space-between;align-items:center;flex-shrink:0;">' +
                 '<div>' +
-                    '<h3 style="margin:0;">' + (options.history ? (isEn() ? 'History comparison' : '历史版本对比') : (isEn() ? 'File Diff Comparison' : '文件差异对比')) + '</h3>' +
+                    '<h3 style="margin:0;">' + (options.syncConflict ? (isEn() ? 'Local / cloud conflict' : '本地 / 云端冲突') : options.history ? (isEn() ? 'History comparison' : '历史版本对比') : (isEn() ? 'File Diff Comparison' : '文件差异对比')) + '</h3>' +
                     '<div id="fileDiffSubtitle" style="font-size:12px;color:' + (nightMode ? '#aaa' : '#666') + ';margin-top:5px;"></div>' +
                 '</div>' +
                 '<button id="closeFileDiffResultBtn" type="button" style="background:none;border:none;font-size:24px;cursor:pointer;color:' + (nightMode ? '#eee' : '#333') + ';">×</button>' +
@@ -4172,6 +4206,14 @@ import { createDiffFileWriter } from './conflict/live-files';
         document.body.appendChild(modal);
 
         const diffScrollEl = modalContent.querySelector('#fileDiffResultContent');
+        if (options.syncConflict) {
+            const toolbar = modalContent.querySelector('#fileDiffToolbar');
+            const action = (text, run) => { const button = document.createElement('button'); button.type = 'button'; button.style.cssText = btnStyle; button.textContent = text; button.onclick = run; toolbar.append(button); };
+            action(isEn() ? 'Use local' : '使用本地', () => void promptSaveMergedContent([state.leftFile, state.rightFile].find(f => f.diffSource === 'local').content));
+            action(isEn() ? 'Use cloud' : '使用云端', () => void promptSaveMergedContent([state.leftFile, state.rightFile].find(f => f.diffSource === 'cloud').content));
+            action(isEn() ? 'Save manual edits' : '保存手动处理', () => void promptSaveMergedContent([state.leftFile, state.rightFile].find(f => f.diffSource === 'local').content));
+            if (typeof options.syncConflict.disk === 'string') action(isEn() ? 'Use original local file' : '使用原本地文件', () => void promptSaveMergedContent(options.syncConflict.disk));
+        }
         modalContent.querySelector('#fileDiffEditors').remove();
         if (options.history) {
             modalContent.querySelector('#fileDiffSwapBtn').hidden = true;
@@ -4195,10 +4237,10 @@ import { createDiffFileWriter } from './conflict/live-files';
                 subtitleEl.textContent = state.leftFile.name + ' ↔ ' + state.rightFile.name;
             }
             if (leftHeaderEl) {
-                leftHeaderEl.textContent = (options.history ? (isEn() ? 'History ' : '历史版本 ') + options.history.versionId + ' · ' + new Date(options.history.timestamp).toLocaleString() + ' · ' : (isEn() ? 'Current: ' : '当前：')) + state.leftFile.name;
+                leftHeaderEl.textContent = options.syncConflict ? ((state.leftFile.diffSource === 'local' ? (isEn() ? 'Local: ' : '本地：') : (isEn() ? 'Cloud: ' : '云端：')) + state.leftFile.name) : (options.history ? (isEn() ? 'History ' : '历史版本 ') + options.history.versionId + ' · ' + new Date(options.history.timestamp).toLocaleString() + ' · ' : (isEn() ? 'Current: ' : '当前：')) + state.leftFile.name;
             }
             if (rightHeaderEl) {
-                rightHeaderEl.textContent = (options.history ? (isEn() ? 'Current: ' : '当前：') : (isEn() ? 'Compare: ' : '对比：')) + state.rightFile.name;
+                rightHeaderEl.textContent = options.syncConflict ? ((state.rightFile.diffSource === 'local' ? (isEn() ? 'Local: ' : '本地：') : (isEn() ? 'Cloud: ' : '云端：')) + state.rightFile.name) : (options.history ? (isEn() ? 'Current: ' : '当前：') : (isEn() ? 'Compare: ' : '对比：')) + state.rightFile.name;
             }
         }
 
@@ -4413,7 +4455,8 @@ import { createDiffFileWriter } from './conflict/live-files';
             };
         }
 
-        function closeComparison() { leaveEditing(); editors?.destroy(); editors = null; global.removeModal(modal); document.removeEventListener('keydown', handleEsc); }
+        function closeComparison() { if (!modal.isConnected) return; leaveEditing(); editors?.destroy(); editors = null; global.removeModal(modal); document.removeEventListener('keydown', handleEsc); }
+        modal.closeComparison = closeComparison;
         modalContent.querySelector('#closeFileDiffResultBtn').onclick = closeComparison;
         const handleEsc = e => { if (e.key === 'Escape' && modal.isConnected && !document.querySelector('.diff-merge-dialog')) closeComparison(); };
         document.addEventListener('keydown', handleEsc);

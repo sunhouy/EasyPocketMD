@@ -223,6 +223,7 @@ CREATE TABLE `user_files` (
   `content` longtext COLLATE utf8mb4_unicode_ci,
   `content_version` int(11) NOT NULL DEFAULT '1' COMMENT '内容版本号，用于并发冲突检测',
   `e2e_enabled` tinyint(4) DEFAULT '0' COMMENT '0: 此文件未开启端到端加密, 1: 此文件已开启端到端加密',
+  `created_at` timestamp NULL DEFAULT NULL,
   `last_modified` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

@@ -114,7 +114,7 @@ export function serializeFiles(files: any[]) {
     return JSON.stringify(files.map(f=>{
         if (![true,1,'1','true'].includes((f.e2e_enabled ?? f.e2eEnabled) as any)) return f;
         const copy = { ...f };
-        for (const field of ['content','crdtBaseContent','localSyncedContent', 'syncConflictRemoteContent', 'syncConflictDiskContent']) if (typeof copy[field] === 'string' && copy[field] && !looksLikeE2ECiphertext(copy[field])) copy[field] = encryptSync(copy[field],null);
+        for (const field of ['content','pendingCloudContent','previousCloudContent','crdtBaseContent','localSyncedContent', 'syncConflictRemoteContent', 'syncConflictDiskContent']) if (typeof copy[field] === 'string' && copy[field] && !looksLikeE2ECiphertext(copy[field])) copy[field] = encryptSync(copy[field],null);
         return copy;
     }));
 }

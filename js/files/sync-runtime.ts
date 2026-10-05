@@ -979,6 +979,7 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
         const serverLastModified = result.data.last_modified || result.data.lastModified || file.serverLastModified || null;
         const contentVersionRaw = result.data.content_version ?? result.data.contentVersion;
         file.content = content;
+        file.createdAt ||= result.data.created_at ?? result.data.createdAt;
         file.contentLoaded = true;
         file.contentFetchedAt = Date.now();
         file.crdtBaseContent = content; file.crdtBaseContentVersion = Number(contentVersionRaw || 0);
@@ -1067,6 +1068,7 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
                         contentLoaded: contentLoaded,
                         e2e_enabled: fileE2EEnabled ? 1 : 0,
                         e2eEnabled: fileE2EEnabled,
+                        createdAt: f.createdAt ?? f.created_at ?? null,
                         lastModified: serverLastModified,
                         serverLastModified: serverLastModified,
                         contentVersion: hasServerContentVersion ? Number(f.content_version ?? f.contentVersion) : null
@@ -1588,6 +1590,7 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
                 content: serverFile.type === 'folder' ? '' : (serverFile.content ?? ''),
                 contentLoaded: serverFile.type === 'folder' ? true : !isServerListContentMissing(serverFile.content),
                 contentFetchedAt: !isServerListContentMissing(serverFile.content) ? Date.now() : undefined,
+                createdAt: serverFile.createdAt ?? serverFile.created_at ?? null,
                 lastModified: serverLastModified,
                 serverLastModified: serverLastModified,
                 contentVersion: serverFile.contentVersion !== null && serverFile.contentVersion !== undefined
@@ -1746,6 +1749,7 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
                 type: serverFile.type || 'file',
                 content: serverFile.type === 'folder' ? '' : (serverFile.content ?? ''),
                 contentLoaded: serverFile.type === 'folder' ? true : !serverContentMissing,
+                createdAt: serverFile.createdAt ?? serverFile.created_at ?? null,
                 lastModified: serverLastModified,
                 serverLastModified: serverLastModified,
                 contentVersion: hasVersion ? Number(serverFile.contentVersion ?? serverFile.content_version) : null,
@@ -1775,6 +1779,7 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
             if (mergedServerFile) {
                 if (localFile.id) {
                     mergedServerFile.id = localFile.id;
+                    mergedServerFile.createdAt ||= localFile.createdAt ?? localFile.created_at;
                 }
                 const localBaseContent = localFile && localFile.id ? (localFile.crdtBaseContent ?? lastSyncedContent[localFile.id] ?? (localFile.isSynced ? localFile.content : undefined)) : undefined;
                 if (localFile.type === 'file' && mergedServerFile.type === 'file') {
