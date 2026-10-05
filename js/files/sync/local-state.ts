@@ -106,12 +106,14 @@ export function refreshSyncIcons(globalRef: any): void {
             const label = globalRef.i18n?.getLanguage?.() === 'en' ? 'This file is end-to-end encrypted' : '此文件已使用端到端加密';
             icon.after(lock);
             lock.setAttribute('aria-label', label); lock.setAttribute('title', label);
-        } else lock?.remove();
+        } else { lock?.remove(); lock = null; }
         let tag = anchor.querySelector('.file-local-label');
         if (file.isExternalLocal || file.localOriginDeviceId) {
             if (!tag) { tag = document.createElement('small'); tag.className = 'file-local-label'; anchor.appendChild(tag); }
             (lock || icon).after(tag);
             tag.textContent = file.localFileMode === 'remote' ? '本地非本机' : '本地';
-        } else tag?.remove();
+        } else { tag?.remove(); tag = null; }
+        const menu = anchor.querySelector('.file-menu-btn');
+        if (menu) { (lock || icon).after(menu); if (tag) menu.after(tag); }
     }
 }

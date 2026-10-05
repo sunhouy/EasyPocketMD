@@ -20,6 +20,23 @@ async function main() {
         assert.equal(shell.success, true, JSON.stringify(shell));
         assert.equal(shell.output.trim(), '你好 Shell');
     }
+    const programs = [
+        {language:'c',code:'#include <stdio.h>\nint main(){int a,b; printf("first: "); scanf("%d",&a); printf("second: "); scanf("%d",&b); printf("sum=%d\\n",a+b);}'},
+        {language:'cpp',code:'#include <iostream>\nint main(){int a,b; std::cin>>a; std::cin>>b; std::cout<<"sum="<<a+b<<"\\n";}'},
+        {language:'java',code:'import java.util.Scanner; public class Hello { public static void main(String[] args) { Scanner s=new Scanner(System.in); int a=s.nextInt(),b=s.nextInt(); System.out.println("sum="+(a+b)); }}'},
+        {language:'bash',code:'read a; read b; printf "sum=%s\\n" "$((a+b))"'},
+    ];
+    for (const {language,code} of programs) {
+        let count=0;
+        const result=await runPythonSandbox(code,undefined,async()=>++count===1?'12':'30',[],{language});
+        assert.equal(result.success,true,JSON.stringify(result));
+        assert.equal(count,2,language+' must accept two inputs');
+        assert.match(result.output,/sum=42/);
+    }
+    const javaFiles=await runPythonSandbox('import java.nio.file.*; public class Hello { public static void main(String[] args) throws Exception { System.out.print(Files.readString(Path.of("data.txt"))); Files.writeString(Path.of("result.txt"),"完成"); }}',undefined,undefined,[{name:'data.txt',data:Buffer.from('上传文件内容').toString('base64')}],{language:'java',workspace:true});
+    assert.equal(javaFiles.success,true,JSON.stringify(javaFiles));
+    assert.equal(javaFiles.output,'上传文件内容');
+    assert.ok(javaFiles.files.some(file=>file.name==='result.txt' && Buffer.from(file.data,'base64').toString()==='完成'));
     const result = await runPythonSandbox("import numpy, pandas, scipy, sympy, sklearn, seaborn, PIL, openpyxl\nimport matplotlib.pyplot as plt\nplt.plot([1,2],[3,4]); plt.title('中文图表'); plt.show()\nplt.figure(); plt.plot([3,2,1]); print('ok')");
     assert.equal(result.success, true, JSON.stringify(result));
     assert.equal(result.output.trim(), 'ok'); assert.equal(result.images.length, 2);

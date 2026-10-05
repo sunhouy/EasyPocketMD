@@ -38,6 +38,7 @@ export async function runPythonSandbox(code: string, signal?: AbortSignal, onInp
                 `--memory=${MEMORY_MB}m`, `--memory-swap=${MEMORY_MB}m`, '--cpus=1', '--pids-limit=64',
                 '--ulimit=nofile=128:128', '--ulimit=core=0', '--log-driver=none',
                 '--tmpfs=/tmp:rw,noexec,nosuid,size=64m,mode=1777',
+                ...(['c','cpp','c++'].includes(options.language || '') ? ['--tmpfs=/runner-build:rw,exec,nosuid,nodev,size=32m,mode=1777'] : []),
                 ...(process.env.PYTHON_SANDBOX_CGROUP ? ['--cgroup-parent=' + process.env.PYTHON_SANDBOX_CGROUP] : []),
                 process.env.PYTHON_SANDBOX_IMAGE || 'easypocketmd-python:1'
             ], { shell:false, stdio:['pipe','pipe','pipe'] });
@@ -74,6 +75,7 @@ export async function runPythonSandbox(code: string, signal?: AbortSignal, onInp
                             if (options.workspace && value.workspace !== true) return finish({success:false,status:503,error:'请更新 Python 沙箱镜像以启用命令行和文件管理'});
                             if (files.length && value.files !== true) return finish({success:false,status:503,error:'沙箱镜像不支持上传文件，请部署最新版本后重试'});
                             if (options.language && !value.languages?.includes(options.language)) return finish({success:false,status:503,error:'沙箱镜像尚不支持该语言，请等待最新版本部署后重试。'});
+                            if (onInput && options.language && !value.interactiveLanguages?.includes(options.language)) return finish({success:false,status:503,error:'当前沙箱镜像不支持该语言的交互输入，请更新镜像后重试。'});
                             protocolReady = true; clearTimeout(handshake);
                         } else if (value.type === 'input') {
                             if (!onInput || !protocolReady || waiting || typeof value.prompt !== 'string' || typeof value.output !== 'string') throw Error('Invalid input request');

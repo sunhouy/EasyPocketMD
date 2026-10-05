@@ -1,3 +1,5 @@
+import { RUNNABLE_LANGUAGES } from '../shared/code-runner-languages';
+import { codeEnvironmentHelp } from './code-runner-help';
 import { uiText, setUiText } from './i18n-messages';
 import { explainPythonError, pythonErrorLine } from './python-run-diagnostics';
 import { RunnerFilesUi } from './code-runner-files';
@@ -16,7 +18,7 @@ export const CodeRunnerConstructor = (function(global) {
         return isEn ? (enFallback || zhFallback) : zhFallback;
     }
 
-    var SUPPORTED_LANGUAGES = new Set(['python', 'py', 'javascript', 'js', 'typescript', 'ts', 'html', 'htm', 'c', 'cpp', 'c++', 'java', 'bash', 'shell', 'sh']);
+    var SUPPORTED_LANGUAGES = new Set<string>(RUNNABLE_LANGUAGES);
     // Python runs in the server's isolated container; no browser interpreter is loaded.
     class CodeRunner {
         cCompilerEndpoint: string;
@@ -93,42 +95,8 @@ export const CodeRunnerConstructor = (function(global) {
             });
         }
 
-        // 运行C/C++代码（通过Emscripten编译）
-        async runCpp(code, language) {
-            try {
-                const response = await fetch(this.cCompilerEndpoint, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        code: code,
-                        language: language
-                    })
-                });
-
-                const payload = await response.json().catch(function() {
-                    return null;
-                });
-
-                if (!response.ok || !payload || payload.success === false) {
-                    return {
-                        success: false,
-                        error: (payload && payload.error) || 'Failed to execute C/C++ code'
-                    };
-                }
-
-                return {
-                    success: true,
-                    output: payload.output || ''
-                };
-            } catch (error) {
-                return {
-                    success: false,
-                    error: error && error.message ? error.message : String(error)
-                };
-            }
-        }
+        // C/C++ 共用隔离沙箱、文件目录与流式交互输入。
+        async runCpp(code, language) { return this.runPython(code, undefined, language); }
 
         // 根据语言类型运行代码
         async runCode(language, code) {
@@ -198,7 +166,7 @@ export const CodeRunnerConstructor = (function(global) {
         if (runnerUiState.button.disabled || runnerFiles?.uploading) return;
         runnerUiState.button.disabled = true;
         if (runnerUiState.runContext?.editor) global.highlightCodeError?.(runnerUiState.runContext.editor, null);
-        runnerUiState.runContext = context; runnerUiState.minimized = false;
+        runnerUiState.runContext = context; runnerUiState.activeCodeBlock = context.block || null; runnerUiState.minimized = false;
         try {
             renderOutput({success:true, output:t('codeRunning', '运行中...', 'Running...')});
             const result = await codeRunner.runCode(context.language, context.code);
@@ -206,7 +174,8 @@ export const CodeRunnerConstructor = (function(global) {
         } finally { runnerUiState.button.disabled = false; }
     };
 
-    global.openCodeSandboxTools = async function(tab, button) {
+    global.openCodeSandboxTools = async function(tab, button, context) {
+        if (context?.block) runnerUiState.activeCodeBlock = context.block;
         ensureRunnerUi(); runnerUiState.outputPanel.style.display='flex';runnerUiState.minimized=false;updatePanelSize();
         if(tab==='upload') await runnerFiles.pick(button);
         else await runnerFiles.show(tab==='terminal'?'terminal':'files');
@@ -383,8 +352,9 @@ export const CodeRunnerConstructor = (function(global) {
         const help = runnerUiState.help;
         help.dataset.open = help.dataset.open === 'true' ? 'false' : 'true';
         runnerUiState.minimized = false;
-        help.setAttribute('data-i18n', 'ui:codeEnvironmentHelp');
-        setUiText(help, uiText('codeEnvironmentHelp'));
+        help.removeAttribute('data-i18n');
+        const language = (runnerUiState.activeCodeBlock ? getLanguageFromCodeBlock(runnerUiState.activeCodeBlock) : '') || runnerUiState.runContext?.language || '';
+        help.textContent = codeEnvironmentHelp(language, global.i18n?.getLanguage?.() === 'en');
         updatePanelSize();
     }
 
@@ -465,14 +435,15 @@ export const CodeRunnerConstructor = (function(global) {
         err.style.cssText = 'margin:0;white-space:pre-wrap;word-break:break-word;color:#a93131;';
         err.textContent = 'Error: ' + (result.error || 'Unknown error');
         runnerUiState.outputBody.appendChild(err);
-        if (['python', 'py', 'java', 'bash', 'shell', 'sh'].includes(runnerUiState.runContext?.language)) {
+        if (['python', 'py', 'c', 'cpp', 'c++', 'java', 'bash', 'shell', 'sh'].includes(runnerUiState.runContext?.language)) {
             const language = runnerUiState.runContext.language;
             runnerUiState.explanation = ['python', 'py'].includes(language) ? explainPythonError(result.error)
                 : language === 'java' ? (/Main method not found/.test(result.error || '')
                     ? '请在类中声明 public static void main(String[] args) 作为程序入口。'
                     : /cannot find symbol/.test(result.error || '') ? 'Java 找不到引用的变量、类或方法。请检查拼写、作用域和 import。'
                     : 'Java 编译或运行失败。请检查上方提示中的行号、类型、括号和分号；公开类的文件名会自动匹配类名。')
-                : 'Shell 脚本执行失败。请检查命令名称、引号和语法；沙箱禁止联网，不能访问宿主机文件，标准输入为非交互模式。';
+                : ['c','cpp','c++'].includes(language) ? 'C/C++ 编译或运行失败。请检查上方的编译错误、行号、类型及指针访问，输入数据需与 scanf/cin 的读取类型一致。'
+                : 'Shell 脚本执行失败。请检查命令名称、引号和语法；沙箱禁止联网，不能访问宿主机文件。';
             const explanation = document.createElement('p');
             explanation.style.cssText = 'margin:10px 0;color:#a93131;';
             explanation.textContent = runnerUiState.explanation;

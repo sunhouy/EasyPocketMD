@@ -43,3 +43,16 @@ it('fails closed when Docker is unavailable',async()=>{
     const request=runPythonSandbox('print(1)');runs[0].child.emit('error',Error('ENOENT'));
     expect((await request).status).toBe(503);expect(spawn.mock.calls.every(call=>call[0]==='docker')).toBe(true);
 });
+
+it('requires native interactive capability and keeps executable builds separate from uploaded files',async()=>{
+    const old=runPythonSandbox('source',undefined,async()=> '42',[],{language:'java'});
+    runs[0].child.stdout.write(JSON.stringify({type:'ready',protocol:2,languages:['java']})+'\n');
+    expect((await old).status).toBe(503);
+    const current=runPythonSandbox('source',undefined,async()=> '42',[],{language:'c'});
+    expect(runs[1].args).toContain('--tmpfs=/runner-build:rw,exec,nosuid,nodev,size=32m,mode=1777');
+    expect(runs[1].args).toContain('--tmpfs=/tmp:rw,noexec,nosuid,size=64m,mode=1777');
+    runs[1].child.stdout.write(JSON.stringify({type:'ready',protocol:2,languages:['c'],interactiveLanguages:['c']})+'\n');
+    runs[1].child.stdout.write(JSON.stringify({type:'result',success:true,output:'42',images:[]})+'\n');
+    runs[1].child.emit('close',0);
+    expect((await current).success).toBe(true);
+});
