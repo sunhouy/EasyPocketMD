@@ -5,9 +5,6 @@ on:
       channel:
         required: true
         type: string
-      action:
-        default: deploy
-        type: string
 permissions:
   contents: read
   actions: read
@@ -22,30 +19,11 @@ jobs:
     - uses: actions/checkout@v6
     - name: Install SSH transfer tools on CI
       run: sudo apt-get update && sudo apt-get install -y sshpass rsync
-    - name: Resolve previous release artifact from server metadata
-      if: inputs.action == 'rollback'
-      id: rollback
-      env:
-        SERVER_HOST: ${{ secrets.SERVER_HOST }}
-        SERVER_USER: ${{ secrets.SERVER_USER }}
-        SSHPASS: ${{ secrets.SERVER_PASSWORD }}
-        SERVER_SSH_HOST_KEY: ${{ secrets.SERVER_SSH_HOST_KEY }}
-      run: bash scripts/transfer-docker-release.sh '${{ inputs.channel }}' resolve-rollback
-    - name: Download rollback images from GitHub
-      if: inputs.action == 'rollback'
-      uses: actions/download-artifact@v4
-      with:
-        name: docker-release-${{ inputs.channel }}
-        path: image-cas
-        run-id: ${{ steps.rollback.outputs.run_id }}
-        github-token: ${{ github.token }}
     - uses: actions/setup-node@v6
-      if: inputs.action == 'deploy'
       with:
         node-version: '24'
         cache: npm
     - name: Setup Emscripten
-      if: inputs.action == 'deploy'
       run: |
         git clone --depth 1 https://github.com/emscripten-core/emsdk.git "$RUNNER_TEMP/emsdk"
         cd "$RUNNER_TEMP/emsdk"
@@ -54,23 +32,18 @@ jobs:
         echo "$RUNNER_TEMP/emsdk" >> "$GITHUB_PATH"
         echo "$RUNNER_TEMP/emsdk/upstream/emscripten" >> "$GITHUB_PATH"
     - name: Build frontend in CI
-      if: inputs.action == 'deploy'
       run: npm ci --prefer-offline --no-audit --no-fund && npm run build
     - name: Download verified Python sandbox image
-      if: inputs.action == 'deploy'
       uses: actions/download-artifact@v4
       with:
         name: python-sandbox-image
         path: python-sandbox-image
     - name: Load verified sandbox on CI
-      if: inputs.action == 'deploy'
       run: |
         bash scripts/setup-python-sandbox.sh --load python-sandbox-image/python-sandbox.tar.gz
         docker tag easypocketmd-python:1 easypocketmd-python:${{ github.sha }}
     - uses: docker/setup-buildx-action@v3
-      if: inputs.action == 'deploy'
     - name: Build application image
-      if: inputs.action == 'deploy'
       uses: docker/build-push-action@v7
       with:
         context: .
@@ -82,7 +55,6 @@ jobs:
         cache-from: type=gha,scope=epmd-app
         cache-to: type=gha,scope=epmd-app,mode=max,ignore-error=true
     - name: Build print service image
-      if: inputs.action == 'deploy'
       uses: docker/build-push-action@v7
       with:
         context: .
@@ -94,7 +66,6 @@ jobs:
         cache-from: type=gha,scope=epmd-print
         cache-to: type=gha,scope=epmd-print,mode=max,ignore-error=true
     - name: Build application gateway image
-      if: inputs.action == 'deploy'
       uses: docker/build-push-action@v7
       with:
         context: .
@@ -106,7 +77,6 @@ jobs:
         cache-from: type=gha,scope=epmd-gateway
         cache-to: type=gha,scope=epmd-gateway,mode=max,ignore-error=true
     - name: Export content-addressed images
-      if: inputs.action == 'deploy'
       run: |
         python3 scripts/image-cas.py export image-cas \
           app=easypocketmd-app:${{ github.sha }} \
@@ -138,25 +108,13 @@ jobs:
         if [ '${{ inputs.channel }}' = dev ]; then
           openssl req -x509 -newkey rsa:4096 -keyout docker-control/tls.key -out docker-control/tls.pem -days 365 -nodes -subj '/CN=dev.yhsun.cn'
         fi
-    - name: Add public rollback metadata
-      if: inputs.action == 'deploy'
-      run: cp docker-control/config.json image-cas/config.json
-    - name: Keep rollback images on GitHub
-      if: inputs.action == 'deploy'
-      uses: actions/upload-artifact@v4
-      with:
-        name: docker-release-${{ inputs.channel }}
-        path: image-cas/
-        compression-level: 0
-        retention-days: 90
-        if-no-files-found: error
     - name: Transfer missing image objects and activate Docker release
       env:
         SERVER_HOST: ${{ secrets.SERVER_HOST }}
         SERVER_USER: ${{ secrets.SERVER_USER }}
         SSHPASS: ${{ secrets.SERVER_PASSWORD }}
         SERVER_SSH_HOST_KEY: ${{ secrets.SERVER_SSH_HOST_KEY }}
-      run: bash scripts/transfer-docker-release.sh '${{ inputs.channel }}' '${{ inputs.action }}'
+      run: bash scripts/transfer-docker-release.sh '${{ inputs.channel }}' 'deploy'
     - name: Remove private CI configuration
       if: always()
       run: rm -rf docker-control

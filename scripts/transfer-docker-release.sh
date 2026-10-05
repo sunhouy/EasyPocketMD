@@ -14,14 +14,9 @@ if [ -n "${SERVER_SSH_HOST_KEY:-}" ]; then
 fi
 remote="${SERVER_USER:?}@${SERVER_HOST:?}"
 # sshpass reads SSHPASS from the process environment, not command-line arguments.
-if [ "$action" = resolve-rollback ]; then
-  run_id=$(sshpass -e ssh "${ssh_options[@]}" "$remote" "python3 -c 'import json; s=json.load(open(\"$remote_root/state-$channel.json\")); print((s.get(\"previous\") or {}).get(\"github_run_id\") or \"\")'")
-  if [[ ! "$run_id" =~ ^[0-9]+$ ]]; then
-    echo "Previous release has no GitHub artifact reference; redeploy the desired Git commit instead." >&2
-    exit 1
-  fi
-  printf 'run_id=%s\n' "$run_id" >> "${GITHUB_OUTPUT:?}"
-  exit
+if [ "$action" != deploy ]; then
+  echo "Only deployment is supported; rollback image backups are disabled." >&2
+  exit 1
 fi
 sshpass -e ssh "${ssh_options[@]}" "$remote" \
   "set -e; command -v docker >/dev/null; command -v python3 >/dev/null; command -v rsync >/dev/null; docker info >/dev/null; mkdir -p '$remote_root/cache/objects' '$release'; chmod 700 '$remote_root/releases' '$release'"
@@ -31,6 +26,6 @@ rsync -r --chmod=F600,D700 docker-control/ "$remote:$release/"
 # Fail before uploading large layers if transfer/import would fill the disk.
 sshpass -e ssh "${ssh_options[@]}" "$remote" \
   "python3 '$release/deploy-resources.py' transfer '$remote_root/cache' '$release' '$channel'"
-rsync -r --ignore-existing --partial-dir=.rsync-partial --delay-updates --stats --bwlimit=8192 image-cas/objects/ "$remote:$remote_root/cache/objects/"
+rsync -r --ignore-existing --partial-dir=.rsync-partial --delay-updates --stats image-cas/objects/ "$remote:$remote_root/cache/objects/"
 sshpass -e ssh "${ssh_options[@]}" "$remote" \
   "python3 '$release/deploy-resources.py' deploy '$remote_root/cache' '$release' '$channel'"

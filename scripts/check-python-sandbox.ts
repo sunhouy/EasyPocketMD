@@ -12,6 +12,14 @@ async function main() {
     assert.match(interactive.output, /你好 小明/);
     assert.match(interactive.output, /下一行 第二行/);
     if (process.argv.includes('--input-only')) return;
+    const java = await runPythonSandbox('package demo; public class Hello { public static void main(String[] args) { System.out.println("你好 Java"); } }', undefined, undefined, [], {language:'java'});
+    assert.equal(java.success, true, JSON.stringify(java));
+    assert.equal(java.output.trim(), '你好 Java');
+    for (const language of ['bash','shell','sh']) {
+        const shell = await runPythonSandbox('printf "你好 Shell\\n"', undefined, undefined, [], {language});
+        assert.equal(shell.success, true, JSON.stringify(shell));
+        assert.equal(shell.output.trim(), '你好 Shell');
+    }
     const result = await runPythonSandbox("import numpy, pandas, scipy, sympy, sklearn, seaborn, PIL, openpyxl\nimport matplotlib.pyplot as plt\nplt.plot([1,2],[3,4]); plt.title('中文图表'); plt.show()\nplt.figure(); plt.plot([3,2,1]); print('ok')");
     assert.equal(result.success, true, JSON.stringify(result));
     assert.equal(result.output.trim(), 'ok'); assert.equal(result.images.length, 2);

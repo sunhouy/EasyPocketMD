@@ -7,6 +7,10 @@ import json
 import os
 from pathlib import Path
 import stat
+import re
+import subprocess
+import tempfile
+import resource
 import sys
 import traceback
 
@@ -57,6 +61,81 @@ def collect_files(root_dir='/tmp/output', max_bytes=MAX_FILE_BYTES, max_count=16
                 if fd is not None:
                     os.close(fd)
     return files, warning
+
+
+
+def java_entry(code):
+    # Mask comments and literals while preserving line numbers/braces in real code.
+    masked = re.sub(r"/\*.*?\*/|//[^\n]*|\"\"\".*?\"\"\"|\"(?:\\.|[^\"\\])*\"|'(?:\\.|[^'\\])*'",
+                    lambda m: ''.join('\n' if c == '\n' else ' ' for c in m[0]), code, flags=re.S)
+    declarations = []
+    for match in re.finditer(r'\b(?:(public)\s+)?(?:(?:final|abstract|sealed|non-sealed|strictfp)\s+)*(?:class|record|enum|interface)\s+([A-Za-z_$][\w$]*)', masked):
+        prefix = masked[:match.start()]
+        if prefix.count('{') == prefix.count('}'):
+            declarations.append((bool(match[1]), match[2]))
+    if not declarations:
+        raise ValueError('Java 代码需要声明一个包含 public static void main(String[] args) 的类。')
+    name = next((name for public, name in declarations if public), declarations[0][1])
+    package = re.search(r'^\s*package\s+([A-Za-z_$][\w$]*(?:\s*\.\s*[A-Za-z_$][\w$]*)*)\s*;', masked, re.M)
+    qualified = re.sub(r'\s+', '', package[1]) + '.' + name if package else name
+    return name, qualified
+
+
+def native_limits():
+    # Bound regular output files before subprocesses write into the tmpfs.
+    resource.setrlimit(resource.RLIMIT_FSIZE, (8 * 1024 * 1024, 8 * 1024 * 1024))
+
+
+def native_command(args):
+    # Regular files keep subprocess output bounded in memory; the container owns
+    # process/time/memory/network isolation and kills all children on timeout.
+    with tempfile.TemporaryFile(dir='/tmp') as captured:
+        completed = subprocess.run(args, stdin=subprocess.DEVNULL, stdout=captured, stderr=subprocess.STDOUT,
+                                   timeout=18, preexec_fn=native_limits, env={**os.environ, 'LC_ALL':'C.UTF-8'})
+        captured.seek(0)
+        raw = captured.read(MAX_TEXT + 1)
+        return completed.returncode, raw[:MAX_TEXT].decode('utf-8', errors='replace'), len(raw) > MAX_TEXT
+
+
+def run_native(request):
+    language = request['language']
+    if language not in ('java', 'bash', 'shell', 'sh'):
+        raise ValueError('不支持的沙箱语言')
+    root = Path(tempfile.mkdtemp(prefix='epmd-source-', dir='/tmp'))
+    try:
+        if language == 'java':
+            name, qualified = java_entry(request['code'])
+            source = root / (name + '.java')
+            source.write_text(request['code'], encoding='utf-8')
+            classes = root / 'classes'
+            classes.mkdir()
+            vm = ['-XX:ActiveProcessorCount=1', '-XX:+UseSerialGC', '-Xmx96m', '-XX:MaxMetaspaceSize=64m', '-XX:ReservedCodeCacheSize=32m', '-Xss512k', '-Djava.io.tmpdir=/tmp']
+            status, output, truncated = native_command(['javac', *['-J' + option for option in vm], '-encoding', 'UTF-8', '-d', str(classes), str(source)])
+            if status:
+                line = re.search(re.escape(str(source)) + r':(\d+):', output)
+                return {'success':False, 'output':'', 'error':output, 'errorLine':int(line[1]) if line else None, 'phase':'compile'}
+            command = ['java', *vm, '-cp', str(classes), qualified]
+        else:
+            source = root / 'main.sh'
+            source.write_text(request['code'], encoding='utf-8')
+            command = ['/bin/sh', str(source)] if language == 'sh' else ['bash', '--noprofile', '--norc', str(source)]
+        status, output, truncated = native_command(command)
+        warning = '\n输出超过 64 KB，已截断。' if truncated else ''
+        result = {'success':status == 0, 'output':output + warning}
+        if status:
+            result['error'] = f'程序退出码：{status}\n' + output
+            if language == 'java':
+                line = re.search(re.escape(name) + r'\.java:(\d+)\)', output)
+            else:
+                line = re.search(re.escape(str(source)) + r':(?: line)? (\d+):', output)
+            if line:
+                result['errorLine'] = int(line[1])
+        return result
+    except subprocess.TimeoutExpired:
+        return {'success':False, 'output':'', 'error':'沙箱运行超时，请检查死循环、等待输入或计算量过大。'}
+    finally:
+        import shutil
+        shutil.rmtree(root, ignore_errors=True)
 
 
 class Output(io.StringIO):
@@ -157,8 +236,8 @@ def main():
         if target.is_relative_to(home) and target.is_dir():
             os.chdir(target)
     output = Output()
-    if request.get('interactive'):
-        wire_out.write(json.dumps({'type':'ready', 'protocol':2, 'files':True, 'workspace':True}) + '\n')
+    if request.get('interactive') or request.get('language', 'python') != 'python':
+        wire_out.write(json.dumps({'type':'ready', 'protocol':2, 'files':True, 'workspace':True, 'languages':['python','java','bash','shell','sh']}) + '\n')
         wire_out.flush()
         calls = 0
         def ask(prompt=''):
@@ -189,42 +268,47 @@ def main():
     result = {"success": True}
     with contextlib.redirect_stdout(output), contextlib.redirect_stderr(output):
         try:
-            import matplotlib
-            matplotlib.use('Agg', force=True)
-            import matplotlib.pyplot as plt
-            install_chinese_font_fallback(matplotlib)
-            plt.rcParams['figure.max_open_warning'] = MAX_IMAGES
-            total = 0
-            captured = set()
+            if request.get('language', 'python') != 'python':
+                native = run_native(request)
+                output.write(native.pop('output', ''))
+                result.update(native)
+            else:
+                import matplotlib
+                matplotlib.use('Agg', force=True)
+                import matplotlib.pyplot as plt
+                install_chinese_font_fallback(matplotlib)
+                plt.rcParams['figure.max_open_warning'] = MAX_IMAGES
+                total = 0
+                captured = set()
 
-            def capture():
-                nonlocal total
-                for number in plt.get_fignums():
-                    fig = plt.figure(number)
-                    if fig in captured:
-                        continue
-                    if len(images) >= MAX_IMAGES:
-                        raise RuntimeError('Too many figures (maximum 8)')
-                    data = io.BytesIO()
-                    fig.savefig(data, format='png', dpi=100, bbox_inches='tight')
-                    raw = data.getvalue()
-                    if len(raw) > MAX_IMAGE_BYTES or total + len(raw) > MAX_TOTAL_IMAGE_BYTES:
-                        raise RuntimeError('Figure output exceeds 2 MB limit')
-                    images.append({"mime": "image/png", "data": base64.b64encode(raw).decode('ascii')})
-                    total += len(raw)
-                    captured.add(fig)
+                def capture():
+                    nonlocal total
+                    for number in plt.get_fignums():
+                        fig = plt.figure(number)
+                        if fig in captured:
+                            continue
+                        if len(images) >= MAX_IMAGES:
+                            raise RuntimeError('Too many figures (maximum 8)')
+                        data = io.BytesIO()
+                        fig.savefig(data, format='png', dpi=100, bbox_inches='tight')
+                        raw = data.getvalue()
+                        if len(raw) > MAX_IMAGE_BYTES or total + len(raw) > MAX_TOTAL_IMAGE_BYTES:
+                            raise RuntimeError('Figure output exceeds 2 MB limit')
+                        images.append({"mime": "image/png", "data": base64.b64encode(raw).decode('ascii')})
+                        total += len(raw)
+                        captured.add(fig)
 
-            # show() captures before users close figures; remaining figures are captured at exit.
-            def show(*args, **kwargs):
-                capture()
-                plt.close('all')
-            plt.show = show
-            scope = {"__name__": "__main__", "__file__": "/tmp/main.py"}
-            try:
-                exec(compile(request['code'], '/tmp/main.py', 'exec'), scope, scope)
-            finally:
-                capture()
-                plt.close('all')
+                # show() captures before users close figures; remaining figures are captured at exit.
+                def show(*args, **kwargs):
+                    capture()
+                    plt.close('all')
+                plt.show = show
+                scope = {"__name__": "__main__", "__file__": "/tmp/main.py"}
+                try:
+                    exec(compile(request['code'], '/tmp/main.py', 'exec'), scope, scope)
+                finally:
+                    capture()
+                    plt.close('all')
         except BaseException:
             error = sys.exc_info()[1]
             frames = traceback.extract_tb(error.__traceback__)

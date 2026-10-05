@@ -13,3 +13,9 @@ it('rejects oversized code before reserving a container',async()=>{
     const response=await request(app).post('/run/run').send({language:'python',code:'x'.repeat(65537)});
     expect(response.status).toBe(413); expect(runPythonSandbox).not.toHaveBeenCalled();
 });
+it.each(['java','bash','shell','sh'])('dispatches %s through the same isolated container',async language=>{
+    const code=language==='java'?'public class Hello { public static void main(String[] args) { System.out.println("hello"); } }':'echo hello';
+    const response=await request(app).post('/run/run').send({language,code});
+    expect(response.body.success).toBe(true);
+    expect(runPythonSandbox).toHaveBeenCalledWith(code,expect.any(AbortSignal),undefined,[],{language});
+});

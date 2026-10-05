@@ -44,3 +44,9 @@ it('shows and copies Chinese error guidance without a Chinese explanation label'
     expect(writeText).toHaveBeenCalledWith(expect.stringContaining('“missing”'));
     expect(writeText.mock.calls[0][0]).not.toContain('中文解释');
 });
+it.each(['java','bash','shell','sh'])('sends %s code to the sandbox endpoint',async language=>{
+    jest.mocked(fetch).mockImplementation(async()=>response({success:true,output:'hello',images:[]}));
+    expect((await new window.CodeRunner().runCode(language,'source code')).success).toBe(true);
+    const call=jest.mocked(fetch).mock.calls.find(([url])=>String(url).endsWith('/run'));
+    expect(JSON.parse(call[1].body as string)).toMatchObject({language,code:'source code'});
+});
