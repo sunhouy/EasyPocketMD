@@ -386,7 +386,7 @@ export const CodeRunnerConstructor = (function(global) {
     async function copyRunResult(button) {
         const result = runnerUiState.lastResult;
         if (!result) return;
-        const text = [result.output === undefined ? '' : String(result.output), result.success ? '' : 'Error: ' + (result.error || 'Unknown error'), runnerUiState.explanation ? '中文解释：' + runnerUiState.explanation : ''].filter(Boolean).join('\n\n');
+        const text = [result.output === undefined ? '' : String(result.output), result.success ? '' : 'Error: ' + (result.error || 'Unknown error'), runnerUiState.explanation || ''].filter(Boolean).join('\n\n');
         button.disabled = true;
         try {
             if (navigator.clipboard?.write && global.ClipboardItem && result.images?.length) {
@@ -464,7 +464,7 @@ export const CodeRunnerConstructor = (function(global) {
             runnerUiState.explanation = explainPythonError(result.error);
             const explanation = document.createElement('p');
             explanation.style.cssText = 'margin:10px 0;color:#a93131;';
-            explanation.textContent = '中文解释：' + runnerUiState.explanation;
+            explanation.textContent = runnerUiState.explanation;
             runnerUiState.outputBody.appendChild(explanation);
             runnerUiState.errorLine = pythonErrorLine(result.error, result.errorLine);
             if (runnerUiState.errorLine) appendErrorSource(runnerUiState.errorLine);

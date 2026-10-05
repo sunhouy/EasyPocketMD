@@ -23,3 +23,24 @@ it('displays matplotlib images with text in the runner panel',async()=>{
     expect(document.querySelector('.code-output').textContent).toContain('图表结果');
     expect(document.querySelector('.code-output img').getAttribute('src')).toBe('data:image/png;base64,iVBORw0KGgo=');
 });
+it('shows and copies Chinese error guidance without a Chinese explanation label',async()=>{
+    document.querySelector('body > pre')?.remove();
+    document.body.insertAdjacentHTML('afterbegin','<pre><code class="language-python">print(missing)</code></pre>');
+    const code=document.querySelector('code');code.getBoundingClientRect=()=>new DOMRect(0,0,300,100);
+    jest.mocked(fetch).mockImplementation(async(url)=>String(url).endsWith('/run')
+        ?response({success:false,error:"NameError: name 'missing' is not defined"})
+        :response({success:true,token:'error-workspace'}));
+    const writeText=jest.fn(async()=>{});
+    Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText}});
+    window.addRunButtons(document);code.dispatchEvent(new MouseEvent('mousemove',{bubbles:true}));
+    (document.querySelector('.code-run-button') as HTMLElement).click();
+    await new Promise(resolve=>setTimeout(resolve,0));
+    const output=document.querySelector('.code-output');
+    expect(output.textContent).toContain('“missing”');
+    expect(output.textContent).toContain("NameError: name 'missing' is not defined");
+    expect(output.textContent).not.toContain('中文解释');
+    (output.querySelector('[title="复制运行结果"]') as HTMLElement).click();
+    await new Promise(resolve=>setTimeout(resolve,0));
+    expect(writeText).toHaveBeenCalledWith(expect.stringContaining('“missing”'));
+    expect(writeText.mock.calls[0][0]).not.toContain('中文解释');
+});
