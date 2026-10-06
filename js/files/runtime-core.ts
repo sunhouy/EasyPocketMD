@@ -2,6 +2,7 @@
  * 文件管理 - 加载、保存、同步、历史版本、文件夹
  */
 // @ts-nocheck
+import { installNotesHome } from './notes-home';
 import { showFileDetails, foldFileName, bindFileTreeLongPress } from './tree/details';
 import { floatingRunWindow } from '../code-runner-window';
 import { installEditorComposition, isEditorComposing, waitForEditorCommit } from '../editor-composition';
@@ -29,6 +30,7 @@ import { createDiffFileWriter } from './conflict/live-files';
 (function(global) {
     'use strict';
     installEditorComposition(global);
+    const notesHome = installNotesHome(global, { loadContent: file => fetchServerFileContent(file), needsContent: file => needsServerFileContentFetch(file) });
 
     function g<K extends keyof Window>(name: K): Window[K] { return global[name]; }
     
@@ -1702,6 +1704,7 @@ import { createDiffFileWriter } from './conflict/live-files';
     }
 
     function loadFiles() {
+        notesHome.render();
         if (deferFileTreeWorkUntilWasmReady(loadFiles, 'loadFiles')) return;
         const fileListSidebar = document.getElementById('fileListSidebar');
         const wasVisible = fileListSidebar && fileListSidebar.classList.contains('show');
@@ -2438,6 +2441,7 @@ import { createDiffFileWriter } from './conflict/live-files';
     }
 
     function getSelectedFolderPath() {
+        if (global.isFileManagementMode) return global.notesHomeFolder ? global.notesHomeFolder + '/' : '';
         if (!window.$ || !window.$.jstree) return '';
         const tree = window.$.jstree.reference('#fileList');
         if (!tree) return '';

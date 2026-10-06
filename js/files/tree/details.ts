@@ -29,14 +29,14 @@ export function foldFileName(anchor: HTMLElement, name: string) {
     else anchor.querySelector('.jstree-themeicon')?.after(span);
 }
 
-export function bindFileTreeLongPress(element: HTMLElement, open: (anchor: HTMLElement, x: number, y: number) => void) {
+export function bindFileTreeLongPress(element: HTMLElement, open: (anchor: HTMLElement, x: number, y: number) => void, selector = '.jstree-anchor') {
     if (element.dataset.longPressBound) return;
     element.dataset.longPressBound = '1';
     let timer: any, x = 0, y = 0, opened = false;
     const cancel = () => clearTimeout(timer);
     element.addEventListener('pointerdown', event => {
         if (event.pointerType === 'mouse' || event.button !== 0) return;
-        cancel(); const anchor = (event.target as Element).closest<HTMLElement>('.jstree-anchor'); if (!anchor) return;
+        cancel(); const anchor = (event.target as Element).closest<HTMLElement>(selector); if (!anchor) return;
         x = event.clientX; y = event.clientY; opened = false;
         timer = setTimeout(() => { opened = true; open(anchor, x, y); }, 550);
     });
