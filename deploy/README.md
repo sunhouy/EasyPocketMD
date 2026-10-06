@@ -118,3 +118,24 @@ bounded to 30 seconds, and rsync fails after 300 seconds without data transfer;
 these are inactivity limits, not bandwidth limits. Interrupted object transfers
 retain partial data for a retry. Remote logs distinguish cleanup/capacity checks,
 HTTPS setup, archive verification/import and health checks/traffic switching.
+
+## Origin route selection and failed edge diagnostics
+
+Before parallel deployment, CI compares one-MiB SSH uploads to `/dev/null` on the
+origin, directly and through a US SSH TCP relay. Each sample has a 45-second
+limit; use the relay only if direct fails or the relay is at least 25% faster.
+If neither works, stop before image transfer. The relay uses `SSHKEY_US` only on
+CI; the origin login and image stream remain inside end-to-end SSH encryption.
+No image archive, origin password or database credentials are copied to the US
+host for this transport. A temporary SSH config applies the selected route to
+both SSH operations and rsync, and is removed after CI finishes. This addresses
+an unfavorable direct network path; it cannot exceed the origin's actual
+bandwidth cap, and a short sample cannot guarantee sustained transfer speed.
+
+The regional proxy permits certificate chain verification to depth four while
+keeping TLS certificate/hostname verification enabled on main. Failed health
+checks record their last HTTP/connection error. Before a failed candidate is
+removed, logs include its running/exit/OOM status and Nginx transport errors
+(with request/query data redacted), plus a pinned-origin HTTPS probe inside the
+gateway to distinguish certificate trust, connectivity and upstream HTTP
+failures. These diagnostics do not log container environment or credentials.

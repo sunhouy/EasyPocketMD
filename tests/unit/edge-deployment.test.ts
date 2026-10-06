@@ -19,6 +19,7 @@ it.each([[0, 0, 0], [1, 0, 1], [0, 1, 1]])('waits for both destinations and repo
     const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'epmd-edge-'));
     try {
         fs.mkdirSync(path.join(temp, 'scripts'));
+        fs.writeFileSync(path.join(temp, 'scripts/select-deploy-route.py'), 'import pathlib, sys\npathlib.Path(sys.argv[2]).write_text("")\n');
         fs.writeFileSync(path.join(temp, 'scripts/transfer-docker-release.sh'), `#!/bin/bash
 if [ "$SERVER_HOST" = us ]; then
   test "$(stat -c %a "$SERVER_SSH_KEY_FILE")" = 600 || exit 9

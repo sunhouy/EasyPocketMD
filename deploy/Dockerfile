@@ -38,4 +38,4 @@ COPY deploy/nginx-container.conf /etc/nginx/templates/default.conf.template
 COPY deploy/nginx-edge.conf /etc/nginx/templates/default.conf.edge
 COPY dist /usr/share/nginx/html
 COPY shared /usr/share/nginx/html/shared
-RUN apk add --no-cache ca-certificates
+RUN apk add --no-cache ca-certificates curl

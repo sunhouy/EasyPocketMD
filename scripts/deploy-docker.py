@@ -79,10 +79,50 @@ def health(port, checksums):
                     if digest.hexdigest() != expected:
                         raise RuntimeError('Served WASM checksum mismatch: ' + path)
             return
-        except Exception:
+        except Exception as error:
+            if attempt == 0 or (attempt + 1) % 10 == 0:
+                print(f'Health attempt {attempt + 1}/40: {type(error).__name__}: {error}', flush=True)
             if attempt == 39:
-                raise RuntimeError('Candidate API/static health check failed; existing service retained')
+                raise RuntimeError(f'Candidate API/static health check failed ({type(error).__name__}: {error}); existing service retained') from error
             time.sleep(2)
+
+
+def gateway_diagnostics(name, origin=None):
+    """Collect transport errors before removing a failed candidate, never env/auth."""
+    try:
+        result = subprocess.run(['docker', 'inspect', '--format', '{{json .State}}', name],
+                                capture_output=True, text=True, timeout=10)
+        if result.returncode == 0 and isinstance(result.stdout, str):
+            state = json.loads(result.stdout)
+            print('Candidate gateway state: ' + json.dumps({key: state.get(key) for key in
+                  ('Status', 'Running', 'ExitCode', 'OOMKilled')}), flush=True)
+        result = subprocess.run(['docker', 'logs', '--tail', '80', name],
+                                capture_output=True, text=True, timeout=10)
+        for output in (result.stdout, result.stderr):
+            if not isinstance(output, str):
+                continue
+            for line in output.splitlines():
+                if not re.search(r'\[(error|emerg|crit|alert)\]', line):
+                    continue
+                line = re.sub(r'request: "[^"]*"', 'request: "[redacted]"', line)
+                line = re.sub(r'(https?://[^?\s"]+)\?[^\s"]*', r'\1?[redacted]', line)
+                print('Candidate gateway error: ' + line, flush=True)
+        if origin:
+            address = str(ipaddress.ip_address(origin['origin_ip']))
+            if ':' in address:
+                address = '[' + address + ']'
+            host = origin['domain']
+            if not re.fullmatch(r'[A-Za-z0-9.-]+', host):
+                return
+            result = subprocess.run(['docker', 'exec', name, 'curl', '--silent', '--show-error',
+                                     '--fail', '--connect-timeout', '5', '--max-time', '10',
+                                     '--resolve', f'{host}:443:{address}', f'https://{host}/api/health',
+                                     '--output', '/dev/null'], capture_output=True, text=True, timeout=15)
+            print(f'Origin HTTPS probe from gateway: exit={result.returncode}', flush=True)
+            if isinstance(result.stderr, str) and result.stderr:
+                print('Origin HTTPS probe: ' + result.stderr.strip()[:2000], flush=True)
+    except Exception as error:
+        print(f'Candidate diagnostics unavailable: {type(error).__name__}', flush=True)
 
 
 def activate(release, channel, slot, current):
@@ -216,6 +256,7 @@ server {{
         return candidate
     finally:
         if not switched:
+            gateway_diagnostics(names['gateway'], config if edge else None)
             for path, content in backups.items():
                 if content is None:
                     path.unlink(missing_ok=True)
