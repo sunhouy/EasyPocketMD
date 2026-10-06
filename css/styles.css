@@ -6252,3 +6252,6 @@ body.night-mode .storage-usage-row strong { color:#eee !important; }
     background:#f1f1f1 !important; color:#555 !important; font-size:18px !important; flex-shrink:0;
 }
 body.night-mode .modal-overlay button:has(> i.fa-times:only-child), body.night-mode .code-output button:is([title="关闭"],[title="Close"]) { background:#444 !important; color:#eee !important; }
+
+.deployment-route-status { padding:12px 16px; margin-top:6px; border-top:1px solid #e5e5e5; font-size:12px; color:#666; cursor:default; }
+body.night-mode .deployment-route-status { color:#bbb; border-color:#444; }

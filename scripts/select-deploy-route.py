@@ -1,29 +1,66 @@
 #!/usr/bin/env python3
 """Choose direct SSH or a US TCP relay using acknowledged upload throughput.
 
-Only a one-MiB zero stream is sent to /dev/null. No credentials/images are copied
+A bounded zero stream is discarded after acknowledgement by the origin. No credentials/images are copied
 to the relay; the original SSH session remains encrypted end-to-end.
 """
 import ipaddress
 import os
+import json
+import select as io_select
 from pathlib import Path
 import shlex
 import subprocess
 import sys
 import time
 
-SAMPLE = b'\0' * (1024 * 1024)
+MAX_SAMPLE_BYTES = 64 * 1024 * 1024
+# Remote acknowledgement measures sustained bytes received, excluding SSH startup.
+SAMPLE_SERVER = """import json,os,select,time
+received=0; started=None; deadline=time.monotonic()+20
+while time.monotonic()<deadline:
+ if not select.select([0],[],[],max(0,deadline-time.monotonic()))[0]: break
+ chunk=os.read(0,65536)
+ if not chunk: break
+ if started is None: started=time.monotonic(); deadline=started+20
+ received+=len(chunk)
+print(json.dumps({'bytes':received,'seconds':time.monotonic()-started if started is not None else 0}))
+"""
 
 
 def probe(options, destination):
-    started = time.monotonic()
+    process = None
     try:
-        subprocess.run(['sshpass', '-e', 'ssh', *options, destination, 'cat >/dev/null'],
-                       input=SAMPLE, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
-                       check=True, timeout=45)
-        return len(SAMPLE) / max(time.monotonic() - started, .001)
-    except (subprocess.SubprocessError, OSError):
+        command = shlex.join(['python3', '-u', '-c', SAMPLE_SERVER])
+        process = subprocess.Popen(['sshpass', '-e', 'ssh', *options, destination, command],
+                                   stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        descriptor = process.stdin.fileno(); os.set_blocking(descriptor, False)
+        deadline, sent = time.monotonic() + 35, 0
+        chunk = b'\0' * 65536
+        while sent < MAX_SAMPLE_BYTES and time.monotonic() < deadline:
+            if process.poll() is not None: break
+            if not io_select.select([], [descriptor], [], .2)[1]: continue
+            try:
+                sent += os.write(descriptor, chunk[:min(len(chunk), MAX_SAMPLE_BYTES - sent)])
+            except BlockingIOError: continue
+            except BrokenPipeError: break
+        try: process.stdin.close()
+        except BrokenPipeError: pass
+        process.stdin = None
+        output, _ = process.communicate(timeout=10)
+        if process.returncode: return None
+        result = json.loads(output)
+        size, elapsed = result['bytes'], result['seconds']
+        if not 0 < size <= min(sent, MAX_SAMPLE_BYTES) or not 0 < elapsed <= 40: return None
+        return size / elapsed
+    except (subprocess.SubprocessError, OSError, ValueError, KeyError, TypeError):
         return None
+    finally:
+        if process is not None and process.poll() is None:
+            process.kill()
+            try: process.communicate(timeout=5)
+            except subprocess.TimeoutExpired:
+                process.stdout.close(); process.stderr.close()
 
 
 def select(key, config):
@@ -41,14 +78,14 @@ def select(key, config):
     common = ['-o', 'ConnectTimeout=10', '-o', 'Compression=no', '-o', 'ServerAliveInterval=15',
               '-o', 'ServerAliveCountMax=1', '-o', 'StrictHostKeyChecking=' + ('yes' if known_key else 'accept-new')]
     destination = user + '@' + host
-    print('Probing origin direct SSH upload (1 MiB, at most 45s)', flush=True)
+    print('Probing sustained origin direct SSH upload (20s reception, maximum 64 MiB)', flush=True)
     direct = probe(common, destination)
     command = shlex.join(['ssh', '-i', str(key), '-o', 'IdentitiesOnly=yes', '-o', 'BatchMode=yes',
                           '-o', 'ConnectTimeout=10', '-o', 'StrictHostKeyChecking=accept-new',
                           '-W', '[%h]:%p', user + '@' + relay])
     relay_config = 'Host *\n    Compression no\n    ProxyCommand ' + command + '\n'
     config.write_text(relay_config)
-    print('Probing origin SSH upload through US (1 MiB, at most 45s)', flush=True)
+    print('Probing sustained origin SSH upload through US (20s reception, maximum 64 MiB)', flush=True)
     routed = probe([*common, '-F', str(config)], destination)
     def speed(value):
         return f'{value / 1024:.1f} KiB/s' if value is not None else 'unavailable'

@@ -121,9 +121,9 @@ HTTPS setup, archive verification/import and health checks/traffic switching.
 
 ## Origin route selection and failed edge diagnostics
 
-Before parallel deployment, CI compares one-MiB SSH uploads to `/dev/null` on the
-origin, directly and through a US SSH TCP relay. Each sample has a 45-second
-limit; use the relay only if direct fails or the relay is at least 25% faster.
+Before parallel deployment, CI compares sustained SSH uploads acknowledged by the origin, directly
+and through a US SSH TCP relay. Each receiver samples for 20 seconds, bounded
+to 64 MiB; each local probe is bounded to about 45 seconds; use the relay only if direct fails or the relay is at least 25% faster.
 If neither works, stop before image transfer. The relay uses `SSHKEY_US` only on
 CI; the origin login and image stream remain inside end-to-end SSH encryption.
 No image archive, origin password or database credentials are copied to the US
@@ -139,3 +139,19 @@ removed, logs include its running/exit/OOM status and Nginx transport errors
 (with request/query data redacted), plus a pinned-origin HTTPS probe inside the
 gateway to distinguish certificate trust, connectivity and upstream HTTP
 failures. These diagnostics do not log container environment or credentials.
+
+## Visible serving route and smaller API runtime
+
+The More menu footer on desktop/mobile reads `/deployment-route.json` from the
+current public origin. The domestic and overseas gateways return their own
+identity before any API proxying, with no-store headers and Service Worker cache
+exclusion. This labels the serving route, rather than guessing a user's country
+or treating the API's always-domestic database origin as the frontend region.
+Failed/offline checks show Unknown and bilingual labels adapt to language changes.
+
+The trusted API runtime no longer embeds the Emscripten SDK. All C/C++ execution
+already runs with GCC/G++ inside the separate sandbox; frontend WASM remains
+built by Emscripten in CI. Removing that unused SDK reduces cold-deployment image
+size without changing supported languages. Original-server bandwidth remains an
+external limit; dependency caching prevents repeated transfers only after those
+layers have been successfully installed/retained on the server.

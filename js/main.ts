@@ -1,3 +1,4 @@
+import { createDeploymentRouteStatus } from './main/deployment-route';
 import { renderStorageUsage } from './main/storage-usage';
 /**
  * Vditor 初始化、界面与功能绑定
@@ -20,6 +21,7 @@ import { clientDownloadLinks } from './client-downloads';
 import { bindFileListDrop } from './files/external/drop';
 
 document.addEventListener('DOMContentLoaded', function() {
+    const refreshDeploymentRoute = createDeploymentRouteStatus();
     'use strict';
 
 
@@ -2112,7 +2114,10 @@ document.addEventListener('DOMContentLoaded', function() {
             neuMenuBtn.addEventListener('click', function(e) { 
                 e.stopPropagation(); 
                 var currentDropdown = document.getElementById('mobileDropdown');
-                if (currentDropdown) currentDropdown.classList.toggle('show'); 
+                if (currentDropdown) {
+                    currentDropdown.classList.toggle('show');
+                    if (currentDropdown.classList.contains('show')) void refreshDeploymentRoute();
+                }
             });
         }
         var mobileModeBtn = document.getElementById('mobileModeBtn');
@@ -2270,6 +2275,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 var willShowMore = !desktopDropdown.classList.contains('show');
                 desktopDropdown.classList.toggle('show');
                 if (willShowMore) {
+                    void refreshDeploymentRoute();
                     var moreRect = e.currentTarget.getBoundingClientRect();
                     var bodyStyles = window.getComputedStyle(document.body);
                     var toolbarOffset = parseFloat(bodyStyles.getPropertyValue('--top-toolbar-offset')) || 0;
@@ -2471,7 +2477,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 fn: function(e) { 
                     e.stopPropagation(); 
                     var currentDropdown = document.getElementById('mobileDropdown');
-                    if (currentDropdown) currentDropdown.classList.toggle('show'); 
+                    if (currentDropdown) {
+                        currentDropdown.classList.toggle('show');
+                        if (currentDropdown.classList.contains('show')) void refreshDeploymentRoute();
+                    }
                 } 
             },
             { id: 'mobileModeBtn', fn: function() { showModeSelection(); closeDrop(); } },
