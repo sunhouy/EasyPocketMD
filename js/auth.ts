@@ -1,3 +1,4 @@
+import { requirePrivacyConsent } from './build-variant';
 /**
  * 用户认证 - 登录、注册、登出、登录模态
  * 添加了登录/注册按钮的防抖处理，防止重复提交
@@ -589,6 +590,9 @@
     }
 
     function showLoginModal() {
+        for (const id of ['loginPrivacyConsent','registerPrivacyConsent']) {
+            const checkbox=document.getElementById(id) as HTMLInputElement; if(checkbox)checkbox.checked=false;
+        }
         const modal = document.getElementById('loginModalOverlay');
         if (!modal) return;
         modal.classList.add('show');
@@ -735,6 +739,7 @@
     }
 
     async function login() {
+        if (!requirePrivacyConsent('login')) return;
         // 防抖：如果正在提交则直接返回
         if (_loginSubmitting) return;
         _loginSubmitting = true;
@@ -843,6 +848,7 @@
     }
 
     async function register() {
+        if (!requirePrivacyConsent('register')) return;
         // 防抖：如果正在提交则直接返回
         if (_registerSubmitting) return;
         _registerSubmitting = true;

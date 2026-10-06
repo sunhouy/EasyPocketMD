@@ -1,3 +1,4 @@
+import { isMarketBuild, requireAIEnabled } from './build-variant';
 // 公式选择器
 function showFormulaPicker() {
     function isEn() { return window.i18n && window.i18n.getLanguage() === 'en'; }
@@ -665,7 +666,7 @@ function showFormulaPicker() {
             emptyMsg.appendChild(hintText);
 
             // 创建AI搜索链接
-            if (searchKeyword) {
+            if (searchKeyword && !isMarketBuild) {
                 // 检查长度限制
                 if (searchKeyword.length > 10) {
                     const lengthError = document.createElement('div');
@@ -862,6 +863,7 @@ function showFormulaPicker() {
 
 // AI搜索公式功能
 async function performAISearch(keyword) {
+    requireAIEnabled();
     function isEn() { return window.i18n && window.i18n.getLanguage() === 'en'; }
 
     // 检查关键词长度

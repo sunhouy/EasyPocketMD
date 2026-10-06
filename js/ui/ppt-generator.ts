@@ -1,3 +1,4 @@
+import { isMarketBuild } from '../build-variant';
 /**
  * PPT生成器模块 - 整合到AI助手
  * 支持：大纲生成 -> 全屏分页预览 -> 单页重新生成 -> 下载PPT
@@ -5,6 +6,7 @@
 
 (function(global) {
     'use strict';
+    if (isMarketBuild) return;
 
     function g<K extends keyof Window>(name: K): Window[K] { return global[name]; }
     function isEn() { return window.i18n && window.i18n.getLanguage() === 'en'; }

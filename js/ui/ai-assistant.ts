@@ -1,3 +1,4 @@
+import { isMarketBuild } from '../build-variant';
 /**
  * AI助手功能模块
  * 包含：帮我写、帮我改、帮我排版、生成PPT、AI查询
@@ -5,6 +6,7 @@
 
 (function(global) {
     'use strict';
+    if (isMarketBuild) return;
 
     function g<K extends keyof Window>(name: K): Window[K] { return global[name]; }
     function isEn() { return window.i18n && window.i18n.getLanguage() === 'en'; }

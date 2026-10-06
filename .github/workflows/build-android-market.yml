@@ -1,0 +1,440 @@
+name: Build Android App for App Markets
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  VITE_APP_MARKET: '1'
+  NODE_VERSION: '24'
+  JAVA_VERSION: '17'
+  ANDROID_API_LEVEL: '34'
+  ANDROID_BUILD_TOOLS: '34.0.0'
+  ANDROID_NDK_VERSION: '26.3.11579264'
+  ANDROID_ABI: 'arm64-v8a'
+
+
+jobs:
+  build-wasm:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Setup Emscripten
+        run: |
+          if [ ! -d "$HOME/emsdk" ]; then
+            git clone https://github.com/emscripten-core/emsdk.git "$HOME/emsdk"
+          fi
+          cd "$HOME/emsdk"
+          ./emsdk install 3.1.57
+          ./emsdk activate 3.1.57
+          echo "$HOME/emsdk" >> "$GITHUB_PATH"
+          echo "$HOME/emsdk/upstream/emscripten" >> "$GITHUB_PATH"
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build WASM text engine
+        run: npm run wasm:text:build
+
+      - name: Verify WASM source artifacts
+        run: npm run wasm:text:verify
+
+      - name: Upload WASM build artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: wasm-text-engine-dist
+          path: |
+            wasm_text_engine/dist/text_engine.js
+            wasm_text_engine/dist/text_engine.wasm
+          if-no-files-found: error
+
+  build-tauri-android:
+    needs: build-wasm
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v6
+
+      - name: Download WASM build artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: wasm-text-engine-dist
+          path: wasm_text_engine/dist
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v4
+        with:
+          packages: ''
+
+      - name: Install Android SDK components
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "y" | sdkmanager --licenses > /dev/null || true
+          sdkmanager \
+            "platform-tools" \
+            "platforms;android-${ANDROID_API_LEVEL}" \
+            "build-tools;${ANDROID_BUILD_TOOLS}" \
+            "ndk;${ANDROID_NDK_VERSION}"
+
+          echo "ANDROID_NDK_HOME=${ANDROID_SDK_ROOT}/ndk/${ANDROID_NDK_VERSION}" >> "$GITHUB_ENV"
+          echo "NDK_HOME=${ANDROID_SDK_ROOT}/ndk/${ANDROID_NDK_VERSION}" >> "$GITHUB_ENV"
+
+      - name: Clean install dependencies
+        run: |
+          rm -rf node_modules package-lock.json
+          npm install
+
+      - name: Generate Tauri icons
+        run: npx tauri icon src-tauri/icon-rgba.png
+
+      - name: Verify WASM source artifacts
+        run: npm run wasm:text:verify
+
+      - name: Build web frontend
+        run: npm run build:web
+
+      - name: Resolve checkout version
+        shell: bash
+        run: |
+          TAG_NAME="" # Use this checkout's package version; no Release publishing.
+          VERSION=$(node -e "
+            let tagName = process.argv[1];
+            let version = tagName.replace(/^v/, '');
+            if (!/^\\d+(?:\\.\\d+){0,2}$/.test(version)) {
+              version = require('./package.json').version || '0.0.0';
+            }
+            const parts = version.split('.').filter(Boolean);
+            if (parts.length === 1) version = parts[0] + '.0.0';
+            else if (parts.length === 2) version = parts[0] + '.' + parts[1] + '.0';
+            else if (parts.length >= 3) version = parts[0] + '.' + parts[1] + '.' + parts[2];
+            if (!/^\\d+\\.\\d+\\.\\d+$/.test(version)) {
+              console.error('Invalid version resolved:', version);
+              process.exit(1);
+            }
+            console.log(version);
+          " "$TAG_NAME")
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+
+      - name: Sync app versions
+        shell: bash
+        run: |
+          node -e '
+            const fs = require("fs");
+            const version = process.env.VERSION;
+
+            const pkgPath = "package.json";
+            const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8"));
+            pkg.version = version;
+            fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2));
+
+            const tauriPath = "src-tauri/tauri.conf.json";
+            const tauriConfig = JSON.parse(fs.readFileSync(tauriPath, "utf8"));
+            tauriConfig.version = version;
+              if (tauriConfig.package) delete tauriConfig.package;
+            fs.writeFileSync(tauriPath, JSON.stringify(tauriConfig, null, 2));
+
+            const cargoPath = "src-tauri/Cargo.toml";
+            const cargoRaw = fs.readFileSync(cargoPath, "utf8");
+            const patched = cargoRaw.replace(/^version\s*=\s*"[^"]+"/m, `version = "${version}"`);
+            fs.writeFileSync(cargoPath, patched);
+          '
+
+      - name: Initialize Android project (if needed)
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ ! -d "src-tauri/gen/android" ] \
+            || [ ! -f "src-tauri/gen/android/gradlew" ] \
+            || [ ! -f "src-tauri/gen/android/app/src/main/AndroidManifest.xml" ] \
+            || { [ ! -f "src-tauri/gen/android/app/build.gradle.kts" ] && [ ! -f "src-tauri/gen/android/app/build.gradle" ]; }; then
+            npm run tauri:android:init
+          fi
+
+      - name: Apply Android theme configuration (Status Bar, MainActivityConfiguration)
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash scripts/apply-android-config.sh
+
+      - name: Configure Android permissions (Camera, Microphone, File Access)
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash scripts/configure-android-permissions.sh
+
+      - name: Verify Android manifest soft input mode (source)
+        shell: bash
+        run: |
+          set -euo pipefail
+          MANIFEST="src-tauri/gen/android/app/src/main/AndroidManifest.xml"
+          if [ ! -f "$MANIFEST" ]; then
+            echo "AndroidManifest.xml not found at $MANIFEST"
+            exit 1
+          fi
+          if ! grep -q 'android:windowSoftInputMode="adjustResize"' "$MANIFEST"; then
+            echo "android:windowSoftInputMode=adjustResize is missing in source AndroidManifest.xml"
+            echo "Current AndroidManifest.xml:" && cat "$MANIFEST"
+            exit 1
+          fi
+          echo "✅ Source AndroidManifest.xml contains windowSoftInputMode=adjustResize"
+
+      - name: Tune Android build for smaller APK
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          APP_GRADLE_KTS="src-tauri/gen/android/app/build.gradle.kts"
+          APP_GRADLE_GROOVY="src-tauri/gen/android/app/build.gradle"
+          PROGUARD_RULES="src-tauri/gen/android/app/proguard-rules.pro"
+
+          if [ -f "$APP_GRADLE_KTS" ] && ! grep -q "EPM_ANDROID_SIZE_TUNING" "$APP_GRADLE_KTS"; then
+            {
+              echo ""
+              echo "// EPM_ANDROID_SIZE_TUNING"
+              echo "android {"
+              echo "  defaultConfig {"
+              echo "    ndk {"
+              echo "      abiFilters += listOf(\"arm64-v8a\")"
+              echo "    }"
+              echo "  }"
+              echo "  buildTypes {"
+              echo "    getByName(\"release\") {"
+              echo "      isMinifyEnabled = true"
+              echo "      isShrinkResources = true"
+              echo "      proguardFiles("
+              echo "        getDefaultProguardFile(\"proguard-android-optimize.txt\"),"
+              echo "        \"proguard-rules.pro\""
+              echo "      )"
+              echo "    }"
+              echo "  }"
+              echo "  packaging {"
+              echo "    resources {"
+              echo "      excludes += setOf("
+              echo "        \"META-INF/AL2.0\","
+              echo "        \"META-INF/LGPL2.1\","
+              echo "        \"META-INF/*.kotlin_module\","
+              echo "        \"DebugProbesKt.bin\""
+              echo "      )"
+              echo "    }"
+              echo "  }"
+              echo "}"
+            } >> "$APP_GRADLE_KTS"
+          fi
+
+          if [ -f "$APP_GRADLE_GROOVY" ] && ! grep -q "EPM_ANDROID_SIZE_TUNING" "$APP_GRADLE_GROOVY"; then
+            {
+              echo ""
+              echo "// EPM_ANDROID_SIZE_TUNING"
+              echo "android {"
+              echo "  defaultConfig {"
+              echo "    ndk {"
+              echo "      abiFilters 'arm64-v8a'"
+              echo "    }"
+              echo "  }"
+              echo "  buildTypes {"
+              echo "    release {"
+              echo "      minifyEnabled true"
+              echo "      shrinkResources true"
+              echo "      proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'"
+              echo "    }"
+              echo "  }"
+              echo "  packagingOptions {"
+              echo "    resources {"
+              echo "      excludes += ['META-INF/AL2.0', 'META-INF/LGPL2.1', 'META-INF/*.kotlin_module', 'DebugProbesKt.bin']"
+              echo "    }"
+              echo "  }"
+              echo "}"
+            } >> "$APP_GRADLE_GROOVY"
+          fi
+
+          if [ ! -f "$PROGUARD_RULES" ]; then
+            {
+              echo "# Keep WebView JS bridges and Tauri runtime integration classes."
+              echo "-keep class app.tauri.** { *; }"
+              echo "-keep class com.tauri.** { *; }"
+              echo "-keep class * extends android.app.Activity"
+            } > "$PROGUARD_RULES"
+          fi
+
+      - name: Setup Android signing keystore (from secrets)
+        env:
+          JKS_BASE64: ${{ secrets.JKS_BASE64 }}
+          JKS_ALIAS: ${{ secrets.JKS_ALIAS }}
+          JKS_PASSWORD: ${{ secrets.JKS_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ -z "${JKS_BASE64:-}" ] || [ -z "${JKS_ALIAS:-}" ] || [ -z "${JKS_PASSWORD:-}" ]; then
+            echo "Missing required signing secrets (JKS_BASE64 / JKS_ALIAS / JKS_PASSWORD)."
+            echo "Android workflow is configured to require signed APK output."
+            exit 1
+          fi
+
+          mkdir -p src-tauri/gen/android/app
+          printf '%s' "$JKS_BASE64" | base64 --decode > src-tauri/gen/android/app/release.keystore
+          chmod 600 src-tauri/gen/android/app/release.keystore
+
+          cat > src-tauri/gen/android/keystore.properties <<EOF
+          storePassword=${JKS_PASSWORD}
+          keyPassword=${JKS_PASSWORD}
+          keyAlias=${JKS_ALIAS}
+          storeFile=app/release.keystore
+          EOF
+
+          cat > src-tauri/gen/android/key.properties <<EOF
+          storePassword=${JKS_PASSWORD}
+          keyPassword=${JKS_PASSWORD}
+          keyAlias=${JKS_ALIAS}
+          storeFile=app/release.keystore
+          EOF
+
+      - name: Build Tauri Android APK
+        env:
+          TAURI_ANDROID_KEYSTORE_PATH: ${{ github.workspace }}/src-tauri/gen/android/app/release.keystore
+          TAURI_ANDROID_KEY_ALIAS: ${{ secrets.JKS_ALIAS }}
+          TAURI_ANDROID_KEY_PASSWORD: ${{ secrets.JKS_PASSWORD }}
+          TAURI_ANDROID_KEYSTORE_PASSWORD: ${{ secrets.JKS_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx tauri android build --apk --target aarch64
+
+      - name: Verify merged manifest soft input mode (release)
+        shell: bash
+        run: |
+          set -euo pipefail
+          MERGED_MANIFEST=""
+          while IFS= read -r file; do
+            if grep -q 'android:windowSoftInputMode="adjustResize"' "$file"; then
+              MERGED_MANIFEST="$file"
+              break
+            fi
+          done < <(find src-tauri/gen/android/app/build/intermediates -type f -name 'AndroidManifest.xml' 2>/dev/null || true)
+
+          if [ -z "${MERGED_MANIFEST:-}" ]; then
+            echo "No merged AndroidManifest.xml with adjustResize found under build/intermediates"
+            find src-tauri/gen/android/app/build/intermediates -type f -name 'AndroidManifest.xml' -print || true
+            exit 1
+          fi
+
+          echo "✅ Merged manifest verified: $MERGED_MANIFEST"
+
+      - name: Collect signed Android artifacts
+        env:
+          JKS_ALIAS: ${{ secrets.JKS_ALIAS }}
+          JKS_PASSWORD: ${{ secrets.JKS_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/android
+
+          SIGNED_APK="$(find src-tauri/gen/android/app/build/outputs/apk -type f -name '*release*.apk' ! -name '*unsigned*.apk' ! -name '*unaligned*.apk' | head -n 1)"
+          if [ -z "${SIGNED_APK:-}" ]; then
+            echo "No signed release APK found, attempting manual signing..."
+
+            UNSIGNED_APK="$(find src-tauri/gen/android/app/build/outputs/apk -type f -name '*release*unsigned.apk' | head -n 1)"
+            if [ -z "${UNSIGNED_APK:-}" ]; then
+              echo "No unsigned release APK found for manual signing"
+              find src-tauri/gen/android/app/build/outputs/apk -type f -name '*.apk' -print || true
+              exit 1
+            fi
+
+            KEYSTORE_PATH="src-tauri/gen/android/app/release.keystore"
+            if [ ! -f "$KEYSTORE_PATH" ]; then
+              echo "Keystore not found at $KEYSTORE_PATH"
+              exit 1
+            fi
+
+            APKSIGNER_BIN="${ANDROID_SDK_ROOT}/build-tools/${ANDROID_BUILD_TOOLS}/apksigner"
+            ZIPALIGN_BIN="${ANDROID_SDK_ROOT}/build-tools/${ANDROID_BUILD_TOOLS}/zipalign"
+            if [ ! -x "$APKSIGNER_BIN" ]; then
+              APKSIGNER_BIN="apksigner"
+            fi
+            if [ ! -x "$ZIPALIGN_BIN" ]; then
+              ZIPALIGN_BIN="zipalign"
+            fi
+
+            ALIGNED_APK="artifacts/android/easypocketmd-android-arm64-release-aligned.apk"
+            SIGNED_APK="artifacts/android/easypocketmd-android-arm64-release-signed.apk"
+
+            "$ZIPALIGN_BIN" -f -p 4 "$UNSIGNED_APK" "$ALIGNED_APK"
+            "$APKSIGNER_BIN" sign \
+              --ks "$KEYSTORE_PATH" \
+              --ks-key-alias "$JKS_ALIAS" \
+              --ks-pass "pass:$JKS_PASSWORD" \
+              --key-pass "pass:$JKS_PASSWORD" \
+              --out "$SIGNED_APK" \
+              "$ALIGNED_APK"
+          fi
+
+          cp "$SIGNED_APK" artifacts/android/easypocketmd-android-arm64-release.apk
+
+          SIGNED_AAB="$(find src-tauri/gen/android/app/build/outputs/bundle -type f -name '*release*.aab' | head -n 1 || true)"
+          if [ -n "${SIGNED_AAB:-}" ]; then
+            cp "$SIGNED_AAB" artifacts/android/easypocketmd-android-arm64-release.aab
+          fi
+
+      - name: Verify APK signature
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK_FILE="artifacts/android/easypocketmd-android-arm64-release.apk"
+          if [ ! -f "$APK_FILE" ]; then
+            echo "APK not found for signature verification: $APK_FILE"
+            exit 1
+          fi
+          APKSIGNER_BIN="${ANDROID_SDK_ROOT}/build-tools/${ANDROID_BUILD_TOOLS}/apksigner"
+          if [ -x "$APKSIGNER_BIN" ]; then
+            "$APKSIGNER_BIN" verify --verbose --print-certs "$APK_FILE"
+          else
+            apksigner verify --verbose --print-certs "$APK_FILE"
+          fi
+
+      - name: Verify market package identity and signing certificate
+        env:
+          JKS_ALIAS: ${{ secrets.JKS_ALIAS }}
+          JKS_PASSWORD: ${{ secrets.JKS_PASSWORD }}
+        run: |
+          set -euo pipefail
+          apk=artifacts/android/easypocketmd-android-arm64-release.apk
+          tools="$ANDROID_SDK_ROOT/build-tools/$ANDROID_BUILD_TOOLS"
+          expected_package=$(node -p "require('./src-tauri/tauri.conf.json').identifier")
+          actual_package=$("$tools/aapt" dump badging "$apk" | sed -n "s/^package: name='\([^']*\)'.*/\1/p")
+          test "$actual_package" = "$expected_package"
+          expected_cert=$(keytool -exportcert -keystore src-tauri/gen/android/app/release.keystore -alias "$JKS_ALIAS" -storepass:env JKS_PASSWORD | sha256sum | cut -d ' ' -f1)
+          actual_cert=$("$tools/apksigner" verify --print-certs "$apk" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | tr '[:upper:]' '[:lower:]' | tr -d ':')
+          test "$actual_cert" = "$expected_cert"
+      - name: Upload Android artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: md-tauri-android-market
+          path: artifacts/android/*
+          if-no-files-found: error
+

@@ -1,3 +1,4 @@
+import { isMarketBuild, requireAIEnabled } from '../build-variant';
 
 (function(global) {
     'use strict';
@@ -170,6 +171,7 @@
 
     // AI搜索功能 - 搜索Markdown代码
     async function performAISearch(keyword) {
+    requireAIEnabled();
         // 检查关键词长度
         if (keyword.length > 10) {
             global.showMessage(isEn() ? 'Search keyword too long (max 10 characters)' : '搜索关键词过长（最多10个字）', 'error');
@@ -437,7 +439,7 @@ Provide 5-10 most relevant Markdown examples. Only return the list, no explanati
                 hintText.style.cssText = 'margin-bottom: 10px;';
                 emptyMsg.appendChild(hintText);
 
-                if (searchKeyword) {
+                if (searchKeyword && !isMarketBuild) {
                     // 检查长度限制
                     if (searchKeyword.length > 10) {
                         var lengthError = document.createElement('div');

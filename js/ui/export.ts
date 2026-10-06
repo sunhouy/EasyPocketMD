@@ -1,3 +1,4 @@
+import { isMarketBuild } from '../build-variant';
 import { saveAfterDialogOpens } from './dialog-save';
 
 const global = window;
@@ -79,6 +80,8 @@ async function exportContent() {
         { name: isEn() ? 'Excel Workbook (.xlsx)' : 'Excel工作簿 (.xlsx)', ext: 'xlsx', icon: '<i class="fas fa-file-excel"></i>' },
         { name: isEn() ? 'PDF File (.pdf)' : 'PDF文件 (.pdf)', ext: 'pdf', icon: '<i class="fas fa-file-pdf"></i>' }
     ];
+
+    if (isMarketBuild) formats = formats.filter(format => format.ext !== 'pptx');
 
     var nightMode = g('nightMode') === true;
     var bg = nightMode ? '#2d2d2d' : 'white';

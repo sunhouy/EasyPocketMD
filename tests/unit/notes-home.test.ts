@@ -98,3 +98,26 @@ it('anchors a measured menu beside the clicked button without guessing its dimen
     const frame=jest.spyOn(window,'requestAnimationFrame').mockImplementation(callback=>{callback(0);return 1;});
     more.click();expect(element.style.left).toBe('140px');expect(element.style.top).toBe('250px');frame.mockRestore();
 });
+it('preserves the scroll position across file refreshes and stops rebuilding at the bottom',()=>{
+    const grid=document.querySelector<HTMLElement>('.notes-home-grid');grid.scrollTop=1250;
+    const tabs=document.querySelector<HTMLElement>('.notes-home-tabs');tabs.scrollLeft=160;
+    render();expect(grid.scrollTop).toBe(1250);expect(tabs.scrollLeft).toBe(160);
+    const replace=jest.spyOn(grid,'replaceChildren');
+    grid.dispatchEvent(new Event('scroll'));expect(replace).not.toHaveBeenCalled();
+});
+it('isolates text search from password autofill',()=>{
+    const search=document.querySelector<HTMLInputElement>('#notesHomeSearch');
+    expect(search.type).toBe('search');expect(search.autocomplete).toBe('off');
+    expect(search.form.getAttribute('role')).toBe('search');expect(search.form.autocomplete).toBe('off');
+});
+it('shows shared synchronization states and encryption locks and opens conflicts without opening the file',()=>{
+    app.files[2].syncConflict=true;app.files[2].e2e_enabled=1;app.openSyncConflict=jest.fn();render();
+    const card=document.querySelector<HTMLElement>('[data-file-id="note"].notes-file-card');
+    const status=card.querySelector<HTMLButtonElement>('.file-sync-icon');
+    expect(status.dataset.state).toBe('conflict');expect(card.querySelector('.fa-lock')).not.toBeNull();
+    status.click();expect(app.openSyncConflict).toHaveBeenCalledWith('note');expect(app.openFile).not.toHaveBeenCalled();
+    app.files[2].syncConflict=false;app.files[2].syncBusy=true;render();
+    expect(document.querySelector('[data-file-id="note"].notes-file-card .fa-spin')).not.toBeNull();
+    app.files[2].syncBusy=false;render();
+    expect(document.querySelector('[data-file-id="note"].notes-file-card .fa-spin')).toBeNull();
+});

@@ -1,6 +1,6 @@
 /// <reference lib="dom" />
 export type SyncStatus = 'syncing' | 'synced' | 'remote' | 'conflict' | 'offline' | 'offline-dirty' | 'pending';
-const states: Record<SyncStatus, [string, string]> = {
+export const syncStatusPresentation: Record<SyncStatus, [string, string]> = {
     syncing: ['fa-arrows-rotate fa-spin', '同步中'], synced: ['fa-circle-check', '已同步'],
     remote: ['fa-cloud-arrow-down', '云端有更新'], conflict: ['fa-triangle-exclamation', '本地与云端冲突，点击处理'],
     offline: ['fa-plug-circle-xmark', '离线'], 'offline-dirty': ['fa-cloud-arrow-up', '离线，本地有修改'], pending: ['fa-clock', '等待同步']
@@ -99,7 +99,7 @@ export function refreshSyncIcons(globalRef: any): void {
         const encrypted = [true, 1, '1', 'true'].includes(file.e2e_enabled ?? file.e2eEnabled);
         const vault = globalRef.E2EVault?.state();
         icon.hidden = !!(encrypted && !vault?.unlocked && (vault?.config || vault?.loaded !== true));
-        const [symbol, label] = states[status]; if (icon.dataset.state !== status) { icon.dataset.state = status; icon.className = 'file-sync-icon ' + status; icon.title = label; icon.setAttribute('aria-label', label);
+        const [symbol, label] = syncStatusPresentation[status]; if (icon.dataset.state !== status) { icon.dataset.state = status; icon.className = 'file-sync-icon ' + status; icon.title = label; icon.setAttribute('aria-label', label);
         icon.innerHTML = '<i class="fas ' + symbol + '" aria-hidden="true"></i>'; }
         let lock = anchor.querySelector('.file-e2e-indicator');
         if (encrypted) {

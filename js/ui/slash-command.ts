@@ -1,3 +1,4 @@
+import { isMarketBuild } from '../build-variant';
 import { pinyin } from 'pinyin-pro';
 import { rememberThemeMode } from '../main/theme-preference';
 
@@ -343,6 +344,7 @@ function activateUploadInput() {
 }
 
 async function runAction(action) {
+    if (isMarketBuild && action === 'openAIAssistant') return false;
     switch (action) {
         case 'openFileList': {
             var sidebar = document.getElementById('fileListSidebar');
@@ -1217,6 +1219,7 @@ function scoreBuiltinItem(item, query) {
 function searchSlashEntries(entries, query, limit) {
     if (!query) return [];
     if (!Array.isArray(entries) || !entries.length) return [];
+    if (isMarketBuild) entries = entries.filter(item => item.action !== 'openAIAssistant');
 
     var matched = [];
     for (var i = 0; i < entries.length; i++) {
@@ -1256,6 +1259,7 @@ function mergePaletteItems(primaryItems, secondaryItems, limit) {
     function append(items) {
         for (var i = 0; i < items.length; i++) {
             var item = items[i];
+            if (isMarketBuild && item.action === 'openAIAssistant') continue;
             var key = keyOf(item);
             if (!key || seen.has(key)) continue;
 

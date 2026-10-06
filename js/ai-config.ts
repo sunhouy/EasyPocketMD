@@ -1,3 +1,4 @@
+import { isMarketBuild, requireAIEnabled } from './build-variant';
 /**
  * AI 模型配置模块（前端直连，云不提供模型）
  *
@@ -52,6 +53,7 @@ export function saveAIConfig(config: AIConfig): void {
 }
 
 export function isAIConfigReady(config?: AIConfig): boolean {
+  if (isMarketBuild) return false;
   const c = config || getAIConfig();
   return !!(c.apiKey && c.baseUrl && c.model);
 }
@@ -100,6 +102,7 @@ async function readChatResponse(response: Response): Promise<any> {
  * @returns 模型返回的文本内容
  */
 async function requestChat(messages: Array<{ role: string; content: string }>, opts?: { maxTokens?: number; temperature?: number; signal?: AbortSignal; recoverTruncation?: boolean }, allowContinuation = true): Promise<string> {
+  requireAIEnabled();
   const config = getAIConfig();
   if (!isAIConfigReady(config)) {
     const err: any = new Error('AI 模型未配置，请在“设置 - AI 模型”中填写 apiKey、baseUrl 与模型名称');
@@ -190,6 +193,7 @@ export async function callText(systemPrompt: string, userPrompt: string, opts?: 
 }
 
 export async function callEmbeddings(input: string[], options: { signal?: AbortSignal } = {}): Promise<number[][]> {
+  requireAIEnabled();
   const config = getAIConfig();
   if (!config.embeddingModel || !isAIConfigReady(config)) throw new Error('请配置检索向量模型 / Configure a retrieval embedding model');
   const url = normalizeChatUrl(config.baseUrl).replace(/\/chat\/completions$/i, '/embeddings');
@@ -212,6 +216,7 @@ const HIDDEN_FILE_KEY = 'ai_config_cloud_uploaded';
 
 /** 将配置端到端加密后保存到云端隐藏文件。仅当前端保存本地会保存时调用。 */
 export async function syncAIConfigToCloud(config: AIConfig): Promise<void> {
+  if (isMarketBuild) return;
   const user = (window as any).currentUser;
   if (!user?.username || !user.token) throw new Error('请先登录后再同步 AI 配置');
   // Encryption unlock is independent from ordinary account authentication.
@@ -255,6 +260,7 @@ export async function syncAIConfigToCloud(config: AIConfig): Promise<void> {
 
 /** 删除云端隐藏配置文件。 */
 export async function deleteAIConfigFromCloud(): Promise<void> {
+  if (isMarketBuild) return;
   const user = (window as any).currentUser;
   if (!user || !user.username) return;
   const api = (window as any).getApiBaseUrl ? (window as any).getApiBaseUrl() : 'api';
@@ -275,6 +281,7 @@ export async function deleteAIConfigFromCloud(): Promise<void> {
 
 /** 从云端隐藏文件拉取并解密配置（合并到本地配置）。 */
 export async function loadAIConfigFromCloud(): Promise<AIConfig | null> {
+  if (isMarketBuild) return null;
   const user = (window as any).currentUser;
   if (!user?.username || !user.token) return null;
   const password = user.password;

@@ -1,8 +1,9 @@
+import { isMarketBuild } from '../build-variant';
 // Only this small controller is eager. The renderer and Live2D SDK stay in lazy chunks.
 import { LIVE2D_MODELS, type Live2DModel, type Live2DPreference } from './live2d-models';
 export type { Live2DPreference } from './live2d-models';
 export function live2DPreference(value: any): Live2DPreference {
-    return { enabled: value?.enabled === true, model: Object.hasOwn(LIVE2D_MODELS, value?.model) ? value.model as Live2DModel : 'shizuku' };
+    return { enabled: !isMarketBuild && value?.enabled === true, model: Object.hasOwn(LIVE2D_MODELS, value?.model) ? value.model as Live2DModel : 'shizuku' };
 }
 export function createLive2DControls() {
     const enabled = document.getElementById('live2dEnabled') as HTMLInputElement;
