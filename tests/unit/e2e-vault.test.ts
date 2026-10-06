@@ -31,7 +31,7 @@ afterEach(()=>{ vault.reset(); delete window.E2EVault; attachments.clear(); jest
 async function setup(custom={}) { await vault.saveSettings({...options,...custom}); window.E2EVault=vault; }
 async function reopen() { vault.reset(); await vault.initialize(); }
 it('each enabled password independently opens the same key, including legacy files',async()=>{
-    const legacy=await e2e.encrypt('legacy private note','login-password');
+    const legacy=require('crypto-js').AES.encrypt('legacy private note','login-password').toString();
     await setup(); const master=vault.secrets().master;
     const cipher=await e2e.encrypt('new private note','ignored'); expect(cipher).toMatch(/^EPMD2:/);
     expect(JSON.stringify(stored)).not.toContain(master); expect(JSON.stringify(stored)).not.toContain('login-password');
@@ -40,6 +40,12 @@ it('each enabled password independently opens the same key, including legacy fil
     expect(await e2e.decrypt(cipher,'wrong')).toBe('new private note');
     expect(await e2e.decrypt(legacy,'wrong')).toBe('legacy private note');
     await reopen(); await vault.unlockPassword('login','login-password'); expect(vault.secrets().master).toBe(master);
+});
+it('opens authenticated documents written before vault setup after dedicated unlock',async()=>{
+    const cipher=await e2e.encrypt('pre-vault private note','login-password');
+    expect(cipher).toMatch(/^EPMD2:/);
+    await setup(); await reopen(); await vault.unlockPassword('dedicated',options.password);
+    expect(await e2e.resolveFileContent(cipher,null,true)).toBe('pre-vault private note');
 });
 it('rejects wrong passwords and authenticated ciphertext modifications',async()=>{
     await setup(); const cipher=await e2e.encrypt('private','ignored');
