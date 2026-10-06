@@ -80,3 +80,21 @@ it('never displays or searches locked plaintext and does not request an unlock',
     expect(document.querySelector('.notes-file-preview').textContent).toBe('加密文件');
     const search=document.querySelector<HTMLInputElement>('#notesHomeSearch');search.value='不能泄露';render();expect(document.querySelectorAll('.notes-file-card')).toHaveLength(0);
 });
+it('uses compact product labels, accessible icons and only real folder tabs',()=>{
+    expect(document.querySelector('.notes-home-header h1').textContent).toBe('EasyPocketMD');
+    expect(document.querySelector<HTMLInputElement>('#notesHomeSearch').placeholder).toBe('搜索文件');
+    expect([...document.querySelectorAll('.notes-folder-tab')].map(item=>item.textContent)).toEqual(['全部','学习','学习/子目录']);
+    const tools=document.querySelectorAll<HTMLButtonElement>('.notes-home-tools button');
+    expect(tools[0].textContent).toBe('');expect(tools[0].querySelector('i')).not.toBeNull();
+    expect(tools[0].getAttribute('aria-label')).toBe('账号管理');
+    app.i18n={getLanguage:()=> 'en'};render();
+    expect(document.querySelector<HTMLInputElement>('#notesHomeSearch').placeholder).toBe('Search files');
+});
+it('anchors a measured menu beside the clicked button without guessing its dimensions',()=>{
+    const element=document.createElement('ul');element.className='vakata-context';document.body.append(element);
+    jest.spyOn(element,'getBoundingClientRect').mockReturnValue({width:180,height:260} as DOMRect);
+    const more=document.querySelector<HTMLButtonElement>('.notes-card-menu');
+    jest.spyOn(more,'getBoundingClientRect').mockReturnValue({right:320,bottom:250,top:214} as DOMRect);
+    const frame=jest.spyOn(window,'requestAnimationFrame').mockImplementation(callback=>{callback(0);return 1;});
+    more.click();expect(element.style.left).toBe('140px');expect(element.style.top).toBe('250px');frame.mockRestore();
+});

@@ -3,7 +3,7 @@
 import { createSyncRuntimeApi } from '../../js/files/sync';
 import { isExternalLocalFile } from '../../js/files/external';
 jest.mock('../../js/files/websocket-sync', () => ({ createWebSocketClient: jest.fn(), createSyncThrottle: jest.fn() }));
-jest.mock('../../js/e2e', () => ({ resolveFileContent: async content => content }));
+jest.mock('../../js/e2e', () => ({ resolveFileContent: jest.fn(async content => content) }));
 
 function fixture(write, read) {
     const file = { id: 'local', name: 'note.md', type: 'file', content: 'edit', isExternalLocal: true, localFileMode: 'tauri', localAccessState: 'ready' };
@@ -215,4 +215,39 @@ it.each([false,true])('first login replaces only an untouched guest welcome: edi
     global.fetch=jest.fn(async()=>({json:async()=>({code:200,data:{files:[{name:'cloud.md',content:'cloud',content_version:2}]}})}));
     try {await rt.loadFilesFromServer();expect(app.files.some(f=>f.id==='guest')).toBe(edited);expect(app.files.find(f=>f.id==='guest')?.serverDeleted).not.toBe(true);expect(app.files.some(f=>f.name==='cloud.md')).toBe(true);}
     finally {jest.clearAllTimers();jest.useRealTimers();}
+});
+test('an unreadable encrypted document does not fail the whole startup file list',async()=>{
+    const {installSyncRuntime}=await import('../../js/files/sync-runtime');
+    const previousUser=window.currentUser, previousVault=window.E2EVault;
+    const decrypt=require('../../js/e2e').resolveFileContent;
+    decrypt.mockImplementation(async content=>{
+        if(content==='EPMD2:unreadable')throw Error('无法解密');return content;
+    });
+    const app={files:[],currentUser:{username:'user',token:'token',password:'secret'},unsavedChanges:{},pendingServerSync:{},lastSyncedContent:{},showSyncStatus:jest.fn()};
+    window.currentUser=app.currentUser;delete window.E2EVault;
+    const hooks={loadFiles:jest.fn(),loadLocalFiles:jest.fn(),shouldAutoOpenInitialFile:()=>false};
+    const rt=installSyncRuntime(app,{syncCurrentEditorSnapshotIntoFiles:()=>{}},hooks);
+    global.fetch=jest.fn(async()=>({json:async()=>({code:200,data:{files:[{name:'locked.md',e2e_enabled:1,content:'EPMD2:unreadable',content_version:2},{name:'plain.md',content:'正常正文',content_version:1}]}})}));
+    try {
+        await rt.loadFilesFromServer();
+        expect(app.showSyncStatus).not.toHaveBeenCalled();expect(hooks.loadLocalFiles).not.toHaveBeenCalled();
+        expect(app.files.find(f=>f.name==='locked.md')).toMatchObject({contentLoaded:false,e2e_enabled:1});
+        expect(app.files.find(f=>f.name==='locked.md').content).toBe('');
+        expect(app.files.find(f=>f.name==='plain.md').content).toBe('正常正文');
+    } finally {decrypt.mockImplementation(async content=>content);window.currentUser=previousUser;window.E2EVault=previousVault;}
+});
+test('a locked cache serializer preserves a successful cloud list without a plaintext fallback',async()=>{
+    const {installSyncRuntime}=await import('../../js/files/sync-runtime');
+    const previous=window.e2eSerializeFiles;
+    window.e2eSerializeFiles=()=>{throw Error('encryption locked');};
+    localStorage.setItem('vditor_files','[]');
+    const app={files:[],currentUser:{username:'user',token:'token'},unsavedChanges:{},pendingServerSync:{},lastSyncedContent:{},showSyncStatus:jest.fn()};
+    const hooks={loadFiles:jest.fn(),loadLocalFiles:jest.fn(),shouldAutoOpenInitialFile:()=>false};
+    const rt=installSyncRuntime(app,{syncCurrentEditorSnapshotIntoFiles:()=>{}},hooks);
+    global.fetch=jest.fn(async()=>({json:async()=>({code:200,data:{files:[{name:'cloud.md',content:'new cloud content',content_version:2}]}})}));
+    try {
+        await rt.loadFilesFromServer();expect(app.files[0].name).toBe('cloud.md');
+        expect(app.showSyncStatus).not.toHaveBeenCalled();expect(hooks.loadLocalFiles).not.toHaveBeenCalled();
+        expect(localStorage.getItem('vditor_files')).toBe('[]');
+    } finally {window.e2eSerializeFiles=previous;}
 });

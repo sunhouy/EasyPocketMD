@@ -1040,9 +1040,17 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
 
                     const fileE2EEnabled = isFileE2EEnabled(f);
                     if (window.currentUser && content) {
-                        await global.E2EVault?.initialize();
                         const state = global.E2EVault?.state();
-                        content = state?.config && !state.unlocked && isFileE2EEnabled(f) ? undefined : await resolveE2EFileContent(content, f);
+                        if (state?.config && !state.unlocked && fileE2EEnabled) content = undefined;
+                        else {
+                            try { content = await resolveE2EFileContent(content, f); }
+                            catch (error) {
+                                // A locked/unreadable document must not fail the entire metadata list.
+                                // Keep its body unloaded; opening the document handles unlock/errors.
+                                if (!fileE2EEnabled && !/^EPMD\d*:|^U2FsdGVkX1/.test(content)) throw error;
+                                content = undefined;
+                            }
+                        }
                     }
 
                     if (name.endsWith('/') || content === '{"meta":"folder"}' || content === '{"type":"folder"}') {
@@ -1176,7 +1184,7 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
             }
         } catch (error) {
             console.error('从服务器加载文件失败:', error);
-            await tryHandleTokenExpired(error);
+            if (!isStillCurrentUser() || await tryHandleTokenExpired(error)) return;
             global.showSyncStatus(isEn() ? 'Sync failed, using local files' : '同步失败，使用本地文件', 'error');
             hooks.loadLocalFiles();
         } finally {
@@ -1716,7 +1724,14 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
         const existing = g('files');
         if (Array.isArray(existing)) { existing.splice(0, existing.length, ...mergedFiles); global.files = existing; }
         else global.files = mergedFiles;
-        localStorage.setItem('vditor_files', window.e2eSerializeFiles ? window.e2eSerializeFiles(global.files) : JSON.stringify(global.files));
+        try {
+            localStorage.setItem('vditor_files', window.e2eSerializeFiles ? window.e2eSerializeFiles(global.files) : JSON.stringify(global.files));
+        } catch (error) {
+            // A locked serializer/full cache must not roll a successful cloud list
+            // back to stale local metadata. Preserve the existing encrypted cache;
+            // never fall back to writing unencrypted documents.
+            console.warn('File list cache could not be refreshed:', error);
+        }
         mergedFiles.forEach(function(file) {
             if (!file || !file.id || isExternalLocalFile(file)) return;
             if (file.isSynced) {

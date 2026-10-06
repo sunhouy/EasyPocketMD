@@ -6155,21 +6155,22 @@ body.night-mode .file-details-dialog { background:#2d2d2d; color:#eee; }
 body.file-management-mode .file-list-header,
 body.file-management-mode .file-list-search-panel,
 body.file-management-mode #fileList { display:none !important; }
-body.file-management-mode .file-list-sidebar { overflow:hidden; padding:0; }
+body.file-management-mode .file-list-sidebar { overflow:hidden; padding:0; max-height:none; height:100dvh; }
+body.file-management-mode.mobile-web-chrome.ui-mode-mobile.mobile-fullscreen .mobile-bottom-bar { display:none !important; }
 body.file-management-mode .notes-home {
     display:flex; flex-direction:column; flex:1; min-height:0; width:100%; max-width:1180px;
-    box-sizing:border-box; margin:0 auto; padding:calc(24px + env(safe-area-inset-top, 0px)) 24px 0;
+    box-sizing:border-box; margin:0 auto; padding:calc(12px + env(safe-area-inset-top, 0px)) 20px 0;
     color:var(--text-color, #222);
 }
-.notes-home-header { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:24px; }
-.notes-home-header h1 { font-size:36px; font-weight:600; margin:0; }
+.notes-home-header { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; }
+.notes-home-header h1 { font-size:26px; font-weight:600; margin:0; }
 .notes-home-tools { display:flex; gap:8px; }
-.notes-home-tools button { border:0; border-radius:12px; padding:10px 12px; background:transparent; color:inherit; cursor:pointer; font-size:14px; }
+.notes-home-tools button { border:0; border-radius:12px; width:36px; height:36px; padding:0; background:transparent; color:inherit; cursor:pointer; font-size:20px; }
 .notes-home-tools button:hover { background:rgba(128,128,128,.15); }
-.notes-home-search { flex-shrink:0; width:100%; box-sizing:border-box; border:0; border-radius:24px; background:#eef0f3; color:inherit; padding:16px 20px; font:inherit; font-size:16px; }
-.notes-home-tabs { display:flex; flex-shrink:0; gap:10px; overflow-x:auto; scrollbar-width:none; padding:20px 0; }
+.notes-home-search { flex-shrink:0; width:100%; box-sizing:border-box; border:0; border-radius:24px; background:#eef0f3; color:inherit; padding:12px 16px; font:inherit; font-size:16px; }
+.notes-home-tabs { display:flex; flex-shrink:0; gap:10px; overflow-x:auto; scrollbar-width:none; padding:12px 0; }
 .notes-home-tabs::-webkit-scrollbar { display:none; }
-.notes-folder-tab { flex-shrink:0; max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; border:1px solid #d9dde4; border-radius:16px; background:transparent; color:inherit; padding:12px 16px; font:inherit; cursor:pointer; }
+.notes-folder-tab { flex-shrink:0; max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; border:1px solid #d9dde4; border-radius:16px; background:transparent; color:inherit; padding:8px 12px; font:inherit; cursor:pointer; }
 .notes-folder-tab.active { background:#e7eaf0; border-color:transparent; font-weight:600; }
 .notes-home-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); align-content:start; gap:18px; overflow-y:auto; min-height:0; padding:2px 2px calc(120px + env(safe-area-inset-bottom, 0px)); scrollbar-width:thin; }
 .notes-file-card { position:relative; display:flex; flex-direction:column; min-width:0; min-height:176px; box-sizing:border-box; border-radius:24px; padding:24px 20px 20px; background:#eef0f3; cursor:pointer; }
@@ -6188,7 +6189,7 @@ body.night-mode .notes-file-card time { color:#999; }
 .notes-home button:focus-visible, .notes-file-card:focus-visible, .notes-home-search:focus-visible { outline:2px solid #5379ef; outline-offset:2px; }
 @media (max-width:600px) {
     body.file-management-mode .notes-home { padding-left:16px; padding-right:16px; }
-    .notes-home-header h1 { font-size:32px; }
+    .notes-home-header h1 { font-size:24px; }
     .notes-home-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
     .notes-file-card { padding:20px 16px 18px; border-radius:22px; }
     .notes-file-card h2 { font-size:17px; }
