@@ -2,6 +2,12 @@ name: Build Android App for App Markets
 
 on:
   workflow_dispatch:
+    inputs:
+      version:
+        description: '应用版本号，如 2.9.10 或 v2.9.10；留空使用项目版本'
+        required: false
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -116,30 +122,23 @@ jobs:
       - name: Verify WASM source artifacts
         run: npm run wasm:text:verify
 
-      - name: Build web frontend
-        run: npm run build:web
-
-      - name: Resolve checkout version
+      - name: Resolve app version
         shell: bash
+        env:
+          APP_VERSION_INPUT: ${{ inputs.version }}
         run: |
-          TAG_NAME="" # Use this checkout's package version; no Release publishing.
-          VERSION=$(node -e "
-            let tagName = process.argv[1];
-            let version = tagName.replace(/^v/, '');
-            if (!/^\\d+(?:\\.\\d+){0,2}$/.test(version)) {
-              version = require('./package.json').version || '0.0.0';
-            }
-            const parts = version.split('.').filter(Boolean);
-            if (parts.length === 1) version = parts[0] + '.0.0';
-            else if (parts.length === 2) version = parts[0] + '.' + parts[1] + '.0';
-            else if (parts.length >= 3) version = parts[0] + '.' + parts[1] + '.' + parts[2];
-            if (!/^\\d+\\.\\d+\\.\\d+$/.test(version)) {
-              console.error('Invalid version resolved:', version);
-              process.exit(1);
-            }
-            console.log(version);
-          " "$TAG_NAME")
-          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          set -euo pipefail
+          node <<'NODE'
+          const fs = require('fs');
+          const input = (process.env.APP_VERSION_INPUT || '').trim();
+          const version = (input || require('./package.json').version || '').replace(/^v/, '');
+          if (!/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(version)) {
+            console.error('版本号格式无效，请填写 2.9.10 或 v2.9.10 / Invalid version: use 2.9.10 or v2.9.10');
+            process.exit(1);
+          }
+          fs.appendFileSync(process.env.GITHUB_ENV, `VERSION=${version}\n`);
+          console.log(`App market version: ${version}`);
+          NODE
 
       - name: Sync app versions
         shell: bash
@@ -164,6 +163,9 @@ jobs:
             const patched = cargoRaw.replace(/^version\s*=\s*"[^"]+"/m, `version = "${version}"`);
             fs.writeFileSync(cargoPath, patched);
           '
+
+      - name: Build web frontend
+        run: npm run build:web
 
       - name: Initialize Android project (if needed)
         shell: bash
