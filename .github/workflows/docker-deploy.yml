@@ -129,6 +129,7 @@ jobs:
         SERVER_SSH_HOST_KEY: ${{ secrets.SERVER_SSH_HOST_KEY }}
         IP_US: ${{ secrets.IP_US }}
         SSHKEY_US: ${{ secrets.SSHKEY_US }}
+        DOMESTIC_DEPLOY_PROVIDER: ${{ vars.DOMESTIC_DEPLOY_PROVIDER }}
       run: |
         test -n "$IP_US" && test -n "$SSHKEY_US"
         umask 077
@@ -136,16 +137,20 @@ jobs:
         config_file="$RUNNER_TEMP/epmd-origin-ssh-config"
         trap 'rm -f "$key_file" "$config_file"' EXIT
         printf '%s\n' "$SSHKEY_US" > "$key_file"
-        python3 -u scripts/select-deploy-route.py "$key_file" "$config_file"
-        # Both destinations receive the same build concurrently; failures count independently.
-        SERVER_SSH_CONFIG_FILE="$config_file" bash scripts/transfer-docker-release.sh '${{ inputs.channel }}' deploy &
-        original_pid=$!
+        original_pid=''
+        if [ "$DOMESTIC_DEPLOY_PROVIDER" = atomgit ]; then
+          echo 'Domestic deployment is managed by AtomGit; GitHub deploys only the US edge.'
+        else
+          python3 -u scripts/select-deploy-route.py "$key_file" "$config_file"
+          SERVER_SSH_CONFIG_FILE="$config_file" bash scripts/transfer-docker-release.sh '${{ inputs.channel }}' deploy &
+          original_pid=$!
+        fi
         DEPLOY_TARGET_LABEL=us SERVER_HOST="$IP_US" SERVER_SSH_HOST_KEY='' SERVER_SSH_KEY_FILE="$key_file" \
           DEPLOY_CONTROL_DIR=docker-control-us DEPLOY_IMAGE_DIR=image-cas-us \
           bash scripts/transfer-docker-release.sh '${{ inputs.channel }}' deploy &
         us_pid=$!
         status=0
-        wait "$original_pid" || status=1
+        if [ -n "$original_pid" ]; then wait "$original_pid" || status=1; fi
         wait "$us_pid" || status=1
         exit "$status"
     - name: Remove private CI configuration

@@ -155,3 +155,57 @@ built by Emscripten in CI. Removing that unused SDK reduces cold-deployment imag
 size without changing supported languages. Original-server bandwidth remains an
 external limit; dependency caching prevents repeated transfers only after those
 layers have been successfully installed/retained on the server.
+
+## 国内服务器使用 AtomGit Actions
+
+配置文件为 `.gitcode/workflows/domestic-deploy.yml`，按 AtomGit 官方文档的目录、
+`atomgit` 上下文、官方 `checkout` / `setup-node` / `cache` 插件和并发语法编写。
+参考：
+- https://docs.atomgit.com/docs/help/home/org_project/pipeline/runner-management/
+- https://docs.atomgit.com/docs/help/home/org_project/pipeline/writing-pipelines/workflow-file-location-structure/
+- https://docs.atomgit.com/docs/help/home/org_project/pipeline/writing-pipelines/using-variables-secrets/
+
+### 启用与切换
+
+1. 将同一份代码同步到自己的 AtomGit 仓库，开启 Actions。
+2. 选择可运行 Docker 的 Runner。默认标签为 `[ubuntu-latest, x64, large]`；
+   若托管资源池不提供 Docker daemon 或不允许临时特权容器，请使用**独立的国内构建机**
+   注册自托管 Runner，将 `runs-on` 换成该 Runner 的标签。不要在空间紧张的生产服务器构建镜像。
+3. 在 AtomGit「项目设置 → Actions 密钥与变量」配置下表 Secrets。
+   GitHub Secrets 不会自动同步到 AtomGit。服务器密码只保存在 Secrets，不写入仓库。
+4. 先手动运行 AtomGit `main` 分支部署，确认成功，再在 GitHub 仓库 Actions **Variables**
+   设置 `DOMESTIC_DEPLOY_PROVIDER=atomgit`。设置后 GitHub 跳过国内选路/上传，仅部署美国节点。
+   未设置时保留原来的双节点部署；切换期间服务器端现有部署锁仍会串行化导入及切流。
+5. 后续 AtomGit `main` / `dev` 分支 push 自动部署对应环境，也可手动运行这两个分支。
+   需要保持 GitHub 与 AtomGit 分支同步；本配置不负责跨平台仓库镜像同步。
+
+| AtomGit Secret | 内容 |
+| --- | --- |
+| `SERVER_HOST` | 国内服务器 IP，例如 `39.106.231.33` |
+| `SERVER_USER` | 部署账号，例如 `root` |
+| `SERVER_PASSWORD` | 国内服务器 SSH 密码 |
+| `SERVER_SSH_HOST_KEY` | 可选，SSH known_hosts 格式的服务器公钥，用于严格校验 |
+| `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME` | 与当前国内部署一致的原数据库配置 |
+| `REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD`, `REDIS_DB` | 当前 Redis 配置，未使用的项目可留空 |
+| `JWT_SECRET`, `JWT_EXPIRES_IN` | 与现有部署一致，保持既有会话兼容 |
+| `ADMIN_USER`, `ADMIN_PASSWORD`, `DASHSCOPE_API_KEY` | 沿用现有部署使用的值 |
+| `BASE_URL`, `DEV_BASE_URL` | 可选，默认 `https://md.yhsun.cn` / `https://dev.yhsun.cn` |
+| `KEY`, `PEM`, `SSL_EMAIL` | 沿用现有 TLS 证书/自动续签配置；开发环境自动生成自签名证书 |
+
+### 构建、缓存与部署
+
+AtomGit 独立构建前端/WASM、API、打印、网关和代码沙箱，镜像仅从国内 Runner
+直接传入国内服务器，不从 GitHub 下载数 GiB 的镜像，也不经过美国节点。
+首次仍需下载 Emscripten、基础镜像和依赖；后续缓存 npm、SDK 与 BuildKit 层，
+镜像构建使用本地缓存后端，不使用 GitHub 专属 `type=gha`。
+构建缓存和临时私密配置均排除在 Docker 上下文之外。
+
+发布前执行全项目类型检查、沙箱语言/交互输入/隔离检查、跨 Docker 引擎可移植性检查
+及 nginx 配置检查。发布复用现有 CAS 增量上传、磁盘预检、过期项目资源清理、
+候选健康检查和切流流程；服务器不保留旧版本回滚备份，上传不设置限速。
+`GITHUB_RUN_ID` / `GITHUB_RUN_ATTEMPT` 是兼容现有脚本的变量名，AtomGit 将其映射为
+带 `atomgit-` 前缀的运行 ID，避免两个平台的发布目录重名。
+
+美国节点仍由 GitHub 构建部署，数据库/API 读写继续回到原服务器。
+两个平台都应部署同一个提交；跨平台构建镜像摘要可能不同，不保证字节级相同。
+实际国内上传吞吐需以 AtomGit 的首次运行日志验证，本地检查不能代替真实 Runner/网络验证。

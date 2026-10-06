@@ -14,3 +14,8 @@ temp_uploads
 src-tauri/target
 src-tauri/gen
 image-cas
+
+.ci-cache
+docker-control
+docker-control-us
+image-cas-us
