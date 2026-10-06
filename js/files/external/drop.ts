@@ -56,8 +56,9 @@ export function bindFileListDrop(app: any = window) {
         event.preventDefault(); event.stopPropagation(); depth = 0; list.classList.remove('external-file-drag');
         const entries = captureDroppedFiles(event.dataTransfer); if (!entries.length) return;
         const node = (event.target as Element).closest('.jstree-node');
-        const file = app.files?.find(file => file.id === node?.id);
-        const folder = file?.type === 'folder' ? file.name : file?.name?.includes('/') ? file.name.slice(0, file.name.lastIndexOf('/')) : '';
+        const card = (event.target as Element).closest<HTMLElement>('[data-file-id]');
+        const file = app.files?.find(file => file.id === (node?.id || card?.dataset.fileId));
+        const folder = file?.type === 'folder' ? file.name : file?.name?.includes('/') ? file.name.slice(0, file.name.lastIndexOf('/')) : app.isFileManagementMode ? app.notesHomeFolder || '' : '';
         showDropChoice(entries, folder, app);
     });
 }

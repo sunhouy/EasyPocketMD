@@ -355,6 +355,7 @@ document.addEventListener('DOMContentLoaded', function() {
         var opts = options || {};
         window.isFileManagementMode = true;
         toggleFileManagementBodyClass(true);
+        (window as any).refreshNotesHome?.();
         mobileChromeScroll.reset();
 
         var sidebar = document.getElementById('fileListSidebar');

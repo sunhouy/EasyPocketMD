@@ -86,6 +86,7 @@ export async function restoreFileFromDB(file: any, manager: any): Promise<void> 
 
 }
 export function refreshSyncIcons(globalRef: any): void {
+    if (typeof document !== 'undefined') document.dispatchEvent(new Event('notes-home-refresh'));
     for (const file of globalRef.files || []) {
         if (file.type !== 'file') continue;
         const anchor = document.getElementById(file.id + '_anchor'); if (!anchor) continue;
