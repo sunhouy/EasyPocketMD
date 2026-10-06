@@ -13,6 +13,7 @@ import { initSlashCommandRuntime } from './ui/slash-command';
 import './ai-config';
 import { enterPresentationMode, exitPresentationMode } from './main/presentation-mode';
 import { initBackNavigation } from './main/back-navigation';
+import { openPrimaryFileInterface } from './main/file-navigation';
 import { installMobileChromeScroll } from './main/mobile-chrome-scroll';
 import { applyBackground, createBackgroundControls } from './main/background';
 import { applyThemeColor, createThemeColorControls } from './main/theme-color';
@@ -382,13 +383,12 @@ document.addEventListener('DOMContentLoaded', function() {
         if (sidebar) sidebar.classList.remove('show');
     };
 
+    function prefersFileListHome() {
+        return !shareModeActive && window.userSettings?.defaultFileOpening === 'fileList';
+    }
+
     function showPrimaryFileInterface() {
-        if (window.isFileManagementMode) {
-            window.enterFileManagementMode({ refresh: true });
-            return;
-        }
-        var sidebar = document.getElementById('fileListSidebar');
-        if (sidebar) sidebar.classList.toggle('show');
+        openPrimaryFileInterface(window, prefersFileListHome());
     }
 
     function initializeAppShellOnce() {
@@ -3894,6 +3894,7 @@ document.addEventListener('DOMContentLoaded', function() {
     initBackNavigation({
         getVisibleModalOverlays,
         closeOverlayByBackPress,
+        prefersFileListHome,
     });
 
     initDesktopModalEscHandler();
