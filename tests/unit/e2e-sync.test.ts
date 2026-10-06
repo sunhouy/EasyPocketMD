@@ -97,6 +97,20 @@ describe('E2E save representations', () => {
             expect(app.files[0].contentLoaded).toBe(true);
             expect(app.files[0].contentFetchedAt).toBeGreaterThan(0);
     });
+    it('rejects a historical ciphertext whose wrong-key output fooled the default unpad', async () => {
+        const cipher = 'U2FsdGVkX1/7azLPhd7a19JY4+SJIC35oC2U4R7zYqE=';
+        expect(await e2e.resolveFileContent(cipher, 'secret', true)).toBe('private text');
+        expect(() => e2e.resolveFileContentSync(cipher, 'wrong', true)).toThrow('无法解密');
+        await expect(e2e.resolveFileContent(cipher, 'wrong', true)).rejects.toThrow('无法解密');
+    });
+    it.each(['r', '中文正文', 'multi-line\ntext', '1234567890123456'])('authenticates new content without a configured vault: %s', async text => {
+        const cipher = await e2e.encrypt(text, 'secret');
+        expect(cipher).toMatch(/^EPMD2:/);
+        expect(e2e.resolveFileContentSync(cipher, 'secret', true)).toBe(text);
+        await expect(e2e.resolveFileContent(cipher, 'wrong', true)).rejects.toThrow('无法解密');
+        const modified = cipher.slice(0,-1) + (cipher.endsWith('a') ? 'b' : 'a');
+        expect(await e2e.decrypt(modified, 'secret')).toBeNull();
+    });
     it('rejects undecipherable content rather than returning encrypted code for the editor', async () => {
         const cipher = await e2e.encrypt('private text', 'secret');
         await expect(e2e.resolveFileContent(cipher, 'wrong', true)).rejects.toThrow('无法解密');

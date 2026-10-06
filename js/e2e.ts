@@ -52,16 +52,39 @@ export function encryptSync(text, password) {
     if (!text) return text;
     const secret = vaultSecret(password);
     if (!secret || !CryptoJS) throw e2eError('e2eCryptoNotReady');
-    return typeof window !== 'undefined' && window.E2EVault?.state().config ? encryptV2(text, secret) : CryptoJS.AES.encrypt(text, secret).toString();
+    // Authenticate every new write, including accounts without a configured vault.
+    return encryptV2(text, secret);
 }
 
 export function decryptSync(ciphertext, password) {
     if (!looksLikeE2ECiphertext(ciphertext)) return ciphertext;
-    if (ciphertext.startsWith(V2_PREFIX)) return decryptV2(ciphertext, vaultSecret(password));
+    if (ciphertext.startsWith(V2_PREFIX)) {
+        const master = vaultSecret(password), legacy = legacySecret(password);
+        try { return decryptV2(ciphertext, master); }
+        catch (error) {
+            // Files written before vault setup used the login password as their key.
+            // The MAC must still verify before either key can return plaintext.
+            if (legacy && legacy !== master) return decryptV2(ciphertext, legacy);
+            throw error;
+        }
+    }
     password = legacySecret(password);
     if (!password || !CryptoJS) throw e2eError('e2eFileDecryptFailed');
     try {
-        const bytes = CryptoJS.AES.decrypt(ciphertext, password);
+        const envelope = CryptoJS.format.OpenSSL.parse(ciphertext);
+        if (!envelope.salt || envelope.salt.sigBytes !== 8 || !envelope.ciphertext.sigBytes || envelope.ciphertext.sigBytes % 16) {
+            throw e2eError('e2eFileDecryptFailed');
+        }
+        // CryptoJS's default unpad only subtracts the last byte, without validating
+        // the padding. A wrong key can therefore appear to produce valid short text.
+        const bytes = CryptoJS.AES.decrypt(envelope, password, { padding: CryptoJS.pad.NoPadding });
+        const byteAt = index => (bytes.words[index >>> 2] >>> (24 - (index % 4) * 8)) & 255;
+        const padding = byteAt(bytes.sigBytes - 1);
+        if (padding < 1 || padding > 16 || padding > bytes.sigBytes) throw e2eError('e2eFileDecryptFailed');
+        for (let i = bytes.sigBytes - padding; i < bytes.sigBytes; i++) {
+            if (byteAt(i) !== padding) throw e2eError('e2eFileDecryptFailed');
+        }
+        bytes.sigBytes -= padding;
         const originalText = bytes.toString(CryptoJS.enc.Utf8);
         if (!originalText) throw e2eError('e2eFileDecryptFailed');
         return originalText;
