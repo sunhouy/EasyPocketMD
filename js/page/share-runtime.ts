@@ -6,18 +6,7 @@ import { createShareCursors } from './share-cursors';
 import { showSharedEditHistory } from './share-history';
 import { setVditorValuePreservingCursor } from '../editor-cursor';
 
-interface SharedDocumentState {
-    shareId: string;
-    viewerId: string;
-    canEdit: boolean;
-    lastKnownContent: string;
-    contentVersion: number;
-    isSaving: boolean;
-    inFlightContent?: string;
-    ws: WebSocket | null;
-    [key: string]: any;
-}
-declare global { interface Window { sharedDocState: SharedDocumentState | null; } }
+import type { SharedDocumentState } from '../../types/global';
 
     // 处理分享链接
     document.addEventListener('DOMContentLoaded', function() {

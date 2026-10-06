@@ -70,6 +70,9 @@ jobs:
         retention-days: 3
         if-no-files-found: error
 
+    - name: Check all project TypeScript types
+      run: npm run typecheck
+
     - name: Run tests
       run: npm test -- --coverage
 
