@@ -129,7 +129,7 @@ jobs:
         # Both destinations receive the same build concurrently; failures count independently.
         bash scripts/transfer-docker-release.sh '${{ inputs.channel }}' deploy &
         original_pid=$!
-        SERVER_HOST="$IP_US" SERVER_SSH_HOST_KEY='' SERVER_SSH_KEY_FILE="$key_file" \
+        DEPLOY_TARGET_LABEL=us SERVER_HOST="$IP_US" SERVER_SSH_HOST_KEY='' SERVER_SSH_KEY_FILE="$key_file" \
           DEPLOY_CONTROL_DIR=docker-control-us DEPLOY_IMAGE_DIR=image-cas-us \
           bash scripts/transfer-docker-release.sh '${{ inputs.channel }}' deploy &
         us_pid=$!

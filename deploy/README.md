@@ -97,3 +97,24 @@ copied to the edge. Print client downloads are published to both servers. A fail
 deployment on either destination fails the workflow; a successfully switched
 server is not rolled back automatically. The original server must stay reachable
 from the edge on HTTPS; geo-DNS is managed outside this workflow.
+
+## Stable sandbox builds and transfer diagnostics
+
+CI caches the verified sandbox archive by the Linux/amd64 platform and the hashes
+of its Dockerfile, requirements and runner source. An exact hit loads that same
+image instead of reinstalling Java, compilers and Python libraries. All runtime
+and independent-engine portability tests still run before deployment. A miss
+uses the persistent Buildx `gha` cache to reuse unchanged dependency layers, then
+saves the archive only after the sandbox checks pass. Cache eviction causes a
+normal rebuild; it never falls back to building on either deployment server.
+When intentionally refreshing a mutable base image without source changes,
+bump the `epmd-sandbox-linux-amd64-v2` cache prefix in both workflows (and change
+or pin the Dockerfile base reference to invalidate its dependency layers).
+
+Deployment logs label the origin/US target, count unique reused/missing compressed
+objects and required upload bytes, show rsync progress/speed and time each phase.
+Long phases print a heartbeat every 30 seconds. SSH connection attempts are
+bounded to 30 seconds, and rsync fails after 300 seconds without data transfer;
+these are inactivity limits, not bandwidth limits. Interrupted object transfers
+retain partial data for a retry. Remote logs distinguish cleanup/capacity checks,
+HTTPS setup, archive verification/import and health checks/traffic switching.

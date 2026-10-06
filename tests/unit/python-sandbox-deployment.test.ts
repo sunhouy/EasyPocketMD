@@ -39,6 +39,13 @@ it('imports the CI artifact without any registry pull or server build',()=>{
     expect(calls).toContain('run --rm --pull=never');
     expect(calls).not.toMatch(/^(pull|build|save) /m);
 });
+it('checks an already built CI image without rebuilding or pulling',()=>{
+    const result=execute('scripts/setup-python-sandbox.sh',['--check']);
+    expect(result.status).toBe(0);
+    const calls=fs.readFileSync(env.DOCKER_CALLS,'utf8');
+    expect(calls).toContain('run --rm --pull=never');
+    expect(calls).not.toMatch(/^(pull|build|load|save) /m);
+});
 it('rejects a corrupt archive before contacting Docker',()=>{
     const archive=exportImage();fs.writeFileSync(env.DOCKER_CALLS,'');fs.appendFileSync(archive,'corruption');
     const result=execute('scripts/setup-python-sandbox.sh',['--load',archive]);

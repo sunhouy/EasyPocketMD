@@ -129,6 +129,33 @@ def import_budget(directory, manifest):
                 print(f'Could not restore temporary import limit {path}: {error}', flush=True)
 
 
+def transfer_plan(cache, manifest):
+    objects = {member['sha256']: member.get('compressed_size', member['size']) for member in manifest['members']}
+    missing = {digest: size for digest, size in objects.items()
+               if not (Path(cache) / 'objects' / (digest + '.gz')).exists()}
+    total, pending = sum(objects.values()), sum(missing.values())
+    print(f'Image objects: {len(objects)} total, {len(objects) - len(missing)} reused, '
+          f'{len(missing)} missing; compressed total {total / MIB:.2f} MiB, '
+          f'reused {(total - pending) / MIB:.2f} MiB, upload {pending / MIB:.2f} MiB', flush=True)
+    if missing:
+        largest = sorted(missing.values(), reverse=True)[:3]
+        print('Largest missing objects (MiB): ' + ', '.join(f'{size / MIB:.2f}' for size in largest), flush=True)
+    return missing
+
+
+@contextlib.contextmanager
+def stage(name):
+    started = time.monotonic()
+    print(f'START {name}', flush=True)
+    try:
+        yield
+    except BaseException:
+        print(f'FAILED {name} ({time.monotonic() - started:.1f}s)', flush=True)
+        raise
+    else:
+        print(f'DONE {name} ({time.monotonic() - started:.1f}s)', flush=True)
+
+
 if __name__ == '__main__':
     import fcntl
     import json
@@ -143,24 +170,31 @@ if __name__ == '__main__':
         except BlockingIOError: raise SystemExit('Another server deployment is in progress')
         # Free obsolete project artifacts before both the large upload and import.
         # Retain this candidate even when retrying an upload older than one day.
-        subprocess.run([sys.executable, str(Path(release) / 'deploy-docker.py'), 'cleanup', sys.argv[4], release],
-                       check=True, env={**os.environ, 'EPMD_DEPLOYMENT_LOCK_HELD': '1'})
+        with stage('Clean obsolete deployment data'):
+            subprocess.run([sys.executable, str(Path(release) / 'deploy-docker.py'), 'cleanup', sys.argv[4], release],
+                           check=True, env={**os.environ, 'EPMD_DEPLOYMENT_LOCK_HELD': '1'})
         if action == 'transfer':
-            missing = {m['sha256']:m.get('compressed_size',m['size']) for m in manifest['members']
-                       if not (Path(cache) / 'objects' / (m['sha256'] + '.gz')).exists()}
-            reserve = required_import_space(manifest)
+            missing = transfer_plan(cache, manifest)
+            with stage('Inspect installed image layers and import capacity'):
+                reserve = required_import_space(manifest)
             needed = sum(missing.values()) + reserve
+            print(f'Disk capacity: need {needed / MIB:.2f} MiB including import reserve, free {shutil.disk_usage(cache).free / MIB:.2f} MiB', flush=True)
             if shutil.disk_usage(cache).free < needed:
                 raise SystemExit(f'Insufficient disk for transfer + import after cleanup: need {needed // MIB} MiB free. Current services retained.')
         else:
             # Check disk before taking the current service offline.
-            required = required_import_space(manifest)
+            with stage('Check import capacity'):
+                required = required_import_space(manifest)
             if shutil.disk_usage(cache).free < required:
                 raise RuntimeError(f'Not enough disk for image import: need {required // MIB} MiB free; current services retained')
             # Validate the existing TLS edge and prepare renewal before stopping
             # any services. Issuance starts only after the new HTTP route is live.
-            subprocess.run([sys.executable, str(Path(release) / 'ssl-renewal.py'), 'configure', release, sys.argv[4]], check=True)
+            with stage('Prepare HTTPS configuration'):
+                subprocess.run([sys.executable, str(Path(release) / 'ssl-renewal.py'), 'configure', release, sys.argv[4]], check=True)
             with deployment_memory(sys.argv[4]):
-                subprocess.run([sys.executable, str(Path(release) / 'image-cas.py'), 'load', cache, str(Path(release) / 'release.json')], check=True)
-                subprocess.run([sys.executable, str(Path(release) / 'deploy-docker.py'), 'deploy', sys.argv[4], release], check=True, env={**os.environ, 'EPMD_DEPLOYMENT_LOCK_HELD': '1'})
-            subprocess.run([sys.executable, str(Path(release) / 'ssl-renewal.py'), 'start', sys.argv[4]], check=True)
+                with stage('Verify cached objects and import Docker images'):
+                    subprocess.run([sys.executable, str(Path(release) / 'image-cas.py'), 'load', cache, str(Path(release) / 'release.json')], check=True)
+                with stage('Start candidate, check health and switch traffic'):
+                    subprocess.run([sys.executable, str(Path(release) / 'deploy-docker.py'), 'deploy', sys.argv[4], release], check=True, env={**os.environ, 'EPMD_DEPLOYMENT_LOCK_HELD': '1'})
+            with stage('Start certificate renewal'):
+                subprocess.run([sys.executable, str(Path(release) / 'ssl-renewal.py'), 'start', sys.argv[4]], check=True)
