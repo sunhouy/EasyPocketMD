@@ -9,11 +9,11 @@ let CryptoJS = null;
 const V2_PREFIX = 'EPMD2:';
 function vaultSecret(password) {
     const value = typeof window !== 'undefined' && window.E2EVault ? window.E2EVault.secrets() : null;
-    return value ? value.master : password;
+    return value ? value.master : password || (typeof window !== 'undefined' ? window.currentUser?.password : undefined);
 }
 function legacySecret(password) {
     const value = typeof window !== 'undefined' && window.E2EVault ? window.E2EVault.secrets() : null;
-    return value ? value.legacy : password;
+    return value ? value.legacy : password || (typeof window !== 'undefined' ? window.currentUser?.password : undefined);
 }
 function encryptV2(text, master) {
     const encKey = CryptoJS.SHA256('EasyPocketMD text enc v2|' + master);
@@ -36,6 +36,15 @@ function decryptV2(ciphertext, master) {
 }
 async function prepareVault() {
     if (typeof window !== 'undefined' && window.E2EVault) await window.E2EVault.ensureUnlocked();
+}
+
+/** Prepare the actual data key before local serialization, uploads or fingerprints. */
+export async function prepareEncryptionKey(password) {
+    await prepareVault();
+    await lazyLoadCrypto();
+    const key = vaultSecret(password);
+    if (!key) throw e2eError('e2eUnlockRequired');
+    return key;
 }
 
 // Lazy load the CryptoJS library
@@ -138,6 +147,9 @@ export async function resolveFileContent(content, password, e2eEnabled) {
         if (decrypted === null) throw e2eError('e2eFileDecryptFailed');
         return decrypted;
     }
+    // Plaintext recovery drafts still require the key before editing: the next
+    // local checkpoint is encrypted synchronously, before any cloud upload.
+    if (e2eEnabled) await prepareEncryptionKey(password);
     return content;
 }
 

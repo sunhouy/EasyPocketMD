@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { isEditorComposing } from '../editor-composition';
+import { e2eErrorText } from '../e2e-i18n';
 /**
  * 同步运行时：服务器同步、自动保存、E2E、共享文档（owner 视角）、外部本地文件、
  * 历史版本辅助、token 过期恢复、pendingServerSync 一致性维护、mergeFiles。
@@ -1336,31 +1337,31 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
             : '本文件已端到端加密，除您以外的任何用户都无法查看本文件，开发者也不例外。');
         if (labelEl) labelEl.textContent = t('e2eInfoFingerprintLabel') || (isEn() ? 'Local key fingerprint' : '本地密钥指纹');
 
-        if (fingerprintEl) {
-            const user = window.currentUser;
-            let key = user?.password;
-            if (window.E2EVault?.state().config) {
-                try { key = window.E2EVault.secrets().master; } catch { key = ''; }
-            }
-            if (!key) {
-                fingerprintEl.textContent = t('e2eInfoFingerprintUnavailable')
-                    || (isEn() ? 'Sign in to view your key fingerprint' : '请先登录以查看密钥指纹');
-            } else {
-                fingerprintEl.textContent = '…';
-                const requestedAnchor = anchor;
-                computeKeyFingerprint(key).then(function(fp) {
-                    if (e2eInfoPopoverOpenAnchor !== requestedAnchor) return;
-                    fingerprintEl.textContent = fp || (isEn() ? 'Unavailable' : '不可用');
-                });
-            }
-        }
-
         popover.setAttribute('aria-hidden', 'false');
         popover.classList.add('is-visible');
         positionE2EInfoPopover(popover, anchor);
         requestAnimationFrame(function() {
             positionE2EInfoPopover(popover, anchor);
         });
+        if (fingerprintEl) {
+            const user = g('currentUser');
+            if (!user?.token) {
+                fingerprintEl.textContent = t('e2eInfoFingerprintUnavailable')
+                    || (isEn() ? 'Sign in to view your key fingerprint' : '请先登录以查看密钥指纹');
+                return;
+            }
+            fingerprintEl.textContent = '…';
+            try {
+                const e2e = await import('../e2e');
+                const key = await e2e.prepareEncryptionKey(user.password);
+                const fp = await computeKeyFingerprint(key);
+                if (e2eInfoPopoverOpenAnchor !== anchor || g('currentUser') !== user) return;
+                fingerprintEl.textContent = fp || (isEn() ? 'Unavailable' : '不可用');
+            } catch (error) {
+                if (e2eInfoPopoverOpenAnchor !== anchor || g('currentUser') !== user) return;
+                fingerprintEl.textContent = e2eErrorText(error);
+            }
+        }
     }
 
     function hideE2EInfoPopover(immediate?) {
