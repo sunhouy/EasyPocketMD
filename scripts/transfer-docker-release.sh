@@ -32,14 +32,11 @@ run_phase() {
 }
 remote_root=/www/wwwroot/easypocketmd/docker
 release="$remote_root/releases/$channel-${GITHUB_RUN_ID:?}-${GITHUB_RUN_ATTEMPT:?}"
-ssh_options=(-o ConnectTimeout=30 -o StrictHostKeyChecking=accept-new -o ServerAliveInterval=15 -o ServerAliveCountMax=8)
+ssh_options=(-o ConnectTimeout=30 -o Compression=no -o ProxyCommand=none -o ProxyJump=none -o StrictHostKeyChecking=accept-new -o ServerAliveInterval=15 -o ServerAliveCountMax=8)
 if [ -n "${SERVER_SSH_HOST_KEY:-}" ]; then
   mkdir -p "$HOME/.ssh"
   printf '%s\n' "$SERVER_SSH_HOST_KEY" >> "$HOME/.ssh/known_hosts"
-  ssh_options=(-o ConnectTimeout=30 -o StrictHostKeyChecking=yes -o ServerAliveInterval=15 -o ServerAliveCountMax=8)
-fi
-if [ -n "${SERVER_SSH_CONFIG_FILE:-}" ]; then
-  ssh_options+=(-F "$SERVER_SSH_CONFIG_FILE")
+  ssh_options=(-o ConnectTimeout=30 -o Compression=no -o ProxyCommand=none -o ProxyJump=none -o StrictHostKeyChecking=yes -o ServerAliveInterval=15 -o ServerAliveCountMax=8)
 fi
 remote="${SERVER_USER:?}@${SERVER_HOST:?}"
 control_dir="${DEPLOY_CONTROL_DIR:-docker-control}"
@@ -60,6 +57,10 @@ run_phase "SSH connection and server prerequisites" "${transport[@]}" "${ssh_opt
 printf -v RSYNC_RSH '%q ' "${transport[@]}" "${ssh_options[@]}"
 export RSYNC_RSH
 run_phase "Upload runtime configuration" rsync -r --timeout=300 --chmod=F600,D700 "$control_dir/" "$remote:$release/"
+if [ "${DEPLOY_REUSE_RUNTIME_CONFIG:-0}" = 1 ]; then
+  run_phase "Reuse current server runtime configuration" "${transport[@]}" "${ssh_options[@]}" "$remote" \
+    "python3 '$release/prepare-manual-runtime.py' '$release' '$channel'"
+fi
 # Fail before uploading large layers if transfer/import would fill the disk.
 run_phase "Cleanup, missing objects and disk capacity" "${transport[@]}" "${ssh_options[@]}" "$remote" \
   "python3 -u '$release/deploy-resources.py' transfer '$remote_root/cache' '$release' '$channel'"
