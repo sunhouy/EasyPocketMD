@@ -1,6 +1,7 @@
 export interface BackNavigationOptions {
   getVisibleModalOverlays: () => Element[];
   closeOverlayByBackPress: (overlay: Element) => boolean;
+  prefersFileListHome?: () => boolean;
 }
 
 /** Keep Android WebView history armed while closing application surfaces. */
@@ -20,6 +21,17 @@ export function initBackNavigation(options: BackNavigationOptions): void {
       return;
     }
     const app = window as any;
+    if (options.prefersFileListHome?.()) {
+      lastBackTime = 0;
+      if (app.isFileManagementMode) {
+        // The list is the root surface: allow native/browser navigation to leave.
+        window.history.back();
+      } else {
+        app.enterFileManagementMode?.({ refresh: true });
+        pushHistory();
+      }
+      return;
+    }
     if (app.isFileManagementMode || document.getElementById('fileListSidebar')?.classList.contains('show')) {
       app.enterEditorMode?.();
       document.getElementById('fileListSidebar')?.classList.remove('show');

@@ -1,6 +1,7 @@
 /** @jest-environment jsdom */
 // @ts-nocheck
 import { initBackNavigation } from '../../js/main/back-navigation';
+import { openPrimaryFileInterface } from '../../js/main/file-navigation';
 import { ensureHandlePermission, createLocalHandleStore } from '../../js/files/external/handles';
 import { normalizeExternalLocalFileRecord } from '../../js/files/external';
 import { installSyncRuntime } from '../../js/files/sync-runtime';
@@ -49,6 +50,26 @@ describe('Android back navigation', () => {
         back();
         expect(window.enterEditorMode).toHaveBeenCalled();
         expect(window.history.back).not.toHaveBeenCalled();
+    });
+    it('returns from the editor to the preferred file home, then exits from that root', () => {
+        window.enterFileManagementMode = jest.fn(() => { window.isFileManagementMode = true; });
+        window.enterEditorMode = jest.fn();
+        initBackNavigation({ getVisibleModalOverlays: () => [], closeOverlayByBackPress: () => true, prefersFileListHome: () => true });
+        back();
+        expect(window.enterFileManagementMode).toHaveBeenCalledWith({ refresh: true });
+        expect(window.history.back).not.toHaveBeenCalled();
+        back();
+        expect(window.history.back).toHaveBeenCalledTimes(1);
+        expect(window.enterEditorMode).not.toHaveBeenCalled();
+    });
+    it('uses the preferred file home for the file icon without opening the old sidebar', () => {
+        document.body.innerHTML = '<aside id="fileListSidebar"></aside>';
+        const app = { isFileManagementMode: false, enterFileManagementMode: jest.fn() };
+        openPrimaryFileInterface(app, true);
+        expect(app.enterFileManagementMode).toHaveBeenCalledWith({ refresh: true });
+        expect(document.getElementById('fileListSidebar').classList.contains('show')).toBe(false);
+        openPrimaryFileInterface(app, false);
+        expect(document.getElementById('fileListSidebar').classList.contains('show')).toBe(true);
     });
     it('requires two back presses on the home screen to leave', () => {
         initBackNavigation({ getVisibleModalOverlays: () => [], closeOverlayByBackPress: () => true });
