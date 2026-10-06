@@ -55,12 +55,10 @@ servers may briefly stop this application's services to make room; deployment
 is not guaranteed to be interruption-free.
 
 Candidate services pass health and protocol checks before activation. Failure
-keeps the currently running release available. The rollback action reads the
-previous successful release’s GitHub run ID from server metadata, downloads its
-artifact in CI and transfers the images again, using current runtime Secrets.
-If the artifact has expired, or the previous deployment predates artifact
-archiving, redeploy the desired Git commit. The first deployment has no previous
-release to restore. Check deployment logs if recovery cannot complete automatically.
+keeps the currently running release available. Previous server images are removed;
+to redeploy an older version, download its retained GitHub artifact and deploy it
+with the current server runtime configuration, as described below. Expired artifacts
+require rebuilding the desired Git commit.
 
 ## TLS renewal
 
@@ -119,18 +117,11 @@ these are inactivity limits, not bandwidth limits. Interrupted object transfers
 retain partial data for a retry. Remote logs distinguish cleanup/capacity checks,
 HTTPS setup, archive verification/import and health checks/traffic switching.
 
-## Origin route selection and failed edge diagnostics
+## Direct delivery and failed edge diagnostics
 
-Before parallel deployment, CI compares sustained SSH uploads acknowledged by the origin, directly
-and through a US SSH TCP relay. Each receiver samples for 20 seconds, bounded
-to 64 MiB; each local probe is bounded to about 45 seconds; use the relay only if direct fails or the relay is at least 25% faster.
-If neither works, stop before image transfer. The relay uses `SSHKEY_US` only on
-CI; the origin login and image stream remain inside end-to-end SSH encryption.
-No image archive, origin password or database credentials are copied to the US
-host for this transport. A temporary SSH config applies the selected route to
-both SSH operations and rsync, and is removed after CI finishes. This addresses
-an unfavorable direct network path; it cannot exceed the origin's actual
-bandwidth cap, and a short sample cannot guarantee sustained transfer speed.
+GitHub Actions transfers directly to each server over SSH/rsync. The US server is
+never used as a relay to the original server. No route probe or deployment-provider
+variable affects the domestic upload.
 
 The regional proxy permits certificate chain verification to depth four while
 keeping TLS certificate/hostname verification enabled on main. Failed health
@@ -156,56 +147,55 @@ size without changing supported languages. Original-server bandwidth remains an
 external limit; dependency caching prevents repeated transfers only after those
 layers have been successfully installed/retained on the server.
 
-## 国内服务器使用 AtomGit Actions
+## 从自己的电脑手动部署国内服务器
 
-配置文件为 `.gitcode/workflows/domestic-deploy.yml`，按 AtomGit 官方文档的目录、
-`atomgit` 上下文、官方 `checkout` / `setup-node` / `cache` 插件和并发语法编写。
-参考：
-- https://docs.atomgit.com/docs/help/home/org_project/pipeline/runner-management/
-- https://docs.atomgit.com/docs/help/home/org_project/pipeline/writing-pipelines/workflow-file-location-structure/
-- https://docs.atomgit.com/docs/help/home/org_project/pipeline/writing-pipelines/using-variables-secrets/
+新流水线在 SSH 上传前归档 `docker-release-main` / `docker-release-dev`，保留 90 天
+（实际保留期限受仓库/组织策略限制）。上传服务器失败也可下载已完成的构建产物。
+包内包含所有 CAS 镜像对象、校验元数据和部署脚本，**不包含 app.env、TLS 私钥或数据库密码**。
 
-### 启用与切换
+适用于国内服务器已有一次成功的 Docker 部署；脚本从该环境的当前发布目录读取
+数据库、Redis、JWT 和证书配置，不将这些配置下载到电脑。首次部署或当前配置丢失时
+应先通过 GitHub Actions Secrets 完成初始化。Linux/macOS 或 Windows WSL 均可作为上传端，
+无需安装 Docker 或重新构建镜像。生产服务器仍需要既有 Docker/Python/rsync 环境。
 
-1. 将同一份代码同步到自己的 AtomGit 仓库，开启 Actions。
-2. 选择可运行 Docker 的 Runner。默认标签为 `[ubuntu-latest, x64, large]`；
-   若托管资源池不提供 Docker daemon 或不允许临时特权容器，请使用**独立的国内构建机**
-   注册自托管 Runner，将 `runs-on` 换成该 Runner 的标签。不要在空间紧张的生产服务器构建镜像。
-3. 在 AtomGit「项目设置 → Actions 密钥与变量」配置下表 Secrets。
-   GitHub Secrets 不会自动同步到 AtomGit。服务器密码只保存在 Secrets，不写入仓库。
-4. 先手动运行 AtomGit `main` 分支部署，确认成功，再在 GitHub 仓库 Actions **Variables**
-   设置 `DOMESTIC_DEPLOY_PROVIDER=atomgit`。设置后 GitHub 跳过国内选路/上传，仅部署美国节点。
-   未设置时保留原来的双节点部署；切换期间服务器端现有部署锁仍会串行化导入及切流。
-5. 后续 AtomGit `main` / `dev` 分支 push 自动部署对应环境，也可手动运行这两个分支。
-   需要保持 GitHub 与 AtomGit 分支同步；本配置不负责跨平台仓库镜像同步。
+1. 合并本次修改后，运行 GitHub CI/CD，等待 `Archive deployable images before server upload`
+   步骤完成。在该次运行的 Artifacts 下载 `docker-release-main` 并解压到一个空目录。
+   不要只下载 `python-sandbox-image`，它不包含 API、前端网关和打印镜像。
+   也可以使用 GitHub CLI（替换 RUN_ID）：
 
-| AtomGit Secret | 内容 |
-| --- | --- |
-| `SERVER_HOST` | 国内服务器 IP，例如 `39.106.231.33` |
-| `SERVER_USER` | 部署账号，例如 `root` |
-| `SERVER_PASSWORD` | 国内服务器 SSH 密码 |
-| `SERVER_SSH_HOST_KEY` | 可选，SSH known_hosts 格式的服务器公钥，用于严格校验 |
-| `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME` | 与当前国内部署一致的原数据库配置 |
-| `REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD`, `REDIS_DB` | 当前 Redis 配置，未使用的项目可留空 |
-| `JWT_SECRET`, `JWT_EXPIRES_IN` | 与现有部署一致，保持既有会话兼容 |
-| `ADMIN_USER`, `ADMIN_PASSWORD`, `DASHSCOPE_API_KEY` | 沿用现有部署使用的值 |
-| `BASE_URL`, `DEV_BASE_URL` | 可选，默认 `https://md.yhsun.cn` / `https://dev.yhsun.cn` |
-| `KEY`, `PEM`, `SSL_EMAIL` | 沿用现有 TLS 证书/自动续签配置；开发环境自动生成自签名证书 |
+   ```bash
+   gh run download RUN_ID --repo sunhouy/EasyPocketMD -n docker-release-main -D epmd-release
+   ```
 
-### 构建、缓存与部署
+2. 上传端安装 `ssh`、`rsync`、`sshpass`。Ubuntu/WSL：
 
-AtomGit 独立构建前端/WASM、API、打印、网关和代码沙箱，镜像仅从国内 Runner
-直接传入国内服务器，不从 GitHub 下载数 GiB 的镜像，也不经过美国节点。
-首次仍需下载 Emscripten、基础镜像和依赖；后续缓存 npm、SDK 与 BuildKit 层，
-镜像构建使用本地缓存后端，不使用 GitHub 专属 `type=gha`。
-构建缓存和临时私密配置均排除在 Docker 上下文之外。
+   ```bash
+   sudo apt-get update
+   sudo apt-get install -y openssh-client rsync sshpass
+   ```
 
-发布前执行全项目类型检查、沙箱语言/交互输入/隔离检查、跨 Docker 引擎可移植性检查
-及 nginx 配置检查。发布复用现有 CAS 增量上传、磁盘预检、过期项目资源清理、
-候选健康检查和切流流程；服务器不保留旧版本回滚备份，上传不设置限速。
-`GITHUB_RUN_ID` / `GITHUB_RUN_ATTEMPT` 是兼容现有脚本的变量名，AtomGit 将其映射为
-带 `atomgit-` 前缀的运行 ID，避免两个平台的发布目录重名。
+3. 从解压目录执行，密码会隐藏输入，不放入命令历史：
 
-美国节点仍由 GitHub 构建部署，数据库/API 读写继续回到原服务器。
-两个平台都应部署同一个提交；跨平台构建镜像摘要可能不同，不保证字节级相同。
-实际国内上传吞吐需以 AtomGit 的首次运行日志验证，本地检查不能代替真实 Runner/网络验证。
+   ```bash
+   cd epmd-release
+   bash manual-deploy.sh 39.106.231.33 root main
+   ```
+
+   若使用 SSH 私钥，改为：
+
+   ```bash
+   SERVER_SSH_KEY_FILE="$HOME/.ssh/id_ed25519" bash manual-deploy.sh 39.106.231.33 root main
+   ```
+
+   开发环境需下载 `docker-release-dev` 并将最后一个参数换成 `dev`；环境不匹配会停止。
+   如果已有 Actions 正在部署，等其结束再运行，服务器部署锁会拒绝重叠的导入/切流。
+
+脚本自动创建新发布目录，复用服务器当前私密配置，清理过期项目资源并检查空间，
+通过 SSH/rsync 从你的电脑**直接上传国内服务器**，然后验证镜像、导入、健康检查并切流。
+上传中断后重新运行同一下载包会复用完整对象及 rsync 部分数据。
+成功时末尾显示 `Docker deploy completed: main` 和 `DONE Verify/import images and activate release`。
+随后访问 `https://md.yhsun.cn/api/health` 并检查网页和已有文件。
+
+服务器不保存回滚备份；要部署旧版，使用 GitHub 上仍在保留期内的旧镜像包。
+手动命令只更新国内节点，美国节点仍由 GitHub 自动部署，需保持两边发布版本一致。
+当前服务器是否具备可复用配置需真实运行验证，本说明不表示已经替你执行部署。
