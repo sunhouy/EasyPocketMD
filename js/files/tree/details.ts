@@ -13,7 +13,8 @@ export function showFileDetails(app: any, file: any) {
     else if (typeof file.content === 'string') rows.push([en ? 'Characters' : '字符数', String(Array.from(file.content).length)]);
     for (const [name, value] of rows) { const key = document.createElement('dt'); key.textContent = name; const text = document.createElement('dd'); text.textContent = value; list.append(key, text); }
     box.append(list);
-    const close = document.createElement('button'); close.type = 'button'; close.textContent = en ? 'Close' : '关闭';
+    const close = document.createElement('button');
+    close.classList.add('epmd-dialog-close'); close.type = 'button'; close.textContent = '×'; close.setAttribute('aria-label', en ? 'Close' : '关闭');
     const dismiss = () => { overlay.remove(); document.removeEventListener('keydown', escape); };
     const escape = (event: KeyboardEvent) => { if (event.key === 'Escape') dismiss(); };
     (overlay as any).dismiss = dismiss;

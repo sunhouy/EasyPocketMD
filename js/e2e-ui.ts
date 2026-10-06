@@ -45,6 +45,7 @@ async function requestUnlock() {
             ${methods.dedicated ? passwordMethod('dedicated','e2eDedicatedMethod','e2eDedicatedInput','e2eUseDedicated') : ''}
             <p class="settings-hint">${text('e2eSessionHint')}</p>`,false);
         const close = document.createElement('button');
+        close.classList.add('epmd-dialog-close');
         close.type = 'button'; close.className = 'modal-close-btn'; close.dataset.unlockClose = '';
         close.setAttribute('aria-label', t('e2eClose')); close.textContent = '×';
         close.addEventListener('click', () => { view.remove(); reject(e2eError('e2eUnlockCancelled')); });

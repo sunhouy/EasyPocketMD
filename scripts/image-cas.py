@@ -89,7 +89,7 @@ def load(directory, manifest_file):
     if hashlib.sha256(content).hexdigest() != expected:
         raise RuntimeError('Release manifest checksum mismatch')
     manifest = json.loads(content)
-    if manifest.get('version') != 1 or set(manifest['images']) != {'app', 'print', 'gateway', 'python'}:
+    if manifest.get('version') != 1 or set(manifest['images']) not in ({'app', 'print', 'gateway', 'python'}, {'gateway'}):
         raise RuntimeError('Invalid image release manifest')
     try:
         if all(portable_identity(image) == manifest['identities'][role] for role, image in manifest['images'].items()):

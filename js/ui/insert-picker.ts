@@ -37,6 +37,30 @@
         { id: 'mindmap', icon: 'fas fa-brain', name: isEn() ? 'Mind Map' : '脑图', category: 'insert', keywords: ['mindmap', '脑图', '思维导图'], action: 'mindmap' }
     ];
 
+    const insertLabels:Record<string,string[]> = {'heading1':['Heading 1', '标题1'],
+'heading2':['Heading 2', '标题2'],
+'heading3':['Heading 3', '标题3'],
+'bold':['Bold', '粗体'],
+'italic':['Italic', '斜体'],
+'strikethrough':['Strikethrough', '删除线'],
+'code':['Code Block', '代码块'],
+'inlineCode':['Inline Code', '行内代码'],
+'quote':['Quote', '引用'],
+'link':['Link', '链接'],
+'image':['Image', '图片'],
+'file':['File', '文件'],
+'webImage':['Web Image', '网络图片'],
+'table':['Table', '表格'],
+'ul':['Unordered List', '无序列表'],
+'ol':['Ordered List', '有序列表'],
+'task':['Task List', '任务列表'],
+'divider':['Divider', '分隔线'],
+'emoji':['Emoji', '表情'],
+'formula':['Formula', '公式'],
+'chart':['Chart', '图表'],
+'footnote':['Footnote', '脚注'],
+'mindmap':['Mind Map', '脑图']};
+    function itemName(item) { return insertLabels[item.id]?.[isEn()?0:1] || item.name; }
     function closeInsertPicker() {
         if (currentModal && currentModal.parentNode) {
             currentModal.parentNode.removeChild(currentModal);
@@ -139,7 +163,8 @@
                     break;
             }
         } else if (item.insert) {
-            insertText(item.insert);
+            const englishSamples:Record<string,string>={bold:'**Bold text**',italic:'*Italic text*',strikethrough:'~~Deleted text~~',inlineCode:'`inline code`',quote:'> Quote',ul:'- List item',ol:'1. List item',task:'- [ ] Task'};
+            insertText(isEn() && englishSamples[item.id] ? englishSamples[item.id] : item.insert);
         }
     }
 
@@ -302,7 +327,7 @@ Provide 5-10 most relevant Markdown examples. Only return the list, no explanati
 
             var nameDiv = document.createElement('div');
             nameDiv.style.cssText = 'font-size: 14px; font-weight: 500; margin-bottom: 4px;';
-            nameDiv.textContent = item.name;
+            nameDiv.textContent = itemName(item);
 
             var previewDiv = document.createElement('div');
             previewDiv.style.cssText = 'font-size: 10px; color: ' + (window.nightMode ? '#aaa' : '#666') + '; font-family: monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;';
@@ -374,6 +399,7 @@ Provide 5-10 most relevant Markdown examples. Only return the list, no explanati
 
         // 创建容器
         var container = document.createElement('div');
+        container.classList.add('desktop-editor-dialog');
         container.style.cssText = 'background: ' + (nightMode ? '#2d2d2d' : 'white') + '; border-radius: 12px; padding: 20px; width: 90%; max-width: 600px; max-height: 85vh; overflow: hidden; display: flex; flex-direction: column;';
 
         // 标题
@@ -444,7 +470,7 @@ Provide 5-10 most relevant Markdown examples. Only return the list, no explanati
 
                 var nameDiv = document.createElement('div');
                 nameDiv.style.cssText = 'font-size: 12px; font-weight: 500;';
-                nameDiv.textContent = item.name;
+                nameDiv.textContent = itemName(item);
 
                 btn.appendChild(iconDiv);
                 btn.appendChild(nameDiv);
@@ -484,7 +510,7 @@ Provide 5-10 most relevant Markdown examples. Only return the list, no explanati
             }
 
             var results = insertItems.filter(function(item) {
-                if (item.name.toLowerCase().includes(q)) return true;
+                if (itemName(item).toLowerCase().includes(q)) return true;
                 if (item.keywords && item.keywords.some(function(k) { return k.toLowerCase().includes(q); })) return true;
                 return false;
             });
@@ -494,6 +520,7 @@ Provide 5-10 most relevant Markdown examples. Only return the list, no explanati
 
         // 右上角关闭按钮
         var closeBtn = document.createElement('button');
+        closeBtn.classList.add('epmd-dialog-close');
         closeBtn.innerHTML = '<i class="fas fa-times"></i>';
         closeBtn.style.cssText = 'position: absolute; top: 15px; right: 15px; width: 32px; height: 32px; background: ' + (nightMode ? '#444' : '#f5f5f5') + '; color: ' + (nightMode ? '#eee' : '#333') + '; border: none; border-radius: 50%; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center;';
         closeBtn.onclick = closeInsertPicker;
@@ -533,6 +560,7 @@ Provide 5-10 most relevant Markdown examples. Only return the list, no explanati
 
         // 创建容器
         var container = document.createElement('div');
+        container.classList.add('desktop-editor-dialog');
         container.style.cssText = 'background: ' + (nightMode ? '#2d2d2d' : 'white') + '; border-radius: 12px; padding: 20px; width: 90%; max-width: 500px; max-height: 85vh; overflow: hidden; display: flex; flex-direction: column;';
 
         // 标题
@@ -619,6 +647,7 @@ Provide 5-10 most relevant Markdown examples. Only return the list, no explanati
 
         // 右上角关闭按钮
         var closeBtn = document.createElement('button');
+        closeBtn.classList.add('epmd-dialog-close');
         closeBtn.innerHTML = '<i class="fas fa-times"></i>';
         closeBtn.style.cssText = 'position: absolute; top: 15px; right: 15px; width: 32px; height: 32px; background: ' + (nightMode ? '#444' : '#f5f5f5') + '; color: ' + (nightMode ? '#eee' : '#333') + '; border: none; border-radius: 50%; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center;';
         closeBtn.onclick = function() {
@@ -661,6 +690,7 @@ Provide 5-10 most relevant Markdown examples. Only return the list, no explanati
 
         // 创建容器
         var container = document.createElement('div');
+        container.classList.add('desktop-editor-dialog');
         container.style.cssText = 'background: ' + (nightMode ? '#2d2d2d' : 'white') + '; border-radius: 12px; padding: 20px; width: 90%; max-width: 600px; max-height: 85vh; overflow: hidden; display: flex; flex-direction: column;';
 
         // 标题
@@ -782,6 +812,7 @@ Provide 5-10 most relevant Markdown examples. Only return the list, no explanati
 
         // 右上角关闭按钮
         var closeBtn = document.createElement('button');
+        closeBtn.classList.add('epmd-dialog-close');
         closeBtn.innerHTML = '<i class="fas fa-times"></i>';
         closeBtn.style.cssText = 'position: absolute; top: 15px; right: 15px; width: 32px; height: 32px; background: ' + (nightMode ? '#444' : '#f5f5f5') + '; color: ' + (nightMode ? '#eee' : '#333') + '; border: none; border-radius: 50%; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center;';
         closeBtn.onclick = function() {

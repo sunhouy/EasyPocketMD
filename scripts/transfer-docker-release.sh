@@ -13,19 +13,27 @@ if [ -n "${SERVER_SSH_HOST_KEY:-}" ]; then
   ssh_options=(-o StrictHostKeyChecking=yes -o ServerAliveInterval=15 -o ServerAliveCountMax=8)
 fi
 remote="${SERVER_USER:?}@${SERVER_HOST:?}"
+control_dir="${DEPLOY_CONTROL_DIR:-docker-control}"
+image_dir="${DEPLOY_IMAGE_DIR:-image-cas}"
+transport=(sshpass -e ssh)
+if [ -n "${SERVER_SSH_KEY_FILE:-}" ]; then
+  ssh_options+=(-i "$SERVER_SSH_KEY_FILE" -o IdentitiesOnly=yes -o BatchMode=yes)
+  transport=(ssh)
+fi
 # sshpass reads SSHPASS from the process environment, not command-line arguments.
 if [ "$action" != deploy ]; then
   echo "Only deployment is supported; rollback image backups are disabled." >&2
   exit 1
 fi
-sshpass -e ssh "${ssh_options[@]}" "$remote" \
+"${transport[@]}" "${ssh_options[@]}" "$remote" \
   "set -e; command -v docker >/dev/null; command -v python3 >/dev/null; command -v rsync >/dev/null; docker info >/dev/null; mkdir -p '$remote_root/cache/objects' '$release'; chmod 700 '$remote_root/releases' '$release'"
 # SHA-addressed immutable members: existing image layers are never sent again.
-export RSYNC_RSH="sshpass -e ssh ${ssh_options[*]}"
-rsync -r --chmod=F600,D700 docker-control/ "$remote:$release/"
+printf -v RSYNC_RSH '%q ' "${transport[@]}" "${ssh_options[@]}"
+export RSYNC_RSH
+rsync -r --chmod=F600,D700 "$control_dir/" "$remote:$release/"
 # Fail before uploading large layers if transfer/import would fill the disk.
-sshpass -e ssh "${ssh_options[@]}" "$remote" \
+"${transport[@]}" "${ssh_options[@]}" "$remote" \
   "python3 '$release/deploy-resources.py' transfer '$remote_root/cache' '$release' '$channel'"
-rsync -r --ignore-existing --partial-dir=.rsync-partial --delay-updates --stats image-cas/objects/ "$remote:$remote_root/cache/objects/"
-sshpass -e ssh "${ssh_options[@]}" "$remote" \
+rsync -r --ignore-existing --partial-dir=.rsync-partial --delay-updates --stats "$image_dir/objects/" "$remote:$remote_root/cache/objects/"
+"${transport[@]}" "${ssh_options[@]}" "$remote" \
   "python3 '$release/deploy-resources.py' deploy '$remote_root/cache' '$release' '$channel'"

@@ -2387,6 +2387,7 @@ import { createDiffFileWriter } from './conflict/live-files';
         });
         
         const closeBtn = document.createElement('button');
+        closeBtn.classList.add('epmd-dialog-close');
         closeBtn.textContent = isEn() ? 'Cancel' : '取消';
         closeBtn.className = 'modal-btn secondary';
         closeBtn.style.alignSelf = 'flex-end';

@@ -126,6 +126,7 @@ function showEmojiPicker() {
     `;
 
     const emojiContainer = document.createElement('div');
+    emojiContainer.classList.add('desktop-editor-dialog');
     emojiContainer.style.cssText = `
         background: ${(window.nightMode === true) ? '#2d2d2d' : 'white'};
         border-radius: 12px;
@@ -151,6 +152,7 @@ function showEmojiPicker() {
     emojiContainer.appendChild(title);
 
     const closeBtn = document.createElement('button');
+    closeBtn.classList.add('epmd-dialog-close');
     closeBtn.innerHTML = '<i class="fas fa-times"></i>';
     closeBtn.style.cssText = `
         position: absolute;

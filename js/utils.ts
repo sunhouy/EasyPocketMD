@@ -28,15 +28,19 @@
         }, 3000);
     }
 
+    let syncStatusTimer: ReturnType<typeof setTimeout>;
     function showSyncStatus(text, type = 'syncing') {
         const syncStatus = document.getElementById('syncStatus');
         const syncText = document.getElementById('syncText');
         if (syncStatus && syncText) {
             syncStatus.className = `sync-status ${type}`;
             syncText.textContent = text;
+            clearTimeout(syncStatusTimer);
+            const icon=syncStatus.querySelector('.sync-icon');
+            if(icon) icon.className='fas sync-icon ' + (type==='syncing'?'fa-sync-alt fa-spin':type==='success'?'fa-check-circle':'fa-exclamation-circle');
             syncStatus.classList.add('syncing');
             if (type === 'success' || type === 'error') {
-                setTimeout(() => syncStatus.classList.remove('syncing'), 2000);
+                syncStatusTimer = setTimeout(() => syncStatus.classList.remove('syncing'), 2000);
             }
         }
     }

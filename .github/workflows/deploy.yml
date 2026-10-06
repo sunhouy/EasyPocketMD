@@ -202,3 +202,21 @@ jobs:
         source: "downloads/*"
         target: "/www/wwwroot/static"
         strip_components: 1
+
+    - name: Create US static download directory
+      uses: appleboy/ssh-action@v1
+      with:
+        host: ${{ secrets.IP_US }}
+        username: ${{ secrets.SERVER_USER }}
+        key: ${{ secrets.SSHKEY_US }}
+        script: mkdir -p /www/wwwroot/static
+
+    - name: Upload print clients to US server
+      uses: appleboy/scp-action@v1
+      with:
+        host: ${{ secrets.IP_US }}
+        username: ${{ secrets.SERVER_USER }}
+        key: ${{ secrets.SSHKEY_US }}
+        source: "downloads/*"
+        target: "/www/wwwroot/static"
+        strip_components: 1

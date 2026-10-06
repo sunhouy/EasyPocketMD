@@ -9,7 +9,8 @@ export async function showSharedEditHistory(getState: () => any, refresh: (data?
     const header = document.createElement('header'); header.className = 'share-history-header';
     const title = document.createElement('strong'); title.textContent = '文档协作历史';
     const filter = document.createElement('select'); filter.setAttribute('aria-label', '按编辑者筛选');
-    const close = document.createElement('button'); close.className = 'share-close-btn'; close.textContent = '关闭'; close.onclick = () => overlay.remove();
+    const close = document.createElement('button');
+    close.classList.add('epmd-dialog-close'); close.className = 'share-close-btn epmd-dialog-close'; close.textContent = '×'; close.setAttribute('aria-label','关闭'); close.onclick = () => overlay.remove();
     header.append(title, filter, close);
     const message = document.createElement('div'); message.className = 'share-history-message'; message.setAttribute('role', 'status');
     const content = document.createElement('div'); content.className = 'share-history-content'; content.textContent = '加载中…';

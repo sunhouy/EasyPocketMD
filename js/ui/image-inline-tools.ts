@@ -897,6 +897,7 @@ import CropperModule from 'cropperjs';
         `;
 
         var content = document.createElement('div');
+        content.classList.add('desktop-editor-dialog');
         content.style.cssText = `
             background: ${bg};
             border-radius: 12px;

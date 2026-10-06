@@ -56,11 +56,11 @@
         let closeOnOverlay = dismissible && options.closeOnOverlay !== false;
         let closeOnEsc = dismissible && options.closeOnEsc !== false;
         let showCancelButton = options.showCancelButton !== false;
-        let showCloseButton = options.showCloseButton === true;
+        let showCloseButton = dismissible && options.showCloseButton !== false;
 
         function buildCloseButton() {
             if (!showCloseButton) return '';
-            return '<button class="custom-dialog-btn close custom-dialog-close" aria-label="close" style="position:absolute;top:10px;right:10px;width:28px;height:28px;border:none;border-radius:6px;background:' + (nightMode ? '#4a4a4a' : '#f0f0f0') + ';color:' + textColor + ';cursor:pointer;font-size:16px;line-height:1;">&times;</button>';
+            return '<button class="custom-dialog-btn close custom-dialog-close epmd-dialog-close" aria-label="' + (isEn ? 'Close' : '关闭') + '" style="position:absolute;top:10px;right:10px;width:28px;height:28px;border:none;border-radius:6px;background:' + (nightMode ? '#4a4a4a' : '#f0f0f0') + ';color:' + textColor + ';cursor:pointer;font-size:16px;line-height:1;">&times;</button>';
         }
 
         function buildCancelButton() {
@@ -77,7 +77,7 @@
                         ${buildCloseButton()}
                         <h2 style="text-align:center;margin:0 0 15px 0;font-size:18px;">${title}</h2>
                         <p style="text-align:center;margin:0 0 20px 0;font-size:14px;line-height:1.5;">${message}</p>
-                        <div style="display:flex;gap:10px;">
+                        <div class="custom-dialog-actions" style="display:flex;gap:10px;">
                             <button class="custom-dialog-btn confirm" style="flex:1;padding:12px;background:var(--theme-accent, #4a90e2);color:white;border:none;border-radius:6px;cursor:pointer;font-size:14px;">${confirmText}</button>
                         </div>
                     </div>
@@ -90,7 +90,7 @@
                         ${buildCloseButton()}
                         <h2 style="text-align:center;margin:0 0 15px 0;font-size:18px;">${title}</h2>
                         <p style="text-align:center;margin:0 0 20px 0;font-size:14px;line-height:1.5;">${message}</p>
-                        <div style="display:flex;gap:10px;">
+                        <div class="custom-dialog-actions" style="display:flex;gap:10px;">
                             ${buildCancelButton()}
                             <button class="custom-dialog-btn confirm" style="flex:1;padding:12px;background:var(--theme-accent, #4a90e2);color:white;border:none;border-radius:6px;cursor:pointer;font-size:14px;">${confirmText}</button>
                         </div>
@@ -105,7 +105,7 @@
                         <h2 style="text-align:center;margin:0 0 15px 0;font-size:18px;">${title}</h2>
                         <p style="text-align:center;margin:0 0 15px 0;font-size:14px;line-height:1.5;">${message}</p>
                         <input type="text" class="custom-dialog-input" style="width:100%;padding:10px;margin-bottom:20px;border:1px solid ${nightMode ? '#555' : '#ddd'};border-radius:6px;background:${inputBgColor};color:${textColor};font-size:14px;box-sizing:border-box;" placeholder="${placeholder}" value="${defaultValue}">
-                        <div style="display:flex;gap:10px;">
+                        <div class="custom-dialog-actions" style="display:flex;gap:10px;">
                             ${buildCancelButton()}
                             <button class="custom-dialog-btn confirm" style="flex:1;padding:12px;background:var(--theme-accent, #4a90e2);color:white;border:none;border-radius:6px;cursor:pointer;font-size:14px;">${confirmText}</button>
                         </div>

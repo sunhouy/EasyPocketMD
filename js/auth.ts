@@ -849,7 +849,6 @@
 
         const username = (document.getElementById('registerUsername') as HTMLInputElement)?.value.trim();
         const password = (document.getElementById('registerPassword') as HTMLInputElement)?.value.trim();
-        const inviteCode = (document.getElementById('registerInviteCode') as HTMLInputElement)?.value.trim();
         const e2eEnabled = (document.getElementById('registerEnableE2E') as HTMLInputElement)?.checked || false;
         const message = document.getElementById('registerMessage');
 
@@ -886,7 +885,6 @@
 
         try {
             const requestBody: {username: string; password: string; e2e_enabled: boolean; invite_code?: string} = { username: username, password: password, e2e_enabled: e2eEnabled };
-            if (inviteCode) requestBody.invite_code = inviteCode;
 
             const apiUrl = (global.getApiBaseUrl ? global.getApiBaseUrl() : 'api') + '/auth/register';
             const response = await fetch(apiUrl, {

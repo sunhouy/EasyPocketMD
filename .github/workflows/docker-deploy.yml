@@ -108,13 +108,35 @@ jobs:
         if [ '${{ inputs.channel }}' = dev ]; then
           openssl req -x509 -newkey rsa:4096 -keyout docker-control/tls.key -out docker-control/tls.pem -days 365 -nodes -subj '/CN=dev.yhsun.cn'
         fi
+    - name: Prepare regional edge configuration
+      env:
+        ORIGIN_IP: ${{ secrets.SERVER_HOST }}
+      run: python3 scripts/prepare-edge-release.py
     - name: Transfer missing image objects and activate Docker release
       env:
         SERVER_HOST: ${{ secrets.SERVER_HOST }}
         SERVER_USER: ${{ secrets.SERVER_USER }}
         SSHPASS: ${{ secrets.SERVER_PASSWORD }}
         SERVER_SSH_HOST_KEY: ${{ secrets.SERVER_SSH_HOST_KEY }}
-      run: bash scripts/transfer-docker-release.sh '${{ inputs.channel }}' 'deploy'
+        IP_US: ${{ secrets.IP_US }}
+        SSHKEY_US: ${{ secrets.SSHKEY_US }}
+      run: |
+        test -n "$IP_US" && test -n "$SSHKEY_US"
+        umask 077
+        key_file="$RUNNER_TEMP/epmd-us-key"
+        trap 'rm -f "$key_file"' EXIT
+        printf '%s\n' "$SSHKEY_US" > "$key_file"
+        # Both destinations receive the same build concurrently; failures count independently.
+        bash scripts/transfer-docker-release.sh '${{ inputs.channel }}' deploy &
+        original_pid=$!
+        SERVER_HOST="$IP_US" SERVER_SSH_HOST_KEY='' SERVER_SSH_KEY_FILE="$key_file" \
+          DEPLOY_CONTROL_DIR=docker-control-us DEPLOY_IMAGE_DIR=image-cas-us \
+          bash scripts/transfer-docker-release.sh '${{ inputs.channel }}' deploy &
+        us_pid=$!
+        status=0
+        wait "$original_pid" || status=1
+        wait "$us_pid" || status=1
+        exit "$status"
     - name: Remove private CI configuration
       if: always()
-      run: rm -rf docker-control
+      run: rm -rf docker-control docker-control-us "$RUNNER_TEMP/epmd-us-key"
