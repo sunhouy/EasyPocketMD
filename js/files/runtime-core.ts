@@ -2,6 +2,8 @@
  * 文件管理 - 加载、保存、同步、历史版本、文件夹
  */
 // @ts-nocheck
+import { createFileOrderStore, reorderSiblings, isOrderMetadataFile } from './order-store';
+import { createTreeSelectionRestorer } from './tree/selection';
 import { installNotesHome } from './notes-home';
 import { showFileDetails, foldFileName, bindFileTreeLongPress } from './tree/details';
 import { floatingRunWindow } from '../code-runner-window';
@@ -30,6 +32,8 @@ import { createDiffFileWriter } from './conflict/live-files';
 (function(global) {
     'use strict';
     installEditorComposition(global);
+    const orderStore = createFileOrderStore(global, () => loadFiles());
+    global.refreshFileOrders = orderStore.refresh;
     const notesHome = installNotesHome(global, { loadContent: file => fetchServerFileContent(file), needsContent: file => needsServerFileContentFetch(file) });
 
     function g<K extends keyof Window>(name: K): Window[K] { return global[name]; }
@@ -401,7 +405,7 @@ import { createDiffFileWriter } from './conflict/live-files';
 
             const data = node.data || {};
             const path = String(data.path || '').trim();
-            if (path === '.easypocketmd_orders') return;
+            if (isOrderMetadataFile(path)) return;
             if (data.type === 'file' && isHiddenCrossSearchFile(path)) return;
 
             const title = getBasename(path || String(node.text || '').trim());
@@ -734,7 +738,9 @@ import { createDiffFileWriter } from './conflict/live-files';
                 '<button type="button" class="file-list-multi-select-btn danger" data-action="delete">' + (isEn() ? 'Delete' : '删除') + '</button>' +
                 '<button type="button" class="file-list-multi-select-btn" data-action="cancel">' + (isEn() ? 'Cancel' : '取消') + '</button>' +
             '</div>';
-        fileList.parentNode.insertBefore(toolbar, fileList);
+        const home = global.isFileManagementMode ? document.getElementById('notesHome') : null;
+        if (home) home.insertBefore(toolbar, home.querySelector('.notes-home-grid'));
+        else fileList.parentNode.insertBefore(toolbar, fileList);
 
         toolbar.addEventListener('click', function(e) {
             const target = e.target;
@@ -754,7 +760,10 @@ import { createDiffFileWriter } from './conflict/live-files';
         return toolbar;
     }
 
+    global.toggleFileListMultiSelectItem = toggleFileListMultiSelectItem;
+
     function updateFileListMultiSelectToolbar() {
+        global.refreshNotesHome?.();
         const countEl = document.getElementById('fileListMultiSelectCount');
         if (countEl) {
             countEl.textContent = String(getFileListMultiSelectedIds().size);
@@ -813,6 +822,13 @@ import { createDiffFileWriter } from './conflict/live-files';
 
     function selectAllFilesForMulti() {
         const set = getFileListMultiSelectedIds();
+        if (global.isFileManagementMode) {
+            document.querySelectorAll<HTMLElement>('#notesHome .notes-file-card, #notesHome .notes-folder-card').forEach(element => {
+                const id = element.dataset.fileId;if (!id) return;
+                set.add(id);
+            });
+            updateFileListMultiSelectToolbar();return;
+        }
         window.$('#fileList .jstree-anchor').each(function() {
             const anchorId = window.$(this).attr('id');
             const nodeId = resolveNodeIdFromAnchorId(anchorId);
@@ -824,6 +840,13 @@ import { createDiffFileWriter } from './conflict/live-files';
 
     function invertFileListMultiSelection() {
         const set = getFileListMultiSelectedIds();
+        if (global.isFileManagementMode) {
+            document.querySelectorAll<HTMLElement>('#notesHome .notes-file-card, #notesHome .notes-folder-card').forEach(element => {
+                const id = element.dataset.fileId;if (!id) return;
+                if (set.has(id)) set.delete(id);else set.add(id);
+            });
+            updateFileListMultiSelectToolbar();return;
+        }
         window.$('#fileList .jstree-anchor').each(function() {
             const anchorId = window.$(this).attr('id');
             const nodeId = resolveNodeIdFromAnchorId(anchorId);
@@ -856,6 +879,7 @@ import { createDiffFileWriter } from './conflict/live-files';
         const tb = document.getElementById('fileListMultiSelectToolbar');
         if (tb && tb.parentNode) tb.parentNode.removeChild(tb);
         window.$('#fileList .file-multi-checkbox').remove();
+        global.refreshNotesHome?.();
     }
 
     async function batchDeleteFileListMultiSelection() {
@@ -970,7 +994,7 @@ import { createDiffFileWriter } from './conflict/live-files';
     function openFirstFile() {
         const currentFileId = g('currentFileId');
         if (currentFileId) {
-            const activeFile = g('files').find(f => f.id === currentFileId && f.type === 'file' && f.name !== '.easypocketmd_orders');
+            const activeFile = g('files').find(f => f.id === currentFileId && f.type === 'file' && !isOrderMetadataFile(f.name));
             if (activeFile) return;
         }
 
@@ -982,13 +1006,13 @@ import { createDiffFileWriter } from './conflict/live-files';
         
         if (defaultOpening === 'firstFile') {
             // 直接打开第一个非系统文件
-            const firstFile = g('files').find(f => f.type === 'file' && f.name !== '.easypocketmd_orders');
+            const firstFile = g('files').find(f => f.type === 'file' && !isOrderMetadataFile(f.name));
             if (firstFile) openFile(firstFile.id);
         } else {
             // lastEdited: 优先打开上次打开的文件
             const lastOpenedFileId = localStorage.getItem('vditor_last_opened_file');
             if (lastOpenedFileId) {
-                const lastFile = g('files').find(f => f.id === lastOpenedFileId && f.type === 'file' && f.name !== '.easypocketmd_orders');
+                const lastFile = g('files').find(f => f.id === lastOpenedFileId && f.type === 'file' && !isOrderMetadataFile(f.name));
                 if (lastFile) {
                     openFile(lastOpenedFileId);
                     return;
@@ -996,142 +1020,23 @@ import { createDiffFileWriter } from './conflict/live-files';
             }
             
             // 如果没有上次打开的文件或文件不存在，则打开第一个非系统文件
-            const firstFile = g('files').find(f => f.type === 'file' && f.name !== '.easypocketmd_orders');
+            const firstFile = g('files').find(f => f.type === 'file' && !isOrderMetadataFile(f.name));
             if (firstFile) openFile(firstFile.id);
         }
     }
 
-    function loadOrders() {
-        const files = g('files');
-        const orderFile = files.find(f => f.name === '.easypocketmd_orders');
-        global.fileOrders = {};
-        if (orderFile && orderFile.content) {
-            try {
-                global.fileOrders = JSON.parse(orderFile.content);
-                files.forEach(f => {
-                    if (global.fileOrders[f.name] !== undefined) {
-                        f.order = global.fileOrders[f.name];
-                    }
-                });
-            } catch (e) {
-                console.error('Failed to parse orders file', e);
-            }
-        }
-    }
-
-    function saveOrdersFromPaths(pathOrders) {
-        const files = g('files');
-        let orderFile = files.find(f => f.name === '.easypocketmd_orders');
-        if (!orderFile) {
-            orderFile = {
-                id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-                name: '.easypocketmd_orders',
-                type: 'file',
-                content: '{}',
-                createdAt: Date.now(),
-                lastModified: Date.now(),
-                isSynced: false
-            };
-            files.push(orderFile);
-        }
-        
-        if (!global.fileOrders) global.fileOrders = {};
-        Object.assign(global.fileOrders, pathOrders);
-        
-        orderFile.content = JSON.stringify(global.fileOrders);
-        orderFile.lastModified = Date.now();
-        orderFile.isSynced = false;
-        
-        localStorage.setItem('vditor_files', window.e2eSerializeFiles ? window.e2eSerializeFiles(files) : JSON.stringify(files));
-        
-        if (g('currentUser')) {
-            global.syncFileToServer(orderFile.id);
-        }
-    }
+    function loadOrders() { void orderStore.load(); }
 
     function moveNodeOrder(nodeId, direction) {
         const tree = window.$.jstree.reference('#fileList');
         if (!tree) return;
-        const node = tree.get_node(nodeId);
-        if (!node) return;
-        
-        const parentId = node.parent;
-        const parentNode = tree.get_node(parentId);
-        const siblings = parentNode.children;
-        const index = siblings.indexOf(nodeId);
-        
-        let targetIndex = -1;
-        if (direction === 'up' && index > 0) {
-            targetIndex = index - 1;
-        } else if (direction === 'down' && index < siblings.length - 1) {
-            targetIndex = index + 1;
-        }
-        
-        if (targetIndex !== -1) {
-            const pathOrders = {};
-            // Assign base orders to spread them out
-            siblings.forEach((id, i) => {
-                const child = tree.get_node(id);
-                child.data.order = i * 10;
-            });
-            
-            // Swap
-            const targetId = siblings[targetIndex];
-            const targetNode = tree.get_node(targetId);
-            
-            const temp = node.data.order;
-            node.data.order = targetNode.data.order;
-            targetNode.data.order = temp;
-            
-            // Collect path orders
-            siblings.forEach(id => {
-                const child = tree.get_node(id);
-                pathOrders[child.data.path] = child.data.order;
-                const file = g('files').find(f => f.name === child.data.path);
-                if (file) file.order = child.data.order;
-            });
-            
-            saveOrdersFromPaths(pathOrders);
-            loadFiles();
-        }
-    }
-
-    function saveOrders() {
-        const files = g('files');
-        let orderFile = files.find(f => f.name === '.easypocketmd_orders');
-        if (!orderFile) {
-            orderFile = {
-                id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-                name: '.easypocketmd_orders',
-                type: 'file',
-                content: '{}',
-                createdAt: Date.now(),
-                lastModified: Date.now(),
-                isSynced: false
-            };
-            files.push(orderFile);
-        }
-        
-        const orders = {};
-        if (global.fileOrders) {
-            Object.assign(orders, global.fileOrders);
-        }
-        
-        files.forEach(f => {
-            if (f.name !== '.easypocketmd_orders') {
-                orders[f.name] = f.order || 0;
-            }
-        });
-        
-        orderFile.content = JSON.stringify(orders);
-        orderFile.lastModified = Date.now();
-        orderFile.isSynced = false;
-        
-        localStorage.setItem('vditor_files', window.e2eSerializeFiles ? window.e2eSerializeFiles(files) : JSON.stringify(files));
-        
-        if (g('currentUser')) {
-            global.syncFileToServer(orderFile.id);
-        }
+        const node = tree.get_node(nodeId);if (!node) return;
+        const siblings = tree.get_node(node.parent)?.children || [];
+        const paths = siblings.map(id => tree.get_node(id)?.data?.path).filter(Boolean);
+        const orders = reorderSiblings(paths, node.data.path, direction);
+        if (!orders) return;
+        orderStore.save(orders);
+        loadFiles();
     }
 
     // ---------- jstree 渲染及交互 ----------
@@ -1151,7 +1056,7 @@ import { createDiffFileWriter } from './conflict/live-files';
         // 2. 收集所有需要创建节点的路径（包括中间路径）
         const allPaths = new Set();
         files.forEach(f => {
-            if (f.name === '.easypocketmd_orders') return; // 过滤掉系统文件
+            if (isOrderMetadataFile(f.name)) return; // 过滤掉系统文件
             allPaths.add(f.name);
             let p = f.name;
             while(p.includes('/')) {
@@ -1269,6 +1174,7 @@ import { createDiffFileWriter } from './conflict/live-files';
             window.$.jstree.reference('#fileList').destroy();
         }
 
+        const selectionRestorer = createTreeSelectionRestorer();
         let lastToggleTime = 0;
         function safeToggleNode(inst, node) {
             const now = Date.now();
@@ -1313,8 +1219,7 @@ import { createDiffFileWriter } from './conflict/live-files';
                         'rename': {
                             'label': isEn() ? 'Rename' : '重命名',
                             'action': function(data) {
-                                const inst = window.$.jstree.reference(data.reference);
-                                const obj = inst.get_node(data.reference);
+                                const obj = node;
                                 
                                 // 对于文件夹，如果是虚拟文件夹，则不允许重命名
                                 if (obj.data.isVirtual) {
@@ -1335,24 +1240,21 @@ import { createDiffFileWriter } from './conflict/live-files';
                         'move_up': {
                             'label': isEn() ? 'Move Up' : '上移',
                             'action': function(data) {
-                                const inst = window.$.jstree.reference(data.reference);
-                                const obj = inst.get_node(data.reference);
+                                const obj = node;
                                 moveNodeOrder(obj.id, 'up');
                             }
                         },
                         'move_down': {
                             'label': isEn() ? 'Move Down' : '下移',
                             'action': function(data) {
-                                const inst = window.$.jstree.reference(data.reference);
-                                const obj = inst.get_node(data.reference);
+                                const obj = node;
                                 moveNodeOrder(obj.id, 'down');
                             }
                         },
                         'move': {
                             'label': isEn() ? 'Move' : '移动',
                             'action': function(data) {
-                                const inst = window.$.jstree.reference(data.reference);
-                                const obj = inst.get_node(data.reference);
+                                const obj = node;
                                 
                                 // 对于文件夹，如果是虚拟文件夹，则不允许移动
                                 if (obj.data.isVirtual) {
@@ -1366,8 +1268,7 @@ import { createDiffFileWriter } from './conflict/live-files';
                         'history': {
                              'label': isEn() ? 'History Versions' : '历史版本',
                              'action': function(data) {
-                                 const inst = window.$.jstree.reference(data.reference);
-                                 const obj = inst.get_node(data.reference);
+                                 const obj = node;
                                  if (obj.data.type === 'file') {
                                      global.showHistoryModal(obj.id, obj.data.path);
                                  }
@@ -1376,16 +1277,14 @@ import { createDiffFileWriter } from './conflict/live-files';
                         'multi_select': {
                             'label': isEn() ? 'Multi Select' : '多选',
                             'action': function(data) {
-                                const inst = window.$.jstree.reference(data.reference);
-                                const obj = inst.get_node(data.reference);
+                                const obj = node;
                                 enterFileListMultiSelectMode(obj.id);
                             }
                         },
                         'delete': {
                             'label': isEn() ? 'Delete' : '删除',
                             'action': function(data) {
-                                const inst = window.$.jstree.reference(data.reference);
-                                const obj = inst.get_node(data.reference);
+                                const obj = node;
                                 if (obj.data.isVirtual) {
                                     g('customAlert')(isEn() ? 'Cannot delete virtual folder directly, please delete its contents' : '不能直接删除虚拟文件夹，请删除其子内容');
                                     return;
@@ -1397,8 +1296,7 @@ import { createDiffFileWriter } from './conflict/live-files';
                             'label': isEn() ? 'New File' : '新建文件',
                             'separator_before': true,
                             'action': function(data) {
-                                const inst = window.$.jstree.reference(data.reference);
-                                const obj = inst.get_node(data.reference);
+                                const obj = node;
                                 const path = obj.data.path;
                                 const baseName = isEn() ? 'New File' : '新文档';
                                 const defaultName = getNextAvailableName(baseName, path);
@@ -1413,8 +1311,7 @@ import { createDiffFileWriter } from './conflict/live-files';
                         'new_folder': {
                             'label': isEn() ? 'New Folder' : '新建文件夹',
                             'action': function(data) {
-                                const inst = window.$.jstree.reference(data.reference);
-                                const obj = inst.get_node(data.reference);
+                                const obj = node;
                                 const path = obj.data.path;
                                 const baseName = isEn() ? 'New Folder' : '新文件夹';
                                 const defaultName = getNextAvailableName(baseName, path);
@@ -1441,14 +1338,12 @@ import { createDiffFileWriter } from './conflict/live-files';
             }
         })
         .on('select_node.jstree', function (e, data) {
+            if (selectionRestorer.isRestoring()) return;
             if (isFileListMultiSelectMode()) {
                 // 多选模式：切换选中状态，但保持 jstree 内部选中态指向当前文件
                 toggleFileListMultiSelectItem(data.node.id);
                 const currentFileId = g('currentFileId');
-                data.instance.deselect_node(data.node);
-                if (currentFileId && data.instance.get_node(currentFileId)) {
-                    data.instance.select_node(currentFileId);
-                }
+                selectionRestorer.restore(data.instance, data.node.id, currentFileId);
                 return;
             }
             if (data.node.type === 'file') {
@@ -1461,13 +1356,13 @@ import { createDiffFileWriter } from './conflict/live-files';
                 // 点击文件夹后，保持当前打开文件的选中状态
                 const currentFileId = g('currentFileId');
                 if (currentFileId && data.instance.get_node(currentFileId)) {
-                    data.instance.deselect_node(data.node);
-                    data.instance.select_node(currentFileId);
+                    selectionRestorer.restore(data.instance, data.node.id, currentFileId);
                 }
             }
         })
         .on('click.jstree', function (e) {
             const inst = window.$.jstree.reference(e.target);
+            if (!inst) return;
             const node = inst.get_node(e.target);
             if (isFileListMultiSelectMode()) {
                 // 多选模式下，点击复选框已单独处理；点击节点其他位置不进行展开/打开
@@ -1713,11 +1608,11 @@ import { createDiffFileWriter } from './conflict/live-files';
     }
 
     function loadFiles() {
+        loadOrders();
         notesHome.render();
         if (deferFileTreeWorkUntilWasmReady(loadFiles, 'loadFiles')) return;
         const fileListSidebar = document.getElementById('fileListSidebar');
         const wasVisible = fileListSidebar && fileListSidebar.classList.contains('show');
-        loadOrders();
         initFileTree();
         bindFileManagementFabIfNeeded();
         bindFileListSearchIfNeeded();

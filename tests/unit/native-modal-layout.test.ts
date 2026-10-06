@@ -1,5 +1,6 @@
 /** @jest-environment jsdom */
 import { applyNativeModalLayout } from '../../js/main/modal-layout';
+afterEach(()=>document.body.className='');
 it.each(['settingsModalOverlay','historyModalOverlay'])('covers the toolbar for native %s',id=>{
     document.body.innerHTML=`<div class="toolbar"><div class="modal-overlay" id="${id}"><div class="modal ${id.startsWith('history')?'history-modal':''}" style="max-height:85vh"></div></div></div>`;
     const overlay=document.getElementById(id); applyNativeModalLayout(overlay);
@@ -8,4 +9,11 @@ it.each(['settingsModalOverlay','historyModalOverlay'])('covers the toolbar for 
     expect(overlay.querySelector<HTMLElement>('.modal').style.height).toBe('100%');
     const markup=overlay.outerHTML; applyNativeModalLayout(overlay);
     expect(overlay.outerHTML).toBe(markup); // Mutation observer must settle rather than loop.
+});
+it.each(['settingsModalOverlay','historyModalOverlay'])('does not add system bar padding twice in Android %s',id=>{
+    document.body.className='tauri-mobile-safe-area tauri-android-native-insets';
+    document.body.innerHTML=`<div class="modal-overlay" id="${id}"><div class="modal history-modal"></div></div>`;
+    applyNativeModalLayout(document.getElementById(id));
+    const modal=document.querySelector<HTMLElement>('.modal');
+    expect(modal.style.paddingTop).toBe('16px');expect(modal.style.paddingBottom).toBe('16px');
 });

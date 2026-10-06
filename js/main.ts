@@ -53,6 +53,8 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!isTauriMobileRuntime() || !document.body) return;
 
         document.body.classList.add('tauri-mobile-safe-area');
+        // Android's MainActivity already pads the WebView outside system bars.
+        document.body.classList.toggle('tauri-android-native-insets', /Android/i.test(navigator.userAgent || ''));
         window.isTauriMobileEnvironment = true;
 
         if (!document.querySelector('.status-bar-placeholder')) {

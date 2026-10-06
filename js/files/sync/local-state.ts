@@ -10,10 +10,13 @@ export function deviceId(): string {
     if (id) return id;
     const created: string = crypto.randomUUID(); localStorage.setItem('epm-device-id', created); return created;
 }
+const activeSyncFiles = new WeakSet<object>();
+export function beginFileSync(file: object) { activeSyncFiles.add(file); }
+export function endFileSync(file: object) { activeSyncFiles.delete(file); }
 export function syncStatus(file: any, online: boolean, dirty: boolean): SyncStatus {
     if (file.syncConflict) return 'conflict';
     if (!online) return dirty ? 'offline-dirty' : 'offline';
-    if (file.syncBusy) return 'syncing';
+    if (activeSyncFiles.has(file)) return 'syncing';
     if (file.remoteContentVersion && Number(file.remoteContentVersion) > Number(file.contentVersion || 0)) return 'remote';
     return dirty ? 'pending' : 'synced';
 }

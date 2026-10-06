@@ -2,7 +2,7 @@
 // @ts-nocheck
 import { createSyncRuntimeApi } from '../../js/files/sync';
 import { installSyncRuntime } from '../../js/files/sync-runtime';
-import { persistFile, restoreFiles, restoreFileFromDB } from '../../js/files/sync/local-state';
+import { persistFile, restoreFiles, restoreFileFromDB, syncStatus } from '../../js/files/sync/local-state';
 jest.mock('../../js/files/websocket-sync', () => ({ createWebSocketClient: jest.fn(), createSyncThrottle: jest.fn() }));
 jest.mock('../../js/e2e', () => ({ resolveFileContent: async content => content }));
 function fixture() {
@@ -15,6 +15,19 @@ function fixture() {
 const response = (content,version,code=200) => ({json:async()=>({code,data:{content,content_version:version}})});
 beforeEach(()=>localStorage.clear());
 afterEach(()=>jest.restoreAllMocks());
+it('does not spin for an open file with a persisted busy flag, and clears real saves on acknowledgement',async()=>{
+    const f=fixture();f.file.syncBusy=true;expect(syncStatus(f.file,true,false)).toBe('synced');let reply;
+    global.fetch=jest.fn(()=>new Promise(resolve=>reply=resolve));const save=f.api.syncFileToServer('note',{background:true});
+    for(let i=0;i<50&&!reply;i++)await Promise.resolve();expect(syncStatus(f.file,true,true)).toBe('syncing');
+    reply(response('first',2));await save;expect(syncStatus(f.file,true,false)).toBe('synced');
+});
+it('clears the active state if preparation fails before a cloud request is sent',async()=>{
+    const f=fixture();f.file.contentLoaded=false;global.fetch=jest.fn(async()=>{throw Error('unavailable');});
+    // A preparatory content request fails before the save body can be built.
+    f.api=createSyncRuntimeApi({globalRef:f.app,g:key=>f.app[key],getCurrentEditorContent:f.text,setEditorContentForFile:jest.fn(),
+        markPendingServerSync:jest.fn(),tryHandleTokenExpired:async()=>false,isExternalLocalFile:()=>false,isEn:()=>false,fetchServerFileContent:async()=>{throw Error('offline');}});
+    expect(await f.api.syncFileToServer('note',{background:true})).toBe(false);expect(syncStatus(f.file,true,false)).toBe('synced');expect(fetch).not.toHaveBeenCalled();
+});
 it('refreshes metadata during a save without replacing its draft, record, array, or acknowledgement',async()=>{
     const f=fixture(), array=f.app.files; let reply;
     global.fetch=jest.fn(()=>new Promise(resolve=>{reply=resolve;}));
