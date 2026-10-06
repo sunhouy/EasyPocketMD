@@ -38,6 +38,9 @@ if [ -n "${SERVER_SSH_HOST_KEY:-}" ]; then
   printf '%s\n' "$SERVER_SSH_HOST_KEY" >> "$HOME/.ssh/known_hosts"
   ssh_options=(-o ConnectTimeout=30 -o StrictHostKeyChecking=yes -o ServerAliveInterval=15 -o ServerAliveCountMax=8)
 fi
+if [ -n "${SERVER_SSH_CONFIG_FILE:-}" ]; then
+  ssh_options+=(-F "$SERVER_SSH_CONFIG_FILE")
+fi
 remote="${SERVER_USER:?}@${SERVER_HOST:?}"
 control_dir="${DEPLOY_CONTROL_DIR:-docker-control}"
 image_dir="${DEPLOY_IMAGE_DIR:-image-cas}"
