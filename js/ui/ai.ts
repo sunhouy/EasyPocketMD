@@ -1,5 +1,7 @@
+import { isMarketBuild } from '../build-variant';
 (function(global) {
     'use strict';
+    if (isMarketBuild) return;
 
     function g<K extends keyof Window>(name: K): Window[K] { return global[name]; }
     function isEn() { return window.i18n && window.i18n.getLanguage() === 'en'; }

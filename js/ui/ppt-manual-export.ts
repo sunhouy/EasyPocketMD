@@ -1,9 +1,11 @@
+import { requireAIEnabled } from '../build-variant';
 import { PPT_TEMPLATES } from '../../shared/ppt-templates';
 import { buildDocumentPPTPrompt, parseDocumentPPTReply, generateDocumentPPT, parsePPTPageRange } from './ppt-document';
 import { downloadGeneratedFile } from './export';
 
 /** Generate a document-specific prompt, then import an external model's reply. */
 export function showManualPPTExport(content: string, filename: string) {
+    requireAIEnabled();
     const global = window;
     let activeRequest: AbortController | undefined;
     const en = global.i18n?.getLanguage() === 'en';

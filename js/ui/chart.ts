@@ -1,3 +1,4 @@
+import { isMarketBuild, requireAIEnabled } from '../build-variant';
 
 (function(global) {
     'use strict';
@@ -788,6 +789,7 @@
 
     // 显示AI生成对话框（自然语言描述）
     function showAIGenerateDialog() {
+        requireAIEnabled();
         var nightMode = g('nightMode') === true;
 
         // 如果已有模态框，先关闭
@@ -1010,7 +1012,7 @@ The chart type is: ${chartType}. Return only valid chart code or JSON, no explan
         aiBtn.innerHTML = '<i class="fas fa-magic"></i> ' + t('aiGenerate');
         aiBtn.style.cssText = 'width: 100%; padding: 8px; margin-bottom: 12px; background: linear-gradient(135deg, #4a90e2 0%, #357abd 100%); color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 500;';
         aiBtn.onclick = showAIGenerateDialog;
-        container.appendChild(aiBtn);
+        if (!isMarketBuild) container.appendChild(aiBtn);
 
         // 搜索框
         var searchBox = document.createElement('input');

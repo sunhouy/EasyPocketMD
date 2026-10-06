@@ -170,6 +170,7 @@ export default defineConfig({
   base: '/',
   publicDir: 'public',
   define: {
+    __APP_MARKET__: JSON.stringify(process.env.VITE_APP_MARKET === '1'),
     __WASM_TEXT_ENGINE_PRESENT__: JSON.stringify(hasWasmTextEngineDist),
     __APP_BUILD_TAG__: JSON.stringify(cacheVersion),
     __APP_PACKAGE_VERSION__: JSON.stringify(appPackageVersion),

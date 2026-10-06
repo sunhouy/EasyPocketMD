@@ -1,3 +1,4 @@
+import { isMarketBuild } from './build-variant';
 import { createDeploymentRouteStatus } from './main/deployment-route';
 import { renderStorageUsage } from './main/storage-usage';
 /**
@@ -468,7 +469,7 @@ document.addEventListener('DOMContentLoaded', function() {
     };
 
     function isToolbarButtonVisible(btnConfig) {
-        if (!btnConfig) return false;
+        if (!btnConfig || (isMarketBuild && /AIBtn$/.test(btnConfig.id))) return false;
         return !btnConfig.isEasterEgg;
     }
 
@@ -500,6 +501,8 @@ document.addEventListener('DOMContentLoaded', function() {
     var erudaModulePromise = null;
     var erudaInstance = null;
     var erudaEnabled = false;
+
+    if (isMarketBuild) keyboardShortcutActionDefinitions = keyboardShortcutActionDefinitions.filter(definition => definition.id !== 'openAIAssistant');
 
     keyboardShortcutActionDefinitions.forEach(function(definition) {
         keyboardShortcutActionsById[definition.id] = definition;

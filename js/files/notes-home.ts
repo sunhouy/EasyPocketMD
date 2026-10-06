@@ -1,3 +1,4 @@
+import { syncStatus, syncStatusPresentation } from './sync/local-state';
 import { bindFileTreeLongPress } from './tree/details';
 
 type Note = {id:string;name:string;type:string;content?:string;lastModified?:number|string;last_modified?:number|string};
@@ -37,11 +38,12 @@ export function installNotesHome(app:any, options:{loadContent?:(file:any)=>Prom
     account.innerHTML='<i class="fas fa-user-circle" aria-hidden="true"></i>';
     settings.innerHTML='<i class="fas fa-cog" aria-hidden="true"></i>';
     tools.append(account,settings);header.append(heading,tools);
-    const search=document.createElement('input');search.type='search';search.className='notes-home-search';search.id='notesHomeSearch';
+    const search=document.createElement('input');search.type='search';search.className='notes-home-search';search.id='notesHomeSearch';search.name='workspace-file-search';search.autocomplete='off';search.setAttribute('data-lpignore','true');search.setAttribute('data-1p-ignore','true');search.setAttribute('autocapitalize','none');
+    const searchForm=document.createElement('form');searchForm.className='notes-home-search-form';searchForm.setAttribute('role','search');searchForm.autocomplete='off';searchForm.onsubmit=event=>event.preventDefault();searchForm.append(search);
     const tabs=document.createElement('nav');tabs.className='notes-home-tabs';
     const grid=document.createElement('div');grid.className='notes-home-grid';
     const empty=document.createElement('p');empty.className='notes-home-empty';
-    home.append(header,search,tabs,grid,empty);sidebar.prepend(home);
+    home.append(header,searchForm,tabs,grid,empty);sidebar.prepend(home);
     let view:'all'|'folder'='all', folder='', timer:ReturnType<typeof setTimeout>;
     const en=()=>app.i18n?.getLanguage?.()==='en';
     const t=(zh:string,english:string)=>en()?english:zh;
@@ -101,6 +103,7 @@ export function installNotesHome(app:any, options:{loadContent?:(file:any)=>Prom
         account.setAttribute('aria-label',t('账号管理','Account management'));settings.setAttribute('aria-label',t('设置','Settings'));
         account.title=t('账号管理','Account management');settings.title=t('设置','Settings');
         search.placeholder=t('搜索文件','Search files');search.setAttribute('aria-label',search.placeholder);
+        const tabsScrollLeft=tabs.scrollLeft;
         tabs.setAttribute('aria-label',t('文件夹筛选','Filter by folder'));tabs.replaceChildren();
         const tab=(text:string,active:boolean,action:()=>void,id?:string)=>{
             const element=button('notes-folder-tab'+(active?' active':''),action);element.textContent=text;element.title=text;
@@ -108,6 +111,8 @@ export function installNotesHome(app:any, options:{loadContent?:(file:any)=>Prom
         };
         tab(t('全部','All'),view==='all',()=>{view='all';render();});
         for (const item of folders) tab(item.name,view==='folder' && item.name===folder,()=>showFolder(item.name),item.id);
+        tabs.scrollLeft=tabsScrollLeft;
+        const scrollTop=grid.scrollTop;
         grid.replaceChildren();
         const query=search.value.trim().toLocaleLowerCase();
         const visibleFolders=view==='all'?[]:folders.filter(item=>parent(item.name)===folder && (!query || item.name.toLocaleLowerCase().includes(query)));
@@ -120,7 +125,18 @@ export function installNotesHome(app:any, options:{loadContent?:(file:any)=>Prom
             const card=document.createElement('article');card.className='notes-file-card';card.dataset.fileId=file.id;card.tabIndex=0;card.setAttribute('role','button');card.setAttribute('aria-label',file.name);card.title=file.name;
             const open=()=>{void app.openFile?.(file.id);};card.onclick=open;
             card.onkeydown=event=>{if(event.target===card && (event.key==='Enter'||event.key===' ')){event.preventDefault();open();}};
+            const titleRow=document.createElement('div');titleRow.className='notes-card-title';
             const title=document.createElement('h2');title.textContent=basename(file.name);
+            const status=syncStatus(file,navigator.onLine!==false,!!(app.unsavedChanges?.[file.id] || app.pendingServerSync?.[file.id] || (file as any).isSynced===false));
+            const [symbol,label]=syncStatusPresentation[status];
+            const sync=button('file-sync-icon '+status,()=>{});sync.dataset.state=status;sync.title=label;sync.setAttribute('aria-label',label);
+            sync.innerHTML='<i class="fas '+symbol+'" aria-hidden="true"></i>';
+            sync.onclick=event=>{event.stopPropagation();if((file as any).syncConflict)app.openSyncConflict?.(file.id);};
+            titleRow.append(title,sync);
+            if(encrypted(file)) {
+                const lock=document.createElement('span');lock.className='file-e2e-indicator';lock.title=t('此文件已使用端到端加密','This file is end-to-end encrypted');lock.setAttribute('aria-label',lock.title);
+                lock.innerHTML='<i class="fas fa-lock" aria-hidden="true"></i>';titleRow.append(lock);
+            }
             const preview=document.createElement('p');preview.className='notes-file-preview';
             const content=file.content || '';
             preview.textContent=locked(file)||/^EPMD\d*:/.test(content)?t('加密文件','Encrypted file'):needs(file)?snapshots.has(key(file))?(snapshots.get(key(file))!.preview || t('暂无内容','No content')):t('摘要加载中…','Loading preview…'):notePreview(content)||t('暂无内容','No content');
@@ -128,8 +144,9 @@ export function installNotesHome(app:any, options:{loadContent?:(file:any)=>Prom
             if(stamp){date.dateTime=new Date(stamp).toISOString();date.textContent=new Intl.DateTimeFormat(en()?'en':'zh-CN',{year:'numeric',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}).format(stamp);}else date.textContent=t('修改时间未记录','Modification time unavailable');
             const more=button('notes-card-menu',()=>{});more.textContent='⋮';more.setAttribute('aria-label',t('更多操作：','More actions: ')+file.name);
             more.onclick=event=>{event.stopPropagation();const rect=more.getBoundingClientRect();menu(file.id,rect.right,rect.bottom,rect);};
-            card.append(title,preview,date,more);grid.append(card);
+            titleRow.append(more);card.append(titleRow,preview,date);grid.append(card);
         }
+        grid.scrollTop=scrollTop;
         loadSnippets(query?candidates:candidates.slice(0,previewLimit),query);
         empty.hidden=!!grid.childElementCount;
         empty.textContent=query?running?t('正在搜索云端文件…','Searching cloud files…'):t('没有找到匹配的文件或文件夹','No matching files or folders'):t('暂无文件，点击右下角加号创建','No files. Use + to create one.');
@@ -137,7 +154,7 @@ export function installNotesHome(app:any, options:{loadContent?:(file:any)=>Prom
     search.addEventListener('input',()=>{clearTimeout(timer);timer=setTimeout(render,120);});
     home.addEventListener('contextmenu',event=>{const target=(event.target as Element).closest<HTMLElement>('[data-file-id]');if(!target)return;event.preventDefault();menu(target.dataset.fileId!,event.clientX,event.clientY);});
     bindFileTreeLongPress(home,(target,x,y)=>menu(target.dataset.fileId!,x,y),'[data-file-id]');
-    grid.addEventListener('scroll',()=>{if(grid.scrollHeight-grid.scrollTop-grid.clientHeight<500){previewLimit+=40;render();}});
+    grid.addEventListener('scroll',()=>{if(grid.scrollHeight-grid.scrollTop-grid.clientHeight<500 && previewLimit<(app.files || []).length){previewLimit+=40;render();}});
     const clearSnapshots=()=>{snapshots.clear();attempted.clear();render();};
     window.addEventListener('e2e-locked',clearSnapshots);window.addEventListener('e2e-unlocked',clearSnapshots);
     app.refreshNotesHome=render;

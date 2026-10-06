@@ -1,3 +1,4 @@
+import { requireAIEnabled } from '../build-variant';
 /** Cross-document retrieval, with an optional exhaustive scan. */
 import { retrieveQueryChunks } from './ai-query-index';
 import { semanticQueryScores, type QueryEmbed } from './ai-query-vectors';
@@ -68,6 +69,7 @@ function batches<T>(items: T[], render: (item: T) => string): T[][] {
 }
 export async function queryDocuments(question: string, documents: QueryDocument[], call: QueryCall,
     options: { signal?: AbortSignal; progress?: (done: number, total: number) => void; mode?: 'fast' | 'full'; embed?: QueryEmbed; embeddingKey?: string } = {}): Promise<QueryResult> {
+    requireAIEnabled();
     question = question.trim();
     if (!question || question.length > 2000) throw new Error('请输入 1–2000 字的问题 / Enter a question of 1–2000 characters');
     const docs = documents.filter(doc => visibleDocument(doc.path) && doc.content.trim());

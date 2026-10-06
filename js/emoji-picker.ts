@@ -1,3 +1,4 @@
+import { isMarketBuild, requireAIEnabled } from './build-variant';
 function showEmojiPicker() {
     function isEn() { return window.i18n && window.i18n.getLanguage && window.i18n.getLanguage() === 'en'; }
 
@@ -313,7 +314,7 @@ function showEmojiPicker() {
             emptyMsg.appendChild(titleText);
 
             const keyword = searchBox.value.trim();
-            if (keyword) {
+            if (keyword && !isMarketBuild) {
                 const aiLink = document.createElement('a');
                 aiLink.href = 'javascript:void(0)';
                 aiLink.textContent = isEn() ? 'Try AI Search' : '试试AI搜索';
@@ -477,6 +478,7 @@ function showEmojiPicker() {
 
 // AI搜索表情
 async function performEmojiAISearch(keyword) {
+    requireAIEnabled();
     function isEn() { return window.i18n && window.i18n.getLanguage && window.i18n.getLanguage() === 'en'; }
 
     const emojiGrid = document.getElementById('emojiGrid');

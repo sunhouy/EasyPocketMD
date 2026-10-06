@@ -346,6 +346,15 @@ import { createDiffFileWriter } from './conflict/live-files';
             });
         }
 
+        for (const [id,action] of [
+            ['fileManagementFabImport',()=>global.importFiles()],
+            ['fileManagementFabLocal',()=>openExternalLocalFileByDialog()]
+        ] as const) {
+            document.getElementById(id)?.addEventListener('click',event=>{
+                event.preventDefault();event.stopPropagation();closeFileManagementFabRing();void action();
+            });
+        }
+
         if (!hasBoundFabRingDismiss) {
             hasBoundFabRingDismiss = true;
             document.addEventListener('click', function(e) {
