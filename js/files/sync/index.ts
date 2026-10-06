@@ -1,9 +1,10 @@
+import { isOrderMetadataFile } from '../../../shared/file-orders';
 import SHA256 from 'crypto-js/sha256';
 import { isEditorComposing, waitForEditorCommit, compositionRevision } from '../../editor-composition';
 import { isUntouchedGuestWelcome } from './revisions';
 import { safeMerge } from '../../../api/utils/safeMerge';
 import { SyncQueue } from './queue';
-import { persistFile, persistFileDurably, restoreFileFromDB, refreshSyncIcons, deviceId } from './local-state';
+import { persistFile, persistFileDurably, restoreFileFromDB, refreshSyncIcons, deviceId, beginFileSync, endFileSync } from './local-state';
 import { showSyncConflict } from './conflict';
 import { createWebSocketClient, createSyncThrottle } from '../websocket-sync';
 
@@ -179,7 +180,7 @@ export function createSyncRuntimeApi(ctx: any) {
   globalRef.queueBackgroundFileSync = (selectedId?: string) => {
     if (navigator.onLine === false || !g('currentUser')) { refreshSyncIcons(globalRef); return; }
     for (const file of g('files') || []) {
-      if (file.type !== 'file' || file.e2eTransition || file.syncConflict) continue;
+      if (file.type !== 'file' || isOrderMetadataFile(file.name) || file.e2eTransition || file.syncConflict) continue;
       const priority = file.id === (selectedId || g('currentFileId')) ? 100 : (g('pendingServerSync')?.[file.id] ? 50 : 0);
       void queue.enqueue(file.id, priority, async () => {
         if (navigator.onLine === false || !g('currentUser') || file.syncConflict || globalRef.fileRelocationInProgress || !g('files').includes(file)) return;
@@ -301,6 +302,7 @@ export function createSyncRuntimeApi(ctx: any) {
   }
 
   async function syncFileToServer(fileId: string, options: any) {
+    if (isOrderMetadataFile(g('files').find(f => f.id === fileId)?.name)) return false;
     if (isEditorComposing(globalRef, fileId)) return false;
     if (globalRef.fileRelocationInProgress && !options?.relocation) return false;
     if (!g('currentUser') || navigator.onLine === false) { refreshSyncIcons(globalRef); return false; }
@@ -349,7 +351,8 @@ export function createSyncRuntimeApi(ctx: any) {
         if (!g('files').includes(file) || isEditorComposing(globalRef, fileId) || file.syncConflict) return false;
         const inputRevision = compositionRevision(globalRef, fileId);
         if (g('currentUser')?.username !== requestUser.username || g('currentUser')?.token !== requestUser.token) return false;
-        file.syncBusy = true; refreshSyncIcons(globalRef);
+        beginFileSync(file); refreshSyncIcons(globalRef);
+        try {
         const baseLastModified = baseLastModifiedOption || file.serverLastModified || null;
 
         let content;
@@ -373,7 +376,6 @@ export function createSyncRuntimeApi(ctx: any) {
 
         }
 
-        try {
           // Cloud acknowledgement must never mark an unsaved original as saved.
           if (isExternalLocalFile(file) && !(await writeExternalLocalContent(file, content)).success) return false;
           const api = globalRef.getApiBaseUrl ? globalRef.getApiBaseUrl() : 'api';
@@ -577,7 +579,7 @@ export function createSyncRuntimeApi(ctx: any) {
             globalRef.showMessage?.((isEn() ? 'Sync failed: ' : '同步失败: ') + (error.message || ''), 'error');
           }
           return false;
-        }
+        } finally { endFileSync(file); refreshSyncIcons(globalRef); }
       });
     const trackedTask = syncTask.catch(function () {
       return false;
@@ -590,7 +592,7 @@ export function createSyncRuntimeApi(ctx: any) {
       if (fileSyncLocks.get(fileId) === trackedTask) {
         fileSyncLocks.delete(fileId);
       }
-      file.syncBusy = false; persist(file);
+      persist(file);
     }
   }
 

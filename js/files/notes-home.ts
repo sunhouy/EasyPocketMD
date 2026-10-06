@@ -1,7 +1,8 @@
+import { isOrderMetadataFile } from '../../shared/file-orders';
 import { syncStatus, syncStatusPresentation } from './sync/local-state';
 import { bindFileTreeLongPress } from './tree/details';
 
-type Note = {id:string;name:string;type:string;content?:string;lastModified?:number|string;last_modified?:number|string};
+type Note = {id:string;name:string;type:string;content?:string;lastModified?:number|string;last_modified?:number|string;order?:number};
 const parent = (name:string) => name.includes('/') ? name.slice(0,name.lastIndexOf('/')) : '';
 const basename = (name:string) => name.split('/').pop() || name;
 export function noteTimestamp(file:Note):number {
@@ -18,9 +19,9 @@ export function notePreview(content:string):string {
 }
 export function visibleNotes(files:Note[], folder:string|null, query:string):Note[] {
     const q=query.trim().toLocaleLowerCase();
-    return files.filter(file=>file.type==='file' && (folder===null || parent(file.name)===folder)
+    return files.filter(file=>file.type==='file' && !isOrderMetadataFile(file.name) && (folder===null || parent(file.name)===folder)
         && (!q || (file.name+' '+(/^EPMD\d*:/.test(file.content || '')?'':file.content || '')).toLocaleLowerCase().includes(q)))
-        .sort((a,b)=>noteTimestamp(b)-noteTimestamp(a) || a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
+        .sort((a,b)=>(a.order || 0)-(b.order || 0) || noteTimestamp(b)-noteTimestamp(a) || a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
 }
 
 /** A home view over the same files and tree actions; it owns no copies of drafts. */
@@ -96,7 +97,7 @@ export function installNotesHome(app:any, options:{loadContent?:(file:any)=>Prom
         const username=app.currentUser?.username || '';
         if(cachedUser!==username){cachedUser=username;snapshots.clear();attempted.clear();}
         const files:Note[]=app.files || [];
-        const folders=files.filter(file=>file.type==='folder').sort((a,b)=>a.name.localeCompare(b.name));
+        const folders=files.filter(file=>file.type==='folder').sort((a,b)=>(a.order || 0)-(b.order || 0) || a.name.localeCompare(b.name));
         if (view==='folder' && !folders.some(file=>file.name===folder)) {view='all';folder='';}
         app.notesHomeFolder=view==='folder'?folder:'';
         heading.textContent='EasyPocketMD';
@@ -142,9 +143,7 @@ export function installNotesHome(app:any, options:{loadContent?:(file:any)=>Prom
             preview.textContent=locked(file)||/^EPMD\d*:/.test(content)?t('加密文件','Encrypted file'):needs(file)?snapshots.has(key(file))?(snapshots.get(key(file))!.preview || t('暂无内容','No content')):t('摘要加载中…','Loading preview…'):notePreview(content)||t('暂无内容','No content');
             const date=document.createElement('time');const stamp=noteTimestamp(file);
             if(stamp){date.dateTime=new Date(stamp).toISOString();date.textContent=new Intl.DateTimeFormat(en()?'en':'zh-CN',{year:'numeric',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}).format(stamp);}else date.textContent=t('修改时间未记录','Modification time unavailable');
-            const more=button('notes-card-menu',()=>{});more.textContent='⋮';more.setAttribute('aria-label',t('更多操作：','More actions: ')+file.name);
-            more.onclick=event=>{event.stopPropagation();const rect=more.getBoundingClientRect();menu(file.id,rect.right,rect.bottom,rect);};
-            titleRow.append(more);card.append(titleRow,preview,date);grid.append(card);
+            card.append(titleRow,preview,date);grid.append(card);
         }
         grid.scrollTop=scrollTop;
         loadSnippets(query?candidates:candidates.slice(0,previewLimit),query);

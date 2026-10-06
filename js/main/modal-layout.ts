@@ -10,6 +10,7 @@ export function applyNativeModalLayout(overlay: HTMLElement) {
     };
     set(overlay, 'top', '0px'); set(overlay, 'bottom', '0px');
     set(overlay, 'z-index', '20000');
+    const androidInsetsHandled = document.body.classList.contains('tauri-android-native-insets');
     const modal = overlay.querySelector<HTMLElement>('.modal');
     const full = overlay.id === 'settingsModalOverlay' || modal?.matches('.diff-modal, .history-modal, .file-diff-modal');
     if (full && modal) {
@@ -19,8 +20,8 @@ export function applyNativeModalLayout(overlay: HTMLElement) {
         set(modal, 'width', '100%'); set(modal, 'max-width', 'none');
         set(modal, 'margin', '0px'); set(modal, 'border-radius', '0px');
         // Insets protect content, while the dialog background covers the toolbar area.
-        set(modal, 'padding-top', 'calc(var(--safe-area-top, 0px) + 16px)');
-        set(modal, 'padding-bottom', 'calc(var(--safe-area-bottom, 0px) + 16px)');
+        set(modal, 'padding-top', androidInsetsHandled ? '16px' : 'calc(var(--safe-area-top, 0px) + 16px)');
+        set(modal, 'padding-bottom', androidInsetsHandled ? '16px' : 'calc(var(--safe-area-bottom, 0px) + 16px)');
     } else {
         set(overlay, 'padding-top', 'calc(var(--safe-area-top, 0px) + 10px)');
         set(overlay, 'padding-bottom', 'calc(var(--safe-area-bottom, 0px) + 10px)');

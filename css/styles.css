@@ -209,8 +209,8 @@ body.night-mode .file-switch-loading-card {
     position: fixed;
     right: 16px;
     bottom: calc(16px + var(--safe-area-bottom));
-    width: 230px;
-    height: 210px;
+    width: 300px;
+    height: 300px;
     z-index: 1049;
     pointer-events: none;
     display: none;
@@ -220,13 +220,14 @@ body.night-mode .file-switch-loading-card {
     position: absolute;
     bottom: 68px;
     right: 0;
-    width: 108px;
-    height: 68px;
+    width: 88px;
+    height: 74px;
     border: none;
     border-radius: 14px;
-    background: transparent;
+    background: #ffffff;
     color: var(--theme-accent, #2e6dd8);
-    box-shadow: none;
+    box-shadow: 0 4px 16px rgba(29,48,79,.22);
+    padding: 6px 2px;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -259,7 +260,7 @@ body.night-mode .file-switch-loading-card {
 }
 
 .file-management-fab-ring.open {
-    pointer-events: auto;
+    pointer-events: none;
 }
 
 .file-management-fab-ring.open .file-management-fab-item {
@@ -268,11 +269,11 @@ body.night-mode .file-switch-loading-card {
 }
 
 .file-management-fab-ring.open .file-management-fab-item { transform:scale(1); }
-.file-management-fab-item.file { right:116px; bottom:144px; }
+.file-management-fab-item.file { right:0; bottom:220px; }
 
-.file-management-fab-item.folder { right:0; bottom:144px; }
-.file-management-fab-item.import { right:116px; }
-.file-management-fab-item.local { right:0; }
+.file-management-fab-item.folder { right:99px; bottom:190px; }
+.file-management-fab-item.import { right:175px; bottom:120px; }
+.file-management-fab-item.local { right:212px; bottom:23px; }
 
 body.file-management-mode .editor-container {
     display: none;
@@ -378,6 +379,8 @@ body.night-mode .file-management-fab {
 }
 
 body.night-mode .file-management-fab-item {
+    background:#252b35;
+    box-shadow:0 4px 16px #0008;
     color: var(--theme-accent-light, #8ab7ff);
 }
 
@@ -6270,3 +6273,8 @@ body.night-mode .deployment-route-status { color:#bbb; border-color:#444; }
 .notes-card-title .file-sync-icon, .notes-card-title .file-e2e-indicator { flex-shrink:0; margin:0; }
 
 .notes-home-search-form { flex-shrink:0; margin:0; }
+
+/* MainActivity handles Android system bars and keyboard insets outside the WebView. */
+body.tauri-android-native-insets { --safe-area-top:0px; --safe-area-bottom:0px; padding-top:0; }
+body.tauri-android-native-insets .status-bar-placeholder { display:none; }
+body.tauri-android-native-insets.file-management-mode .notes-home { padding-top:12px; }

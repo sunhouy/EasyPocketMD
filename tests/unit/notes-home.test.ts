@@ -1,4 +1,5 @@
 /** @jest-environment jsdom */
+import { beginFileSync, endFileSync } from '../../js/files/sync/local-state';
 import {installNotesHome,visibleNotes,notePreview} from '../../js/files/notes-home';
 const files=[
     {id:'old',type:'file',name:'old.md',content:'旧笔记',lastModified:1},
@@ -42,7 +43,7 @@ it('searches beyond the visible snippet and keeps user text safe',()=>{
     expect(visibleNotes([{id:'encrypted',type:'file',name:'密文',content:'EPMD2:secret'}],null,'secret')).toEqual([]);
 });
 it('uses the existing menu for files and folder names',()=>{
-    const card=document.querySelector<HTMLElement>('.notes-file-card');card.querySelector<HTMLButtonElement>('.notes-card-menu').click();
+    const card=document.querySelector<HTMLElement>('.notes-file-card');card.dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,cancelable:true,clientX:20,clientY:40}));
     expect(tree.show_contextmenu).toHaveBeenCalledWith({id:'note'},expect.any(Number),expect.any(Number));expect(app.openFile).not.toHaveBeenCalled();
     document.querySelector('.notes-folder-tab[data-file-id="folder"]').dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,cancelable:true,clientX:20,clientY:40}));
     expect(tree.show_contextmenu).toHaveBeenLastCalledWith({id:'folder'},20,40);
@@ -90,13 +91,8 @@ it('uses compact product labels, accessible icons and only real folder tabs',()=
     app.i18n={getLanguage:()=> 'en'};render();
     expect(document.querySelector<HTMLInputElement>('#notesHomeSearch').placeholder).toBe('Search files');
 });
-it('anchors a measured menu beside the clicked button without guessing its dimensions',()=>{
-    const element=document.createElement('ul');element.className='vakata-context';document.body.append(element);
-    jest.spyOn(element,'getBoundingClientRect').mockReturnValue({width:180,height:260} as DOMRect);
-    const more=document.querySelector<HTMLButtonElement>('.notes-card-menu');
-    jest.spyOn(more,'getBoundingClientRect').mockReturnValue({right:320,bottom:250,top:214} as DOMRect);
-    const frame=jest.spyOn(window,'requestAnimationFrame').mockImplementation(callback=>{callback(0);return 1;});
-    more.click();expect(element.style.left).toBe('140px');expect(element.style.top).toBe('250px');frame.mockRestore();
+it('keeps the card header compact without a three-dot button',()=>{
+    expect(document.querySelector('.notes-card-menu')).toBeNull();
 });
 it('preserves the scroll position across file refreshes and stops rebuilding at the bottom',()=>{
     const grid=document.querySelector<HTMLElement>('.notes-home-grid');grid.scrollTop=1250;
@@ -116,8 +112,8 @@ it('shows shared synchronization states and encryption locks and opens conflicts
     const status=card.querySelector<HTMLButtonElement>('.file-sync-icon');
     expect(status.dataset.state).toBe('conflict');expect(card.querySelector('.fa-lock')).not.toBeNull();
     status.click();expect(app.openSyncConflict).toHaveBeenCalledWith('note');expect(app.openFile).not.toHaveBeenCalled();
-    app.files[2].syncConflict=false;app.files[2].syncBusy=true;render();
+    app.files[2].syncConflict=false;beginFileSync(app.files[2]);render();
     expect(document.querySelector('[data-file-id="note"].notes-file-card .fa-spin')).not.toBeNull();
-    app.files[2].syncBusy=false;render();
+    endFileSync(app.files[2]);render();
     expect(document.querySelector('[data-file-id="note"].notes-file-card .fa-spin')).toBeNull();
 });

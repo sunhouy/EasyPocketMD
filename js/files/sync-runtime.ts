@@ -1148,6 +1148,8 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
                 if (!isStillCurrentUser()) return;
 
                 mergeFiles(localFiles, serverFiles);
+                await global.refreshFileOrders?.();
+                if (!isStillCurrentUser()) return;
                 hooks.loadFiles();
                 setTimeout(() => global.queueBackgroundFileSync?.(g('currentFileId')), 0);
                 void fetch(api + '/files/local-origins?username=' + encodeURIComponent(requestUsername), { headers: { Authorization: 'Bearer ' + g('currentUser').token } }).then(r => r.json()).then(result => {

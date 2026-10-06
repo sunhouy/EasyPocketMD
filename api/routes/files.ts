@@ -1,3 +1,5 @@
+const { getFileOrders, setFileOrders } = require('../models/FileOrders');
+const { normalizeOrders } = require('../../shared/file-orders');
 const { getLocalOrigins, setLocalOrigin, clearLocalOrigin } = require('../models/LocalOrigins');
 const express = require('express');
 const router = express.Router();
@@ -45,6 +47,20 @@ router.post('/local-origin', verifyUser, async (req, res) => {
     if (typeof filename !== 'string' || !filename || filename.length > 255 || typeof device_id !== 'string' || !/^[a-zA-Z0-9-]{1,64}$/.test(device_id)) return res.status(400).json({ code: 400, message: '无效的文件来源' });
     try { await setLocalOrigin(req.user.username, filename, device_id); res.json({ code: 200 }); }
     catch { res.status(503).json({ code: 503, message: '本地来源元数据保存失败' }); }
+});
+
+// Sort metadata is separate from document saves, versions, encryption and text conflicts.
+router.get('/orders', verifyUser, async (req, res) => {
+    try {res.json({code:200, data:await getFileOrders(req.user.username)});}
+    catch {res.status(503).json({code:503, message:'排序元数据暂不可用'});}
+});
+router.post('/orders', verifyUser, async (req, res) => {
+    const input = req.body.orders;
+    if (!input || typeof input !== 'object' || Array.isArray(input) || Object.keys(input).length > 10000 || Object.keys(normalizeOrders(input)).length !== Object.keys(input).length) {
+        return res.status(400).json({code:400, message:'无效的排序数据'});
+    }
+    try {await setFileOrders(req.user.username, input);res.json({code:200});}
+    catch {res.status(503).json({code:503, message:'排序元数据保存失败'});}
 });
 
 // Get single file

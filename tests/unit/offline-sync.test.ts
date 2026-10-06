@@ -1,4 +1,5 @@
 /** @jest-environment jsdom */
+import { beginFileSync, endFileSync } from '../../js/files/sync/local-state';
 import { safeMerge } from '../../api/utils/safeMerge';
 import { AutoSaveScheduler } from '../../js/files/autoSave';
 import { persistFile, restoreFiles, syncStatus, refreshSyncIcons } from '../../js/files/sync/local-state';
@@ -24,7 +25,7 @@ describe('offline journals and status', () => {
     });
     it('distinguishes all states', () => {
         expect(syncStatus({}, false, false)).toBe('offline'); expect(syncStatus({}, false, true)).toBe('offline-dirty');
-        expect(syncStatus({ syncConflict: true }, true, true)).toBe('conflict'); expect(syncStatus({ syncBusy: true }, true, true)).toBe('syncing');
+        expect(syncStatus({ syncConflict: true }, true, true)).toBe('conflict'); const active={};beginFileSync(active);expect(syncStatus(active,true,true)).toBe('syncing');endFileSync(active);expect(syncStatus({syncBusy:true},true,false)).toBe('synced');
         expect(syncStatus({ remoteContentVersion: 2, contentVersion: 1 }, true, false)).toBe('remote'); expect(syncStatus({}, true, false)).toBe('synced');
     });
     it('shows icon-only status and labels another-device local files', () => {
