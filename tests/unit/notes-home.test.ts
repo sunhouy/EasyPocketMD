@@ -94,6 +94,22 @@ it('uses compact product labels, accessible icons and only real folder tabs',()=
 it('keeps the card header compact without a three-dot button',()=>{
     expect(document.querySelector('.notes-card-menu')).toBeNull();
 });
+it('opens nested-card menus with the model node even when no hidden tree anchor exists',()=>{
+    const action=jest.fn();tree.settings={contextmenu:{items:jest.fn(node=>({rename:{action:()=>action(node.id)}}))}};
+    app.$.vakata={context:{show:jest.fn((reference,position,items)=>items.rename.action())}};
+    const card=document.querySelector<HTMLElement>('.notes-file-card[data-file-id="nested"]');
+    card.dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,cancelable:true,clientX:60,clientY:80}));
+    expect(action).toHaveBeenCalledWith('nested');expect(tree.show_contextmenu).not.toHaveBeenCalled();
+});
+it('toggles multiple cards and folders without opening files or leaving selection mode',()=>{
+    app.fileListMultiSelectMode=true;app.fileListMultiSelectedIds=new Set(['note']);
+    app.toggleFileListMultiSelectItem=jest.fn(id=>{const set=app.fileListMultiSelectedIds;if(set.has(id))set.delete(id);else set.add(id);render();});render();
+    const card=()=>document.querySelector<HTMLElement>('.notes-file-card[data-file-id="nested"]');
+    card().click();expect(app.fileListMultiSelectedIds.has('nested')).toBe(true);expect(card().getAttribute('aria-checked')).toBe('true');
+    card().dispatchEvent(new KeyboardEvent('keydown',{key:' ',bubbles:true}));expect(app.fileListMultiSelectedIds.has('nested')).toBe(false);
+    document.querySelector<HTMLButtonElement>('.notes-folder-tab[data-file-id="folder"]').click();expect(app.fileListMultiSelectedIds.has('folder')).toBe(true);
+    expect(app.openFile).not.toHaveBeenCalled();expect(app.fileListMultiSelectMode).toBe(true);
+});
 it('preserves the scroll position across file refreshes and stops rebuilding at the bottom',()=>{
     const grid=document.querySelector<HTMLElement>('.notes-home-grid');grid.scrollTop=1250;
     const tabs=document.querySelector<HTMLElement>('.notes-home-tabs');tabs.scrollLeft=160;

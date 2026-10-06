@@ -88,7 +88,14 @@ export function installNotesHome(app:any, options:{loadContent?:(file:any)=>Prom
         // jsTree expects page coordinates, while our menu CSS uses fixed positioning.
         // Measure the rendered menu rather than guessing a width/height before opening.
         app.$?.(document)?.one?.('context_show.vakata.notesHome',position);
-        tree.show_contextmenu(node,x+window.scrollX,y+window.scrollY);
+        const source=tree.settings?.contextmenu?.items;
+        const reference=[...home.querySelectorAll<HTMLElement>('[data-file-id]')].find(element=>element.dataset.fileId===String(id));
+        // Nested notes can have no rendered jsTree anchor while the tree is hidden/collapsed.
+        // Build the same actions with the model node and anchor them to the visible card.
+        if(source && reference && app.$?.vakata?.context?.show) {
+            const items=typeof source==='function'?source.call(tree,node):source;
+            app.$.vakata.context.show(app.$(reference),{x:x+window.scrollX,y:y+window.scrollY},items);
+        } else tree.show_contextmenu(node,x+window.scrollX,y+window.scrollY);
         requestAnimationFrame(position);
     };
     const showFolder=(path:string)=>{view='folder';folder=path;app.notesHomeFolder=path;render();};
@@ -106,8 +113,11 @@ export function installNotesHome(app:any, options:{loadContent?:(file:any)=>Prom
         search.placeholder=t('搜索文件','Search files');search.setAttribute('aria-label',search.placeholder);
         const tabsScrollLeft=tabs.scrollLeft;
         tabs.setAttribute('aria-label',t('文件夹筛选','Filter by folder'));tabs.replaceChildren();
+        const multi=!!app.fileListMultiSelectMode;
+        const selected=(id:string)=>!!app.fileListMultiSelectedIds?.has(String(id));
+        const activate=(id:string, action:()=>void)=>multi ? app.toggleFileListMultiSelectItem?.(id) : action();
         const tab=(text:string,active:boolean,action:()=>void,id?:string)=>{
-            const element=button('notes-folder-tab'+(active?' active':''),action);element.textContent=text;element.title=text;
+            const element=button('notes-folder-tab'+(active?' active':'')+(multi && id && selected(id)?' selected':''),()=>id ? activate(id,action) : action());element.textContent=text;element.title=text;
             element.setAttribute('aria-pressed',String(active));if(id)element.dataset.fileId=id;tabs.append(element);
         };
         tab(t('全部','All'),view==='all',()=>{view='all';render();});
@@ -118,15 +128,19 @@ export function installNotesHome(app:any, options:{loadContent?:(file:any)=>Prom
         const query=search.value.trim().toLocaleLowerCase();
         const visibleFolders=view==='all'?[]:folders.filter(item=>parent(item.name)===folder && (!query || item.name.toLocaleLowerCase().includes(query)));
         for (const item of visibleFolders) {
-            const card=button('notes-folder-card',()=>showFolder(item.name));card.dataset.fileId=item.id;card.textContent='📁 '+basename(item.name);card.title=item.name;grid.append(card);
+            const card=button('notes-folder-card',()=>activate(item.id,()=>showFolder(item.name)));card.dataset.fileId=item.id;card.textContent='📁 '+basename(item.name);card.title=item.name;card.classList.toggle('selected',multi && selected(item.id));grid.append(card);
         }
         const candidates=visibleNotes(files,view==='folder'?folder:null,'');
         const notes=candidates.filter(file=>searchable(file,query));
         for (const file of notes) {
             const card=document.createElement('article');card.className='notes-file-card';card.dataset.fileId=file.id;card.tabIndex=0;card.setAttribute('role','button');card.setAttribute('aria-label',file.name);card.title=file.name;
-            const open=()=>{void app.openFile?.(file.id);};card.onclick=open;
+            const open=()=>activate(file.id,()=>{void app.openFile?.(file.id);});card.onclick=open;
             card.onkeydown=event=>{if(event.target===card && (event.key==='Enter'||event.key===' ')){event.preventDefault();open();}};
             const titleRow=document.createElement('div');titleRow.className='notes-card-title';
+            if (multi) {
+                card.classList.toggle('selected',selected(file.id));card.setAttribute('role','checkbox');card.setAttribute('aria-checked',String(selected(file.id)));
+                const check=document.createElement('span');check.className='notes-card-selection';check.innerHTML='<i class="far '+(selected(file.id)?'fa-check-square':'fa-square')+'" aria-hidden="true"></i>';titleRow.append(check);
+            }
             const title=document.createElement('h2');title.textContent=basename(file.name);
             const status=syncStatus(file,navigator.onLine!==false,!!(app.unsavedChanges?.[file.id] || app.pendingServerSync?.[file.id] || (file as any).isSynced===false));
             const [symbol,label]=syncStatusPresentation[status];

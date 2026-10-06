@@ -6278,3 +6278,6 @@ body.night-mode .deployment-route-status { color:#bbb; border-color:#444; }
 body.tauri-android-native-insets { --safe-area-top:0px; --safe-area-bottom:0px; padding-top:0; }
 body.tauri-android-native-insets .status-bar-placeholder { display:none; }
 body.tauri-android-native-insets.file-management-mode .notes-home { padding-top:12px; }
+
+.notes-file-card.selected, .notes-folder-card.selected, .notes-folder-tab.selected { outline:2px solid var(--theme-accent,#2e6dd8); outline-offset:-2px; }
+.notes-card-selection { flex-shrink:0; color:var(--theme-accent,#2e6dd8); font-size:16px; }

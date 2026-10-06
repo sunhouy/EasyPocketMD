@@ -1,3 +1,4 @@
+import { resolveFrontendAsset } from './utils/frontend-assets';
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
@@ -98,11 +99,15 @@ app.get('/sw.js', (req, res) => {
 app.get('/manifest.webmanifest', (req, res) => {
     // Some browsers expect application/manifest+json; Express doesn't have a built-in shortcut for it.
     res.setHeader('Content-Type', 'application/manifest+json; charset=utf-8');
-    res.sendFile(path.join(rootPath, 'manifest.webmanifest'));
+    const asset = resolveFrontendAsset('manifest.webmanifest', rootPath, distPath);
+    if (!asset) return res.status(404).end();
+    res.sendFile(asset);
 });
 app.get('/icon.png', (req, res) => {
     res.type('image/png');
-    res.sendFile(path.join(rootPath, 'icon.png'));
+    const asset = resolveFrontendAsset('icon.png', rootPath, distPath);
+    if (!asset) return res.status(404).end();
+    res.sendFile(asset);
 });
 
 

@@ -1036,6 +1036,17 @@ import CropperModule from 'cropperjs';
         return modal;
     }
 
+    document.addEventListener('keydown', function(event) {
+        if (event.key !== 'Escape') return;
+        const crop = document.getElementById(FULLSCREEN_CROP_ID);
+        const tools = document.getElementById(MODAL_ID);
+        if (crop && crop.style.display !== 'none') {
+            event.preventDefault();event.stopImmediatePropagation();hideFullscreenCropModal();
+        } else if (tools && tools.style.display !== 'none') {
+            event.preventDefault();event.stopImmediatePropagation();closeModal();
+        }
+    }, true);
+
     function closeModal() {
         var modal = document.getElementById(MODAL_ID);
         if (modal) {
