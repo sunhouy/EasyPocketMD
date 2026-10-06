@@ -33,13 +33,16 @@ export function installNotesHome(app:any, options:{loadContent?:(file:any)=>Prom
     const button=(className:string, action:()=>void)=>{const element=document.createElement('button');element.type='button';element.className=className;element.onclick=action;return element;};
     const account=button('',()=>{});
     account.onclick=event=>app.handleLoginButtonClick ? app.handleLoginButtonClick(event) : app.showLoginModal?.();
-    const settings=button('',()=>app.showSettingsDialog?.());tools.append(account,settings);header.append(heading,tools);
+    const settings=button('',()=>app.showSettingsDialog?.());
+    account.innerHTML='<i class="fas fa-user-circle" aria-hidden="true"></i>';
+    settings.innerHTML='<i class="fas fa-cog" aria-hidden="true"></i>';
+    tools.append(account,settings);header.append(heading,tools);
     const search=document.createElement('input');search.type='search';search.className='notes-home-search';search.id='notesHomeSearch';
     const tabs=document.createElement('nav');tabs.className='notes-home-tabs';
     const grid=document.createElement('div');grid.className='notes-home-grid';
     const empty=document.createElement('p');empty.className='notes-home-empty';
     home.append(header,search,tabs,grid,empty);sidebar.prepend(home);
-    let view:'all'|'folders'|'folder'='all', folder='', timer:ReturnType<typeof setTimeout>;
+    let view:'all'|'folder'='all', folder='', timer:ReturnType<typeof setTimeout>;
     const en=()=>app.i18n?.getLanguage?.()==='en';
     const t=(zh:string,english:string)=>en()?english:zh;
     const snapshots=new Map<string,{preview:string;query:string;matched:boolean}>();
@@ -67,9 +70,23 @@ export function installNotesHome(app:any, options:{loadContent?:(file:any)=>Prom
             }).catch(()=>{if(app.currentUser?.username===username && key(file)===stamp) snapshots.set(stamp,{preview:t('摘要暂不可用，点击打开文件','Preview unavailable. Open the file.'),query,matched:false});}).finally(()=>{running--;render();});
         }
     }
-    const menu=(id:string,x:number,y:number)=>{
+    const menu=(id:string,x:number,y:number,anchor?:DOMRect)=>{
         const tree=app.$?.('#fileList').jstree(true);if(!tree || typeof tree.get_node!=='function')return;const node=tree.get_node(id);
-        if (node) tree.show_contextmenu(node,Math.max(8,Math.min(x,window.innerWidth-210)),Math.max(8,Math.min(y,window.innerHeight-220)));
+        if (!node) return;
+        const position=()=>{
+            const element=document.querySelector<HTMLElement>('.vakata-context');if(!element)return;
+            element.style.maxHeight=Math.max(80,window.innerHeight-16)+'px';element.style.overflowY='auto';
+            const rect=element.getBoundingClientRect();
+            const left=anchor?anchor.right-rect.width:x;
+            const top=anchor && y+rect.height>window.innerHeight-8?anchor.top-rect.height:y;
+            element.style.left=Math.max(8,Math.min(left,window.innerWidth-rect.width-8))+'px';
+            element.style.top=Math.max(8,Math.min(top,window.innerHeight-rect.height-8))+'px';
+        };
+        // jsTree expects page coordinates, while our menu CSS uses fixed positioning.
+        // Measure the rendered menu rather than guessing a width/height before opening.
+        app.$?.(document)?.one?.('context_show.vakata.notesHome',position);
+        tree.show_contextmenu(node,x+window.scrollX,y+window.scrollY);
+        requestAnimationFrame(position);
     };
     const showFolder=(path:string)=>{view='folder';folder=path;app.notesHomeFolder=path;render();};
     function render() {
@@ -80,24 +97,24 @@ export function installNotesHome(app:any, options:{loadContent?:(file:any)=>Prom
         const folders=files.filter(file=>file.type==='folder').sort((a,b)=>a.name.localeCompare(b.name));
         if (view==='folder' && !folders.some(file=>file.name===folder)) {view='all';folder='';}
         app.notesHomeFolder=view==='folder'?folder:'';
-        heading.textContent=t('笔记','Notes');account.textContent=t('账号','Account');settings.textContent=t('设置','Settings');
+        heading.textContent='EasyPocketMD';
         account.setAttribute('aria-label',t('账号管理','Account management'));settings.setAttribute('aria-label',t('设置','Settings'));
-        search.placeholder=t('搜索笔记','Search notes');search.setAttribute('aria-label',search.placeholder);
+        account.title=t('账号管理','Account management');settings.title=t('设置','Settings');
+        search.placeholder=t('搜索文件','Search files');search.setAttribute('aria-label',search.placeholder);
         tabs.setAttribute('aria-label',t('文件夹筛选','Filter by folder'));tabs.replaceChildren();
         const tab=(text:string,active:boolean,action:()=>void,id?:string)=>{
             const element=button('notes-folder-tab'+(active?' active':''),action);element.textContent=text;element.title=text;
             element.setAttribute('aria-pressed',String(active));if(id)element.dataset.fileId=id;tabs.append(element);
         };
         tab(t('全部','All'),view==='all',()=>{view='all';render();});
-        tab(t('文件夹','Folders'),view==='folders',()=>{view='folders';render();});
         for (const item of folders) tab(item.name,view==='folder' && item.name===folder,()=>showFolder(item.name),item.id);
         grid.replaceChildren();
         const query=search.value.trim().toLocaleLowerCase();
-        const visibleFolders=view==='all'?[]:folders.filter(item=>(view==='folders' || parent(item.name)===folder) && (!query || item.name.toLocaleLowerCase().includes(query)));
+        const visibleFolders=view==='all'?[]:folders.filter(item=>parent(item.name)===folder && (!query || item.name.toLocaleLowerCase().includes(query)));
         for (const item of visibleFolders) {
-            const card=button('notes-folder-card',()=>showFolder(item.name));card.dataset.fileId=item.id;card.textContent='📁 '+(view==='folders'?item.name:basename(item.name));card.title=item.name;grid.append(card);
+            const card=button('notes-folder-card',()=>showFolder(item.name));card.dataset.fileId=item.id;card.textContent='📁 '+basename(item.name);card.title=item.name;grid.append(card);
         }
-        const candidates=view==='folders'?[]:visibleNotes(files,view==='folder'?folder:null,'');
+        const candidates=visibleNotes(files,view==='folder'?folder:null,'');
         const notes=candidates.filter(file=>searchable(file,query));
         for (const file of notes) {
             const card=document.createElement('article');card.className='notes-file-card';card.dataset.fileId=file.id;card.tabIndex=0;card.setAttribute('role','button');card.setAttribute('aria-label',file.name);card.title=file.name;
@@ -110,12 +127,12 @@ export function installNotesHome(app:any, options:{loadContent?:(file:any)=>Prom
             const date=document.createElement('time');const stamp=noteTimestamp(file);
             if(stamp){date.dateTime=new Date(stamp).toISOString();date.textContent=new Intl.DateTimeFormat(en()?'en':'zh-CN',{year:'numeric',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}).format(stamp);}else date.textContent=t('修改时间未记录','Modification time unavailable');
             const more=button('notes-card-menu',()=>{});more.textContent='⋮';more.setAttribute('aria-label',t('更多操作：','More actions: ')+file.name);
-            more.onclick=event=>{event.stopPropagation();const rect=more.getBoundingClientRect();menu(file.id,rect.right,rect.bottom);};
+            more.onclick=event=>{event.stopPropagation();const rect=more.getBoundingClientRect();menu(file.id,rect.right,rect.bottom,rect);};
             card.append(title,preview,date,more);grid.append(card);
         }
         loadSnippets(query?candidates:candidates.slice(0,previewLimit),query);
         empty.hidden=!!grid.childElementCount;
-        empty.textContent=query?running?t('正在搜索云端笔记…','Searching cloud notes…'):t('没有找到匹配的笔记或文件夹','No matching notes or folders'):view==='folders'?t('暂无文件夹，点击右下角加号创建','No folders. Use + to create one.'):t('暂无笔记，点击右下角加号创建','No notes. Use + to create one.');
+        empty.textContent=query?running?t('正在搜索云端文件…','Searching cloud files…'):t('没有找到匹配的文件或文件夹','No matching files or folders'):t('暂无文件，点击右下角加号创建','No files. Use + to create one.');
     }
     search.addEventListener('input',()=>{clearTimeout(timer);timer=setTimeout(render,120);});
     home.addEventListener('contextmenu',event=>{const target=(event.target as Element).closest<HTMLElement>('[data-file-id]');if(!target)return;event.preventDefault();menu(target.dataset.fileId!,event.clientX,event.clientY);});
