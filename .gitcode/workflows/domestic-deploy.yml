@@ -1,0 +1,137 @@
+# AtomGit recognizes .gitcode/workflows (see deploy/README.md).
+name: 国内服务器 Docker 部署 (AtomGit)
+'on':
+  push:
+    branches:
+    - main
+    - dev
+  workflow_dispatch: {}
+permissions:
+  repository: read
+concurrency:
+  enable: true
+  max: 1
+  exceed-action: QUEUE
+  preemption:
+    enable: false
+defaults:
+  run:
+    shell: bash
+jobs:
+  deploy:
+    if: ${{ atomgit.ref == 'refs/heads/main' || atomgit.ref == 'refs/heads/dev' }}
+    runs-on:
+    - ubuntu-latest
+    - x64
+    - large
+    timeout-minutes: 120
+    env:
+      CHANNEL: ${{ atomgit.ref == 'refs/heads/dev' && 'dev' || 'main' }}
+      ATOMGIT_SHA: ${{ atomgit.sha }}
+      GITHUB_RUN_ID: atomgit-${{ atomgit.run_id }}
+      GITHUB_RUN_ATTEMPT: ${{ atomgit.run_attempt }}
+    steps:
+    - name: Checkout source
+      uses: checkout
+    - name: Setup Node.js
+      uses: setup-node
+      with:
+        node-version: '24'
+    - name: Install transfer tools and check Docker
+      run: |-
+        set -euo pipefail
+        sudo apt-get update
+        sudo apt-get install -y sshpass rsync python3 git curl xz-utils openssl
+        if ! command -v docker >/dev/null; then sudo apt-get install -y docker.io; fi
+        docker info >/dev/null || { echo 'Runner requires a running Docker daemon; select a Docker-capable Runner.' >&2; exit 1; }
+    - name: Cache npm and Emscripten
+      uses: cache
+      with:
+        path: |-
+          ~/.npm
+          .ci-cache/emsdk
+        key: epmd-atomgit-tools-linux-amd64-emsdk-3.1.57-${{ hashFiles('package-lock.json') }}
+        restore-keys: epmd-atomgit-tools-linux-amd64-emsdk-3.1.57-
+    - name: Setup Emscripten and build frontend
+      run: |-
+        set -euo pipefail
+        mkdir -p .ci-cache
+        if [ ! -d .ci-cache/emsdk/.git ]; then
+          git clone --depth 1 https://github.com/emscripten-core/emsdk.git .ci-cache/emsdk
+        fi
+        (cd .ci-cache/emsdk && ./emsdk install 3.1.57 && ./emsdk activate 3.1.57)
+        source .ci-cache/emsdk/emsdk_env.sh
+        npm ci --prefer-offline --no-audit --no-fund
+        npm run typecheck
+        npm run build
+    - name: Cache Docker build layers
+      uses: cache
+      with:
+        path: .ci-cache/buildx
+        key: epmd-atomgit-images-linux-amd64-v1-${{ hashFiles('deploy/**', 'sandbox/python/**', 'package.json', 'package-lock.json', 'requirements.txt', 'api/**', 'shared/**', 'scripts/**', 'dist/**', 'reference-docs/**') }}
+        restore-keys: epmd-atomgit-images-linux-amd64-v1-
+    - name: Setup Docker builder
+      uses: docker/setup-buildx-action@v3
+    - name: Build cached application and sandbox images
+      run: bash scripts/build-atomgit-images.sh
+    - name: Verify isolated sandbox before deployment
+      run: |-
+        set -euo pipefail
+        bash scripts/setup-python-sandbox.sh --check
+        npx tsx scripts/check-python-sandbox.ts
+        bash scripts/export-python-sandbox.sh .ci-cache/sandbox-check
+        bash scripts/check-sandbox-image-portability.sh .ci-cache/sandbox-check
+        rm -rf .ci-cache/sandbox-check
+    - name: Validate origin gateway
+      run: |-
+        docker run --rm --pull=never --network=none \
+          -e APP_PORT=3150 -e PRINT_PORT=3160 -e GATEWAY_PORT=3180 -e PRINT_GATEWAY_PORT=3182 \
+          "easypocketmd-gateway:$ATOMGIT_SHA" nginx -t
+    - name: Export content-addressed images
+      run: |-
+        python3 scripts/image-cas.py export image-cas \
+          "app=easypocketmd-app:$ATOMGIT_SHA" \
+          "print=easypocketmd-print:$ATOMGIT_SHA" \
+          "gateway=easypocketmd-gateway:$ATOMGIT_SHA" \
+          "python=easypocketmd-python:$ATOMGIT_SHA"
+    - name: Prepare private runtime configuration
+      env:
+        DB_HOST: ${{ secrets.DB_HOST }}
+        DB_PORT: ${{ secrets.DB_PORT }}
+        DB_USER: ${{ secrets.DB_USER }}
+        DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+        DB_NAME: ${{ secrets.DB_NAME }}
+        REDIS_HOST: ${{ secrets.REDIS_HOST }}
+        REDIS_PORT: ${{ secrets.REDIS_PORT }}
+        REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
+        REDIS_DB: ${{ secrets.REDIS_DB }}
+        JWT_SECRET: ${{ secrets.JWT_SECRET }}
+        JWT_EXPIRES_IN: ${{ secrets.JWT_EXPIRES_IN }}
+        ADMIN_USER: ${{ secrets.ADMIN_USER }}
+        ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+        DASHSCOPE_API_KEY: ${{ secrets.DASHSCOPE_API_KEY }}
+        BASE_URL: ${{ env.CHANNEL == 'dev' && (secrets.DEV_BASE_URL || 'https://dev.yhsun.cn') || (secrets.BASE_URL || 'https://md.yhsun.cn') }}
+        TLS_KEY: ${{ env.CHANNEL == 'main' && secrets.KEY || '' }}
+        TLS_PEM: ${{ env.CHANNEL == 'main' && secrets.PEM || '' }}
+        SSL_EMAIL: ${{ secrets.SSL_EMAIL }}
+      run: |
+        python3 scripts/prepare-docker-release.py
+        if [ "$CHANNEL" = dev ]; then
+          openssl req -x509 -newkey rsa:4096 -keyout docker-control/tls.key -out docker-control/tls.pem -days 365 -nodes -subj '/CN=dev.yhsun.cn'
+        fi
+    - name: Deploy directly to domestic server
+      env:
+        SERVER_HOST: ${{ secrets.SERVER_HOST }}
+        SERVER_USER: ${{ secrets.SERVER_USER }}
+        SSHPASS: ${{ secrets.SERVER_PASSWORD }}
+        SERVER_SSH_HOST_KEY: ${{ secrets.SERVER_SSH_HOST_KEY }}
+        DEPLOY_TARGET_LABEL: atomgit-origin
+      run: |-
+        set -euo pipefail
+        : "${SERVER_HOST:?Configure SERVER_HOST in AtomGit secrets}"
+        : "${SERVER_USER:?Configure SERVER_USER in AtomGit secrets}"
+        : "${SSHPASS:?Configure SERVER_PASSWORD in AtomGit secrets}"
+        bash scripts/transfer-docker-release.sh "$CHANNEL" deploy
+    - name: Remove private runtime configuration
+      if: ${{ always() }}
+      run: rm -rf docker-control .ci-cache/sandbox-check

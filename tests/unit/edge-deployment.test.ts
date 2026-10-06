@@ -33,7 +33,7 @@ exit "$ORIGINAL_STATUS"
 `);
         const result = spawnSync('bash', ['-e', '-c', step.run.replaceAll('${{ inputs.channel }}', 'main')], {
             cwd: temp, encoding: 'utf8', timeout: 10000,
-            env: {...process.env, RUNNER_TEMP: temp, SERVER_HOST: 'original', IP_US: 'us', SSHKEY_US: 'fake-key', ORIGINAL_STATUS: String(original), US_STATUS: String(us)}
+            env: {...process.env, RUNNER_TEMP: temp, SERVER_HOST: 'original', IP_US: 'us', SSHKEY_US: 'fake-key', DOMESTIC_DEPLOY_PROVIDER: '', ORIGINAL_STATUS: String(original), US_STATUS: String(us)}
         });
         expect(result.status).toBe(expected);
         expect(fs.readFileSync(path.join(temp, 'completed'), 'utf8').trim().split('\n').sort()).toEqual(['original', 'us']);
