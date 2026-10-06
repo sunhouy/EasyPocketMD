@@ -36,6 +36,7 @@
 
         // Close button
         const closeBtn = document.createElement('button');
+        closeBtn.classList.add('epmd-dialog-close');
         closeBtn.innerHTML = '<i class="fas fa-times"></i>';
         closeBtn.style.cssText = `position:absolute;top:15px;right:15px;background:none;border:none;color:${textColor};font-size:20px;cursor:pointer;`;
         closeBtn.onclick = () => modal.remove();

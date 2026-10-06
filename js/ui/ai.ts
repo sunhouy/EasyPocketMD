@@ -75,12 +75,14 @@
             
             <div style="display:flex;gap:10px;margin-top:25px;">
                 <button id="startAILayoutBtn" style="flex:2;padding:12px;font-weight:bold;background:linear-gradient(135deg, #4a90e2 0%, #357abd 100%);color:white;border:none;border-radius:6px;cursor:pointer;font-size:16px;">
-                    <i class="fas fa-sparkles"></i> ${isEn() ? 'Start Smart Layout' : '开始智能排版'}
+                    <i class="fas fa-magic"></i> ${isEn() ? 'Start Smart Layout' : '开始智能排版'}
                 </button>
                 <button id="cancelAIBtn" style="flex:1;padding:12px;background:${nightMode ? '#555' : '#9E9E9E'};color:white;border:none;border-radius:6px;cursor:pointer;">${isEn() ? 'Cancel' : '取消'}</button>
             </div>
         `;
         
+        modalContent.style.position='relative'; modalContent.classList.add('ai-layout-dialog');
+        const closeLayout=document.createElement('button'); closeLayout.type='button'; closeLayout.className='epmd-dialog-close'; closeLayout.textContent='×'; closeLayout.setAttribute('aria-label',isEn()?'Close':'关闭'); closeLayout.onclick=()=>aiModal.remove(); modalContent.prepend(closeLayout);
         aiModal.appendChild(modalContent);
         document.body.appendChild(aiModal);
         
@@ -298,6 +300,7 @@
             previewContent.style.cssText = 'background:' + (nightMode ? '#1a1a1a' : '#f0f0f0') + ';border-radius:0;display:flex;flex-direction:column;flex:1;box-shadow:none;border:none;min-height:0;';
 
             var closeBtn = document.createElement('button');
+            closeBtn.classList.add('epmd-dialog-close');
             closeBtn.innerHTML = '<i class="fas fa-times"></i>';
             closeBtn.style.cssText = 'position:absolute;top:10px;right:10px;background:' + (nightMode ? '#333' : '#fff') + ';border:1px solid ' + (nightMode ? '#555' : '#ddd') + ';color:#666;font-size:16px;cursor:pointer;padding:8px;border-radius:4px;z-index:10;';
 

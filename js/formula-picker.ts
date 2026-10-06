@@ -424,6 +424,7 @@ function showFormulaPicker() {
 
     // 创建选择器容器
     const formulaContainer = document.createElement('div');
+    formulaContainer.classList.add('desktop-editor-dialog');
     formulaContainer.style.cssText = `
         background: ${(window.nightMode === true) ? '#2d2d2d' : 'white'};
         border-radius: 12px;
@@ -494,6 +495,7 @@ function showFormulaPicker() {
 
     // 右上角关闭按钮
     const closeBtn = document.createElement('button');
+    closeBtn.classList.add('epmd-dialog-close');
     closeBtn.innerHTML = '<i class="fas fa-times"></i>';
     closeBtn.style.cssText = `
         position: absolute;

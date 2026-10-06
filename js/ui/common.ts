@@ -35,6 +35,7 @@ import { rememberThemeMode } from '../main/theme-preference';
         });
         // 右上角关闭按钮
         var closeBtn = document.createElement('button');
+        closeBtn.classList.add('epmd-dialog-close');
         closeBtn.innerHTML = '<i class="fas fa-times"></i>';
         closeBtn.style.cssText = 'position:absolute;top:10px;right:10px;width:28px;height:28px;background:' + (nightMode ? '#555' : '#f5f5f5') + ';border:none;border-radius:50%;font-size:14px;color:' + (nightMode ? '#eee' : '#333') + ';cursor:pointer;display:flex;align-items:center;justify-content:center;';
         closeBtn.addEventListener('click', hideMobileActionSheet);

@@ -6198,3 +6198,57 @@ body.file-management-mode .user-menu-dropdown {
     position:fixed; top:calc(76px + env(safe-area-inset-top, 0px));
     left:auto; right:max(16px, calc((100vw - 1180px) / 2 + 24px)); max-width:calc(100vw - 32px);
 }
+
+/* All window close controls share the insert dialog's circular affordance. */
+.epmd-dialog-close, .modal-close-btn, .epmd-modal-close, .epmd-fs-crop-close, .share-close-btn {
+    display:inline-flex !important; align-items:center !important; justify-content:center !important;
+    width:32px !important; height:32px !important; min-width:32px !important; padding:0 !important;
+    border:0 !important; border-radius:50% !important; background:#f1f1f1 !important; color:#555 !important;
+    font-size:18px !important; line-height:1 !important; cursor:pointer; flex-shrink:0; box-sizing:border-box;
+}
+body.night-mode :is(.epmd-dialog-close,.modal-close-btn,.epmd-modal-close,.epmd-fs-crop-close,.share-close-btn) { background:#444 !important; color:#eee !important; }
+:is(.epmd-dialog-close,.modal-close-btn,.epmd-modal-close):hover { filter:brightness(.94); }
+:is(.epmd-dialog-close,.modal-close-btn,.epmd-modal-close):focus-visible { outline:2px solid var(--theme-accent,#4a90e2); outline-offset:3px; }
+.file-details-dialog, .ppt-export-dialog, .ai-layout-dialog { position:relative; }
+:is(.file-details-dialog,.ppt-export-dialog,.ai-layout-dialog) > .epmd-dialog-close,
+.ppt-export-dialog .epmd-dialog-close { position:absolute; top:14px; right:14px; }
+.file-details-dialog h3, .ppt-export-dialog h2 { margin-right:40px; }
+.custom-dialog-content { box-sizing:border-box; width:calc(100vw - 32px) !important; max-width:460px !important; padding:30px 24px 24px !important; }
+.custom-dialog-content h2 { padding:0 32px; line-height:1.4; }
+.custom-dialog-content p { text-align:left !important; line-height:1.7 !important; overflow-wrap:anywhere; }
+.custom-dialog-input { border-radius:10px !important; min-height:44px; }
+.custom-dialog-actions { justify-content:flex-end; margin-top:8px; gap:12px !important; }
+.custom-dialog-actions .custom-dialog-btn { flex:0 1 auto !important; min-width:96px; padding:11px 22px !important; border-radius:10px !important; font-weight:500; }
+.custom-dialog-actions .cancel { background:#eee !important; color:#444 !important; }
+body.night-mode .custom-dialog-actions .cancel { background:#444 !important; color:#eee !important; }
+.storage-usage-row { display:flex; align-items:center; gap:10px; padding:12px 0; border-bottom:1px solid #e7e7e7; }
+.storage-usage-row strong { margin-left:auto; color:inherit; font-size:14px; font-weight:600; }
+.storage-usage-row button { padding:5px 10px; font-size:12px; min-height:30px; }
+body.night-mode .storage-usage-row { color:#eee; border-color:#444; }
+body.night-mode .storage-usage-row strong { color:#eee !important; }
+.clear-all-storage { display:block; width:100%; margin-top:16px; }
+#storageActionStaging:empty { display:none; }
+.settings-list-item[hidden] { display:none !important; }
+.settings-list-item:has(> .form-group[style*="display:none"]) { display:none; }
+.settings-list-item:last-child { border-bottom:0; }
+.ai-generate-btn, #startAILayoutBtn { display:inline-flex; align-items:center; justify-content:center; gap:8px; }
+.ai-generate-btn i, #startAILayoutBtn i { flex-shrink:0; }
+.sync-status.success .sync-icon, .sync-status.error .sync-icon { animation:none !important; }
+.ppt-page-range { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:16px 0; font-size:14px; }
+.ppt-page-range input { width:95px; padding:10px; border:1px solid #888; border-radius:8px; background:transparent; color:inherit; }
+@media (min-width:900px) {
+    .desktop-editor-dialog { width:min(88vw,1000px) !important; max-width:1000px !important; max-height:88dvh !important; position:relative; box-sizing:border-box; padding:28px !important; }
+    .desktop-editor-dialog [style*="grid-template-columns"] { grid-template-columns:repeat(auto-fit,minmax(105px,1fr)) !important; max-height:60dvh !important; }
+    .desktop-editor-dialog textarea { min-height:130px; }
+}
+.settings-list-item:has(+ .settings-list-item[hidden]) { border-bottom:0; }
+@media (min-width:900px) {
+    .desktop-editor-dialog #insertItemGrid { max-height:60dvh !important; }
+}
+.desktop-editor-dialog { position:relative; box-sizing:border-box; }
+.modal-overlay button:has(> i.fa-times:only-child), .code-output button:is([title="关闭"],[title="Close"]) {
+    display:inline-flex !important; align-items:center !important; justify-content:center !important;
+    width:32px !important; height:32px !important; padding:0 !important; border:0 !important; border-radius:50% !important;
+    background:#f1f1f1 !important; color:#555 !important; font-size:18px !important; flex-shrink:0;
+}
+body.night-mode .modal-overlay button:has(> i.fa-times:only-child), body.night-mode .code-output button:is([title="关闭"],[title="Close"]) { background:#444 !important; color:#eee !important; }

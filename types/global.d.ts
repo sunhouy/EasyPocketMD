@@ -30,6 +30,18 @@ export interface VditorFile {
     created?: number;
     [key: string]: unknown;
 }
+export interface SharedDocumentState {
+    shareId: string;
+    viewerId: string;
+    ownerFileId?: string;
+    canEdit: boolean;
+    lastKnownContent: string;
+    contentVersion: number;
+    isSaving: boolean;
+    inFlightContent?: string;
+    ws: WebSocket | null;
+    [key: string]: any;
+}
 export interface ToolbarButtonDef {
     id: string;
     icon?: string;
@@ -123,6 +135,9 @@ declare global {
         };
     }
     interface Window {
+        sharedDocState: SharedDocumentState | null;
+        initCodeRunnerLazyLoad: () => void;
+        ensureCodeRunnerLoaded: () => Promise<void>;
         showAIQueryPanel: () => void;
         importDroppedFiles: (files: File[], targetFolder?: string) => Promise<void>;
         Vditor: typeof Vditor;

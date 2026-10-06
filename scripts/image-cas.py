@@ -89,7 +89,7 @@ def load(directory, manifest_file):
     if hashlib.sha256(content).hexdigest() != expected:
         raise RuntimeError('Release manifest checksum mismatch')
     manifest = json.loads(content)
-    if manifest.get('version') != 1 or set(manifest['images']) != {'app', 'print', 'gateway', 'python'}:
+    if manifest.get('version') != 1 or set(manifest['images']) not in ({'app', 'print', 'gateway', 'python'}, {'gateway'}):
         raise RuntimeError('Invalid image release manifest')
     try:
         if all(portable_identity(image) == manifest['identities'][role] for role, image in manifest['images'].items()):
@@ -99,7 +99,8 @@ def load(directory, manifest_file):
         pass
     # Validate cached objects before docker load. Remove damaged objects so retry
     # retransmits them; never silently reuse corrupt local cache.
-    for member in manifest['members']:
+    print(f"Verifying {len(manifest['members'])} cached archive members before Docker import", flush=True)
+    for index, member in enumerate(manifest['members'], 1):
         key = member['sha256']
         if len(key) != 64 or any(char not in '0123456789abcdef' for char in key):
             raise RuntimeError('Invalid object digest')
@@ -115,10 +116,13 @@ def load(directory, manifest_file):
         except Exception:
             path.unlink(missing_ok=True)
             raise RuntimeError(f'Image object corrupt or missing: {key}; retry to upload it again')
+        if index % 10 == 0 or index == len(manifest['members']):
+            print(f"Verified archive members: {index}/{len(manifest['members'])}", flush=True)
     import importlib.util
     spec = importlib.util.spec_from_file_location('deploy_resources', Path(__file__).with_name('deploy-resources.py'))
     resources = importlib.util.module_from_spec(spec); spec.loader.exec_module(resources)
     with resources.import_budget(directory, manifest):
+        print('Importing verified archive into Docker', flush=True)
         process = subprocess.Popen(['docker', 'load'], stdin=subprocess.PIPE)
         try:
             with tarfile.open(fileobj=process.stdin, mode='w|') as archive:
@@ -134,6 +138,7 @@ def load(directory, manifest_file):
             if process.poll() is None:
                 process.kill()
             process.wait()
+        print('Docker import finished; verifying executable image identities', flush=True)
         for role, image in manifest['images'].items():
             if portable_identity(image) != manifest['identities'][role]:
                 raise RuntimeError(f'Loaded image content mismatch: {role}')

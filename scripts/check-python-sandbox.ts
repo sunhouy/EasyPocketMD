@@ -1,4 +1,4 @@
-import { runPythonSandbox } from '../api/services/python-sandbox';
+import { runPythonSandbox, type SandboxResult } from '../api/services/python-sandbox';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 async function main() {
@@ -33,9 +33,10 @@ async function main() {
         assert.equal(count,2,language+' must accept two inputs');
         assert.match(result.output,/sum=42/);
     }
-    const javaFiles=await runPythonSandbox('import java.nio.file.*; public class Hello { public static void main(String[] args) throws Exception { System.out.print(Files.readString(Path.of("data.txt"))); Files.writeString(Path.of("result.txt"),"完成"); }}',undefined,undefined,[{name:'data.txt',data:Buffer.from('上传文件内容').toString('base64')}],{language:'java',workspace:true});
+    const javaFiles: SandboxResult=await runPythonSandbox('import java.nio.file.*; public class Hello { public static void main(String[] args) throws Exception { System.out.print(Files.readString(Path.of("data.txt"))); Files.writeString(Path.of("result.txt"),"完成"); }}',undefined,undefined,[{name:'data.txt',data:Buffer.from('上传文件内容').toString('base64')}],{language:'java',workspace:true});
     assert.equal(javaFiles.success,true,JSON.stringify(javaFiles));
     assert.equal(javaFiles.output,'上传文件内容');
+    assert.ok(javaFiles.files, 'Java sandbox must return uploaded/generated files');
     assert.ok(javaFiles.files.some(file=>file.name==='result.txt' && Buffer.from(file.data,'base64').toString()==='完成'));
     const result = await runPythonSandbox("import numpy, pandas, scipy, sympy, sklearn, seaborn, PIL, openpyxl\nimport matplotlib.pyplot as plt\nplt.plot([1,2],[3,4]); plt.title('中文图表'); plt.show()\nplt.figure(); plt.plot([3,2,1]); print('ok')");
     assert.equal(result.success, true, JSON.stringify(result));

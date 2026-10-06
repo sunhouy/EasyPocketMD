@@ -159,6 +159,7 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
         content.style.cssText = 'background:' + bg + ';color:' + textColor + ';border-radius:12px;padding:25px;width:90%;max-width:500px;max-height:85vh;overflow-y:auto;position:relative;box-shadow:0 4px 12px rgba(0,0,0,0.15);';
 
         var closeBtn = document.createElement('button');
+        closeBtn.classList.add('epmd-dialog-close');
         closeBtn.innerHTML = '<i class="fas fa-times"></i>';
         closeBtn.style.cssText = 'position:absolute;top:15px;right:15px;background:none;border:none;color:' + textColor + ';font-size:18px;cursor:pointer;opacity:0.7;padding:5px;';
         closeBtn.onclick = function() { modal.remove(); };
@@ -283,6 +284,7 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
 
         // 右上角关闭按钮
         var closeBtn = document.createElement('button');
+        closeBtn.classList.add('epmd-dialog-close');
         closeBtn.innerHTML = '<i class="fas fa-times"></i>';
         closeBtn.style.cssText = 'position:absolute;top:15px;right:15px;background:none;border:none;color:' + textColor + ';font-size:20px;cursor:pointer;z-index:10;';
         closeBtn.onclick = function() { 
@@ -1159,6 +1161,7 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
                     } catch (error) {
                         console.error('Failed to load AI Layout module:', error);
                         global.showMessage((isEn() ? 'Failed to load AI Layout module: ' : '加载AI排版模块失败: ') + error.message, 'error');
+                    } finally {
                         (aiLayoutBtn as HTMLButtonElement).disabled = false;
                         aiLayoutBtn.innerHTML = '<i class="fas fa-magic"></i> ' + (isEn() ? 'AI Smart Layout' : 'AI智能排版');
                     }
@@ -1603,6 +1606,7 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
         loadingContent.style.cssText = 'background:' + (nightMode ? '#2d2d2d' : 'white') + ';color:' + (nightMode ? '#eee' : '#333') + ';border-radius:12px;padding:30px;text-align:center;position:relative;';
         
         var closeBtnLoading = document.createElement('button');
+        closeBtnLoading.classList.add('epmd-dialog-close');
         closeBtnLoading.innerHTML = '<i class="fas fa-times"></i>';
         closeBtnLoading.style.cssText = 'position:absolute;top:10px;right:10px;background:none;border:none;color:' + (nightMode ? '#aaa' : '#666') + ';font-size:16px;cursor:pointer;padding:5px;';
         
@@ -1649,6 +1653,7 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
             previewContent.style.cssText = 'background:' + (nightMode ? '#1a1a1a' : '#f0f0f0') + ';border-radius:0;display:flex;flex-direction:column;flex:1;box-shadow:none;border:none;min-height:0;';
             
             var closeBtn = document.createElement('button');
+            closeBtn.classList.add('epmd-dialog-close');
             closeBtn.innerHTML = '<i class="fas fa-times"></i>';
             closeBtn.style.cssText = 'position:absolute;top:10px;right:10px;background:' + (nightMode ? '#333' : '#fff') + ';border:1px solid ' + (nightMode ? '#555' : '#ddd') + ';color:#666;font-size:16px;cursor:pointer;padding:8px;border-radius:4px;z-index:10;';
 
@@ -2104,6 +2109,7 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
 
         // 右上角关闭按钮
         var closeBtn = document.createElement('button');
+        closeBtn.classList.add('epmd-dialog-close');
         closeBtn.innerHTML = '<i class="fas fa-times"></i>';
         closeBtn.style.cssText = 'position:absolute;top:15px;right:15px;background:none;border:none;color:' + textColor + ';font-size:20px;cursor:pointer;';
         closeBtn.onclick = function() {

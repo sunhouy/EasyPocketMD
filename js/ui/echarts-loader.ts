@@ -1358,6 +1358,7 @@ import { echartsMarkdown } from './echarts-markdown';
 
         // 创建容器
         var container = document.createElement('div');
+        container.classList.add('desktop-editor-dialog');
         container.style.cssText = 'background: ' + (nightMode ? '#2d2d2d' : 'white') + '; border-radius: 12px; padding: 20px; width: 90%; max-width: 600px; max-height: 90vh; overflow-y: auto; display: flex; flex-direction: column;';
 
         // 标题
@@ -1516,6 +1517,7 @@ import { echartsMarkdown } from './echarts-markdown';
 
         // 右上角关闭按钮
         var closeBtn = document.createElement('button');
+        closeBtn.classList.add('epmd-dialog-close');
         closeBtn.innerHTML = '<i class="fas fa-times"></i>';
         closeBtn.style.cssText = 'position: absolute; top: 15px; right: 15px; width: 32px; height: 32px; background: ' + (nightMode ? '#444' : '#f5f5f5') + '; color: ' + (nightMode ? '#eee' : '#333') + '; border: none; border-radius: 50%; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center;';
         closeBtn.onclick = function() {
@@ -1617,6 +1619,7 @@ import { echartsMarkdown } from './echarts-markdown';
 
         // 创建容器
         var container = document.createElement('div');
+        container.classList.add('desktop-editor-dialog');
         container.style.cssText = 'background: ' + (nightMode ? '#2d2d2d' : 'white') + '; border-radius: 12px; padding: 20px; width: 90%; max-width: 700px; max-height: 85vh; overflow: hidden; display: flex; flex-direction: column;';
 
         // 标题
@@ -1712,6 +1715,7 @@ import { echartsMarkdown } from './echarts-markdown';
 
         // 右上角关闭按钮
         var closeBtn = document.createElement('button');
+        closeBtn.classList.add('epmd-dialog-close');
         closeBtn.innerHTML = '<i class="fas fa-times"></i>';
         closeBtn.style.cssText = 'position: absolute; top: 15px; right: 15px; width: 32px; height: 32px; background: ' + (nightMode ? '#444' : '#f5f5f5') + '; color: ' + (nightMode ? '#eee' : '#333') + '; border: none; border-radius: 50%; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center;';
         closeBtn.onclick = function() {

@@ -31,7 +31,7 @@ describe('Cross-document AI knowledge queries', () => {
         expect(result.files).toBe(14);
     });
     it('does not send hidden configuration files or synthesize an unsupported answer', async () => {
-        const call = jest.fn(async () => 'NO_EVIDENCE');
+        const call = jest.fn(async (_system: string, _input: string) => 'NO_EVIDENCE');
         const result = await queryDocuments('What is the secret?', [
             { path: '.ai-config.json', content: 'API secret' }, { path: 'nested/.secret.md', content: 'password' }, { path: 'readme.md', content: 'Notes' }
         ], call);

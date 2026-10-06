@@ -746,8 +746,9 @@ function createPanel() {
     header.appendChild(hint);
 
     var close = document.createElement('button');
+    close.classList.add('epmd-dialog-close');
     close.type = 'button';
-    close.className = 'slash-command-close';
+    close.className = 'slash-command-close epmd-dialog-close';
     close.innerHTML = '<i class="fas fa-times"></i>';
     close.addEventListener('mousedown', function(event) {
         event.preventDefault();

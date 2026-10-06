@@ -30,7 +30,7 @@ it('shows and copies Chinese error guidance without a Chinese explanation label'
     jest.mocked(fetch).mockImplementation(async(url)=>String(url).endsWith('/run')
         ?response({success:false,error:"NameError: name 'missing' is not defined"})
         :response({success:true,token:'error-workspace'}));
-    const writeText=jest.fn(async()=>{});
+    const writeText=jest.fn(async(_text: string)=>{});
     Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText}});
     window.addRunButtons(document);code.dispatchEvent(new MouseEvent('mousemove',{bubbles:true}));
     (document.querySelector('.code-run-button') as HTMLElement).click();

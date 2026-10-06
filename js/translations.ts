@@ -108,7 +108,7 @@ import { uiMessages } from './i18n-messages';
 
             // 文件列表
             fileListTitle: '文件列表',
-            fileListHelp: '点击三个点显示更多功能',
+            fileListHelp: '查看帮助',
             fileListSearch: '搜索文件',
             fileListSearchPlaceholder: '搜索文件...',
             searchScopeTitleOnly: '仅标题',
@@ -1080,7 +1080,7 @@ import { uiMessages } from './i18n-messages';
 
             // File list
             fileListTitle: 'File List',
-            fileListHelp: 'Click the three dots for more functions',
+            fileListHelp: 'View help',
             fileListSearch: 'Search Files',
             fileListSearchPlaceholder: 'Search files...',
             searchScopeTitleOnly: 'Title',
@@ -1966,6 +1966,8 @@ import { uiMessages } from './i18n-messages';
 
     // 语言管理器
     // 暴露到全局
+    Object.assign(translations.zh,{clearLocalStorage:'清空 LocalStorage',clearAllStorage:'全部清空',confirmClearAllStorage:'确定清空所选存储吗？本地文件、草稿、设置和登录信息可能被移除，请先备份重要内容。',clearAllStorageSuccess:'清空完成',clearAllStorageFailed:'部分存储清空失败，请关闭其他页面后重试'});
+    Object.assign(translations.en,{clearLocalStorage:'Clear LocalStorage',clearAllStorage:'Clear all',confirmClearAllStorage:'Clear the selected storage? Local files, drafts, settings and sign-in data may be removed. Back up important content first.',clearAllStorageSuccess:'Storage cleared',clearAllStorageFailed:'Some storage could not be cleared. Close other tabs and retry.'});
     window.i18n = {
         // 初始化语言
         init: function () {

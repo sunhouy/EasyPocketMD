@@ -50,16 +50,54 @@ jobs:
     - name: Verify WASM source artifacts
       run: npm run wasm:text:verify && npm run wasm:image:verify
 
+    - name: Restore verified sandbox image by build inputs
+      id: sandbox-image-cache
+      uses: actions/cache/restore@v4
+      with:
+        path: ${{ runner.temp }}/python-sandbox-image
+        key: epmd-sandbox-linux-amd64-v2-${{ hashFiles('sandbox/python/Dockerfile', 'sandbox/python/requirements.txt', 'sandbox/python/runner.py') }}
+
+    - name: Setup sandbox builder on cache miss
+      if: steps.sandbox-image-cache.outputs.cache-hit != 'true'
+      uses: docker/setup-buildx-action@v3
+
+    - name: Build sandbox with persistent dependency layers
+      if: steps.sandbox-image-cache.outputs.cache-hit != 'true'
+      uses: docker/build-push-action@v7
+      with:
+        context: sandbox/python
+        file: sandbox/python/Dockerfile
+        platforms: linux/amd64
+        load: true
+        tags: easypocketmd-python:1
+        cache-from: type=gha,scope=epmd-python-sandbox
+        cache-to: type=gha,scope=epmd-python-sandbox,mode=max,ignore-error=true
+
     - name: Build and verify isolated Python runner
+      env:
+        SANDBOX_CACHE_HIT: ${{ steps.sandbox-image-cache.outputs.cache-hit }}
       run: |
-        bash scripts/setup-python-sandbox.sh --build
+        if [ "$SANDBOX_CACHE_HIT" = true ]; then
+          echo 'Sandbox build inputs unchanged: verifying the cached image'
+          bash scripts/setup-python-sandbox.sh --load "$RUNNER_TEMP/python-sandbox-image/python-sandbox.tar.gz"
+        else
+          bash scripts/setup-python-sandbox.sh --check
+        fi
         npx tsx scripts/check-python-sandbox.ts
-        bash scripts/export-python-sandbox.sh "$RUNNER_TEMP/python-sandbox-image"
-        bash scripts/setup-python-sandbox.sh --load "$RUNNER_TEMP/python-sandbox-image/python-sandbox.tar.gz"
+        if [ "$SANDBOX_CACHE_HIT" != true ]; then
+          bash scripts/export-python-sandbox.sh "$RUNNER_TEMP/python-sandbox-image"
+        fi
 
     - name: Verify sandbox image in a separate Docker engine
       timeout-minutes: 5
       run: bash scripts/check-sandbox-image-portability.sh "$RUNNER_TEMP/python-sandbox-image"
+
+    - name: Cache sandbox image after portability verification
+      if: steps.sandbox-image-cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v4
+      with:
+        path: ${{ runner.temp }}/python-sandbox-image
+        key: ${{ steps.sandbox-image-cache.outputs.cache-primary-key }}
 
     - name: Upload verified Python sandbox image
       uses: actions/upload-artifact@v4
@@ -69,6 +107,9 @@ jobs:
         compression-level: 0
         retention-days: 3
         if-no-files-found: error
+
+    - name: Check all project TypeScript types
+      run: npm run typecheck
 
     - name: Run tests
       run: npm test -- --coverage

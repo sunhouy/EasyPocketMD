@@ -96,6 +96,7 @@ async function exportContent() {
 
     // 右上角关闭按钮
     var closeBtn = document.createElement('button');
+    closeBtn.classList.add('epmd-dialog-close');
     closeBtn.innerHTML = '<i class="fas fa-times"></i>';
     closeBtn.style.cssText = 'position:absolute;top:15px;right:15px;background:none;border:none;color:' + textColor + ';font-size:20px;cursor:pointer;';
     closeBtn.onclick = function() { modal.remove(); };
@@ -192,6 +193,7 @@ function showFilenameDialog(defaultName, ext, callback) {
     container.style.cssText = 'background:' + bg + ';color:' + textColor + ';border-radius:12px;padding:25px;width:90%;max-width:400px;position:relative;';
 
     var closeBtn = document.createElement('button');
+    closeBtn.classList.add('epmd-dialog-close');
     closeBtn.innerHTML = '<i class="fas fa-times"></i>';
     closeBtn.style.cssText = 'position:absolute;top:15px;right:15px;background:none;border:none;color:' + textColor + ';font-size:20px;cursor:pointer;';
     closeBtn.onclick = function() { modal.remove(); };
@@ -322,6 +324,7 @@ async function exportFile(content, ext) {
                 loadingContent.style.cssText = 'background:white;color:#333;border-radius:12px;padding:30px;text-align:center;position:relative;';
                 
                 var closeBtnLoading = document.createElement('button');
+                closeBtnLoading.classList.add('epmd-dialog-close');
                 closeBtnLoading.innerHTML = '<i class="fas fa-times"></i>';
                 closeBtnLoading.style.cssText = 'position:absolute;top:10px;right:10px;background:none;border:none;color:#666;font-size:16px;cursor:pointer;padding:5px;';
                 closeBtnLoading.onclick = function() {

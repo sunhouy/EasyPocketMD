@@ -6,6 +6,7 @@ static delivery run in containers. All images are already loaded offline.
 """
 import fcntl
 import hashlib
+import ipaddress
 import json
 import os
 from pathlib import Path
@@ -93,8 +94,12 @@ def activate(release, channel, slot, current):
     base = (3150 if channel == 'main' else 3250) + slot
     app_port, print_port, gateway_port, print_gateway_port = base, base + 10, base + 30, base + 32
     names = {role: f'epmd-{channel}-{role}-{slot}' for role in ('app', 'print', 'gateway')}
-    sandbox_group = resources.configure_sandbox_budget()
-    cleanup_sandboxes(names['app'])
+    edge = config.get('role') == 'edge'
+    if edge:
+        names = {'gateway': names['gateway']}
+    sandbox_group = resources.configure_sandbox_budget() if not edge else None
+    if not edge:
+        cleanup_sandboxes(names['app'])
     for name in names.values():
         remove(name)
     common = ['run', '-d', '--pull=never', '--restart=unless-stopped', '--init', '--network=host',
@@ -111,23 +116,38 @@ def activate(release, channel, slot, current):
     nginx = '/www/server/nginx/sbin/nginx' if Path('/www/server/nginx/sbin/nginx').is_file() else shutil.which('nginx') or '/usr/bin/nginx'
     switched = False
     try:
-        docker(*common, '--name', names['app'], '--env-file', str(release / 'app.env'),
-               '-e', f'PORT={app_port}', '-e', 'HOST=127.0.0.1', '-e', f"EPMD_SANDBOX_OWNER={names['app']}", '-e', f"PYTHON_SANDBOX_IMAGE={images['python']}",
-               '-e', f'PYTHON_SANDBOX_CGROUP={sandbox_group}',
-               f"--memory={resources.container_limits('app')}m", f"--memory-swap={resources.container_limits('app')}m", '-e', f"NODE_OPTIONS=--max-old-space-size={resources.container_limits('app') // 2}", '--pids-limit=256', '--cpus=1', *mounts, images['app'])
-        docker(*common, '--name', names['print'], f"--memory={resources.container_limits('print')}m", f"--memory-swap={resources.container_limits('print')}m", '--cpus=.5', '--pids-limit=64', images['print'], '--port', str(print_port))
-        docker(*common, '--name', names['gateway'], f"--memory={resources.container_limits('gateway')}m", f"--memory-swap={resources.container_limits('gateway')}m", '--cpus=.5', '--pids-limit=64',
-               '-v', f'{static}:/www/wwwroot/static:ro', '-e', f'APP_PORT={app_port}',
-               '-e', f'PRINT_PORT={print_port}', '-e', f'GATEWAY_PORT={gateway_port}',
-               '-e', f'PRINT_GATEWAY_PORT={print_gateway_port}', images['gateway'])
-        health(gateway_port, config['wasm'])
-        # Probe the exact app-configured sandbox before changing live traffic.
-        command('docker', 'exec', names['app'], './node_modules/.bin/tsx',
-                'scripts/check-python-sandbox.ts', '--input-only', stdout=subprocess.DEVNULL, timeout=30)
-        # Verify the print service responds to a real WebSocket handshake.
-        command('docker', 'exec', names['print'], 'python', '-c',
-                'import asyncio,websockets\nasync def check():\n async with websockets.connect("ws://127.0.0.1:' + str(print_port) + '") as ws: pass\nasyncio.run(check())',
-                stdout=subprocess.DEVNULL, timeout=10)
+        if edge:
+            address = str(ipaddress.ip_address(config['origin_ip']))
+            if ':' in address:
+                address = '[' + address + ']'
+            origin_host = config['domain']
+            if not re.fullmatch(r'[A-Za-z0-9.-]+', origin_host):
+                raise RuntimeError('Invalid origin hostname')
+            docker(*common, '--name', names['gateway'],
+                   f"--memory={resources.container_limits('gateway')}m", '--pids-limit=64', '--cpus=.5',
+                   '-v', f'{static}:/www/wwwroot/static:ro', '-e', f'GATEWAY_PORT={gateway_port}',
+                   '-e', 'NGINX_ENVSUBST_TEMPLATE_SUFFIX=.edge', '-e', f'ORIGIN_IP={address}',
+                   '-e', f'ORIGIN_HOST={origin_host}', '-e', f"ORIGIN_TLS_VERIFY={'on' if channel == 'main' else 'off'}",
+                   images['gateway'])
+            health(gateway_port, config['wasm'])
+        else:
+            docker(*common, '--name', names['app'], '--env-file', str(release / 'app.env'),
+                   '-e', f'PORT={app_port}', '-e', 'HOST=127.0.0.1', '-e', f"EPMD_SANDBOX_OWNER={names['app']}", '-e', f"PYTHON_SANDBOX_IMAGE={images['python']}",
+                   '-e', f'PYTHON_SANDBOX_CGROUP={sandbox_group}',
+                   f"--memory={resources.container_limits('app')}m", f"--memory-swap={resources.container_limits('app')}m", '-e', f"NODE_OPTIONS=--max-old-space-size={resources.container_limits('app') // 2}", '--pids-limit=256', '--cpus=1', *mounts, images['app'])
+            docker(*common, '--name', names['print'], f"--memory={resources.container_limits('print')}m", f"--memory-swap={resources.container_limits('print')}m", '--cpus=.5', '--pids-limit=64', images['print'], '--port', str(print_port))
+            docker(*common, '--name', names['gateway'], f"--memory={resources.container_limits('gateway')}m", f"--memory-swap={resources.container_limits('gateway')}m", '--cpus=.5', '--pids-limit=64',
+                   '-v', f'{static}:/www/wwwroot/static:ro', '-e', f'APP_PORT={app_port}',
+                   '-e', f'PRINT_PORT={print_port}', '-e', f'GATEWAY_PORT={gateway_port}',
+                   '-e', f'PRINT_GATEWAY_PORT={print_gateway_port}', images['gateway'])
+            health(gateway_port, config['wasm'])
+            # Probe the exact app-configured sandbox before changing live traffic.
+            command('docker', 'exec', names['app'], './node_modules/.bin/tsx',
+                    'scripts/check-python-sandbox.ts', '--input-only', stdout=subprocess.DEVNULL, timeout=30)
+            # Verify the print service responds to a real WebSocket handshake.
+            command('docker', 'exec', names['print'], 'python', '-c',
+                    'import asyncio,websockets\nasync def check():\n async with websockets.connect("ws://127.0.0.1:' + str(print_port) + '") as ws: pass\nasyncio.run(check())',
+                    stdout=subprocess.DEVNULL, timeout=10)
         domain = config['domain']
         if not re.fullmatch(r'[A-Za-z0-9.-]+', domain):
             raise RuntimeError('Invalid deployment domain')
@@ -175,7 +195,7 @@ server {{
 }}
 '''
         write_atomic(vhost, contents, 0o644)
-        if channel == 'main':
+        if channel == 'main' and not edge:
             print_vhost = Path('/www/server/panel/vhost/nginx/print.yhsun.cn.conf')
             if not print_vhost.exists():
                 raise RuntimeError('Existing print.yhsun.cn TLS vhost missing')
@@ -274,7 +294,7 @@ def main():
     migrate_data(channel, Path('/www/wwwroot/js_shared' if channel == 'main' else '/www/wwwroot/js_dev_shared'))
     paused = []
     try:
-        if current and resources.memory()['MemAvailable'] < 256 * resources.MIB:
+        if current and current['containers'].get('app') and resources.memory()['MemAvailable'] < 256 * resources.MIB:
             # Pause only the API, and only for activation when capacity is tight.
             # The existing gateway still serves the editor/static assets.
             cleanup_sandboxes(current['containers']['app'])
@@ -292,7 +312,8 @@ def main():
     if current:
         for name in current['containers'].values():
             subprocess.run(['docker', 'stop', '--time', '5', name], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        cleanup_sandboxes(current['containers']['app'])
+        if current['containers'].get('app'):
+            cleanup_sandboxes(current['containers']['app'])
         for name in current['containers'].values():
             remove(name)
     # Stop only this project's legacy PM2 processes, after successful traffic switch.

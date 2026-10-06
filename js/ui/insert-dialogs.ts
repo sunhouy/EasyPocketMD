@@ -55,6 +55,7 @@
         modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:2100;display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;';
 
         var container = document.createElement('div');
+        container.classList.add('desktop-editor-dialog');
         container.style.cssText = 'position:relative;background:' + (nightMode ? '#2d2d2d' : '#fff') + ';border-radius:12px;padding:20px;width:100%;max-width:560px;max-height:90vh;overflow:auto;display:flex;flex-direction:column;gap:12px;';
 
         var title = document.createElement('div');
@@ -62,6 +63,7 @@
         title.style.cssText = 'font-size:18px;font-weight:600;text-align:center;color:' + (nightMode ? '#eee' : '#333') + ';';
 
         var closeBtn = document.createElement('button');
+        closeBtn.classList.add('epmd-dialog-close');
         closeBtn.type = 'button';
         closeBtn.innerHTML = '<i class="fas fa-times"></i>';
         closeBtn.style.cssText = 'position:absolute;top:12px;right:12px;width:32px;height:32px;background:' + (nightMode ? '#444' : '#f5f5f5') + ';color:' + (nightMode ? '#eee' : '#333') + ';border:none;border-radius:50%;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;';

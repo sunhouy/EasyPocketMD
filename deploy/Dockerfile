@@ -33,3 +33,9 @@ ENTRYPOINT ["python", "print_server.py", "--host", "127.0.0.1"]
 
 FROM nginx:1.28-alpine AS gateway
 COPY deploy/nginx-container.conf /etc/nginx/templates/default.conf.template
+
+# The regional edge serves the exact same frontend without a second database/API.
+COPY deploy/nginx-edge.conf /etc/nginx/templates/default.conf.edge
+COPY dist /usr/share/nginx/html
+COPY shared /usr/share/nginx/html/shared
+RUN apk add --no-cache ca-certificates

@@ -1,3 +1,4 @@
+import { renderStorageUsage } from './main/storage-usage';
 /**
  * Vditor 初始化、界面与功能绑定
  */
@@ -2690,9 +2691,11 @@ document.addEventListener('DOMContentLoaded', function() {
         if (mdAssociationSetting && mdAssociationCheckbox) {
             if (window.electron) {
                 mdAssociationSetting.style.display = '';
+                mdAssociationSetting.closest('li').hidden = false;
                 mdAssociationCheckbox.checked = !!window.userSettings.mdFileAssociationEnabled;
             } else {
                 mdAssociationSetting.style.display = 'none';
+                mdAssociationSetting.closest('li').hidden = true;
             }
         }
 
@@ -2837,12 +2840,7 @@ document.addEventListener('DOMContentLoaded', function() {
         var listEl = document.getElementById('storageUsageList');
         if (!listEl) return;
 
-        listEl.innerHTML = rows.map(function(row) {
-            return '<div style="display:flex;justify-content:space-between;gap:8px;padding:6px 8px;border:1px solid #e8e8e8;border-radius:6px;background:#fff;">' +
-                '<span style="color:#666;">' + row.label + '</span>' +
-                '<strong style="font-weight:600;">' + row.value + '</strong>' +
-                '</div>';
-        }).join('');
+        renderStorageUsage(listEl,rows);
     }
 
     async function updateStorageUsageDetails() {
@@ -3023,6 +3021,12 @@ document.addEventListener('DOMContentLoaded', function() {
     bindStorageManagementAction('clearIndexedDBBtn', clearAllIndexedDB, 'confirmClearIndexedDB', 'clearIndexedDBSuccess', 'clearIndexedDBFailed');
     bindStorageManagementAction('clearServiceWorkerBtn', clearAllServiceWorkers, 'confirmClearServiceWorker', 'clearServiceWorkerSuccess', 'clearServiceWorkerFailed');
     bindStorageManagementAction('clearCookiesBtn', clearAllCookies, 'confirmClearCookies', 'clearCookiesSuccess', 'clearCookiesFailed');
+    bindStorageManagementAction('clearLocalStorageBtn', async()=>localStorage.clear(), 'confirmClearAllStorage', 'clearAllStorageSuccess', 'clearAllStorageFailed');
+    bindStorageManagementAction('clearAllStorageBtn', async()=>{
+        const results=await Promise.allSettled([clearAllCacheStorage(),clearAllIndexedDB(),clearAllServiceWorkers(),clearAllCookies()]);
+        localStorage.clear();
+        if(results.some(result=>result.status==='rejected')) throw new Error('Some storage could not be cleared');
+    }, 'confirmClearAllStorage', 'clearAllStorageSuccess', 'clearAllStorageFailed');
     initStorageManagementPanel();
 
     // 保存设置
