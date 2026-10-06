@@ -47,12 +47,15 @@ class RouteHealth(unittest.TestCase):
             self.choose([None, None])
 
     def test_probe_stream_is_bounded_and_never_puts_password_in_arguments(self):
-        with patch.object(subprocess, 'run') as run, patch.object(route.time, 'monotonic', side_effect=[0, 2]):
-            self.assertEqual(route.probe([], 'root@192.0.2.1'), 1024 * 1024 / 2)
-            self.assertEqual(run.call_args.kwargs['timeout'], 45)
-            self.assertEqual(len(run.call_args.kwargs['input']), 1024 * 1024)
-            self.assertEqual(run.call_args.args[0][-1], 'cat >/dev/null')
-        with patch.object(subprocess, 'run', side_effect=subprocess.TimeoutExpired('ssh', 45)):
+        real_popen = subprocess.Popen
+        def receive(args, **kwargs):
+            self.assertEqual(args[:3], ['sshpass', '-e', 'ssh'])
+            self.assertIn('received', args[-1])
+            # A local receiver exercises nonblocking writes/remote EOF and acknowledged bytes.
+            return real_popen(['python3', '-c', "import sys,json; data=sys.stdin.buffer.read(65536); print(json.dumps({'bytes':len(data),'seconds':20}))"], **kwargs)
+        with patch.object(route.subprocess, 'Popen', side_effect=receive):
+            self.assertEqual(route.probe([], 'root@192.0.2.1'), 65536 / 20)
+        with patch.object(route.subprocess, 'Popen', side_effect=OSError('unavailable')):
             self.assertIsNone(route.probe([], 'root@192.0.2.1'))
 
     def test_health_error_retains_final_http_failure(self):

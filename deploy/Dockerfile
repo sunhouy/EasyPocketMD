@@ -1,5 +1,4 @@
 # All downloads/builds happen in GitHub Actions, never on the deployment server.
-FROM emscripten/emsdk:3.1.57 AS compiler
 FROM docker:28-cli AS docker-client
 FROM node:24-bookworm-slim AS app
 ENV NODE_ENV=production QT_QPA_PLATFORM=offscreen MARKITDOWN_PYTHON=/opt/python/bin/python
@@ -12,8 +11,6 @@ RUN python3 -m venv /opt/python && /opt/python/bin/pip install --no-cache-dir -r
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev --no-audit --no-fund && npm cache clean --force
 COPY --from=docker-client /usr/local/bin/docker /usr/local/bin/docker
-COPY --from=compiler /emsdk /emsdk
-RUN ln -s /emsdk /app/emsdk
 COPY api ./api
 COPY shared ./shared
 COPY scripts ./scripts

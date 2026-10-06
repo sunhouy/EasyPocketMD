@@ -20,6 +20,7 @@ function shouldCacheRequest(request) {
   if (request.mode === 'navigate') return false;
 
   if (
+    url.pathname === '/deployment-route.json' ||
     url.pathname.startsWith('/api/') ||
     url.pathname.startsWith('/uploads/') ||
     url.pathname.startsWith('/screenshots/') ||
