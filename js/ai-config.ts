@@ -219,10 +219,10 @@ export async function syncAIConfigToCloud(config: AIConfig): Promise<void> {
   if (isMarketBuild) return;
   const user = (window as any).currentUser;
   if (!user?.username || !user.token) throw new Error('请先登录后再同步 AI 配置');
-  // Encryption unlock is independent from ordinary account authentication.
+  // The authenticated account password is the only encryption credential.
   if (window.E2EVault) await window.E2EVault.ensureUnlocked();
   const password = user.password;
-  if (!window.E2EVault?.state().config && !password) throw new Error('请先在管理加密解锁方式中设置账号密码、专用密码或通行密钥');
+  if (!window.E2EVault?.state().config && !password) throw new Error('请重新登录以使用账户密码加密 AI 配置');
 
   const json = JSON.stringify({
     apiKey: config.apiKey,

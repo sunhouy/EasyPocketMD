@@ -62,7 +62,7 @@ export async function load(url: string): Promise<string> {
     await vault.ensureUnlocked();
     if (cache.has(url)) return cache.get(url);
     if (pending.has(url)) return pending.get(url);
-    const account = window.currentUser?.username, expiry = vault.state().expiresAt;
+    const account = window.currentUser?.username, session = vault.state().sessionId;
     const task = (async () => {
         const source = url.slice(0,-MARKER.length);
         let bytes: ArrayBuffer;
@@ -76,7 +76,7 @@ export async function load(url: string): Promise<string> {
             bytes = await response.arrayBuffer();
         }
         const data = await decryptBytes(bytes);
-        if (window.currentUser?.username !== account || vault.state().expiresAt !== expiry) throw e2eError('e2eSessionChanged');
+        if (window.currentUser?.username !== account || vault.state().sessionId !== session) throw e2eError('e2eSessionChanged');
         if (vault.state().config) vault.secrets();
         const blobUrl = URL.createObjectURL(data.blob); cache.set(url,blobUrl);
         (window.LocalImageManager as any)?.registerUrlPair(url,blobUrl);
@@ -124,7 +124,6 @@ export async function uploadEncrypted(files: File[]): Promise<string> {
 }
 if (typeof window !== 'undefined') {
     window.E2EAttachments = { encryptedUrl,currentFileEncrypted,encryptFile,markUrl,markdown,decryptBytes,load,clear,migrateMarkdown,uploadEncrypted };
-    window.addEventListener('e2e-locked',clear);
     document.addEventListener('click',async event => {
         const anchor = (event.target as Element)?.closest?.('a');
         if (!anchor || !encryptedUrl(anchor.getAttribute('href'))) return;

@@ -4,6 +4,7 @@
 // @ts-nocheck
 import { createFileOrderStore, reorderSiblings, isOrderMetadataFile } from './order-store';
 import { createTreeSelectionRestorer } from './tree/selection';
+import { e2eErrorText } from '../e2e-i18n';
 import { installNotesHome } from './notes-home';
 import { showFileDetails, foldFileName, bindFileTreeLongPress } from './tree/details';
 import { floatingRunWindow } from '../code-runner-window';
@@ -2715,6 +2716,23 @@ import { createDiffFileWriter } from './conflict/live-files';
         }
 
         const file = files[fileIndex];
+        // Local encrypted checkpoints need an unlocked key before serialization.
+        // Preserve the live editor draft if account-key preparation fails.
+        if (isFileE2EEnabled(file)) {
+            const user = g('currentUser');
+            try {
+                const e2e = await import('../e2e');
+                await e2e.prepareEncryptionKey(user?.password);
+            } catch (error) {
+                if (isManual) showSaveStatus('failed');
+                global.showMessage(e2eErrorText(error), 'error');
+                return false;
+            }
+            if (g('currentUser') !== user || g('currentFileId') !== currentFileId || !g('files').includes(file)) return false;
+            // Key initialization can take time; capture the latest draft.
+            content = getCurrentEditorContent(currentFileId, file.content);
+            if (global.LocalImageManager?.convertBlobToLocal) content = global.LocalImageManager.convertBlobToLocal(content);
+        }
         const contentChanged = content !== file.content;
         file.content = content;
         if (contentChanged) {
