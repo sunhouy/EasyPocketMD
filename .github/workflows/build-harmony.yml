@@ -1,0 +1,115 @@
+name: Build and Publish HarmonyOS App
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '应用版本号，如 2.9.10 或 v2.9.10；留空使用项目版本'
+        required: false
+        type: string
+        default: ''
+      version_code:
+        description: '鸿蒙 versionCode；必须大于已发布版本；留空按 major*1000000+minor*1000+patch 生成'
+        required: false
+        type: string
+        default: ''
+      publish_release:
+        description: '将 HAP/APP 附加到 GitHub Release（不自动提交华为应用市场）'
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: harmony-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 60
+    outputs:
+      version: ${{ steps.prepare.outputs.version }}
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v6
+
+      - name: Validate version and prepare signing files
+        id: prepare
+        env:
+          APP_VERSION: ${{ inputs.version }}
+          APP_VERSION_CODE: ${{ inputs.version_code }}
+          HARMONY_KEY: ${{ secrets.HARMONY_KEY }}
+          HARMONY_CERT: ${{ secrets.HARMONY_CERT }}
+          HARMONY_PROFILE: ${{ secrets.HARMONY_PROFILE }}
+          HARMONY_STORE_PASSWORD: ${{ secrets.HARMONY_STORE_PASSWORD }}
+          HARMONY_KEY_PASSWORD: ${{ secrets.HARMONY_KEY_PASSWORD }}
+          HARMONY_KEY_ALIAS: ${{ secrets.HARMONY_KEY_ALIAS }}
+        run: python3 scripts/harmony-build.py prepare --signing "$RUNNER_TEMP/harmony-signing"
+
+      - name: Install official HarmonyOS command line tools and SDK
+        env:
+          HARMONY_TOOLS_URL: ${{ secrets.HARMONY_TOOLS_URL }}
+          HARMONY_TOOLS_SHA256: ${{ vars.HARMONY_TOOLS_SHA256 }}
+        run: bash scripts/setup-harmony-tools.sh
+
+      - name: Install HarmonyOS dependencies
+        working-directory: harmony
+        run: '"$HARMONY_OHPM" install --all'
+
+      - name: Build release HAP
+        working-directory: harmony
+        run: '"$HARMONY_HVIGOR" --mode module -p product=default -p module=entry@default -p buildMode=release assembleHap --no-daemon'
+
+      - name: Sign, verify and package HarmonyOS release
+        env:
+          HARMONY_KEY: ${{ secrets.HARMONY_KEY }}
+          HARMONY_CERT: ${{ secrets.HARMONY_CERT }}
+          HARMONY_PROFILE: ${{ secrets.HARMONY_PROFILE }}
+          HARMONY_STORE_PASSWORD: ${{ secrets.HARMONY_STORE_PASSWORD }}
+          HARMONY_KEY_PASSWORD: ${{ secrets.HARMONY_KEY_PASSWORD }}
+          HARMONY_KEY_ALIAS: ${{ secrets.HARMONY_KEY_ALIAS }}
+        run: python3 scripts/harmony-build.py pack --signing "$RUNNER_TEMP/harmony-signing" --output "$RUNNER_TEMP/harmony-output"
+
+      - name: Upload signed HarmonyOS packages
+        uses: actions/upload-artifact@v7
+        with:
+          name: easypocketmd-${{ steps.prepare.outputs.version }}-harmony
+          path: |
+            ${{ runner.temp }}/harmony-output/*.hap
+            ${{ runner.temp }}/harmony-output/*.app
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Remove signing material
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/harmony-signing"
+
+  publish-release:
+    if: ${{ inputs.publish_release }}
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download signed HarmonyOS packages
+        uses: actions/download-artifact@v8
+        with:
+          name: easypocketmd-${{ needs.build.outputs.version }}-harmony
+          path: harmony-output
+
+      - name: Publish HarmonyOS release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          APP_VERSION: ${{ needs.build.outputs.version }}
+          SOURCE_SHA: ${{ github.sha }}
+        run: |
+          tag="v$APP_VERSION"
+          if ! gh release view "$tag" >/dev/null 2>&1; then
+            gh release create "$tag" --target "$SOURCE_SHA" --title "$tag" --notes 'EasyPocketMD HarmonyOS 签名构建（com.yhsun.md）'
+          fi
+          # Existing assets are never silently replaced.
+          gh release upload "$tag" harmony-output/*.hap harmony-output/*.app

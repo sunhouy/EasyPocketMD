@@ -1,0 +1,10 @@
+{
+  "app": {
+    "bundleName": "com.yhsun.md",
+    "vendor": "sunhouy",
+    "versionCode": 2009003,
+    "versionName": "2.9.3",
+    "icon": "$media:app_icon",
+    "label": "$string:app_name"
+  }
+}
