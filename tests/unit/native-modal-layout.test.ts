@@ -17,3 +17,8 @@ it.each(['settingsModalOverlay','historyModalOverlay'])('does not add system bar
     const modal=document.querySelector<HTMLElement>('.modal');
     expect(modal.style.paddingTop).toBe('16px');expect(modal.style.paddingBottom).toBe('16px');
 });
+it('preserves the layer of nested file dialogs and settles after repeated layout updates',()=>{
+ document.body.innerHTML='<div class="modal-overlay" style="z-index:100120"><div class="modal"></div></div>';
+ const overlay=document.querySelector<HTMLElement>('.modal-overlay');applyNativeModalLayout(overlay);
+ expect(overlay.style.zIndex).toBe('100120');const markup=overlay.outerHTML;applyNativeModalLayout(overlay);expect(overlay.outerHTML).toBe(markup);
+});

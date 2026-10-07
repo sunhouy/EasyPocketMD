@@ -53,3 +53,14 @@ it('opens an image after a long press and cancels a press when the pointer moves
   pointer('pointerup',0);document.querySelector('.resource-preview-overlay .epmd-dialog-close').click();document.querySelector('.file-manager-heading .epmd-dialog-close').click();
  }finally{jest.useRealTimers();}
 });
+it('keeps My Files open when Escape cancels a deletion confirmation above it',async()=>{
+ jest.resetModules();require('../../js/ui/dialog');await window.showFileManager();
+ document.querySelector('.file-manager-card-actions .del-btn').click();
+ const confirmation=document.getElementById('customDialogContainer');
+ expect(Number(confirmation.style.zIndex)).toBeGreaterThan(100130);
+ expect(confirmation.querySelector('.delete-warning').textContent).toBe('此操作不可撤销。');
+ document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}));await Promise.resolve();
+ expect(confirmation.style.display).toBe('none');expect(document.querySelector('.file-manager-overlay')).not.toBeNull();
+ expect(fetch.mock.calls.some(([url])=>url.endsWith('/delete'))).toBe(false);
+ document.querySelector('.file-manager-heading .epmd-dialog-close').click();
+});

@@ -139,14 +139,15 @@ import { findFileReferences, uploadDate } from './file-references';
                 action(en() ? 'Copy selected links' : '复制所选链接',() => {
                     void navigator.clipboard.writeText([...selected].map(linkFor).join('\n')).then(() => global.showMessage(t('linkCopied'),'success')).catch(() => global.showMessage(en() ? 'Copy failed' : '复制失败','error'));
                 },true);
-                action(en() ? 'Delete selected' : '删除所选',() => {void (async () => {
+                const deleteSelected=action(en() ? 'Delete selected' : '删除所选',() => {void (async () => {
                     const files = [...selected];
-                    const confirmed = await g('customConfirm')(en() ? `Delete ${files.length} selected files? Referencing documents may lose these resources.` : `确定删除所选的 ${files.length} 个文件？引用这些资源的文档将无法再加载它们。`);
+                    const confirmed = await g('customConfirm')(en() ? `Delete ${files.length} selected files? Referencing documents may lose these resources.` : `确定删除所选的 ${files.length} 个文件？引用这些资源的文档将无法再加载它们。`, {danger:true,confirmText:en()?'Delete':'删除'});
                     if(!confirmed) return;
                     let failed = 0;
                     for(const file of files) try {await removeFile(file);} catch {failed++;}
                     global.showMessage(failed ? (en() ? `${failed} files could not be deleted` : `${failed} 个文件删除失败`) : t('deleteSuccess'),failed ? 'error':'success');
                 })();},true);
+                deleteSelected.classList.add('danger');
                 toolbar.append(selectionCount);content.insertBefore(toolbar,fileListContainer);updateSelection();
 
                 renderUsage();
@@ -211,7 +212,7 @@ import { findFileReferences, uploadDate } from './file-references';
 
                         const delBtn = item.querySelector('.del-btn');
                         (delBtn as HTMLElement).onclick = async () => {
-                            if(!await g('customConfirm')(t('confirmDeleteFile').replace('{name}',displayName))) return;
+                            if(!await g('customConfirm')(t('confirmDeleteFile').replace('{name}',displayName), {danger:true,confirmText:en()?'Delete':'删除'})) return;
                             try {await removeFile(file);global.showMessage(t('deleteSuccess'),'success');}
                             catch(error) {global.showMessage(error.message || t('deleteFailed'),'error');}
                         };

@@ -12,7 +12,7 @@
         if (!container) {
             container = document.createElement('div');
             container.id = 'customDialogContainer';
-            container.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:100000;display:none;';
+            container.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:200000;display:none;';
             document.body.appendChild(container);
         }
         return container;
@@ -117,6 +117,13 @@
         container.innerHTML = content;
         container.style.display = 'block';
 
+        if (type === 'confirm' && options.danger === true) {
+            const warning=document.createElement('p');warning.className='delete-warning';
+            warning.textContent=isEn?'This action cannot be undone.':'此操作不可撤销。';
+            container.querySelector('.custom-dialog-actions').before(warning);
+            container.querySelector('.custom-dialog-btn.confirm').classList.add('danger');
+        }
+
         const confirmBtn = container.querySelector('.custom-dialog-btn.confirm');
         const cancelBtn = container.querySelector('.custom-dialog-btn.cancel');
         const closeBtn = container.querySelector('.custom-dialog-btn.close, .custom-dialog-close, [data-dialog-close]');
@@ -174,6 +181,7 @@
             onKeydown = (e) => {
                 if (e.key === 'Escape') {
                     e.preventDefault();
+                    e.stopImmediatePropagation();
                     closeDialog(type === 'prompt' ? null : false);
                 }
             };

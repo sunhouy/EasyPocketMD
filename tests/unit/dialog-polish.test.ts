@@ -48,3 +48,9 @@ it('cancels nested prompts through Back and resolves the pending operation',asyn
     await alert;
     expect(document.getElementById('customDialogContainer').style.display).toBe('none');
 });
+it.each(['zh','en'])('marks deletion as irreversible with an explicit destructive action in %s',async(lang)=>{
+ language=lang;const pending=window.customConfirm('delete resource',{danger:true,confirmText:lang==='en'?'Delete':'删除'});
+ expect(document.querySelector('.delete-warning').textContent).toBe(lang==='en'?'This action cannot be undone.':'此操作不可撤销。');
+ expect(document.querySelector('.custom-dialog-btn.confirm').classList.contains('danger')).toBe(true);
+ document.querySelector<HTMLButtonElement>('.custom-dialog-btn.cancel').click();expect(await pending).toBe(false);
+});
