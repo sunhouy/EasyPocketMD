@@ -1,3 +1,5 @@
+import { showResourcePreview } from './resource-preview';
+import { bindFileTreeLongPress } from '../files/tree/details';
 import { collectQueryDocuments } from './ai-query-files';
 import { findFileReferences, uploadDate } from './file-references';
 (function(global) {
@@ -8,7 +10,7 @@ import { findFileReferences, uploadDate } from './file-references';
     function t(key) { return window.i18n ? window.i18n.t(key) : key; }
 
     function formatSize(bytes) {
-        if (bytes === 0) return '0 B';
+        if (!Number.isFinite(bytes) || bytes<=0) return '0 B';
         const k = 1024;
         const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
         const i = Math.floor(Math.log(bytes) / Math.log(k));
@@ -27,47 +29,18 @@ import { findFileReferences, uploadDate } from './file-references';
         const requestUser = g('currentUser');
         const referenceAbort = new AbortController();
         const en = () => isEn();
-        const escape = (value: any) => String(value).replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
-        const nightMode = g('nightMode') === true;
-        const modal = document.createElement('div');
-        modal.className = 'modal-overlay';
-        modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:10005;';
-
-        const bg = nightMode ? '#2d2d2d' : 'white';
-        const textColor = nightMode ? '#eee' : '#333';
-        const borderColor = nightMode ? '#444' : '#ddd';
-
-        const content = document.createElement('div');
-        content.style.cssText = `background:${bg};color:${textColor};border-radius:12px;padding:25px;width:90%;max-width:800px;max-height:85vh;display:flex;flex-direction:column;position:relative;`;
-
-        // Close button
-        const closeBtn = document.createElement('button');
-        closeBtn.classList.add('epmd-dialog-close');
-        closeBtn.setAttribute('aria-label', en() ? 'Close' : '关闭');
-        closeBtn.innerHTML = '<i class="fas fa-times"></i>';
-        closeBtn.style.cssText = `position:absolute;top:15px;right:15px;background:none;border:none;color:${textColor};font-size:20px;cursor:pointer;`;
-        closeBtn.onclick = () => {referenceAbort.abort();modal.remove();};
-        content.appendChild(closeBtn);
-
-        // Header
-        const header = document.createElement('h2');
-        header.textContent = t('myFiles');
-        header.style.cssText = 'margin-top:0;margin-bottom:20px;text-align:center;';
-        content.appendChild(header);
-
-        // Usage Info
-        const usageInfo = document.createElement('div');
-        usageInfo.style.cssText = `margin-bottom:20px;padding:15px;background:${nightMode ? '#3d3d3d' : '#f8f9fa'};border-radius:8px;text-align:center;`;
-        usageInfo.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ' + t('loading');
-        content.appendChild(usageInfo);
-
-        // File List
-        const fileListContainer = document.createElement('div');
-        fileListContainer.style.cssText = 'flex:1;overflow-y:auto;min-height:200px;border:1px solid ' + borderColor + ';border-radius:8px;padding:10px;';
-        content.appendChild(fileListContainer);
-
-        modal.appendChild(content);
-        document.body.appendChild(modal);
+        const blobUrls:string[]=[];
+        const modal = document.createElement('div');modal.className='modal-overlay file-manager-overlay';
+        const content=document.createElement('section');content.className='file-manager-page';content.setAttribute('role','dialog');content.setAttribute('aria-modal','true');
+        const closeBtn=document.createElement('button');closeBtn.className='epmd-dialog-close';closeBtn.type='button';closeBtn.textContent='×';closeBtn.setAttribute('aria-label',en()?'Close':'关闭');
+        const dismiss=()=>{referenceAbort.abort();modal.remove();blobUrls.forEach(url=>URL.revokeObjectURL(url));document.removeEventListener('keydown',escapePage);};
+        const escapePage=(event:KeyboardEvent)=>{if(event.key==='Escape' && !document.querySelector('.resource-preview-overlay')) dismiss();};
+        (modal as any).epmdCloseByBackPress=dismiss;closeBtn.onclick=dismiss;document.addEventListener('keydown',escapePage);
+        const header=document.createElement('header');header.className='file-manager-heading';
+        const title=document.createElement('h2');title.textContent=t('myFiles');header.append(title,closeBtn);content.append(header);
+        const usageInfo=document.createElement('div');usageInfo.className='file-manager-usage';usageInfo.textContent=t('loading');content.append(usageInfo);
+        const fileListContainer=document.createElement('div');fileListContainer.className='file-manager-scroll';content.append(fileListContainer);
+        modal.append(content);document.body.append(modal);
 
         // Fetch Data
         try {
@@ -116,27 +89,27 @@ import { findFileReferences, uploadDate } from './file-references';
                 if (g('currentUser') !== requestUser || !modal.isConnected) return;
                 const allFiles = [...localStorageFiles, ...indexedDBFiles, ...result.data];
                 const renderUsage = () => {
-                    usageInfo.innerHTML = `<div style="font-size:16px;margin-bottom:5px;">${t('usedSpace')}: <strong>${formatSize(result.totalSize)}</strong></div>
-                        <div style="font-size:12px;color:${nightMode ? '#aaa' : '#666'};">${t('totalFiles').replace('{count}',String(allFiles.length))}</div>`;
+                    usageInfo.textContent=(en()?'Used space: ':'已用空间：')+formatSize(result.totalSize)+' · '+(en()?allFiles.length+' files':'共 '+allFiles.length+' 个文件');
                 };
                 const selected = new Set<any>();
                 const rows = new Map<any, HTMLElement>();
                 const referenceLabels = new Map<any, HTMLElement>();
                 const toolbar = document.createElement('div');
                 toolbar.className = 'file-manager-selection';
-                toolbar.style.cssText = 'display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px;';
+
                 const selectionCount = document.createElement('span');
                 const updateSelection = () => {
                     selectionCount.textContent = en() ? `${selected.size} selected` : `已选择 ${selected.size} 个`;
                     for (const [file,item] of rows) {
                         (item.querySelector('.file-manager-checkbox') as HTMLInputElement).checked = selected.has(file);
-                        item.style.outline = selected.has(file) ? '2px solid var(--theme-accent, #2196F3)' : '';
+                        item.classList.toggle('selected',selected.has(file));
                     }
+                    const all=rows.size>0 && selected.size===rows.size;const toggle=toolbar.querySelector<HTMLButtonElement>('[data-select-all]');if(toggle)toggle.textContent=en()?(all?'Deselect all':'Select all'):(all?'取消全选':'全选');
                     toolbar.querySelectorAll<HTMLButtonElement>('[data-selection-action]').forEach(button => button.disabled = !selected.size);
                 };
                 const action = (label: string, fn: () => void, needsSelection = false) => {
                     const button = document.createElement('button'); button.type = 'button';
-                    button.className = 'modal-btn secondary'; button.textContent = label;
+                    button.className = 'file-manager-control'; button.textContent = label;
                     if(needsSelection) button.dataset.selectionAction = '';
                     button.onclick = fn; toolbar.append(button); return button;
                 };
@@ -162,8 +135,7 @@ import { findFileReferences, uploadDate } from './file-references';
                     if(!file.isLocal) result.totalSize=Math.max(0,result.totalSize-(Number(file.size)||0));
                     updateSelection();renderUsage();
                 };
-                action(en() ? 'Select all' : '全选',() => {for(const file of rows.keys()) selected.add(file);updateSelection();});
-                action(en() ? 'Clear selection' : '取消选择',() => {selected.clear();updateSelection();});
+                const toggleAll=action(en() ? 'Select all' : '全选',() => {if(rows.size && selected.size===rows.size)selected.clear();else for(const file of rows.keys()) selected.add(file);updateSelection();});toggleAll.dataset.selectAll='';
                 action(en() ? 'Copy selected links' : '复制所选链接',() => {
                     void navigator.clipboard.writeText([...selected].map(linkFor).join('\n')).then(() => global.showMessage(t('linkCopied'),'success')).catch(() => global.showMessage(en() ? 'Copy failed' : '复制失败','error'));
                 },true);
@@ -181,72 +153,45 @@ import { findFileReferences, uploadDate } from './file-references';
 
                 // Render Files
                 if (allFiles.length === 0) {
-                    fileListContainer.innerHTML = `<div style="text-align:center;padding:40px;color:${nightMode ? '#aaa' : '#666'};">${t('noFiles')}</div>`;
+                    fileListContainer.textContent=t('noFiles');
                 } else {
                     const list = document.createElement('div');
-                    list.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill, minmax(190px, 1fr));gap:10px;';
+                    list.className='file-manager-grid';
                     
                     allFiles.forEach(file => {
                         const item = document.createElement('div');
-                        item.style.cssText = `border:1px solid ${borderColor};border-radius:6px;padding:8px;position:relative;display:flex;flex-direction:column;align-items:center;transition:all 0.2s;`;
-                        item.onmouseover = () => item.style.borderColor = '#2196F3';
-                        item.onmouseout = () => item.style.borderColor = borderColor;
-
-                        // Display name logic: remove timestamp prefix (digits + underscore)
-                        const displayName = (file.originalName || file.name).replace(/^\d+_/, '');
-
-                        // Local indicator
-                        const locIndicator = file.isLocal 
-                            ? `<i class="fas fa-hdd" style="position:absolute;top:5px;left:5px;font-size:10px;color:#2196F3;" title="${t('localFile')}"></i>`
-                            : `<i class="fas fa-cloud" style="position:absolute;top:5px;left:5px;font-size:10px;color:#4CAF50;" title="${t('cloudFile')}"></i>`;
-
-                        // Preview
-                        let preview = '';
-                        const isImage = /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(file.name) || 
-                                        (file.type && file.type.startsWith('image/'));
-                        
-                        if (isImage) {
-                            let imageUrl = file.thumbUrl || file.url;
-                            
-                            // If it's from IndexedDB, create a blob URL
-                            if (file.source === 'indexedDB' && file.idbData && global.IndexedDBManager) {
-                                try {
-                                    imageUrl = global.IndexedDBManager.createBlobURL(file.idbData.data, file.idbData.contentType);
-                                } catch (err) {
-                                    console.error('Failed to create blob URL for preview:', err);
-                                }
+                        item.className='file-manager-card';
+                        const displayName=(file.originalName || file.name).replace(/^\d+_/,'');
+                        const preview=document.createElement('div');preview.className='file-manager-preview';
+                        const isImage=/\.(jpg|jpeg|png|gif|webp|svg|bmp|avif)$/i.test(file.name) || file.type?.startsWith('image/');
+                        if(isImage){
+                            let imageUrl=file.thumbUrl || file.url;
+                            if(file.source==='indexedDB' && file.idbData && global.IndexedDBManager){
+                                imageUrl=global.IndexedDBManager.createBlobURL(file.idbData.data,file.idbData.contentType);blobUrls.push(imageUrl);
                             }
-                            
-                            preview = `<div style="width:100%;height:80px;background-image:url('${escape(imageUrl)}');background-size:contain;background-repeat:no-repeat;background-position:center;border-radius:4px;margin-bottom:5px;"></div>`;
-                        } else {
-                            preview = `<div style="width:100%;height:80px;display:flex;align-items:center;justify-content:center;background:${nightMode ? '#444' : '#eee'};border-radius:4px;margin-bottom:5px;"><i class="fas fa-file" style="font-size:32px;color:#999;"></i></div>`;
-                        }
-
-                        item.innerHTML = `
-                            ${locIndicator}
-                            ${preview}
-                            <div style="font-size:12px;width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center;margin-bottom:2px;" title="${escape(displayName)}">${escape(displayName)}</div>
-                            <div style="font-size:10px;color:${nightMode ? '#aaa' : '#666'};">${formatSize(file.size)}</div>
-                            <div style="display:flex;flex-direction:column;gap:5px;margin-top:5px;width:100%;">
-                                <div style="display:flex;gap:5px;width:100%;">
-                                    <button class="copy-btn" style="flex:1;background:#2196F3;color:white;border:none;border-radius:3px;padding:2px;font-size:10px;cursor:pointer;">${t('copy')}</button>
-                                    <button class="del-btn" style="flex:1;background:#dc3545;color:white;border:none;border-radius:3px;padding:2px;font-size:10px;cursor:pointer;">${t('delete')}</button>
-                                </div>
-                                ${file.isLocal ? `<button class="convert-btn" style="width:100%;background:#4CAF50;color:white;border:none;border-radius:3px;padding:2px;font-size:10px;cursor:pointer;">${t('convertToCloud')}</button>` : ''}
-                            </div>
-                        `;
+                            const image=document.createElement('img');image.src=imageUrl;image.alt=displayName;image.loading='lazy';preview.append(image);
+                            const expand=async()=>{try{const source=file.source==='indexedDB'?imageUrl:file.url;const resolved=global.E2EAttachments?.encryptedUrl?.(source)?await global.E2EAttachments.load(source):source;if(modal.isConnected && g('currentUser')===requestUser)showResourcePreview(resolved,displayName);}catch(error){global.showMessage(en()?'Preview unavailable':'无法预览图片','error');}};
+                            preview.ondblclick=()=>void expand();preview.tabIndex=0;preview.setAttribute('role','button');preview.setAttribute('aria-label',(en()?'View image: ':'查看图片：')+displayName);
+                            preview.onkeydown=event=>{if(event.key==='Enter'){event.preventDefault();void expand();}};
+                            bindFileTreeLongPress(preview,()=>void expand(),'.file-manager-preview');
+                        }else preview.innerHTML='<i class="fas fa-file-lines" aria-hidden="true"></i>';
+                        const name=document.createElement('h3');name.textContent=displayName;name.title=displayName;
+                        const size=document.createElement('span');size.className='file-manager-size';size.textContent=(file.isLocal?(en()?'Local · ':'本地 · '):(en()?'Cloud · ':'云端 · '))+formatSize(file.size);
+                        const actions=document.createElement('div');actions.className='file-manager-card-actions';
+                        actions.innerHTML='<button class="copy-btn" type="button">'+t('copy')+'</button><button class="del-btn" type="button">'+t('delete')+'</button>'+(file.isLocal?'<button class="convert-btn" type="button">'+t('convertToCloud')+'</button>':'');
+                        item.append(preview,name,size,actions);
 
                         const checkbox = document.createElement('input');checkbox.type='checkbox';checkbox.className='file-manager-checkbox';
                         checkbox.setAttribute('aria-label',(en() ? 'Select ' : '选择 ') + displayName);
-                        checkbox.style.cssText='align-self:flex-end;margin:0 0 6px;';
+
                         checkbox.onchange=() => {if(checkbox.checked) selected.add(file);else selected.delete(file);updateSelection();};
                         item.prepend(checkbox);rows.set(file,item);
                         const uploaded = document.createElement('div');
-                        uploaded.className='file-manager-upload-date';uploaded.style.cssText=`font-size:11px;color:${nightMode ? '#aaa' : '#666'};margin-top:6px;`;
+                        uploaded.className='file-manager-upload-date';
                         const date=uploadDate(file);
                         uploaded.textContent=(en() ? 'Uploaded: ' : '上传日期：') + (date ? new Date(date).toLocaleString(en() ? 'en' : 'zh-CN') : (en() ? 'Unknown' : '未知'));
                         const reference = document.createElement('div');reference.className='file-manager-references';
-                        reference.style.cssText=`font-size:12px;overflow-wrap:anywhere;margin-top:6px;color:${nightMode ? '#ccc' : '#555'};`;
+
                         reference.textContent=en() ? 'Checking references…' : '正在检查引用…';
                         referenceLabels.set(file,reference);item.append(uploaded,reference);
 
@@ -326,7 +271,7 @@ import { findFileReferences, uploadDate } from './file-references';
                                         }
                                         
                                         global.showMessage(t('uploadSuccess') || '上传成功', 'success');
-                                        modal.remove();
+                                        dismiss();
                                         showFileManager();
                                     }
                                 } catch (err) {
@@ -340,14 +285,28 @@ import { findFileReferences, uploadDate } from './file-references';
                     });
                     fileListContainer.appendChild(list);
                 }
+                updateSelection();
                 void collectQueryDocuments({includeEncrypted:true,signal:referenceAbort.signal},global).then(corpus => {
                     if(!modal.isConnected || g('currentUser') !== requestUser) return;
                     const references=findFileReferences(allFiles,corpus.documents);
                     for(const file of allFiles) {
                         const label=referenceLabels.get(file);if(!label) continue;
                         const names=references.get(file.url) || [];
-                        label.textContent=names.length ? (en() ? 'Referenced in: ' : '引用文档：') + names.join('、') :
-                            corpus.skipped.length ? (en() ? 'References unknown: some documents were unreadable' : '引用情况未确认：部分文档未能读取') : (en() ? 'Not referenced' : '未引用');
+                        label.replaceChildren();
+                        if(names.length){
+                            const caption=document.createElement('span');caption.textContent=en()?'Referenced in:':'引用文档：';label.append(caption);
+                            for(const name of names){const link=document.createElement('button');link.type='button';link.className='file-reference-link';link.textContent=name;
+                                link.onclick=async()=>{link.disabled=true;try{
+                                    if(g('currentUser')!==requestUser)return;
+                                    let document=(global.files || []).find(file=>file.name===name && file.type==='file');
+                                    if(!document){await global.loadFilesFromServer?.();document=(global.files || []).find(file=>file.name===name && file.type==='file');}
+                                    if(g('currentUser')!==requestUser || !modal.isConnected)return;
+                                    if(!document)throw Error(en()?'Document is unavailable':'文档暂不可用');
+                                    const openFile=global.openFile as ((id:string)=>Promise<unknown>);
+                                    if(typeof openFile!=='function')throw Error(en()?'Document cannot be opened':'暂时无法打开文档');
+                                    dismiss();await openFile(document.id);
+                                }catch(error){global.showMessage((error as Error).message,'error');}finally{link.disabled=false;}};label.append(link);}
+                        }else label.textContent=corpus.skipped.length?(en()?'References unknown: some documents were unreadable':'引用情况未确认：部分文档未能读取'):(en()?'Not referenced':'未引用');
                     }
                 }).catch(() => {
                     if(!modal.isConnected) return;

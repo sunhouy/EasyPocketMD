@@ -6217,3 +6217,84 @@ body.tauri-android-native-insets.file-management-mode .notes-home { padding-top:
 body.night-mode .file-selection-panel,body.night-mode .file-action-sheet { background:#242424;color:#eee; }
 .file-details-dialog { max-height:85dvh;overflow:auto; }
 @media(max-width:480px) { .batch-rename-form { grid-template-columns:1fr; } }
+
+/* File windows share compact headings; close controls never occupy a row. */
+.file-action-sheet > .epmd-dialog-close { position:absolute;top:16px;right:16px;z-index:2; }
+.file-action-dialog-overlay { align-items:flex-start;padding:16px 12px;box-sizing:border-box; }
+.file-action-dialog-overlay .file-action-sheet { max-width:680px;max-height:calc(100dvh - 32px);border-radius:18px;padding:20px; }
+.rename-description { margin:0 40px 16px 0;font-size:13px;opacity:.7; }
+.batch-rename-form { grid-template-columns:repeat(2,minmax(0,1fr));gap:12px; }
+.batch-rename-form label[data-field=template] { grid-column:1/-1; }
+.batch-rename-form .rename-checkbox-row { grid-column:1/-1;flex-direction:row;align-items:center;gap:8px; }
+.rename-checkbox-row input { width:16px;height:16px;margin:0;accent-color:var(--theme-accent,#2e6dd8); }
+.batch-rename-form button[type=submit] { grid-column:1/-1;min-height:36px; }
+.batch-rename-preview { max-height:120px; }
+.file-selection-control { border:0;border-radius:8px;padding:5px 9px;min-height:28px;font-size:12px;background:#80808018;color:inherit;cursor:pointer; }
+.file-action-button[hidden] { display:none !important; }
+
+#historyModalOverlay .history-modal { width:min(900px,94vw);height:min(760px,88dvh);max-height:88dvh !important;padding:24px !important;box-sizing:border-box; }
+.history-modal .history-page-heading { padding:0 46px 12px 0; border:0;text-align:left; }
+.history-modal #closeHistoryBtn { top:16px !important;right:16px !important; }
+.history-page-heading h2 { margin:0 0 5px;font-size:22px;text-align:left; }
+#historyFileName { margin:0;font-size:13px;text-align:left;opacity:.7;overflow-wrap:anywhere; }
+.history-modal .history-info { background:transparent;padding:0 0 14px;gap:6px;font-size:12px;opacity:.75; }
+.history-modal .history-list { margin:12px 0 0;border:0;border-radius:0;padding:0 2px; }
+.history-modal .history-batch-toolbar { padding:8px 0 !important;background:transparent;border:0;gap:8px;flex-wrap:wrap; }
+.history-batch-right { flex-wrap:wrap;justify-content:flex-end; }
+.history-modal .modal-btn.small { padding:6px 10px;font-size:12px;border-radius:8px;min-height:30px; }
+.history-modal .history-version { border:1px solid #8883;border-radius:12px;padding:14px;margin-bottom:12px;gap:10px; }
+.history-modal .history-version-header { flex-wrap:wrap;gap:6px; }
+.history-modal .history-version-content { font:13px/1.6 system-ui;max-height:100px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical; }
+.history-modal .history-version-actions { flex-wrap:wrap; }
+.history-empty { height:100%;min-height:220px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;color:#777;gap:12px; }
+.history-empty > i { font-size:36px;opacity:.45; }
+.history-empty h3 { margin:0;font-size:18px;color:inherit; }
+.history-empty p { margin:0;font-size:13px; }
+body.night-mode .history-empty { color:#aaa; }
+
+.file-manager-overlay { position:fixed;inset:0;display:flex;align-items:stretch;background:#fff;z-index:100100; }
+.file-manager-page { position:relative;display:flex;flex-direction:column;width:100%;height:100%;min-height:0;box-sizing:border-box;padding:16px 24px calc(16px + var(--safe-area-bottom,0px));background:#fff;color:#252a34; }
+.file-manager-heading { position:relative;flex-shrink:0;padding:2px 48px 10px 0; }
+.file-manager-heading h2 { margin:0;font-size:22px;line-height:32px; }
+.file-manager-heading > .epmd-dialog-close { position:absolute;right:0;top:0; }
+.file-manager-usage { flex-shrink:0;font-size:13px;color:#737b88;margin:0 0 12px; }
+.file-manager-selection { flex-shrink:0;display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:0 0 12px; }
+.file-manager-selection > span { font-size:12px;color:#737b88;margin-left:auto; }
+.file-manager-control { min-height:30px;border:0;border-radius:8px;font-size:12px;padding:6px 10px;background:#edf0f5;color:inherit;cursor:pointer; }
+.file-manager-control:disabled { opacity:.4;cursor:default; }
+.file-manager-scroll { flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;padding:2px 2px 16px; }
+.file-manager-grid { display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:16px;align-items:start;max-width:1500px;margin:0 auto; }
+.file-manager-card { position:relative;border:1px solid #8883;border-radius:14px;padding:12px;min-width:0;display:flex;flex-direction:column;gap:8px;background:#f8f9fc; }
+.file-manager-card.selected { outline:2px solid var(--theme-accent,#2e6dd8);outline-offset:-1px; }
+.file-manager-card h3 { font-size:14px;line-height:1.4;margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-right:4px; }
+.file-manager-checkbox { position:absolute;top:18px;right:18px;width:18px;height:18px;z-index:1;margin:0;accent-color:var(--theme-accent,#2e6dd8);cursor:pointer; }
+.file-manager-preview { height:132px;display:flex;align-items:center;justify-content:center;border-radius:9px;background:#edf0f5;overflow:hidden;touch-action:pan-y; }
+.file-manager-preview img { width:100%;height:100%;object-fit:contain; }
+.file-manager-preview[role=button] { cursor:zoom-in; }
+.file-manager-preview > i { font-size:36px;color:#929bad; }
+.file-manager-size,.file-manager-upload-date { font-size:11px;color:#737b88; }
+.file-manager-card-actions { display:flex;flex-wrap:wrap;gap:6px; }
+.file-manager-card-actions button { border:0;border-radius:7px;min-height:28px;font-size:12px;padding:5px 10px;background:#e7ecf5;color:#2e6dd8;cursor:pointer; }
+.file-manager-card-actions .del-btn { background:#e5484812;color:#c54d4d; }
+.file-manager-references { display:flex;flex-wrap:wrap;align-items:center;gap:4px;font-size:12px;line-height:1.5;overflow-wrap:anywhere;color:#737b88; }
+.file-reference-link { max-width:100%;white-space:normal;overflow-wrap:anywhere;text-align:left;border:0;border-radius:5px;font-size:12px;background:#2e6dd810;color:var(--theme-accent,#2e6dd8);padding:3px 6px;cursor:pointer; }
+.resource-preview-overlay { position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#101114f5;z-index:100110;padding:60px 16px;box-sizing:border-box; }
+.resource-preview-overlay > img { max-width:100%;max-height:100%;object-fit:contain; }
+.resource-preview-overlay > p { position:absolute;bottom:16px;left:16px;right:16px;text-align:center;color:#ddd;font-size:13px;overflow-wrap:anywhere;margin:0; }
+.resource-preview-overlay > .epmd-dialog-close { position:absolute;right:16px;top:16px; }
+body.night-mode .file-manager-overlay,body.night-mode .file-manager-page { background:#181a1f;color:#eee; }
+body.night-mode .file-manager-card { background:#24272e; }
+body.night-mode .file-manager-control,body.night-mode .file-manager-preview { background:#30343e; }
+body.night-mode .file-manager-card-actions button { background:#354158;color:#9bbcff; }
+body.night-mode .file-manager-card-actions .del-btn { color:#ffa1a1;background:#61323c; }
+body.night-mode :is(.file-manager-usage,.file-manager-selection > span,.file-manager-size,.file-manager-upload-date,.file-manager-references) { color:#a5adba; }
+@media(max-width:768px) {
+    #historyModalOverlay .history-modal { width:100vw !important;height:100% !important;max-height:100% !important;padding:16px !important; }
+    .file-manager-page { padding:16px 12px calc(12px + var(--safe-area-bottom,0px)); }
+    .file-manager-grid { grid-template-columns:repeat(2,minmax(0,1fr));gap:10px; }
+    .file-manager-card { padding:10px;gap:7px; }
+    .file-manager-preview { height:110px; }
+    .file-manager-card h3 { font-size:13px; }
+    .file-manager-selection > span { font-size:11px; }
+}
+@media(max-width:360px) { .file-manager-grid { grid-template-columns:minmax(0,1fr); } }
