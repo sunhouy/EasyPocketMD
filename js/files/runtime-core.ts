@@ -827,7 +827,7 @@ import { createDiffFileWriter } from './conflict/live-files';
         const owner=g('currentUser');
         const confirmed = await g('customConfirm')(isEn()
             ? `Delete ${itemsArr.length} selected item(s)? Folders include all contents.`
-            : `确认删除选中的 ${itemsArr.length} 项？文件夹将连同其所有内容一起删除。`);
+            : `确认删除选中的 ${itemsArr.length} 项？文件夹将连同其所有内容一起删除。`, {danger:true,confirmText:isEn()?'Delete':'删除'});
         if (!confirmed) return;
 
         if(g('currentUser')!==owner || g('files')!==files) return;
@@ -2270,7 +2270,7 @@ import { createDiffFileWriter } from './conflict/live-files';
                 g('customAlert')(isEn() ? 'At least one file must be kept' : '至少需要保留一个文件');
                 return;
             }
-            const confirmed = await g('customConfirm')(isEn() ? `Are you sure you want to delete "${item.name}"?` : `确认删除"${item.name}"吗？`);
+            const confirmed = await g('customConfirm')(isEn() ? `Are you sure you want to delete "${item.name}"?` : `确认删除"${item.name}"吗？`, {danger:true,confirmText:isEn()?'Delete':'删除'});
             if (!confirmed) return;
 
             const idx = files.findIndex(f => f.id === id);
@@ -2289,7 +2289,7 @@ import { createDiffFileWriter } from './conflict/live-files';
             loadFiles();
             global.showMessage(isEn() ? 'File deleted: ' + item.name : '已删除文件: ' + item.name);
         } else {
-            const confirmed = await g('customConfirm')(isEn() ? `Are you sure you want to delete the folder "${item.name}" and all its contents?` : `确定要删除文件夹“${item.name}”及其所有内容吗？`);
+            const confirmed = await g('customConfirm')(isEn() ? `Are you sure you want to delete the folder "${item.name}" and all its contents?` : `确定要删除文件夹“${item.name}”及其所有内容吗？`, {danger:true,confirmText:isEn()?'Delete':'删除'});
             if (!confirmed) return;
 
             const toDelete = files.filter(f => f.name === item.name || f.name.startsWith(item.name + '/'));
@@ -2824,7 +2824,7 @@ import { createDiffFileWriter } from './conflict/live-files';
         var nightMode = g('nightMode') === true;
         var confirmModal = document.createElement('div');
         confirmModal.className = 'modal-overlay';
-        confirmModal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:10001;';
+        confirmModal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:200000;';
         var modalContent = document.createElement('div');
         var bgColor = nightMode ? '#2d2d2d' : 'white';
         var textColor = nightMode ? '#eee' : '#333';
@@ -2833,6 +2833,7 @@ import { createDiffFileWriter } from './conflict/live-files';
         modalContent.innerHTML = '<div class="modal-header" style="text-align:center;margin-bottom:20px;"><h2 style="margin:0 0 10px 0;color:#dc3545;">' + (isEn() ? 'Batch Delete Confirmation' : '批量删除确认') + '</h2><p style="color:' + secondaryTextColor + ';margin:0;">' + (isEn() ? 'Are you sure you want to delete the selected history versions?' : '确定要删除选中的历史版本吗？') + '</p></div><div style="margin:15px 0;text-align:center;"><strong style="color:#dc3545;font-size:18px;">' + versionIds.length + '</strong> ' + (isEn() ? 'versions will be deleted' : '个版本将被删除') + '</div><div style="display:flex;gap:10px;justify-content:center;margin-top:25px;"><button class="delete-confirm-cancel" style="padding:10px 24px;background:' + (nightMode ? '#555' : '#6c757d') + ';color:white;border:none;border-radius:6px;cursor:pointer;">' + (isEn() ? 'Cancel' : '取消') + '</button><button class="delete-confirm-ok" style="padding:10px 24px;background:#dc3545;color:white;border:none;border-radius:6px;cursor:pointer;">' + (isEn() ? 'Confirm Delete' : '确认删除') + '</button></div>';
         confirmModal.appendChild(modalContent);
         document.body.appendChild(confirmModal);
+        const warning=document.createElement('p');warning.className='delete-warning';warning.textContent=isEn()?'This action cannot be undone.':'此操作不可撤销。';modalContent.querySelector('.delete-confirm-ok').parentElement.before(warning);
         var cancelBtn = modalContent.querySelector('.delete-confirm-cancel');
         var confirmBtn = modalContent.querySelector('.delete-confirm-ok');
         cancelBtn.onclick = function() { global.removeModal(confirmModal); };
@@ -2892,7 +2893,7 @@ import { createDiffFileWriter } from './conflict/live-files';
         var nightMode = g('nightMode') === true;
         var confirmModal = document.createElement('div');
         confirmModal.className = 'modal-overlay';
-        confirmModal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:10001;';
+        confirmModal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:200000;';
         var modalContent = document.createElement('div');
         var bgColor = nightMode ? '#2d2d2d' : 'white';
         var textColor = nightMode ? '#eee' : '#333';
@@ -2901,6 +2902,7 @@ import { createDiffFileWriter } from './conflict/live-files';
         modalContent.innerHTML = '<div class="modal-header" style="text-align:center;margin-bottom:20px;"><h2 style="margin:0 0 10px 0;color:#dc3545;"><i class="fas fa-exclamation-triangle"></i> ' + (isEn() ? 'Clear All History' : '清空全部历史') + '</h2><p style="color:' + secondaryTextColor + ';margin:0;">' + (isEn() ? 'Are you sure you want to clear ALL history versions?' : '确定要清空该文件的所有历史版本吗？') + '</p></div><div style="margin:15px 0;text-align:center;color:#dc3545;font-weight:bold;">' + (isEn() ? 'This action cannot be undone!' : '此操作不可恢复！') + '</div><div style="margin:10px 0;text-align:center;color:' + secondaryTextColor + ';">' + (isEn() ? 'File: ' : '文件：') + global.escapeHtml(filename) + '</div><div style="display:flex;gap:10px;justify-content:center;margin-top:25px;"><button class="delete-confirm-cancel" style="padding:10px 24px;background:' + (nightMode ? '#555' : '#6c757d') + ';color:white;border:none;border-radius:6px;cursor:pointer;">' + (isEn() ? 'Cancel' : '取消') + '</button><button class="delete-confirm-ok" style="padding:10px 24px;background:#dc3545;color:white;border:none;border-radius:6px;cursor:pointer;">' + (isEn() ? 'Confirm Clear All' : '确认清空全部') + '</button></div>';
         confirmModal.appendChild(modalContent);
         document.body.appendChild(confirmModal);
+        const warning=document.createElement('p');warning.className='delete-warning';warning.textContent=isEn()?'This action cannot be undone.':'此操作不可撤销。';modalContent.querySelector('.delete-confirm-ok').parentElement.before(warning);
         var cancelBtn = modalContent.querySelector('.delete-confirm-cancel');
         var confirmBtn = modalContent.querySelector('.delete-confirm-ok');
         cancelBtn.onclick = function() { global.removeModal(confirmModal); };
@@ -3101,7 +3103,7 @@ import { createDiffFileWriter } from './conflict/live-files';
         var nightMode = g('nightMode') === true;
         var confirmModal = document.createElement('div');
         confirmModal.className = 'modal-overlay';
-        confirmModal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:10001;';
+        confirmModal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:200000;';
         var modalContent = document.createElement('div');
         var bgColor = nightMode ? '#2d2d2d' : 'white';
         var textColor = nightMode ? '#eee' : '#333';
@@ -3112,6 +3114,7 @@ import { createDiffFileWriter } from './conflict/live-files';
         modalContent.innerHTML = '<div class="modal-header" style="text-align:center;margin-bottom:20px;"><h2 style="margin:0 0 10px 0;color:#dc3545;">' + (isEn() ? 'Delete Confirmation' : '删除确认') + '</h2><p style="color:' + secondaryTextColor + ';margin:0;">' + (isEn() ? 'Please confirm you want to delete this history version' : '请确认是否要删除此历史版本') + '</p></div><div style="margin:15px 0;">' + (isEn() ? 'File: ' : '文件：') + global.escapeHtml(filename) + '</div><div style="display:flex;gap:10px;justify-content:center;margin-top:25px;"><button class="delete-confirm-cancel" style="padding:10px 24px;background:' + (nightMode ? '#555' : '#6c757d') + ';color:white;border:none;border-radius:6px;cursor:pointer;">' + (isEn() ? 'Cancel' : '取消') + '</button><button class="delete-confirm-ok" style="padding:10px 24px;background:#dc3545;color:white;border:none;border-radius:6px;cursor:pointer;">' + (isEn() ? 'Confirm Delete' : '确认删除') + '</button></div>';
         confirmModal.appendChild(modalContent);
         document.body.appendChild(confirmModal);
+        const warning=document.createElement('p');warning.className='delete-warning';warning.textContent=isEn()?'This action cannot be undone.':'此操作不可撤销。';modalContent.querySelector('.delete-confirm-ok').parentElement.before(warning);
         var cancelBtn = modalContent.querySelector('.delete-confirm-cancel');
         var confirmBtn = modalContent.querySelector('.delete-confirm-ok');
         cancelBtn.onclick = function() { global.removeModal(confirmModal); };
@@ -3720,7 +3723,7 @@ import { createDiffFileWriter } from './conflict/live-files';
             return new Promise(function(resolve) {
                 const overlay = document.createElement('div');
                 overlay.className = 'modal-overlay';
-                overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:10010;';
+                overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:100140;';
                 const box = document.createElement('div');
                 box.className = 'diff-merge-dialog';
                 box.style.cssText = 'background:' + (nightMode ? '#2d2d2d' : '#fff') + ';color:' + (nightMode ? '#eee' : '#333') + ';';
@@ -3803,7 +3806,7 @@ import { createDiffFileWriter } from './conflict/live-files';
         modal.className = 'modal-overlay file-diff-modal-overlay';
         modal.id = 'fileDiffResultModal';
         if (options.syncConflict) modal.dataset.syncConflictFileId = options.syncConflict.fileId;
-        modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;z-index:10002;';
+        modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;z-index:100130;';
 
         const modalContent = document.createElement('div');
         modalContent.className = 'file-diff-modal';

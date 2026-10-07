@@ -9,7 +9,9 @@ export function applyNativeModalLayout(overlay: HTMLElement) {
         }
     };
     set(overlay, 'top', '0px'); set(overlay, 'bottom', '0px');
-    set(overlay, 'z-index', '20000');
+    // Preserve a nested surface's layer instead of lowering it beneath its parent.
+    const currentLayer=Number.parseInt(getComputedStyle(overlay).zIndex,10) || 0;
+    set(overlay, 'z-index', String(Math.max(20000,currentLayer)));
     const androidInsetsHandled = document.body.classList.contains('tauri-android-native-insets');
     const modal = overlay.querySelector<HTMLElement>('.modal');
     const full = overlay.id === 'settingsModalOverlay' || modal?.matches('.diff-modal, .history-modal, .file-diff-modal');

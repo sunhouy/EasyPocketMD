@@ -61,6 +61,7 @@ export interface I18nApi {
     translations?: Record<string, string>;
 }
 export interface DialogOptions {
+    danger?: boolean;
     title?: string;
     cancelText?: string;
     confirmText?: string;

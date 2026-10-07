@@ -6298,3 +6298,15 @@ body.night-mode :is(.file-manager-usage,.file-manager-selection > span,.file-man
     .file-manager-selection > span { font-size:11px; }
 }
 @media(max-width:360px) { .file-manager-grid { grid-template-columns:minmax(0,1fr); } }
+
+/* File surfaces sit above selection actions; confirmations sit above every file surface. */
+.file-details-overlay, #historyModalOverlay { z-index:100120; }
+.file-action-sheet-overlay { z-index:100120; }
+.resource-preview-overlay { z-index:100130; }
+.custom-dialog-btn.confirm.danger,
+.file-action-button[data-action=delete],
+.file-manager-control.danger,
+.file-manager-card-actions .del-btn,
+.history-modal :is(.delete-history-btn,#historyBatchDeleteBtn,#historyClearAllBtn) { background:#dc3545 !important;color:#fff !important; }
+.delete-warning { margin:0 0 16px;text-align:center;color:#c82d3d;font-size:13px;line-height:1.5; }
+body.night-mode .delete-warning { color:#ff9ca8; }
