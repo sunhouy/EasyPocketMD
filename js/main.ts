@@ -13,7 +13,8 @@ import { initSlashCommandRuntime } from './ui/slash-command';
 import './ai-config';
 import { enterPresentationMode, exitPresentationMode } from './main/presentation-mode';
 import { initBackNavigation } from './main/back-navigation';
-import { openPrimaryFileInterface } from './main/file-navigation';
+import { modalSurfaceSelector, isVisibleModalSurface, dismissTransientSurface } from './main/modal-surfaces';
+import { openPrimaryFileInterface, clearFileListReturn, returnFromPrimaryFileInterface } from './main/file-navigation';
 import { installMobileChromeScroll } from './main/mobile-chrome-scroll';
 import { applyBackground, createBackgroundControls } from './main/background';
 import { applyThemeColor, createThemeColorControls } from './main/theme-color';
@@ -88,19 +89,10 @@ document.addEventListener('DOMContentLoaded', function() {
         return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent || '');
     }
 
-    var MODAL_OVERLAY_SELECTOR = [
-        '.share-history-overlay',
-        '.modal-overlay',
-        '.mobile-action-sheet-overlay',
-        '.insert-picker-modal',
-        '.insert-dialog-modal',
-        '.footnote-picker-modal',
-        '.formula-picker-modal',
-        '.chart-picker-modal',
-        '.echarts-picker-modal'
-    ].join(', ');
+    var MODAL_OVERLAY_SELECTOR = modalSurfaceSelector;
 
     var MODAL_CLOSE_BUTTON_SELECTOR = [
+        '.epmd-dialog-close',
         '.modal-close-btn',
         '#closeDiffModalBtn',
         '#closeHistoryBtn',
@@ -118,14 +110,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     var desktopModalEscInitialized = false;
 
-    function isOverlayVisible(el) {
-        if (!el || !el.isConnected) return false;
-        if (el.getAttribute('data-esc-closable') === 'false') return false;
-        if (el.classList.contains('show')) return true;
-        if (el.style.display && el.style.display !== 'none') return true;
-        var computed = window.getComputedStyle(el);
-        return computed.display !== 'none' && computed.visibility !== 'hidden' && computed.opacity !== '0';
-    }
+    function isOverlayVisible(el) { return isVisibleModalSurface(el); }
 
     function isCustomDialogVisible() {
         var container = document.getElementById('customDialogContainer');
@@ -214,6 +199,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function closeOverlayByBackPress(overlay) {
         if (!overlay) return false;
+        if (dismissTransientSurface(overlay)) return true;
         if (overlay.getAttribute('data-esc-closable') === 'false') return false;
 
         if (overlay.id === 'settingsModalOverlay' && typeof requestCloseSettingsDialog === 'function') {
@@ -374,6 +360,7 @@ document.addEventListener('DOMContentLoaded', function() {
     };
 
     window.enterEditorMode = function() {
+        clearFileListReturn(window);
         window.isFileManagementMode = false;
         window.deferInitialFileOpen = false;
         toggleFileManagementBodyClass(false);
@@ -3895,6 +3882,7 @@ document.addEventListener('DOMContentLoaded', function() {
         getVisibleModalOverlays,
         closeOverlayByBackPress,
         prefersFileListHome,
+        returnFromFileList: () => returnFromPrimaryFileInterface(window),
     });
 
     initDesktopModalEscHandler();

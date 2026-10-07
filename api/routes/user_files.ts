@@ -44,10 +44,12 @@ router.post('/list', checkAuth, (req, res) => {
                         thumbUrl = `${userModel.baseUrl}/user_files/${username}/${thumbName}`;
                     }
 
+                    const uploadTimestamp = file.match(/(?:^|_)(\d{13})_/);
                     fileList.push({
                         name: file,
                         size: stats.size,
                         mtime: stats.mtime,
+                        uploadedAt: uploadTimestamp ? new Date(Number(uploadTimestamp[1])).toISOString() : (stats.birthtimeMs > 0 ? stats.birthtime : stats.mtime),
                         url: url,
                         thumbUrl: thumbUrl
                     });

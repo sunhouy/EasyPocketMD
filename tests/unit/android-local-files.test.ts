@@ -1,7 +1,7 @@
 /** @jest-environment jsdom */
 // @ts-nocheck
 import { initBackNavigation } from '../../js/main/back-navigation';
-import { openPrimaryFileInterface } from '../../js/main/file-navigation';
+import { openPrimaryFileInterface, returnFromPrimaryFileInterface, clearFileListReturn } from '../../js/main/file-navigation';
 import { ensureHandlePermission, createLocalHandleStore } from '../../js/files/external/handles';
 import { normalizeExternalLocalFileRecord } from '../../js/files/external';
 import { installSyncRuntime } from '../../js/files/sync-runtime';
@@ -61,6 +61,22 @@ describe('Android back navigation', () => {
         back();
         expect(window.history.back).toHaveBeenCalledTimes(1);
         expect(window.enterEditorMode).not.toHaveBeenCalled();
+    });
+    it('returns from a file-opened list to that file, then the root list, then exits', () => {
+        window.currentFileId = 'note';clearFileListReturn(window);
+        window.enterFileManagementMode = jest.fn(() => {window.isFileManagementMode = true;});
+        window.enterEditorMode = jest.fn(() => {window.isFileManagementMode = false;clearFileListReturn(window);});
+        initBackNavigation({getVisibleModalOverlays:()=>[],closeOverlayByBackPress:()=>true,prefersFileListHome:()=>true,returnFromFileList:()=>returnFromPrimaryFileInterface(window)});
+        openPrimaryFileInterface(window,true);
+        back();expect(window.isFileManagementMode).toBe(false);expect(window.currentFileId).toBe('note');
+        expect(window.history.back).not.toHaveBeenCalled();
+        back();expect(window.isFileManagementMode).toBe(true);expect(window.history.back).not.toHaveBeenCalled();
+        back();expect(window.history.back).toHaveBeenCalledTimes(1);
+    });
+    it('discarding a list return when opening another file makes Back return to the root', () => {
+        const app={currentFileId:'old',isFileManagementMode:false,enterFileManagementMode:()=>{app.isFileManagementMode=true;},enterEditorMode:jest.fn()};
+        openPrimaryFileInterface(app,true);clearFileListReturn(app);app.currentFileId='new';
+        expect(returnFromPrimaryFileInterface(app)).toBe(false);
     });
     it('uses the preferred file home for the file icon without opening the old sidebar', () => {
         document.body.innerHTML = '<aside id="fileListSidebar"></aside>';

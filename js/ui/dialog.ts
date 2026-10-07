@@ -130,10 +130,14 @@
             if (onKeydown) {
                 document.removeEventListener('keydown', onKeydown, true);
             }
+            delete (container as any).epmdCloseByBackPress;
             container.style.display = 'none';
             container.innerHTML = '';
             callback(result);
         };
+
+        // Back dismisses through the same callback as Cancel, settling queued promises.
+        (container as any).epmdCloseByBackPress = () => closeDialog(type === 'prompt' ? null : false);
 
         confirmBtn.addEventListener('click', () => {
             if (type === 'prompt') {
