@@ -326,6 +326,7 @@ export const nativeFileApi = (function(global: Window) {
         if (isTauriRuntime()) {
             return saveWithTauri(payload, {
                 filename: filename,
+                mimeType: mimeType,
                 defaultPath: filename,
                 title: options && options.title ? options.title : filename
             });

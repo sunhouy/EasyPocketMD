@@ -2,11 +2,12 @@
  * 文件管理 - 加载、保存、同步、历史版本、文件夹
  */
 // @ts-nocheck
-import { createFileOrderStore, reorderSiblings, isOrderMetadataFile } from './order-store';
+import { createFileOrderStore, isOrderMetadataFile } from './order-store';
+import { installBatchFileActions, showBottomSheet } from './batch-actions';
 import { createTreeSelectionRestorer } from './tree/selection';
 import { e2eErrorText } from '../e2e-i18n';
-import { installNotesHome } from './notes-home';
-import { showFileDetails, foldFileName, bindFileTreeLongPress } from './tree/details';
+import { noteTimestamp, installNotesHome } from './notes-home';
+import { foldFileName, bindFileTreeLongPress } from './tree/details';
 import { floatingRunWindow } from '../code-runner-window';
 import { installEditorComposition, isEditorComposing, waitForEditorCommit } from '../editor-composition';
 import { AutoSaveScheduler } from './autoSave';
@@ -35,6 +36,24 @@ import { createDiffFileWriter } from './conflict/live-files';
     installEditorComposition(global);
     const orderStore = createFileOrderStore(global, () => loadFiles());
     global.refreshFileOrders = orderStore.refresh;
+    const batchActions = installBatchFileActions(global, {
+        reload: () => loadFiles(), orders: orders => orderStore.save(orders),
+        loadContent: async file => file.id === g('currentFileId') ? getCurrentEditorContent(file.id,file.content) : needsServerFileContentFetch(file) ? fetchServerFileContent(file) : resolveE2EFileContent(file.content,file),
+        exit: () => exitFileListMultiSelectMode(), delete: () => batchDeleteFileListMultiSelection(),
+        upDown: (items,direction) => {
+            const tree = window.$('#fileList').jstree(true); if (!tree) return;
+            const selected = new Set(items.map(file => file.name)); const groups = new Set(items.map(file => getParentPath(file.name)));
+            const orders = {};
+            for (const parentPath of groups) {
+                const visible = getJsTreeData().map(node => node.id);
+                const siblings = (g('files') || []).filter(file => getParentPath(file.name) === parentPath).sort((a,b) => document.body.classList.contains('file-management-mode') ? Number(a.order || 0)-Number(b.order || 0) || (a.type==='file' && b.type==='file' ? noteTimestamp(b)-noteTimestamp(a) : a.name.localeCompare(b.name)) : visible.indexOf(a.id)-visible.indexOf(b.id));
+                if (direction === 'up') {for (let i=1;i<siblings.length;i++) if (selected.has(siblings[i].name) && !selected.has(siblings[i-1].name)) [siblings[i-1],siblings[i]]=[siblings[i],siblings[i-1]];}
+                else {for (let i=siblings.length-2;i>=0;i--) if (selected.has(siblings[i].name) && !selected.has(siblings[i+1].name)) [siblings[i],siblings[i+1]]=[siblings[i+1],siblings[i]];}
+                siblings.forEach((file,index) => orders[file.name] = (Number(global.fileOrders?.[file.name])<=-1000000 ? -2000000 : 0)+index*10);
+            }
+            orderStore.save(orders);loadFiles();
+        }, import: path => pickAndImportFiles(path)
+    });
     const notesHome = installNotesHome(global, { loadContent: file => fetchServerFileContent(file), needsContent: file => needsServerFileContentFetch(file) });
 
     function g<K extends keyof Window>(name: K): Window[K] { return global[name]; }
@@ -259,7 +278,6 @@ import { createDiffFileWriter } from './conflict/live-files';
     }
 
     let hasNotifiedInitialFileListRendered = false;
-    let hasBoundFabRingDismiss = false;
     const FILE_LIST_SEARCH_DEBOUNCE = 180;
     const fileListSearchState = {
         query: '',
@@ -272,7 +290,7 @@ import { createDiffFileWriter } from './conflict/live-files';
     };
 
     function shouldAutoOpenInitialFile() {
-        return !global.deferInitialFileOpen;
+        return !global.deferInitialFileOpen && !global.nativeOpenRequestInProgress;
     }
 
     function notifyInitialFileListRendered() {
@@ -289,95 +307,29 @@ import { createDiffFileWriter } from './conflict/live-files';
         }
     }
 
-    function closeFileManagementFabRing() {
-        const fab = (document.getElementById('fileManagementFab') as HTMLButtonElement);
-        const ring = document.getElementById('fileManagementFabRing');
-        if (fab) fab.classList.remove('open');
-        if (ring) {
-            ring.classList.remove('open');
-            ring.setAttribute('aria-hidden', 'true');
-        }
-    }
+    function closeFileActionSheet() {document.getElementById('fileActionSheet')?.remove();}
 
-    function toggleFileManagementFabRing() {
-        const fab = (document.getElementById('fileManagementFab') as HTMLButtonElement);
-        const ring = document.getElementById('fileManagementFabRing');
-        if (!fab || !ring) return;
-
-        const willOpen = !ring.classList.contains('open');
-        if (!willOpen) {
-            closeFileManagementFabRing();
-            return;
-        }
-
-        fab.classList.add('open');
-        ring.classList.add('open');
-        ring.setAttribute('aria-hidden', 'false');
+    function showFileCreationSheet() {
+        showBottomSheet(isEn() ? 'Create or open' : '新建或打开', [
+            {label:isEn()?'New file':'新建文件',icon:'fa-file-circle-plus',run:()=>global.createNewFile()},
+            {label:isEn()?'New folder':'新建文件夹',icon:'fa-folder-plus',run:()=>global.createNewFolder()},
+            {label:isEn()?'Import files':'导入文件',icon:'fa-file-import',run:()=>global.importFiles()},
+            {label:isEn()?'Open local file':'打开本地文件',icon:'fa-folder-open',run:()=>openExternalLocalFileByDialog()}
+        ]);
     }
 
     function bindFileManagementFabIfNeeded() {
-        const fab = (document.getElementById('fileManagementFab') as HTMLButtonElement);
-        const ring = document.getElementById('fileManagementFabRing');
-        const newFileBtn = (document.getElementById('fileManagementFabNewFile') as HTMLButtonElement);
-        const newFolderBtn = (document.getElementById('fileManagementFabNewFolder') as HTMLButtonElement);
+        const fab = document.getElementById('fileManagementFab');
         if (!fab || fab.dataset.bound === '1') return;
-
         fab.dataset.bound = '1';
-        fab.addEventListener('click', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            if (ring) {
-                toggleFileManagementFabRing();
-                return;
-            }
-            global.createNewFile();
+        fab.addEventListener('click', event => {
+            event.preventDefault();event.stopPropagation();showFileCreationSheet();
         });
-
-        if (newFileBtn) {
-            newFileBtn.addEventListener('click', function(e) {
-                e.preventDefault();
-                e.stopPropagation();
-                closeFileManagementFabRing();
-                global.createNewFile();
-            });
-        }
-
-        if (newFolderBtn) {
-            newFolderBtn.addEventListener('click', function(e) {
-                e.preventDefault();
-                e.stopPropagation();
-                closeFileManagementFabRing();
-                global.createNewFolder();
-            });
-        }
-
-        for (const [id,action] of [
-            ['fileManagementFabImport',()=>global.importFiles()],
-            ['fileManagementFabLocal',()=>openExternalLocalFileByDialog()]
-        ] as const) {
-            document.getElementById(id)?.addEventListener('click',event=>{
-                event.preventDefault();event.stopPropagation();closeFileManagementFabRing();void action();
-            });
-        }
-
-        if (!hasBoundFabRingDismiss) {
-            hasBoundFabRingDismiss = true;
-            document.addEventListener('click', function(e) {
-                const fabEl = (document.getElementById('fileManagementFab') as HTMLButtonElement);
-                const ringEl = document.getElementById('fileManagementFabRing');
-                if (!ringEl || !ringEl.classList.contains('open')) return;
-
-                if ((fabEl && fabEl.contains(e.target)) || ringEl.contains(e.target)) {
-                    return;
-                }
-
-                closeFileManagementFabRing();
-            });
-
-            document.addEventListener('keydown', function(e) {
-                if (e.key === 'Escape') closeFileManagementFabRing();
-            });
-        }
+        document.addEventListener('keydown', event => {
+            if (event.key !== 'Escape') return;
+            if (document.getElementById('fileActionSheet')) closeFileActionSheet();
+            else if (![...document.querySelectorAll<HTMLElement>('.modal-overlay, [aria-modal="true"]')].some(element => !element.hidden && getComputedStyle(element).display !== 'none' && getComputedStyle(element).visibility !== 'hidden') && isFileListMultiSelectMode()) exitFileListMultiSelectMode();
+        });
     }
 
     function setFileListSearchResult(message, isError) {
@@ -718,58 +670,12 @@ import { createDiffFileWriter } from './conflict/live-files';
     }
 
     function ensureFileListMultiSelectToolbar() {
-        let toolbar = document.getElementById('fileListMultiSelectToolbar');
-        if (toolbar) return toolbar;
-        const sidebar = document.getElementById('fileListSidebar');
-        const fileList = document.getElementById('fileList');
-        if (!sidebar || !fileList) return null;
-
-        toolbar = document.createElement('div');
-        toolbar.id = 'fileListMultiSelectToolbar';
-        toolbar.className = 'file-list-multi-select-toolbar';
-        toolbar.innerHTML =
-            '<div class="file-list-multi-select-info">' +
-                '<i class="far fa-check-square"></i> ' +
-                '<span>' + (isEn() ? 'Selected' : '已选') + '</span> ' +
-                '<span id="fileListMultiSelectCount">0</span>' +
-            '</div>' +
-            '<div class="file-list-multi-select-actions">' +
-                '<button type="button" class="file-list-multi-select-btn" data-action="select-all">' + (isEn() ? 'Select All' : '全选') + '</button>' +
-                '<button type="button" class="file-list-multi-select-btn" data-action="invert">' + (isEn() ? 'Invert' : '反选') + '</button>' +
-                '<button type="button" class="file-list-multi-select-btn danger" data-action="delete">' + (isEn() ? 'Delete' : '删除') + '</button>' +
-                '<button type="button" class="file-list-multi-select-btn" data-action="cancel">' + (isEn() ? 'Cancel' : '取消') + '</button>' +
-            '</div>';
-        const home = global.isFileManagementMode ? document.getElementById('notesHome') : null;
-        if (home) home.insertBefore(toolbar, home.querySelector('.notes-home-grid'));
-        else fileList.parentNode.insertBefore(toolbar, fileList);
-
-        toolbar.addEventListener('click', function(e) {
-            const target = e.target;
-            const btn = target && target.closest ? target.closest('[data-action]') : null;
-            if (!btn) return;
-            const action = btn.getAttribute('data-action');
-            if (action === 'cancel') {
-                exitFileListMultiSelectMode();
-            } else if (action === 'select-all') {
-                selectAllFilesForMulti();
-            } else if (action === 'invert') {
-                invertFileListMultiSelection();
-            } else if (action === 'delete') {
-                batchDeleteFileListMultiSelection();
-            }
-        });
-        return toolbar;
+        return document.getElementById('fileListMultiSelectToolbar') || batchActions.toolbar();
     }
 
     global.toggleFileListMultiSelectItem = toggleFileListMultiSelectItem;
 
-    function updateFileListMultiSelectToolbar() {
-        global.refreshNotesHome?.();
-        const countEl = document.getElementById('fileListMultiSelectCount');
-        if (countEl) {
-            countEl.textContent = String(getFileListMultiSelectedIds().size);
-        }
-    }
+    function updateFileListMultiSelectToolbar() { global.refreshNotesHome?.(); batchActions.update(); }
 
     function ensureMultiSelectCheckbox(anchor, nodeId) {
         if (!isFileListMultiSelectMode()) return;
@@ -807,6 +713,7 @@ import { createDiffFileWriter } from './conflict/live-files';
             const checked = set.has(String(nodeId));
             $cb.attr('aria-checked', checked ? 'true' : 'false');
             $cb.toggleClass('checked', checked);
+            $anchor.toggleClass('file-selected',checked);
             const $icon = $cb.find('i');
             $icon.removeClass('fa-square fa-check-square');
             $icon.addClass(checked ? 'fa-check-square' : 'fa-square');
@@ -824,7 +731,7 @@ import { createDiffFileWriter } from './conflict/live-files';
     function selectAllFilesForMulti() {
         const set = getFileListMultiSelectedIds();
         if (global.isFileManagementMode) {
-            document.querySelectorAll<HTMLElement>('#notesHome .notes-file-card, #notesHome .notes-folder-card').forEach(element => {
+            document.querySelectorAll<HTMLElement>('#notesHome .notes-file-card, #notesHome .notes-folder-card, #notesHome .notes-folder-tab[data-file-id]').forEach(element => {
                 const id = element.dataset.fileId;if (!id) return;
                 set.add(id);
             });
@@ -842,7 +749,7 @@ import { createDiffFileWriter } from './conflict/live-files';
     function invertFileListMultiSelection() {
         const set = getFileListMultiSelectedIds();
         if (global.isFileManagementMode) {
-            document.querySelectorAll<HTMLElement>('#notesHome .notes-file-card, #notesHome .notes-folder-card').forEach(element => {
+            document.querySelectorAll<HTMLElement>('#notesHome .notes-file-card, #notesHome .notes-folder-card, #notesHome .notes-folder-tab[data-file-id]').forEach(element => {
                 const id = element.dataset.fileId;if (!id) return;
                 if (set.has(id)) set.delete(id);else set.add(id);
             });
@@ -859,7 +766,14 @@ import { createDiffFileWriter } from './conflict/live-files';
         updateFileListMultiSelectToolbar();
     }
 
+    global.openFileSelectionPanel = id => {
+        if (isFileListMultiSelectMode()) {getFileListMultiSelectedIds().add(String(id));refreshFileListMultiSelectUi();updateFileListMultiSelectToolbar();}
+        else enterFileListMultiSelectMode(id);
+    };
+    global.exitFileListMultiSelectMode = exitFileListMultiSelectMode;
+    global.selectAllFilesForMulti = selectAllFilesForMulti;
     function enterFileListMultiSelectMode(initialId) {
+        document.body.classList.add('file-selection-active');
         global.fileListMultiSelectMode = true;
         global.fileListMultiSelectedIds = new Set();
         if (initialId !== undefined && initialId !== null && initialId !== '') {
@@ -873,6 +787,7 @@ import { createDiffFileWriter } from './conflict/live-files';
     }
 
     function exitFileListMultiSelectMode() {
+        document.body.classList.remove('file-selection-active');
         global.fileListMultiSelectMode = false;
         global.fileListMultiSelectedIds = new Set();
         const sidebar = document.getElementById('fileListSidebar');
@@ -880,6 +795,7 @@ import { createDiffFileWriter } from './conflict/live-files';
         const tb = document.getElementById('fileListMultiSelectToolbar');
         if (tb && tb.parentNode) tb.parentNode.removeChild(tb);
         window.$('#fileList .file-multi-checkbox').remove();
+        window.$('#fileList .file-selected').removeClass('file-selected');
         global.refreshNotesHome?.();
     }
 
@@ -913,11 +829,13 @@ import { createDiffFileWriter } from './conflict/live-files';
             return;
         }
 
+        const owner=g('currentUser');
         const confirmed = await g('customConfirm')(isEn()
             ? `Delete ${itemsArr.length} selected item(s)? Folders include all contents.`
             : `确认删除选中的 ${itemsArr.length} 项？文件夹将连同其所有内容一起删除。`);
         if (!confirmed) return;
 
+        if(g('currentUser')!==owner || g('files')!==files) return;
         const deletedFileNames = itemsArr.filter(f => f.type === 'file').map(f => f.name);
         const deletedFolderNames = itemsArr.filter(f => f.type === 'folder' && f.isSynced).map(f => f.name);
         const deletedIds = itemsArr.map(f => f.id);
@@ -1027,18 +945,6 @@ import { createDiffFileWriter } from './conflict/live-files';
     }
 
     function loadOrders() { void orderStore.load(); }
-
-    function moveNodeOrder(nodeId, direction) {
-        const tree = window.$.jstree.reference('#fileList');
-        if (!tree) return;
-        const node = tree.get_node(nodeId);if (!node) return;
-        const siblings = tree.get_node(node.parent)?.children || [];
-        const paths = siblings.map(id => tree.get_node(id)?.data?.path).filter(Boolean);
-        const orders = reorderSiblings(paths, node.data.path, direction);
-        if (!orders) return;
-        orderStore.save(orders);
-        loadFiles();
-    }
 
     // ---------- jstree 渲染及交互 ----------
 
@@ -1202,141 +1108,7 @@ import { createDiffFileWriter } from './conflict/live-files';
                 'default': { 'icon': 'fas fa-folder' },
                 'file': { 'icon': 'fas fa-file' },
                 'folder': { 'icon': 'fas fa-folder' } },
-            'plugins': ['types', 'contextmenu'],
-            'contextmenu': {
-                'select_node': false,
-                'show_at_node': false,
-                'shortcut_all': false,
-                'items': function(node) {
-                    const items = {
-                        'details': {
-                            label: isEn() ? 'Details' : '详情',
-                            action: () => {
-                                const file = (g('files') || []).find(f => f.id === node.id) || { name: node.data.path, type: 'folder' };
-                                showFileDetails(global, file);
-                            }
-                        },
-                        'import': { label: isEn() ? 'Import into folder' : '导入文件', action: () => pickAndImportFiles(normalizePath(node.data.path)) },
-                        'rename': {
-                            'label': isEn() ? 'Rename' : '重命名',
-                            'action': function(data) {
-                                const obj = node;
-                                
-                                // 对于文件夹，如果是虚拟文件夹，则不允许重命名
-                                if (obj.data.isVirtual) {
-                                    g('customAlert')(isEn() ? 'Virtual folder cannot be renamed, please create as real folder first' : '虚拟文件夹不可重命名，请先创建为实体文件夹');
-                                    return;
-                                }
-
-                                if (typeof renameFile === 'function') {
-                                    renameFile(obj.id);
-                                } else if (typeof global.renameFile === 'function') {
-                                    global.renameFile(obj.id);
-                                } else {
-                                    console.error('renameFile function not found');
-                                    g('customAlert')(isEn() ? 'Rename function not available' : '重命名功能不可用');
-                                }
-                            }
-                        },
-                        'move_up': {
-                            'label': isEn() ? 'Move Up' : '上移',
-                            'action': function(data) {
-                                const obj = node;
-                                moveNodeOrder(obj.id, 'up');
-                            }
-                        },
-                        'move_down': {
-                            'label': isEn() ? 'Move Down' : '下移',
-                            'action': function(data) {
-                                const obj = node;
-                                moveNodeOrder(obj.id, 'down');
-                            }
-                        },
-                        'move': {
-                            'label': isEn() ? 'Move' : '移动',
-                            'action': function(data) {
-                                const obj = node;
-                                
-                                // 对于文件夹，如果是虚拟文件夹，则不允许移动
-                                if (obj.data.isVirtual) {
-                                    g('customAlert')(isEn() ? 'Virtual folder cannot be moved, please create as real folder first' : '虚拟文件夹不可移动，请先创建为实体文件夹');
-                                    return;
-                                }
-                                
-                                global.moveFile(obj.id);
-                            }
-                        },
-                        'history': {
-                             'label': isEn() ? 'History Versions' : '历史版本',
-                             'action': function(data) {
-                                 const obj = node;
-                                 if (obj.data.type === 'file') {
-                                     global.showHistoryModal(obj.id, obj.data.path);
-                                 }
-                             }
-                        },
-                        'multi_select': {
-                            'label': isEn() ? 'Multi Select' : '多选',
-                            'action': function(data) {
-                                const obj = node;
-                                enterFileListMultiSelectMode(obj.id);
-                            }
-                        },
-                        'delete': {
-                            'label': isEn() ? 'Delete' : '删除',
-                            'action': function(data) {
-                                const obj = node;
-                                if (obj.data.isVirtual) {
-                                    g('customAlert')(isEn() ? 'Cannot delete virtual folder directly, please delete its contents' : '不能直接删除虚拟文件夹，请删除其子内容');
-                                    return;
-                                }
-                                global.deleteFile(obj.id);
-                            }
-                        },
-                        'new_file': {
-                            'label': isEn() ? 'New File' : '新建文件',
-                            'separator_before': true,
-                            'action': function(data) {
-                                const obj = node;
-                                const path = obj.data.path;
-                                const baseName = isEn() ? 'New File' : '新文档';
-                                const defaultName = getNextAvailableName(baseName, path);
-                                g('customPrompt')(isEn() ? 'Please enter filename' : '请输入文件名', { defaultValue: defaultName }).then(function(name) {
-                                    if (name) {
-                                        const newPath = path + '/' + name;
-                                        createFileAtPath(newPath);
-                                    }
-                                });
-                            }
-                        },
-                        'new_folder': {
-                            'label': isEn() ? 'New Folder' : '新建文件夹',
-                            'action': function(data) {
-                                const obj = node;
-                                const path = obj.data.path;
-                                const baseName = isEn() ? 'New Folder' : '新文件夹';
-                                const defaultName = getNextAvailableName(baseName, path);
-                                g('customPrompt')(isEn() ? 'Please enter folder name' : '请输入文件夹名', { defaultValue: defaultName }).then(function(name) {
-                                    if (name) {
-                                        const newPath = path + '/' + name;
-                                        createFolderAtPath(newPath);
-                                    }
-                                });
-                            }
-                        }
-                    };
-                    
-                    if (node.type === 'file') {
-                        delete items.new_file;
-                        delete items.new_folder;
-                        delete items.import;
-                    } else {
-                        delete items.history;
-                    }
-                    
-                    return items;
-                }
-            }
+            'plugins': ['types']
         })
         .on('select_node.jstree', function (e, data) {
             if (selectionRestorer.isRestoring()) return;
@@ -1410,73 +1182,7 @@ import { createDiffFileWriter } from './conflict/live-files';
                         e.preventDefault();
                         const node = window.$('#fileList').jstree(true).get_node(nodeId);
                         if (node) {
-                            const rect = e.target.getBoundingClientRect();
-                            const viewportH = window.innerHeight;
-                            const viewportW = window.innerWidth;
-                            let x = rect.left;
-                            let y = rect.bottom;
-
-                            // 确保菜单不会超出屏幕右侧
-                            const menuWidth = 200; // 估算的菜单宽度
-                            if (x + menuWidth > viewportW) {
-                                x = viewportW - menuWidth - 10;
-                            }
-
-                            // 先移除已存在的菜单
-                            window.$('.vakata-context').remove();
-
-                            // 显示上下文菜单
-                            window.$('#fileList').jstree(true).show_contextmenu(node, x, y);
-
-                            // 阻止菜单点击事件冒泡，防止文件列表被关闭
-                            setTimeout(function() {
-                                const $context = window.$('.vakata-context');
-                                if ($context.length) {
-                                    $context.on('click', function(e) {
-                                        e.stopPropagation();
-                                        e.stopImmediatePropagation();
-                                    });
-                                }
-                            }, 10);
-
-                            // 多次尝试设置位置，确保正确
-                            const setPosition = function() {
-                                const $context = window.$('.vakata-context');
-                                if ($context.length) {
-                                    const finalMenuWidth = $context.outerWidth() || 200;
-                                    const finalMenuHeight = $context.outerHeight() || 200;
-
-                                    let finalX = rect.left;
-                                    if (finalX + finalMenuWidth > viewportW) {
-                                        finalX = viewportW - finalMenuWidth - 10;
-                                    }
-                                    if (finalX < 8) finalX = 8;
-
-                                    // 默认在按钮下方展开；若下方空间不足，则改为按钮上方
-                                    let finalY = rect.bottom;
-                                    if (finalY + finalMenuHeight > viewportH - 8) {
-                                        const yAbove = rect.top - finalMenuHeight;
-                                        if (yAbove >= 8) {
-                                            finalY = yAbove;
-                                        } else {
-                                            // 上下都放不下时，贴底显示并允许菜单内部滚动
-                                            finalY = Math.max(8, viewportH - finalMenuHeight - 8);
-                                        }
-                                    }
-
-                                    $context.css({
-                                        left: finalX,
-                                        top: finalY,
-                                        position: 'fixed',
-                                        'max-height': (viewportH - 16) + 'px',
-                                        'overflow-y': 'auto',
-                                        'z-index': 99999
-                                    });
-                                }
-                            };
-                            setPosition();
-                            setTimeout(setPosition, 5);
-                            setTimeout(setPosition, 50);
+                            global.openFileSelectionPanel(node.id);
                         }
                     });
                     window.$(this).append(menuBtn);
@@ -1494,10 +1200,16 @@ import { createDiffFileWriter } from './conflict/live-files';
             if (isFileListMultiSelectMode()) {
                 refreshFileListMultiSelectUi();
             }
-            bindFileTreeLongPress(document.getElementById('fileList'), (anchor, x, y) => {
+            const list = document.getElementById('fileList');
+            list.oncontextmenu = event => {
+                const anchor = (event.target as Element).closest<HTMLElement>('.jstree-anchor');
+                if (!anchor) return;
+                event.preventDefault();global.openFileSelectionPanel(resolveNodeIdFromAnchorId(anchor.id));
+            };
+            bindFileTreeLongPress(list, (anchor, x, y) => {
                 const tree = window.$('#fileList').jstree(true);
                 const node = tree.get_node(resolveNodeIdFromAnchorId(anchor.id));
-                if (node) tree.show_contextmenu(node, x, y);
+                if (node) global.openFileSelectionPanel(node.id);
             });
         });
     }
@@ -2465,7 +2177,7 @@ import { createDiffFileWriter } from './conflict/live-files';
 
             if (requestToken !== fileOpenRequestToken) return;
 
-            closeFileManagementFabRing();
+            closeFileActionSheet();
 
             const files = g('files');
             const file = files.find(f => f.id === fileId && f.type === 'file');

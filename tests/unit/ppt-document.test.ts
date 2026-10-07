@@ -12,11 +12,14 @@ describe('Direct document PPT export', () => {
         expect(buildDocumentPPTPrompt('全文末尾', '报告')).toContain('全文末尾');
     });
     it('sends the chosen template directly to the exporter and returns the file', async () => {
+        window.currentUser={username:'native',token:'native-token'};window.getApiBaseUrl=()=> 'https://md.yhsun.cn/api';
         const file = new Blob(['pptx']);
         global.fetch = jest.fn().mockResolvedValue({ ok: true, blob: async () => file });
         const document = parseDocumentPPTReply('{"pages":[{"title":"标题"}]}', '报告');
         await expect(generateDocumentPPT(document, PPT_TEMPLATES[2].id)).resolves.toBe(file);
         const init = jest.mocked(fetch).mock.calls[0][1]!;
+        expect(fetch).toHaveBeenCalledWith('https://md.yhsun.cn/api/ppt-export',expect.any(Object));
+        expect(init.credentials).toBeUndefined();expect(init.headers).toMatchObject({Authorization:'Bearer native-token'});
         expect(JSON.parse(String(init.body))).toMatchObject({ templateId: 'dark-gold', pages: [{ title: '标题' }] });
         await expect(generateDocumentPPT(document, 'unknown')).rejects.toThrow();
         expect(fetch).toHaveBeenCalledTimes(1);

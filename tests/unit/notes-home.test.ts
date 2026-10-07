@@ -13,7 +13,7 @@ beforeEach(()=>{
     document.body.innerHTML='<div id="fileListSidebar"></div>';
     document.body.className='file-management-mode';
     tree={get_node:jest.fn(id=>({id})),show_contextmenu:jest.fn()};
-    app={files:files.map(file=>({...file})),openFile:jest.fn(),showSettingsDialog:jest.fn(),showLoginModal:jest.fn(),showUserInfo:jest.fn(),handleLoginButtonClick:jest.fn(),$:()=>({jstree:()=>tree})};
+    app={files:files.map(file=>({...file})),openFile:jest.fn(),openFileSelectionPanel:jest.fn(),showSettingsDialog:jest.fn(),showLoginModal:jest.fn(),showUserInfo:jest.fn(),handleLoginButtonClick:jest.fn(),$:()=>({jstree:()=>tree})};
     render=installNotesHome(app).render;render();
 });
 afterEach(()=>jest.useRealTimers());
@@ -44,9 +44,9 @@ it('searches beyond the visible snippet and keeps user text safe',()=>{
 });
 it('uses the existing menu for files and folder names',()=>{
     const card=document.querySelector<HTMLElement>('.notes-file-card');card.dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,cancelable:true,clientX:20,clientY:40}));
-    expect(tree.show_contextmenu).toHaveBeenCalledWith({id:'note'},expect.any(Number),expect.any(Number));expect(app.openFile).not.toHaveBeenCalled();
+    expect(app.openFileSelectionPanel).toHaveBeenCalledWith('note');expect(app.openFile).not.toHaveBeenCalled();
     document.querySelector('.notes-folder-tab[data-file-id="folder"]').dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,cancelable:true,clientX:20,clientY:40}));
-    expect(tree.show_contextmenu).toHaveBeenLastCalledWith({id:'folder'},20,40);
+    expect(app.openFileSelectionPanel).toHaveBeenLastCalledWith('folder');
 });
 it('returns to all notes if the current folder was removed by synchronization',()=>{
     (document.querySelector('.notes-folder-tab[data-file-id="folder"]') as HTMLElement).click();
@@ -72,7 +72,7 @@ it('loads cloud snippets on isolated snapshots without changing canonical files'
 it('opens the original menu on touch long press and suppresses opening the file',()=>{
     jest.useFakeTimers();const card=document.querySelector<HTMLElement>('.notes-file-card');
     const down=new Event('pointerdown',{bubbles:true});Object.assign(down,{pointerType:'touch',button:0,clientX:20,clientY:40});card.dispatchEvent(down);
-    jest.advanceTimersByTime(550);expect(tree.show_contextmenu).toHaveBeenCalledWith({id:'note'},20,40);
+    jest.advanceTimersByTime(550);expect(app.openFileSelectionPanel).toHaveBeenCalledWith('note');
     card.click();expect(app.openFile).not.toHaveBeenCalled();
 });
 it('never displays or searches locked plaintext and does not request an unlock',()=>{
@@ -99,7 +99,7 @@ it('opens nested-card menus with the model node even when no hidden tree anchor 
     app.$.vakata={context:{show:jest.fn((reference,position,items)=>items.rename.action())}};
     const card=document.querySelector<HTMLElement>('.notes-file-card[data-file-id="nested"]');
     card.dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,cancelable:true,clientX:60,clientY:80}));
-    expect(action).toHaveBeenCalledWith('nested');expect(tree.show_contextmenu).not.toHaveBeenCalled();
+    expect(app.openFileSelectionPanel).toHaveBeenCalledWith('nested');expect(tree.show_contextmenu).not.toHaveBeenCalled();
 });
 it('toggles multiple cards and folders without opening files or leaving selection mode',()=>{
     app.fileListMultiSelectMode=true;app.fileListMultiSelectedIds=new Set(['note']);

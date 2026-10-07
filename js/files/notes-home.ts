@@ -73,31 +73,7 @@ export function installNotesHome(app:any, options:{loadContent?:(file:any)=>Prom
             }).catch(()=>{if(app.currentUser?.username===username && key(file)===stamp) snapshots.set(stamp,{preview:t('摘要暂不可用，点击打开文件','Preview unavailable. Open the file.'),query,matched:false});}).finally(()=>{running--;render();});
         }
     }
-    const menu=(id:string,x:number,y:number,anchor?:DOMRect)=>{
-        const tree=app.$?.('#fileList').jstree(true);if(!tree || typeof tree.get_node!=='function')return;const node=tree.get_node(id);
-        if (!node) return;
-        const position=()=>{
-            const element=document.querySelector<HTMLElement>('.vakata-context');if(!element)return;
-            element.style.maxHeight=Math.max(80,window.innerHeight-16)+'px';element.style.overflowY='auto';
-            const rect=element.getBoundingClientRect();
-            const left=anchor?anchor.right-rect.width:x;
-            const top=anchor && y+rect.height>window.innerHeight-8?anchor.top-rect.height:y;
-            element.style.left=Math.max(8,Math.min(left,window.innerWidth-rect.width-8))+'px';
-            element.style.top=Math.max(8,Math.min(top,window.innerHeight-rect.height-8))+'px';
-        };
-        // jsTree expects page coordinates, while our menu CSS uses fixed positioning.
-        // Measure the rendered menu rather than guessing a width/height before opening.
-        app.$?.(document)?.one?.('context_show.vakata.notesHome',position);
-        const source=tree.settings?.contextmenu?.items;
-        const reference=[...home.querySelectorAll<HTMLElement>('[data-file-id]')].find(element=>element.dataset.fileId===String(id));
-        // Nested notes can have no rendered jsTree anchor while the tree is hidden/collapsed.
-        // Build the same actions with the model node and anchor them to the visible card.
-        if(source && reference && app.$?.vakata?.context?.show) {
-            const items=typeof source==='function'?source.call(tree,node):source;
-            app.$.vakata.context.show(app.$(reference),{x:x+window.scrollX,y:y+window.scrollY},items);
-        } else tree.show_contextmenu(node,x+window.scrollX,y+window.scrollY);
-        requestAnimationFrame(position);
-    };
+    const menu=(id:string,_x:number,_y:number)=>{app.openFileSelectionPanel?.(id);};
     const showFolder=(path:string)=>{view='folder';folder=path;app.notesHomeFolder=path;render();};
     function render() {
         if (!document.body.classList.contains('file-management-mode')) return;
@@ -117,8 +93,8 @@ export function installNotesHome(app:any, options:{loadContent?:(file:any)=>Prom
         const selected=(id:string)=>!!app.fileListMultiSelectedIds?.has(String(id));
         const activate=(id:string, action:()=>void)=>multi ? app.toggleFileListMultiSelectItem?.(id) : action();
         const tab=(text:string,active:boolean,action:()=>void,id?:string)=>{
-            const element=button('notes-folder-tab'+(active?' active':'')+(multi && id && selected(id)?' selected':''),()=>id ? activate(id,action) : action());element.textContent=text;element.title=text;
-            element.setAttribute('aria-pressed',String(active));if(id)element.dataset.fileId=id;tabs.append(element);
+            const element=button('notes-folder-tab'+(active?' active':'')+(multi && id && selected(id)?' selected':''),()=>id ? activate(id,action) : action());element.textContent=(multi && id ? (selected(id)?'☑ ':'☐ '):'')+text;element.title=text;
+            element.setAttribute('aria-pressed',String(active));if(multi && id){element.setAttribute('role','checkbox');element.setAttribute('aria-checked',String(selected(id)));}if(id)element.dataset.fileId=id;tabs.append(element);
         };
         tab(t('全部','All'),view==='all',()=>{view='all';render();});
         for (const item of folders) tab(item.name,view==='folder' && item.name===folder,()=>showFolder(item.name),item.id);
@@ -128,7 +104,7 @@ export function installNotesHome(app:any, options:{loadContent?:(file:any)=>Prom
         const query=search.value.trim().toLocaleLowerCase();
         const visibleFolders=view==='all'?[]:folders.filter(item=>parent(item.name)===folder && (!query || item.name.toLocaleLowerCase().includes(query)));
         for (const item of visibleFolders) {
-            const card=button('notes-folder-card',()=>activate(item.id,()=>showFolder(item.name)));card.dataset.fileId=item.id;card.textContent='📁 '+basename(item.name);card.title=item.name;card.classList.toggle('selected',multi && selected(item.id));grid.append(card);
+            const card=button('notes-folder-card',()=>activate(item.id,()=>showFolder(item.name)));card.dataset.fileId=item.id;card.textContent=(multi?(selected(item.id)?'☑ ':'☐ '):'📁 ')+basename(item.name);card.title=item.name;card.classList.toggle('selected',multi && selected(item.id));grid.append(card);
         }
         const candidates=visibleNotes(files,view==='folder'?folder:null,'');
         const notes=candidates.filter(file=>searchable(file,query));
@@ -148,6 +124,7 @@ export function installNotesHome(app:any, options:{loadContent?:(file:any)=>Prom
             sync.innerHTML='<i class="fas '+symbol+'" aria-hidden="true"></i>';
             sync.onclick=event=>{event.stopPropagation();if((file as any).syncConflict)app.openSyncConflict?.(file.id);};
             titleRow.append(title,sync);
+            if(Number(file.order)<=-1000000){const pin=document.createElement('i');pin.className='fas fa-thumbtack notes-pin';pin.title=t('已置顶','Pinned');titleRow.append(pin);}
             if(encrypted(file)) {
                 const lock=document.createElement('span');lock.className='file-e2e-indicator';lock.title=t('此文件已使用端到端加密','This file is end-to-end encrypted');lock.setAttribute('aria-label',lock.title);
                 lock.innerHTML='<i class="fas fa-lock" aria-hidden="true"></i>';titleRow.append(lock);
