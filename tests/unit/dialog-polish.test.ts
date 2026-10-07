@@ -35,3 +35,16 @@ it('uses a non-spinning success icon and prevents an old hide timer hiding a new
     window.showSyncStatus('保存成功','success');expect(document.querySelector('i').classList.contains('fa-spin')).toBe(false);
     jest.advanceTimersByTime(1000);window.showSyncStatus('再次保存','syncing');jest.advanceTimersByTime(1000);expect(document.getElementById('syncStatus').classList.contains('syncing')).toBe(true);jest.useRealTimers();
 });
+
+it('cancels nested prompts through Back and resolves the pending operation',async()=>{
+    const first=(window.customPrompt as (message:string)=>Promise<string|null>)('文件名');
+    (document.getElementById('customDialogContainer') as any).epmdCloseByBackPress();
+    expect(await first).toBeNull();
+    const second=window.customConfirm('删除文件');
+    (document.getElementById('customDialogContainer') as any).epmdCloseByBackPress();
+    expect(await second).toBe(false);
+    const alert=(window.customAlert as (message:string)=>Promise<void>)('提示');
+    (document.getElementById('customDialogContainer') as any).epmdCloseByBackPress();
+    await alert;
+    expect(document.getElementById('customDialogContainer').style.display).toBe('none');
+});

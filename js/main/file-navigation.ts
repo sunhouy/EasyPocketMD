@@ -1,11 +1,23 @@
 interface FileNavigationApp {
+    currentFileId?: string;
+    enterEditorMode?: () => void;
     isFileManagementMode?: boolean;
     enterFileManagementMode?: (options: { refresh: boolean }) => void;
+}
+
+const returnToEditor = new WeakSet<object>();
+export function clearFileListReturn(app: FileNavigationApp): void { returnToEditor.delete(app); }
+export function returnFromPrimaryFileInterface(app: FileNavigationApp): boolean {
+    if (!app.isFileManagementMode || !returnToEditor.has(app)) return false;
+    returnToEditor.delete(app);
+    app.enterEditorMode?.();
+    return true;
 }
 
 /** Use the same primary file surface from both desktop and mobile file buttons. */
 export function openPrimaryFileInterface(app: FileNavigationApp, prefersFileListHome: boolean): void {
     if (prefersFileListHome || app.isFileManagementMode) {
+        if (!app.isFileManagementMode && app.currentFileId) returnToEditor.add(app);
         app.enterFileManagementMode?.({ refresh: true });
         return;
     }

@@ -19,3 +19,10 @@ it('applies the same token check to file deletion', async()=>{
     const res=await request(app).post('/user_files/delete').send({username:'user',token:token('other'),filename:'note.md'});
     expect(res.body.code).toBe(401);
 });
+it('returns the upload timestamp independently of subsequent filesystem modifications',async()=>{
+    jest.spyOn(fs,'existsSync').mockReturnValue(true);
+    jest.spyOn(fs,'readdirSync').mockReturnValue(['1720000000000_file.pdf']);
+    jest.spyOn(fs,'statSync').mockReturnValue({isFile:()=>true,size:10,mtime:new Date('2026-10-07'),birthtimeMs:1,birthtime:new Date(1)});
+    const res=await request(app).post('/user_files/list').set('Authorization','Bearer '+token('user')).send({username:'user'});
+    expect(res.body.data[0].uploadedAt).toBe(new Date(1720000000000).toISOString());
+});

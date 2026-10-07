@@ -62,7 +62,8 @@ export async function collectQueryDocuments(options: { signal?: AbortSignal; inc
         const path = paths[i], file = byPath.get(path), server = remote.get(path);
         try {
             const isCurrent = file?.id === app.currentFileId && (!app.sharedDocState || app.sharedDocState.ownerFileId === file?.id);
-            const live = isCurrent ? app.vditor?.getValue() : undefined;
+            const live = isCurrent ? (typeof (app as any).getCurrentEditorContent === 'function'
+                ? (app as any).getCurrentEditorContent(file.id, file.content) : app.vditor?.getValue()) : undefined;
             const dirty = file && (app.unsavedChanges?.[file.id] || app.pendingServerSync?.[file.id] || file.isSynced === false || file.syncConflict || (typeof live === 'string' && live !== file.content));
             let content: string;
             let encrypted = [server?.e2e_enabled, file?.e2e_enabled, file?.e2eEnabled].some(value => [true, 1, '1', 'true'].includes(value as any));

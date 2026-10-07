@@ -2,6 +2,7 @@ export interface BackNavigationOptions {
   getVisibleModalOverlays: () => Element[];
   closeOverlayByBackPress: (overlay: Element) => boolean;
   prefersFileListHome?: () => boolean;
+  returnFromFileList?: () => boolean;
 }
 
 /** Keep Android WebView history armed while closing application surfaces. */
@@ -16,6 +17,11 @@ export function initBackNavigation(options: BackNavigationOptions): void {
         .sort((a, b) => a.z - b.z || a.index - b.index).pop()!;
       // Even a protected or asynchronously closing dialog must consume back.
       options.closeOverlayByBackPress(top.element);
+      lastBackTime = 0;
+      pushHistory();
+      return;
+    }
+    if (options.returnFromFileList?.()) {
       lastBackTime = 0;
       pushHistory();
       return;
