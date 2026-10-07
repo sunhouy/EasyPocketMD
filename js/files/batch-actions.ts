@@ -77,11 +77,14 @@ export function installBatchFileActions(app:any,hooks:{reload:()=>void;orders:(o
     }
     async function rename() {
         const roots=items();if(!roots.length) return;
-        const overlay=showBottomSheet(t('按规则重命名','Rename by rule'),[]),panel=overlay.querySelector('.file-action-sheet')!;
+        if(selected().length===1){app.renameFile?.(roots[0].id);return;}
+        const overlay=showBottomSheet(t('重命名','Rename'),[]),panel=overlay.querySelector('.file-action-sheet')!;
+        overlay.classList.add('file-action-dialog-overlay');
+        const description=document.createElement('p');description.className='rename-description';description.textContent=t('已选择 '+selected().length+' 项，设置规则并检查新名称','Set a rule and review the new names for '+selected().length+' items');panel.append(description);
         const form=document.createElement('form');form.className='batch-rename-form';
         const fields=[['template',t('名称模板：{name} 原名，{n} 序号（保留扩展名）','Name template: {name}, {n}; extensions are kept'),'{name}'],['start',t('起始序号','Start number'),'1'],['find',t('查找文字','Find text'),''],['replace',t('替换为','Replace with'),''],['prefix',t('前缀','Prefix'),''],['suffix',t('后缀','Suffix'),'']];
-        for(const [name,label,value] of fields){const row=document.createElement('label');row.textContent=label;const input=document.createElement('input');input.name=name;input.value=value;input.type=name==='start'?'number':'text';row.append(input);form.append(row);}
-        const deduplicate=document.createElement('label');deduplicate.textContent=t('重名时自动加序号去重','Add a number when names collide');const check=document.createElement('input');check.type='checkbox';check.name='deduplicate';deduplicate.prepend(check);form.append(deduplicate);
+        for(const [name,label,value] of fields){const row=document.createElement('label');row.textContent=label;row.dataset.field=name;const input=document.createElement('input');input.name=name;input.value=value;input.type=name==='start'?'number':'text';row.append(input);form.append(row);}
+        const deduplicate=document.createElement('label');deduplicate.className='rename-checkbox-row';deduplicate.textContent=t('重名时自动加序号去重','Add a number when names collide');const check=document.createElement('input');check.type='checkbox';check.name='deduplicate';deduplicate.prepend(check);form.append(deduplicate);
         const preview=document.createElement('div');preview.className='batch-rename-preview';form.append(preview);
         const submit=document.createElement('button');submit.type='submit';submit.className='modal-btn primary';submit.textContent=t('确认重命名','Rename');form.append(submit);panel.append(form);
         let plan:Array<{file:any;path:string}>=[];
@@ -127,18 +130,21 @@ export function installBatchFileActions(app:any,hooks:{reload:()=>void;orders:(o
             hooks.reload();app.showMessage?.(t(copy?'复制完成':'移动完成',copy?'Copied':'Moved'),'success');
         });
     }
-    function pin(){const roots=items();const allPinned=roots.every(file=>Number(app.fileOrders?.[file.name])<=-1000000);const orders:Record<string,number>={};roots.forEach((file,index)=>orders[file.name]=allPinned?0:-2000000+index*10);hooks.orders(orders);hooks.reload();}
+    function pin(){const roots=items();const allPinned=roots.every(file=>Number(app.fileOrders?.[file.name])<=-1000000);const orders:Record<string,number>={};roots.forEach((file,index)=>orders[file.name]=allPinned?0:-2000000+index*10);app.fileOrders={...app.fileOrders,...orders};hooks.orders(orders);hooks.reload();update();}
     function run(action:string){if(busy)return;if(action==='details')showFileDetails(app,selected());else if(action==='pin')pin();else if(action==='rename')void rename().catch(report);else if(action==='move'||action==='copy')void moveOrCopy(action==='copy').catch(report);else if(action==='up'||action==='down')hooks.upDown(items(),action);else if(action==='history'){const file=selected()[0];if(selected().length===1 && file.type==='file')app.showHistoryModal(file.id,file.name);}else if(action==='delete')void hooks.delete();else if(action==='import' && selected().length===1 && selected()[0].type==='folder')void hooks.import(selected()[0].name);}
     function toolbar(){const toolbar=document.createElement('div');toolbar.id='fileListMultiSelectToolbar';toolbar.className='file-selection-panel';
         const header=document.createElement('div');header.className='file-selection-header';
         const count=document.createElement('strong');count.id='fileListMultiSelectCount';header.append(count);
-        for(const [label,fn] of [[t('全选','Select all'),()=>app.selectAllFilesForMulti?.()],[t('取消','Cancel'),hooks.exit]] as const){const button=document.createElement('button');button.textContent=label;button.onclick=fn;button.className='modal-btn secondary';header.append(button);}toolbar.append(header);
+        for(const [label,fn] of [[t('全选','Select all'),()=>app.selectAllFilesForMulti?.()],[t('取消','Cancel'),hooks.exit]] as const){const button=document.createElement('button');button.textContent=label;button.onclick=fn;button.className='file-selection-control';if(fn!==hooks.exit)button.dataset.selectAll='';header.append(button);}toolbar.append(header);
         const grid=document.createElement('div');grid.className='file-action-grid';
         for(const [action,label,icon] of [['details',t('详情','Details'),'fa-circle-info'],['pin',t('置顶','Pin'),'fa-thumbtack'],['rename',t('重命名','Rename'),'fa-pen'],['up',t('上移','Up'),'fa-arrow-up'],['down',t('下移','Down'),'fa-arrow-down'],['move',t('移动','Move'),'fa-folder-open'],['copy',t('复制','Copy'),'fa-copy'],['history',t('历史版本','History'),'fa-clock-rotate-left'],['delete',t('删除','Delete'),'fa-trash-can'],['import',t('导入文件','Import'),'fa-file-import']]){const button=document.createElement('button');button.className='file-action-button';button.dataset.action=action;button.innerHTML='<i class="fas '+icon+'" aria-hidden="true"></i>';const span=document.createElement('span');span.textContent=label;button.append(span);button.onclick=()=>run(action);grid.append(button);}toolbar.append(grid);document.body.append(toolbar);update();return toolbar;}
     function update(){const toolbar=document.getElementById('fileListMultiSelectToolbar');if(!toolbar)return;const files=selected();const count=toolbar.querySelector('#fileListMultiSelectCount');if(count)count.textContent=t('已选择 '+files.length+' 项',files.length+' selected');
-        for(const button of toolbar.querySelectorAll<HTMLButtonElement>('[data-action]')){const action=button.dataset.action;button.disabled=busy || !files.length || (action==='history' && (files.length!==1 || files[0].type!=='file'));button.hidden=action==='import' && (files.length!==1 || files[0].type!=='folder');
-            if(action==='rename')button.querySelector('span')!.textContent=t(files.length>1?'批量重命名':'重命名',files.length>1?'Batch rename':'Rename');
-            if(action==='pin')button.querySelector('span')!.textContent=t(files.length && files.every(file=>Number(app.fileOrders?.[file.name])<=-1000000)?'取消置顶':'置顶',files.length && files.every(file=>Number(app.fileOrders?.[file.name])<=-1000000)?'Unpin':'Pin');}
+        const ids=app.getFileListSelectableIds?.() || (app.files || []).map(file=>String(file.id));
+        const all=ids.length>0 && ids.every(id=>app.fileListMultiSelectedIds?.has(String(id)));
+        const selectAll=toolbar.querySelector<HTMLButtonElement>('[data-select-all]');if(selectAll)selectAll.textContent=t(all?'取消全选':'全选',all?'Deselect all':'Select all');
+        for(const button of toolbar.querySelectorAll<HTMLButtonElement>('[data-action]')){const action=button.dataset.action;button.disabled=busy || !files.length || (action==='history' && (files.length!==1 || files[0].type!=='file'));button.hidden=(action==='history' && (files.length!==1 || files[0].type!=='file')) || (action==='import' && (files.length!==1 || files[0].type!=='folder'));
+            if(action==='rename')button.querySelector('span')!.textContent=t('重命名','Rename');
+            if(action==='pin')button.querySelector('span')!.textContent=t(files.length && items().every(file=>Number(app.fileOrders?.[file.name])<=-1000000)?'取消置顶':'置顶',files.length && items().every(file=>Number(app.fileOrders?.[file.name])<=-1000000)?'Unpin':'Pin');}
     }
     return {toolbar,update};
 }

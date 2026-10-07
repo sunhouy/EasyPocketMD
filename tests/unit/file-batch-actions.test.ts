@@ -24,11 +24,11 @@ it('stages swaps and restores original paths after a partially applied rename fa
 });
 function setup(files:any[]){const app:any={files,fileListMultiSelectedIds:new Set(files.map(x=>x.id)),unsavedChanges:{},showMessage:jest.fn(),showHistoryModal:jest.fn(),fileOrders:{}};
  const hooks={reload:jest.fn(),orders:jest.fn(),loadContent:jest.fn(async()=> 'loaded draft'),exit:jest.fn(),delete:jest.fn(),upDown:jest.fn(),import:jest.fn()};const ui=installBatchFileActions(app,hooks);ui.toolbar();return {app,hooks,ui};}
-it('shows details for multiple items and disables history for multi-select and folders',()=>{
- const {app,ui}=setup([file('a','a.md'),file('f','目录','folder')]);expect(document.querySelector<HTMLButtonElement>('[data-action=history]').disabled).toBe(true);
- expect(document.querySelector('[data-action=rename]').textContent).toContain('批量重命名');document.querySelector<HTMLButtonElement>('[data-action=details]').click();expect(document.querySelectorAll('#fileDetailsModal dl')).toHaveLength(2);
- app.fileListMultiSelectedIds=new Set(['a']);ui.update();expect(document.querySelector<HTMLButtonElement>('[data-action=history]').disabled).toBe(false);document.querySelector<HTMLButtonElement>('[data-action=history]').click();expect(app.showHistoryModal).toHaveBeenCalledWith('a','a.md');
- app.fileListMultiSelectedIds=new Set(['f']);ui.update();expect(document.querySelector<HTMLButtonElement>('[data-action=history]').disabled).toBe(true);
+it('shows details for multiple items and hides history for multi-select and folders',()=>{
+ const {app,ui}=setup([file('a','a.md'),file('f','目录','folder')]);expect(document.querySelector<HTMLButtonElement>('[data-action=history]').hidden).toBe(true);
+ expect(document.querySelector('[data-action=rename]').textContent).toBe('重命名');document.querySelector<HTMLButtonElement>('[data-action=details]').click();expect(document.querySelectorAll('#fileDetailsModal dl')).toHaveLength(2);
+ app.fileListMultiSelectedIds=new Set(['a']);ui.update();expect(document.querySelector<HTMLButtonElement>('[data-action=history]').hidden).toBe(false);document.querySelector<HTMLButtonElement>('[data-action=history]').click();expect(app.showHistoryModal).toHaveBeenCalledWith('a','a.md');
+ app.fileListMultiSelectedIds=new Set(['f']);ui.update();expect(document.querySelector<HTMLButtonElement>('[data-action=history]').hidden).toBe(true);
 });
 it('copies to the same directory with a unique path without overwriting the original or its local binding',async()=>{
  const original={...file('a','a.md'),externalLocalFileId:'disk',e2e_enabled:1};const {app,hooks}=setup([original]);document.querySelector<HTMLButtonElement>('[data-action=copy]').click();document.querySelector<HTMLButtonElement>('#fileActionSheet .file-action-button').click();await tick();
@@ -44,4 +44,20 @@ it('uses a dismissible four-action bottom sheet and runs the selected action onc
 it('saves PPT blobs through the same Android native bridge as other exports',async()=>{
  const payload=new Blob(['pptx']);window.nativeFileOps={isTauriRuntime:()=>true,saveFile:jest.fn().mockResolvedValue(undefined)} as any;
  await downloadGeneratedFile(payload,'报告.pptx','application/vnd.openxmlformats-officedocument.presentationml.presentation');expect(window.nativeFileOps.saveFile).toHaveBeenCalledWith(payload,expect.objectContaining({filename:'报告.pptx'}));
+});
+
+it('uses the ordinary name prompt for one item and a top-aligned rule form for multiple items',()=>{
+ const {app,ui}=setup([file('a','a.md'),file('b','b.md')]);app.renameFile=jest.fn();
+ app.fileListMultiSelectedIds=new Set(['a']);ui.update();document.querySelector<HTMLButtonElement>('[data-action=rename]').click();
+ expect(app.renameFile).toHaveBeenCalledWith('a');expect(document.getElementById('fileActionSheet')).toBeNull();
+ app.fileListMultiSelectedIds.add('b');ui.update();document.querySelector<HTMLButtonElement>('[data-action=rename]').click();
+ expect(document.getElementById('fileActionSheet').classList.contains('file-action-dialog-overlay')).toBe(true);
+ expect(document.querySelectorAll('.batch-rename-preview > div')).toHaveLength(2);
+});
+it('toggles pin and select-all labels immediately as selection changes',()=>{
+ const {app,ui}=setup([file('a','a.md'),file('b','b.md')]);
+ const pin=document.querySelector<HTMLButtonElement>('[data-action=pin]');pin.click();expect(pin.textContent).toContain('取消置顶');pin.click();expect(pin.textContent).not.toContain('取消置顶');
+ const all=document.querySelector<HTMLButtonElement>('[data-select-all]');expect(all.textContent).toBe('取消全选');
+ app.selectAllFilesForMulti=()=>{app.fileListMultiSelectedIds.size===2?app.fileListMultiSelectedIds.clear():app.files.forEach(f=>app.fileListMultiSelectedIds.add(f.id));ui.update();};
+ all.click();expect(all.textContent).toBe('全选');all.click();expect(all.textContent).toBe('取消全选');
 });

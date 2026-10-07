@@ -728,22 +728,17 @@ import { createDiffFileWriter } from './conflict/live-files';
         updateFileListMultiSelectToolbar();
     }
 
-    function selectAllFilesForMulti() {
-        const set = getFileListMultiSelectedIds();
+    global.getFileListSelectableIds = () => {
+        const ids = [];
         if (global.isFileManagementMode) {
-            document.querySelectorAll<HTMLElement>('#notesHome .notes-file-card, #notesHome .notes-folder-card, #notesHome .notes-folder-tab[data-file-id]').forEach(element => {
-                const id = element.dataset.fileId;if (!id) return;
-                set.add(id);
-            });
-            updateFileListMultiSelectToolbar();return;
-        }
-        window.$('#fileList .jstree-anchor').each(function() {
-            const anchorId = window.$(this).attr('id');
-            const nodeId = resolveNodeIdFromAnchorId(anchorId);
-            if (nodeId) set.add(String(nodeId));
-        });
-        syncFileListMultiSelectCheckboxes();
-        updateFileListMultiSelectToolbar();
+            document.querySelectorAll<HTMLElement>('#notesHome [data-file-id]').forEach(element => {if(element.dataset.fileId) ids.push(element.dataset.fileId);});
+        } else window.$('#fileList .jstree-anchor').each(function(){const id=resolveNodeIdFromAnchorId(this.id);if(id) ids.push(String(id));});
+        return [...new Set(ids)].filter(id=>(g('files') || []).some(file=>String(file.id)===id));
+    };
+    function selectAllFilesForMulti() {
+        const set = getFileListMultiSelectedIds(),ids=global.getFileListSelectableIds();
+        if(ids.length && ids.every(id=>set.has(id))) set.clear();else ids.forEach(id=>set.add(id));
+        syncFileListMultiSelectCheckboxes();updateFileListMultiSelectToolbar();
     }
 
     function invertFileListMultiSelection() {
@@ -2686,7 +2681,7 @@ import { createDiffFileWriter } from './conflict/live-files';
         try {
             const history = await getFileHistory(filename);
             if (history.length === 0) {
-                historyList.innerHTML = '<div class="history-loading">' + (isEn() ? 'No history versions' : '暂无历史版本') + '</div>';
+                historyList.innerHTML = '<div class="history-empty"><i class="fas fa-clock-rotate-left" aria-hidden="true"></i><h3>' + (isEn() ? 'No history yet' : '暂无历史版本') + '</h3><p>' + (isEn() ? 'Saved document versions will appear here.' : '文档保存后，历史版本将在这里显示。') + '</p></div>';
                 // 隐藏批量操作工具栏
                 const batchToolbar = document.getElementById('historyBatchToolbar');
                 if (batchToolbar) batchToolbar.style.display = 'none';
@@ -2713,7 +2708,7 @@ import { createDiffFileWriter } from './conflict/live-files';
                 // 添加复选框（当前版本除外）
                 const checkboxHtml = index > 0 ? '<input type="checkbox" class="history-version-checkbox" data-version-id="' + version.version_id + '">' : '';
 
-                const modifiedBy = version.modified_by ? (isEn() ? ' by ' : ' 由 ') + version.modified_by : '';
+                const modifiedBy = version.modified_by ? (isEn() ? ' by ' : ' 由 ') + global.escapeHtml(version.modified_by) : '';
                 versionEl.innerHTML = checkboxHtml + '<div class="history-version-content-wrapper"><div class="history-version-header"><div class="history-version-title">' + (isEn() ? 'Version ' : '版本 ') + version.version_id + (index === 0 ? ' <span style="color:#4CAF50;font-size:12px;">(' + (isEn() ? 'Current' : '当前') + ')</span>' : '') + modifiedBy + '</div><div class="history-version-date">' + date + '</div></div><div class="history-version-content">' + global.escapeHtml(contentPreview) + '</div><div class="history-version-actions"><button class="modal-btn small preview-btn"><i class="fas fa-eye"></i> ' + (isEn() ? 'Preview' : '预览') + '</button>' + (index > 0 ? '<button class="modal-btn small primary restore-btn"><i class="fas fa-history"></i> ' + (isEn() ? 'Restore' : '恢复') + '</button>' : '') + '<button class="modal-btn small delete-history-btn"><i class="fas fa-trash"></i> ' + (isEn() ? 'Delete' : '删除') + '</button></div></div>';
 
                 // 绑定复选框事件
