@@ -56,6 +56,7 @@ struct OpenLocalFileDialogResponse {
     content: Option<String>,
     error: Option<String>,
     local_file_mode: Option<String>,
+    writable: Option<bool>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -67,6 +68,7 @@ struct ReadLocalFileResponse {
     content: Option<String>,
     error: Option<String>,
     local_file_mode: Option<String>,
+    writable: Option<bool>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -232,7 +234,13 @@ fn get_local_file_path(app: AppHandle, name: String) -> Result<String, String> {
 
 #[cfg(not(target_os = "android"))]
 #[tauri::command]
-fn open_local_file_dialog(app: AppHandle) -> OpenLocalFileDialogResponse {
+async fn open_local_file_dialog(app: AppHandle) -> Result<OpenLocalFileDialogResponse, String> {
+    tauri::async_runtime::spawn_blocking(move || pick_desktop_local_file(app))
+        .await.map_err(|error| error.to_string())
+}
+
+#[cfg(not(target_os = "android"))]
+fn pick_desktop_local_file(app: AppHandle) -> OpenLocalFileDialogResponse {
     let result = app
         .dialog()
         .file()
@@ -250,6 +258,7 @@ fn open_local_file_dialog(app: AppHandle) -> OpenLocalFileDialogResponse {
                 content: None,
                 error: None,
                 local_file_mode: None,
+                writable: None,
             }
         }
     };
@@ -266,6 +275,7 @@ fn open_local_file_dialog(app: AppHandle) -> OpenLocalFileDialogResponse {
                 content: None,
                 error: Some(error.to_string()),
                 local_file_mode: None,
+                writable: None,
             }
         }
     };
@@ -282,6 +292,7 @@ fn open_local_file_dialog(app: AppHandle) -> OpenLocalFileDialogResponse {
             content: Some(content),
             error: None,
             local_file_mode: Some("tauri".to_string()),
+            writable: Some(true),
         },
         Err(error) => OpenLocalFileDialogResponse {
             canceled: false,
@@ -291,6 +302,7 @@ fn open_local_file_dialog(app: AppHandle) -> OpenLocalFileDialogResponse {
             content: None,
             error: Some(error),
             local_file_mode: None,
+            writable: None,
         },
     }
 }
@@ -306,6 +318,7 @@ fn read_local_file(file_path: String) -> ReadLocalFileResponse {
             content: None,
             error: Some("Empty path".to_string()),
             local_file_mode: None,
+            writable: None,
         };
     }
 
@@ -318,6 +331,7 @@ fn read_local_file(file_path: String) -> ReadLocalFileResponse {
             content: None,
             error: Some("File not found".to_string()),
             local_file_mode: None,
+            writable: None,
         };
     }
 
@@ -332,6 +346,7 @@ fn read_local_file(file_path: String) -> ReadLocalFileResponse {
             content: Some(content),
             error: None,
             local_file_mode: Some("tauri".to_string()),
+            writable: Some(true),
         },
         Err(error) => ReadLocalFileResponse {
             success: false,
@@ -340,6 +355,7 @@ fn read_local_file(file_path: String) -> ReadLocalFileResponse {
             content: None,
             error: Some(error),
             local_file_mode: None,
+            writable: None,
         },
     }
 }
@@ -379,19 +395,19 @@ async fn open_local_file_dialog(app: AppHandle) -> Result<OpenLocalFileDialogRes
 #[cfg(target_os = "android")]
 #[tauri::command]
 async fn read_local_file(app: AppHandle, file_path: String) -> Result<ReadLocalFileResponse, String> {
-    if file_path.starts_with("content://") {
+    if file_path.starts_with("content://") || file_path.starts_with("file://") {
         return android_document(app, "read", serde_json::json!({ "uri": file_path })).await;
     }
     let path = normalize_file_path(file_path);
     let content = read_text_file(&path)?;
-    fs::OpenOptions::new().write(true).open(&path).map_err(|error| error.to_string())?;
-    Ok(ReadLocalFileResponse { success: true, path: Some(path_to_string(&path)), name: path.file_name().map(|name| name.to_string_lossy().to_string()), content: Some(content), error: None, local_file_mode: Some("tauri".into()) })
+    let writable = fs::OpenOptions::new().write(true).open(&path).is_ok();
+    Ok(ReadLocalFileResponse { success: true, path: Some(path_to_string(&path)), name: path.file_name().map(|name| name.to_string_lossy().to_string()), content: Some(content), error: None, local_file_mode: Some("tauri".into()), writable: Some(writable) })
 }
 
 #[cfg(target_os = "android")]
 #[tauri::command]
 async fn write_local_file(app: AppHandle, file_path: String, content: String) -> Result<WriteLocalFileResponse, String> {
-    if file_path.starts_with("content://") {
+    if file_path.starts_with("content://") || file_path.starts_with("file://") {
         return android_document(app, "write", serde_json::json!({ "uri": file_path, "content": content })).await;
     }
     let path = normalize_file_path(file_path);
@@ -495,27 +511,23 @@ pub fn run() {
                 emit_open_file_event(&app.app_handle(), path);
             }
             
-            let handle = app.handle().clone();
-            std::thread::spawn(move || {
-                if let Ok(cache_dir) = handle.path().cache_dir() {
-                    let intent_file = cache_dir.join("startup_intent.txt");
-                    loop {
-                        if let Ok(content) = fs::read_to_string(&intent_file) {
-                            if !content.trim().is_empty() {
-                                let target_path = PathBuf::from(content.trim().to_string());
-                                // Only emit if it actually changed or just trust it?
-                                // Let's just emit. consume_pending_open_file_path can be used.
-                                if let Ok(mut guard) = handle.state::<PendingOpenFilePath>().0.lock() {
-                                    *guard = Some(path_to_string(&target_path));
-                                }
-                                emit_open_file_event(&handle, target_path);
+            #[cfg(target_os = "android")]
+            {
+                let handle = app.handle().clone();
+                std::thread::spawn(move || loop {
+                    let result: Result<serde_json::Value, _> = handle.state::<AndroidDocuments>().0
+                        .run_mobile_plugin("consumeIntent", serde_json::json!({}));
+                    if let Ok(result) = result {
+                        if let Some(path) = result.get("path").and_then(|value| value.as_str()) {
+                            if let Ok(mut guard) = handle.state::<PendingOpenFilePath>().0.lock() {
+                                *guard = Some(path.to_string());
                             }
-                            let _ = fs::remove_file(&intent_file);
+                            let _ = handle.emit("open-local-file-request", path.to_string());
                         }
-                        std::thread::sleep(std::time::Duration::from_millis(500));
                     }
-                }
-            });
+                    std::thread::sleep(std::time::Duration::from_millis(500));
+                });
+            }
 
             Ok(())
         })

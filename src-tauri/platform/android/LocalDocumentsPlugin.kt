@@ -1,5 +1,6 @@
 package cn.yhsun.md
 
+import java.util.ArrayDeque
 import android.app.Activity
 import android.content.Intent
 import android.net.Uri
@@ -20,10 +21,22 @@ class DocumentArgs {
     var content: String = ""
 }
 
+/** Shared by MainActivity and the Rust plugin; independent of platform cache paths. */
+object IncomingDocuments {
+    private val queue = ArrayDeque<String>()
+    @Synchronized fun enqueue(uri: String) { queue.addLast(uri) }
+    @Synchronized fun consume(): String? = if (queue.isEmpty()) null else queue.removeFirst()
+}
+
 /** Keep SAF document URIs and grants; never translate them into storage paths. */
 @TauriPlugin
 class LocalDocumentsPlugin(private val activity: Activity) : Plugin(activity) {
     private val io = Executors.newSingleThreadExecutor()
+
+    @Command
+    fun consumeIntent(invoke: Invoke) {
+        invoke.resolve(JSObject().put("path", IncomingDocuments.consume()))
+    }
 
     @Command
     fun pick(invoke: Invoke) {
@@ -61,15 +74,18 @@ class LocalDocumentsPlugin(private val activity: Activity) : Plugin(activity) {
     private fun readDocument(uri: Uri): JSObject {
         val out = JSObject().put("path", uri.toString()).put("localFileMode", "tauri")
         try {
-            activity.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
-                if (cursor.moveToFirst()) out.put("name", cursor.getString(0))
-            }
+            try {
+                if (uri.scheme == "content") activity.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
+                    if (cursor.moveToFirst()) out.put("name", cursor.getString(0))
+                }
+            } catch (_: Exception) { /* A missing display-name query must not block reading. */ }
+            if (!out.has("name")) out.put("name", uri.lastPathSegment ?: "document.md")
             val content = activity.contentResolver.openInputStream(uri)?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }
                 ?: throw IllegalStateException("Cannot read local document")
             out.put("content", content)
             // Probe edit access without truncating or changing the original file.
-            activity.contentResolver.openFileDescriptor(uri, "rw")?.use { } ?: throw IllegalStateException("Document is not writable")
-            out.put("success", true).put("writable", true)
+            val writable = try { activity.contentResolver.openFileDescriptor(uri, "rw")?.use { true } ?: false } catch (_: Exception) { false }
+            out.put("success", true).put("writable", writable)
         } catch (e: Exception) {
             out.put("success", false).put("writable", false).put("error", e.message ?: "Document permission unavailable")
         }

@@ -830,6 +830,8 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
 
     async function openExternalLocalFileByPath(filePath, presetData?) {
         if (!filePath) return false;
+        await global.ensureWasmTextEngineReady?.();
+        const requestUser=g('currentUser');
 
         let fileData = presetData;
         if (!fileData) {
@@ -840,6 +842,7 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
             fileData = await global.electron.readLocalFile(filePath);
         }
 
+        if(g('currentUser')!==requestUser) return false;
         if (!fileData || (!fileData.success && typeof fileData.content !== 'string')) {
             global.showMessage((isEn() ? 'Failed to open local file: ' : '打开本地文件失败：') + ((fileData && fileData.error) || ''), 'error');
             return false;
@@ -852,10 +855,12 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
                 if (previous && await fileData.browserFileHandle.isSameEntry(previous)) { resolvedPath = existing.localFilePath; break; }
             }
         }
+        if(g('currentUser')!==requestUser) return false;
         const localFileMode = fileData.localFileMode || (global.electron ? 'electron' : 'browser-file');
 
         const files = g('files');
-        let target = files.find(function(f) { return f.type === 'file' && f.isExternalLocal && f.localFilePath === resolvedPath; });
+        const readonly=fileData.writable===false;
+        let target = readonly ? undefined : files.find(function(f) { return f.type === 'file' && f.isExternalLocal && f.localFilePath === resolvedPath; });
         const now = Date.now();
 
         if (!target) {
@@ -868,9 +873,11 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
                 content: fileData.content || '',
                 lastModified: now,
                 isSynced: false,
-                isExternalLocal: true,
-                localFilePath: resolvedPath,
-                localFileMode: localFileMode,
+                contentLoaded: true,
+                createdAt: now,
+                isExternalLocal: !readonly,
+                localFilePath: readonly ? undefined : resolvedPath,
+                localFileMode: readonly ? undefined : localFileMode,
                 localOriginalName: fileData.name || baseName,
                 localAccessState: 'unverified'
             };
@@ -894,6 +901,8 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
         if (g('unsavedChanges')[target.id] === undefined) g('unsavedChanges')[target.id] = false;
         hooks.loadFiles();
         await hooks.openFile(target.id);
+        if(g('currentFileId') && g('currentFileId')!==target.id) return false;
+        if(readonly) global.showMessage(isEn()?'The source app grants read-only access. An editable copy was imported; changes will not be written back to the source.':'来源应用仅提供读取权限，已导入可编辑副本；修改会保存到副本，无法写回来源文件。','info');
         return true;
     }
 
@@ -1005,6 +1014,7 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
     async function loadFilesFromServer(preserveFileName?) {
         if (!g('currentUser')) return;
         const requestUsername = g('currentUser').username;
+        const initialFileId=g('currentFileId');
         function isStillCurrentUser() {
             return g('currentUser') && g('currentUser').username === requestUsername;
         }
@@ -1164,7 +1174,7 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
                     refreshSyncIcons(global);
                 }).catch(console.warn);
 
-                if (hooks.shouldAutoOpenInitialFile()) {
+                if (hooks.shouldAutoOpenInitialFile() && !global.nativeOpenRequestInProgress && (g('currentFileId')===initialFileId || !g('currentFileId'))) {
                     if (preserveFileName) {
                         const preservedFile = g('files').find(f => f.name === preserveFileName && f.type === 'file');
                         if (preservedFile) {

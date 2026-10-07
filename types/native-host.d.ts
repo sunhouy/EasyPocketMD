@@ -1,4 +1,5 @@
 export interface NativeFileResponse {
+    writable?: boolean;
     success?: boolean;
     canceled?: boolean;
     path?: string | null;

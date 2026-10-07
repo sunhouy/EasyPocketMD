@@ -32,6 +32,14 @@ describe('Android back navigation', () => {
         window.isFileManagementMode = false;
     });
     afterEach(() => jest.useRealTimers());
+    it('Back exits selection before returning to the editor or leaving the app', () => {
+        window.fileListMultiSelectMode=true;
+        window.exitFileListMultiSelectMode=jest.fn(()=>{window.fileListMultiSelectMode=false;});
+        const returnFromFileList=jest.fn(()=>false);
+        initBackNavigation({getVisibleModalOverlays:()=>[],closeOverlayByBackPress:()=>true,returnFromFileList});
+        back();expect(window.exitFileListMultiSelectMode).toHaveBeenCalledTimes(1);
+        expect(returnFromFileList).not.toHaveBeenCalled();expect(window.history.back).not.toHaveBeenCalled();
+    });
     it('closes the top settings/dialog and rearms history even when closing is asynchronous', () => {
         const lower = document.createElement('div'), top = document.createElement('div');
         lower.style.zIndex = '10'; top.style.zIndex = '20';

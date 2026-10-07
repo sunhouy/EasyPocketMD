@@ -1,3 +1,4 @@
+import { installNativeOpenBridge } from './main/native-open';
 import { isMarketBuild } from './build-variant';
 import { createDeploymentRouteStatus } from './main/deployment-route';
 import { renderStorageUsage } from './main/storage-usage';
@@ -1236,6 +1237,8 @@ document.addEventListener('DOMContentLoaded', function() {
     window.userSettings.keyboardShortcuts = getEffectiveKeyboardShortcuts(window.userSettings);
     applyDebugModeSetting(window.userSettings.enableDebugMode, false);
 
+    let resolveNativeWorkspace: () => void;
+    const nativeWorkspaceReady = new Promise<void>(resolve => {resolveNativeWorkspace=resolve;});
     let desktopOpenFileBridgeInitialized = false;
 
     async function syncMdAssociationSettingFromDesktop() {
@@ -1253,33 +1256,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!window.electron || typeof window.electron.onOpenLocalFileRequest !== 'function' || desktopOpenFileBridgeInitialized) return;
         desktopOpenFileBridgeInitialized = true;
 
-        var lastDesktopOpenFilePath = null;
-
-        async function handleDesktopOpenFileRequest(filePath) {
-            if (!filePath || typeof window.openExternalLocalFileByPath !== 'function') return;
-            if (filePath === lastDesktopOpenFilePath) return;
-            lastDesktopOpenFilePath = filePath;
-            try {
-                await window.openExternalLocalFileByPath(filePath);
-            } catch (error) {
-                console.error('Failed to open local file from system event:', error);
-                window.showMessage((window.i18n ? window.i18n.t('localFileOpenFailed') : '打开本地文件失败') + ': ' + error.message, 'error');
-            }
-        }
-
-        window.electron.onOpenLocalFileRequest(function(filePath) {
-            handleDesktopOpenFileRequest(filePath);
-        });
-
-        if (typeof window.electron.consumePendingOpenFilePath === 'function') {
-            window.electron.consumePendingOpenFilePath()
-                .then(function(filePath) {
-                    handleDesktopOpenFileRequest(filePath);
-                })
-                .catch(function(error) {
-                    console.warn('Failed to consume pending open file path:', error);
-                });
-        }
+        installNativeOpenBridge(window, nativeWorkspaceReady);
     }
 
     syncMdAssociationSettingFromDesktop();
@@ -1973,6 +1950,7 @@ document.addEventListener('DOMContentLoaded', function() {
         var bootFileWorkspaceSafely = function() {
             try {
                 bootFileWorkspace();
+                resolveNativeWorkspace();
             } catch (error) {
                 handleStartupFailure(error);
             }

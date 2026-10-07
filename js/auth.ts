@@ -1065,6 +1065,11 @@ import { requirePrivacyConsent } from './build-variant';
     }
 
     async function logout() {
+        const user = global.currentUser;
+        if (!user) return;
+        document.getElementById('userMenuDropdown')?.classList.remove('show');
+        if (!await g('customConfirm')(window.i18n?.getLanguage() === 'en' ? 'Sign out of this account?' : '确定退出当前账号登录吗？')) return;
+        if (global.currentUser !== user) return;
         const files = global.files || [];
         const unsavedChanges = global.unsavedChanges || {};
         let hasUnsaved = false;
@@ -1079,6 +1084,7 @@ import { requirePrivacyConsent } from './build-variant';
             }
         }
 
+        if (global.currentUser !== user) return;
         if (global.stopAutoSync) global.stopAutoSync();
         window.dispatchEvent(new Event('e2e-account-reset'));
         window.E2EAttachments?.clear();
@@ -1720,6 +1726,17 @@ import { requirePrivacyConsent } from './build-variant';
                 renderAccountList();
 
                 dropdown.classList.toggle('show');
+                if (dropdown.classList.contains('show')) {
+                    const anchor = e?.currentTarget instanceof HTMLElement ? e.currentTarget : document.querySelector<HTMLElement>('#notesHome .notes-home-tools button, #mobileLoginBtn, #loginBtn');
+                    if (anchor) {
+                        const rect = anchor.getBoundingClientRect();
+                        dropdown.style.position = 'fixed';
+                        dropdown.style.right = 'auto';
+                        const width = dropdown.getBoundingClientRect().width;
+                        dropdown.style.left = Math.max(8,Math.min(rect.right-width,window.innerWidth-width-8)) + 'px';
+                        dropdown.style.top = Math.max(8,Math.min(rect.bottom+6,window.innerHeight-dropdown.getBoundingClientRect().height-8)) + 'px';
+                    }
+                }
             }
         } else {
             showLoginModal();

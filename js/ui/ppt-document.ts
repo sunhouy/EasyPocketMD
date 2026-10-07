@@ -47,7 +47,7 @@ export async function generateDocumentPPT(document: DocumentPPT, templateId: str
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     if (window.currentUser?.token) headers.Authorization = 'Bearer ' + window.currentUser.token;
     const response = await fetch((window.getApiBaseUrl?.() || '/api') + '/ppt-export', {
-        method: 'POST', credentials: 'include', headers, signal,
+        method: 'POST', headers, signal,
         body: JSON.stringify({ ...document, templateId })
     });
     if (!response.ok) {

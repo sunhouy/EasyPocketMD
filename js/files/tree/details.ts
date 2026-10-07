@@ -4,6 +4,10 @@ export function showFileDetails(app: any, file: any) {
     const box = document.createElement('section'); box.className = 'file-details-dialog'; box.setAttribute('role', 'dialog'); box.setAttribute('aria-modal', 'true');
     const en = app.i18n?.getLanguage?.() === 'en';
     const title = document.createElement('h3'); title.textContent = en ? 'Details' : '详情'; box.append(title);
+    const selected=Array.isArray(file)?file:[file];
+    for (const item of selected) {
+    file=item;
+    const subtitle=document.createElement('h4');subtitle.textContent=file.name;box.append(subtitle);
     const list = document.createElement('dl');
     const timestamp = (value: any) => { const date = value ? new Date(value) : null; return date && !Number.isNaN(date.getTime()) ? date.toLocaleString() : en ? 'Not recorded' : '未记录'; };
     const children = file.type === 'folder' ? (app.files || []).filter((f: any) => f.name.startsWith(file.name + '/')) : [];
@@ -13,6 +17,7 @@ export function showFileDetails(app: any, file: any) {
     else if (typeof file.content === 'string') rows.push([en ? 'Characters' : '字符数', String(Array.from(file.content).length)]);
     for (const [name, value] of rows) { const key = document.createElement('dt'); key.textContent = name; const text = document.createElement('dd'); text.textContent = value; list.append(key, text); }
     box.append(list);
+    }
     const close = document.createElement('button');
     close.classList.add('epmd-dialog-close'); close.type = 'button'; close.textContent = '×'; close.setAttribute('aria-label', en ? 'Close' : '关闭');
     const dismiss = () => { overlay.remove(); document.removeEventListener('keydown', escape); };
@@ -34,10 +39,12 @@ export function bindFileTreeLongPress(element: HTMLElement, open: (anchor: HTMLE
     if (element.dataset.longPressBound) return;
     element.dataset.longPressBound = '1';
     let timer: any, x = 0, y = 0, opened = false;
-    const cancel = () => clearTimeout(timer);
+    let pressed:HTMLElement;
+    const cancel = () => {clearTimeout(timer);pressed?.classList.remove('file-press-active');};
     element.addEventListener('pointerdown', event => {
-        if (event.pointerType === 'mouse' || event.button !== 0) return;
+        if (event.button !== 0) return;
         cancel(); const anchor = (event.target as Element).closest<HTMLElement>(selector); if (!anchor) return;
+        pressed=anchor;anchor.classList.add('file-press-active');
         x = event.clientX; y = event.clientY; opened = false;
         timer = setTimeout(() => { opened = true; open(anchor, x, y); }, 550);
     });

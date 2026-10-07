@@ -21,6 +21,10 @@ export function initBackNavigation(options: BackNavigationOptions): void {
       pushHistory();
       return;
     }
+    const currentApp = window as any;
+    if (currentApp.fileListMultiSelectMode) {
+      currentApp.exitFileListMultiSelectMode?.();lastBackTime = 0;pushHistory();return;
+    }
     if (options.returnFromFileList?.()) {
       lastBackTime = 0;
       pushHistory();

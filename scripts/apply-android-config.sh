@@ -133,25 +133,19 @@ class MainActivity : TauriActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        setIntent(intent)
         handleIntent(intent)
     }
 
     private fun handleIntent(intent: Intent?) {
-        val uri = intent?.data
-        if (uri != null) {
-            val grants = (intent?.flags ?: 0) and (Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+        if (intent == null || intent.action !in arrayOf(Intent.ACTION_VIEW, Intent.ACTION_EDIT, Intent.ACTION_SEND)) return
+        val uri = intent.data ?: intent.getParcelableExtra<android.net.Uri>(Intent.EXTRA_STREAM)
+            ?: intent.clipData?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.uri ?: return
+        val grants = intent.flags and (Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+        if (intent.flags and Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION != 0) {
             try { contentResolver.takePersistableUriPermission(uri, grants) } catch (_: SecurityException) { }
         }
-        val action = intent?.action
-        val data = intent?.dataString
-        if ((Intent.ACTION_VIEW == action || Intent.ACTION_EDIT == action) && data != null) {
-            try {
-                val file = java.io.File(cacheDir, "startup_intent.txt")
-                file.writeText(data)
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-        }
+        IncomingDocuments.enqueue(uri.toString())
     }
 }
 EOF
