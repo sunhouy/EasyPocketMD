@@ -61,3 +61,9 @@ it('toggles pin and select-all labels immediately as selection changes',()=>{
  app.selectAllFilesForMulti=()=>{app.fileListMultiSelectedIds.size===2?app.fileListMultiSelectedIds.clear():app.files.forEach(f=>app.fileListMultiSelectedIds.add(f.id));ui.update();};
  all.click();expect(all.textContent).toBe('全选');all.click();expect(all.textContent).toBe('取消全选');
 });
+it('reports asynchronous deletion failures and permits a subsequent retry',async()=>{
+ const {hooks}=setup([file('a','a.md'),file('b','b.md')]);hooks.delete.mockImplementationOnce(()=>Promise.reject(Error('云端删除失败')));
+ const button=document.querySelector<HTMLButtonElement>('[data-action=delete]');button.click();expect(button.disabled).toBe(true);await tick();
+ expect(hooks.delete).toHaveBeenCalledTimes(1);expect(button.disabled).toBe(false);
+ button.click();await tick();expect(hooks.delete).toHaveBeenCalledTimes(2);
+});

@@ -2,6 +2,7 @@
  * 文件管理 - 加载、保存、同步、历史版本、文件夹
  */
 // @ts-nocheck
+import { deletionOwner, resolveDeletionPlan } from './delete-plan';
 import { createFileOrderStore, isOrderMetadataFile } from './order-store';
 import { installBatchFileActions, showBottomSheet } from './batch-actions';
 import { createTreeSelectionRestorer } from './tree/selection';
@@ -794,76 +795,68 @@ import { createDiffFileWriter } from './conflict/live-files';
         global.refreshNotesHome?.();
     }
 
-    async function batchDeleteFileListMultiSelection() {
-        const ids = Array.from(getFileListMultiSelectedIds());
-        if (ids.length === 0) {
-            g('customAlert')(isEn() ? 'No items selected' : '尚未选择任何项');
-            return;
-        }
-        const files = g('files');
+    async function deleteFileSelection(ids) {
         const idSet = new Set(ids.map(String));
-
-        // 收集所选项及其所有后代（针对选中的文件夹）
-        const selectedItems = files.filter(f => idSet.has(String(f.id)));
-        const allToDelete = new Set(selectedItems);
-        selectedItems.forEach(item => {
-            if (item.type === 'folder') {
-                files.forEach(f => {
-                    if (f === item) return;
-                    if (f.name === item.name || f.name.startsWith(item.name + '/')) {
-                        allToDelete.add(f);
-                    }
-                });
-            }
-        });
-
-        const itemsArr = Array.from(allToDelete);
-        const remainingFileCount = files.filter(f => f.type === 'file' && !allToDelete.has(f)).length;
-        if (remainingFileCount === 0) {
-            g('customAlert')(isEn() ? 'At least one file must be kept' : '至少需要保留一个文件');
+        const originalFiles = g('files') || [];
+        const roots = originalFiles.filter(file => idSet.has(String(file.id)));
+        if (!roots.length) {
+            if (!ids.length) throw Error(isEn() ? 'Select a file to delete' : '请先选择要删除的文件');
+            const cached = JSON.parse(localStorage.getItem('vditor_files') || '[]');
+            if (Array.isArray(cached)) localStorage.setItem('vditor_files',JSON.stringify(cached.filter(file => !idSet.has(String(file.id)))));
+            exitFileListMultiSelectMode();
+            global.refreshNotesHome?.();
+            global.showMessage(isEn() ? 'Already deleted; list refreshed' : '文件已删除，列表已刷新');
+            loadFiles();
             return;
         }
-
-        const owner=g('currentUser');
+        const targets = originalFiles.filter(file => roots.some(root => root === file || (root.type === 'folder' && file.name.startsWith(root.name + '/'))));
+        if (!originalFiles.some(file => file.type === 'file' && !targets.includes(file))) {
+            await g('customAlert')(isEn() ? 'At least one file must be kept' : '至少需要保留一个文件');
+            return;
+        }
+        // Capture immutable names: list refreshes can replace the array and its records.
+        const plan = targets.map(file => ({id:String(file.id),name:file.name,type:file.type}));
+        const owner = deletionOwner(global);
         const confirmed = await g('customConfirm')(isEn()
-            ? `Delete ${itemsArr.length} selected item(s)? Folders include all contents.`
-            : `确认删除选中的 ${itemsArr.length} 项？文件夹将连同其所有内容一起删除。`, {danger:true,confirmText:isEn()?'Delete':'删除'});
+            ? `Delete ${targets.length} selected item(s)? Folders include all contents.`
+            : `确认删除选中的 ${targets.length} 项？文件夹将连同其所有内容一起删除。`, {danger:true,confirmText:isEn()?'Delete':'删除'});
         if (!confirmed) return;
-
-        if(g('currentUser')!==owner || g('files')!==files) return;
-        const deletedFileNames = itemsArr.filter(f => f.type === 'file').map(f => f.name);
-        const deletedFolderNames = itemsArr.filter(f => f.type === 'folder' && f.isSynced).map(f => f.name);
-        const deletedIds = itemsArr.map(f => f.id);
-        const deletedIdSet = new Set(deletedIds.map(String));
-
-        for (let i = files.length - 1; i >= 0; i--) {
-            if (deletedIdSet.has(String(files[i].id))) files.splice(i, 1);
-        }
-        localStorage.setItem('vditor_files', window.e2eSerializeFiles ? window.e2eSerializeFiles(files) : JSON.stringify(files));
-
+        const items = resolveDeletionPlan(global,plan,owner,true);
         if (g('currentUser')) {
-            deletedFileNames.forEach(name => {
-                try { global.deleteFileFromServer(name); } catch (e) {}
-            });
-            deletedFolderNames.forEach(name => {
-                try { global.deleteFileFromServer(name + '/'); } catch (e) {}
-            });
+            // Await real server results; do not report success then restore a failed deletion on refresh.
+            for (const item of items) {
+                resolveDeletionPlan(global,plan,owner,true);
+                if (item.type === 'file' || item.isSynced) {
+                    const deleted = await global.deleteFileFromServer(item.name + (item.type === 'folder' ? '/' : ''));
+                    if (deleted === false) throw Error(isEn() ? 'Delete failed; please sign in again' : '删除失败，请重新登录后重试');
+                }
+            }
         }
-
-        deletedIds.forEach(id => {
-            delete g('lastSyncedContent')[id];
-            delete g('unsavedChanges')[id];
-        });
-
-        if (deletedIdSet.has(String(g('currentFileId')))) {
-            const firstFile = files.find(f => f.type === 'file');
-            if (firstFile) openFile(firstFile.id);
+        resolveDeletionPlan(global,plan,owner,true);
+        const files = g('files'), deletedIds = new Set(plan.map(file => file.id));
+        const remaining = files.filter(file => !deletedIds.has(String(file.id)));
+        // Persist before mutating the visible array: quota/serialization errors remain actionable.
+        localStorage.setItem('vditor_files', window.e2eSerializeFiles ? window.e2eSerializeFiles(remaining) : JSON.stringify(remaining));
+        files.splice(0,files.length,...remaining);
+        for (const id of deletedIds) {
+            if (global.lastSyncedContent) delete global.lastSyncedContent[id];
+            if (global.unsavedChanges) delete global.unsavedChanges[id];
+            global.markPendingServerSync?.(id,false);
+        }
+        if (deletedIds.has(String(g('currentFileId')))) {
+            const first = files.find(file => file.type === 'file');
+            if (first) await openFile(first.id);
             else createDefaultFile();
         }
-
         exitFileListMultiSelectMode();
+        // Visible cards and the confirmation toast update immediately, before rebuilding the tree.
+        global.refreshNotesHome?.();
+        global.showMessage(isEn() ? 'Deleted ' + targets.length + ' item(s)' : '已删除 ' + targets.length + ' 项');
         loadFiles();
-        global.showMessage(isEn() ? 'Deleted ' + itemsArr.length + ' item(s)' : '已删除 ' + itemsArr.length + ' 项');
+    }
+
+    async function batchDeleteFileListMultiSelection() {
+        await deleteFileSelection(Array.from(getFileListMultiSelectedIds()));
     }
 
     function loadLocalFiles() {
@@ -2261,64 +2254,8 @@ import { createDiffFileWriter } from './conflict/live-files';
     }
 
     async function deleteFile(id) {
-        const files = g('files');
-        const item = files.find(f => f.id === id);
-        if (!item) return;
-
-        if (item.type === 'file') {
-            if (files.filter(f => f.type === 'file').length <= 1) {
-                g('customAlert')(isEn() ? 'At least one file must be kept' : '至少需要保留一个文件');
-                return;
-            }
-            const confirmed = await g('customConfirm')(isEn() ? `Are you sure you want to delete "${item.name}"?` : `确认删除"${item.name}"吗？`, {danger:true,confirmText:isEn()?'Delete':'删除'});
-            if (!confirmed) return;
-
-            const idx = files.findIndex(f => f.id === id);
-            files.splice(idx, 1);
-            localStorage.setItem('vditor_files', window.e2eSerializeFiles ? window.e2eSerializeFiles(files) : JSON.stringify(files));
-
-            if (g('currentUser')) global.deleteFileFromServer(item.name);
-            delete g('lastSyncedContent')[id];
-            delete g('unsavedChanges')[id];
-
-            if (id === g('currentFileId')) {
-                const firstFile = files.find(f => f.type === 'file');
-                if (firstFile) openFile(firstFile.id);
-                else createDefaultFile();
-            }
-            loadFiles();
-            global.showMessage(isEn() ? 'File deleted: ' + item.name : '已删除文件: ' + item.name);
-        } else {
-            const confirmed = await g('customConfirm')(isEn() ? `Are you sure you want to delete the folder "${item.name}" and all its contents?` : `确定要删除文件夹“${item.name}”及其所有内容吗？`, {danger:true,confirmText:isEn()?'Delete':'删除'});
-            if (!confirmed) return;
-
-            const toDelete = files.filter(f => f.name === item.name || f.name.startsWith(item.name + '/'));
-            const fileNamesToDelete = toDelete.filter(f => f.type === 'file').map(f => f.name);
-
-            deleteFolderAndChildren(item.name);
-            localStorage.setItem('vditor_files', window.e2eSerializeFiles ? window.e2eSerializeFiles(files) : JSON.stringify(files));
-
-            if (g('currentUser')) {
-                fileNamesToDelete.forEach(name => global.deleteFileFromServer(name));
-                // 只有当文件夹本身已同步（即服务器存在记录）时，才发送删除请求
-                if (item.isSynced) {
-                    global.deleteFileFromServer(item.name + '/');
-                }
-            }
-
-            toDelete.forEach(f => {
-                delete g('lastSyncedContent')[f.id];
-                delete g('unsavedChanges')[f.id];
-            });
-
-            if (id === g('currentFileId') || toDelete.some(f => f.id === g('currentFileId'))) {
-                const firstFile = files.find(f => f.type === 'file');
-                if (firstFile) openFile(firstFile.id);
-                else createDefaultFile();
-            }
-            loadFiles();
-            global.showMessage(isEn() ? 'Folder deleted: ' + item.name : '已删除文件夹: ' + item.name);
-        }
+        try { await deleteFileSelection([id]); }
+        catch (error) { global.showMessage(isEn() ? 'Delete failed: ' + error.message : '删除失败：' + error.message,'error'); }
     }
 
     async function toggleCurrentFileE2E() {

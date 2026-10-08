@@ -1687,7 +1687,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (overlay && false && e.target === overlay) window.hideMobileActionSheet();
                     var mobileLoginBtn = (document.getElementById('mobileLoginBtn') as HTMLButtonElement);
                     var desktopLoginBtn = (document.getElementById('desktopLoginBtn') as HTMLButtonElement);
-                    var loginTriggerClicked = (mobileLoginBtn && mobileLoginBtn.contains(e.target)) || (desktopLoginBtn && desktopLoginBtn.contains(e.target));
+                    var settingsAccountBtn = document.getElementById('settingsAccountBtn');
+                    var loginTriggerClicked = (settingsAccountBtn && settingsAccountBtn.contains(e.target)) || (mobileLoginBtn && mobileLoginBtn.contains(e.target)) || (desktopLoginBtn && desktopLoginBtn.contains(e.target));
                     if (userMenu && !loginTriggerClicked && !userMenu.contains(e.target)) userMenu.classList.remove('show');
                 });
             }

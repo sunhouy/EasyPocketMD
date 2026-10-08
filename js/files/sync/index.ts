@@ -614,6 +614,8 @@ export function createSyncRuntimeApi(ctx: any) {
         }
       }
 
+      // Missing remote records (local-only files or a retried delete) are already deleted.
+      if (result.code === 404) return true;
       if (result.code !== 200) {
         throw new Error(result.message || (isEn() ? 'Delete failed' : '删除失败'));
       }
