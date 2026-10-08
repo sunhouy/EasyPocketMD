@@ -2,6 +2,7 @@ import '@sunhouyun/vditor/dist/index.css';
 import '@fortawesome/fontawesome-free/css/all.min.css';
 import 'cropperjs/dist/cropper.css';
 import './css/styles.css';
+import './css/material.css';
 
 import './js/jquery-global';
 import './js/tauri-bridge';
@@ -51,7 +52,14 @@ import './js/ui/image-compressor';
 // import './js/ui/ai-assistant';
 // PPT生成器改为懒加载，不在首屏加载
 // import './js/ui/ppt-generator';
-import './js/ui/file-manager';
+// Resource management and cross-document reference scanning are loaded on demand.
+const loadFileManager = async () => {
+    await import('./js/ui/file-manager');
+    const open = window.showFileManager;
+    if (open === loadFileManager) throw new Error('File manager failed to initialize');
+    await open();
+};
+window.showFileManager = loadFileManager;
 
 // 以下模块改为懒加载，不在首屏加载
 // import './js/emoji-picker';

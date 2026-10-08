@@ -9,6 +9,7 @@ export interface NativeFileResponse {
     localFileMode?: string | null;
 }
 export interface NativeCommandMap {
+    request_storage_access: { granted: boolean };
     save_local_file: NativeFileResponse;
     get_local_file_path: string;
     open_local_file_dialog: NativeFileResponse;

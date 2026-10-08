@@ -1,6 +1,6 @@
 // Public model assets only: never cache AI requests, credentials or document text here.
 export const LIVE2D_CACHE = 'epmd-live2d-models-v1';
-import { LIVE2D_MODELS } from '../main/live2d-models';
+import { LIVE2D_MODELS, live2dModelUrl } from '../main/live2d-models';
 export { LIVE2D_MODELS } from '../main/live2d-models';
 function check(signal: AbortSignal) { if (signal.aborted) throw new DOMException('Cancelled', 'AbortError'); }
 export async function cachedModelAsset(url: string, signal: AbortSignal): Promise<Response> {
@@ -16,7 +16,7 @@ export async function cachedModelAsset(url: string, signal: AbortSignal): Promis
 
 /** Cubism 2 accepts a slash-free data URL, so all resources can use cached blob URLs. */
 export async function prepareCachedModel(model: keyof typeof LIVE2D_MODELS, signal: AbortSignal) {
-    const manifestUrl = LIVE2D_MODELS[model];
+    const manifestUrl = live2dModelUrl(model);
     const manifest = await (await cachedModelAsset(manifestUrl, signal)).json();
     if (!manifest.model || !Array.isArray(manifest.textures)) throw new Error('Invalid Live2D model');
     const urls: string[] = [];

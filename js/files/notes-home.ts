@@ -33,7 +33,7 @@ export function installNotesHome(app:any, options:{loadContent?:(file:any)=>Prom
     const heading=document.createElement('h1');
     const tools=document.createElement('div');tools.className='notes-home-tools';
     const button=(className:string, action:()=>void)=>{const element=document.createElement('button');element.type='button';element.className=className;element.onclick=action;return element;};
-    const account=button('',()=>{});
+    const account=button('notes-account-button',()=>{});
     account.onclick=event=>app.handleLoginButtonClick ? app.handleLoginButtonClick(event) : app.showLoginModal?.();
     const settings=button('',()=>app.showSettingsDialog?.());
     account.innerHTML='<i class="fas fa-user-circle" aria-hidden="true"></i>';
@@ -124,6 +124,9 @@ export function installNotesHome(app:any, options:{loadContent?:(file:any)=>Prom
             sync.innerHTML='<i class="fas '+symbol+'" aria-hidden="true"></i>';
             sync.onclick=event=>{event.stopPropagation();if((file as any).syncConflict)app.openSyncConflict?.(file.id);};
             titleRow.append(title,sync);
+            if((file as any).isExternalLocal || (file as any).externalLocalFileId || (file as any).localFilePath){
+                const badge=document.createElement('span');badge.className='file-local-badge';badge.textContent=t('本地','Local');badge.title=t('修改会保存到本地文件','Changes are saved to the local file');titleRow.append(badge);
+            }
             if(Number(file.order)<=-1000000){const pin=document.createElement('i');pin.className='fas fa-thumbtack notes-pin';pin.title=t('已置顶','Pinned');titleRow.append(pin);}
             if(encrypted(file)) {
                 const lock=document.createElement('span');lock.className='file-e2e-indicator';lock.title=t('此文件已使用端到端加密','This file is end-to-end encrypted');lock.setAttribute('aria-label',lock.title);

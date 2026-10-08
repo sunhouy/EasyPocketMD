@@ -42,3 +42,5 @@ emsdk/
 **/__pycache__/
 image-cas/
 docker-control/
+
+.native-resources/

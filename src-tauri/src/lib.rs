@@ -386,6 +386,14 @@ fn write_local_file(file_path: String, content: String) -> WriteLocalFileRespons
     }
 }
 
+#[tauri::command]
+async fn request_storage_access(app: AppHandle, force: Option<bool>) -> Result<serde_json::Value, String> {
+    #[cfg(target_os = "android")]
+    { return android_document(app, "storageAccess", serde_json::json!({"force": force.unwrap_or(false)})).await; }
+    #[cfg(not(target_os = "android"))]
+    { let _ = (app, force); Ok(serde_json::json!({ "granted": true })) }
+}
+
 #[cfg(target_os = "android")]
 #[tauri::command]
 async fn open_local_file_dialog(app: AppHandle) -> Result<OpenLocalFileDialogResponse, String> {
@@ -539,6 +547,7 @@ pub fn run() {
             save_local_file,
             get_local_file_path,
             open_local_file_dialog,
+            request_storage_access,
             read_local_file,
             write_local_file,
             save_file_with_dialog,
