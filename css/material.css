@@ -169,3 +169,10 @@ body .android-todo-modal { width:min(100%,560px);max-width:560px; }
 #settingsModalOverlay .settings-access-status + i { margin-left:0; }
 .android-todo-modal .modal-close-btn { position:absolute;top:14px;right:14px; }
 .android-todo-modal :is(input,select,textarea) { margin-bottom:0; }
+.runner-view-tabs { display:flex;gap:6px;padding:8px 0;border-bottom:1px solid var(--md-outline);margin-bottom:10px;font:14px system-ui; }
+body .runner-view-tabs button { flex:1;padding:9px 6px !important;border:0 !important;border-radius:10px !important;background:var(--md-container) !important;color:var(--md-text) !important; }
+body .runner-view-tabs button[aria-selected=true] { background:var(--md-selected) !important;color:var(--md-primary-text) !important;font-weight:600;box-shadow:inset 0 -2px var(--md-primary); }
+.runner-file-actions { display:flex;gap:8px;flex-wrap:wrap;margin:8px 0; }
+#findDialogModal #closeFindBtn { font-size:28px !important;width:36px;height:36px;border-radius:50%;background:var(--md-container) !important; }
+body .code-runner-ui-host .code-output { background:var(--md-surface) !important;color:var(--md-text) !important;border-color:var(--md-outline) !important;border-radius:16px !important; }
+body .code-runner-ui-host .code-output > :first-child { color:var(--md-muted) !important; }

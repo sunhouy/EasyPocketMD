@@ -94,6 +94,9 @@ export function floatingRunWindow(panel: HTMLElement, header: HTMLElement, initi
     window.visualViewport?.addEventListener('resize',apply);
     window.visualViewport?.addEventListener('scroll',apply);
     return {update(full: boolean, collapsed: boolean) { maximized = full; minimized = collapsed; apply(); },
+        setHeight(height:number, growOnly=false) {
+            apply(); if(rect){rect=fit({...rect,height:growOnly?Math.max(rect.height,height):height});apply();}
+        },
         destroy() { header.removeEventListener('pointerdown',drag); window.removeEventListener('resize',apply);
             window.visualViewport?.removeEventListener('resize',apply); window.visualViewport?.removeEventListener('scroll',apply);
             handles.forEach(handle => handle.remove()); }

@@ -1,4 +1,4 @@
-import { canRunLanguage, isSandboxLanguage } from '../shared/code-runner-languages';
+import { canRunLanguage } from '../shared/code-runner-languages';
 import { recordCodeBlockExit } from './code-block-focus';
 import { uiText, setUiText } from './i18n-messages';
 import { basicSetup } from 'codemirror';
@@ -115,15 +115,13 @@ function createEditor(block: HTMLElement, source: HTMLElement, preview: HTMLElem
             await global.runCodeBlock?.({language, code: view.state.doc.toString(), block: source, editor: view});
         });
     }
-    if (isSandboxLanguage(language)) {
-        const upload = button(uiText('上传'), async () => {
-            const global = window as any;
-            await global.ensureCodeRunnerLoaded?.();
-            await global.openCodeSandboxTools?.('upload', upload, {language, block:source});
-        });
-        setUiText(upload, uiText('上传文件到沙箱用户目录'), 'title');
-    }
-    button(uiText('复制'), () => navigator.clipboard?.writeText(view.state.doc.toString()).catch(() => (window as any).showToast?.(uiText('复制失败，请手动选择代码复制'), 'error')));
+    button(uiText('复制'), async () => {
+        try {
+            if (!navigator.clipboard) throw Error('Clipboard unavailable');
+            await navigator.clipboard.writeText(view.state.doc.toString());
+            (window as any).showMessage?.(uiText('已复制'), 'success');
+        } catch { (window as any).showMessage?.(uiText('复制失败，请手动选择代码复制'), 'error'); }
+    });
     const editorParent = document.createElement('div'); host.append(header, editorParent);
     const renderDiagram = () => {
         const global = window as any;
