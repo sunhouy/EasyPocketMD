@@ -5,8 +5,12 @@ on:
       - 'scripts/prepare-windows-nsis.ps1'
       - '.github/workflows/build-tauri.yml'
       - '.github/workflows/check-windows.yml'
+      - 'vite.config.ts'
+      - 'scripts/bundle-native-resources.mjs'
 permissions:
   contents: read
+env:
+  VITE_NATIVE_BUNDLE: '1'
 concurrency:
   group: check-windows-${{ github.ref }}
   cancel-in-progress: true
@@ -26,6 +30,13 @@ jobs:
           echo "$RUNNER_TEMP/emsdk/upstream/emscripten" >> "$GITHUB_PATH"
       - run: npm ci --prefer-offline --no-audit --no-fund
       - run: npm run wasm:text:build
+      - run: node scripts/bundle-native-resources.mjs
+      - uses: actions/upload-artifact@v7
+        with:
+          name: windows-check-native-models
+          path: .native-resources/live2d
+          include-hidden-files: true
+          if-no-files-found: error
       - uses: actions/upload-artifact@v7
         with:
           name: windows-check-wasm
@@ -40,6 +51,10 @@ jobs:
         with:
           name: windows-check-wasm
           path: wasm_text_engine/dist
+      - uses: actions/download-artifact@v8
+        with:
+          name: windows-check-native-models
+          path: .native-resources/live2d
       - uses: actions/setup-node@v6
         with:
           node-version: '24'

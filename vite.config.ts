@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite';
+import { defineConfig, normalizePath } from 'vite';
 import { clientDownloadLinks } from './js/client-downloads';
 import { useVditorVectorCharts } from './scripts/vditor-vector-charts';
 import { viteStaticCopy } from 'vite-plugin-static-copy';
@@ -257,7 +257,7 @@ export default defineConfig({
     },
     viteStaticCopy({
       targets: [
-        ...(nativeBundle ? [{src: join(nativeResourcesDir, 'live2d'), dest: 'native-resources'}] : []),
+        ...(nativeBundle ? [{src: normalizePath(join(nativeResourcesDir, 'live2d')), dest: 'native-resources'}] : []),
         { src: ['assets/fonts/liberation/LICENSE', 'assets/fonts/liberation/NOTICE.md'], dest: 'licenses/liberation' },
         { src: ['vendor/ppt-templates/LICENSE', 'vendor/ppt-templates/NOTICE.md'], dest: 'licenses/ppt-templates' },
         {

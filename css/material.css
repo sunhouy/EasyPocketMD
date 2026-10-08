@@ -1,150 +1,108 @@
-/* Material-inspired surfaces and state layers, sharing the user's accent color. */
-:root { --md-surface:#fafbff;--md-container:#f0f3f9;--md-text:#202530;--md-muted:#687181;--md-outline:#7b84932b;--md-elevation:0 6px 24px #172b4d14; }
-body.night-mode { --md-surface:#191c22;--md-container:#242933;--md-text:#e4e8f0;--md-muted:#a5adbc;--md-outline:#a5adbc2e;--md-elevation:0 6px 24px #0004; }
-:is(button,.bottom-btn,.notes-file-card,.notes-folder-tab,.jstree-anchor) { transition:background-color .18s,box-shadow .18s,transform .12s,border-color .18s; }
-button:active:not(:disabled),.bottom-btn:active { transform:scale(.96); }
-:is(button,input,select,textarea):focus-visible { outline:2px solid var(--theme-accent,#3478e5);outline-offset:3px; }
-:is(.modal,.file-action-sheet,.file-details-dialog,.custom-dialog-content) { border-radius:24px;box-shadow:var(--md-elevation); }
-:is(.notes-file-card,.notes-folder-card,.file-manager-card) { border-color:var(--md-outline);background:var(--md-container);border-radius:20px;box-shadow:0 2px 6px #172b4d08; }
-:is(.notes-file-card,.notes-folder-card):hover { box-shadow:var(--md-elevation); }
-:is(.notes-folder-tab,.file-manager-control,.file-selection-control) { border-radius:12px; }
-:is(.modal-btn,.custom-dialog-btn:not(.close)) { border-radius:20px !important;min-height:36px; }
-:is(.mobile-dropdown-content,.desktop-dropdown-content,.user-menu-dropdown) { border-radius:16px;box-shadow:var(--md-elevation); }
-:is(.mobile-action-btn,.bottom-btn):hover { background:color-mix(in srgb,var(--theme-accent,#3478e5) 10%,transparent); }
-.bottom-btn:active { background:color-mix(in srgb,var(--theme-accent,#3478e5) 18%,transparent); }
-.file-local-badge { flex-shrink:0;border-radius:6px;padding:2px 5px;font-size:10px;font-weight:500;line-height:1.4;color:var(--theme-accent,#3478e5);background:color-mix(in srgb,var(--theme-accent,#3478e5) 12%,transparent); }
+/* Shared Material components. Tokens live on body so theme changes recompute
+   every state together; interaction ink never changes the text color. */
+body {
+    --md-surface:#fff; --md-container:#f5f5f7; --md-field:#f5f5f7;
+    --md-text:#24262b; --md-muted:#686b73; --md-outline:#d9dce2;
+    --md-selected:#eaf2ff; --md-danger:#c62f38; --md-elevation:0 8px 28px #00000018;
+    --md-primary:var(--theme-accent,#3478e5); --md-primary-text:#2863bb;
+}
+body.night-mode {
+    --md-surface:#202124; --md-container:#292a2e; --md-field:#303136;
+    --md-text:#eceef2; --md-muted:#b0b3bb; --md-outline:#45474e;
+    --md-selected:#29374b; --md-primary-text:#aacaff; --md-danger:#ff8c94; --md-elevation:0 8px 28px #0005;
+}
+body :is(.modal,.custom-dialog-content,.desktop-editor-dialog,.ai-layout-dialog,.file-action-sheet,.file-details-dialog,.file-manager-page) {
+    background:var(--md-surface) !important;color:var(--md-text) !important;
+    border-radius:20px;box-shadow:var(--md-elevation);
+}
+body :is(.chart-picker-modal,.insert-picker-modal,.footnote-picker-modal,.mindmap-picker-modal,.formula-picker-modal,.emoji-picker-modal) > div {
+    background:var(--md-surface) !important;color:var(--md-text) !important;border-radius:20px !important;box-shadow:var(--md-elevation);
+}
+/* Menus and navigation share neutral surfaces, including keyboard focus. */
+body :is(.mobile-toolbar-container,.mobile-bottom-bar,.desktop-toolbar,.file-selection-panel) {
+    background:var(--md-surface) !important;color:var(--md-text);border-color:var(--md-outline);
+}
+body :is(.desktop-dropdown-content,.mobile-dropdown-content,.user-menu-dropdown) {
+    background:var(--md-surface) !important;color:var(--md-text);border:1px solid var(--md-outline);border-radius:16px;box-shadow:var(--md-elevation);
+}
+body :is(.desktop-toolbar-btn,.mobile-action-btn,.bottom-btn,.dropdown-item,.desktop-dropdown-item,.file-action-button) {
+    border-radius:12px;color:var(--md-text);transition:box-shadow .18s;
+}
+body :is(.modal-btn,.custom-dialog-btn):not(.close):not(.custom-dialog-close) { border-radius:14px !important;min-height:38px; }
+body :is(.modal-btn.primary,.custom-dialog-btn.confirm,.file-management-fab) { background:var(--md-primary) !important;color:#fff !important; }
+body :is(.modal-btn.secondary,.custom-dialog-btn.cancel,.file-manager-control) { background:var(--md-container) !important;color:var(--md-text) !important;border:1px solid var(--md-outline); }
+body :is(.custom-dialog-btn.confirm.danger,.modal-btn.danger,.del-btn,.file-manager-control.danger) { background:#c62f38 !important;color:#fff !important; }
+/* Deletion in a selection toolbar is a red icon action, not a filled tile. */
+body .file-action-button[data-action=delete],body.night-mode .file-action-button[data-action=delete] { background:transparent !important;color:var(--md-danger) !important;box-shadow:none !important; }
+body .file-action-button :is(i,span) { color:inherit; }
+body :is(.notes-file-card,.notes-folder-card,.file-manager-card) {
+    background:var(--md-container) !important;color:var(--md-text);border:1px solid transparent;border-radius:20px;box-shadow:none;
+}
+body :is(.notes-file-card,.notes-folder-card).selected,body.night-mode :is(.notes-file-card,.notes-folder-card).selected {
+    background:var(--md-selected) !important;color:var(--md-text) !important;border-color:var(--md-primary);outline:none;
+}
+body :is(.notes-file-title,.notes-folder-title) { color:var(--md-text); }
+body :is(.notes-file-preview,.notes-file-card time,.file-manager-size,.file-manager-upload-date) { color:var(--md-muted) !important; }
+body .notes-home-search { background:var(--md-container);color:var(--md-text); }
+body .notes-folder-tab { background:transparent;color:var(--md-text);border-color:var(--md-outline);border-radius:14px; }
+body .notes-folder-tab.active,body.night-mode .notes-folder-tab.active { background:var(--md-selected) !important;color:var(--md-primary-text) !important;border-color:var(--md-primary); }
+body .jstree-default .jstree-clicked { background:var(--md-selected);color:var(--md-text);border-radius:8px;box-shadow:none; }
+body .jstree-default .jstree-hovered { background:var(--md-container);border-radius:8px;box-shadow:none; }
+/* Fields have exactly one outline. Pointer focus does not add a second ring. */
+body :is(.modal,.custom-dialog-content,.desktop-editor-dialog,.file-action-sheet,.file-manager-page)
+    :where(input:not([type=checkbox]):not([type=radio]):not([type=color]):not([type=range]):not([type=file]),textarea,select) {
+    background:var(--md-field) !important;color:var(--md-text) !important;
+    border:1px solid var(--md-outline) !important;border-radius:12px !important;box-sizing:border-box;
+    outline:none !important;box-shadow:none !important;
+}
+body :is(.modal,.custom-dialog-content,.desktop-editor-dialog,.file-action-sheet)
+    :is(input,textarea,select):focus { border-color:var(--md-primary) !important; }
+body :is(button,[role=button]):focus-visible { outline:2px solid var(--md-primary);outline-offset:2px; }
+body :is(input[type=checkbox],input[type=radio]) { accent-color:var(--md-primary); }
+body :is(.epmd-dialog-close,.modal-close-btn,.custom-dialog-close) {
+    border-radius:50% !important;background:var(--md-container) !important;color:var(--md-muted) !important;box-shadow:none !important;
+}
+/* Account pages must clear native inline layers as well as the Settings layer. */
+.user-menu-dropdown.show { z-index:100150 !important; }
+:is(#loginModalOverlay,#userSettingsModalOverlay,#changePasswordModalOverlay,#deleteAccountModalOverlay,#addAccountModalOverlay,#switchAccountConfirmModalOverlay).show { z-index:100160 !important; }
+#settingsModalOverlay .settings-modal { padding:20px !important; }
+#settingsModalOverlay .modal-header { padding:0 44px 18px 0;background:var(--md-surface) !important;border:0;box-shadow:none !important;text-align:left; }
+#settingsModalOverlay .modal-header h2 { margin:0;text-align:left;font-size:24px;color:var(--md-text); }
+#settingsModalOverlay .modal-form { padding-right:4px !important; }
+#settingsModalOverlay .settings-section { padding:16px;margin-bottom:14px;border:1px solid var(--md-outline);border-radius:16px;background:var(--md-container);box-shadow:none; }
+#settingsModalOverlay .settings-section-header,body.night-mode #settingsModalOverlay .settings-section-header {
+    padding:0 0 12px;background:transparent !important;box-shadow:none !important;border:0;
+}
+#settingsModalOverlay .settings-section-title { padding:0;color:var(--md-text);font-weight:600; }
+#settingsModalOverlay .settings-collapsible-summary,body.night-mode #settingsModalOverlay .settings-collapsible-summary { background:transparent !important;color:var(--md-text);box-shadow:none;border:0; }
+#settingsModalOverlay .settings-section-header > i { color:var(--md-primary); }
+#settingsModalOverlay .settings-list { margin:0;padding:0;background:transparent; }
+#settingsModalOverlay .settings-list-item { padding:8px 0;border:0;background:transparent; }
+#settingsModalOverlay .radio-group { display:flex;flex-wrap:wrap;gap:8px; }
+#settingsModalOverlay .radio-group label { padding:8px 10px;border:1px solid var(--md-outline);border-radius:12px;background:transparent;color:var(--md-text); }
+#settingsModalOverlay .radio-group label:has(input:checked) { border-color:var(--md-primary); }
+#settingsModalOverlay :is(.settings-hint,.settings-section-hint,.background-hint) { color:var(--md-muted); }
+#settingsModalOverlay .modal-actions,body.night-mode #settingsModalOverlay .modal-actions { background:var(--md-surface) !important;box-shadow:none;border-top:1px solid var(--md-outline);padding:12px 0 0; }
+#appearanceSettings { padding:12px;border:1px solid var(--md-outline);border-radius:14px;background:transparent; }
+#appearanceSettings summary { color:var(--md-text); }
+#appearanceSettings .appearance-settings-content { margin-top:12px; }
+#appearanceSettings .background-setting-actions { display:flex;flex-wrap:wrap;align-items:center;gap:10px;background:transparent;padding:8px 0; }
+#appearanceSettings input[type=color] { width:42px;height:34px;padding:3px;border:1px solid var(--md-outline);border-radius:8px;background:var(--md-field); }
+#appearanceSettings button { border:1px solid var(--md-outline);border-radius:10px;padding:8px 12px;background:var(--md-surface);color:var(--md-text); }
+#backgroundPreview { height:96px;border-radius:12px;border-color:var(--md-outline); }
+.settings-account-button { display:flex;align-items:center;gap:12px;width:100%;padding:12px;border:0;border-radius:12px;background:var(--md-surface);color:var(--md-text);text-align:left; }
+.settings-account-button > i:first-child { font-size:22px;color:var(--md-primary); }
+.settings-account-button > i:last-child { margin-left:auto;font-size:12px;color:var(--md-muted); }
+.file-local-badge { flex-shrink:0;padding:2px 5px;border-radius:6px;font-size:10px;line-height:1.4;color:var(--md-primary-text);background:var(--md-selected); }
 #desktopLoginBtn,#mobileLoginBtn,.notes-account-button { display:none !important; }
 .android-app #saveFileBtn { display:none !important; }
-#mobileMenuAIBtn { display:none; }
-.android-app #mobileMenuAIBtn { display:flex; }
-/* Account menus remain above the Settings surface which now owns their entry point. */
-.user-menu-dropdown.show { z-index:100150 !important; }
-:is(#loginModalOverlay,#userSettingsModalOverlay,#changePasswordModalOverlay,#deleteAccountModalOverlay).show { z-index:100160; }
-#settingsModalOverlay .settings-modal { background:var(--md-surface);color:var(--md-text);padding:22px !important; }
-#settingsModalOverlay .modal-header { padding:0 44px 18px 0;border:0;text-align:left; }
-#settingsModalOverlay .modal-header h2 { text-align:left;margin:0;font-size:24px;font-weight:600; }
-#settingsModalOverlay .modal-form { padding:0 4px 8px 0 !important; }
-#settingsModalOverlay .settings-section { background:var(--md-container);border:1px solid var(--md-outline);border-radius:18px;padding:16px;margin-bottom:14px;box-shadow:none; }
-#settingsModalOverlay .settings-section-header { padding:0 0 12px;margin:0;gap:10px;border:0; }
-#settingsModalOverlay .settings-section-header > i { color:var(--theme-accent,#3478e5); }
-#settingsModalOverlay .settings-section-title { color:var(--md-text);font-size:15px;font-weight:600; }
-#settingsModalOverlay .settings-list { margin:0;padding:0;gap:14px;background:transparent; }
-#settingsModalOverlay .settings-list-item { background:transparent;border:0;padding:4px 0;margin:0;border-radius:0; }
-#settingsModalOverlay .form-group { padding:0;margin:0 0 8px; }
-#settingsModalOverlay :is(.settings-hint,.background-hint) { color:var(--md-muted);font-size:12px;line-height:1.6; }
-#settingsModalOverlay input:not([type=radio]):not([type=checkbox]):not([type=color]):not([type=file]),#settingsModalOverlay select { border:1px solid var(--md-outline);background:var(--md-surface);color:var(--md-text);border-radius:12px;min-height:38px;padding:8px 12px;box-shadow:none; }
-#settingsModalOverlay :is(input[type=checkbox],input[type=radio]) { accent-color:var(--theme-accent,#3478e5); }
-#settingsModalOverlay .radio-group { display:flex;flex-wrap:wrap;gap:6px; }
-#settingsModalOverlay .radio-group label { border:1px solid var(--md-outline);border-radius:10px;padding:7px 10px;background:var(--md-surface);font-size:13px; }
-#settingsModalOverlay .radio-group label:has(input:checked) { color:var(--theme-accent,#3478e5);border-color:var(--theme-accent,#3478e5);background:color-mix(in srgb,var(--theme-accent,#3478e5) 10%,var(--md-surface)); }
-#appearanceSettings { border:1px solid var(--md-outline);background:var(--md-surface);border-radius:14px;padding:12px; }
-#appearanceSettings summary { padding:2px 0;font-size:14px;font-weight:500;color:var(--md-text); }
-#appearanceSettings .appearance-settings-content { display:grid;grid-template-columns:minmax(0,1fr);gap:10px;margin:14px 0 0; }
-#appearanceSettings .background-setting-actions { display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin:0;padding:10px;border-radius:12px;background:var(--md-container); }
-#appearanceSettings input[type=color] { width:42px;height:34px;border:1px solid var(--md-outline);border-radius:10px;padding:3px;background:var(--md-surface);cursor:pointer; }
-#appearanceSettings button { border:0;border-radius:12px;padding:8px 12px;background:var(--md-surface);color:var(--theme-accent,#3478e5);font-size:12px; }
-#backgroundPreview { height:96px;border-radius:12px;border-color:var(--md-outline); }
-.settings-account-button { display:flex;align-items:center;gap:12px;width:100%;border:0;border-radius:12px;padding:12px;background:var(--md-surface);color:var(--md-text);text-align:left; }
-.settings-account-button > i:first-child { color:var(--theme-accent,#3478e5);font-size:22px; }
-.settings-account-button > i:last-child { margin-left:auto;color:var(--md-muted);font-size:12px; }
-@media(max-width:768px) { #settingsModalOverlay .settings-modal { padding:16px !important; } #settingsModalOverlay .settings-section { padding:14px; } }
-@media(prefers-reduced-motion:reduce) { :is(button,.bottom-btn,.notes-file-card,.notes-folder-tab,.jstree-anchor) { transition:none; } }
-
-/* One component language for the web, desktop shell and Android shell. Document
-   content keeps its own typography; these rules style application chrome. */
-:root {
-    --md-primary:var(--theme-accent,#3478e5);
-    --md-primary-container:color-mix(in srgb,var(--md-primary) 12%,var(--md-surface));
-    --md-error:#ba1a1a;
-    --md-shape-small:12px;
-    --md-shape-medium:16px;
-    --md-shape-large:24px;
-    --md-state-hover:color-mix(in srgb,var(--md-primary) 8%,var(--md-surface));
-    --md-state-pressed:color-mix(in srgb,var(--md-primary) 16%,var(--md-surface));
-}
-body.night-mode { --md-error:#ffb4ab; }
-body :is(.mobile-toolbar-container,.mobile-bottom-bar,.desktop-toolbar,.file-selection-bar) {
-    background:var(--md-surface);color:var(--md-text);border-color:var(--md-outline);box-shadow:0 2px 8px #0000000a;
-}
-body :is(.desktop-toolbar-btn,.mobile-action-btn,.bottom-btn) {
-    border-radius:var(--md-shape-medium);border-color:transparent;color:var(--md-text);box-shadow:none;
-}
-body :is(.desktop-toolbar-btn,.mobile-action-btn,.bottom-btn):hover { background:var(--md-state-hover); }
-body :is(.desktop-toolbar-btn,.mobile-action-btn,.bottom-btn):active { background:var(--md-state-pressed); }
-body :is(.modal,.custom-dialog-content,.mobile-action-sheet,.file-action-sheet,.file-details-dialog,
-    .desktop-editor-dialog,.ai-layout-dialog,.modal-overlay > div:not(.modal-overlay)) {
-    background:var(--md-surface) !important;color:var(--md-text) !important;
-    border:1px solid var(--md-outline);border-radius:var(--md-shape-large) !important;box-shadow:var(--md-elevation) !important;
-}
-body :is(.modal-header,.history-page-heading,.file-manager-heading) { border-color:var(--md-outline);color:var(--md-text); }
-body :is(.modal-header h2,.modal-header h3,.history-page-heading h2) { font-weight:600;letter-spacing:0; }
-body :is(.modal,.custom-dialog-content,.mobile-action-sheet,.chart-picker-modal,.insert-picker-modal,
-    .footnote-picker-modal,.mindmap-picker-modal,.formula-picker-modal,.emoji-picker-modal,.file-action-sheet,.file-manager-page)
-    :is(button:not(.epmd-dialog-close):not(.modal-close-btn):not(.custom-dialog-close),.tab-btn) {
-    border-radius:var(--md-shape-small) !important;transition:background-color .18s,box-shadow .18s,transform .12s;
-}
-body :is(.modal,.custom-dialog-content,.chart-picker-modal,.insert-picker-modal,.footnote-picker-modal,
-    .mindmap-picker-modal,.formula-picker-modal,.emoji-picker-modal,.file-manager-page)
-    :is(input:not([type=checkbox]):not([type=radio]):not([type=color]):not([type=range]):not([type=file]),textarea,select) {
-    border:1px solid var(--md-outline) !important;border-radius:var(--md-shape-small) !important;
-    background:var(--md-container) !important;color:var(--md-text) !important;box-sizing:border-box;
-}
-body :is(.modal,.custom-dialog-content) :is(input,textarea,select):focus { border-color:var(--md-primary) !important; }
-body :is(.modal-btn.primary,.custom-dialog-btn.confirm,.file-management-fab) {
-    background:var(--md-primary) !important;color:#fff;border-radius:20px !important;box-shadow:0 2px 6px #0002;
-}
-body :is(.modal-btn.secondary,.custom-dialog-btn.cancel,.file-manager-control) {
-    background:var(--md-primary-container) !important;color:var(--md-primary) !important;border:0;
-}
-body :is(.custom-dialog-btn.danger,.modal-btn.danger,.del-btn,.file-selection-action.danger) {
-    background:var(--md-error) !important;color:#fff !important;
-}
-body.night-mode :is(.custom-dialog-btn.danger,.modal-btn.danger,.del-btn,.file-selection-action.danger) { color:#601410 !important; }
-body :is(.desktop-dropdown-content,.mobile-dropdown-content,.user-menu-dropdown,.jstree-contextmenu) {
-    background:var(--md-container) !important;color:var(--md-text);border:1px solid var(--md-outline);border-radius:16px;box-shadow:var(--md-elevation);
-}
-body :is(.dropdown-item,.desktop-dropdown-item,.user-menu-item) { border-radius:10px;color:var(--md-text); }
-body :is(.dropdown-item,.desktop-dropdown-item,.user-menu-item):hover { background:var(--md-state-hover); }
-body :is(.tab-btn.active,.formula-tab.active,.emoji-tab.active,.notes-folder-tab.active) {
-    background:var(--md-primary-container) !important;color:var(--md-primary) !important;border-color:var(--md-primary);
-}
-body :is(.notes-file-card,.notes-folder-card,.file-manager-card,.history-version-item) {
-    background:var(--md-container) !important;color:var(--md-text);border-radius:20px;border-color:var(--md-outline);
-}
-body :is(.notes-file-card,.notes-folder-card).selected { background:var(--md-primary-container) !important;border-color:var(--md-primary); }
-body :is(.notes-home-search,.notes-folder-tab) { background:var(--md-container);color:var(--md-text);border-color:var(--md-outline); }
-body :is(.file-manager-page,.notes-home,.file-list-sidebar) { color:var(--md-text); }
-body #fileListSidebar { border-color:var(--md-outline); }
-body .jstree-default .jstree-hovered { background:var(--md-state-hover);border-radius:10px;box-shadow:none; }
-body .jstree-default .jstree-clicked { background:var(--md-primary-container);border-radius:10px;box-shadow:none; }
-body :is(.epmd-dialog-close,.modal-close-btn,.custom-dialog-close) {
-    border-radius:50% !important;background:var(--md-container) !important;color:var(--md-muted) !important;box-shadow:none;
-}
-body :is(.epmd-dialog-close,.modal-close-btn,.custom-dialog-close):hover { background:var(--md-state-pressed) !important;color:var(--md-text) !important; }
-body :is(.modal,.custom-dialog-content,.file-manager-page) :is(input[type=checkbox],input[type=radio]) { accent-color:var(--md-primary); }
-@media(prefers-reduced-motion:reduce) { body button { transition:none !important; } }
-.android-storage-button { display:none; }
-.android-app .android-storage-button { display:flex;margin-top:8px; }
-/* Picker classes are backdrops, while their children are the elevated surfaces. */
-body :is(.chart-picker-modal,.insert-picker-modal,.footnote-picker-modal,.mindmap-picker-modal,.formula-picker-modal,.emoji-picker-modal) > div {
-    background:var(--md-surface) !important;color:var(--md-text) !important;border-radius:24px !important;border:1px solid var(--md-outline);box-shadow:var(--md-elevation) !important;
-}
-body :is(.chart-picker-modal,.insert-picker-modal,.footnote-picker-modal,.mindmap-picker-modal,.formula-picker-modal,.emoji-picker-modal) {
-    background:#0008;border-radius:0;box-shadow:none;
-}
-body .desktop-editor-dialog :is(input:not([type=checkbox]):not([type=radio]):not([type=color]):not([type=range]):not([type=file]),textarea,select) {
-    background:var(--md-container) !important;color:var(--md-text) !important;border:1px solid var(--md-outline) !important;border-radius:12px !important;
-}
-body :is(.ai-style-option,.ppt-source-btn,.code-output,.epmd-image-tool-panel) {
-    border-radius:12px !important;border-color:var(--md-outline);background:var(--md-container);color:var(--md-text);
-}
-body :is(.ai-style-option.selected,.ppt-source-btn.active) { background:var(--md-primary-container) !important;border-color:var(--md-primary) !important; }
-body :is(.code-run-button,.epmd-image-tool-btn,.epmd-modal-btn) { border-radius:12px !important; }
-body :is(.notes-file-preview,.notes-file-card time,.file-manager-size,.file-manager-upload-date) { color:var(--md-muted); }
-body :is(.file-manager-page,.file-selection-panel) { background:var(--md-surface) !important;color:var(--md-text);border-color:var(--md-outline); }
-body .file-action-button { border-radius:12px;color:var(--md-text); }
-body .file-action-button:hover { background:var(--md-state-hover); }
-body .file-action-button[data-action=delete] { color:var(--md-error) !important; }
-body .file-action-button:active { background:var(--md-state-pressed); }
-body :is(.mobile-toolbar-container,.desktop-toolbar,.mobile-bottom-bar) button:focus-visible { outline:2px solid var(--md-primary);outline-offset:2px; }
-body :is(.notes-home,.modal,.custom-dialog-content,.file-manager-page) button:disabled { opacity:.45;box-shadow:none;cursor:default;transform:none; }
+#mobileMenuAIBtn,.android-storage-button { display:none; }
+.android-app #mobileMenuAIBtn,.android-app .android-storage-button { display:flex; }
+.android-app .android-storage-button { margin-top:8px; }
+/* Ripple ink is clipped in a non-interactive portal, never in the button itself. */
+.md-ripple-layer { position:fixed;pointer-events:none;overflow:hidden;z-index:2147483647;contain:strict; }
+.md-ripple-wave { position:absolute;border-radius:50%;opacity:0;transform:scale(0);animation:md-ripple .55s ease-out forwards; }
+@keyframes md-ripple { 0% { transform:scale(0);opacity:.2; } 65% { opacity:.14; } 100% { transform:scale(1);opacity:0; } }
+@media(hover:hover) { body :is(.desktop-toolbar-btn,.mobile-action-btn,.bottom-btn,.file-action-button,.dropdown-item):hover { box-shadow:inset 0 0 0 100px #80808012; } }
+@media(max-width:768px) { #settingsModalOverlay .settings-modal { padding:16px !important; } }
+@media(prefers-reduced-motion:reduce) { .md-ripple-layer { display:none; } }

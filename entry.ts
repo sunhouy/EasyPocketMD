@@ -3,6 +3,8 @@ import '@fortawesome/fontawesome-free/css/all.min.css';
 import 'cropperjs/dist/cropper.css';
 import './css/styles.css';
 import './css/material.css';
+import { installMaterialInteractions } from './js/main/material-interactions';
+installMaterialInteractions();
 
 import './js/jquery-global';
 import './js/tauri-bridge';

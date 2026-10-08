@@ -1,4 +1,4 @@
-import { isAndroidApp, defaultBottomButtons, applyAndroidDefaults, installAndroidChrome } from './main/android-ui';
+import { isAndroidApp, defaultBottomButtons, applyAndroidDefaults, installAndroidChrome, orderedBottomButtons } from './main/android-ui';
 import { installNativeOpenBridge } from './main/native-open';
 import { isMarketBuild } from './build-variant';
 import { createDeploymentRouteStatus } from './main/deployment-route';
@@ -2547,7 +2547,7 @@ document.addEventListener('DOMContentLoaded', function() {
         var buttons = window.userSettings.toolbarButtons || window.defaultToolbarButtons;
         var visibleButtons = getVisibleToolbarButtons();
 
-        buttons.forEach(function(btnId) {
+        orderedBottomButtons(buttons,isAndroidApp()).forEach(function(btnId) {
             var btnConfig = visibleButtons.find(function(b) { return b.id === btnId; });
             if (btnConfig) {
                 var btn = document.createElement('button');
