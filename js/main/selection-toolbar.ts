@@ -21,8 +21,17 @@ export function installSelectionToolbar(app:any=window) {
         const surfaces=Array.from(document.querySelectorAll<HTMLElement>('.modal-overlay.show,[role=dialog]'));
         return !surfaces.some(surface=>visibleSurface(surface) && !surface.contains(owner));
     };
-    const visibleSurface=(node:HTMLElement)=>!node.hidden && getComputedStyle(node).display!=='none' && getComputedStyle(node).visibility!=='hidden';
-    const hide=()=>{toolbar.hidden=true;snapshot=null;};
+    const visibleSurface=(node:HTMLElement)=>{
+        for(let parent:HTMLElement|null=node;parent;parent=parent.parentElement){const style=getComputedStyle(parent);if(parent.hidden || parent.getAttribute('aria-hidden')==='true' || style.display==='none' || style.visibility==='hidden' || style.opacity==='0')return false;}
+        return true;
+    };
+    const observer=new MutationObserver(()=>{if(snapshot && (!snapshot.owner.isConnected || !visible(snapshot.owner)))hide();});
+    let observedOwner:HTMLElement|null=null;
+    const hide=()=>{toolbar.hidden=true;snapshot=null;observer.disconnect();observedOwner=null;};
+    function observeOwner(owner:HTMLElement){
+        if(owner===observedOwner)return;observer.disconnect();observedOwner=owner;
+        for(let parent:HTMLElement|null=owner;parent;parent=parent.parentElement)observer.observe(parent,{attributes:true,attributeFilter:['hidden','class','style'],childList:true});
+    }
     function capture():Snapshot|null {
         const active=document.activeElement as HTMLElement;
         if(toolbar.contains(active))return snapshot;
@@ -63,7 +72,7 @@ export function installSelectionToolbar(app:any=window) {
     function refresh(){
         frame=0;if(busy)return;
         const next=capture();if(!next){hide();return;}
-        snapshot=next;toolbar.hidden=false;
+        snapshot=next;observeOwner(next.owner);toolbar.hidden=false;
         toolbar.setAttribute('aria-label',app.i18n?.getLanguage?.()==='en'?'Text actions':'文本操作');
         for(const button of Array.from(toolbar.querySelectorAll<HTMLButtonElement>('button'))){
             const action=actions.find(a=>a[0]===button.dataset.action)!;
@@ -108,11 +117,11 @@ export function installSelectionToolbar(app:any=window) {
         button.onpointerdown=event=>event.preventDefault();button.onmousedown=event=>event.preventDefault();button.onclick=()=>{void execute(action);};toolbar.append(button);
     }
     document.addEventListener('selectionchange',schedule);
-    document.addEventListener('select',schedule,true);document.addEventListener('keyup',event=>{if(event.key!=='Escape')schedule();},true);document.addEventListener('pointerup',schedule,true);
+    document.addEventListener('select',schedule,true);document.addEventListener('pointerup',schedule,true);
+    document.addEventListener('touchend',schedule,{passive:true});
+    document.addEventListener('beforeinput',hide,true);
     document.addEventListener('pointerdown',event=>{if(!toolbar.contains(event.target as Node)){hide();schedule();}},true);
     document.addEventListener('keydown',event=>{if(event.key==='Escape')hide();});
     document.addEventListener('scroll',()=>{if(snapshot && !toolbar.hidden){if(snapshot.valid())position(snapshot);else hide();}},true);
     window.addEventListener('resize',schedule);window.visualViewport?.addEventListener('resize',schedule);
-    const observer=new MutationObserver(()=>{if(snapshot && !snapshot.valid())hide();});
-    observer.observe(document.body,{subtree:true,childList:true,attributes:true,attributeFilter:['hidden','class','style']});
 }

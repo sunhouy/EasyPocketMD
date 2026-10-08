@@ -6,6 +6,9 @@ static delivery run in containers. All images are already loaded offline.
 """
 import fcntl
 import hashlib
+import http.client
+import socket
+import ssl
 import ipaddress
 import json
 import os
@@ -125,6 +128,59 @@ def gateway_diagnostics(name, origin=None):
         print(f'Candidate diagnostics unavailable: {type(error).__name__}', flush=True)
 
 
+def nginx_site_directory(nginx):
+    """Use an included directory of the running nginx, not an unused panel path."""
+    result = command(nginx, '-T', capture_output=True, text=True)
+    config = result.stdout
+    candidates = re.findall(r'^\s*include\s+([^;]+);', config, re.MULTILINE)
+    for preferred in ('/www/server/panel/vhost/nginx', '/etc/nginx/conf.d', '/etc/nginx/sites-enabled'):
+        if any(item.strip().strip('"').startswith(preferred + '/') for item in candidates):
+            return Path(preferred)
+    raise RuntimeError('No supported active nginx vhost include directory; existing service retained')
+
+
+def public_https_health(domain, channel, edge):
+    """Probe the actual port 443 with SNI, certificate validation and routing."""
+    context = ssl.create_default_context() if channel == 'main' else ssl._create_unverified_context()
+    context.minimum_version = ssl.TLSVersion.TLSv1_2
+    for attempt in range(10):
+        connection = None
+        try:
+            transport = socket.create_connection(('127.0.0.1', 443), timeout=5)
+            try:
+                tls = context.wrap_socket(transport, server_hostname=domain)
+            except Exception:
+                transport.close()
+                raise
+            connection = http.client.HTTPConnection(domain, timeout=5)
+            connection.sock = tls
+            connection.request('GET', '/api/health', headers={'Host': domain})
+            response = connection.getresponse()
+            if response.status != 200 or json.loads(response.read()).get('code') != 200:
+                raise RuntimeError('Public HTTPS API unhealthy')
+            connection.close()
+            transport = socket.create_connection(('127.0.0.1', 443), timeout=5)
+            try:
+                tls = context.wrap_socket(transport, server_hostname=domain)
+            except Exception:
+                transport.close()
+                raise
+            connection = http.client.HTTPConnection(domain, timeout=5)
+            connection.sock = tls
+            connection.request('GET', '/deployment-route.json', headers={'Host': domain})
+            response = connection.getresponse()
+            if response.status != 200 or json.loads(response.read()).get('route') != ('overseas' if edge else 'domestic'):
+                raise RuntimeError('Public HTTPS points at the wrong gateway')
+            return
+        except Exception as error:
+            if attempt == 9:
+                raise RuntimeError('Public HTTPS/SNI health check failed; existing service retained') from error
+            time.sleep(1)
+        finally:
+            if connection:
+                connection.close()
+
+
 def activate(release, channel, slot, current):
     manifest = json.loads((release / 'release.json').read_text())
     config = json.loads((release / 'config.json').read_text())
@@ -204,7 +260,7 @@ def activate(release, channel, slot, current):
                 shutil.copy2(supplied, destination); destination.chmod(0o600 if target.endswith('key.pem') else 0o644)
         if not (cert / 'privkey.pem').is_file() or not (cert / 'fullchain.pem').is_file():
             raise RuntimeError('TLS certificate missing; existing service retained')
-        vhost = Path('/www/server/panel/vhost/nginx') / (domain + '.conf')
+        vhost = nginx_site_directory(nginx) / (domain + '.conf')
         backups[vhost] = vhost.read_bytes() if vhost.exists() else None
         # Only advertise the hostname covered by this channel's certificate.
         domains = domain
@@ -248,6 +304,7 @@ server {{
             write_atomic(print_vhost, new, 0o644)
         command(nginx, '-t')
         command(nginx, '-s', 'reload')
+        public_https_health(domain, channel, edge)
         candidate = {'release': str(release), 'slot': slot, 'containers': names,
                      'github_run_id': config.get('github_run_id')}
         write_atomic(release / '.activated', 'healthy\n')
