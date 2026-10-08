@@ -133,3 +133,8 @@ it('shows shared synchronization states and encryption locks and opens conflicts
     endFileSync(app.files[2]);render();
     expect(document.querySelector('[data-file-id="note"].notes-file-card .fa-spin')).toBeNull();
 });
+it('labels external local documents without marking cloud documents as local',()=>{
+    app.files=[{id:'local',type:'file',name:'local.md',localFilePath:'/storage/emulated/0/Documents/local.md',content:'本地',lastModified:2},{id:'cloud',type:'file',name:'cloud.md',content:'云端',lastModified:1}];
+    render();expect(document.querySelector('[data-file-id="local"] .file-local-badge').textContent).toBe('本地');
+    expect(document.querySelector('[data-file-id="cloud"] .file-local-badge')).toBeNull();
+});

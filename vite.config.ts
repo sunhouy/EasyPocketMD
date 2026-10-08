@@ -5,6 +5,8 @@ import { viteStaticCopy } from 'vite-plugin-static-copy';
 import { readFileSync, existsSync, writeFileSync, readFile, cpSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
+const nativeResourcesDir = join(__dirname, '.native-resources');
+const nativeBundle = process.env.VITE_NATIVE_BUNDLE === '1';
 const versionPath = join(__dirname, 'version.json');
 const packageJsonPath = join(__dirname, 'package.json');
 const wasmJsPath = join(__dirname, 'wasm_text_engine', 'dist', 'text_engine.js');
@@ -170,6 +172,7 @@ export default defineConfig({
   base: '/',
   publicDir: 'public',
   define: {
+    __NATIVE_BUNDLE__: JSON.stringify(nativeBundle),
     __APP_MARKET__: JSON.stringify(process.env.VITE_APP_MARKET === '1'),
     __WASM_TEXT_ENGINE_PRESENT__: JSON.stringify(hasWasmTextEngineDist),
     __APP_BUILD_TAG__: JSON.stringify(cacheVersion),
@@ -254,6 +257,7 @@ export default defineConfig({
     },
     viteStaticCopy({
       targets: [
+        ...(nativeBundle ? [{src: join(nativeResourcesDir, 'live2d'), dest: 'native-resources'}] : []),
         { src: ['assets/fonts/liberation/LICENSE', 'assets/fonts/liberation/NOTICE.md'], dest: 'licenses/liberation' },
         { src: ['vendor/ppt-templates/LICENSE', 'vendor/ppt-templates/NOTICE.md'], dest: 'licenses/ppt-templates' },
         {

@@ -3,6 +3,11 @@ package cn.yhsun.md
 import java.util.ArrayDeque
 import android.app.Activity
 import android.content.Intent
+import android.os.Build
+import android.os.Environment
+import android.provider.Settings
+import android.provider.DocumentsContract
+import java.io.File
 import android.net.Uri
 import android.provider.OpenableColumns
 import java.util.concurrent.Executors
@@ -14,6 +19,9 @@ import app.tauri.annotation.TauriPlugin
 import app.tauri.plugin.Invoke
 import app.tauri.plugin.JSObject
 import app.tauri.plugin.Plugin
+
+@InvokeArg
+class StorageArgs { var force: Boolean = false }
 
 @InvokeArg
 class DocumentArgs {
@@ -28,10 +36,51 @@ object IncomingDocuments {
     @Synchronized fun consume(): String? = if (queue.isEmpty()) null else queue.removeFirst()
 }
 
-/** Keep SAF document URIs and grants; never translate them into storage paths. */
+/** Reuse persistent grants and, when authorized, shared-storage paths. */
 @TauriPlugin
 class LocalDocumentsPlugin(private val activity: Activity) : Plugin(activity) {
     private val io = Executors.newSingleThreadExecutor()
+
+    @Command
+    fun storageAccess(invoke: Invoke) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+            invoke.resolve(JSObject().put("granted", false)); return
+        }
+        if (Environment.isExternalStorageManager()) {
+            invoke.resolve(JSObject().put("granted", true)); return
+        }
+        val prefs = activity.getSharedPreferences("local-documents", Activity.MODE_PRIVATE)
+        // A declined request must never repeatedly interrupt startup or file saves.
+        if (!invoke.parseArgs(StorageArgs::class.java).force && prefs.getBoolean("storage-access-requested", false)) {
+            invoke.resolve(JSObject().put("granted", false)); return
+        }
+        prefs.edit().putBoolean("storage-access-requested", true).apply()
+        val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION, Uri.parse("package:" + activity.packageName))
+        try { startActivityForResult(invoke, intent, "storageAccessResult") }
+        catch (_: Exception) { invoke.resolve(JSObject().put("granted", false)) }
+    }
+
+    @ActivityCallback
+    fun storageAccessResult(invoke: Invoke, result: ActivityResult) {
+        invoke.resolve(JSObject().put("granted", Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && Environment.isExternalStorageManager()))
+    }
+
+    private fun sharedFile(uri: Uri): File? {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R || !Environment.isExternalStorageManager()) return null
+        if (uri.scheme == "file") return uri.path?.let { File(it) }
+        if (uri.authority != "com.android.externalstorage.documents") return null
+        return try {
+            val parts = DocumentsContract.getDocumentId(uri).split(":", limit = 2)
+            if (parts.size != 2) return null
+            val root = when {
+                parts[0] == "primary" -> Environment.getExternalStorageDirectory().canonicalFile
+                parts[0].matches(Regex("[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}")) -> File("/storage", parts[0]).canonicalFile
+                else -> return null
+            }
+            val file = File(root, parts[1]).canonicalFile
+            if (file.path.startsWith(root.path + File.separator)) file else null
+        } catch (_: Exception) { null }
+    }
 
     @Command
     fun consumeIntent(invoke: Invoke) {
@@ -74,6 +123,10 @@ class LocalDocumentsPlugin(private val activity: Activity) : Plugin(activity) {
     private fun readDocument(uri: Uri): JSObject {
         val out = JSObject().put("path", uri.toString()).put("localFileMode", "tauri")
         try {
+            val direct = sharedFile(uri)
+            if (direct != null && direct.isFile) {
+                return out.put("path", direct.path).put("name", direct.name).put("content", direct.readText(Charsets.UTF_8)).put("success", true).put("writable", direct.canWrite())
+            }
             try {
                 if (uri.scheme == "content") activity.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
                     if (cursor.moveToFirst()) out.put("name", cursor.getString(0))
@@ -97,8 +150,14 @@ class LocalDocumentsPlugin(private val activity: Activity) : Plugin(activity) {
         val args = invoke.parseArgs(DocumentArgs::class.java)
         io.execute {
         try {
-            activity.contentResolver.openOutputStream(Uri.parse(args.uri), "wt")?.use { it.write(args.content.toByteArray(Charsets.UTF_8)) }
-                ?: throw IllegalStateException("Cannot save local document")
+            val uri = Uri.parse(args.uri)
+            val direct = sharedFile(uri)
+            if (direct != null) {
+                direct.writeText(args.content, Charsets.UTF_8)
+            } else {
+                activity.contentResolver.openOutputStream(uri, "wt")?.use { it.write(args.content.toByteArray(Charsets.UTF_8)) }
+                    ?: throw IllegalStateException("Cannot save local document")
+            }
             invoke.resolve(JSObject().put("success", true).put("path", args.uri))
         } catch (e: Exception) {
             invoke.resolve(JSObject().put("success", false).put("path", args.uri).put("error", e.message ?: "Cannot save local document"))

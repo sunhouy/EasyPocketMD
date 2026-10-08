@@ -1,5 +1,7 @@
 /** Shared message catalogue for newer dialogs and tools. Chinese source text is the message ID. */
 export const uiMessages: Record<string, string> = {
+    "登录与账户管理": "Sign in and manage accounts",
+    "允许访问本地文件": "Allow access to local files",
     "背景预览": "Background preview",
     "输入PPT主题...": "Enter a presentation topic…",
     "此文件已使用端到端加密": "This file is end-to-end encrypted",

@@ -1,3 +1,4 @@
+import { isAndroidApp, defaultBottomButtons, applyAndroidDefaults, installAndroidChrome } from './main/android-ui';
 import { installNativeOpenBridge } from './main/native-open';
 import { isMarketBuild } from './build-variant';
 import { createDeploymentRouteStatus } from './main/deployment-route';
@@ -1173,10 +1174,12 @@ document.addEventListener('DOMContentLoaded', function() {
     ];
 
     // 默认配置（未登录时显示：插入、公式、图表、撤销、重做、AI助手）
-    window.defaultToolbarButtons = ['mobileInsertBtn', 'mobileFormulaBtn', 'mobileChartBtn', 'mobileUndoBtn', 'mobileRedoBtn', 'mobileAIBtn'];
+    window.defaultToolbarButtons = defaultBottomButtons(isAndroidApp());
+    installAndroidChrome();
 
     // 加载用户配置
     window.userSettings = JSON.parse(localStorage.getItem('vditor_settings') || '{}');
+    applyAndroidDefaults(window.userSettings,isAndroidApp());
     delete (window.userSettings as any).storageLocation; // Retired setting: uploads always use the server.
     const backgroundControls = createBackgroundControls();
     const live2dControls = createLive2DControls();
@@ -1684,7 +1687,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (overlay && false && e.target === overlay) window.hideMobileActionSheet();
                     var mobileLoginBtn = (document.getElementById('mobileLoginBtn') as HTMLButtonElement);
                     var desktopLoginBtn = (document.getElementById('desktopLoginBtn') as HTMLButtonElement);
-                    var loginTriggerClicked = (mobileLoginBtn && mobileLoginBtn.contains(e.target)) || (desktopLoginBtn && desktopLoginBtn.contains(e.target));
+                    var settingsAccountBtn = document.getElementById('settingsAccountBtn');
+                    var loginTriggerClicked = (settingsAccountBtn && settingsAccountBtn.contains(e.target)) || (mobileLoginBtn && mobileLoginBtn.contains(e.target)) || (desktopLoginBtn && desktopLoginBtn.contains(e.target));
                     if (userMenu && !loginTriggerClicked && !userMenu.contains(e.target)) userMenu.classList.remove('show');
                 });
             }
@@ -3854,6 +3858,13 @@ document.addEventListener('DOMContentLoaded', function() {
     window.resetMobileChromeScroll = function() { mobileChromeScroll.reset(); };
     window.bindMobileChromeScroll = function() { mobileChromeScroll.bind(); };
 
+    const settingsAccount=document.getElementById('settingsAccountBtn');
+    if(settingsAccount)settingsAccount.onclick=event=>window.handleLoginButtonClick?.(event);
+    const storageButton=document.getElementById('settingsStorageBtn');
+    if(storageButton)storageButton.onclick=()=>{const invoke=window.__TAURI__?.core?.invoke || window.__TAURI__?.invoke;if(invoke)void invoke('request_storage_access',{force:true}).catch(error=>window.showMessage?.(String(error),'error'));};
+    const menuAI=document.getElementById('mobileMenuAIBtn');
+    if(menuAI && isMarketBuild)menuAI.remove();
+    else if(menuAI)menuAI.onclick=()=>{document.getElementById('mobileDropdown')?.classList.remove('show');void window.allToolbarButtons.find(button=>button.id==='mobileAIBtn')?.fn();};
     initializeAppShellOnce();
     
     initBackNavigation({

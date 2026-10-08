@@ -15,6 +15,7 @@ permissions:
   contents: write
 
 env:
+  VITE_NATIVE_BUNDLE: '1'
   NODE_VERSION: '24'
   JAVA_VERSION: '17'
   ANDROID_API_LEVEL: '34'
@@ -49,6 +50,17 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Bundle native model resources
+        run: node scripts/bundle-native-resources.mjs
+
+      - name: Upload native model resources
+        uses: actions/upload-artifact@v7
+        with:
+          name: native-model-resources
+          path: .native-resources/live2d
+          include-hidden-files: true
+          if-no-files-found: error
+
       - name: Build WASM text engine
         run: npm run wasm:text:build
 
@@ -70,6 +82,12 @@ jobs:
     steps:
       - name: Checkout source
         uses: actions/checkout@v6
+
+      - name: Download native model resources
+        uses: actions/download-artifact@v8
+        with:
+          name: native-model-resources
+          path: .native-resources/live2d
 
       - name: Download WASM build artifact
         uses: actions/download-artifact@v8

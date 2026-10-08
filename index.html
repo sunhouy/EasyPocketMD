@@ -399,7 +399,7 @@
 
 <!-- 设置模态窗口 -->
 <div class="modal-overlay" id="settingsModalOverlay">
-    <div class="modal" style="position:relative;max-height:85vh;overflow:hidden;display:flex;flex-direction:column;">
+    <div class="modal settings-modal" style="position:relative;max-height:85vh;overflow:hidden;display:flex;flex-direction:column;">
         <button class="modal-close-btn" id="cancelSettingsBtn" style="position:absolute;top:15px;right:15px;background:none;border:none;font-size:20px;cursor:pointer;z-index:10;">
             <i class="fas fa-times"></i>
         </button>
@@ -408,6 +408,11 @@
         </div>
         <div class="modal-form" style="flex:1;overflow-y:auto;padding-right:5px;">
 
+            <section class="settings-section settings-account-section" aria-labelledby="settingsAccountTitle">
+                <div class="settings-section-header"><i class="fas fa-user-circle" aria-hidden="true"></i><h3 class="settings-section-title" id="settingsAccountTitle" data-i18n="userSettings">账户设置</h3></div>
+                <button type="button" id="settingsAccountBtn" class="settings-account-button"><i class="fas fa-user-circle" aria-hidden="true"></i><span data-i18n="ui:登录与账户管理">登录与账户管理</span><i class="fas fa-chevron-right" aria-hidden="true"></i></button>
+                <button type="button" id="settingsStorageBtn" class="settings-account-button android-storage-button"><i class="fas fa-folder-open" aria-hidden="true"></i><span data-i18n="ui:允许访问本地文件">允许访问本地文件</span><i class="fas fa-chevron-right" aria-hidden="true"></i></button>
+            </section>
             <section class="settings-section" aria-labelledby="settingsAppearanceGroupTitle">
                 <div class="settings-section-header"><i class="fas fa-palette" aria-hidden="true"></i><h3 class="settings-section-title" id="settingsAppearanceGroupTitle" data-i18n="settingsGroupAppearance">外观与语言</h3></div>
                 <ul class="settings-list settings-grid" role="list">
@@ -1296,6 +1301,7 @@
                     <i class="fas fa-ellipsis-v"></i>
                 </button>
                 <div class="mobile-dropdown-content" id="mobileDropdown">
+                    <button class="dropdown-item" id="mobileMenuAIBtn"><i class="fas fa-robot"></i><span data-i18n="aiAssistant">AI助手</span></button>
                     <div class="dropdown-category" data-i18n="fileManagement">文件管理</div>
                     <button class="dropdown-item" id="mobileFileManagerBtn"><i class="fas fa-folder"></i>  <span data-i18n="myFiles">我的文件</span></button>
                     <button class="dropdown-item" id="mobileExportBtn"><i class="fas fa-file-export"></i>  <span data-i18n="export">导出</span></button>

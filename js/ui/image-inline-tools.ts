@@ -1,4 +1,3 @@
-import CropperModule from 'cropperjs';
 
 (function(global) {
     'use strict';
@@ -438,7 +437,7 @@ import CropperModule from 'cropperjs';
 
     function loadCropperLibrary() {
         if (!cropperLoadPromise) {
-            cropperLoadPromise = Promise.resolve(CropperModule || global.Cropper).then(function(CropperCtor) {
+            cropperLoadPromise = import('cropperjs').then(module=>module.default || global.Cropper).then(function(CropperCtor) {
                 if (!CropperCtor) {
                     throw new Error('Cropper library unavailable');
                 }

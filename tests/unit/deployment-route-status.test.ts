@@ -1,5 +1,5 @@
 /** @jest-environment jsdom */
-import {createDeploymentRouteStatus} from '../../js/main/deployment-route';
+import {createDeploymentRouteStatus,deploymentRouteEndpoint} from '../../js/main/deployment-route';
 let language = 'zh';
 beforeEach(() => {
     document.body.innerHTML = '<div data-deployment-route></div><div data-deployment-route></div>';
@@ -25,11 +25,20 @@ it('does not mistake the domestic API for the overseas serving gateway and coale
     const refresh=createDeploymentRouteStatus(), first=refresh(), second=refresh();
     expect(first).toBe(second);
     finish({ok:true,json:async()=>({route:'overseas'})} as Response); await first;
-    expect(fetch).toHaveBeenCalledWith('https://md.example.com/deployment-route.json', expect.anything());
+    expect(fetch).toHaveBeenCalledWith(new URL('/deployment-route.json',window.location.href).href, expect.anything());
     expect(document.body.textContent).toContain('境外');
 });
 it.each(['offline','invalid'])('reports unknown when metadata is %s rather than guessing a country', async kind=>{
     if(kind==='offline') jest.mocked(fetch).mockRejectedValue(new Error('offline'));
     else jest.mocked(fetch).mockResolvedValue({ok:true,json:async()=>({route:'unexpected'})} as Response);
     await createDeploymentRouteStatus()(); expect(document.body.textContent).toContain('未识别');
+});
+
+it('uses the overseas page origin while database/API traffic stays at the domestic origin',()=>{
+    const app={location:{href:'https://overseas.example.com/editor'},getApiBaseUrl:()=> 'https://domestic.example.com/api'} as unknown as Window;
+    expect(deploymentRouteEndpoint(app).href).toBe('https://overseas.example.com/deployment-route.json');
+});
+it('uses the service gateway for locally bundled Android/desktop assets',()=>{
+    const app={location:{href:'https://tauri.localhost/'},__TAURI__:{},getApiBaseUrl:()=> 'https://service.example.com/api'} as unknown as Window;
+    expect(deploymentRouteEndpoint(app).href).toBe('https://service.example.com/deployment-route.json');
 });

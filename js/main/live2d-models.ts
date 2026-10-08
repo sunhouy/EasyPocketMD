@@ -12,3 +12,9 @@ export const LIVE2D_MODELS = {
 };
 export type Live2DModel = keyof typeof LIVE2D_MODELS;
 export interface Live2DPreference { enabled: boolean; model: Live2DModel }
+
+declare const __NATIVE_BUNDLE__: boolean;
+export function live2dModelUrl(model:Live2DModel):string {
+    if(typeof __NATIVE_BUNDLE__ !== 'undefined' && __NATIVE_BUNDLE__)return new URL('/native-resources/live2d/'+model+'/'+model+'.model.json',window.location.href).href;
+    return LIVE2D_MODELS[model];
+}
