@@ -10,17 +10,25 @@ mkdir -p "$install_dir"
 curl --fail --silent --show-error --location --retry 3 "$HARMONY_TOOLS_URL" -o "$archive"
 printf '%s  %s\n' "$HARMONY_TOOLS_SHA256" "$archive" | shasum -a 256 -c -
 unzip -q "$archive" -d "$install_dir"
-# Use the SDK's own Node/JBR/Hvigor/OHPM to keep tool versions compatible.
+# Command Line Tools need not bundle DevEco Studio's JBR; CI installs JDK 17 separately.
 find_one() {
-  local result
-  result=$(find "$install_dir" -type f -path "$1" -print -quit)
-  [[ -n "$result" ]] || { echo "::error::工具链压缩包缺少 $1" >&2; exit 1; }
-  printf '%s' "$result"
+  local result pattern
+  for pattern in "$@"; do
+    result=$(find -L "$install_dir" -type f -path "$pattern" -print -quit)
+    if [[ -n "$result" ]]; then printf '%s' "$result"; return; fi
+  done
+  echo "::error::工具链压缩包缺少可用工具：$*" >&2
+  exit 1
 }
 node_bin=$(find_one '*/node*/bin/node')
-java_bin=$(find_one '*/jbr*/bin/java')
-ohpm_bin=$(find_one '*/ohpm/bin/ohpm')
-hvigor_bin=$(find_one '*/hvigor/bin/hvigorw')
+if [[ -n "${JAVA_HOME:-}" && -x "$JAVA_HOME/bin/java" ]]; then
+  java_bin="$JAVA_HOME/bin/java"
+else
+  java_bin=$(find_one '*/jbr*/bin/java' '*/jdk*/bin/java')
+fi
+"$java_bin" -version
+ohpm_bin=$(find_one '*/ohpm/bin/ohpm' '*/command-line-tools/bin/ohpm')
+hvigor_bin=$(find_one '*/hvigor/bin/hvigorw' '*/command-line-tools/bin/hvigorw')
 signer=$(find_one '*/toolchains/lib/hap-sign-tool.jar')
 packer=$(find_one '*/toolchains/lib/app_packing_tool.jar')
 sdk_root=$(find "$install_dir" -type d -path '*/sdk/default' -print -quit)

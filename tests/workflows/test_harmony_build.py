@@ -1,4 +1,7 @@
 import base64
+import hashlib
+import os
+import zipfile
 import importlib.util
 import json
 from pathlib import Path
@@ -64,6 +67,56 @@ class HarmonyBuildTests(unittest.TestCase):
                     with self.assertRaisesRegex(ValueError, '发布 Profile'):
                         build.pack(root, signing, root / 'output', env)
                     self.assertEqual(run.call_count, 1)
+
+
+class HarmonyToolSetupTests(unittest.TestCase):
+    def test_cli_without_jbr_uses_installed_java_and_flat_launchers(self):
+        self.check_tools(external_java=True, flat=True)
+
+    def test_bundle_jdk_is_accepted_without_external_java(self):
+        self.check_tools(external_java=False, flat=False)
+
+    def check_tools(self, external_java, flat):
+        project = Path(__file__).resolve().parents[2]
+        with tempfile.TemporaryDirectory(prefix='harmony-tools-') as temp:
+            root = Path(temp)
+            archive = root / 'official.zip'
+            files = {
+                'command-line-tools/node/bin/node': '#!/bin/sh\nexit 0\n',
+                'command-line-tools/sdk/default/openharmony/toolchains/lib/hap-sign-tool.jar': 'signer',
+                'command-line-tools/sdk/default/openharmony/toolchains/lib/app_packing_tool.jar': 'packer',
+            }
+            for tool, directory in [('ohpm', 'ohpm'), ('hvigorw', 'hvigor')]:
+                name = 'command-line-tools/bin/' + tool if flat else 'command-line-tools/' + directory + '/bin/' + tool
+                files[name] = '#!/bin/sh\nexit 0\n'
+            if not external_java:
+                files['command-line-tools/jdk-17/bin/java'] = '#!/bin/sh\necho java17\n'
+            with zipfile.ZipFile(archive, 'w') as zipped:
+                for name, content in files.items():
+                    info = zipfile.ZipInfo(name)
+                    info.external_attr = (0o100755 if '/bin/' in name else 0o100644) << 16
+                    zipped.writestr(info, content)
+            mocks = root / 'mocks'; mocks.mkdir()
+            curl = mocks / 'curl'; curl.write_text('#!/bin/bash\ncp "$LOCAL_TEST_ZIP" "${@: -1}"\n'); curl.chmod(0o755)
+            runtime = root / 'runner'; runtime.mkdir()
+            env = {**os.environ, 'PATH': str(mocks) + ':' + os.environ['PATH'],
+                   'LOCAL_TEST_ZIP': str(archive), 'RUNNER_TEMP': str(runtime),
+                   'HARMONY_TOOLS_URL': 'https://example.invalid/tools.zip',
+                   'HARMONY_TOOLS_SHA256': hashlib.sha256(archive.read_bytes()).hexdigest(),
+                   'GITHUB_ENV': str(root / 'env'), 'GITHUB_PATH': str(root / 'path')}
+            env.pop('JAVA_HOME', None)
+            if external_java:
+                java_home = root / 'jdk with spaces'; (java_home / 'bin').mkdir(parents=True)
+                java = java_home / 'bin/java'; java.write_text('#!/bin/sh\necho java17\n'); java.chmod(0o755)
+                env['JAVA_HOME'] = str(java_home)
+            result = subprocess.run(['bash', str(project / 'scripts/setup-harmony-tools.sh')], env=env, capture_output=True, text=True, timeout=20)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            exported = (root / 'env').read_text()
+            expected = str(java) if external_java else str(runtime / 'harmony-tools/command-line-tools/jdk-17/bin/java')
+            self.assertIn('HARMONY_JAVA=' + expected, exported)
+            self.assertIn('HARMONY_HVIGOR=', exported)
+            self.assertIn('HARMONY_OHPM=', exported)
+            self.assertFalse((runtime / 'harmony-tools.zip').exists())
 
 
 if __name__ == '__main__':

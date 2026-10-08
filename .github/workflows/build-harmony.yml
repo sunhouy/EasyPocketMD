@@ -49,6 +49,12 @@ jobs:
           HARMONY_KEY_ALIAS: ${{ secrets.HARMONY_KEY_ALIAS }}
         run: python3 scripts/harmony-build.py prepare --signing "$RUNNER_TEMP/harmony-signing"
 
+      - name: Set up JDK 17 for HarmonyOS command line builds
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
       - name: Install official HarmonyOS command line tools and SDK
         env:
           HARMONY_TOOLS_URL: ${{ secrets.HARMONY_TOOLS_URL }}
