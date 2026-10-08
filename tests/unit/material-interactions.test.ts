@@ -24,3 +24,12 @@ it('skips disabled controls and respects reduced motion',()=>{
     const element=button();element.disabled=true;element.click();expect(document.querySelector('.md-ripple-layer')).toBeNull();element.disabled=false;
     const original=window.matchMedia;window.matchMedia=jest.fn().mockReturnValue({matches:true});element.click();expect(document.querySelector('.md-ripple-layer')).toBeNull();window.matchMedia=original;
 });
+it.each(['remove','hide'])('removes ink immediately when its surface is closed (%s)',async method=>{
+ const element=button(),surface=document.createElement('div');document.body.append(surface);surface.append(element);element.click();expect(document.querySelector('.md-ripple-layer')).not.toBeNull();
+ if(method==='remove')surface.remove();else surface.style.display='none';await Promise.resolve();expect(document.querySelector('.md-ripple-layer')).toBeNull();
+});
+it('does not leave ink floating over a newly opened dialog',async()=>{
+ const element=button();element.click();const modal=document.createElement('div');document.body.append(modal);
+ const original=document.elementFromPoint;document.elementFromPoint=jest.fn().mockReturnValue(modal);
+ await Promise.resolve();expect(document.querySelector('.md-ripple-layer')).toBeNull();document.elementFromPoint=original;
+});

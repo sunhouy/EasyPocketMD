@@ -79,6 +79,11 @@ export function installNotesHome(app:any, options:{loadContent?:(file:any)=>Prom
         if (!document.body.classList.contains('file-management-mode')) return;
         const username=app.currentUser?.username || '';
         if(cachedUser!==username){cachedUser=username;snapshots.clear();attempted.clear();}
+        heading.textContent='EasyPocketMD';search.placeholder=t('搜索文件','Search files');
+        const initializing=!!app.fileListInitializing;
+        tabs.hidden=initializing;grid.hidden=initializing;
+        home.classList.toggle('is-loading',initializing);
+        if(initializing){grid.replaceChildren();empty.hidden=false;empty.textContent=t('正在加载文件…','Loading files…');heading.textContent='EasyPocketMD';return;}
         const files:Note[]=app.files || [];
         const folders=files.filter(file=>file.type==='folder').sort((a,b)=>(a.order || 0)-(b.order || 0) || a.name.localeCompare(b.name));
         if (view==='folder' && !folders.some(file=>file.name===folder)) {view='all';folder='';}

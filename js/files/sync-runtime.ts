@@ -1032,6 +1032,7 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
             if (!isStillCurrentUser()) return;
             var api = global.getApiBaseUrl ? global.getApiBaseUrl() : 'api';
             const response = await fetch(api + '/files?username=' + encodeURIComponent(g('currentUser').username), {
+                ...(global.fileListInitializing && typeof AbortSignal.timeout==='function'?{signal:AbortSignal.timeout(12000)}:{}),
                 headers: { 'Authorization': 'Bearer ' + g('currentUser').token }
             });
             const result = global.parseJsonResponse ? await global.parseJsonResponse(response) : await response.json();

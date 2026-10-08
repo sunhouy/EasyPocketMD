@@ -40,3 +40,9 @@ it('rejects non-numeric/system paths and keeps legacy metadata out of the card l
     expect(normalizeOrders({'a':3,'b':'4','.easypocketmd_orders':2,'bad':Infinity})).toEqual({a:3});
     expect(visibleNotes([{id:'m',type:'file',name:'.easypocketmd_orders'}],null,'')).toEqual([]);
 });
+it('does not retry a failed order request on every card refresh, but retries an explicit refresh',async()=>{
+ const app:any={files:[{name:'a.md',type:'file'}],currentUser:{username:'user',token:'token'}};
+ global.fetch=jest.fn().mockRejectedValueOnce(Error('offline')).mockResolvedValue({json:async()=>({code:200,data:{'a.md':30}})});
+ jest.spyOn(console,'warn').mockImplementation(()=>{});store=createFileOrderStore(app,()=>{});
+ await store.load();await store.load();expect(fetch).toHaveBeenCalledTimes(1);await store.refresh();expect(fetch).toHaveBeenCalledTimes(2);expect(app.files[0].order).toBe(30);
+});
