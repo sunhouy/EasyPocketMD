@@ -1,4 +1,5 @@
-import { canRunLanguage, isSandboxLanguage } from '../shared/code-runner-languages';
+import { bindMobileCodeInput } from './code-block-mobile';
+import { canRunLanguage } from '../shared/code-runner-languages';
 import { recordCodeBlockExit } from './code-block-focus';
 import { uiText, setUiText } from './i18n-messages';
 import { basicSetup } from 'codemirror';
@@ -115,15 +116,13 @@ function createEditor(block: HTMLElement, source: HTMLElement, preview: HTMLElem
             await global.runCodeBlock?.({language, code: view.state.doc.toString(), block: source, editor: view});
         });
     }
-    if (isSandboxLanguage(language)) {
-        const upload = button(uiText('上传'), async () => {
-            const global = window as any;
-            await global.ensureCodeRunnerLoaded?.();
-            await global.openCodeSandboxTools?.('upload', upload, {language, block:source});
-        });
-        setUiText(upload, uiText('上传文件到沙箱用户目录'), 'title');
-    }
-    button(uiText('复制'), () => navigator.clipboard?.writeText(view.state.doc.toString()).catch(() => (window as any).showToast?.(uiText('复制失败，请手动选择代码复制'), 'error')));
+    button(uiText('复制'), async () => {
+        try {
+            if (!navigator.clipboard) throw Error('Clipboard unavailable');
+            await navigator.clipboard.writeText(view.state.doc.toString());
+            (window as any).showMessage?.(uiText('已复制'), 'success');
+        } catch { (window as any).showMessage?.(uiText('复制失败，请手动选择代码复制'), 'error'); }
+    });
     const editorParent = document.createElement('div'); host.append(header, editorParent);
     const renderDiagram = () => {
         const global = window as any;
@@ -202,6 +201,7 @@ function createEditor(block: HTMLElement, source: HTMLElement, preview: HTMLElem
         parent: editorParent,
         state: EditorState.create({doc: source.textContent || '', extensions: [
             basicSetup, keymap.of([indentWithTab]), errorMarks, syntax.of([]),
+            ...(/Android|iPhone|iPad/i.test(navigator.userAgent) || window.matchMedia?.('(pointer: coarse)').matches ? [EditorView.lineWrapping] : []),
             readonly.of([EditorState.readOnly.of(entry.readonlyValue), EditorView.editable.of(!entry.readonlyValue)]),
             theme.of(entry.darkValue ? oneDark : []),
             EditorView.theme({
@@ -227,10 +227,7 @@ function createEditor(block: HTMLElement, source: HTMLElement, preview: HTMLElem
     });
     const description = languageExtension(language);
     description?.load().then(support => { if (entries.get(block) === entry) view.dispatch({effects:syntax.reconfigure(support)}); }).catch(console.warn);
-    // All editing events belong to CodeMirror, not the enclosing contenteditable.
-    for (const name of ['input','beforeinput','keydown','keyup','paste','copy','cut','click','dblclick','mousedown','compositionstart','compositionend']) {
-        host.addEventListener(name, event => event.stopPropagation());
-    }
+    bindMobileCodeInput(host,view,()=>!entry.readonlyValue);
     // Expose the exact source and view to execution/error highlighting without DOM edits.
     (host as any).__epmdCode = {view, source, language};
 }

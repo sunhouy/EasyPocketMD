@@ -169,3 +169,25 @@ body .android-todo-modal { width:min(100%,560px);max-width:560px; }
 #settingsModalOverlay .settings-access-status + i { margin-left:0; }
 .android-todo-modal .modal-close-btn { position:absolute;top:14px;right:14px; }
 .android-todo-modal :is(input,select,textarea) { margin-bottom:0; }
+.runner-view-tabs { display:flex;gap:6px;padding:8px 0;border-bottom:1px solid var(--md-outline);margin-bottom:10px;font:14px system-ui; }
+body .runner-view-tabs button { flex:1;padding:9px 6px !important;border:0 !important;border-radius:10px !important;background:var(--md-container) !important;color:var(--md-text) !important; }
+body .runner-view-tabs button[aria-selected=true] { background:var(--md-selected) !important;color:var(--md-primary-text) !important;font-weight:600;box-shadow:inset 0 -2px var(--md-primary); }
+.runner-file-actions { display:flex;gap:8px;flex-wrap:wrap;margin:8px 0; }
+#findDialogModal #closeFindBtn { font-size:28px !important;width:36px;height:36px;border-radius:50%;background:var(--md-container) !important; }
+body .code-runner-ui-host .code-output { background:var(--md-surface) !important;color:var(--md-text) !important;border-color:var(--md-outline) !important;border-radius:16px !important; }
+body .code-runner-ui-host .code-output > :first-child { color:var(--md-muted) !important; }
+.selection-toolbar { position:fixed;z-index:100240;display:flex;flex-wrap:wrap;gap:2px;max-width:min(490px,calc(100vw - 16px));padding:6px;border:1px solid var(--md-outline);border-radius:14px;background:var(--md-surface);color:var(--md-text);box-shadow:0 5px 22px rgba(0,0,0,.24); }
+.selection-toolbar[hidden] { display:none !important; }
+.selection-toolbar button { display:flex;align-items:center;justify-content:center;position:relative;flex:0 0 32px;width:32px;height:34px;padding:0;border:0;border-radius:8px;background:transparent;color:inherit;font-size:15px; }
+.selection-toolbar button:disabled { opacity:.32;cursor:default; }
+.selection-toolbar button:not(:disabled):hover { background:var(--md-container); }
+.selection-toolbar sup { font-size:9px;margin-top:-10px; }
+@media(max-width:600px){ .selection-toolbar { max-width:min(254px,calc(100vw - 16px)); } }
+.epmd-code-editor :is(.cm-content,.cm-line) { user-select:text !important;-webkit-user-select:text !important;-webkit-touch-callout:default; }
+@media(pointer:coarse){
+    .epmd-code-editor .cm-editor { font-size:16px !important; }
+    .epmd-code-editor .cm-content { min-height:100px;padding:10px 0; }
+    .epmd-code-editor .cm-scroller { max-height:min(52dvh,360px) !important;touch-action:auto; }
+    .epmd-code-header button { min-height:34px;padding:6px 10px; }
+}
+.epmd-code-editor .cm-lineWrapping .cm-line { white-space:pre-wrap;overflow-wrap:anywhere; }

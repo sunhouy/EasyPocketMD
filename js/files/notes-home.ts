@@ -1,3 +1,4 @@
+import { bindFolderSwipe } from './folder-swipe';
 import { isOrderMetadataFile } from '../../shared/file-orders';
 import { syncStatus, syncStatusPresentation } from './sync/local-state';
 import { bindFileTreeLongPress } from './tree/details';
@@ -149,7 +150,16 @@ export function installNotesHome(app:any, options:{loadContent?:(file:any)=>Prom
         empty.hidden=!!grid.childElementCount;
         empty.textContent=query?running?t('正在搜索云端文件…','Searching cloud files…'):t('没有找到匹配的文件或文件夹','No matching files or folders'):t('暂无文件，点击右下角加号创建','No files. Use + to create one.');
     }
-    search.addEventListener('input',()=>{clearTimeout(timer);timer=setTimeout(render,120);});
+    bindFolderSwipe(grid,direction=>{
+        const buttons=Array.from(tabs.querySelectorAll<HTMLButtonElement>('.notes-folder-tab'));
+        const current=buttons.findIndex(button=>button.getAttribute('aria-pressed')==='true');
+        const next=buttons[current+direction];
+        if(!next)return;
+        next.click();
+        tabs.querySelector<HTMLButtonElement>('.notes-folder-tab[aria-pressed="true"]')?.scrollIntoView?.({block:'nearest',inline:'nearest',behavior:'smooth'});
+        grid.scrollTop=0;
+    },()=>!app.fileListMultiSelectMode && !app.fileListInitializing);
+    search.addEventListener('input' ,()=>{clearTimeout(timer);timer=setTimeout(render,120);});
     home.addEventListener('contextmenu',event=>{const target=(event.target as Element).closest<HTMLElement>('[data-file-id]');if(!target)return;event.preventDefault();menu(target.dataset.fileId!,event.clientX,event.clientY);});
     bindFileTreeLongPress(home,(target,x,y)=>menu(target.dataset.fileId!,x,y),'[data-file-id]');
     grid.addEventListener('scroll',()=>{if(grid.scrollHeight-grid.scrollTop-grid.clientHeight<500 && previewLimit<(app.files || []).length){previewLimit+=40;render();}});

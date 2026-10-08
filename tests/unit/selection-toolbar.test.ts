@@ -1,0 +1,20 @@
+/** @jest-environment jsdom */
+import {installSelectionToolbar,selectionMarkdown} from '../../js/main/selection-toolbar';
+it('keeps selected text and generates inline/block markdown',()=>{
+ expect(selectionMarkdown('选中文字','bold')).toBe('**选中文字**');expect(selectionMarkdown('a\nb','ordered-list')).toBe('1. a\n2. b');expect(selectionMarkdown('a','check')).toBe('- [ ] a');
+});
+it('formats the original selection, protects readonly and CodeMirror, and hides on selection collapse',async()=>{
+ jest.useFakeTimers();
+ document.body.innerHTML='<textarea id="longFileTextarea">before selected after</textarea><div class="cm-editor"><div contenteditable="true">code</div></div>';
+ const message=jest.fn(),writeText=jest.fn().mockResolvedValue(undefined);
+ Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText}});
+ const app={currentFileId:'f',showMessage:message};installSelectionToolbar(app);
+ const input=document.querySelector('textarea')!;input.focus();input.setSelectionRange(7,15);document.dispatchEvent(new Event('selectionchange'));jest.advanceTimersByTime(20);
+ const toolbar=document.getElementById('selectionToolbar')!;
+ expect(toolbar.hidden).toBe(false);(toolbar.querySelector('[data-action=bold]') as HTMLButtonElement).click();await Promise.resolve();expect(input.value).toBe('before **selected** after');
+ input.setSelectionRange(7,19);document.dispatchEvent(new Event('selectionchange'));jest.advanceTimersByTime(20);
+ (toolbar.querySelector('[data-action=copy]') as HTMLButtonElement).click();await Promise.resolve();await Promise.resolve();expect(writeText).toHaveBeenCalledWith('**selected**');expect(message).toHaveBeenCalledWith('已复制','success');
+ input.readOnly=true;input.setSelectionRange(0,6);document.dispatchEvent(new Event('selectionchange'));jest.advanceTimersByTime(20);expect((toolbar.querySelector('[data-action=cut]') as HTMLButtonElement).disabled).toBe(true);expect((toolbar.querySelector('[data-action=bold]') as HTMLButtonElement).disabled).toBe(true);
+ input.blur();const code=document.querySelector('.cm-editor div')!;const range=document.createRange();range.selectNodeContents(code);document.getSelection()!.removeAllRanges();document.getSelection()!.addRange(range);document.dispatchEvent(new Event('selectionchange'));jest.advanceTimersByTime(20);expect(toolbar.hidden).toBe(true);
+ document.getSelection()!.removeAllRanges();document.dispatchEvent(new Event('selectionchange'));jest.advanceTimersByTime(20);expect(toolbar.hidden).toBe(true);jest.useRealTimers();
+});

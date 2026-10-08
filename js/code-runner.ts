@@ -130,6 +130,7 @@ export const CodeRunnerConstructor = (function(global) {
     }
 
     function showInteractiveInput(event, endpoint, controller) {
+        runnerFiles?.showResult();
         renderOutput({success:true,output:event.output || ''});
         runnerUiState.minimized = false; updatePanelSize();
         const form = document.createElement('form');
@@ -167,6 +168,7 @@ export const CodeRunnerConstructor = (function(global) {
         runnerUiState.button.disabled = true;
         if (runnerUiState.runContext?.editor) global.highlightCodeError?.(runnerUiState.runContext.editor, null);
         runnerUiState.runContext = context; runnerUiState.activeCodeBlock = context.block || null; runnerUiState.minimized = false;
+        runnerFiles?.showResult();
         try {
             renderOutput({success:true, output:t('codeRunning', '运行中...', 'Running...')});
             const result = await codeRunner.runCode(context.language, context.code);
@@ -292,7 +294,9 @@ export const CodeRunnerConstructor = (function(global) {
         if (!panel) return;
         floatingPanel?.update(runnerUiState.maximized, runnerUiState.minimized);
         runnerFiles?.setMinimized(runnerUiState.minimized);
-        runnerUiState.outputBody.hidden = runnerUiState.minimized;
+        runnerUiState.outputBody.hidden = runnerUiState.minimized || !!runnerFiles?.toolsVisible;
+        const minimize=panel.querySelector('[data-runner-minimize]') as HTMLButtonElement;
+        if(minimize){const label=uiText(runnerUiState.minimized?'还原':'最小化');setUiText(minimize,label,'title');setUiText(minimize,label,'aria-label');minimize.innerHTML='<i class="fas fa-'+(runnerUiState.minimized?'window-restore':'window-minimize')+'" aria-hidden="true"></i>';}
         if (runnerUiState.help) runnerUiState.help.hidden = runnerUiState.minimized || runnerUiState.help.dataset.open !== 'true';
     }
 
@@ -382,7 +386,8 @@ export const CodeRunnerConstructor = (function(global) {
                 if (!copied) throw Error(uiText('剪贴板不可用，请手动选择输出内容复制'));
             }
             setUiText(button, uiText('已复制'), 'title');
-            if (global.showToast) global.showToast(uiText('运行结果已复制'), 'success');
+            if (global.showMessage) global.showMessage(uiText('已复制'), 'success');
+            else global.showToast?.(uiText('已复制'), 'success');
         } catch (error) { if (global.showToast) global.showToast(uiText('复制失败：') + error.message, 'error'); }
         finally { button.disabled = false; }
     }
@@ -522,7 +527,7 @@ export const CodeRunnerConstructor = (function(global) {
             btn.addEventListener('click', () => callback(btn)); actions.appendChild(btn); return btn;
         }
         action(uiText('运行方式与环境'), 'question-circle', showEnvironmentHelp);
-        runnerFiles = new RunnerFilesUi(global, () => !!runnerUiState.button?.disabled || !!codeRunner.abortRun, runSandboxCommand);
+        runnerFiles = new RunnerFilesUi(global, () => !!runnerUiState.button?.disabled || !!codeRunner.abortRun, runSandboxCommand, tools=>{if(runnerUiState.outputBody)runnerUiState.outputBody.hidden=runnerUiState.minimized || tools;});
         action(uiText('沙箱命令行'), 'terminal', () => runnerFiles.show('terminal'));
         action(uiText('沙箱文件管理'), 'folder-open', () => runnerFiles.show('files'));
         action(uiText('复制运行结果'), 'copy', copyRunResult);
@@ -530,7 +535,8 @@ export const CodeRunnerConstructor = (function(global) {
             runnerUiState.maximized = !runnerUiState.maximized; runnerUiState.minimized = false; updatePanelSize();
             maximize.innerHTML = '<i class="fas fa-' + (runnerUiState.maximized ? 'compress' : 'expand') + '" aria-hidden="true"></i>';
         });
-        action(uiText('最小化/展开'), 'window-minimize', () => { runnerUiState.minimized = !runnerUiState.minimized; updatePanelSize(); });
+        const minimize=action(uiText('最小化'), 'window-minimize', () => { runnerUiState.minimized = !runnerUiState.minimized; updatePanelSize(); });
+        minimize.dataset.runnerMinimize='true';
         action(uiText('关闭'), 'times', () => { codeRunner.abortRun?.(); outputPanel.style.display = 'none'; refreshErrorHighlight(); });
         outputHeader.appendChild(actions);
 
@@ -568,6 +574,7 @@ export const CodeRunnerConstructor = (function(global) {
                 if (runnerUiState.runContext?.editor) global.highlightCodeError?.(runnerUiState.runContext.editor, null);
                 runnerUiState.runContext = { block, language, code };
                 runnerUiState.minimized = false;
+                runnerFiles?.showResult();
                 renderOutput({ success: true, output: t('codeRunning', '运行中...', 'Running...') });
                 var result = await codeRunner.runCode(language, code);
                 if (runnerUiState.outputPanel.style.display !== 'none') renderOutput(result);

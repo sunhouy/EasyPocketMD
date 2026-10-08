@@ -11,13 +11,17 @@ export class RunnerFilesUi {
     private directories: string[] = [];
     private cwd = '/tmp/home';
     private tab: 'files'|'terminal'|null = null;
-    constructor(private global: any, private busy: () => boolean, private command: (command:string)=>Promise<any>) {
-        this.list.style.cssText = 'flex-shrink:0;max-height:50%;overflow:auto;font:12px system-ui;white-space:normal;user-select:text;-webkit-user-select:text;';
+    private minimized = false;
+    constructor(private global: any, private busy: () => boolean, private command: (command:string)=>Promise<any>, private onTab: (tools:boolean)=>void = ()=>{}) {
+        this.list.className='runner-workspace';
+        this.list.style.cssText = 'min-height:0;overflow:auto;font:12px system-ui;white-space:normal;user-select:text;-webkit-user-select:text;';
         this.status.setAttribute('role','status');
         this.terminal.style.cssText='max-height:130px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;user-select:text;-webkit-user-select:text;';
     }
     attach(panel: HTMLElement) { panel.appendChild(this.list); this.draw(); }
-    setMinimized(value:boolean) { this.list.hidden=value || !this.tab; }
+    setMinimized(value:boolean) { this.minimized=value;this.list.hidden=value; }
+    get toolsVisible() { return !!this.tab; }
+    showResult() {this.tab=null;this.draw();}
     resetExpired() {this.token='';this.files=[];this.directories=[];this.cwd='/tmp/home';this.draw();this.message(uiText('会话已过期，请重新上传文件'));}
     private endpoint() { return (this.global.getApiBaseUrl?.() || '/api').replace(/\/$/,'') + '/code-runner'; }
     private message(text:string) { this.status.textContent=text; }
@@ -47,12 +51,19 @@ export class RunnerFilesUi {
     }
     async show(tab:'files'|'terminal') {this.tab=tab;this.list.hidden=false;this.draw();try {await this.refresh();}catch(e){this.message(e.message);}}
     private draw() {
-        this.list.replaceChildren();this.list.hidden=!this.tab;
+        this.list.replaceChildren();this.list.hidden=this.minimized;
+        this.list.style.flex=this.tab?'1':'0 0 auto';
+        this.onTab(!!this.tab);
+        const tabs=document.createElement('div');tabs.className='runner-view-tabs';tabs.setAttribute('role','tablist');
+        for(const [label,tab] of [[uiText('运行结果'),null],[uiText('文件'),'files'],[uiText('命令行'),'terminal']] as const){
+            const button=this.button(tabs,label,()=>tab?this.show(tab):this.showResult());button.setAttribute('role','tab');button.setAttribute('aria-selected',String(this.tab===tab));
+        }
+        this.list.append(tabs);
         if(!this.tab)return;
-        const tabs=document.createElement('div');tabs.style.cssText='display:flex;gap:6px;align-items:center;margin:5px 0;';
-        this.button(tabs,uiText('文件'),()=>this.show('files'));this.button(tabs,uiText('命令行'),()=>this.show('terminal'));
-        this.button(tabs,uiText('刷新'),()=>this.refresh().catch(e=>this.message(e.message)));
-        this.button(tabs,uiText('关闭'),()=>{this.tab=null;this.draw();});this.list.append(tabs);
+        const actions=document.createElement('div');actions.className='runner-file-actions';
+        if(this.tab==='files'){const upload=this.button(actions,uiText('上传文件'),()=>this.pick(upload));upload.disabled=this.uploading;}
+        this.button(actions,uiText('刷新'),()=>this.refresh().catch(e=>this.message(e.message)));
+        this.list.append(actions);
         const directory=document.createElement('div');directory.textContent=uiText('用户目录 /tmp/home · 当前目录 ')+this.cwd;directory.style.overflowWrap='anywhere';this.list.append(directory);
         if(this.tab==='terminal') {
             this.list.append(this.terminal);
@@ -67,7 +78,7 @@ export class RunnerFilesUi {
                 catch(e){this.message(e.message);}finally{send.disabled=false;input.readOnly=false;this.terminal.scrollTop=this.terminal.scrollHeight;}
             };
         } else {
-            if(!this.files.length&&!this.directories.length){const empty=document.createElement('p');setUiText(empty, uiText('目录为空，可使用代码块顶部的上传按钮添加文件。'));this.list.append(empty);}
+            if(!this.files.length&&!this.directories.length){const empty=document.createElement('p');setUiText(empty, uiText('目录为空，点击上传文件添加文件。'));this.list.append(empty);}
             for(const folder of this.directories){const row=document.createElement('div');row.textContent='📁 '+folder;this.list.append(row);}
             for(const file of this.files){
                 const row=document.createElement('div');row.style.cssText='display:flex;gap:6px;align-items:center;padding:4px 0;border-bottom:1px solid #ddd;';
@@ -94,7 +105,7 @@ export class RunnerFilesUi {
             if(files.length>8||files.some(f=>f.size>5*1024*1024)||files.reduce((n,f)=>n+f.size,0)>8*1024*1024)return this.message(uiText('单次最多 8 个文件，单文件 5 MB，总大小 8 MB'));
             this.uploading=true;button.disabled=true;button.setAttribute('aria-busy','true');this.tab='files';this.draw();this.message(uiText('上传中…'));
             try{const workspace=await this.workspace();const body=new FormData();body.append('workspace',workspace);files.forEach(f=>body.append('files',f));const response=await fetch(this.endpoint()+'/files',{method:'POST',body});const result=await response.json();if(!response.ok)throw Error(result.error||uiText('上传失败'));this.accept(result);this.message(uiText('已上传，可复制 /tmp/home/ 路径供代码使用。同名文件会替换；会话空闲 30 分钟后清理。'));}
-            catch(e){this.message(e.message);}finally{this.uploading=false;button.disabled=false;button.removeAttribute('aria-busy');}
+            catch(e){this.message(e.message);}finally{this.uploading=false;button.disabled=false;button.removeAttribute('aria-busy');this.draw();}
         };picker.click();
     }
     private button(parent:HTMLElement,label:string,action:()=>unknown) {

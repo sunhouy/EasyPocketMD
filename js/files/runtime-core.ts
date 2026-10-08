@@ -4082,7 +4082,7 @@ import { createDiffFileWriter } from './conflict/live-files';
             '<div id="findDialogHeader" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:' + sectionGap + ';cursor:move;user-select:none;touch-action:none;">' +
                 '<h3 style="margin:0;font-size:' + titleSize + ';">' + (isEn() ? 'Find and Replace' : '查找和替换') + '</h3>' +
                 '<button id="maximizeFindBtn" type="button" title="' + (isEn() ? 'Maximize/restore' : '最大化/恢复') + '" aria-label="' + (isEn() ? 'Maximize/restore' : '最大化/恢复') + '" style="margin-left:auto;background:none;border:none;color:inherit;cursor:pointer;"><i class="fas fa-expand"></i></button>' +
-                '<button id="closeFindBtn" style="background:none;border:none;font-size:18px;cursor:pointer;color:' + secondaryTextColor + ';padding:0;line-height:1;">&times;</button>' +
+                '<button id="closeFindBtn" type="button" aria-label="' + (isEn() ? 'Close' : '关闭') + '" style="background:none;border:none;font-size:28px;width:36px;height:36px;flex-shrink:0;cursor:pointer;color:' + secondaryTextColor + ';padding:0;line-height:1;">&times;</button>' +
             '</div>' +
             '<div class="find-dialog-controls">' +
             '<div style="margin-bottom:' + sectionGap + ';display:flex;align-items:center;gap:6px;">' +
@@ -4121,7 +4121,7 @@ import { createDiffFileWriter } from './conflict/live-files';
         saveAfterDialogOpens(global);
         const bounds = dialog.getBoundingClientRect();
         const floating = floatingRunWindow(dialog, dialog.querySelector('#findDialogHeader'), {
-            x: bounds.left, y: bounds.top, width: bounds.width, height: Math.max(bounds.height, Math.min(520, window.innerHeight - dialogTop - 24))
+            x: bounds.left, y: bounds.top, width: bounds.width, height: Math.max(bounds.height, 190)
         });
         floating.update(false, false);
         let findMaximized = false;
@@ -4146,6 +4146,7 @@ import { createDiffFileWriter } from './conflict/live-files';
                 toggleReplaceIcon.style.transform = 'rotate(90deg)';
                 replaceContainer.style.display = 'block';
                 replaceButtonsContainer.style.display = 'flex';
+                floating.setHeight(280, true);
             } else {
                 toggleReplaceIcon.style.transform = 'rotate(0deg)';
                 replaceContainer.style.display = 'none';
@@ -4480,6 +4481,11 @@ import { createDiffFileWriter } from './conflict/live-files';
                 return;
             }
 
+            isCrossSearchCollapsed = false;
+            wasmSearchResults.style.display = 'flex';
+            wasmSearchPanel.classList.remove('cross-search-collapsed');
+            toggleCrossSearchBtn.textContent = isEn() ? 'Collapse' : '收起';
+            floating.setHeight(Math.min(520, window.innerHeight * .65), true);
             const readyRes = await gateway.ensureReady();
             if (!readyRes || readyRes.code !== 200) {
                 crossSearchLazyState = null;
@@ -4823,6 +4829,7 @@ import { createDiffFileWriter } from './conflict/live-files';
                 isCrossSearchCollapsed = !isCrossSearchCollapsed;
                 if (wasmSearchResults) wasmSearchResults.style.display = isCrossSearchCollapsed ? 'none' : 'flex';
                 wasmSearchPanel?.classList.toggle('cross-search-collapsed', isCrossSearchCollapsed);
+                floating.setHeight(isCrossSearchCollapsed ? (isReplaceVisible ? 280 : 190) : Math.min(520, window.innerHeight * .65));
                 toggleCrossSearchBtn.textContent = isCrossSearchCollapsed
                     ? (isEn() ? 'Expand' : '展开')
                     : (isEn() ? 'Collapse' : '收起');
