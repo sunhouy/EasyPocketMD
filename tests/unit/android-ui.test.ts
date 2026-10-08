@@ -5,7 +5,7 @@ afterEach(()=>{delete window.__TAURI__;document.body.className='';});
 it('groups Android undo, redo and Save at the right without resetting chosen tools',()=>{
     const buttons=['mobileBottomSaveBtn','mobileUndoBtn','mobileInsertBtn','mobileRedoBtn','mobileFormulaBtn'];
     expect(orderedBottomButtons(buttons,true)).toEqual(['mobileInsertBtn','mobileFormulaBtn','mobileUndoBtn','mobileRedoBtn','mobileBottomSaveBtn']);
-    expect(orderedBottomButtons(buttons,false)).toEqual(buttons);
+    expect(orderedBottomButtons(buttons,false)).toEqual(orderedBottomButtons(buttons,true));
 });
 it('starts fresh Android users in the file list with Save in place of AI',()=>{
     const settings:any={};applyAndroidDefaults(settings,true);
@@ -16,9 +16,9 @@ it('starts fresh Android users in the file list with Save in place of AI',()=>{
 it('keeps the desktop default and explicit user preferences',()=>{
     const settings:any={};applyAndroidDefaults(settings,false);
     expect(settings.defaultFileOpening).toBe('lastEdited');
-    expect(settings.toolbarButtons).toEqual(legacyBottomButtons);
+    expect(settings.toolbarButtons).toEqual(defaultBottomButtons(false));
     const custom={defaultFileOpening:'lastEdited',toolbarButtons:['mobileUndoBtn']};
-    applyAndroidDefaults(custom,true);expect(custom).toEqual({defaultFileOpening:'lastEdited',toolbarButtons:['mobileUndoBtn']});
+    applyAndroidDefaults(custom,true);expect(custom).toEqual({defaultFileOpening:'lastEdited',toolbarButtons:['mobileUndoBtn','mobileBottomSaveBtn']});
 });
 it('migrates only the original Android toolbar arrangement',()=>{
     const settings={toolbarButtons:[...legacyBottomButtons]};applyAndroidDefaults(settings,true);
@@ -32,4 +32,10 @@ it('requests native storage access only in the Android shell and handles refusal
     installAndroidChrome();await Promise.resolve();
     expect(invoke).toHaveBeenCalledWith('request_storage_access');expect(document.body.classList.contains('android-app')).toBe(true);
     Object.defineProperty(navigator,'userAgent',{configurable:true,value:original});
+});
+
+it('replaces AI in web custom toolbars and always provides Save at the right',()=>{
+ const settings={toolbarButtons:['mobileAIBtn','mobileInsertBtn','mobileRedoBtn','mobileBottomSaveBtn']};applyAndroidDefaults(settings,false);
+ expect(settings.toolbarButtons).toEqual(['mobileInsertBtn','mobileRedoBtn','mobileBottomSaveBtn']);
+ expect(orderedBottomButtons(['mobileChartBtn'],false)).toEqual(['mobileChartBtn','mobileBottomSaveBtn']);
 });

@@ -44,7 +44,7 @@ export function createFileOrderStore(app: any, changed: () => void) {
         const user = app.currentUser;
         const base = app.getApiBaseUrl?.() || 'api';
         const response = await fetch(base + '/files/orders?username=' + encodeURIComponent(user.username), {
-            method, headers: {Authorization: 'Bearer ' + user.token, 'Content-Type': 'application/json'},
+            method, ...(typeof AbortSignal.timeout==='function'?{signal:AbortSignal.timeout(12000)}:{}), headers: {Authorization: 'Bearer ' + user.token, 'Content-Type': 'application/json'},
             ...(body ? {body: JSON.stringify({username:user.username, orders:body})} : {})
         });
         const result = app.parseJsonResponse ? await app.parseJsonResponse(response) : await response.json();
@@ -80,7 +80,10 @@ export function createFileOrderStore(app: any, changed: () => void) {
                 // Pending local moves win over a metadata response started before those moves.
                 orders = normalizeOrders({...orders, ...remote, ...pending});loaded = true;persist();apply();changed();
                 void flush();
-            } catch (error) { console.warn('排序元数据暂不可用，保留本机排序', error); }
+            } catch (error) {
+                if(username()===owner && account===owner && session===app.currentUser?.token)loaded=true;
+                console.warn('排序元数据暂不可用，保留本机排序', error);
+            }
         })();
         loading = task;
         try {await task;} finally {if (loading === task) loading = undefined;}

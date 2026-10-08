@@ -1,3 +1,4 @@
+import { initializeFileList } from './files/initial-list';
 import { isAndroidApp, defaultBottomButtons, applyAndroidDefaults, installAndroidChrome, orderedBottomButtons } from './main/android-ui';
 import { installNativeOpenBridge } from './main/native-open';
 import { isMarketBuild } from './build-variant';
@@ -465,7 +466,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function getVisibleToolbarButtons() {
-        return window.allToolbarButtons.filter(isToolbarButtonVisible);
+        return window.allToolbarButtons.filter(button=>button.id!=='mobileAIBtn' && isToolbarButtonVisible(button));
     }
 
     var keyboardShortcutActionDefinitions = [
@@ -1132,6 +1133,7 @@ document.addEventListener('DOMContentLoaded', function() {
             checkbox.type = 'checkbox';
             checkbox.value = btnConfig.id;
             checkbox.checked = currentButtons.includes(btnConfig.id);
+            if(btnConfig.id==='mobileBottomSaveBtn'){checkbox.checked=true;checkbox.disabled=true;}
 
             label.appendChild(checkbox);
             var buttonText = (window.i18n && btnConfig.textKey) ? window.i18n.t(btnConfig.textKey) : btnConfig.text;
@@ -1924,9 +1926,11 @@ document.addEventListener('DOMContentLoaded', function() {
             if (shareModeActive) { hideTopNoticeBanner(); return; }
             if (window.currentUser) {
                 window.showUserInfo();
-                if (localStorage.getItem('vditor_files')) window.loadLocalFiles();
-                window.startAutoSync();
-                setTimeout(() => window.loadFilesFromServer(), 0);
+                void initializeFileList(window,async()=>{
+                    if (localStorage.getItem('vditor_files')) window.loadLocalFiles();
+                    window.startAutoSync();
+                    await window.loadFilesFromServer();
+                }).catch(handleStartupFailure);
                 hideTopNoticeBanner();
             } else {
                 const urlParams = new URLSearchParams(window.location.search);
@@ -2257,7 +2261,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     var moreWidth = desktopDropdown.offsetWidth || desktopDropdown.scrollWidth || 210;
                     desktopDropdown.style.position = 'fixed';
                     desktopDropdown.style.top = Math.max(moreRect.bottom + 2, toolbarOffset + toolbarHeight + 1) + 'px';
-                    desktopDropdown.style.left = Math.round(moreRect.right - moreWidth) + 'px';
+                    desktopDropdown.style.left = Math.round(Math.max(12,Math.min(window.innerWidth-moreWidth-12,moreRect.right-moreWidth))) + 'px';
                     desktopDropdown.style.right = 'auto';
                     desktopDropdown.style.zIndex = '1200';
                 }
@@ -3862,9 +3866,12 @@ document.addEventListener('DOMContentLoaded', function() {
     if(settingsAccount)settingsAccount.onclick=event=>window.handleLoginButtonClick?.(event);
     const storageButton=document.getElementById('settingsStorageBtn');
     if(storageButton)storageButton.onclick=()=>{const invoke=window.__TAURI__?.core?.invoke || window.__TAURI__?.invoke;if(invoke)void invoke('request_storage_access',{force:true}).catch(error=>window.showMessage?.(String(error),'error'));};
-    const menuAI=document.getElementById('mobileMenuAIBtn');
-    if(menuAI && isMarketBuild)menuAI.remove();
-    else if(menuAI)menuAI.onclick=()=>{document.getElementById('mobileDropdown')?.classList.remove('show');void window.allToolbarButtons.find(button=>button.id==='mobileAIBtn')?.fn();};
+    for(const [buttonId,menuId] of [['mobileMenuAIBtn','mobileDropdown'],['desktopMenuAIBtn','desktopMoreDropdown']]){
+        const menuAI=document.getElementById(buttonId);
+        if(menuAI && isMarketBuild)menuAI.remove();
+        else if(menuAI)menuAI.onclick=()=>{document.getElementById(menuId)?.classList.remove('show');void window.allToolbarButtons.find(button=>button.id==='mobileAIBtn')?.fn();};
+    }
+    document.querySelectorAll<HTMLButtonElement>('[data-close-more-menu]').forEach(button=>button.onclick=()=>document.getElementById(button.dataset.closeMoreMenu)?.classList.remove('show'));
     initializeAppShellOnce();
     
     initBackNavigation({
