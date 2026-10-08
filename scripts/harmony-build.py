@@ -8,6 +8,7 @@ from pathlib import Path
 import re
 import subprocess
 import sys
+import zipfile
 
 BUNDLE_NAME = 'com.yhsun.md'
 SIGNING_SECRETS = ('HARMONY_KEY', 'HARMONY_CERT', 'HARMONY_PROFILE', 'HARMONY_STORE_PASSWORD', 'HARMONY_KEY_PASSWORD', 'HARMONY_KEY_ALIAS')
@@ -65,6 +66,23 @@ def run_private(args):
         raise RuntimeError('鸿蒙签名/打包工具执行失败（退出码 %d），请检查证书、Profile、密钥及 SDK 版本' % result.returncode)
 
 
+def verify_app_contents(app, hap, signing, java, signer):
+    # Packing can rewrite pack.info inside the HAP and silently discard its signature.
+    # Verify the distributed bytes, not just the standalone HAP before packing.
+    with zipfile.ZipFile(app) as archive:
+        haps = [name for name in archive.namelist() if name.endswith('.hap')]
+        if len(haps) != 1 or 'pack.info' not in archive.namelist():
+            raise ValueError('APP 必须包含一个 entry HAP 和 pack.info')
+        data = archive.read(haps[0])
+    if data != hap.read_bytes():
+        raise ValueError('APP 内的 HAP 被打包工具改写，签名可能已丢失，禁止上传')
+    embedded = signing / 'packed-entry.hap'
+    embedded.write_bytes(data)
+    run_private([java, '-jar', signer, 'verify-app', '-inFile', str(embedded),
+                 '-outCertChain', str(signing / 'packed-verified.cer'),
+                 '-outProfile', str(signing / 'packed-verified.p7b')])
+
+
 def pack(root, signing, output, env):
     check_secrets(env)
     java = env.get('HARMONY_JAVA', 'java')
@@ -88,10 +106,12 @@ def pack(root, signing, output, env):
     run_private([java, '-jar', signer, 'sign-app', '-mode', 'localSign', '-keyAlias', env['HARMONY_KEY_ALIAS'], '-signAlg', 'SHA256withECDSA', '-appCertFile', str(signing / 'release.cer'), '-profileFile', str(signing / 'release.p7b'), '-inFile', str(haps[0]), '-keystoreFile', str(signing / 'release.p12'), '-outFile', str(hap), '-keyPwd', env['HARMONY_KEY_PASSWORD'], '-keystorePwd', env['HARMONY_STORE_PASSWORD'], '-signCode', '1'])
     run_private([java, '-jar', signer, 'verify-app', '-inFile', str(hap), '-outCertChain', str(signing / 'verified.cer'), '-outProfile', str(signing / 'verified.p7b')])
     app = output / ('easypocketmd-' + version + '-harmony.app')
-    run_private([java, '-jar', packer, '--mode', 'app', '--hap-path', str(hap), '--pack-info-path', str(infos[0]), '--out-path', str(app), '--force', 'true'])
+    run_private([java, '-jar', packer, '--mode', 'app', '--hap-path', str(hap), '--pack-info-path', str(infos[0]), '--out-path', str(app), '--force', 'true', '--replace-pack-info', 'false'])
     for path in (hap, app):
         if not path.is_file() or not path.stat().st_size:
             raise ValueError('鸿蒙构建产物缺失：' + path.name)
+    verify_app_contents(app, hap, signing, java, signer)
+    print('APP 内 HAP 内容一致，签名和代码签名校验通过')
 
 
 def main():
@@ -114,6 +134,6 @@ def main():
 if __name__ == '__main__':
     try:
         main()
-    except (ValueError, RuntimeError, KeyError) as error:
+    except (ValueError, RuntimeError, KeyError, zipfile.BadZipFile) as error:
         print('::error::' + str(error), file=sys.stderr)
         sys.exit(1)

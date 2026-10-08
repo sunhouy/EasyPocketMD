@@ -16,6 +16,47 @@ spec.loader.exec_module(build)
 
 
 class HarmonyBuildTests(unittest.TestCase):
+    def test_packed_app_verifies_the_exact_signed_hap(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            hap = root / 'entry.hap'; hap.write_bytes(b'signed-hap-with-signing-block')
+            app = root / 'release.app'
+            with zipfile.ZipFile(app, 'w') as archive:
+                archive.writestr('entry.hap', hap.read_bytes())
+                archive.writestr('pack.info', '{}')
+            with patch.object(build, 'run_private') as verify:
+                build.verify_app_contents(app, hap, root, 'java', 'signer.jar')
+                embedded = root / 'packed-entry.hap'
+                self.assertEqual(embedded.read_bytes(), hap.read_bytes())
+                self.assertIn(str(embedded), verify.call_args.args[0])
+                self.assertIn('verify-app', verify.call_args.args[0])
+
+    def test_packing_that_strips_signature_is_rejected(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            hap = root / 'entry.hap'; hap.write_bytes(b'signed-hap-with-signing-block')
+            app = root / 'release.app'
+            with zipfile.ZipFile(app, 'w') as archive:
+                archive.writestr('entry.hap', b'unsigned-hap')
+                archive.writestr('pack.info', '{}')
+            with patch.object(build, 'run_private') as verify:
+                with self.assertRaisesRegex(ValueError, '改写'):
+                    build.verify_app_contents(app, hap, root, 'java', 'signer.jar')
+                verify.assert_not_called()
+
+    def test_app_without_entry_hap_or_pack_info_is_rejected(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            hap = root / 'entry.hap'; hap.write_bytes(b'signed')
+            for contents in ({'pack.info': '{}'}, {'entry.hap': 'signed'},
+                             {'one.hap': 'signed', 'two.hap': 'signed', 'pack.info': '{}'}):
+                app = root / 'release.app'
+                with zipfile.ZipFile(app, 'w') as archive:
+                    for name, content in contents.items():
+                        archive.writestr(name, content)
+                with self.assertRaisesRegex(ValueError, 'entry HAP'):
+                    build.verify_app_contents(app, hap, root, 'java', 'signer.jar')
+
     def test_version_validation_and_override(self):
         self.assertEqual(build.version_values('v2.9.10', '', '1.0.0'), ('2.9.10', 2009010))
         self.assertEqual(build.version_values('', '88', '2.9.3'), ('2.9.3', 88))
