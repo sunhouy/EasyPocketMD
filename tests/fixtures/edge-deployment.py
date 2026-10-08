@@ -28,7 +28,7 @@ class Edge(unittest.TestCase):
                 value = str(value)
                 return root / value.lstrip('/') if value.startswith('/www/') or value == '/var/run/docker.sock' else Path(value)
             socket = mapped('/var/run/docker.sock'); socket.parent.mkdir(parents=True); socket.touch()
-            with patch.object(deploy, 'ROOT', root), patch.object(deploy, 'Path', side_effect=mapped), patch.object(deploy, 'docker') as docker, patch.object(deploy, 'command') as command, patch.object(deploy, 'health') as health, patch.object(deploy, 'nginx_site_directory', return_value=root / 'nginx'), patch.object(deploy, 'public_https_health') as https_health, patch.object(deploy, 'remove') as remove, patch.object(deploy.resources, 'configure_sandbox_budget') as sandbox, patch.object(deploy.resources, 'container_limits', return_value=48), patch.object(deploy.shutil, 'which', return_value='/usr/bin/nginx'), patch.object(subprocess, 'run'):
+            with patch.object(deploy, 'ROOT', root), patch.object(deploy, 'Path', side_effect=mapped), patch.object(deploy, 'docker') as docker, patch.object(deploy, 'command') as command, patch.object(deploy, 'health') as health, patch.object(deploy, 'nginx_site_directory', return_value=root / 'nginx'), patch.object(deploy, 'public_https_health') as https_health, patch.object(deploy, 'ensure_nginx_site_loaded'), patch.object(deploy, 'https_listeners', return_value='    listen 443 ssl;'), patch.object(deploy, 'remove') as remove, patch.object(deploy.resources, 'configure_sandbox_budget') as sandbox, patch.object(deploy.resources, 'container_limits', return_value=48), patch.object(deploy.shutil, 'which', return_value='/usr/bin/nginx'), patch.object(subprocess, 'run'):
                 candidate = deploy.activate(release, 'main', 0, None)
                 self.assertEqual(candidate['containers'], {'gateway': 'epmd-main-gateway-0'})
                 sandbox.assert_not_called()
@@ -40,6 +40,7 @@ class Edge(unittest.TestCase):
                 health.assert_called_once_with(3180, {})
                 https_health.assert_called_once_with('md.example.com', 'main', True)
                 self.assertIn('listen 443 ssl', (root / 'nginx/md.example.com.conf').read_text())
+                self.assertIn('ssl_reject_handshake off;', (root / 'nginx/md.example.com.conf').read_text())
                 self.assertFalse(any('exec' in call.args for call in command.call_args_list))
                 self.assertEqual(json.loads((root / 'state-main.json').read_text())['current'], candidate)
                 old_vhost = (root / 'nginx/md.example.com.conf').read_bytes()
@@ -57,6 +58,31 @@ class Edge(unittest.TestCase):
         with patch.object(deploy, 'command', return_value=subprocess.CompletedProcess([], 0, stdout='http {}')):
             with self.assertRaises(RuntimeError):
                 deploy.nginx_site_directory('/usr/sbin/nginx')
+
+    def test_named_include_registers_site_and_keeps_original_configuration(self):
+        deploy = load('nginx_named_include', 'deploy-docker.py')
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            main = root / 'nginx.conf'
+            original = 'events {}\nhttp {\n include /etc/nginx/conf.d/smartnotebook.conf;\n}\n'
+            main.write_text(original)
+            site = root / 'md.example.com.conf'; site.write_text('server {}')
+            unloaded = '# configuration file ' + str(main) + ':\n' + original
+            loaded = unloaded + '\n# configuration file ' + str(site) + ':\nserver {}'
+            backups = {}
+            with patch.object(deploy, 'command', side_effect=[subprocess.CompletedProcess([], 0, stdout=unloaded), subprocess.CompletedProcess([], 0, stdout=loaded)]):
+                deploy.ensure_nginx_site_loaded('/usr/sbin/nginx', site, backups)
+            self.assertIn('include "' + str(site) + '";', main.read_text())
+            self.assertIn('include /etc/nginx/conf.d/smartnotebook.conf;', main.read_text())
+            self.assertEqual(backups[main], original.encode())
+            with patch.object(deploy, 'command', return_value=subprocess.CompletedProcess([], 0, stdout=loaded)):
+                deploy.ensure_nginx_site_loaded('/usr/sbin/nginx', site, {})
+            self.assertEqual(main.read_text().count('include "'), 1)
+
+    def test_sni_site_joins_existing_address_specific_listeners(self):
+        deploy = load('nginx_address_listeners', 'deploy-docker.py')
+        with patch.object(deploy, 'command', return_value=subprocess.CompletedProcess([], 0, stdout='listen 443 ssl default_server;\nlisten 0.0.0.0:443 ssl;\nlisten *:443 ssl;\nlisten 127.0.0.1:443 ssl;\nlisten [::]:443 ssl;')):
+            self.assertEqual(deploy.https_listeners('/usr/sbin/nginx'), '    listen 443 ssl;\n    listen 127.0.0.1:443 ssl;\n    listen [::]:443 ssl;')
 
     def test_preparation_excludes_credentials_and_exports_only_built_gateway(self):
         edge = load('edge_prepare', 'prepare-edge-release.py')

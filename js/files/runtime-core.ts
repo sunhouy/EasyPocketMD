@@ -2,6 +2,7 @@
  * 文件管理 - 加载、保存、同步、历史版本、文件夹
  */
 // @ts-nocheck
+import { bindFileCreationButton, quickDocumentPath } from './quick-create';
 import { returnToListAfterDeletion } from '../main/file-navigation';
 import { deletionOwner, resolveDeletionPlan } from './delete-plan';
 import { createFileOrderStore, isOrderMetadataFile } from './order-store';
@@ -324,9 +325,7 @@ import { createDiffFileWriter } from './conflict/live-files';
         const fab = document.getElementById('fileManagementFab');
         if (!fab || fab.dataset.bound === '1') return;
         fab.dataset.bound = '1';
-        fab.addEventListener('click', event => {
-            event.preventDefault();event.stopPropagation();showFileCreationSheet();
-        });
+        bindFileCreationButton(fab, showFileCreationSheet, () => createNewFile({ quick: true }));
         document.addEventListener('keydown', event => {
             if (event.key !== 'Escape') return;
             if (document.getElementById('fileActionSheet')) closeFileActionSheet();
@@ -2062,12 +2061,12 @@ import { createDiffFileWriter } from './conflict/live-files';
         return '';
     }
 
-    function createNewFile() {
+    function createNewFile(options = {}) {
         const baseName = isEn() ? 'New Document' : '新文档';
-        const parentPath = getSelectedFolderPath().replace(/\/$/, '');
+        const parentPath = (global.isFileManagementMode ? global.notesHomeFolderPath || '' : getSelectedFolderPath()).replace(/\/$/, '');
         const defaultName = getNextAvailableName(baseName, parentPath);
         const defaultPath = parentPath ? parentPath + '/' + defaultName : defaultName;
-        g('customPrompt')(isEn() ? 'Please enter filename (e.g., docs/note; missing folders are created automatically)' : '请输入文件名（例如 docs/note，缺失的文件夹将自动创建）', { defaultValue: defaultPath }).then(function(input) {
+        const commitNewFile = function(input) {
             if (!input) return;
 
             let path = normalizePath(input);
@@ -2100,7 +2099,12 @@ import { createDiffFileWriter } from './conflict/live-files';
             g('unsavedChanges')[newFile.id] = false;
             if (g('currentUser')) global.syncFileToServer(newFile.id);
             global.showMessage(isEn() ? 'File created: ' + path : '已创建文件: ' + path);
-        });
+        };
+        if (options.quick) {
+            commitNewFile(quickDocumentPath(g('files'), parentPath, baseName));
+            return;
+        }
+        g('customPrompt')(isEn() ? 'Please enter filename (e.g., docs/note; missing folders are created automatically)' : '请输入文件名（例如 docs/note，缺失的文件夹将自动创建）', { defaultValue: defaultPath }).then(commitNewFile);
     }
 
     function createNewFolder() {

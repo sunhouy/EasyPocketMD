@@ -31,6 +31,9 @@ import app.tauri.plugin.JSObject
 import app.tauri.plugin.Plugin
 
 @InvokeArg
+class SelectionMenuArgs { var enabled: Boolean = false }
+
+@InvokeArg
 class StorageArgs { var force: Boolean = false; var checkOnly: Boolean = false }
 
 @InvokeArg
@@ -61,6 +64,14 @@ object IncomingDocuments {
 /** Reuse persistent grants and, when authorized, shared-storage paths. */
 @TauriPlugin(permissions=[Permission(strings=[Manifest.permission.READ_CALENDAR,Manifest.permission.WRITE_CALENDAR],alias="calendar")])
 class LocalDocumentsPlugin(private val activity: Activity) : Plugin(activity) {
+    @Command
+    fun selectionMenu(invoke: Invoke) {
+        val args = invoke.parseArgs(SelectionMenuArgs::class.java)
+        SelectionMenus.enabled = args.enabled
+        activity.runOnUiThread { SelectionMenus.current?.invalidate() }
+        invoke.resolve(JSObject().put("enabled", args.enabled))
+    }
+
     private val io = Executors.newSingleThreadExecutor()
 
     @Command

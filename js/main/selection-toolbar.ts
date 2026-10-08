@@ -15,6 +15,21 @@ export function installSelectionToolbar(app:any=window) {
     toolbar.setAttribute('role','toolbar');toolbar.setAttribute('aria-label','文本操作');
     document.body.append(toolbar);
     let snapshot:Snapshot|null=null, frame=0,busy=false;
+    let nativeMenuEnabled:boolean|undefined;
+    function nativeMenu(custom:boolean){
+        if(nativeMenuEnabled===custom)return;
+        const native=app.__TAURI__?.core?.invoke || app.__TAURI__?.invoke || app.__TAURI_INTERNALS__?.invoke;
+        if(!native)return;
+        nativeMenuEnabled=custom;
+        void native('set_selection_menu',{enabled:custom}).catch(()=>{nativeMenuEnabled=undefined;});
+    }
+    function customMenuTarget(target:Element|null){
+        if(!target || target.closest('.cm-editor,.epmd-code-editor'))return false;
+        const input=target.closest('input,textarea');
+        if(input instanceof HTMLInputElement && ['password','email','number','date','color'].includes(input.type))return false;
+        return !!input || !!target.closest('#vditor');
+    }
+
     const visible=(owner:HTMLElement)=>{
         if(!owner.isConnected)return false;
         for(let node:HTMLElement|null=owner;node;node=node.parentElement){const style=getComputedStyle(node);if(node.hidden || style.display==='none' || style.visibility==='hidden')return false;}
@@ -72,7 +87,7 @@ export function installSelectionToolbar(app:any=window) {
     function refresh(){
         frame=0;if(busy)return;
         const next=capture();if(!next){hide();return;}
-        snapshot=next;observeOwner(next.owner);toolbar.hidden=false;
+        snapshot=next;observeOwner(next.owner);toolbar.hidden=false;nativeMenu(true);
         toolbar.setAttribute('aria-label',app.i18n?.getLanguage?.()==='en'?'Text actions':'文本操作');
         for(const button of Array.from(toolbar.querySelectorAll<HTMLButtonElement>('button'))){
             const action=actions.find(a=>a[0]===button.dataset.action)!;
@@ -120,7 +135,12 @@ export function installSelectionToolbar(app:any=window) {
     document.addEventListener('select',schedule,true);document.addEventListener('pointerup',schedule,true);
     document.addEventListener('touchend',schedule,{passive:true});
     document.addEventListener('beforeinput',hide,true);
-    document.addEventListener('pointerdown',event=>{if(!toolbar.contains(event.target as Node)){hide();schedule();}},true);
+    document.addEventListener('pointerdown',event=>{if(!toolbar.contains(event.target as Node)){nativeMenu(customMenuTarget(event.target instanceof Element?event.target:null));hide();schedule();}},true);
+    document.addEventListener('focusin',event=>{if(!toolbar.contains(event.target as Node))nativeMenu(customMenuTarget(event.target instanceof Element?event.target:null));},true);
+    document.addEventListener('contextmenu',event=>{
+        const next=capture();if(!next || !next.valid())return;
+        event.preventDefault();nativeMenu(true);schedule();
+    },true);
     document.addEventListener('keydown',event=>{if(event.key==='Escape')hide();});
     document.addEventListener('scroll',()=>{if(snapshot && !toolbar.hidden){if(snapshot.valid())position(snapshot);else hide();}},true);
     window.addEventListener('resize',schedule);window.visualViewport?.addEventListener('resize',schedule);

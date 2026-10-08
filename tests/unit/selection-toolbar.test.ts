@@ -8,7 +8,8 @@ it('formats the original selection, protects readonly and CodeMirror, and hides 
  document.body.innerHTML='<div style="display:none"><div role="dialog">Hidden modal</div></div><textarea id="longFileTextarea">before selected after</textarea><div id="vditor"><div class="vditor-toolbar"><button data-tag="h1"></button></div><div contenteditable="true"><p>selected prose</p></div></div><div class="cm-editor"><div contenteditable="true">code</div></div>';
  const message=jest.fn(),writeText=jest.fn().mockResolvedValue(undefined);
  Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText}});
- const app={currentFileId:'f',showMessage:message};installSelectionToolbar(app);
+ const invoke=jest.fn().mockResolvedValue(undefined);
+ const app={currentFileId:'f',showMessage:message,__TAURI__:{core:{invoke}}};installSelectionToolbar(app);
  const input=document.querySelector('textarea')!;input.focus();input.setSelectionRange(7,15);document.dispatchEvent(new Event('selectionchange'));jest.advanceTimersByTime(20);
  const toolbar=document.getElementById('selectionToolbar')!;
  expect(toolbar.hidden).toBe(false);(toolbar.querySelector('[data-action=bold]') as HTMLButtonElement).click();await Promise.resolve();expect(input.value).toBe('before **selected** after');
@@ -20,7 +21,9 @@ it('formats the original selection, protects readonly and CodeMirror, and hides 
  const nativeHeading=document.querySelector<HTMLButtonElement>('#vditor button')!,heading=jest.fn();nativeHeading.addEventListener('click',heading);
  document.getSelection()!.removeAllRanges();document.getSelection()!.addRange(proseRange);document.dispatchEvent(new Event('selectionchange'));jest.advanceTimersByTime(20);
  expect(toolbar.hidden).toBe(false);expect(toolbar.querySelectorAll('button')).toHaveLength(13);
+ const menu=new MouseEvent('contextmenu',{bubbles:true,cancelable:true});prose.dispatchEvent(menu);expect(menu.defaultPrevented).toBe(true);expect(invoke).toHaveBeenCalledWith('set_selection_menu',{enabled:true});
  (toolbar.querySelector('[data-action=h1]') as HTMLButtonElement).click();await Promise.resolve();expect(heading).toHaveBeenCalledTimes(1);
  input.blur();const code=document.querySelector('.cm-editor div')!;const range=document.createRange();range.selectNodeContents(code);document.getSelection()!.removeAllRanges();document.getSelection()!.addRange(range);document.dispatchEvent(new Event('selectionchange'));jest.advanceTimersByTime(20);expect(toolbar.hidden).toBe(true);
+ code.dispatchEvent(new MouseEvent('pointerdown',{bubbles:true}));const codeMenu=new MouseEvent('contextmenu',{bubbles:true,cancelable:true});code.dispatchEvent(codeMenu);expect(codeMenu.defaultPrevented).toBe(false);expect(invoke).toHaveBeenCalledWith('set_selection_menu',{enabled:false});
  document.getSelection()!.removeAllRanges();document.dispatchEvent(new Event('selectionchange'));jest.advanceTimersByTime(20);expect(toolbar.hidden).toBe(true);jest.useRealTimers();
 });

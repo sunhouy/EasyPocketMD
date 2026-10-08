@@ -191,3 +191,7 @@ body .code-runner-ui-host .code-output > :first-child { color:var(--md-muted) !i
     .epmd-code-header button { min-height:34px;padding:6px 10px; }
 }
 .epmd-code-editor .cm-lineWrapping .cm-line { white-space:pre-wrap;overflow-wrap:anywhere; }
+
+/* Suppress WebKit native callouts while keeping text selection and its handles. */
+#vditor, #longFileTextarea { -webkit-touch-callout:none; }
+#vditor :is(.cm-editor,.cm-content,.cm-line) { -webkit-touch-callout:default; }
