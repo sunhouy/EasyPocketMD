@@ -1,3 +1,4 @@
+import { bindMobileCodeInput } from './code-block-mobile';
 import { canRunLanguage } from '../shared/code-runner-languages';
 import { recordCodeBlockExit } from './code-block-focus';
 import { uiText, setUiText } from './i18n-messages';
@@ -200,6 +201,7 @@ function createEditor(block: HTMLElement, source: HTMLElement, preview: HTMLElem
         parent: editorParent,
         state: EditorState.create({doc: source.textContent || '', extensions: [
             basicSetup, keymap.of([indentWithTab]), errorMarks, syntax.of([]),
+            ...(/Android|iPhone|iPad/i.test(navigator.userAgent) || window.matchMedia?.('(pointer: coarse)').matches ? [EditorView.lineWrapping] : []),
             readonly.of([EditorState.readOnly.of(entry.readonlyValue), EditorView.editable.of(!entry.readonlyValue)]),
             theme.of(entry.darkValue ? oneDark : []),
             EditorView.theme({
@@ -225,10 +227,7 @@ function createEditor(block: HTMLElement, source: HTMLElement, preview: HTMLElem
     });
     const description = languageExtension(language);
     description?.load().then(support => { if (entries.get(block) === entry) view.dispatch({effects:syntax.reconfigure(support)}); }).catch(console.warn);
-    // All editing events belong to CodeMirror, not the enclosing contenteditable.
-    for (const name of ['input','beforeinput','keydown','keyup','paste','copy','cut','click','dblclick','mousedown','compositionstart','compositionend']) {
-        host.addEventListener(name, event => event.stopPropagation());
-    }
+    bindMobileCodeInput(host,view,()=>!entry.readonlyValue);
     // Expose the exact source and view to execution/error highlighting without DOM edits.
     (host as any).__epmdCode = {view, source, language};
 }

@@ -1,3 +1,4 @@
+import { installSelectionToolbar } from './main/selection-toolbar';
 import { installSettingsRows, createStorageAccessStatus } from './main/settings-layout';
 import { initializeFileList } from './files/initial-list';
 import { isAndroidApp, defaultBottomButtons, applyAndroidDefaults, installAndroidChrome, orderedBottomButtons } from './main/android-ui';
@@ -1627,7 +1628,7 @@ document.addEventListener('DOMContentLoaded', function() {
         placeholder: window.i18n ? window.i18n.t('startEditing') : '开始编辑...支持 Markdown 语法',
         cdn: getVditorCdn(),
         lang: 'en_US', // 彻底禁用中文语言文件，使用默认英语
-        toolbar: ['emoji', 'br', 'bold', 'italic', 'strike', '|', 'line', 'quote', 'list', 'ordered-list', 'check', 'outdent', 'indent', 'code', 'inline-code', 'insert-after', 'insert-before', 'upload', 'link', 'table', 'record', 'edit-mode', 'both', 'preview', 'fullscreen', 'outline', 'code-theme', 'content-theme', 'export', 'info', 'help', 'br'],
+        toolbar: ['emoji', 'br', 'headings', 'bold', 'italic', 'strike', '|', 'line', 'quote', 'list', 'ordered-list', 'check', 'outdent', 'indent', 'code', 'inline-code', 'insert-after', 'insert-before', 'upload', 'link', 'table', 'record', 'edit-mode', 'both', 'preview', 'fullscreen', 'outline', 'code-theme', 'content-theme', 'export', 'info', 'help', 'br'],
         customWysiwygToolbar: function() {}, // 修复报错
         theme: window.nightMode ? 'dark' : 'classic',
         mode: getStoredEditorMode(),
@@ -1664,6 +1665,7 @@ document.addEventListener('DOMContentLoaded', function() {
             // 初始化用户界面和移动特性
             var continueAfterEngineReady = function() {
                 initializeAppShellOnce();
+    installSelectionToolbar(window);
                 initSlashCommandRuntime();
             };
 
@@ -2380,7 +2382,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 placeholder: window.i18n ? window.i18n.t('startEditing') : '开始编辑...支持 Markdown 语法',
                 cdn: getVditorCdn(),
                 lang: 'en_US', // 彻底禁用中文语言文件，使用默认英语
-                toolbar: ['emoji', 'br', 'bold', 'italic', 'strike', '|', 'line', 'quote', 'list', 'ordered-list', 'check', 'outdent', 'indent', 'code', 'inline-code', 'insert-after', 'insert-before', 'upload', 'link', 'table', 'record', 'edit-mode', 'both', 'preview', 'fullscreen', 'outline', 'code-theme', 'content-theme', 'export', 'info', 'help', 'br'],
+                toolbar: ['emoji', 'br', 'headings', 'bold', 'italic', 'strike', '|', 'line', 'quote', 'list', 'ordered-list', 'check', 'outdent', 'indent', 'code', 'inline-code', 'insert-after', 'insert-before', 'upload', 'link', 'table', 'record', 'edit-mode', 'both', 'preview', 'fullscreen', 'outline', 'code-theme', 'content-theme', 'export', 'info', 'help', 'br'],
                 customWysiwygToolbar: function() {},
                 theme: window.nightMode ? 'dark' : 'classic',
                 mode: mode,
