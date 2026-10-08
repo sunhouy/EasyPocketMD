@@ -528,8 +528,6 @@ export const CodeRunnerConstructor = (function(global) {
         }
         action(uiText('运行方式与环境'), 'question-circle', showEnvironmentHelp);
         runnerFiles = new RunnerFilesUi(global, () => !!runnerUiState.button?.disabled || !!codeRunner.abortRun, runSandboxCommand, tools=>{if(runnerUiState.outputBody)runnerUiState.outputBody.hidden=runnerUiState.minimized || tools;});
-        action(uiText('沙箱命令行'), 'terminal', () => runnerFiles.show('terminal'));
-        action(uiText('沙箱文件管理'), 'folder-open', () => runnerFiles.show('files'));
         action(uiText('复制运行结果'), 'copy', copyRunResult);
         const maximize = action(uiText('最大化/恢复'), 'expand', () => {
             runnerUiState.maximized = !runnerUiState.maximized; runnerUiState.minimized = false; updatePanelSize();

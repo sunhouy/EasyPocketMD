@@ -2,9 +2,9 @@ export async function showSelectionTranslation(text: string, app: any = window) 
     const en = app.i18n?.getLanguage?.() === 'en';
     const overlay = document.createElement('div');
     overlay.className = 'modal-overlay show'; overlay.style.zIndex = '100180';
-    overlay.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-label="${en ? 'Translation' : '翻译'}"><button class="epmd-dialog-close modal-close-btn" aria-label="${en ? 'Close' : '关闭'}">×</button><div class="modal-header"><h2>${en ? 'Translation' : '翻译'}</h2></div><div class="modal-form"><label>${en ? 'Target language' : '目标语言'}<select><option value="zh">中文</option><option value="en">English</option><option value="ja">日本語</option><option value="ko">한국어</option><option value="fr">Français</option><option value="de">Deutsch</option><option value="es">Español</option></select></label><p role="status" aria-live="polite"></p><textarea readonly rows="8" aria-label="${en ? 'Translation result' : '翻译结果'}"></textarea><button class="modal-btn secondary" data-copy>${en ? 'Copy' : '复制'}</button></div></div>`;
+    overlay.innerHTML = `<div class="modal selection-translation-modal" role="dialog" aria-modal="true" aria-label="${en ? 'Translation' : '翻译'}"><button class="epmd-dialog-close modal-close-btn" aria-label="${en ? 'Close' : '关闭'}">×</button><div class="modal-header"><h2>${en ? 'Translation' : '翻译'}</h2></div><div class="modal-form"><label>${en ? 'Target language' : '目标语言'}<select><option value="zh">中文</option><option value="en">English</option><option value="ja">日本語</option><option value="ko">한국어</option><option value="fr">Français</option><option value="de">Deutsch</option><option value="es">Español</option></select></label><p role="status" aria-live="polite"></p><textarea readonly rows="8" aria-label="${en ? 'Translation result' : '翻译结果'}"></textarea><button class="modal-btn secondary" data-copy>${en ? 'Copy' : '复制'}</button></div></div>`;
     const target = overlay.querySelector('select')!;
-    const status = overlay.querySelector('[role=status]')!;
+    const status = overlay.querySelector<HTMLElement>('[role=status]')!;
     const result = overlay.querySelector('textarea')!;
     const copy = overlay.querySelector<HTMLButtonElement>('[data-copy]')!;
     target.value = /[\u3400-\u9fff]/.test(text) ? 'en' : 'zh';
@@ -24,6 +24,7 @@ export async function showSelectionTranslation(text: string, app: any = window) 
     document.body.append(overlay); document.addEventListener('keydown', keydown); target.focus();
     const translate = async () => {
         controller?.abort(); const request = new AbortController(); controller = request;
+        status.hidden = false;
         status.textContent = en ? 'Translating…' : '翻译中…'; result.value = ''; copy.disabled = true;
         try {
             const token = app.currentUser?.token;
@@ -34,7 +35,7 @@ export async function showSelectionTranslation(text: string, app: any = window) 
             const data = await response.json();
             if (!response.ok || !data.success) throw Error(data.message || (en ? 'Translation failed' : '翻译失败'));
             if (request.signal.aborted || !overlay.isConnected) return;
-            result.value = data.data.text; copy.disabled = false; status.textContent = en ? 'Translated by Tencent Cloud' : '腾讯云翻译';
+            result.value = data.data.text; copy.disabled = false; status.textContent = ''; status.hidden = true;
         } catch (error) { if (!request.signal.aborted) status.textContent = String((error as Error).message); }
     };
     target.onchange = () => { void translate(); };

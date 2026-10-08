@@ -317,17 +317,11 @@ import type { NativeCommandMap } from '../types/native-host';
                 var opener = getOpenerApi();
                 if (opener && typeof opener.openUrl === 'function') {
                     return Promise.resolve(opener.openUrl(target)).catch(function() {
-                        var opened = global.open(target, '_blank', 'noopener,noreferrer');
-                        if (!opened) {
-                            global.location.href = target;
-                        }
+                        global.open(target, '_blank', 'noopener,noreferrer');
                     });
                 }
 
-                var opened = global.open(target, '_blank', 'noopener,noreferrer');
-                if (!opened) {
-                    global.location.href = target;
-                }
+                global.open(target, '_blank', 'noopener,noreferrer');
             });
         },
         getMdAssociationEnabled: function() {

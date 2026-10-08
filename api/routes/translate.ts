@@ -34,7 +34,7 @@ router.post('/', async (req, res) => {
         });
         const data = await response.json() as {Response?: {TargetText?:string; Source?:string; Error?:{Code:string}}};
         if (!response.ok || data.Response?.Error || typeof data.Response?.TargetText !== 'string') {
-            res.status(502).json({success:false, message:'腾讯云翻译失败，请稍后重试 / Tencent Cloud translation failed; please retry'}); return;
+            res.status(502).json({success:false, message:'翻译失败，请稍后重试 / Translation failed; please retry'}); return;
         }
         res.json({success:true, data:{text:data.Response.TargetText, source:data.Response.Source, target}});
     } catch { res.status(502).json({success:false, message:'翻译服务连接超时或不可用 / Translation service timed out or is unavailable'}); }

@@ -27,4 +27,11 @@ describe('Android SAF bridge routing', () => {
         expect(invoke).toHaveBeenCalledWith('open_local_file_dialog', {});
         expect(window.__TAURI__.dialog.open).not.toHaveBeenCalled();
     });
+    it('does not navigate the editor after an external new window returns null', async () => {
+        invoke.mockRejectedValueOnce(Error('Unavailable'));
+        const open = jest.spyOn(window, 'open').mockReturnValue(null);
+        const error = jest.spyOn(console, 'error').mockImplementation(() => {});
+        await window.electron.openExternalUrl('https://www.baidu.com/');
+        expect(open).toHaveBeenCalledTimes(1); expect(error).not.toHaveBeenCalled();
+    });
 });
