@@ -573,6 +573,8 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
                     }
                     const result = await global.electron.readLocalFile(file.localFilePath);
                     if (!result?.success) throw new Error(result?.error || 'Local file permission unavailable');
+                    if(result.path && result.path!==file.localFilePath){file.localFilePath=result.path;persistFile(file,window.e2eSerializeFiles);}
+                    if(result.writable===false)throw new Error('原文件没有写入权限，请在系统文件选择器中授权原文件');
                     content = result.content ?? '';
                 }
                 // Pending editor changes are a recovery draft, never silently replace them with disk text.

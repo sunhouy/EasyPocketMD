@@ -20,6 +20,9 @@ fi
 # 权限列表
 PERMISSIONS=(
     "android.permission.INTERNET"
+    "android.permission.READ_CALENDAR"
+    "android.permission.WRITE_CALENDAR"
+    "com.android.alarm.permission.SET_ALARM"
     "android.permission.CAMERA"
     "android.permission.RECORD_AUDIO"
     "android.permission.READ_EXTERNAL_STORAGE"

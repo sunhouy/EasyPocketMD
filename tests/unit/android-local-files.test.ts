@@ -176,3 +176,9 @@ describe('durable local file access and recovery', () => {
         await expect(createLocalHandleStore(undefined).get('id')).rejects.toThrow();
     });
 });
+it('persists the resolved shared-storage path and reopens it after a restart without a picker',async()=>{
+ localStorage.clear();const file=local();const read=jest.fn(async path=>({success:true,path:'/storage/emulated/0/Download/note.md',content:'disk',writable:true}));const picker=jest.fn();
+ const first=runtime(file,{electron:{readLocalFile:read,openLocalFileDialog:picker}});expect(await first.rt.ensureExternalLocalAccess(file)).toBe(true);
+ expect(file.localFilePath).toBe('/storage/emulated/0/Download/note.md');const restored=JSON.parse(localStorage.getItem('vditor_files'))[0];normalizeExternalLocalFileRecord(first.app,restored);
+ const second=runtime(restored,{electron:{readLocalFile:read,openLocalFileDialog:picker}});expect(await second.rt.ensureExternalLocalAccess(restored)).toBe(true);expect(read).toHaveBeenLastCalledWith('/storage/emulated/0/Download/note.md');expect(picker).not.toHaveBeenCalled();
+});

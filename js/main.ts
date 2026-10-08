@@ -1,3 +1,4 @@
+import { installSettingsRows, createStorageAccessStatus } from './main/settings-layout';
 import { initializeFileList } from './files/initial-list';
 import { isAndroidApp, defaultBottomButtons, applyAndroidDefaults, installAndroidChrome, orderedBottomButtons } from './main/android-ui';
 import { installNativeOpenBridge } from './main/native-open';
@@ -17,7 +18,7 @@ import './ai-config';
 import { enterPresentationMode, exitPresentationMode } from './main/presentation-mode';
 import { initBackNavigation } from './main/back-navigation';
 import { modalSurfaceSelector, isVisibleModalSurface, dismissTransientSurface } from './main/modal-surfaces';
-import { openPrimaryFileInterface, clearFileListReturn, returnFromPrimaryFileInterface } from './main/file-navigation';
+import { openPrimaryFileInterface, clearFileListReturn, returnFromPrimaryFileInterface, closeEditorSearch } from './main/file-navigation';
 import { installMobileChromeScroll } from './main/mobile-chrome-scroll';
 import { applyBackground, createBackgroundControls } from './main/background';
 import { applyThemeColor, createThemeColorControls } from './main/theme-color';
@@ -28,6 +29,7 @@ import { bindFileListDrop } from './files/external/drop';
 
 document.addEventListener('DOMContentLoaded', function() {
     const refreshDeploymentRoute = createDeploymentRouteStatus();
+    const refreshStorageAccess = createStorageAccessStatus(document.getElementById('settingsStorageBtn'));
     'use strict';
 
 
@@ -348,6 +350,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     window.enterFileManagementMode = function(options) {
+        closeEditorSearch();
         var opts = options || {};
         window.isFileManagementMode = true;
         toggleFileManagementBodyClass(true);
@@ -2094,7 +2097,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 var currentDropdown = document.getElementById('mobileDropdown');
                 if (currentDropdown) {
                     currentDropdown.classList.toggle('show');
-                    if (currentDropdown.classList.contains('show')) void refreshDeploymentRoute();
+
                 }
             });
         }
@@ -2253,7 +2256,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 var willShowMore = !desktopDropdown.classList.contains('show');
                 desktopDropdown.classList.toggle('show');
                 if (willShowMore) {
-                    void refreshDeploymentRoute();
+
                     var moreRect = e.currentTarget.getBoundingClientRect();
                     var bodyStyles = window.getComputedStyle(document.body);
                     var toolbarOffset = parseFloat(bodyStyles.getPropertyValue('--top-toolbar-offset')) || 0;
@@ -2457,7 +2460,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     var currentDropdown = document.getElementById('mobileDropdown');
                     if (currentDropdown) {
                         currentDropdown.classList.toggle('show');
-                        if (currentDropdown.classList.contains('show')) void refreshDeploymentRoute();
+
                     }
                 } 
             },
@@ -2569,6 +2572,7 @@ document.addEventListener('DOMContentLoaded', function() {
     window.showSettingsDialog = function() {
         var modal = document.getElementById('settingsModalOverlay');
         if (!modal) return;
+        void refreshStorageAccess();
 
         backgroundControls.open(window.userSettings.background);
         live2dControls.open(window.userSettings.live2d);
@@ -2729,6 +2733,7 @@ document.addEventListener('DOMContentLoaded', function() {
             storageUsagePanel.style.display = 'none';
         }
 
+        installSettingsRows(modal);
         settingsDialogInitialSnapshot = buildSettingsDialogSnapshot();
 
         modal.classList.add('show');
@@ -3431,6 +3436,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // 服务状态对话框
     window.showServiceStatusDialog = function() {
+        void refreshDeploymentRoute();
         var modal = document.getElementById('serviceStatusModalOverlay');
         if (modal) {
             modal.classList.add('show');
@@ -3865,12 +3871,15 @@ document.addEventListener('DOMContentLoaded', function() {
     const settingsAccount=document.getElementById('settingsAccountBtn');
     if(settingsAccount)settingsAccount.onclick=event=>window.handleLoginButtonClick?.(event);
     const storageButton=document.getElementById('settingsStorageBtn');
-    if(storageButton)storageButton.onclick=()=>{const invoke=window.__TAURI__?.core?.invoke || window.__TAURI__?.invoke;if(invoke)void invoke('request_storage_access',{force:true}).catch(error=>window.showMessage?.(String(error),'error'));};
+    if(storageButton)storageButton.onclick=()=>{void refreshStorageAccess(true);};
     for(const [buttonId,menuId] of [['mobileMenuAIBtn','mobileDropdown'],['desktopMenuAIBtn','desktopMoreDropdown']]){
         const menuAI=document.getElementById(buttonId);
         if(menuAI && isMarketBuild)menuAI.remove();
         else if(menuAI)menuAI.onclick=()=>{document.getElementById(menuId)?.classList.remove('show');void window.allToolbarButtons.find(button=>button.id==='mobileAIBtn')?.fn();};
     }
+    const todoButton=document.getElementById('mobileAddTodoBtn');
+    if(todoButton && isAndroidApp())todoButton.onclick=()=>{document.getElementById('mobileDropdown')?.classList.remove('show');void import('./main/android-todo').then(module=>module.showAndroidTodo(window)).catch(error=>window.showMessage?.(String(error),'error'));};
+    else todoButton?.remove();
     document.querySelectorAll<HTMLButtonElement>('[data-close-more-menu]').forEach(button=>button.onclick=()=>document.getElementById(button.dataset.closeMoreMenu)?.classList.remove('show'));
     initializeAppShellOnce();
     
