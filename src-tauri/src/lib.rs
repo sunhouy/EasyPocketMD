@@ -387,11 +387,22 @@ fn write_local_file(file_path: String, content: String) -> WriteLocalFileRespons
 }
 
 #[tauri::command]
-async fn request_storage_access(app: AppHandle, force: Option<bool>) -> Result<serde_json::Value, String> {
+async fn calendar_action(app: AppHandle, action: String, payload: serde_json::Value) -> Result<serde_json::Value, String> {
     #[cfg(target_os = "android")]
-    { return android_document(app, "storageAccess", serde_json::json!({"force": force.unwrap_or(false)})).await; }
+    {
+        let command = match action.as_str() { "calendars" => "calendars", "addTodo" => "addTodo", _ => return Err("不支持的日历操作".into()) };
+        android_document(app, command, payload).await
+    }
     #[cfg(not(target_os = "android"))]
-    { let _ = (app, force); Ok(serde_json::json!({ "granted": true })) }
+    { let _ = (app, action, payload); Err("添加待办仅支持安卓应用".into()) }
+}
+
+#[tauri::command]
+async fn request_storage_access(app: AppHandle, force: Option<bool>, check_only: Option<bool>) -> Result<serde_json::Value, String> {
+    #[cfg(target_os = "android")]
+    { return android_document(app, "storageAccess", serde_json::json!({"force": force.unwrap_or(false), "checkOnly": check_only.unwrap_or(false)})).await; }
+    #[cfg(not(target_os = "android"))]
+    { let _ = (app, force, check_only); Ok(serde_json::json!({ "granted": true })) }
 }
 
 #[cfg(target_os = "android")]
@@ -548,6 +559,7 @@ pub fn run() {
             get_local_file_path,
             open_local_file_dialog,
             request_storage_access,
+            calendar_action,
             read_local_file,
             write_local_file,
             save_file_with_dialog,

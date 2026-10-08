@@ -23,3 +23,14 @@ export function openPrimaryFileInterface(app: FileNavigationApp, prefersFileList
     }
     document.getElementById('fileListSidebar')?.classList.toggle('show');
 }
+
+export function closeEditorSearch():void {
+    const dialog=document.getElementById('findDialogModal') as HTMLElement & {closeFindDialog?:()=>void};
+    if(dialog?.closeFindDialog)dialog.closeFindDialog();else dialog?.remove();
+}
+
+/** Deleting a file must not navigate to another document or back to a deleted one. */
+export function returnToListAfterDeletion(app:any, ids:Set<string>):void {
+    if(ids.has(String(app.currentFileId))){app.currentFileId=null;app.deferInitialFileOpen=true;}
+    clearFileListReturn(app);closeEditorSearch();app.enterFileManagementMode?.({refresh:true});
+}

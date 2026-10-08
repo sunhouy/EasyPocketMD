@@ -225,5 +225,14 @@ if [ ! -f "$PROGUARD_RULES" ]; then
   printf '%s\n' '-keep class app.tauri.** { *; }' '-keep class com.tauri.** { *; }' '-keep class * extends android.app.Activity' > "$PROGUARD_RULES"
 fi
 if ! grep -q 'cn.yhsun.md.LocalDocumentsPlugin' "$PROGUARD_RULES"; then
-  printf '%s\n' '-keep class cn.yhsun.md.LocalDocumentsPlugin { *; }' '-keep class cn.yhsun.md.DocumentArgs { *; }' >> "$PROGUARD_RULES"
+  printf '%s\n' '-keep class cn.yhsun.md.LocalDocumentsPlugin { *; }' '-keep class cn.yhsun.md.DocumentArgs { *; }
+-keep class cn.yhsun.md.CalendarTodoArgs { *; }' >> "$PROGUARD_RULES"
+fi
+
+if ! grep -q "cn.yhsun.md.CalendarTodoArgs" "$PROGUARD_RULES"; then
+  echo "-keep class cn.yhsun.md.CalendarTodoArgs { *; }" >> "$PROGUARD_RULES"
+fi
+
+if ! grep -q "cn.yhsun.md.StorageArgs" "$PROGUARD_RULES"; then
+  echo "-keep class cn.yhsun.md.StorageArgs { *; }" >> "$PROGUARD_RULES"
 fi

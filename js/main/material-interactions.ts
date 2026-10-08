@@ -1,6 +1,6 @@
 /** Delegated ink for dynamic controls; it never consumes focus or clicks. */
 export function installMaterialInteractions(root:Document=document) {
-    const targets='button,[role="button"],.notes-file-card,.notes-folder-card,.notes-folder-tab,.jstree-anchor,.radio-group label';
+    const targets='summary.settings-setting-summary,button,[role="button"],.notes-file-card,.notes-folder-card,.notes-folder-tab,.jstree-anchor,.radio-group label';
     const layers=new Map<HTMLElement,{source:HTMLElement;timer:ReturnType<typeof setTimeout>}>();
     const remove=(layer:HTMLElement)=>{const record=layers.get(layer);if(record)clearTimeout(record.timer);layer.remove();layers.delete(layer);};
     const clear=()=>{for(const layer of layers.keys())remove(layer);};

@@ -2,6 +2,7 @@
  * 文件管理 - 加载、保存、同步、历史版本、文件夹
  */
 // @ts-nocheck
+import { returnToListAfterDeletion } from '../main/file-navigation';
 import { deletionOwner, resolveDeletionPlan } from './delete-plan';
 import { createFileOrderStore, isOrderMetadataFile } from './order-store';
 import { installBatchFileActions, showBottomSheet } from './batch-actions';
@@ -804,6 +805,7 @@ import { createDiffFileWriter } from './conflict/live-files';
             const cached = JSON.parse(localStorage.getItem('vditor_files') || '[]');
             if (Array.isArray(cached)) localStorage.setItem('vditor_files',JSON.stringify(cached.filter(file => !idSet.has(String(file.id)))));
             exitFileListMultiSelectMode();
+            returnToListAfterDeletion(global,idSet);
             global.refreshNotesHome?.();
             global.showMessage(isEn() ? 'Already deleted; list refreshed' : '文件已删除，列表已刷新');
             loadFiles();
@@ -843,12 +845,8 @@ import { createDiffFileWriter } from './conflict/live-files';
             if (global.unsavedChanges) delete global.unsavedChanges[id];
             global.markPendingServerSync?.(id,false);
         }
-        if (deletedIds.has(String(g('currentFileId')))) {
-            const first = files.find(file => file.type === 'file');
-            if (first) await openFile(first.id);
-            else createDefaultFile();
-        }
         exitFileListMultiSelectMode();
+        returnToListAfterDeletion(global,deletedIds);
         // Visible cards and the confirmation toast update immediately, before rebuilding the tree.
         global.refreshNotesHome?.();
         global.showMessage(isEn() ? 'Deleted ' + targets.length + ' item(s)' : '已删除 ' + targets.length + ' 项');

@@ -120,11 +120,52 @@ body .more-menu .dropdown-item > i { width:20px;flex-shrink:0;text-align:center;
 body .more-menu .more-menu-ai { background:var(--md-selected);color:var(--md-primary-text); }
 body .more-menu .more-menu-ai > i { color:inherit; }
 .more-menu-tools { margin-top:10px;padding-top:10px;border-top:1px solid var(--md-outline); }
-.more-menu-tools > summary { cursor:pointer;padding:8px 10px;color:var(--md-muted);font-size:13px; }
-.more-menu-tools[open] > summary { margin-bottom:6px; }
+.more-menu-tools > h3 { margin:0 0 6px;padding:8px 10px;color:var(--md-muted);font-size:13px;font-weight:600; }
+
 .more-menu-footer { margin-top:10px;padding-top:8px;border-top:1px solid var(--md-outline); }
 body .more-menu .deployment-route-status { grid-column:1/-1;border:0;margin:0;padding:8px 10px;color:var(--md-muted); }
 body .more-menu :is(#mobileClearBtn,#desktopClearBtn) { color:var(--md-danger); }
 body .more-menu :is(#mobileClearBtn,#desktopClearBtn) > i { color:inherit; }
 .notes-home.is-loading :is(.notes-home-grid,.notes-home-tabs) { display:none; }
 .notes-home .notes-file-preview { height:6.6em;flex-shrink:0; }
+
+.android-todo-button { display:none !important; }
+.android-app .android-todo-button { display:flex !important; }
+body .android-todo-modal { width:min(100%,560px);max-width:560px; }
+.android-todo-modal .modal-header { margin-right:40px; }
+.android-todo-modal form > label,.android-todo-modal [data-repeat-options] > label,.todo-time-row > label { display:flex;flex-direction:column;gap:6px;margin:12px 0;font-size:14px; }
+.android-todo-modal :is(input:not([type=checkbox]),select,textarea) { width:100%;min-width:0;padding:10px;font:inherit; }
+.todo-time-row { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px; }
+.android-todo-modal .todo-alarm-option { flex-direction:row;align-items:flex-start; }
+.android-todo-modal input[type=checkbox] { flex-shrink:0;width:auto; }
+.todo-hint { font-size:12px;line-height:1.6;color:var(--md-muted); }
+.android-todo-modal [data-error] { color:var(--md-danger);font-size:13px; }
+.android-todo-modal .modal-actions { display:flex;justify-content:flex-end;gap:10px; }
+
+/* Fixed card tracks reserve an inner footer; previews can never push dates outside. */
+.notes-home .notes-home-grid { grid-auto-rows:224px; }
+.notes-home .notes-file-card { display:grid;grid-template-rows:auto minmax(0,1fr) auto;height:224px;min-height:224px;overflow:hidden; }
+.notes-home .notes-file-preview { height:auto;min-height:0;margin:0 0 12px;align-self:start;max-height:6.6em; }
+.notes-home .notes-file-card time { display:block;min-width:0;margin-top:0;align-self:end;overflow-wrap:anywhere; }
+.service-status-content > .deployment-route-status { border:1px solid var(--md-outline);border-radius:12px;background:var(--md-container);color:var(--md-text);margin:0 0 14px;padding:12px; }
+/* A single row surface for every settings entry, including nested appearance/tools. */
+#settingsModalOverlay .settings-grid { display:grid;grid-template-columns:minmax(0,1fr);gap:8px; }
+#settingsModalOverlay .settings-list-item { padding:0;margin:0 0 8px;min-width:0; }
+#settingsModalOverlay :is(.settings-setting-row,.settings-collapsible,.background-settings) { padding:0;border:0;border-radius:12px;background:transparent;box-shadow:none; }
+#settingsModalOverlay summary.settings-setting-summary,body.night-mode #settingsModalOverlay summary.settings-setting-summary {
+    display:flex;align-items:center;gap:12px;min-height:52px;width:100%;padding:12px;border:0;border-radius:12px;
+    background:var(--md-surface) !important;color:var(--md-text);font-size:15px;font-weight:400;list-style:none;cursor:pointer;box-shadow:none;
+}
+#settingsModalOverlay summary.settings-setting-summary::-webkit-details-marker { display:none; }
+#settingsModalOverlay summary.settings-setting-summary::after { display:none; }
+#settingsModalOverlay .settings-row-icon { flex-shrink:0;width:24px;font-size:22px;text-align:center;color:var(--md-primary); }
+#settingsModalOverlay .settings-row-chevron { flex-shrink:0;margin-left:auto;font-size:12px;color:var(--md-muted);transition:transform .15s; }
+#settingsModalOverlay details[open] > summary .settings-row-chevron { transform:rotate(90deg); }
+#settingsModalOverlay details > :not(summary) { margin:0;padding:12px; }
+#settingsModalOverlay .settings-control-label { position:absolute;width:1px;height:1px;padding:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap; }
+#settingsModalOverlay .settings-collapsible-group { margin:0;padding:0; }
+#settingsModalOverlay .settings-access-status { margin-left:auto;flex-shrink:0;color:var(--md-primary);font-size:13px; }
+#settingsModalOverlay .settings-access-status[hidden] { display:none; }
+#settingsModalOverlay .settings-access-status + i { margin-left:0; }
+.android-todo-modal .modal-close-btn { position:absolute;top:14px;right:14px; }
+.android-todo-modal :is(input,select,textarea) { margin-bottom:0; }
