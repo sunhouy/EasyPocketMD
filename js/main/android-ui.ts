@@ -5,6 +5,11 @@ export const legacyBottomButtons=['mobileInsertBtn','mobileFormulaBtn','mobileCh
 export function defaultBottomButtons(android:boolean):string[] {
     return legacyBottomButtons.map(id=>android && id==='mobileAIBtn'?'mobileBottomSaveBtn':id);
 }
+export function orderedBottomButtons(buttons:string[],android:boolean):string[] {
+    if(!android)return [...buttons];
+    const group=['mobileUndoBtn','mobileRedoBtn','mobileBottomSaveBtn'];
+    return [...buttons.filter(id=>!group.includes(id)),...group.filter(id=>buttons.includes(id))];
+}
 export function applyAndroidDefaults(settings:any,android:boolean) {
     if(!settings.defaultFileOpening)settings.defaultFileOpening=android?'fileList':'lastEdited';
     if(!settings.toolbarButtons || (android && JSON.stringify(settings.toolbarButtons)===JSON.stringify(legacyBottomButtons)))settings.toolbarButtons=defaultBottomButtons(android);

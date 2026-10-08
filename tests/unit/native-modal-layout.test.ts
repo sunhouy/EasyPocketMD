@@ -1,6 +1,14 @@
 /** @jest-environment jsdom */
 import { applyNativeModalLayout } from '../../js/main/modal-layout';
 afterEach(()=>document.body.className='');
+it.each(['loginModalOverlay','userSettingsModalOverlay','addAccountModalOverlay','switchAccountConfirmModalOverlay','changePasswordModalOverlay','deleteAccountModalOverlay'])('opens %s above Settings after layout of a hidden modal',id=>{
+    document.body.innerHTML=`<div class="modal-overlay" id="${id}"><div class="modal"></div></div><div class="modal-overlay" id="settingsModalOverlay"><div class="modal"></div></div>`;
+    const account=document.getElementById(id),settings=document.getElementById('settingsModalOverlay');
+    applyNativeModalLayout(account);applyNativeModalLayout(settings);
+    account.classList.add('show');applyNativeModalLayout(account);
+    expect(Number(account.style.zIndex)).toBeGreaterThan(Number(settings.style.zIndex));
+    const markup=account.outerHTML;applyNativeModalLayout(account);expect(account.outerHTML).toBe(markup);
+});
 it.each(['settingsModalOverlay','historyModalOverlay'])('covers the toolbar for native %s',id=>{
     document.body.innerHTML=`<div class="toolbar"><div class="modal-overlay" id="${id}"><div class="modal ${id.startsWith('history')?'history-modal':''}" style="max-height:85vh"></div></div></div>`;
     const overlay=document.getElementById(id); applyNativeModalLayout(overlay);

@@ -1,7 +1,12 @@
 /** @jest-environment jsdom */
-import {applyAndroidDefaults,defaultBottomButtons,legacyBottomButtons,isAndroidApp,installAndroidChrome} from '../../js/main/android-ui';
+import {applyAndroidDefaults,defaultBottomButtons,legacyBottomButtons,isAndroidApp,installAndroidChrome,orderedBottomButtons} from '../../js/main/android-ui';
 
 afterEach(()=>{delete window.__TAURI__;document.body.className='';});
+it('groups Android undo, redo and Save at the right without resetting chosen tools',()=>{
+    const buttons=['mobileBottomSaveBtn','mobileUndoBtn','mobileInsertBtn','mobileRedoBtn','mobileFormulaBtn'];
+    expect(orderedBottomButtons(buttons,true)).toEqual(['mobileInsertBtn','mobileFormulaBtn','mobileUndoBtn','mobileRedoBtn','mobileBottomSaveBtn']);
+    expect(orderedBottomButtons(buttons,false)).toEqual(buttons);
+});
 it('starts fresh Android users in the file list with Save in place of AI',()=>{
     const settings:any={};applyAndroidDefaults(settings,true);
     expect(settings.defaultFileOpening).toBe('fileList');
