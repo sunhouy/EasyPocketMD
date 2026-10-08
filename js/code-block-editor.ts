@@ -1,3 +1,4 @@
+import { affectsCodeBlocks } from './code-block-mutations';
 import { bindMobileCodeInput } from './code-block-mobile';
 import { canRunLanguage } from '../shared/code-runner-languages';
 import { recordCodeBlockExit } from './code-block-focus';
@@ -285,8 +286,8 @@ export function registerCodeBlockEditors(instance: any, root: HTMLElement) {
     if (view?.dom.isConnected) view.dispatch({effects:errorLine.of(line)});
 };
 const observer = new MutationObserver(mutations => {
-    // CodeMirror manages its own DOM; scanning on every caret blink/input would recurse.
-    if (mutations.some(mutation => mutation.target === document.body || (!(mutation.target as HTMLElement).closest?.('.epmd-code-editor') && ((mutation.target as HTMLElement).closest?.('.vditor, .diff-vditor') || [...mutation.addedNodes].some(node => (node as HTMLElement).querySelector?.('.vditor, .diff-vditor')))))) scheduleScan();
+    // Ordinary prose edits and CodeMirror caret changes do not rescan every code block.
+    if (mutations.some(affectsCodeBlocks)) scheduleScan();
 });
 observer.observe(document.body, {subtree:true, childList:true, characterData:true, attributes:true, attributeFilter:['contenteditable','class']});
 scheduleScan();

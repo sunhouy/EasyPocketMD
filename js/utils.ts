@@ -175,6 +175,16 @@
         }
 
         if (typeof window !== 'undefined') {
+            // Production and packaged clients cannot redirect stateful requests via a saved override.
+            // Overseas gateways forward this API to the domestic origin by pinned IP.
+            var host = window.location?.hostname;
+            if (window.electron || window.desktopRuntime?.type === 'tauri' || window.__TAURI__ ||
+                window.location?.protocol === 'file:' || host === 'tauri.localhost') {
+                return 'https://md.yhsun.cn/api';
+            }
+            if (host === 'md.yhsun.cn' || host === 'dev.yhsun.cn') {
+                return window.location.origin + '/api';
+            }
             var configuredApiBase = window.API_BASE_URL || localStorage.getItem('apiBaseUrl');
             if (configuredApiBase) {
                 return normalizeApiBase(configuredApiBase);

@@ -388,6 +388,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function initializeAppShellOnce() {
         if (shellInitialized) return;
         shellInitialized = true;
+        installSelectionToolbar(window);
         installFileListLayout();
         initUserInterface();
         initMobileFeatures();
@@ -1665,7 +1666,6 @@ document.addEventListener('DOMContentLoaded', function() {
             // 初始化用户界面和移动特性
             var continueAfterEngineReady = function() {
                 initializeAppShellOnce();
-    installSelectionToolbar(window);
                 initSlashCommandRuntime();
             };
 

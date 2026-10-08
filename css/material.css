@@ -109,8 +109,8 @@ body :is(.epmd-dialog-close,.modal-close-btn,.custom-dialog-close) {
 
 /* The same editor actions and grouped More menu on web and native shells. */
 #mobileMenuAIBtn { display:flex; }
-body.ui-mode-desktop:not(.file-management-mode):not(.mobile-fullscreen) .mobile-bottom-bar { display:block; }
-body.ui-mode-desktop:not(.mobile-fullscreen) .editor-container { bottom:var(--mobile-bottom-bar-height); }
+body.ui-mode-desktop .mobile-bottom-bar { display:none !important; }
+body.ui-mode-desktop:not(.mobile-fullscreen) .editor-container { bottom:0; }
 body.ui-mode-desktop .bottom-bar-buttons { max-width:760px;margin:auto; }
 body :is(#mobileDropdown,#desktopMoreDropdown) { width:min(340px,calc(100vw - 24px));padding:12px;max-height:calc(100dvh - var(--top-toolbar-offset) - var(--top-toolbar-height) - 16px);overflow:auto;overscroll-behavior:contain; }
 .more-menu-header { display:flex;align-items:center;justify-content:space-between;padding:0 0 10px; }
