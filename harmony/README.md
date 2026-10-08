@@ -6,7 +6,18 @@
 
 合并后在 Actions 选择 **Build and Publish HarmonyOS App → Run workflow**。可填 `version`（例如 `2.9.10`）、`version_code`；版本名留空取 `package.json`，版本代码留空按 `major*1000000+minor*1000+patch` 生成。更新已上架应用时，必须保证版本代码大于此前版本。该流程只修改当前构建的鸿蒙清单，不改其他客户端版本。
 
-构建成功后，下载 `easypocketmd-版本-harmony` 产物，包含签名校验通过的 `.hap` 以及包含该 HAP 的 `.app`。只有勾选 `publish_release` 才上传到 GitHub 的 `v版本` Release，不覆盖已有同名附件。流程不会自动提交 AppGallery Connect 审核，也不会触发服务器部署。
+构建成功后，下载 `easypocketmd-版本-harmony` 产物，包含签名校验通过的 `.hap` 以及保留完整 HAP 签名的 `.app`。APP 打包禁用 HAP 内 pack.info 的重写，随后逐字节比对内嵌 HAP，并再次执行华为签名/代码签名校验；校验失败不会上传。只有勾选 `publish_release` 才上传到 GitHub 的 `v版本` Release，不覆盖已有同名附件。流程不会自动提交 AppGallery Connect 审核，也不会触发服务器部署。
+
+## 安装与发布区别
+
+Actions 显示的产物大小是 ZIP 大小，不是手机应用占用空间。本工程只有 ArkWeb 容器和图标，编辑器通过网络加载，几十到几百 KB 的产物并不代表编译失败；它不是完整离线编辑器。
+
+- 下载 Actions 产物后先解压，外层 ZIP 不能直接安装。
+- `.app` 是提交 AppGallery Connect 的发布包，不是点击即安装的 APK。发布签名不能保证本地旁加载获准，实际分发须使用华为应用市场或 AGC 支持的测试渠道。
+- 本地设备调试使用 `.hap` 和 `hdc install 文件.hap`，需要匹配的调试证书、包含设备 UDID 的调试 Profile 以及开发者模式。当前发布工作流只接受发布 Profile，不生成调试包，不能把发布包当成调试包。
+- 仅支持 HarmonyOS NEXT / HarmonyOS 5+，不能作为 Android APK 安装在旧版 HarmonyOS 或 Android 上。
+
+参考华为安装错误说明：<https://developer.huawei.com/consumer/cn/doc/harmonyos-guides-v5/bm-tool-V5>。若安装仍失败，请提供具体错误码与系统版本，区分包损坏、签名来源限制及 SDK 不兼容。
 
 ## GitHub 配置
 
@@ -23,7 +34,7 @@
 | `HARMONY_TOOLS_URL` | Secret | 华为官方 macOS ARM64 Command Line Tools 完整 ZIP 的可直接下载 HTTPS 地址 |
 | `HARMONY_TOOLS_SHA256` | Variable | 与下载包匹配的 64 位 SHA256 |
 
-工具包需要包含匹配的 Node、JBR、OHPM、Hvigor，以及 `sdk/default` 下完整 HarmonyOS SDK（含 ArkTS、签名工具和打包工具），支持工程 API 12 / modelVersion 5.0.0。工作流固定使用 GitHub `macos-15` ARM64 runner，因此不能提供 Windows、Linux 或 macOS Intel 工具包。下载链接不能返回登录网页；如果链接过期，需更新 URL。流程会先校验 SHA256，再安装工具。不需要自建 runner，也不需要在仓库存放签名文件。
+工具包需要包含匹配的 Node、OHPM、Hvigor，Java 由 Actions 单独安装 JDK 17（命令行工具包不要求包含 JBR），以及 `sdk/default` 下完整 HarmonyOS SDK（含 ArkTS、签名工具和打包工具），支持工程 API 12 / modelVersion 5.0.0。工作流固定使用 GitHub `macos-15` ARM64 runner，因此不能提供 Windows、Linux 或 macOS Intel 工具包。下载链接不能返回登录网页；如果链接过期，需更新 URL。流程会先校验 SHA256，再安装工具。不需要自建 runner，也不需要在仓库存放签名文件。
 
 华为官方工具下载入口：<https://developer.huawei.com/consumer/cn/download/command-line-tools-for-hmos>。开发者登录获取匹配的 macOS ARM64 版本及完整 SDK；如果下载页分开提供 SDK，需提供包含两者的完整工具包。证书和发布 Profile 在 AppGallery Connect 的“证书、APP ID 和 Profile”中申请；其中 APP ID 包名必须是 `com.yhsun.md`，Profile 必须为发布类型。上架前还需按 AppGallery Connect 的要求完成应用资料、隐私政策及审核提交。
 
