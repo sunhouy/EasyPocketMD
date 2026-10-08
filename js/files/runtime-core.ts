@@ -2,6 +2,7 @@
  * 文件管理 - 加载、保存、同步、历史版本、文件夹
  */
 // @ts-nocheck
+import { isMobileUserAgent } from '../main/device-layout';
 import { cancelEditorHistoryTimers } from '../editor-history';
 import { bindFileCreationButton, quickDocumentPath } from './quick-create';
 import { returnToListAfterDeletion } from '../main/file-navigation';
@@ -4181,7 +4182,7 @@ import { createDiffFileWriter } from './conflict/live-files';
         let crossSearchLazyState = null;
         const CROSS_SEARCH_BATCH_SIZE = 50;
         const CROSS_SEARCH_PREFETCH_OFFSET = 180;
-        const shouldAutoFocusFindInput = !/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        const shouldAutoFocusFindInput = !isMobileUserAgent(navigator.userAgent);
 
         const gateway = global.wasmTextEngineGateway;
         if (wasmSearchPanel) wasmSearchPanel.style.display = 'flex';

@@ -1,3 +1,4 @@
+import { isMobileUserAgent } from './main/device-layout';
 import { installEditorHistory, cancelEditorHistoryTimers } from './editor-history';
 import { loadFeature } from './feature-loader';
 import { selectionSearchUrl } from './main/selection-search';
@@ -43,7 +44,7 @@ document.addEventListener('DOMContentLoaded', function() {
         window.i18n.init();
         applyTranslations();
     }
-    var isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    var isMobileDevice = isMobileUserAgent(navigator.userAgent || '');
     window.isMobileEditorEnvironment = isMobileDevice;
     window.editorInterfaceMode = window.isMobileEditorEnvironment ? 'mobile' : 'desktop';
     window.isTauriMobileEnvironment = false;
@@ -57,7 +58,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function isTauriMobileRuntime() {
         if (!isTauriRuntime()) return false;
-        return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || '');
+        return isMobileUserAgent(navigator.userAgent || '');
     }
 
     function ensureTauriMobileSafeArea() {
@@ -95,7 +96,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function isMobileClient() {
-        return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent || '');
+        return isMobileUserAgent(navigator.userAgent || '');
     }
 
     var MODAL_OVERLAY_SELECTOR = modalSurfaceSelector;
