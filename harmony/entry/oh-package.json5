@@ -1,0 +1,9 @@
+{
+  "name": "entry",
+  "version": "2.9.3",
+  "description": "EasyPocketMD ArkWeb entry",
+  "main": "",
+  "author": "sunhouy",
+  "license": "MIT",
+  "dependencies": {}
+}
