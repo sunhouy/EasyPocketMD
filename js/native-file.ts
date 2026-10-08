@@ -138,25 +138,9 @@ export const nativeFileApi = (function(global: Window) {
             }
         }
 
-        var opened = window.open(target, '_blank', 'noopener,noreferrer');
-        if (!opened) {
-            var anchor = document.createElement('a');
-            anchor.href = target;
-            anchor.target = '_blank';
-            anchor.rel = 'noopener noreferrer';
-            anchor.style.display = 'none';
-            document.body.appendChild(anchor);
-            anchor.click();
-            setTimeout(function() {
-                if (anchor.parentNode) anchor.parentNode.removeChild(anchor);
-            }, 120);
-
-            try {
-                window.location.assign(target);
-            } catch (error) {
-                window.location.href = target;
-            }
-        }
+        // noopener can return null even after opening a new tab successfully.
+        // Do not retry or navigate the editor based on that return value.
+        window.open(target, '_blank', 'noopener,noreferrer');
     }
 
     async function uploadBlobForAndroidDownload(blobPayload, filename) {

@@ -689,35 +689,26 @@ body.mobile-fullscreen .mobile-bottom-bar {
     display: none !important;
 }
 
-/* Mobile web: bottom bar stays visible; top bar can slide away while scrolling down */
-body.mobile-web-chrome.ui-mode-mobile.mobile-fullscreen .mobile-bottom-bar {
-    display: block !important;
+/* Keep both bars in the visible mobile web viewport, including above the keyboard. */
+body.mobile-web-chrome.ui-mode-mobile .mobile-toolbar-container {
+    top: calc(var(--top-toolbar-offset) + var(--mobile-web-viewport-top, 0px));
+    transition: none;
 }
 
-body.mobile-web-chrome.ui-mode-mobile .mobile-toolbar-container {
-    transition: transform 0.25s ease, opacity 0.25s ease;
-    will-change: transform;
+body.mobile-web-chrome.ui-mode-mobile .mobile-bottom-bar {
+    bottom: var(--keyboard-inset-bottom, 0px);
 }
 
 body.mobile-web-chrome.ui-mode-mobile .editor-container {
-    transition: top 0.25s ease;
+    top: calc(var(--top-toolbar-offset) + var(--top-toolbar-height) + var(--mobile-web-viewport-top, 0px));
+    bottom: calc(var(--mobile-bottom-bar-height) + var(--keyboard-inset-bottom, 0px));
 }
 
-body.mobile-web-chrome.ui-mode-mobile.mobile-top-toolbar-hidden .mobile-toolbar-container {
-    transform: translateY(calc(-100% - var(--top-toolbar-offset, 0px)));
-    opacity: 0;
-    pointer-events: none;
-}
-
-body.mobile-web-chrome.ui-mode-mobile.mobile-top-toolbar-hidden .editor-container {
-    top: var(--top-toolbar-offset);
-}
-
-body.mobile-keyboard-visible.hide-mobile-bottom-toolbar-on-keyboard .mobile-bottom-bar {
+body:not(.mobile-web-chrome).mobile-keyboard-visible.hide-mobile-bottom-toolbar-on-keyboard .mobile-bottom-bar {
     display: none !important;
 }
 
-body.mobile-keyboard-visible.hide-mobile-bottom-toolbar-on-keyboard .editor-container {
+body:not(.mobile-web-chrome).mobile-keyboard-visible.hide-mobile-bottom-toolbar-on-keyboard .editor-container {
     bottom: 0;
 }
 
@@ -6064,7 +6055,6 @@ body.file-management-mode .file-list-header,
 body.file-management-mode .file-list-search-panel,
 body.file-management-mode #fileList { display:none !important; }
 body.file-management-mode .file-list-sidebar { overflow:hidden; padding:0; max-height:none; height:100dvh; }
-body.file-management-mode.mobile-web-chrome.ui-mode-mobile.mobile-fullscreen .mobile-bottom-bar { display:none !important; }
 body.file-management-mode .notes-home {
     display:flex; flex-direction:column; flex:1; min-height:0; height:100%; overflow:hidden; width:100%; max-width:1180px;
     box-sizing:border-box; margin:0 auto; padding:calc(12px + env(safe-area-inset-top, 0px)) 20px 0;

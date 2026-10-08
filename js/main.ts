@@ -25,6 +25,7 @@ import { initBackNavigation } from './main/back-navigation';
 import { modalSurfaceSelector, isVisibleModalSurface, dismissTransientSurface } from './main/modal-surfaces';
 import { openPrimaryFileInterface, clearFileListReturn, returnFromPrimaryFileInterface, closeEditorSearch } from './main/file-navigation';
 import { installMobileChromeScroll } from './main/mobile-chrome-scroll';
+import { syncMobileWebViewport } from './main/mobile-web-viewport';
 import { applyBackground, createBackgroundControls } from './main/background';
 import { applyThemeColor, createThemeColorControls } from './main/theme-color';
 import { readThemeMode, rememberThemeMode, isNightTheme } from './main/theme-preference';
@@ -1304,7 +1305,7 @@ document.addEventListener('DOMContentLoaded', function() {
     var mobileViewportSyncScheduled = false;
 
     function isMobileToolbarHideEnabledForKeyboard() {
-        return window.editorInterfaceMode === 'mobile' && window.userSettings.hideBottomToolbarOnKeyboard === true;
+        return window.editorInterfaceMode === 'mobile' && !!window.isTauriMobileEnvironment && window.userSettings.hideBottomToolbarOnKeyboard === true;
     }
 
     function isMobileTextInputActive() {
@@ -1321,6 +1322,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         root.style.setProperty('--app-viewport-height', '100%');
         root.style.setProperty('--keyboard-inset-bottom', '0px');
+        syncMobileWebViewport(window.editorInterfaceMode === 'mobile' && !window.isTauriMobileEnvironment);
 
         var keyboardVisible = isMobileTextInputActive();
         if (window.editorInterfaceMode !== 'mobile') {
@@ -1347,6 +1349,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
         window.addEventListener('resize', scheduleMobileViewportSync);
         window.addEventListener('orientationchange', scheduleMobileViewportSync);
+        window.visualViewport?.addEventListener('resize', scheduleMobileViewportSync);
+        window.visualViewport?.addEventListener('scroll', scheduleMobileViewportSync);
         window.addEventListener('focusin', scheduleMobileViewportSync, true);
         window.addEventListener('focusout', function() {
             scheduleMobileViewportSync();
