@@ -1,3 +1,4 @@
+import { loadFeature } from '../feature-loader';
 import { isMarketBuild } from '../build-variant';
 (function(global) {
     'use strict';
@@ -17,7 +18,7 @@ import { isMarketBuild } from '../build-variant';
     // 懒加载 PDF 生成器
     async function getPDFGenerator() {
         if (!global.generatePDF) {
-            const module = await import('./pdf-generator');
+            const module = await loadFeature('ui/pdf-generator', () => import('./pdf-generator'));
             global.generatePDF = module.generatePDF;
             global.renderPDF = module.renderPDF;
         }

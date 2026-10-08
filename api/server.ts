@@ -133,6 +133,7 @@ const { initFileSyncServer } = require('./realtime/fileSyncServer');
 // Use routes with rate limiting - MUST BE BEFORE SPA FALLBACK!
 // AI routes - strict rate limiting (especially for unauthenticated users)
 app.use('/api/ai', aiLimiter, aiRoutes);
+app.use('/api/translate', aiLimiter, require('./routes/translate'));
 
 // Auth routes - prevent brute force attacks
 app.use('/api/auth/login', authLimiter);

@@ -1,6 +1,8 @@
+import { selectionSearchUrl } from './selection-search';
+import { showSelectionTranslation } from './selection-translation';
 type Snapshot = {owner:HTMLElement;text:string;rect:()=>DOMRect|DOMRectReadOnly;valid:()=>boolean;restore:()=>void;replace:(text:string)=>void;editable:boolean;markdown:boolean;range?:Range};
-type Action = 'copy'|'cut'|'paste'|'h1'|'h2'|'h3'|'bold'|'italic'|'quote'|'strike'|'list'|'ordered-list'|'check';
-const actions:[Action,string,string,string][]=[['copy','copy','复制','Copy'],['cut','scissors','剪切','Cut'],['paste','paste','粘贴','Paste'],['h1','heading','标题1','Heading 1'],['h2','heading','标题2','Heading 2'],['h3','heading','标题3','Heading 3'],['bold','bold','粗体','Bold'],['italic','italic','斜体','Italic'],['quote','quote-right','引用','Quote'],['strike','strikethrough','删除线','Strikethrough'],['list','list-ul','无序列表','Bullet list'],['ordered-list','list-ol','有序列表','Numbered list'],['check','list-check','任务列表','Task list']];
+type Action = 'search'|'translate'|'copy'|'cut'|'paste'|'h1'|'h2'|'h3'|'bold'|'italic'|'quote'|'strike'|'list'|'ordered-list'|'check';
+const actions:[Action,string,string,string][]=[['copy','copy','复制','Copy'],['cut','scissors','剪切','Cut'],['paste','paste','粘贴','Paste'],['search','magnifying-glass','搜索','Search'],['translate','language','翻译','Translate'],['h1','heading','标题1','Heading 1'],['h2','heading','标题2','Heading 2'],['h3','heading','标题3','Heading 3'],['bold','bold','粗体','Bold'],['italic','italic','斜体','Italic'],['quote','quote-right','引用','Quote'],['strike','strikethrough','删除线','Strikethrough'],['list','list-ul','无序列表','Bullet list'],['ordered-list','list-ol','有序列表','Numbered list'],['check','list-check','任务列表','Task list']];
 export function selectionMarkdown(text:string,action:string):string {
     const marks:Record<string,string>={bold:'**',italic:'*',strike:'~~'};
     if(marks[action])return marks[action]+text+marks[action];
@@ -15,6 +17,11 @@ export function installSelectionToolbar(app:any=window) {
     toolbar.setAttribute('role','toolbar');toolbar.setAttribute('aria-label','文本操作');
     document.body.append(toolbar);
     let snapshot:Snapshot|null=null, frame=0,busy=false;
+    let pasteAllowed=!!navigator.clipboard?.readText;
+    if(navigator.permissions?.query)void navigator.permissions.query({name:'clipboard-read' as PermissionName}).then(permission=>{
+        const update=()=>{pasteAllowed=permission.state!=='denied' && !!navigator.clipboard?.readText;if(snapshot)schedule();};
+        permission.onchange=update;update();
+    }).catch(()=>{});
     let nativeMenuEnabled:boolean|undefined;
     function nativeMenu(custom:boolean){
         if(nativeMenuEnabled===custom)return;
@@ -92,7 +99,13 @@ export function installSelectionToolbar(app:any=window) {
         for(const button of Array.from(toolbar.querySelectorAll<HTMLButtonElement>('button'))){
             const action=actions.find(a=>a[0]===button.dataset.action)!;
             button.title=app.i18n?.getLanguage?.()==='en'?action[3]:action[2];button.setAttribute('aria-label',button.title);
-            button.disabled=action[0]==='copy'?false:['cut','paste'].includes(action[0])?!next.editable:!next.markdown;
+            const supported=['copy','search','translate'].includes(action[0]) ? true : action[0]==='paste' ? next.editable && pasteAllowed : action[0]==='cut' ? next.editable : next.markdown;
+            button.hidden=!supported;button.disabled=false;
+            if(supported && next.range && !['copy','cut','paste','search','translate'].includes(action[0])) {
+                const selector=action[0].startsWith('h')?`button[data-tag="${action[0]}"]`:`button[data-type="${action[0]}"]`;
+                const native=document.getElementById('vditor')?.querySelector<HTMLElement>('.vditor-toolbar '+selector);
+                button.hidden=!native || native.classList.contains('vditor-menu--disabled');
+            }
         }
         position(next);
     }
@@ -102,7 +115,13 @@ export function installSelectionToolbar(app:any=window) {
         const context=snapshot;if(!context || busy || !context.valid())return hide();
         busy=true;
         try {
-            if(action==='copy' || action==='cut'){
+            if(action==='search'){
+                const url=selectionSearchUrl(context.text,app.userSettings?.searchEngine,app.userSettings?.customSearchUrl);
+                if(app.nativeFileOps?.openExternalUrl)await app.nativeFileOps.openExternalUrl(url);
+                else window.open(url,'_blank','noopener,noreferrer');
+            } else if(action==='translate'){
+                hide();void showSelectionTranslation(context.text,app);
+            } else if(action==='copy' || action==='cut'){
                 if(action==='cut' && !context.editable)return;
                 if(navigator.clipboard?.writeText)await navigator.clipboard.writeText(context.text);
                 else {context.restore();if(!document.execCommand('copy'))throw Error('无法访问剪贴板，请使用系统复制');}
@@ -123,7 +142,7 @@ export function installSelectionToolbar(app:any=window) {
                     native.dispatchEvent(new Event(navigator.userAgent.includes('iPhone')?'touchstart':'click',{bubbles:true,cancelable:true}));
                 } else context.replace(selectionMarkdown(context.text,action));
             }
-        } catch(error){report(String((error as Error).message),'Clipboard or formatting failed. Please reselect the text or use the system menu.','error');}
+        } catch(error){report(String((error as Error).message),String((error as Error).message),'error');}
         finally {busy=false;hide();}
     }
     for(const [action,icon,zh] of actions){

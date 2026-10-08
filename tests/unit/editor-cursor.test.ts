@@ -34,6 +34,8 @@ describe('background Vditor content updates', () => {
             })
         };
         runtime = installEditorRuntime({ currentFileId: 'file', vditor: editor }, {});
+        runtime.setEditorContentForFile('file', value);
+        editor.setValue.mockClear();
     });
 
     afterEach(() => {

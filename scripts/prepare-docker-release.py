@@ -15,7 +15,8 @@ for name in ('release.json', 'release.sha256'):
     shutil.copy2(Path('image-cas') / name, root / name)
 keys = ('DB_HOST', 'DB_PORT', 'DB_USER', 'DB_PASSWORD', 'DB_NAME', 'REDIS_HOST',
         'REDIS_PORT', 'REDIS_PASSWORD', 'REDIS_DB', 'JWT_SECRET', 'JWT_EXPIRES_IN',
-        'ADMIN_USER', 'ADMIN_PASSWORD', 'BASE_URL', 'DASHSCOPE_API_KEY')
+        'ADMIN_USER', 'ADMIN_PASSWORD', 'BASE_URL', 'DASHSCOPE_API_KEY',
+        'TENCENT_SECRET_ID', 'TENCENT_SECRET_KEY')
 values = []
 for key in keys:
     value = os.environ.get(key, '')

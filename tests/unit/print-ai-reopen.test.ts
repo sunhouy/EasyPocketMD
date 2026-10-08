@@ -10,7 +10,7 @@ it('restores the print AI button after lazy loading and permits reopening',async
     window.WebSocket=jest.fn(()=>({readyState:0,close:jest.fn(),send:jest.fn()}));
     delete window.showAILayoutDialog;window.showPrintDialog('print');
     const button=document.getElementById('aiLayoutBtn');expect(button).not.toBeNull();
-    await button.onclick();expect(button.disabled).toBe(false);expect(button.textContent).not.toContain('加载中');
+    const opening=button.onclick();expect(document.getElementById('featureLoadingStatus')).not.toBeNull();await jest.advanceTimersByTimeAsync(32);await opening;expect(document.getElementById('featureLoadingStatus')).toBeNull();expect(button.disabled).toBe(false);expect(button.textContent).not.toContain('加载中');
     await button.onclick();expect(window.showAILayoutDialog).toHaveBeenCalledTimes(2);
     jest.clearAllTimers();jest.useRealTimers();
 });

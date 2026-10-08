@@ -1,8 +1,9 @@
+import { loadFeature } from '../feature-loader';
 import type { Live2DModel } from '../main/live2d-models';
 import { prepareCachedModel } from './live2d-assets';
 
 export async function openCompanionQuery() {
-    await import('./ai-assistant');
+    if (typeof window.showAIQueryPanel !== 'function') await loadFeature('ui/ai-assistant', () => import('./ai-assistant'));
     window.showAIQueryPanel();
 }
 
