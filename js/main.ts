@@ -1,3 +1,6 @@
+import { installEditorHistory, cancelEditorHistoryTimers } from './editor-history';
+import { loadFeature } from './feature-loader';
+import { selectionSearchUrl } from './main/selection-search';
 import { installSelectionToolbar } from './main/selection-toolbar';
 import { installSettingsRows, createStorageAccessStatus } from './main/settings-layout';
 import { initializeFileList } from './files/initial-list';
@@ -693,7 +696,7 @@ document.addEventListener('DOMContentLoaded', function() {
         case 'openAIAssistant':
             if (clickElementById('desktopAIBtn')) return;
             if (typeof window.showAIPanel !== 'function') {
-                import('./ui/ai-assistant').then(function() {
+                loadFeature('ui/ai-assistant', () => import('./ui/ai-assistant')).then(function() {
                     if (typeof window.showAIPanel === 'function') {
                         window.showAIPanel();
                     }
@@ -1110,14 +1113,14 @@ document.addEventListener('DOMContentLoaded', function() {
 
     async function handleBottomExport() {
         if (typeof window.exportContent !== 'function') {
-            await import('./ui/export');
+            await loadFeature('ui/export', () => import('./ui/export'));
         }
         window.exportContent();
     }
 
     async function handleBottomShare() {
         if (typeof window.showShareDialog !== 'function') {
-            await import('./ui/share');
+            await loadFeature('ui/share', () => import('./ui/share'));
         }
         window.showShareDialog();
     }
@@ -1159,13 +1162,13 @@ document.addEventListener('DOMContentLoaded', function() {
         { id: 'mobileBottomFileListBtn', icon: 'fas fa-folder-open', textKey: 'fileListTitle', fn: handleBottomFileList },
         { id: 'mobileFormulaBtn', icon: 'fas fa-superscript', textKey: 'formula', fn: async function() {
             if (typeof window.showFormulaPicker !== 'function') {
-                await import('./formula-picker');
+                await loadFeature('formula-picker', () => import('./formula-picker'));
             }
             if (typeof window.showFormulaPicker === 'function') window.showFormulaPicker();
         } },
         { id: 'mobileChartBtn', icon: 'fas fa-chart-bar', textKey: 'chart', fn: async function() {
             if (typeof window.showChartPicker !== 'function') {
-                await import('./ui/chart');
+                await loadFeature('ui/chart', () => import('./ui/chart'));
             }
             if (typeof window.showChartPicker === 'function') window.showChartPicker();
         } },
@@ -1174,7 +1177,7 @@ document.addEventListener('DOMContentLoaded', function() {
         { id: 'mobileAIBtn', icon: 'fas fa-robot', textKey: 'aiAssistant', fn: async function() {
             if (typeof window.showAIPanel !== 'function') {
                 // 懒加载 AI 助手模块
-                await import('./ui/ai-assistant');
+                await loadFeature('ui/ai-assistant', () => import('./ui/ai-assistant'));
             }
             if (typeof window.showAIPanel === 'function') window.showAIPanel();
         } }
@@ -1645,6 +1648,7 @@ document.addEventListener('DOMContentLoaded', function() {
         },
         after: function() {
             window.vditorReady = true;
+            installEditorHistory(window.vditor);
             if (loading) loading.style.display = 'none';
 
             if (typeof window.initInlineImageTools === 'function') {
@@ -2040,7 +2044,7 @@ document.addEventListener('DOMContentLoaded', function() {
         var mobileShareBtn = (document.getElementById('mobileShareBtn') as HTMLButtonElement);
         if (mobileShareBtn) mobileShareBtn.addEventListener('click', async function() {
             if (typeof window.showShareDialog !== 'function') {
-                await import('./ui/share');
+                await loadFeature('ui/share', () => import('./ui/share'));
             }
             window.showShareDialog();
             closeDrop();
@@ -2081,7 +2085,7 @@ document.addEventListener('DOMContentLoaded', function() {
         var mobilePrintBtn = (document.getElementById('mobilePrintBtn') as HTMLButtonElement);
         if (mobilePrintBtn) mobilePrintBtn.addEventListener('click', async function() {
             if (typeof window.showPrintDialog !== 'function') {
-                await import('./ui/print');
+                await loadFeature('ui/print', () => import('./ui/print'));
             }
             window.showPrintDialog();
             closeDrop();
@@ -2117,7 +2121,7 @@ document.addEventListener('DOMContentLoaded', function() {
         var mobileExportBtn = (document.getElementById('mobileExportBtn') as HTMLButtonElement);
         if (mobileExportBtn) mobileExportBtn.addEventListener('click', async function() {
             if (typeof window.exportContent !== 'function') {
-                await import('./ui/export');
+                await loadFeature('ui/export', () => import('./ui/export'));
             }
             window.exportContent();
             closeDrop();
@@ -2187,8 +2191,8 @@ document.addEventListener('DOMContentLoaded', function() {
             (document.getElementById('desktopOutlineToggleBtn') as HTMLButtonElement)?.setAttribute('aria-pressed', String(!!window.userSettings.showOutline));
         };
         bindDesktopButton('desktopThemeToggleBtn', function() { window.toggleNightMode(); syncQuickActions(); });
-        bindDesktopButton('desktopQuickShareBtn', async function() { if (typeof window.showShareDialog !== 'function') await import('./ui/share'); window.showShareDialog(); });
-        bindDesktopButton('desktopQuickExportBtn', async function() { if (typeof window.exportContent !== 'function') await import('./ui/export'); window.exportContent(); });
+        bindDesktopButton('desktopQuickShareBtn', async function() { if (typeof window.showShareDialog !== 'function') await loadFeature('ui/share', () => import('./ui/share')); window.showShareDialog(); });
+        bindDesktopButton('desktopQuickExportBtn', async function() { if (typeof window.exportContent !== 'function') await loadFeature('ui/export', () => import('./ui/export')); window.exportContent(); });
         bindDesktopButton('desktopOutlineToggleBtn', function() {
             if (window.isLongFileMode || !window.vditor) return;
             const editor = window.vditor.vditor;
@@ -2208,7 +2212,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         bindDesktopButton('desktopAIBtn', async function() {
             if (typeof window.showAIPanel !== 'function') {
-                await import('./ui/ai-assistant');
+                await loadFeature('ui/ai-assistant', () => import('./ui/ai-assistant'));
             }
             if (typeof window.showAIPanel === 'function') {
                 window.showAIPanel();
@@ -2276,7 +2280,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         bindDesktopButton('desktopShareBtn', async function() {
             if (typeof window.showShareDialog !== 'function') {
-                await import('./ui/share');
+                await loadFeature('ui/share', () => import('./ui/share'));
             }
             window.showShareDialog();
             closeDesktopDrop();
@@ -2304,7 +2308,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         bindDesktopButton('desktopPrintBtn', async function() {
             if (typeof window.showPrintDialog !== 'function') {
-                await import('./ui/print');
+                await loadFeature('ui/print', () => import('./ui/print'));
             }
             window.showPrintDialog();
             closeDesktopDrop();
@@ -2322,7 +2326,7 @@ document.addEventListener('DOMContentLoaded', function() {
         bindDesktopButton('desktopImportBtn', function() { window.importFiles(); closeDesktopDrop(); });
         bindDesktopButton('desktopExportBtn', async function() {
             if (typeof window.exportContent !== 'function') {
-                await import('./ui/export');
+                await loadFeature('ui/export', () => import('./ui/export'));
             }
             window.exportContent();
             closeDesktopDrop();
@@ -2375,6 +2379,7 @@ document.addEventListener('DOMContentLoaded', function() {
         try {
             var currentContent = window.vditor.getValue();
             localStorage.setItem('vditor_editor_mode', mode);
+            cancelEditorHistoryTimers(window.vditor);
             if (window.vditor.destroy) window.vditor.destroy();
             var newConfig: IOptions = {
                 height: editorConfig.height,
@@ -2393,6 +2398,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 preview: buildVditorPreviewConfig(),
                 upload: editorConfig.upload,
                 after: function() {
+                    installEditorHistory(window.vditor);
                     reinitEditorEvents();
                     reinitMenuEvents();
                     reinitMobileFeatures();
@@ -2439,7 +2445,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
             { id: 'mobileShareBtn', fn: async function() {
                 if (typeof window.showShareDialog !== 'function') {
-                    await import('./ui/share');
+                    await loadFeature('ui/share', () => import('./ui/share'));
                 }
                 window.showShareDialog();
                 closeDrop();
@@ -2449,7 +2455,7 @@ document.addEventListener('DOMContentLoaded', function() {
             { id: 'mobileFindBtn', fn: function() { if (typeof window.showFindDialog === 'function') window.showFindDialog(); closeDrop(); } },
             { id: 'mobilePrintBtn', fn: async function() {
                 if (typeof window.showPrintDialog !== 'function') {
-                    await import('./ui/print');
+                    await loadFeature('ui/print', () => import('./ui/print'));
                 }
                 window.showPrintDialog();
                 closeDrop();
@@ -2475,7 +2481,7 @@ document.addEventListener('DOMContentLoaded', function() {
             } },
             { id: 'mobileExportBtn', fn: async function() {
                 if (typeof window.exportContent !== 'function') {
-                    await import('./ui/export');
+                    await loadFeature('ui/export', () => import('./ui/export'));
                 }
                 window.exportContent();
                 closeDrop();
@@ -2575,6 +2581,12 @@ document.addEventListener('DOMContentLoaded', function() {
         var modal = document.getElementById('settingsModalOverlay');
         if (!modal) return;
         void refreshStorageAccess();
+        const searchEngine=document.getElementById('selectionSearchEngine') as HTMLSelectElement;
+        const customUrl=document.getElementById('customSearchUrl') as HTMLInputElement;
+        searchEngine.value=window.userSettings.searchEngine || 'baidu';
+        customUrl.value=window.userSettings.customSearchUrl || '';
+        const updateSearchUrlVisibility=()=>{document.getElementById('customSearchUrlGroup').hidden=searchEngine.value!=='custom';};
+        searchEngine.onchange=updateSearchUrlVisibility;updateSearchUrlVisibility();
 
         backgroundControls.open(window.userSettings.background);
         live2dControls.open(window.userSettings.live2d);
@@ -3027,7 +3039,11 @@ document.addEventListener('DOMContentLoaded', function() {
     var saveSettingsBtn = (document.getElementById('saveSettingsBtn') as HTMLButtonElement);
     if(saveSettingsBtn) saveSettingsBtn.addEventListener('click', function() {
         if (backgroundControls.isLoading()) { window.showMessage(window.i18n.t('backgroundProcessing'), 'info'); return; }
+        const searchEngine=(document.getElementById('selectionSearchEngine') as HTMLSelectElement).value as import('./main/selection-search').SearchEngine;
+        const customSearchUrl=(document.getElementById('customSearchUrl') as HTMLInputElement).value.trim();
+        try { selectionSearchUrl('test',searchEngine,customSearchUrl); } catch(error) { window.showMessage(String((error as Error).message),'error');return; }
         var newSettings: import("../types/global").UserSettings = {
+            searchEngine, customSearchUrl,
             toolbarButtons: [],
             background: backgroundControls.get(),
             themeColor: themeColorControls.get(),
@@ -3880,7 +3896,7 @@ document.addEventListener('DOMContentLoaded', function() {
         else if(menuAI)menuAI.onclick=()=>{document.getElementById(menuId)?.classList.remove('show');void window.allToolbarButtons.find(button=>button.id==='mobileAIBtn')?.fn();};
     }
     const todoButton=document.getElementById('mobileAddTodoBtn');
-    if(todoButton && isAndroidApp())todoButton.onclick=()=>{document.getElementById('mobileDropdown')?.classList.remove('show');void import('./main/android-todo').then(module=>module.showAndroidTodo(window)).catch(error=>window.showMessage?.(String(error),'error'));};
+    if(todoButton && isAndroidApp())todoButton.onclick=()=>{document.getElementById('mobileDropdown')?.classList.remove('show');void loadFeature('main/android-todo', () => import('./main/android-todo')).then(module=>module.showAndroidTodo(window)).catch(error=>window.showMessage?.(String(error),'error'));};
     else todoButton?.remove();
     document.querySelectorAll<HTMLButtonElement>('[data-close-more-menu]').forEach(button=>button.onclick=()=>document.getElementById(button.dataset.closeMoreMenu)?.classList.remove('show'));
     initializeAppShellOnce();

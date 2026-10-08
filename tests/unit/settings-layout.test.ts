@@ -13,6 +13,7 @@ describe('uniform settings rows', () => {
         expect(root.querySelectorAll('.settings-setting-row')).toHaveLength(2);
         expect(root.querySelectorAll('#enabled')).toHaveLength(1);
         expect(root.querySelectorAll('.settings-row-chevron')).toHaveLength(3);
+        expect(root.querySelectorAll('.settings-row-icon')).toHaveLength(0);
         expect(root.querySelector('#appearance > summary > span')?.getAttribute('data-i18n')).toBe('appearance');
         expect(root.querySelector('label[for="mode"]')).not.toBeNull();
         expect(root.querySelector('details.settings-category')).toBeNull();

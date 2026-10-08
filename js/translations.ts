@@ -9,6 +9,9 @@ import { uiMessages } from './i18n-messages';
     // 所有翻译文本
     const translations = {
         zh: {
+            selectionSearchEngine: '选中文字搜索引擎',
+            customSearchEngine: '自定义',
+            customSearchUrl: '搜索地址（使用 {query} 代表选中文字）',
             // End-to-end encryption settings, unlock methods and errors
             e2eDefaultTitle: "默认端到端加密",
             e2eNewFilesDefault: "新建文件默认开启端到端加密",
@@ -937,6 +940,9 @@ import { uiMessages } from './i18n-messages';
             e2eInfoFingerprintUnavailable: '请先登录以查看密钥指纹'
         },
         en: {
+            selectionSearchEngine: 'Selected text search engine',
+            customSearchEngine: 'Custom',
+            customSearchUrl: 'Search URL (use {query} for selected text)',
             // End-to-end encryption settings, unlock methods and errors
             e2eDefaultTitle: "Default end-to-end encryption",
             e2eNewFilesDefault: "Enable end-to-end encryption for new files",

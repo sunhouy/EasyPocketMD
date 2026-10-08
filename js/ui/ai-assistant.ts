@@ -1,3 +1,4 @@
+import { loadFeature } from '../feature-loader';
 import { isMarketBuild } from '../build-variant';
 /**
  * AI助手功能模块
@@ -422,7 +423,7 @@ import { isMarketBuild } from '../build-variant';
                     // 如果是PPT菜单，懒加载并初始化PPT生成器
                     if (action === 'ppt') {
                         if (typeof global.initPPTGenerator !== 'function') {
-                            import('./ppt-generator').then(function() {
+                            loadFeature('ui/ppt-generator', () => import('./ppt-generator')).then(function() {
                                 if (typeof global.initPPTGenerator === 'function') {
                                     global.initPPTGenerator();
                                 }

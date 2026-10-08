@@ -1,3 +1,4 @@
+import { loadFeature } from '../feature-loader';
 import { isMarketBuild } from '../build-variant';
 // Only this small controller is eager. The renderer and Live2D SDK stay in lazy chunks.
 import { LIVE2D_MODELS, type Live2DModel, type Live2DPreference } from './live2d-models';
@@ -31,7 +32,7 @@ export function applyLive2D(value: unknown, force = false) {
     pending = pending.catch(() => {}).then(async () => {
         if (request.signal.aborted) return;
         try {
-            const { mountLive2D } = await import('../ui/live2d-companion');
+            const { mountLive2D } = await loadFeature('ui/live2d-companion', () => import('../ui/live2d-companion'));
             if (request.signal.aborted) return;
             const companion = await mountLive2D(pref.model, request.signal);
             if (request.signal.aborted) companion.destroy();

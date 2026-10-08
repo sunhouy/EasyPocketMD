@@ -35,11 +35,6 @@ export function installSettingsRows(root: HTMLElement) {
     root.querySelectorAll<HTMLElement>('details > summary').forEach(summary => {
         if (summary.classList.contains('settings-setting-summary')) return;
         summary.classList.add('settings-setting-summary');
-        const icon = document.createElement('i');
-        icon.className = 'fas fa-sliders-h settings-row-icon';
-        icon.setAttribute('aria-hidden', 'true');
-        const headingIcon = summary.closest('.settings-section')?.querySelector('.settings-section-header > i');
-        if (headingIcon) icon.className = headingIcon.className + ' settings-row-icon';
         const chevron = document.createElement('i');
         chevron.className = 'fas fa-chevron-right settings-row-chevron';
         chevron.setAttribute('aria-hidden', 'true');
@@ -51,7 +46,7 @@ export function installSettingsRows(root: HTMLElement) {
             summary.removeAttribute('data-i18n');
             summary.append(text);
         }
-        summary.prepend(icon);
+        summary.querySelectorAll('.settings-row-icon').forEach(icon => icon.remove());
         summary.append(chevron);
     });
 }

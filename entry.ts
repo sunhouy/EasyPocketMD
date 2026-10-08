@@ -1,3 +1,4 @@
+import { preloadFeatures, loadFeature } from './js/feature-loader';
 import '@sunhouyun/vditor/dist/index.css';
 import '@fortawesome/fontawesome-free/css/all.min.css';
 import 'cropperjs/dist/cropper.css';
@@ -56,7 +57,7 @@ import './js/ui/image-compressor';
 // import './js/ui/ppt-generator';
 // Resource management and cross-document reference scanning are loaded on demand.
 const loadFileManager = async () => {
-    await import('./js/ui/file-manager');
+    await loadFeature('ui/file-manager', () => import('./js/ui/file-manager'));
     const open = window.showFileManager;
     if (open === loadFileManager) throw new Error('File manager failed to initialize');
     await open();
@@ -74,3 +75,7 @@ import './js/ui/insert-picker';
 import './js/main';
 
 import './js/code-block-editor-loader';
+
+// Begin silent preloading only after the initial page and app shell have loaded.
+if (document.readyState === 'complete') setTimeout(preloadFeatures, 0);
+else window.addEventListener('load', () => { setTimeout(preloadFeatures, 0); }, {once:true});

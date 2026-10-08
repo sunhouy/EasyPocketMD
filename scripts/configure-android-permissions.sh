@@ -22,7 +22,6 @@ PERMISSIONS=(
     "android.permission.INTERNET"
     "android.permission.READ_CALENDAR"
     "android.permission.WRITE_CALENDAR"
-    "com.android.alarm.permission.SET_ALARM"
     "android.permission.CAMERA"
     "android.permission.RECORD_AUDIO"
     "android.permission.READ_EXTERNAL_STORAGE"
@@ -38,6 +37,8 @@ TEMP_MANIFEST=$(mktemp)
 
 # 读取现有内容
 cat "$MANIFEST_PATH" > "$TEMP_MANIFEST"
+# Remove the obsolete clock permission from previously initialized projects.
+sed -i '/com\.android\.alarm\.permission\.SET_ALARM/d' "$TEMP_MANIFEST"
 
 # 检查并添加缺失的权限
 for perm in "${PERMISSIONS[@]}"; do

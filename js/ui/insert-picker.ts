@@ -1,3 +1,4 @@
+import { loadFeature } from '../feature-loader';
 import { isMarketBuild, requireAIEnabled } from '../build-variant';
 
 (function(global) {
@@ -123,7 +124,7 @@ import { isMarketBuild, requireAIEnabled } from '../build-variant';
                 case 'emoji':
                     closeInsertPicker();
                     if (typeof window.showEmojiPicker !== 'function') {
-                        import('../emoji-picker').then(function() {
+                        loadFeature('emoji-picker', () => import('../emoji-picker')).then(function() {
                             if (typeof window.showEmojiPicker === 'function') window.showEmojiPicker();
                         });
                     } else {
@@ -133,7 +134,7 @@ import { isMarketBuild, requireAIEnabled } from '../build-variant';
                 case 'formula':
                     closeInsertPicker();
                     if (typeof window.showFormulaPicker !== 'function') {
-                        import('../formula-picker').then(function() {
+                        loadFeature('formula-picker', () => import('../formula-picker')).then(function() {
                             if (typeof window.showFormulaPicker === 'function') window.showFormulaPicker();
                         });
                     } else {
@@ -143,7 +144,7 @@ import { isMarketBuild, requireAIEnabled } from '../build-variant';
                 case 'chart':
                     closeInsertPicker();
                     if (typeof window.showChartPicker !== 'function') {
-                        import('./chart').then(function() {
+                        loadFeature('ui/chart', () => import('./chart')).then(function() {
                             if (typeof window.showChartPicker === 'function') window.showChartPicker();
                         });
                     } else {

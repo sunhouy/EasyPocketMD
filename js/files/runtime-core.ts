@@ -2,6 +2,7 @@
  * 文件管理 - 加载、保存、同步、历史版本、文件夹
  */
 // @ts-nocheck
+import { cancelEditorHistoryTimers } from '../editor-history';
 import { bindFileCreationButton, quickDocumentPath } from './quick-create';
 import { returnToListAfterDeletion } from '../main/file-navigation';
 import { deletionOwner, resolveDeletionPlan } from './delete-plan';
@@ -2205,6 +2206,7 @@ import { createDiffFileWriter } from './conflict/live-files';
             if (requestToken !== fileOpenRequestToken) return;
 
             if (global.sharedDocState?.ownerFileId && global.sharedDocState.ownerFileId !== fileId) global.deactivateSharedDocumentSession?.();
+            if (String(global.currentFileId) !== String(fileId)) cancelEditorHistoryTimers(g('vditor'));
             global.currentFileId = fileId;
             refreshE2EUi();
 

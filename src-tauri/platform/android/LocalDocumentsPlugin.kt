@@ -5,7 +5,6 @@ import android.Manifest
 import android.content.ContentProviderOperation
 import android.content.ContentValues
 import android.provider.CalendarContract
-import android.provider.AlarmClock
 import app.tauri.annotation.Permission
 import app.tauri.annotation.PermissionCallback
 import app.tauri.PermissionState
@@ -50,8 +49,6 @@ class CalendarTodoArgs {
     var start:Long=0
     var end:Long=0
     var rrule:String=""
-    var reminderMinutes:Int=-1
-    var alarm:Boolean=false
 }
 
 /** Shared by MainActivity and the Rust plugin; independent of platform cache paths. */
@@ -100,39 +97,18 @@ class LocalDocumentsPlugin(private val activity: Activity) : Plugin(activity) {
         io.execute {try {
             require(args.title.trim().isNotEmpty() && args.title.length<=500){"请输入待办标题（最多500字）"}
             require(args.calendarId>0 && args.start>0 && args.end>args.start){"请选择日历和有效的开始、结束时间"}
-            require(args.reminderMinutes in -1..525600){"提醒时间无效"}
             require(args.rrule.isEmpty() || args.rrule.matches(Regex("FREQ=(DAILY|WEEKLY|MONTHLY|YEARLY)(;INTERVAL=[0-9]{1,3})?(;BYDAY=(MO,TU,WE,TH,FR))?(;(COUNT=[0-9]{1,4}|UNTIL=[0-9]{8}T[0-9]{6}Z))?"))){"重复规则无效"}
-            val alarmSeconds=(args.start-args.reminderMinutes.coerceAtLeast(0)*60000L-System.currentTimeMillis())/1000
-            require(!args.alarm || (args.reminderMinutes>=0 && alarmSeconds in 1..Int.MAX_VALUE.toLong())){"闹钟提醒时间必须在未来"}
-            var reminderMethod=CalendarContract.Reminders.METHOD_ALERT
-            val eligible=activity.contentResolver.query(CalendarContract.Calendars.CONTENT_URI,arrayOf(CalendarContract.Calendars.ALLOWED_REMINDERS,CalendarContract.Calendars.MAX_REMINDERS),"${CalendarContract.Calendars._ID} = ? AND ${CalendarContract.Calendars.CALENDAR_ACCESS_LEVEL} >= ?",arrayOf(args.calendarId.toString(),CalendarContract.Calendars.CAL_ACCESS_CONTRIBUTOR.toString()),null)?.use {cursor->
-                if(!cursor.moveToFirst())false else {
-                    if(args.reminderMinutes>=0){
-                        require(cursor.isNull(1) || cursor.getInt(1)>0){"这个日历不支持提醒，请选择其他日历"}
-                        val allowed=cursor.getString(0).orEmpty().split(",").filter {it.isNotBlank()}
-                        if(allowed.isNotEmpty() && !allowed.contains(reminderMethod.toString())){
-                            require(allowed.contains(CalendarContract.Reminders.METHOD_DEFAULT.toString())){"这个日历不支持本机提醒"}
-                            reminderMethod=CalendarContract.Reminders.METHOD_DEFAULT
-                        }
-                    };true
-                }
-            } ?: false
+            val eligible=activity.contentResolver.query(CalendarContract.Calendars.CONTENT_URI,arrayOf(CalendarContract.Calendars._ID),"${CalendarContract.Calendars._ID} = ? AND ${CalendarContract.Calendars.CALENDAR_ACCESS_LEVEL} >= ?",arrayOf(args.calendarId.toString(),CalendarContract.Calendars.CAL_ACCESS_CONTRIBUTOR.toString()),null)?.use {cursor->cursor.moveToFirst()} ?: false
             require(eligible){"日历不可写或已被删除，请重新选择日历"}
             val values=ContentValues().apply {
                 put(CalendarContract.Events.CALENDAR_ID,args.calendarId);put(CalendarContract.Events.TITLE,args.title.trim());put(CalendarContract.Events.DESCRIPTION,args.description)
                 put(CalendarContract.Events.DTSTART,args.start);put(CalendarContract.Events.EVENT_TIMEZONE,TimeZone.getDefault().id)
-                put(CalendarContract.Events.HAS_ALARM,if(args.reminderMinutes>=0)1 else 0)
                 if(args.rrule.isEmpty())put(CalendarContract.Events.DTEND,args.end) else {put(CalendarContract.Events.RRULE,args.rrule);put(CalendarContract.Events.DURATION,"PT${(args.end-args.start)/1000}S")}
             }
             val operations=arrayListOf(ContentProviderOperation.newInsert(CalendarContract.Events.CONTENT_URI).withValues(values).build())
-            if(args.reminderMinutes>=0)operations.add(ContentProviderOperation.newInsert(CalendarContract.Reminders.CONTENT_URI).withValueBackReference(CalendarContract.Reminders.EVENT_ID,0).withValue(CalendarContract.Reminders.MINUTES,args.reminderMinutes).withValue(CalendarContract.Reminders.METHOD,reminderMethod).build())
             val results=activity.contentResolver.applyBatch(CalendarContract.AUTHORITY,operations)
             val result=JSObject().put("eventUri",results[0].uri.toString())
-            if(args.alarm)activity.runOnUiThread {
-                try {activity.startActivity(Intent(AlarmClock.ACTION_SET_TIMER).putExtra(AlarmClock.EXTRA_LENGTH,alarmSeconds.toInt()).putExtra(AlarmClock.EXTRA_MESSAGE,args.title).putExtra(AlarmClock.EXTRA_SKIP_UI,false))}
-                catch (_:Exception){result.put("warning","待办已写入日历，但设备没有可用的系统闹钟应用；日历提醒仍然有效")}
-                invoke.resolve(result)
-            } else invoke.resolve(result)
+            invoke.resolve(result)
         } catch(e:Exception){invoke.reject("添加待办失败："+(e.message?:"请检查日历权限和时间设置"))} }
     }
 

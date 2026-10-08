@@ -136,7 +136,6 @@ body .android-todo-modal { width:min(100%,560px);max-width:560px; }
 .android-todo-modal form > label,.android-todo-modal [data-repeat-options] > label,.todo-time-row > label { display:flex;flex-direction:column;gap:6px;margin:12px 0;font-size:14px; }
 .android-todo-modal :is(input:not([type=checkbox]),select,textarea) { width:100%;min-width:0;padding:10px;font:inherit; }
 .todo-time-row { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px; }
-.android-todo-modal .todo-alarm-option { flex-direction:row;align-items:flex-start; }
 .android-todo-modal input[type=checkbox] { flex-shrink:0;width:auto; }
 .todo-hint { font-size:12px;line-height:1.6;color:var(--md-muted); }
 .android-todo-modal [data-error] { color:var(--md-danger);font-size:13px; }
@@ -195,3 +194,6 @@ body .code-runner-ui-host .code-output > :first-child { color:var(--md-muted) !i
 /* Suppress WebKit native callouts while keeping text selection and its handles. */
 #vditor, #longFileTextarea { -webkit-touch-callout:none; }
 #vditor :is(.cm-editor,.cm-content,.cm-line) { -webkit-touch-callout:default; }
+
+#featureLoadingStatus { position:fixed;left:50%;bottom:calc(80px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:2147483646;padding:12px 24px;border-radius:24px;background:var(--md-surface, #fff);color:var(--md-on-surface, #222);box-shadow:0 4px 20px #0003;pointer-events:none; }
+.selection-toolbar button[hidden] { display:none; }

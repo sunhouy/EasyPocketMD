@@ -1,3 +1,4 @@
+import { loadFeature } from './feature-loader';
 import { RUNNABLE_LANGUAGES } from '../shared/code-runner-languages';
 (function(global) {
     'use strict';
@@ -35,10 +36,10 @@ import { RUNNABLE_LANGUAGES } from '../shared/code-runner-languages';
         return null;
     }
 
-    function ensureCodeRunnerLoaded() {
-        if (loadPromise) return loadPromise;
+    function ensureCodeRunnerLoaded(foreground = true) {
+        if (loadPromise) return foreground ? loadFeature('code-runner', () => import('./code-runner')).then(() => loadPromise) : loadPromise;
 
-        loadPromise = import('./code-runner').then(function() {
+        loadPromise = loadFeature('code-runner', () => import('./code-runner'), foreground).then(function() {
             if (typeof global.addRunButtons === 'function') {
                 global.addRunButtons();
             }
@@ -51,10 +52,10 @@ import { RUNNABLE_LANGUAGES } from '../shared/code-runner-languages';
         return loadPromise;
     }
 
-    function maybeLoadForTarget(target) {
+    function maybeLoadForTarget(target, foreground = true) {
         var codeBlock = getCodeBlockFromTarget(target);
         if (!isRunnableCodeBlock(codeBlock)) return;
-        void ensureCodeRunnerLoaded();
+        void ensureCodeRunnerLoaded(foreground).catch(() => {});
     }
 
     function initCodeRunnerLazyLoad() {
@@ -62,7 +63,7 @@ import { RUNNABLE_LANGUAGES } from '../shared/code-runner-languages';
         lazyLoadInitialized = true;
 
         document.addEventListener('mousemove', function(event) {
-            maybeLoadForTarget(event.target);
+            maybeLoadForTarget(event.target, false);
         }, true);
 
         document.addEventListener('click', function(event) {

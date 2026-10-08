@@ -1,3 +1,4 @@
+import { loadFeature } from '../feature-loader';
 import { exportHeadingSizes, exportFontStack } from '../../shared/export-typography';
 import { afterDialogPaint, saveAfterDialogOpens } from './dialog-save';
 
@@ -29,7 +30,7 @@ function shouldHideLocalPdfConvert(content) {
 // 懒加载 PDF 生成器
 async function getPDFGenerator() {
     if (!global.generatePDF) {
-        const module = await import('./pdf-generator');
+        const module = await loadFeature('ui/pdf-generator', () => import('./pdf-generator'));
         global.generatePDF = module.generatePDF;
         global.renderPDF = module.renderPDF;
     }
@@ -1154,7 +1155,7 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
                     try {
                         (aiLayoutBtn as HTMLButtonElement).disabled = true;
                         aiLayoutBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ' + (isEn() ? 'Loading...' : '加载中...');
-                        await import('./ai');
+                        await loadFeature('ui/ai', () => import('./ai'));
                         if (global.showAILayoutDialog) {
                             global.showAILayoutDialog(modalContent, cleanup, printModal);
                         }

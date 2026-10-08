@@ -1,3 +1,4 @@
+import { loadFeature } from '../feature-loader';
 import { isMarketBuild } from '../build-variant';
 import { pinyin } from 'pinyin-pro';
 import { rememberThemeMode } from '../main/theme-preference';
@@ -27,15 +28,15 @@ const state = {
 };
 
 const moduleLoaders = {
-    insertPicker: function() { return import('./insert-picker'); },
-    formulaPicker: function() { return import('../formula-picker'); },
-    chartPicker: function() { return import('./chart'); },
-    emojiPicker: function() { return import('../emoji-picker'); },
-    exportPanel: function() { return import('./export'); },
-    sharePanel: function() { return import('./share'); },
-    printPanel: function() { return import('./print'); },
-    aiAssistant: function() { return import('./ai-assistant'); },
-    fileManager: function() { return import('./file-manager'); }
+    insertPicker: function() { return loadFeature('ui/insert-picker', () => import('./insert-picker')); },
+    formulaPicker: function() { return loadFeature('formula-picker', () => import('../formula-picker')); },
+    chartPicker: function() { return loadFeature('ui/chart', () => import('./chart')); },
+    emojiPicker: function() { return loadFeature('emoji-picker', () => import('../emoji-picker')); },
+    exportPanel: function() { return loadFeature('ui/export', () => import('./export')); },
+    sharePanel: function() { return loadFeature('ui/share', () => import('./share')); },
+    printPanel: function() { return loadFeature('ui/print', () => import('./print')); },
+    aiAssistant: function() { return loadFeature('ui/ai-assistant', () => import('./ai-assistant')); },
+    fileManager: function() { return loadFeature('ui/file-manager', () => import('./file-manager')); }
 };
 
 const loadedModules = {};
@@ -1060,7 +1061,7 @@ async function loadBuiltinSlashEntries() {
     if (Array.isArray(builtinSlashEntries)) return builtinSlashEntries;
 
     if (!builtinSlashLoadPromise) {
-        builtinSlashLoadPromise = import('./slash-builtin-index').then(function(mod) {
+        builtinSlashLoadPromise = loadFeature('ui/slash-builtin-index', () => import('./slash-builtin-index')).then(function(mod) {
             if (mod && typeof mod.getBuiltinSlashEntries === 'function') {
                 builtinSlashEntries = mod.getBuiltinSlashEntries();
             }

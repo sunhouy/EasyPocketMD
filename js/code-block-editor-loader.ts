@@ -1,6 +1,7 @@
+import { loadFeature } from './feature-loader';
 let loading: Promise<typeof import('./code-block-editor')>;
 function ensureLoaded() {
-    if (!loading) loading = import('./code-block-editor').catch(error => { loading = null; console.error('Code editor loading failed', error); throw error; });
+    if (!loading) loading = loadFeature('code-block-editor', () => import('./code-block-editor'), false).catch(error => { loading = null; console.error('Code editor loading failed', error); throw error; });
     return loading;
 }
 function loadForCode() {

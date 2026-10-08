@@ -107,6 +107,8 @@ jobs:
         JWT_EXPIRES_IN: ${{ secrets.JWT_EXPIRES_IN }}
         ADMIN_USER: ${{ secrets.ADMIN_USER }}
         ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+        TENCENT_SECRET_ID: ${{ secrets.TENCENT_SECRET_ID || secrets.SECRETID || secrets.SECRET_ID }}
+        TENCENT_SECRET_KEY: ${{ secrets.TENCENT_SECRET_KEY || secrets.SECRETKEY || secrets.SECRET_KEY }}
         DASHSCOPE_API_KEY: ${{ secrets.DASHSCOPE_API_KEY }}
         BASE_URL: ${{ inputs.channel == 'dev' && (secrets.DEV_BASE_URL || 'https://dev.yhsun.cn') || (secrets.BASE_URL || 'https://md.yhsun.cn') }}
         TLS_KEY: ${{ inputs.channel == 'main' && secrets.KEY || '' }}

@@ -1,3 +1,5 @@
+import { loadFeature } from '../feature-loader';
+import { markdownToPlainText } from '../markdown-plain-text';
 import { isMarketBuild } from '../build-variant';
 import { saveAfterDialogOpens } from './dialog-save';
 
@@ -17,51 +19,10 @@ function getResourceResolveBase() {
     return window.location.href;
 }
 
-// 将 Markdown 转换为纯文本
-function markdownToPlainText(markdown) {
-    if (!markdown) return '';
-
-    return markdown
-        // 去掉代码块
-        .replace(/```[\s\S]*?```/g, '')
-        // 去掉行内代码
-        .replace(/`([^`]+)`/g, '$1')
-        // 去掉标题标记 #
-        .replace(/^#{1,6}\s+/gm, '')
-        // 去掉粗体 ** 和 __
-        .replace(/\*\*([^*]+)\*\*/g, '$1')
-        .replace(/__([^_]+)__/g, '$1')
-        // 去掉斜体 * 和 _
-        .replace(/\*([^*]+)\*/g, '$1')
-        .replace(/_([^_]+)_/g, '$1')
-        // 去掉删除线 ~~
-        .replace(/~~([^~]+)~~/g, '$1')
-        // 去掉链接，只保留文本 [text](url) -> text
-        .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
-        // 去掉图片 ![alt](url)
-        .replace(/!\[([^\]]*)\]\([^)]+\)/g, '')
-        // 去掉引用标记 >
-        .replace(/^>\s*/gm, '')
-        // 去掉列表标记 - + *
-        .replace(/^[-+*]\s+/gm, '')
-        // 去掉有序列表标记 1. 2. 等
-        .replace(/^\d+\.\s+/gm, '')
-        // 去掉水平分割线 --- *** ___
-        .replace(/^[\-\*_]{3,}\s*$/gm, '')
-        // 去掉 HTML 标签
-        .replace(/<[^>]+>/g, '')
-        // 将多个空行合并为一个
-        .replace(/\n{3,}/g, '\n\n')
-        // 去掉行首空格
-        .replace(/^[ \t]+/gm, '')
-        // 去掉首尾空白
-        .trim();
-}
-
 // 懒加载 PDF 生成器
 async function getPDFGenerator() {
     if (!global.generatePDF) {
-        const module = await import('./pdf-generator');
+        const module = await loadFeature('ui/pdf-generator', () => import('./pdf-generator'));
         global.generatePDF = module.generatePDF;
         global.renderPDF = module.renderPDF;
     }
@@ -274,7 +235,7 @@ async function exportFile(content, ext) {
 
     if (ext === 'pptx') {
         try {
-            const { showManualPPTExport } = await import('./ppt-manual-export');
+            const { showManualPPTExport } = await loadFeature('ui/ppt-manual-export', () => import('./ppt-manual-export'));
             showManualPPTExport(content, defaultFileName);
         } catch (error) {
             global.showMessage((isEn() ? 'Unable to open PPT export. Please retry: ' : '无法打开 PPT 导出，请重试：') + error.message, 'error');
@@ -286,7 +247,7 @@ async function exportFile(content, ext) {
         showFilenameDialog(defaultFileName, 'xlsx', async function(filename) {
             try {
                 global.showMessage(isEn() ? 'Generating Excel workbook…' : '正在生成 Excel 工作簿…');
-                const { createMarkdownXLSX } = await import('./xlsx-export');
+                const { createMarkdownXLSX } = await loadFeature('ui/xlsx-export', () => import('./xlsx-export'));
                 const bytes = createMarkdownXLSX(content, isEn());
                 await downloadGeneratedFile(bytes, filename + '.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
             } catch (error) {
@@ -305,7 +266,7 @@ async function exportFile(content, ext) {
     if (ext === 'pdf') {
         // 懒加载打印模块
         if (typeof global.showPrintDialog !== 'function') {
-            await import('./print');
+            await loadFeature('ui/print', () => import('./print'));
         }
         global.hideMobileActionSheet();
         global.showPrintDialog('export-pdf', async function(settings) {
@@ -403,7 +364,7 @@ async function exportFile(content, ext) {
     if (ext === 'html') {
         // 懒加载打印模块
         if (typeof global.showPrintDialog !== 'function') {
-            await import('./print');
+            await loadFeature('ui/print', () => import('./print'));
         }
         global.hideMobileActionSheet();
         global.showPrintDialog('export-html', async function(settings) {
@@ -475,14 +436,14 @@ async function exportFile(content, ext) {
     if (ext === 'docx') {
         // 懒加载打印模块（如果未加载）
         if (typeof global.showPrintDialog !== 'function') {
-            await import('./print');
+            await loadFeature('ui/print', () => import('./print'));
         }
         global.hideMobileActionSheet();
         // 显示打印设置对话框，让用户配置导出选项
         global.showPrintDialog('export-docx', async function(settings) {
             // 懒加载 DOCX 生成器
             if (typeof global.exportDOCX !== 'function') {
-                await import('./docx-generator');
+                await loadFeature('ui/docx-generator', () => import('./docx-generator'));
             }
             // 显示文件名输入对话框，然后导出
             showFilenameDialog(defaultFileName, 'docx', async function(filename) {

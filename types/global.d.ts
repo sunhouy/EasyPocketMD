@@ -77,6 +77,8 @@ export interface ActionSheetItem {
     action?: () => void | Promise<void>;
 }
 export interface UserSettings {
+    searchEngine?: import('../js/main/selection-search').SearchEngine;
+    customSearchUrl?: string;
     toolbarButtons?: string[];
     themeMode?: string;
     live2d?: import('../js/main/live2d-models').Live2DPreference;

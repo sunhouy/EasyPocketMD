@@ -1,3 +1,4 @@
+import { setEditorFileValue } from '../editor-history';
 // @ts-nocheck
 /**
  * 编辑器运行时：长文件模式、Vditor 光标桥接、加载遮罩、编辑器内容读写。
@@ -418,11 +419,13 @@ export function installEditorRuntime(global: any, ctx: Partial<EditorRuntimeCtx>
 
     function setEditorContentForFile(fileId, content, options?) {
         const opts = options || {};
-        pendingVditorValue = null;
         const normalizedContent = String(content || '');
         const currentFileId = g('currentFileId');
         const isCurrentFile = String(fileId || '') === String(currentFileId || '');
 
+        if (!isCurrentFile) return;
+        pendingVditorValue = null;
+        const switched = String(appliedEditorFileId || '') !== String(fileId || '');
         if (isCurrentFile) {
             if (shouldUseLongFileMode(normalizedContent)) {
                 activateLongFileEditor(fileId, normalizedContent);
@@ -461,15 +464,15 @@ export function installEditorRuntime(global: any, ctx: Partial<EditorRuntimeCtx>
             }
 
             try {
-                appliedEditorFileId = fileId;
-                if (isCurrentFile && typeof vditor.getValue === 'function' && vditor.getValue() === normalizedContent) {
+                if (!switched && isCurrentFile && typeof vditor.getValue === 'function' && vditor.getValue() === normalizedContent) {
                     return;
                 }
-                if (isCurrentFile && opts.preserveCursor) {
+                if (!switched && isCurrentFile && opts.preserveCursor) {
                     setVditorValuePreservingCursor(vditor, normalizedContent);
                 } else {
-                    vditor.setValue(normalizedContent);
+                    setEditorFileValue(vditor, normalizedContent, switched);
                 }
+                appliedEditorFileId = fileId;
             } catch (error) {
                 console.warn('设置编辑器内容失败，等待编辑器就绪后重试:', error);
                 scheduleDeferredVditorValueApply(fileId, normalizedContent);
@@ -515,7 +518,7 @@ export function installEditorRuntime(global: any, ctx: Partial<EditorRuntimeCtx>
             if (!isVditorValueBridgeReady(instance)) {
                 return;
             }
-            instance.setValue(pending.content);
+            setEditorFileValue(instance, pending.content, String(appliedEditorFileId || '') !== String(fileId || ''));
             appliedEditorFileId = fileId;
             pendingVditorValue = null;
         }).catch(function(error) {
