@@ -30,6 +30,52 @@ class HarmonyBuildTests(unittest.TestCase):
                 self.assertEqual(embedded.read_bytes(), hap.read_bytes())
                 self.assertIn(str(embedded), verify.call_args.args[0])
                 self.assertIn('verify-app', verify.call_args.args[0])
+                self.assertEqual(verify.call_count, 2)
+                self.assertIn(str(app), verify.call_args_list[0].args[0])
+
+    def test_release_pipeline_signs_final_app_and_rejects_unsigned_container(self):
+        for strip_app_signature in (False, True):
+            with self.subTest(strip_app_signature=strip_app_signature), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp)
+                signing = root / 'signing'; signing.mkdir()
+                (signing / 'profile.json').write_text(json.dumps({'type': 'release', 'bundle-info': {'bundle-name': build.BUNDLE_NAME}}))
+                scope = root / 'harmony/AppScope'; scope.mkdir(parents=True)
+                (scope / 'app.json5').write_text('{"app":{"versionName":"1.0.0"}}')
+                built = root / 'harmony/entry/build/default/outputs/default'; built.mkdir(parents=True)
+                (built / 'pack.info').write_text('{}')
+                with zipfile.ZipFile(built / 'entry-unsigned.hap', 'w') as archive:
+                    archive.writestr('module.json', '{}')
+                env = {name: 'value' for name in build.SIGNING_SECRETS}
+                env.update(HARMONY_SIGNER='signer.jar', HARMONY_PACKER='packer.jar')
+                verified = []
+
+                def tool(command):
+                    if command[0] == 'openssl':
+                        return
+                    if 'sign-app' in command:
+                        source = Path(command[command.index('-inFile') + 1])
+                        target = Path(command[command.index('-outFile') + 1])
+                        marker = b'' if strip_app_signature and target.suffix == '.app' else b'SIGNATURE'
+                        target.write_bytes(source.read_bytes() + marker)
+                    elif '--mode' in command:
+                        hap = Path(command[command.index('--hap-path') + 1])
+                        target = Path(command[command.index('--out-path') + 1])
+                        with zipfile.ZipFile(target, 'w') as archive:
+                            archive.writestr(hap.name, hap.read_bytes())
+                            archive.writestr('pack.info', '{}')
+                    elif 'verify-app' in command:
+                        source = Path(command[command.index('-inFile') + 1])
+                        if not source.read_bytes().endswith(b'SIGNATURE'):
+                            raise RuntimeError('unsigned package')
+                        verified.append(source)
+
+                with patch.object(build, 'run_private', side_effect=tool):
+                    if strip_app_signature:
+                        with self.assertRaisesRegex(RuntimeError, 'unsigned package'):
+                            build.pack(root, signing, root / 'output', env)
+                    else:
+                        build.pack(root, signing, root / 'output', env)
+                        self.assertEqual([path.suffix for path in verified], ['.hap', '.app', '.hap'])
 
     def test_packing_that_strips_signature_is_rejected(self):
         with tempfile.TemporaryDirectory() as temp:

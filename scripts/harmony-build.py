@@ -76,11 +76,28 @@ def verify_app_contents(app, hap, signing, java, signer):
         data = archive.read(haps[0])
     if data != hap.read_bytes():
         raise ValueError('APP 内的 HAP 被打包工具改写，签名可能已丢失，禁止上传')
+    # The APP container needs its own signature, independent of the nested HAP.
+    run_private([java, '-jar', signer, 'verify-app', '-inFile', str(app),
+                 '-outCertChain', str(signing / 'app-verified.cer'),
+                 '-outProfile', str(signing / 'app-verified.p7b')])
     embedded = signing / 'packed-entry.hap'
     embedded.write_bytes(data)
     run_private([java, '-jar', signer, 'verify-app', '-inFile', str(embedded),
                  '-outCertChain', str(signing / 'packed-verified.cer'),
                  '-outProfile', str(signing / 'packed-verified.p7b')])
+
+
+def sign_package(source, target, signing, java, signer, env, sign_code=False):
+    command = [java, '-jar', signer, 'sign-app', '-mode', 'localSign',
+               '-keyAlias', env['HARMONY_KEY_ALIAS'], '-signAlg', 'SHA256withECDSA',
+               '-appCertFile', str(signing / 'release.cer'),
+               '-profileFile', str(signing / 'release.p7b'), '-inFile', str(source),
+               '-keystoreFile', str(signing / 'release.p12'), '-outFile', str(target),
+               '-keyPwd', env['HARMONY_KEY_PASSWORD'],
+               '-keystorePwd', env['HARMONY_STORE_PASSWORD']]
+    if sign_code:
+        command += ['-signCode', '1']
+    run_private(command)
 
 
 def pack(root, signing, output, env):
@@ -103,15 +120,18 @@ def pack(root, signing, output, env):
     version = json.loads((root / 'harmony/AppScope/app.json5').read_text())['app']['versionName']
     output.mkdir(parents=True, exist_ok=True)
     hap = output / ('easypocketmd-' + version + '-harmony.hap')
-    run_private([java, '-jar', signer, 'sign-app', '-mode', 'localSign', '-keyAlias', env['HARMONY_KEY_ALIAS'], '-signAlg', 'SHA256withECDSA', '-appCertFile', str(signing / 'release.cer'), '-profileFile', str(signing / 'release.p7b'), '-inFile', str(haps[0]), '-keystoreFile', str(signing / 'release.p12'), '-outFile', str(hap), '-keyPwd', env['HARMONY_KEY_PASSWORD'], '-keystorePwd', env['HARMONY_STORE_PASSWORD'], '-signCode', '1'])
+    sign_package(haps[0], hap, signing, java, signer, env, sign_code=True)
     run_private([java, '-jar', signer, 'verify-app', '-inFile', str(hap), '-outCertChain', str(signing / 'verified.cer'), '-outProfile', str(signing / 'verified.p7b')])
     app = output / ('easypocketmd-' + version + '-harmony.app')
-    run_private([java, '-jar', packer, '--mode', 'app', '--hap-path', str(hap), '--pack-info-path', str(infos[0]), '--out-path', str(app), '--force', 'true', '--replace-pack-info', 'false'])
+    unsigned_app = signing / 'release-unsigned.app'
+    run_private([java, '-jar', packer, '--mode', 'app', '--hap-path', str(hap), '--pack-info-path', str(infos[0]), '--out-path', str(unsigned_app), '--force', 'true', '--replace-pack-info', 'false'])
+    # Match Hvigor PackageApp -> SignApp: signing the HAP does not sign the APP.
+    sign_package(unsigned_app, app, signing, java, signer, env)
     for path in (hap, app):
         if not path.is_file() or not path.stat().st_size:
             raise ValueError('鸿蒙构建产物缺失：' + path.name)
     verify_app_contents(app, hap, signing, java, signer)
-    print('APP 内 HAP 内容一致，签名和代码签名校验通过')
+    print('最终 APP 签名、内部 HAP 签名和代码签名校验通过')
 
 
 def main():

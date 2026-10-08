@@ -6,7 +6,7 @@
 
 合并后在 Actions 选择 **Build and Publish HarmonyOS App → Run workflow**。可填 `version`（例如 `2.9.10`）、`version_code`；版本名留空取 `package.json`，版本代码留空按 `major*1000000+minor*1000+patch` 生成。更新已上架应用时，必须保证版本代码大于此前版本。该流程只修改当前构建的鸿蒙清单，不改其他客户端版本。
 
-构建成功后，下载 `easypocketmd-版本-harmony` 产物，包含签名校验通过的 `.hap` 以及保留完整 HAP 签名的 `.app`。APP 打包禁用 HAP 内 pack.info 的重写，随后逐字节比对内嵌 HAP，并再次执行华为签名/代码签名校验；校验失败不会上传。只有勾选 `publish_release` 才上传到 GitHub 的 `v版本` Release，不覆盖已有同名附件。流程不会自动提交 AppGallery Connect 审核，也不会触发服务器部署。
+构建成功后，下载 `easypocketmd-版本-harmony` 产物，包含签名校验通过的 `.hap` 以及保留完整 HAP 签名的 `.app`。APP 打包禁用 HAP 内 pack.info 的重写，打包完成后必须再对 APP 容器本身执行 sign-app 签名。随后校验最终 APP 签名、逐字节比对内嵌 HAP，并再次执行 HAP 签名/代码签名校验；任一步失败不会上传。仅验证 HAP 签名不能证明 APP 已签名。只有勾选 `publish_release` 才上传到 GitHub 的 `v版本` Release，不覆盖已有同名附件。流程不会自动提交 AppGallery Connect 审核，也不会触发服务器部署。
 
 ## 安装与发布区别
 
@@ -54,7 +54,7 @@ keytool -list -keystore release.p12 -storetype PKCS12
 
 ## 本地构建
 
-使用匹配的 DevEco Studio 工具链打开 `harmony/`。发布产品配置没有内置签名材料；命令行先用 Hvigor 构建未签名 HAP，再运行 `scripts/harmony-build.py pack`，使用官方 `hap-sign-tool.jar` 签名并校验，用 `app_packing_tool.jar` 打包 APP。不要把本地签名配置提交到 Git。
+使用匹配的 DevEco Studio 工具链打开 `harmony/`。发布产品配置没有内置签名材料；命令行先用 Hvigor 构建未签名 HAP，再运行 `scripts/harmony-build.py pack`，使用官方 `hap-sign-tool.jar` 签名并校验，用 `app_packing_tool.jar` 打包未签名 APP，再用 `hap-sign-tool.jar sign-app` 对 APP 签名，最后用 `verify-app` 校验最终 APP 和内部 HAP。这是 Hvigor 的 PackageApp → SignApp 两个独立步骤，不能直接上传打包工具生成的未签名 APP。不要把本地签名配置提交到 Git。
 
 参考：
 
