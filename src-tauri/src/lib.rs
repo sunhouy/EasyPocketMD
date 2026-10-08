@@ -398,6 +398,14 @@ async fn calendar_action(app: AppHandle, action: String, payload: serde_json::Va
 }
 
 #[tauri::command]
+async fn set_selection_menu(app: AppHandle, enabled: bool) -> Result<serde_json::Value, String> {
+    #[cfg(target_os = "android")]
+    { return android_document(app, "selectionMenu", serde_json::json!({"enabled": enabled})).await; }
+    #[cfg(not(target_os = "android"))]
+    { let _ = (app, enabled); Ok(serde_json::json!({})) }
+}
+
+#[tauri::command]
 async fn request_storage_access(app: AppHandle, force: Option<bool>, check_only: Option<bool>) -> Result<serde_json::Value, String> {
     #[cfg(target_os = "android")]
     { return android_document(app, "storageAccess", serde_json::json!({"force": force.unwrap_or(false), "checkOnly": check_only.unwrap_or(false)})).await; }
@@ -559,6 +567,7 @@ pub fn run() {
             get_local_file_path,
             open_local_file_dialog,
             request_storage_access,
+            set_selection_menu,
             calendar_action,
             read_local_file,
             write_local_file,

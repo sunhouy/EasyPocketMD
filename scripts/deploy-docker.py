@@ -139,6 +139,48 @@ def nginx_site_directory(nginx):
     raise RuntimeError('No supported active nginx vhost include directory; existing service retained')
 
 
+def ensure_nginx_site_loaded(nginx, vhost, backups):
+    """An include directory may contain only a named file, not a wildcard."""
+    result = command(nginx, '-T', capture_output=True, text=True)
+    marker = '# configuration file ' + str(vhost) + ':'
+    if marker in result.stdout:
+        print('Active HTTPS site loaded: ' + str(vhost), flush=True)
+        return
+    match = re.search(r'^# configuration file ([^\n]+):$', result.stdout, re.MULTILINE)
+    if not match:
+        raise RuntimeError('Cannot locate active nginx main configuration')
+    main = Path(match.group(1))
+    old = main.read_text()
+    pattern = r'(?m)^([ \t]*http[ \t]*(?:\n[ \t]*)?\{)'
+    include = '\n    include "' + str(vhost) + '";'
+    new, count = re.subn(pattern, lambda m: m.group(1) + include, old, count=1)
+    if count != 1:
+        raise RuntimeError('Cannot register managed nginx site in the HTTP context')
+    backups.setdefault(main, main.read_bytes())
+    write_atomic(main, new, main.stat().st_mode & 0o777)
+    result = command(nginx, '-T', capture_output=True, text=True)
+    if marker not in result.stdout:
+        raise RuntimeError('Managed HTTPS site is not loaded by nginx')
+    print('Registered active HTTPS site: ' + str(vhost), flush=True)
+
+
+def https_listeners(nginx):
+    """Join existing address-specific 443 groups so SNI also works on loopback."""
+    result = command(nginx, '-T', capture_output=True, text=True)
+    addresses = ['443']
+    for match in re.finditer(r'^\s*listen\s+([^;\s]+)([^;]*);', result.stdout, re.MULTILINE):
+        address, options = match.groups()
+        if address in ('0.0.0.0:443', '*:443'):
+            address = '443'
+        if address != '443' and not address.endswith(':443'):
+            continue
+        if 'proxy_protocol' in options:
+            raise RuntimeError('Port 443 requires proxy_protocol; configure a direct HTTPS listener before deployment')
+        if address not in addresses:
+            addresses.append(address)
+    return '\n'.join('    listen ' + address + ' ssl;' for address in addresses)
+
+
 def public_https_health(domain, channel, edge):
     """Probe the actual port 443 with SNI, certificate validation and routing."""
     context = ssl.create_default_context() if channel == 'main' else ssl._create_unverified_context()
@@ -264,6 +306,8 @@ def activate(release, channel, slot, current):
         backups[vhost] = vhost.read_bytes() if vhost.exists() else None
         # Only advertise the hostname covered by this channel's certificate.
         domains = domain
+        listeners = https_listeners(nginx)
+        print('Managed HTTPS listeners: ' + listeners.strip().replace('\n', ' '), flush=True)
         contents = f'''server {{
     listen 80;
     server_name {domains};
@@ -271,11 +315,15 @@ def activate(release, channel, slot, current):
     location / {{ return 301 https://$host$request_uri; }}
 }}
 server {{
-    listen 443 ssl;
+{listeners}
     server_name {domains};
     ssl_certificate {cert}/fullchain.pem;
     ssl_certificate_key {cert}/privkey.pem;
     ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_reject_handshake off;
+    ssl_verify_client off;
+    ssl_ciphers HIGH:!aNULL:!MD5:!3DES;
+    ssl_ecdh_curve auto;
     client_max_body_size 100m;
     location / {{
         proxy_pass http://127.0.0.1:{gateway_port};
@@ -302,6 +350,7 @@ server {{
             if not count:
                 raise RuntimeError('Print TLS proxy target not found')
             write_atomic(print_vhost, new, 0o644)
+        ensure_nginx_site_loaded(nginx, vhost, backups)
         command(nginx, '-t')
         command(nginx, '-s', 'reload')
         public_https_health(domain, channel, edge)

@@ -102,6 +102,7 @@ export function installNotesHome(app:any, options:{loadContent?:(file:any)=>Prom
             const element=button('notes-folder-tab'+(active?' active':'')+(multi && id && selected(id)?' selected':''),()=>id ? activate(id,action) : action());element.textContent=(multi && id ? (selected(id)?'☑ ':'☐ '):'')+text;element.title=text;
             element.setAttribute('aria-pressed',String(active));if(multi && id){element.setAttribute('role','checkbox');element.setAttribute('aria-checked',String(selected(id)));}if(id)element.dataset.fileId=id;tabs.append(element);
         };
+        app.notesHomeFolderPath=view==='folder'?folder:'';
         tab(t('全部','All'),view==='all',()=>{view='all';render();});
         for (const item of folders) tab(item.name,view==='folder' && item.name===folder,()=>showFolder(item.name),item.id);
         tabs.scrollLeft=tabsScrollLeft;

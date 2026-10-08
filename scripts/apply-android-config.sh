@@ -112,6 +112,20 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updatePadding
 
 class MainActivity : TauriActivity() {
+    private var startingSelectionMode = false
+
+    override fun onWindowStartingActionMode(callback: android.view.ActionMode.Callback, type: Int): android.view.ActionMode? {
+        if (type != android.view.ActionMode.TYPE_FLOATING || startingSelectionMode) {
+            return super.onWindowStartingActionMode(callback, type)
+        }
+        startingSelectionMode = true
+        return try {
+            window.decorView.startActionMode(SelectionMenus.wrap(callback), type)
+        } finally {
+            startingSelectionMode = false
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         handleIntent(intent)
@@ -151,6 +165,7 @@ class MainActivity : TauriActivity() {
 EOF
 
 cp "$PROJECT_ROOT/src-tauri/platform/android/LocalDocumentsPlugin.kt" "$ANDROID_MAIN_DIR/LocalDocumentsPlugin.kt"
+cp "$PROJECT_ROOT/src-tauri/platform/android/SelectionMenus.kt" "$ANDROID_MAIN_DIR/SelectionMenus.kt"
 
 echo "✅ MainActivity.kt 已同步输入法/窗口配置"
 
@@ -235,4 +250,8 @@ fi
 
 if ! grep -q "cn.yhsun.md.StorageArgs" "$PROGUARD_RULES"; then
   echo "-keep class cn.yhsun.md.StorageArgs { *; }" >> "$PROGUARD_RULES"
+fi
+
+if ! grep -q "cn.yhsun.md.SelectionMenuArgs" "$PROGUARD_RULES"; then
+  echo "-keep class cn.yhsun.md.SelectionMenuArgs { *; }" >> "$PROGUARD_RULES"
 fi
