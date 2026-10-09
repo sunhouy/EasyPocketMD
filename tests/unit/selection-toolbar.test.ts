@@ -20,7 +20,7 @@ it('formats the original selection, protects readonly and CodeMirror, and hides 
  Object.defineProperty(Range.prototype,'getBoundingClientRect',{configurable:true,value:()=>({left:20,top:200,width:120,height:20,bottom:220})});
  const nativeHeading=document.querySelector<HTMLButtonElement>('#vditor button')!,heading=jest.fn();nativeHeading.addEventListener('click',heading);
  document.getSelection()!.removeAllRanges();document.getSelection()!.addRange(proseRange);document.dispatchEvent(new Event('selectionchange'));jest.advanceTimersByTime(20);
- expect(toolbar.hidden).toBe(false);expect(toolbar.querySelectorAll('button')).toHaveLength(27);
+ expect(toolbar.hidden).toBe(false);expect(toolbar.querySelectorAll('button')).toHaveLength(28);
  const menu=new MouseEvent('contextmenu',{bubbles:true,cancelable:true});prose.dispatchEvent(menu);expect(menu.defaultPrevented).toBe(true);expect(invoke).toHaveBeenCalledWith('set_selection_menu',{enabled:true});
  (toolbar.querySelector('[data-action=h1]') as HTMLButtonElement).click();await Promise.resolve();expect(heading).toHaveBeenCalledTimes(1);
  input.blur();const code=document.querySelector('.cm-editor div')!;const range=document.createRange();range.selectNodeContents(code);document.getSelection()!.removeAllRanges();document.getSelection()!.addRange(range);document.dispatchEvent(new Event('selectionchange'));jest.advanceTimersByTime(20);expect(toolbar.hidden).toBe(true);

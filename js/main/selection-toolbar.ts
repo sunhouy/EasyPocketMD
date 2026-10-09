@@ -1,5 +1,5 @@
 import { selectionSearchUrl } from './selection-search';
-import { showSelectionTranslation } from './selection-translation';
+import { showSelectionTranslation, selectionTranslationContext } from './selection-translation';
 import { copyContent, canReadClipboard, readClipboardText } from '../clipboard';
 import { selectionContent } from './selection-content';
 import { contextInsert, contextInsertActions } from './editor-context-actions';
@@ -20,7 +20,7 @@ export function installSelectionToolbar(app:any=window) {
     const toolbar=document.createElement('div');toolbar.id='selectionToolbar';toolbar.className='selection-toolbar';toolbar.hidden=true;
     toolbar.setAttribute('role','toolbar');toolbar.setAttribute('aria-label','文本操作');
     document.body.append(toolbar);
-    const menuActions=[...actions,...contextInsertActions];
+    const menuActions:[Action,string,string,string][]=[['select-all','object-group','全选','Select all'],...actions,...contextInsertActions];
     let snapshot:Snapshot|null=null, frame=0,busy=false;
     let pasteAllowed=canReadClipboard();
     if(navigator.permissions?.query)void navigator.permissions.query({name:'clipboard-read' as PermissionName}).then(permission=>{
@@ -81,7 +81,8 @@ export function installSelectionToolbar(app:any=window) {
         const range=selection.getRangeAt(0).cloneRange();
         const owner=(range.commonAncestorContainer instanceof HTMLElement?range.commonAncestorContainer:range.commonAncestorContainer.parentElement);
         if(!owner || toolbar.contains(owner) || !visible(owner))return null;
-        if(Array.from(document.querySelectorAll('.cm-editor')).some(node=>range.intersectsNode(node)))return null;
+        const end=range.endContainer instanceof Element?range.endContainer:range.endContainer.parentElement;
+        if(end?.closest('.cm-editor,.epmd-code-editor'))return null;
         const root=owner.closest<HTMLElement>('[contenteditable=true]');
         const editor=owner.closest<HTMLElement>('#vditor');
         const editable=!!root && !editor?.matches('[data-shared-readonly=true],.vditor-readonly') && !owner.closest('.cm-editor');
@@ -108,12 +109,12 @@ export function installSelectionToolbar(app:any=window) {
         toolbar.setAttribute('aria-label',app.i18n?.getLanguage?.()==='en'?'Text actions':'文本操作');
         for(const button of Array.from(toolbar.querySelectorAll<HTMLButtonElement>('button'))){
             const action=menuActions.find(a=>a[0]===button.dataset.action)!;
-            button.title=app.i18n?.getLanguage?.()==='en'?action[3]:action[2];button.setAttribute('aria-label',button.title);const label=button.querySelector('.context-action-label');if(label)label.textContent=button.title;
+            button.title=app.i18n?.getLanguage?.()==='en'?action[3]:action[2];button.setAttribute('aria-label',button.title);
             const insert=contextInsertActions.some(item=>item[0]===action[0]);
-            const caretAction=['paste','h1','h2','h3','quote'].includes(action[0]) || insert;
-            const supported=next.caret ? next.markdown && caretAction && (action[0]!=='paste' || pasteAllowed) : insert ? false : ['copy','search','translate'].includes(action[0]) ? true : action[0]==='paste' ? next.editable && pasteAllowed : action[0]==='cut' ? next.editable : next.markdown;
+            const caretAction=['select-all','paste','h1','h2','h3','quote'].includes(action[0]) || insert;
+            const supported=next.caret ? next.markdown && caretAction && (action[0]!=='paste' || pasteAllowed) : insert ? false : ['select-all','copy','search','translate'].includes(action[0]) ? true : action[0]==='paste' ? next.editable && pasteAllowed : action[0]==='cut' ? next.editable : next.markdown;
             button.hidden=!supported;button.disabled=false;
-            if(supported && !next.caret && next.range && !['copy','cut','paste','search','translate'].includes(action[0])) {
+            if(supported && !next.caret && next.range && !['select-all','copy','cut','paste','search','translate'].includes(action[0])) {
                 const selector=action[0].startsWith('h')?`button[data-tag="${action[0]}"]`:`button[data-type="${action[0]}"]`;
                 const native=document.getElementById('vditor')?.querySelector<HTMLElement>('.vditor-toolbar '+selector);
                 button.hidden=!native || native.classList.contains('vditor-menu--disabled');
@@ -131,7 +132,15 @@ export function installSelectionToolbar(app:any=window) {
         const context=snapshot;if(!context || busy || !context.valid())return hide();
         busy=true;
         try {
-            if(contextInsertActions.some(item=>item[0]===action)){
+            if(action==='select-all'){
+                context.restore();
+                if(context.owner instanceof HTMLInputElement || context.owner instanceof HTMLTextAreaElement)context.owner.select();
+                else {
+                    const root=context.owner.closest('.vditor-reset,[contenteditable=true]') || context.owner;
+                    const range=document.createRange();range.selectNodeContents(root);
+                    const selection=document.getSelection();selection?.removeAllRanges();selection?.addRange(range);
+                }
+            } else if(contextInsertActions.some(item=>item[0]===action)){
                 toolbar.hidden=true;
                 await contextInsert(action,app,context.restore,text=>context.range?insertMarkdown(text):context.replace(text),context.valid);
             } else if(action==='search'){
@@ -139,7 +148,8 @@ export function installSelectionToolbar(app:any=window) {
                 if(app.nativeFileOps?.openExternalUrl)await app.nativeFileOps.openExternalUrl(url);
                 else window.open(url,'_blank','noopener,noreferrer');
             } else if(action==='translate'){
-                hide();void showSelectionTranslation(context.text,app);
+                const nearby=selectionTranslationContext(context.text,context.range,context.owner,app);
+                hide();void showSelectionTranslation(context.text,app,nearby);
             } else if(action==='copy' || action==='cut'){
                 if(action==='cut' && !context.editable)return;
                 await copyContent({text:context.text,html:context.html});
@@ -161,12 +171,11 @@ export function installSelectionToolbar(app:any=window) {
                 } else context.replace(selectionMarkdown(context.text,action));
             }
         } catch(error){report(String((error as Error).message),String((error as Error).message),'error');}
-        finally {busy=false;hide();}
+        finally {busy=false;hide();if(action==='select-all')schedule();}
     }
     for(const [action,icon,zh] of menuActions){
         const button=document.createElement('button');button.type='button';button.dataset.action=action;button.title=zh;button.setAttribute('aria-label',zh);
         button.innerHTML=`<i class="fas fa-${icon}" aria-hidden="true"></i>${/^h[123]$/.test(action)?`<sup aria-hidden="true">${action.slice(1)}</sup>`:''}`;
-        const label=document.createElement('span');label.className='context-action-label';label.textContent=zh;button.append(label);
         button.onpointerdown=event=>event.preventDefault();button.onmousedown=event=>event.preventDefault();button.onclick=()=>{void execute(action);};toolbar.append(button);
     }
     document.addEventListener('selectionchange',schedule);

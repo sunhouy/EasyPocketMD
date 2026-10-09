@@ -955,6 +955,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         return {
             editorMode: getCheckedRadioValue('editorMode', 'wysiwyg'),
+            translationMethod:(document.getElementById('selectionTranslationMethod') as HTMLSelectElement)?.value || 'auto',
             themeMode: getCheckedRadioValue('themeMode', 'system'),
             live2d: live2dControls.get(),
             background: backgroundControls.get(),
@@ -2589,6 +2590,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const searchEngine=document.getElementById('selectionSearchEngine') as HTMLSelectElement;
         const customUrl=document.getElementById('customSearchUrl') as HTMLInputElement;
         searchEngine.value=window.userSettings.searchEngine || 'baidu';
+        (document.getElementById('selectionTranslationMethod') as HTMLSelectElement).value=window.userSettings.translationMethod || 'auto';
         customUrl.value=window.userSettings.customSearchUrl || '';
         const updateSearchUrlVisibility=()=>{document.getElementById('customSearchUrlGroup').hidden=searchEngine.value!=='custom';};
         searchEngine.onchange=updateSearchUrlVisibility;updateSearchUrlVisibility();
@@ -3049,6 +3051,7 @@ document.addEventListener('DOMContentLoaded', function() {
         try { selectionSearchUrl('test',searchEngine,customSearchUrl); } catch(error) { window.showMessage(String((error as Error).message),'error');return; }
         var newSettings: import("../types/global").UserSettings = {
             searchEngine, customSearchUrl,
+            translationMethod:(document.getElementById('selectionTranslationMethod') as HTMLSelectElement).value as import('./main/selection-translation').TranslationMethod,
             toolbarButtons: [],
             background: backgroundControls.get(),
             themeColor: themeColorControls.get(),

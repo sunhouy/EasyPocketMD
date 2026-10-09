@@ -14,12 +14,19 @@ it('opens one custom menu at a collapsed caret with all requested insert actions
     const toolbar=document.getElementById('selectionToolbar')!;expect(toolbar.hidden).toBe(false);
     const shown=Array.from(toolbar.querySelectorAll<HTMLButtonElement>('button')).filter(button=>!button.hidden).map(button=>button.dataset.action);
     expect(shown).toEqual(expect.arrayContaining(['paste','h1','h2','h3','code-block','inline-code','formula','chart','quote','link','image','file','table','divider','emoji','footnote','mindmap']));
-    expect(shown).not.toContain('copy');
+    expect(shown).not.toContain('copy');expect(shown).toContain('select-all');
+    expect(toolbar.querySelector('.context-action-label')).toBeNull();
+    expect(toolbar.querySelector('[data-action=formula]')!.textContent).toBe('');
     toolbar.querySelector<HTMLButtonElement>('[data-action=inline-code]')!.click();await Promise.resolve();await Promise.resolve();
     expect(insertValue).toHaveBeenCalledWith('`code`');expect(toolbar.hidden).toBe(true);
     // Long press opens the same menu; a scroll gesture cancels the timer.
     const down=new Event('pointerdown',{bubbles:true});Object.assign(down,{pointerType:'touch',clientX:20,clientY:20});root.dispatchEvent(down);jest.advanceTimersByTime(560);expect(toolbar.hidden).toBe(false);
     root.dispatchEvent(down);const move=new Event('pointermove',{bubbles:true});Object.assign(move,{clientX:20,clientY:100});root.dispatchEvent(move);jest.advanceTimersByTime(560);expect(toolbar.hidden).toBe(true);
+    const cm=document.createElement('div');cm.className='epmd-code-editor';cm.contentEditable='false';cm.innerHTML='<div class="cm-editor">code controls</div>';root.append(cm);
+    root.dispatchEvent(event);toolbar.querySelector<HTMLButtonElement>('[data-action=select-all]')!.click();await Promise.resolve();jest.advanceTimersByTime(20);
+    expect(document.getSelection()!.getRangeAt(0).startContainer).toBe(root);
+    expect(document.getSelection()!.getRangeAt(0).endOffset).toBe(root.childNodes.length);
+    expect(toolbar.hidden).toBe(false);expect(toolbar.querySelector<HTMLButtonElement>('[data-action=copy]')!.hidden).toBe(false);
     jest.useRealTimers();
 });
 it('serializes tables with Markdown and HTML and expands rendered formulas to their canonical source',()=>{
