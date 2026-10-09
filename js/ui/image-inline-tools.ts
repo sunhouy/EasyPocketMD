@@ -1,3 +1,19 @@
+/** Vditor exposes inline HTML as code; keep its source while showing image-only tags. */
+export function renderInlineImagePreviews(root: HTMLElement) {
+    root.querySelectorAll<HTMLElement>('code[data-type="html-inline"], [data-type="html-inline"] > code').forEach(code=>{
+        if(code.classList.contains('epmd-inline-image'))return;
+        const source=code.textContent || '';
+        const html=source.replace(/\u200b/g,'').trim();
+        if(!/^<img\b[^>]*\/?\s*>$/i.test(html))return;
+        const parsed=document.createElement('template');parsed.innerHTML=html;
+        if(parsed.content.children.length!==1 || !(parsed.content.firstElementChild instanceof HTMLImageElement))return;
+        const original=parsed.content.firstElementChild,img=document.createElement('img');
+        for(const attr of ['src','alt','title','width','height'])if(original.hasAttribute(attr))img.setAttribute(attr,original.getAttribute(attr)!);
+        for(const property of ['width','height','maxWidth','maxHeight','transform','transformOrigin'] as const)img.style[property]=original.style[property];
+        // Keep the first child as a text node: Lute reads inline HTML from it.
+        code.replaceChildren(document.createTextNode(source),img);code.classList.add('epmd-inline-image');code.contentEditable='false';
+    });
+}
 
 (function(global) {
     'use strict';
@@ -77,7 +93,7 @@
 
     function isEditorImage(img) {
         if (!img) return false;
-        if (img.closest('.vditor-wysiwyg, .vditor-ir__preview, .vditor-sv')) return true;
+        if (img.closest('.vditor-wysiwyg, .vditor-ir, .vditor-sv')) return true;
         return false;
     }
 
@@ -125,7 +141,7 @@
     function getTargetImages() {
         var root = document.getElementById('vditor');
         if (!root) return [];
-        return Array.from(root.querySelectorAll('.vditor-wysiwyg img, .vditor-ir__preview img, .vditor-sv img')).filter(isEditorImage);
+        return Array.from(root.querySelectorAll('.vditor-wysiwyg img, .vditor-ir img, .vditor-sv img')).filter(isEditorImage);
     }
 
     function getImageMeta(img) {
@@ -204,9 +220,14 @@
     }
 
     function applyEditorValue(updated) {
+        var images=getTargetImages();
+        var editingIndex=currentEditingImage ? images.indexOf(currentEditingImage) : -1;
         suspendObserver = true;
         try {
             global.vditor.setValue(updated);
+            var root=document.getElementById('vditor');
+            if(root)renderInlineImagePreviews(root);
+            if(editingIndex>=0)currentEditingImage=getTargetImages()[editingIndex] || null;
             if (global.currentFileId) {
                 global.unsavedChanges = global.unsavedChanges || {};
                 global.unsavedChanges[global.currentFileId] = true;
@@ -248,8 +269,9 @@
             updated = replaceFirstMatch(raw, htmlRegex, function(match) {
                 var matchUrl = normalizeUrl(match[2]);
                 if (!urlsMatch(matchUrl, oldSrc)) return null;
-                var altMatch = match[0].match(/\balt=(['"])(.*?)\1/i);
-                var alt = altMatch ? altMatch[2] : (imgAlt || '');
+                var tag=document.createElement('template');tag.innerHTML=match[0];
+                var original=tag.content.querySelector('img');
+                var alt = original?.getAttribute('alt') || imgAlt || '';
                 return buildImageHtml(newSrc, alt, width, rotate);
             });
         }
@@ -680,9 +702,10 @@
             updated = replaceFirstMatch(raw, htmlRegex, function(match) {
                 var matchUrl = normalizeUrl(match[2]);
                 if (!urlsMatch(matchUrl, srcNorm)) return null;
-                var altMatch = match[0].match(/\balt=(['"])(.*?)\1/i);
-                var alt = altMatch ? altMatch[2] : (img.getAttribute('alt') || '');
-                return buildImageHtml(match[2], alt, width, rotate);
+                var tag=document.createElement('template');tag.innerHTML=match[0];
+                var original=tag.content.querySelector('img');
+                var alt = original?.getAttribute('alt') || img.getAttribute('alt') || '';
+                return buildImageHtml(original?.getAttribute('src') || src, alt, width, rotate);
             });
         }
 
@@ -1835,6 +1858,8 @@
 
     function bindAllImageEvents() {
         if (suspendObserver) return;
+        var root=document.getElementById('vditor');
+        if(root)renderInlineImagePreviews(root);
         var images = getTargetImages();
         images.forEach(function(img) {
             if ((img as HTMLElement).dataset.epmdToolsBound === '1') return;

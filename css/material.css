@@ -198,10 +198,10 @@ body .code-runner-ui-host .code-output > :first-child { color:var(--md-muted) !i
 
 #featureLoadingStatus { position:fixed;left:50%;bottom:calc(80px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:2147483646;padding:12px 24px;border-radius:24px;background:var(--md-surface, #fff);color:var(--md-on-surface, #222);box-shadow:0 4px 20px #0003;pointer-events:none; }
 .selection-toolbar button[hidden] { display:none; }
-.selection-toolbar .context-action-label { display:none; }
-.editor-context-toolbar { display:grid;grid-template-columns:repeat(3,minmax(0,1fr));width:min(360px,calc(100vw - 16px));max-height:60dvh;overflow:auto; }
-.editor-context-toolbar button { width:auto;height:46px;gap:6px;padding:4px 8px;font-size:13px; }
-.editor-context-toolbar .context-action-label { display:inline; }
+.editor-context-toolbar { display:grid;grid-template-columns:repeat(6,minmax(0,1fr));width:min(288px,calc(100vw - 16px));max-height:60dvh;overflow:auto; }
+.editor-context-toolbar button { width:auto;height:44px;padding:4px;font-size:16px; }
+#vditor code.epmd-inline-image { display:inline-block;padding:0;background:transparent;border:0;vertical-align:middle;font-size:0; }
+#vditor code.epmd-inline-image > img { font-size:16px; }
 
 .selection-translation-modal > .modal-close-btn { position:absolute;top:14px;right:14px;left:auto; }
 .selection-translation-modal .modal-header { padding-right:32px; }

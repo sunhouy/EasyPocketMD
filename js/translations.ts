@@ -10,6 +10,10 @@ import { uiMessages } from './i18n-messages';
     const translations = {
         zh: {
             selectionSearchEngine: '选中文字搜索引擎',
+            selectionTranslationMethod: '选中文字翻译方式',
+            translationAuto: '自动（有 API Key 时优先大模型）',
+            translationAI: '大模型翻译',
+            translationCloud: '云翻译',
             customSearchEngine: '自定义',
             customSearchUrl: '搜索地址（使用 {query} 代表选中文字）',
             // End-to-end encryption settings, unlock methods and errors
@@ -941,6 +945,10 @@ import { uiMessages } from './i18n-messages';
         },
         en: {
             selectionSearchEngine: 'Selected text search engine',
+            selectionTranslationMethod: 'Selected text translation method',
+            translationAuto: 'Automatic (prefer AI when an API key is set)',
+            translationAI: 'AI translation',
+            translationCloud: 'Cloud translation',
             customSearchEngine: 'Custom',
             customSearchUrl: 'Search URL (use {query} for selected text)',
             // End-to-end encryption settings, unlock methods and errors

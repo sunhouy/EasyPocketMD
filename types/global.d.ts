@@ -79,6 +79,7 @@ export interface ActionSheetItem {
 export interface UserSettings {
     searchEngine?: import('../js/main/selection-search').SearchEngine;
     customSearchUrl?: string;
+    translationMethod?: import('../js/main/selection-translation').TranslationMethod;
     toolbarButtons?: string[];
     themeMode?: string;
     live2d?: import('../js/main/live2d-models').Live2DPreference;
