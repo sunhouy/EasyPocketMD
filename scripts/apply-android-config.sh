@@ -166,6 +166,7 @@ EOF
 
 cp "$PROJECT_ROOT/src-tauri/platform/android/LocalDocumentsPlugin.kt" "$ANDROID_MAIN_DIR/LocalDocumentsPlugin.kt"
 cp "$PROJECT_ROOT/src-tauri/platform/android/SelectionMenus.kt" "$ANDROID_MAIN_DIR/SelectionMenus.kt"
+cp "$PROJECT_ROOT/src-tauri/platform/android/EditorClipboardPlugin.kt" "$ANDROID_MAIN_DIR/EditorClipboardPlugin.kt"
 
 echo "✅ MainActivity.kt 已同步输入法/窗口配置"
 
@@ -242,6 +243,9 @@ fi
 if ! grep -q 'cn.yhsun.md.LocalDocumentsPlugin' "$PROGUARD_RULES"; then
   printf '%s\n' '-keep class cn.yhsun.md.LocalDocumentsPlugin { *; }' '-keep class cn.yhsun.md.DocumentArgs { *; }
 -keep class cn.yhsun.md.CalendarTodoArgs { *; }' >> "$PROGUARD_RULES"
+fi
+if ! grep -q 'cn.yhsun.md.EditorClipboardPlugin' "$PROGUARD_RULES"; then
+  printf '%s\n' '-keep class cn.yhsun.md.EditorClipboardPlugin { *; }' '-keep class cn.yhsun.md.EditorClipboardArgs { *; }' >> "$PROGUARD_RULES"
 fi
 
 if ! grep -q "cn.yhsun.md.CalendarTodoArgs" "$PROGUARD_RULES"; then

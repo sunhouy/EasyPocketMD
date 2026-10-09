@@ -20,12 +20,12 @@ it('copies formula and chart sources from their visible buttons when Clipboard A
     const {registerCodeBlockEditors}=require('../../js/code-block-editor');registerCodeBlockEditors(instance,root);
     frames.shift()!(0);
     expect(surface.querySelectorAll('.epmd-code-editor')).toHaveLength(3);
-    const copied:string[]=[];document.execCommand=jest.fn(()=>{copied.push((document.activeElement as HTMLTextAreaElement).value);return true;});
+    const copied:string[]=[];document.execCommand=jest.fn(()=>{const event=new Event('copy',{bubbles:true,cancelable:true});Object.defineProperty(event,'clipboardData',{value:{setData:(type:string,text:string)=>{if(type==='text/plain')copied.push(text);}}});document.dispatchEvent(event);return event.defaultPrevented;});
     for(const host of Array.from(surface.querySelectorAll<HTMLElement>('.epmd-code-editor'))){
         const button=Array.from(host.querySelectorAll('button')).find(button=>button.textContent==='复制')!;
         expect(button).toBeDefined();button.click();await Promise.resolve();await Promise.resolve();await Promise.resolve();
     }
-    expect(copied).toEqual(sources.map(([,source])=>source));expect(showMessage).toHaveBeenCalledTimes(3);
+    expect(copied).toEqual(sources.map(([language,source])=>language==='math'?`$$\n${source}\n$$`:`\`\`\`${language}\n${source}\n\`\`\``));expect(showMessage).toHaveBeenCalledTimes(3);
     expect(showMessage).toHaveBeenLastCalledWith('已复制','success');
     document.body.replaceChildren();jest.restoreAllMocks();
 });

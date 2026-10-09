@@ -1,8 +1,11 @@
 import { selectionSearchUrl } from './selection-search';
 import { showSelectionTranslation } from './selection-translation';
-import { copyText } from '../clipboard';
-type Snapshot = {owner:HTMLElement;text:string;rect:()=>DOMRect|DOMRectReadOnly;valid:()=>boolean;restore:()=>void;replace:(text:string)=>void;editable:boolean;markdown:boolean;range?:Range};
-type Action = 'search'|'translate'|'copy'|'cut'|'paste'|'h1'|'h2'|'h3'|'bold'|'italic'|'quote'|'strike'|'list'|'ordered-list'|'check';
+import { copyContent, canReadClipboard, readClipboardText } from '../clipboard';
+import { selectionContent } from './selection-content';
+import { contextInsert, contextInsertActions } from './editor-context-actions';
+import { recoverEditorRendering } from '../editor-render-recovery';
+type Snapshot = {owner:HTMLElement;text:string;html?:string;caret?:boolean;rect:()=>DOMRect|DOMRectReadOnly;valid:()=>boolean;restore:()=>void;replace:(text:string)=>void;editable:boolean;markdown:boolean;range?:Range};
+type Action = string;
 const actions:[Action,string,string,string][]=[['copy','copy','复制','Copy'],['cut','scissors','剪切','Cut'],['paste','paste','粘贴','Paste'],['search','magnifying-glass','搜索','Search'],['translate','language','翻译','Translate'],['h1','heading','标题1','Heading 1'],['h2','heading','标题2','Heading 2'],['h3','heading','标题3','Heading 3'],['bold','bold','粗体','Bold'],['italic','italic','斜体','Italic'],['quote','quote-right','引用','Quote'],['strike','strikethrough','删除线','Strikethrough'],['list','list-ul','无序列表','Bullet list'],['ordered-list','list-ol','有序列表','Numbered list'],['check','list-check','任务列表','Task list']];
 export function selectionMarkdown(text:string,action:string):string {
     const marks:Record<string,string>={bold:'**',italic:'*',strike:'~~'};
@@ -17,10 +20,11 @@ export function installSelectionToolbar(app:any=window) {
     const toolbar=document.createElement('div');toolbar.id='selectionToolbar';toolbar.className='selection-toolbar';toolbar.hidden=true;
     toolbar.setAttribute('role','toolbar');toolbar.setAttribute('aria-label','文本操作');
     document.body.append(toolbar);
+    const menuActions=[...actions,...contextInsertActions];
     let snapshot:Snapshot|null=null, frame=0,busy=false;
-    let pasteAllowed=!!navigator.clipboard?.readText;
+    let pasteAllowed=canReadClipboard();
     if(navigator.permissions?.query)void navigator.permissions.query({name:'clipboard-read' as PermissionName}).then(permission=>{
-        const update=()=>{pasteAllowed=permission.state!=='denied' && !!navigator.clipboard?.readText;if(snapshot)schedule();};
+        const update=()=>{pasteAllowed=canReadClipboard() && (permission.state!=='denied' || /Android/i.test(navigator.userAgent) && !!(app.__TAURI_INTERNALS__?.invoke || app.__TAURI__?.core?.invoke || app.__TAURI__?.invoke));if(snapshot)schedule();};
         permission.onchange=update;update();
     }).catch(()=>{});
     let nativeMenuEnabled:boolean|undefined;
@@ -35,7 +39,7 @@ export function installSelectionToolbar(app:any=window) {
         if(!target || target.closest('.cm-editor,.epmd-code-editor'))return false;
         const input=target.closest('input,textarea');
         if(input instanceof HTMLInputElement && ['password','email','number','date','color'].includes(input.type))return false;
-        return !!input || !!target.closest('#vditor');
+        return !!input || !!target.closest('#vditor .vditor-reset,#vditor [contenteditable]');
     }
 
     const visible=(owner:HTMLElement)=>{
@@ -50,14 +54,15 @@ export function installSelectionToolbar(app:any=window) {
     };
     const observer=new MutationObserver(()=>{if(snapshot && (!snapshot.owner.isConnected || !visible(snapshot.owner)))hide();});
     let observedOwner:HTMLElement|null=null;
-    const hide=()=>{toolbar.hidden=true;snapshot=null;observer.disconnect();observedOwner=null;};
+    const hide=()=>{caretRequested=false;toolbar.hidden=true;snapshot=null;observer.disconnect();observedOwner=null;};
     function observeOwner(owner:HTMLElement){
         if(owner===observedOwner)return;observer.disconnect();observedOwner=owner;
         for(let parent:HTMLElement|null=owner;parent;parent=parent.parentElement)observer.observe(parent,{attributes:true,attributeFilter:['hidden','class','style'],childList:true});
     }
-    function capture():Snapshot|null {
+    function capture(allowCaret=false):Snapshot|null {
+        if(document.body.classList.contains('epmd-copying'))return null;
         const active=document.activeElement as HTMLElement;
-        if(toolbar.contains(active))return snapshot;
+        if(toolbar.contains(active) && !allowCaret)return snapshot;
         const selection=document.getSelection();
         const anchor=selection?.anchorNode;
         const anchorElement=anchor instanceof Element?anchor:anchor?.parentElement;
@@ -65,14 +70,14 @@ export function installSelectionToolbar(app:any=window) {
         if(active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement){
             if(active instanceof HTMLInputElement && ['password','email','number','date','color'].includes(active.type))return null;
             const from=active.selectionStart,to=active.selectionEnd;
-            if(from==null || to==null || from===to || !visible(active))return null;
+            if(from==null || to==null || from===to && (!allowCaret || active.id!=='longFileTextarea') || !visible(active))return null;
             const value=active.value,text=value.slice(from,to),file=app.currentFileId,readonly=active.readOnly;
-            return {owner:active,text,editable:!active.readOnly && !active.disabled,markdown:active.id==='longFileTextarea' && !active.readOnly && !active.disabled,rect:()=>active.getBoundingClientRect(),
+            return {owner:active,text,caret:from===to,editable:!active.readOnly && !active.disabled,markdown:active.id==='longFileTextarea' && !active.readOnly && !active.disabled,rect:()=>active.getBoundingClientRect(),
                 valid:()=>visible(active) && active.readOnly===readonly && active.value===value && (active.id!=='longFileTextarea' || file===app.currentFileId),
                 restore:()=>{active.focus({preventScroll:true});active.setSelectionRange(from,to);},
                 replace:next=>{active.setRangeText(next,from,to,'select');active.dispatchEvent(new InputEvent('input',{bubbles:true,inputType:'insertText',data:next}));}};
         }
-        if(!selection?.rangeCount || selection.isCollapsed || !selection.toString().trim())return null;
+        if(!selection?.rangeCount || selection.isCollapsed && !allowCaret)return null;
         const range=selection.getRangeAt(0).cloneRange();
         const owner=(range.commonAncestorContainer instanceof HTMLElement?range.commonAncestorContainer:range.commonAncestorContainer.parentElement);
         if(!owner || toolbar.contains(owner) || !visible(owner))return null;
@@ -80,9 +85,11 @@ export function installSelectionToolbar(app:any=window) {
         const root=owner.closest<HTMLElement>('[contenteditable=true]');
         const editor=owner.closest<HTMLElement>('#vditor');
         const editable=!!root && !editor?.matches('[data-shared-readonly=true],.vditor-readonly') && !owner.closest('.cm-editor');
-        const file=app.currentFileId,text=selection.toString();
-        const valid=()=>visible(owner) && range.startContainer.isConnected && range.endContainer.isConnected && range.toString()===text && (!editor || file===app.currentFileId);
-        return {owner,text,range,editable,markdown:editable && !!editor,valid,rect:()=>range.getBoundingClientRect(),restore:()=>{root?.focus({preventScroll:true});selection.removeAllRanges();selection.addRange(range);},
+        if(selection.isCollapsed && (!editable || !editor))return null;
+        const file=app.currentFileId,raw=range.toString(),content=selectionContent(range,app);
+        if(!selection.isCollapsed && !content.text.trim())return null;
+        const valid=()=>visible(owner) && range.startContainer.isConnected && range.endContainer.isConnected && range.toString()===raw && (!editor || file===app.currentFileId);
+        return {owner,...content,caret:range.collapsed,range,editable,markdown:editable && !!editor,valid,rect:()=>range.getBoundingClientRect(),restore:()=>{root?.focus({preventScroll:true});selection.removeAllRanges();selection.addRange(range);},
             replace:next=>{if(!document.execCommand(next?'insertText':'delete',false,next))throw Error('无法修改选中文字，请使用编辑器工具栏重试');}};
     }
     function position(context:Snapshot) {
@@ -92,17 +99,21 @@ export function installSelectionToolbar(app:any=window) {
         const top=rect.top-bounds.height-10>=y?rect.top-bounds.height-10:rect.bottom+10;
         toolbar.style.top=Math.max(y,Math.min(top,y+h-bounds.height))+'px';
     }
+    let caretRequested=false;
     function refresh(){
         frame=0;if(busy)return;
-        const next=capture();if(!next){hide();return;}
+        const next=capture(caretRequested);if(!next){hide();return;}
         snapshot=next;observeOwner(next.owner);toolbar.hidden=false;nativeMenu(true);
+        toolbar.classList.toggle('editor-context-toolbar',!!next.caret);
         toolbar.setAttribute('aria-label',app.i18n?.getLanguage?.()==='en'?'Text actions':'文本操作');
         for(const button of Array.from(toolbar.querySelectorAll<HTMLButtonElement>('button'))){
-            const action=actions.find(a=>a[0]===button.dataset.action)!;
-            button.title=app.i18n?.getLanguage?.()==='en'?action[3]:action[2];button.setAttribute('aria-label',button.title);
-            const supported=['copy','search','translate'].includes(action[0]) ? true : action[0]==='paste' ? next.editable && pasteAllowed : action[0]==='cut' ? next.editable : next.markdown;
+            const action=menuActions.find(a=>a[0]===button.dataset.action)!;
+            button.title=app.i18n?.getLanguage?.()==='en'?action[3]:action[2];button.setAttribute('aria-label',button.title);const label=button.querySelector('.context-action-label');if(label)label.textContent=button.title;
+            const insert=contextInsertActions.some(item=>item[0]===action[0]);
+            const caretAction=['paste','h1','h2','h3','quote'].includes(action[0]) || insert;
+            const supported=next.caret ? next.markdown && caretAction && (action[0]!=='paste' || pasteAllowed) : insert ? false : ['copy','search','translate'].includes(action[0]) ? true : action[0]==='paste' ? next.editable && pasteAllowed : action[0]==='cut' ? next.editable : next.markdown;
             button.hidden=!supported;button.disabled=false;
-            if(supported && next.range && !['copy','cut','paste','search','translate'].includes(action[0])) {
+            if(supported && !next.caret && next.range && !['copy','cut','paste','search','translate'].includes(action[0])) {
                 const selector=action[0].startsWith('h')?`button[data-tag="${action[0]}"]`:`button[data-type="${action[0]}"]`;
                 const native=document.getElementById('vditor')?.querySelector<HTMLElement>('.vditor-toolbar '+selector);
                 button.hidden=!native || native.classList.contains('vditor-menu--disabled');
@@ -112,11 +123,18 @@ export function installSelectionToolbar(app:any=window) {
     }
     const schedule=()=>{if(!frame)frame=requestAnimationFrame(refresh);};
     const report=(zh:string,en:string,type='success')=>app.showMessage?.(app.i18n?.getLanguage?.()==='en'?en:zh,type);
+    const insertMarkdown=(text:string)=>{
+        (app.vditor.insertMD || app.vditor.insertValue).call(app.vditor,text);
+        recoverEditorRendering(app.vditor);
+    };
     async function execute(action:Action){
         const context=snapshot;if(!context || busy || !context.valid())return hide();
         busy=true;
         try {
-            if(action==='search'){
+            if(contextInsertActions.some(item=>item[0]===action)){
+                toolbar.hidden=true;
+                await contextInsert(action,app,context.restore,text=>context.range?insertMarkdown(text):context.replace(text),context.valid);
+            } else if(action==='search'){
                 const url=selectionSearchUrl(context.text,app.userSettings?.searchEngine,app.userSettings?.customSearchUrl);
                 if(app.nativeFileOps?.openExternalUrl)await app.nativeFileOps.openExternalUrl(url);
                 else window.open(url,'_blank','noopener,noreferrer');
@@ -124,14 +142,14 @@ export function installSelectionToolbar(app:any=window) {
                 hide();void showSelectionTranslation(context.text,app);
             } else if(action==='copy' || action==='cut'){
                 if(action==='cut' && !context.editable)return;
-                await copyText(context.text);
+                await copyContent({text:context.text,html:context.html});
                 if(action==='cut'){if(!context.valid())throw Error('选中文字已变化，请重新选择');context.restore();context.replace('');}
                 report(action==='copy'?'已复制':'已剪切',action==='copy'?'Copied':'Cut');
             } else if(action==='paste'){
                 if(!context.editable)return;
-                if(!navigator.clipboard?.readText)throw Error('当前环境无法读取剪贴板，请使用系统粘贴');
-                const text=await navigator.clipboard.readText();
-                if(!context.valid())throw Error('选中文字已变化，请重新选择');context.restore();context.replace(text);
+                const text=await readClipboardText();
+                if(!context.valid())throw Error('选中文字已变化，请重新选择');context.restore();
+                if(context.markdown && context.range)insertMarkdown(text);else context.replace(text);
             } else {
                 if(!context.markdown || !context.editable)return;
                 context.restore();
@@ -145,20 +163,39 @@ export function installSelectionToolbar(app:any=window) {
         } catch(error){report(String((error as Error).message),String((error as Error).message),'error');}
         finally {busy=false;hide();}
     }
-    for(const [action,icon,zh] of actions){
+    for(const [action,icon,zh] of menuActions){
         const button=document.createElement('button');button.type='button';button.dataset.action=action;button.title=zh;button.setAttribute('aria-label',zh);
-        button.innerHTML=`<i class="fas fa-${icon}" aria-hidden="true"></i>${action.startsWith('h')?`<sup aria-hidden="true">${action.slice(1)}</sup>`:''}`;
+        button.innerHTML=`<i class="fas fa-${icon}" aria-hidden="true"></i>${/^h[123]$/.test(action)?`<sup aria-hidden="true">${action.slice(1)}</sup>`:''}`;
+        const label=document.createElement('span');label.className='context-action-label';label.textContent=zh;button.append(label);
         button.onpointerdown=event=>event.preventDefault();button.onmousedown=event=>event.preventDefault();button.onclick=()=>{void execute(action);};toolbar.append(button);
     }
     document.addEventListener('selectionchange',schedule);
     document.addEventListener('select',schedule,true);document.addEventListener('pointerup',schedule,true);
     document.addEventListener('touchend',schedule,{passive:true});
     document.addEventListener('beforeinput',hide,true);
-    document.addEventListener('pointerdown',event=>{if(!toolbar.contains(event.target as Node)){nativeMenu(customMenuTarget(event.target instanceof Element?event.target:null));hide();schedule();}},true);
+    let pressTimer:ReturnType<typeof setTimeout>|undefined,pressPoint:{x:number;y:number}|undefined;
+    const cancelPress=()=>{clearTimeout(pressTimer);pressPoint=undefined;};
+    document.addEventListener('pointerdown',event=>{if(!toolbar.contains(event.target as Node)){
+        caretRequested=false;cancelPress();const target=event.target instanceof Element?event.target:null;
+        const custom=customMenuTarget(target);nativeMenu(custom);hide();schedule();
+        if(custom && event.pointerType==='touch'){
+            pressPoint={x:event.clientX,y:event.clientY};
+            pressTimer=setTimeout(()=>{caretRequested=true;refresh();},550);
+        }
+    }},true);
+    document.addEventListener('pointermove',event=>{if(pressPoint && Math.hypot(event.clientX-pressPoint.x,event.clientY-pressPoint.y)>10)cancelPress();},true);
+    document.addEventListener('pointerup',cancelPress,true);document.addEventListener('pointercancel',cancelPress,true);
     document.addEventListener('focusin',event=>{if(!toolbar.contains(event.target as Node))nativeMenu(customMenuTarget(event.target instanceof Element?event.target:null));},true);
     document.addEventListener('contextmenu',event=>{
-        const next=capture();if(!next || !next.valid())return;
-        event.preventDefault();nativeMenu(true);schedule();
+        const target=event.target instanceof Element?event.target:null;
+        if(!customMenuTarget(target))return;
+        event.preventDefault();nativeMenu(true);caretRequested=true;
+        const selection=document.getSelection();
+        if(target?.closest('#vditor') && (!selection?.rangeCount || selection.isCollapsed)){
+            const pointRange=(document as any).caretRangeFromPoint?.(event.clientX,event.clientY) as Range | undefined;
+            if(pointRange && target.closest('[contenteditable=true]')?.contains(pointRange.startContainer)){selection?.removeAllRanges();selection?.addRange(pointRange);}
+        }
+        const next=capture(true);if(!next || !next.valid()){hide();return;}refresh();
     },true);
     document.addEventListener('keydown',event=>{if(event.key==='Escape')hide();});
     document.addEventListener('scroll',()=>{if(snapshot && !toolbar.hidden){if(snapshot.valid())position(snapshot);else hide();}},true);

@@ -27,6 +27,19 @@ it('keeps a successful login valid when encryption configuration is unavailable'
         await document.getElementById('loginSubmitBtn').onclick();
         expect(window.currentUser.token).toBe('valid-login');
         expect(document.getElementById('loginMessage').className).toContain('success');
+        expect(document.getElementById('loginSubmitBtn').hidden).toBe(true);
+        expect(document.getElementById('registerSubmitBtn').hidden).toBe(true);
+        expect(document.getElementById('loginSubmitBtn').disabled).toBe(true);
+        await document.getElementById('loginSubmitBtn').onclick();expect(fetch).toHaveBeenCalledTimes(1);
         expect(window.E2EVault.unlockAfterLogin).not.toHaveBeenCalled();
     } finally {warn.mockRestore();jest.clearAllTimers();jest.useRealTimers();delete window.E2EVault;}
+});
+it('hides both submission buttons after registration auto-login and restores them for a new login flow',async()=>{
+    jest.useFakeTimers();global.fetch=jest.fn().mockResolvedValueOnce({json:async()=>({code:200})}).mockResolvedValueOnce({json:async()=>({code:200,data:{token:'registered'}})});
+    try{
+        await document.getElementById('registerSubmitBtn').onclick();
+        expect(document.getElementById('registerSubmitBtn').hidden).toBe(true);expect(document.getElementById('loginSubmitBtn').hidden).toBe(true);
+        await document.getElementById('registerSubmitBtn').onclick();expect(fetch).toHaveBeenCalledTimes(2);
+        window.showLoginModal();expect(document.getElementById('registerSubmitBtn').hidden).toBe(false);
+    }finally{jest.clearAllTimers();jest.useRealTimers();}
 });
