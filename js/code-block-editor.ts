@@ -3,7 +3,7 @@ import { bindMobileCodeInput } from './code-block-mobile';
 import { canRunLanguage } from '../shared/code-runner-languages';
 import { recordCodeBlockExit } from './code-block-focus';
 import { uiText, setUiText } from './i18n-messages';
-import { copyText } from './clipboard';
+import { copyContent } from './clipboard';
 import { basicSetup } from 'codemirror';
 import { EditorState, StateEffect, StateField, Compartment } from '@codemirror/state';
 import { EditorView, Decoration, DecorationSet, keymap } from '@codemirror/view';
@@ -120,7 +120,10 @@ function createEditor(block: HTMLElement, source: HTMLElement, preview: HTMLElem
     }
     button(uiText('复制'), async () => {
         try {
-            await copyText(view.state.doc.toString());
+            const sourceText=view.state.doc.toString();
+            const text=diagram ? language==='math' ? `$$\n${sourceText}\n$$` : `\`\`\`${language}\n${sourceText}\n\`\`\`` : sourceText;
+            const html=diagram ? instance?.vditor?.lute?.Md2HTML?.(text) : undefined;
+            await copyContent({text,html});
             (window as any).showMessage?.(uiText('已复制'), 'success');
         } catch { (window as any).showMessage?.(uiText('复制失败，请手动选择代码复制'), 'error'); }
     });
@@ -220,7 +223,9 @@ function createEditor(block: HTMLElement, source: HTMLElement, preview: HTMLElem
         ]}),
     });
     entry.view = view; entries.set(block, entry);
-    if (diagram && preview.firstElementChild?.tagName === 'CODE') renderDiagram();
+    // History snapshots are source-only. Native undo may already have started
+    // rendering this fresh preview; keep its node alive while that render awaits scripts.
+    if (diagram && (preview.dataset.render !== '1' || !preview.firstElementChild?.classList.contains('language-'+language))) renderDiagram();
     // CodeMirror maintains local undo while typing; snapshot the document on exit,
     // avoiding Vditor's full-DOM diff on every short pause in code input.
     host.addEventListener('focusout', event => {

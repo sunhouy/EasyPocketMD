@@ -10,6 +10,13 @@ import { requirePrivacyConsent } from './build-variant';
     // 防抖标志
     let _loginSubmitting = false;
     let _registerSubmitting = false;
+    let authenticatedInModal = false;
+    function syncAuthSubmitVisibility() {
+        for (const id of ['loginSubmitBtn','registerSubmitBtn','loginTabBtn','registerTabBtn']) {
+            const button=document.getElementById(id) as HTMLButtonElement;
+            if(button){button.hidden=authenticatedInModal;button.disabled=authenticatedInModal;}
+        }
+    }
     let _accountSwitching = false;
 
     // 辅助函数：获取翻译
@@ -111,7 +118,8 @@ import { requirePrivacyConsent } from './build-variant';
         } else {
             // 恢复原始状态
             btn.classList.remove('is-loading');
-            (btn as HTMLButtonElement).disabled = false;
+            (btn as HTMLButtonElement).disabled = authenticatedInModal;
+            btn.hidden = authenticatedInModal;
             btn.removeAttribute('aria-busy');
             if (btnSpinner) {
                 (btnSpinner as HTMLElement).style.display = 'none';
@@ -590,6 +598,7 @@ import { requirePrivacyConsent } from './build-variant';
     }
 
     function showLoginModal() {
+        authenticatedInModal=false;syncAuthSubmitVisibility();
         for (const id of ['loginPrivacyConsent','registerPrivacyConsent']) {
             const checkbox=document.getElementById(id) as HTMLInputElement; if(checkbox)checkbox.checked=false;
         }
@@ -739,6 +748,7 @@ import { requirePrivacyConsent } from './build-variant';
     }
 
     async function login() {
+        if(authenticatedInModal)return;
         if (!requirePrivacyConsent('login')) return;
         // 防抖：如果正在提交则直接返回
         if (_loginSubmitting) return;
@@ -779,6 +789,7 @@ import { requirePrivacyConsent } from './build-variant';
                         token: result.data.token,
                         password: password
                     };
+                    authenticatedInModal=true;syncAuthSubmitVisibility();
                     await window.E2EVault?.initialize?.().catch(error => console.warn('Encryption configuration unavailable; login remains valid:', error));
                     localStorage.setItem('vditor_user', window.e2eSerializeUser ? window.e2eSerializeUser(global.currentUser) : JSON.stringify(global.currentUser));
 
@@ -848,6 +859,7 @@ import { requirePrivacyConsent } from './build-variant';
     }
 
     async function register() {
+        if(authenticatedInModal)return;
         if (!requirePrivacyConsent('register')) return;
         // 防抖：如果正在提交则直接返回
         if (_registerSubmitting) return;
@@ -918,6 +930,7 @@ import { requirePrivacyConsent } from './build-variant';
                             token: loginResult.data.token,
                             password: password
                         };
+                        authenticatedInModal=true;syncAuthSubmitVisibility();
                         await window.E2EVault?.initialize?.().catch(error => console.warn('Encryption configuration unavailable; login remains valid:', error));
                         localStorage.setItem('vditor_user', window.e2eSerializeUser ? window.e2eSerializeUser(global.currentUser) : JSON.stringify(global.currentUser));
                         addAccountToList(username, password, loginResult.data.token);
@@ -990,6 +1003,7 @@ import { requirePrivacyConsent } from './build-variant';
                             token: loginResult.data.token,
                             password: password
                         };
+                        authenticatedInModal=true;syncAuthSubmitVisibility();
                         await window.E2EVault?.initialize?.().catch(error => console.warn('Encryption configuration unavailable; login remains valid:', error));
                         localStorage.setItem('vditor_user', window.e2eSerializeUser ? window.e2eSerializeUser(global.currentUser) : JSON.stringify(global.currentUser));
                         message.textContent = t('autoLoginSuccess');

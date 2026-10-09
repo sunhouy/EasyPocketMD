@@ -193,10 +193,15 @@ body .code-runner-ui-host .code-output > :first-child { color:var(--md-muted) !i
 
 /* Suppress WebKit native callouts while keeping text selection and its handles. */
 #vditor, #longFileTextarea { -webkit-touch-callout:none; }
+#loginModalOverlay button[hidden] { display:none !important; }
 #vditor :is(.cm-editor,.cm-content,.cm-line) { -webkit-touch-callout:default; }
 
 #featureLoadingStatus { position:fixed;left:50%;bottom:calc(80px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:2147483646;padding:12px 24px;border-radius:24px;background:var(--md-surface, #fff);color:var(--md-on-surface, #222);box-shadow:0 4px 20px #0003;pointer-events:none; }
 .selection-toolbar button[hidden] { display:none; }
+.selection-toolbar .context-action-label { display:none; }
+.editor-context-toolbar { display:grid;grid-template-columns:repeat(3,minmax(0,1fr));width:min(360px,calc(100vw - 16px));max-height:60dvh;overflow:auto; }
+.editor-context-toolbar button { width:auto;height:46px;gap:6px;padding:4px 8px;font-size:13px; }
+.editor-context-toolbar .context-action-label { display:inline; }
 
 .selection-translation-modal > .modal-close-btn { position:absolute;top:14px;right:14px;left:auto; }
 .selection-translation-modal .modal-header { padding-right:32px; }

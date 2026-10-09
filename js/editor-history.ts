@@ -1,4 +1,5 @@
 import { captureVditorCursor, getVditorEditableElement, restoreVditorCursor } from './editor-cursor';
+import { recoverEditorRendering, canonicalHistoryHtml } from './editor-render-recovery';
 
 export function cancelEditorHistoryTimers(instance: any) {
     for (const mode of ['wysiwyg', 'ir', 'sv']) {
@@ -15,6 +16,10 @@ export function installEditorHistory(instance: any) {
     const history = instance?.vditor?.undo;
     if (!history || history.epmdInstalled) return;
     history.epmdInstalled = true;
+    if(typeof history.addCaret==='function'){
+        const addCaret=history.addCaret;
+        history.addCaret=function(internal:any,...args:any[]){return canonicalHistoryHtml(addCaret.call(this,internal,...args),internal.currentMode);};
+    }
     let recorded = instance.getValue();
     const add = history.addToUndoStack;
     history.addToUndoStack = function(internal: any) {
@@ -37,6 +42,7 @@ export function installEditorHistory(instance: any) {
                 before?.removeAllRanges(); before?.addRange(range);
             }
             const result = original.call(this, internal);
+            recoverEditorRendering(instance);
             recorded = instance.getValue();
             const selection = document.getSelection();
             // Vditor places a missing caret before the editor. Keep it inside the document.

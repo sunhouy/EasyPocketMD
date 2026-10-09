@@ -10,6 +10,8 @@ use tauri_plugin_opener::OpenerExt;
 
 #[cfg(target_os = "android")]
 struct AndroidDocuments(tauri::plugin::PluginHandle<tauri::Wry>);
+#[cfg(target_os = "android")]
+struct AndroidClipboard(tauri::plugin::PluginHandle<tauri::Wry>);
 
 fn local_documents_plugin() -> tauri::plugin::TauriPlugin<tauri::Wry> {
     tauri::plugin::Builder::<tauri::Wry>::new("local-documents")
@@ -19,6 +21,15 @@ fn local_documents_plugin() -> tauri::plugin::TauriPlugin<tauri::Wry> {
             Ok(())
         })
         .build()
+}
+
+fn editor_clipboard_plugin() -> tauri::plugin::TauriPlugin<tauri::Wry> {
+    tauri::plugin::Builder::<tauri::Wry>::new("editor-clipboard")
+        .setup(|_app, _api| {
+            #[cfg(target_os = "android")]
+            _app.manage(AndroidClipboard(_api.register_android_plugin("cn.yhsun.md", "EditorClipboardPlugin")?));
+            Ok(())
+        }).build()
 }
 
 #[cfg(target_os = "android")]
@@ -398,6 +409,19 @@ async fn calendar_action(app: AppHandle, action: String, payload: serde_json::Va
 }
 
 #[tauri::command]
+async fn editor_clipboard_action(app: AppHandle, action: String, text: String, html: Option<String>) -> Result<serde_json::Value, String> {
+    #[cfg(target_os = "android")]
+    {
+        let command = match action.as_str() { "write" => "write", "read" => "read", _ => return Err("Unsupported clipboard action".into()) };
+        tauri::async_runtime::spawn_blocking(move || {
+            app.state::<AndroidClipboard>().0.run_mobile_plugin(command, serde_json::json!({"text":text,"html":html})).map_err(|error| error.to_string())
+        }).await.map_err(|error| error.to_string())?
+    }
+    #[cfg(not(target_os = "android"))]
+    { let _ = (app, action, text, html); Err("Native editor clipboard is Android only".into()) }
+}
+
+#[tauri::command]
 async fn set_selection_menu(app: AppHandle, enabled: bool) -> Result<serde_json::Value, String> {
     #[cfg(target_os = "android")]
     { return android_document(app, "selectionMenu", serde_json::json!({"enabled": enabled})).await; }
@@ -559,6 +583,7 @@ pub fn run() {
             Ok(())
         })
         .plugin(local_documents_plugin())
+        .plugin(editor_clipboard_plugin())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_opener::init())
@@ -568,6 +593,7 @@ pub fn run() {
             open_local_file_dialog,
             request_storage_access,
             set_selection_menu,
+            editor_clipboard_action,
             calendar_action,
             read_local_file,
             write_local_file,
