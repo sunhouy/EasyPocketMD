@@ -1,3 +1,4 @@
+import { copyText } from '../clipboard';
 export async function showSelectionTranslation(text: string, app: any = window) {
     const en = app.i18n?.getLanguage?.() === 'en';
     const overlay = document.createElement('div');
@@ -39,6 +40,6 @@ export async function showSelectionTranslation(text: string, app: any = window) 
         } catch (error) { if (!request.signal.aborted) status.textContent = String((error as Error).message); }
     };
     target.onchange = () => { void translate(); };
-    copy.onclick = () => { if (!navigator.clipboard?.writeText) { result.focus(); result.select(); return; } void navigator.clipboard.writeText(result.value).then(() => app.showMessage?.(en ? 'Copied' : '已复制', 'success')).catch(() => { result.focus(); result.select(); }); };
+    copy.onclick = () => { void copyText(result.value).then(() => app.showMessage?.(en ? 'Copied' : '已复制', 'success')).catch(() => { result.focus(); result.select(); app.showMessage?.(en ? 'Copy failed; please copy the selected text manually' : '复制失败，请手动复制已选中的文本', 'error'); }); };
     await translate();
 }

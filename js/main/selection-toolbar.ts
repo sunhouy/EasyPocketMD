@@ -1,5 +1,6 @@
 import { selectionSearchUrl } from './selection-search';
 import { showSelectionTranslation } from './selection-translation';
+import { copyText } from '../clipboard';
 type Snapshot = {owner:HTMLElement;text:string;rect:()=>DOMRect|DOMRectReadOnly;valid:()=>boolean;restore:()=>void;replace:(text:string)=>void;editable:boolean;markdown:boolean;range?:Range};
 type Action = 'search'|'translate'|'copy'|'cut'|'paste'|'h1'|'h2'|'h3'|'bold'|'italic'|'quote'|'strike'|'list'|'ordered-list'|'check';
 const actions:[Action,string,string,string][]=[['copy','copy','复制','Copy'],['cut','scissors','剪切','Cut'],['paste','paste','粘贴','Paste'],['search','magnifying-glass','搜索','Search'],['translate','language','翻译','Translate'],['h1','heading','标题1','Heading 1'],['h2','heading','标题2','Heading 2'],['h3','heading','标题3','Heading 3'],['bold','bold','粗体','Bold'],['italic','italic','斜体','Italic'],['quote','quote-right','引用','Quote'],['strike','strikethrough','删除线','Strikethrough'],['list','list-ul','无序列表','Bullet list'],['ordered-list','list-ol','有序列表','Numbered list'],['check','list-check','任务列表','Task list']];
@@ -123,8 +124,7 @@ export function installSelectionToolbar(app:any=window) {
                 hide();void showSelectionTranslation(context.text,app);
             } else if(action==='copy' || action==='cut'){
                 if(action==='cut' && !context.editable)return;
-                if(navigator.clipboard?.writeText)await navigator.clipboard.writeText(context.text);
-                else {context.restore();if(!document.execCommand('copy'))throw Error('无法访问剪贴板，请使用系统复制');}
+                await copyText(context.text);
                 if(action==='cut'){if(!context.valid())throw Error('选中文字已变化，请重新选择');context.restore();context.replace('');}
                 report(action==='copy'?'已复制':'已剪切',action==='copy'?'Copied':'Cut');
             } else if(action==='paste'){

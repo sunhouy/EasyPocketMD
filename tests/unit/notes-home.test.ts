@@ -1,6 +1,6 @@
 /** @jest-environment jsdom */
 import { beginFileSync, endFileSync } from '../../js/files/sync/local-state';
-import {installNotesHome,visibleNotes,notePreview} from '../../js/files/notes-home';
+import {installNotesHome,visibleNotes,notePreview,noteTimestamp} from '../../js/files/notes-home';
 const files=[
     {id:'old',type:'file',name:'old.md',content:'旧笔记',lastModified:1},
     {id:'folder',type:'folder',name:'学习',lastModified:2},
@@ -8,6 +8,12 @@ const files=[
     {id:'sub',type:'folder',name:'学习/子目录'},
     {id:'nested',type:'file',name:'学习/子目录/嵌套.md',content:'完整文档'+'.'.repeat(300)+'深处的关键词',lastModified:5},
 ];
+it('sorts by actual modification time before manual order and handles server date strings',()=>{
+    const old={id:'old',type:'file',name:'old.md',order:-2000000,lastModified:'2020-01-01T00:00:00Z'};
+    const latest={id:'new',type:'file',name:'new.md',order:100,lastModified:String(Date.UTC(2026,9,8))};
+    expect(visibleNotes([old,latest],null,'').map(file=>file.id)).toEqual(['new','old']);
+    expect(noteTimestamp(latest)).toBe(Date.UTC(2026,9,8));expect(noteTimestamp({...old,lastModified:undefined})).toBe(0);
+});
 let app:any,render:()=>void,tree:any;
 beforeEach(()=>{
     document.body.innerHTML='<div id="fileListSidebar"></div>';

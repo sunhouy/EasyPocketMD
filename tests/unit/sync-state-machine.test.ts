@@ -15,6 +15,30 @@ function fixture() {
 const response = (content,version,code=200) => ({json:async()=>({code,data:{content,content_version:version}})});
 beforeEach(()=>localStorage.clear());
 afterEach(()=>jest.restoreAllMocks());
+it('uses the server modification date for an unchanged acknowledgement and preserves a newer local edit date',async()=>{
+    const old='2020-01-01T00:00:00Z';
+    const f=fixture();f.edit('base');f.file.lastModified=Date.now();
+    global.fetch=jest.fn(async()=>({json:async()=>({code:200,data:{content:'base',content_version:1,last_modified:old}})}));
+    await f.api.syncFileToServer('note',{background:true});expect(f.file.lastModified).toBe(old);
+    let reply;f.edit('first');f.file.lastModified=100;
+    global.fetch=jest.fn(()=>new Promise(resolve=>reply=resolve));const save=f.api.syncFileToServer('note',{background:true});
+    for(let i=0;i<50&&!reply;i++)await Promise.resolve();
+    f.edit('second');f.file.lastModified=200;
+    reply({json:async()=>({code:200,data:{content:'first',content_version:2,last_modified:old}})});
+    await save;expect(f.file.lastModified).toBe(200);expect(f.file.serverLastModified).toBe(old);
+});
+it('keeps the original remote date when reconciling already synced content',async()=>{
+    const f=fixture();f.edit('base');f.file.lastModified=Date.now();
+    await f.app.reconcileRemoteFile(f.file,{content:'base',content_version:1,last_modified:'2020-01-01T00:00:00Z'});
+    expect(f.file.lastModified).toBe('2020-01-01T00:00:00Z');
+});
+it('repairs clean cached dates from metadata without changing dirty file dates',()=>{
+    const f=fixture();f.edit('base');f.file.lastModified=Date.now();
+    const remote={name:'note.md',type:'file',contentVersion:1,lastModified:'2020-01-01T00:00:00Z',contentLoaded:false};
+    f.rt.mergeFiles([{...f.file}],[remote]);expect(f.file.lastModified).toBe(remote.lastModified);
+    f.file.isSynced=false;f.file.lastModified=123;f.app.unsavedChanges.note=true;
+    f.rt.mergeFiles([{...f.file}],[remote]);expect(f.file.lastModified).toBe(123);
+});
 it('does not spin for an open file with a persisted busy flag, and clears real saves on acknowledgement',async()=>{
     const f=fixture();f.file.syncBusy=true;expect(syncStatus(f.file,true,false)).toBe('synced');let reply;
     global.fetch=jest.fn(()=>new Promise(resolve=>reply=resolve));const save=f.api.syncFileToServer('note',{background:true});

@@ -1,3 +1,4 @@
+import { fileTimestamp } from '../modified-time';
 export function showFileDetails(app: any, file: any) {
     (document.getElementById('fileDetailsModal') as any)?.dismiss?.();
     const overlay = document.createElement('div'); overlay.id = 'fileDetailsModal'; overlay.className = 'modal-overlay file-details-overlay';
@@ -9,7 +10,7 @@ export function showFileDetails(app: any, file: any) {
     file=item;
     const subtitle=document.createElement('h4');subtitle.textContent=file.name;box.append(subtitle);
     const list = document.createElement('dl');
-    const timestamp = (value: any) => { const date = value ? new Date(value) : null; return date && !Number.isNaN(date.getTime()) ? date.toLocaleString() : en ? 'Not recorded' : '未记录'; };
+    const timestamp = (value: any) => { const time = fileTimestamp(value); return time ? new Date(time).toLocaleString() : en ? 'Not recorded' : '未记录'; };
     const children = file.type === 'folder' ? (app.files || []).filter((f: any) => f.name.startsWith(file.name + '/')) : [];
     const rows = [[en ? 'Name / path' : '名称 / 路径', file.name], [en ? 'Type' : '类型', file.type === 'folder' ? (en ? 'Folder' : '文件夹') : (en ? 'File' : '文件')],
         [en ? 'Created' : '创建时间', timestamp(file.createdAt ?? file.created_at)], [en ? 'Last modified' : '最后修改时间', timestamp(file.lastModified ?? file.last_modified)]];

@@ -162,7 +162,10 @@ export function createSyncRuntimeApi(ctx: any) {
     if (!final.clean) { conflict(file, content, version); return; }
     file.content = final.content; file.contentLoaded = true; file.contentFetchedAt = Date.now(); file.contentVersion = version;
     file.crdtBaseContent = content; file.crdtBaseContentVersion = version;
-    file.serverLastModified = remote.last_modified ?? remote.serverLastModified; file.lastModified = Date.now();
+    file.serverLastModified = remote.last_modified ?? remote.serverLastModified ?? remote.lastModified ?? file.serverLastModified;
+    // Downloading/acknowledging a revision is not a local edit.
+    if (final.content === content) file.lastModified = file.serverLastModified ?? file.lastModified;
+    else if (final.content !== originalLocal) file.lastModified = Date.now();
     if (isExternalLocalFile(file)) { file.localSyncedContent = content; file.localCloudUsername = g('currentUser').username; if (final.content !== merged.content) file.localPendingWrite = true; }
     g('lastSyncedContent')[file.id] = content; file.isSynced = final.content === content;
     if (file.isSynced) { delete file.pendingCloudContent; delete file.pendingCloudBaseVersion; delete file.previousCloudContent; delete file.previousCloudBaseVersion; file.cloudSaveReceipts = (file.cloudSaveReceipts || []).filter((receipt: any) => receipt.hash !== SHA256(file.crdtBaseContent || '').toString()); }
@@ -529,9 +532,9 @@ export function createSyncRuntimeApi(ctx: any) {
               if (!hasNewerActiveEditorContent) { delete file.pendingCloudContent; delete file.pendingCloudBaseVersion; delete file.previousCloudContent; delete file.previousCloudBaseVersion; file.cloudSaveReceipts = (file.cloudSaveReceipts || []).filter((receipt: any) => receipt.hash !== SHA256(file.crdtBaseContent || '').toString()); }
               files[fileIndex].crdtBaseContent = serverContent;
               files[fileIndex].crdtBaseContentVersion = Number(result.data?.content_version ?? file.contentVersion ?? 0);
-              files[fileIndex].lastModified = Date.now();
               files[fileIndex].serverLastModified =
-                result.data && result.data.last_modified ? result.data.last_modified : files[fileIndex].lastModified;
+                result.data?.last_modified ?? result.data?.lastModified ?? files[fileIndex].serverLastModified;
+              if (!hasNewerActiveEditorContent) files[fileIndex].lastModified = files[fileIndex].serverLastModified ?? files[fileIndex].lastModified;
               files[fileIndex].contentVersion = Number(
                 result.data && result.data.content_version
                   ? result.data.content_version

@@ -3,6 +3,7 @@ import { bindMobileCodeInput } from './code-block-mobile';
 import { canRunLanguage } from '../shared/code-runner-languages';
 import { recordCodeBlockExit } from './code-block-focus';
 import { uiText, setUiText } from './i18n-messages';
+import { copyText } from './clipboard';
 import { basicSetup } from 'codemirror';
 import { EditorState, StateEffect, StateField, Compartment } from '@codemirror/state';
 import { EditorView, Decoration, DecorationSet, keymap } from '@codemirror/view';
@@ -119,8 +120,7 @@ function createEditor(block: HTMLElement, source: HTMLElement, preview: HTMLElem
     }
     button(uiText('复制'), async () => {
         try {
-            if (!navigator.clipboard) throw Error('Clipboard unavailable');
-            await navigator.clipboard.writeText(view.state.doc.toString());
+            await copyText(view.state.doc.toString());
             (window as any).showMessage?.(uiText('已复制'), 'success');
         } catch { (window as any).showMessage?.(uiText('复制失败，请手动选择代码复制'), 'error'); }
     });

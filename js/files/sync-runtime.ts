@@ -11,7 +11,7 @@ import { e2eErrorText } from '../e2e-i18n';
  *    因为它们的定义仍位于 runtime-core 内部。
  */
 import { materializeParentFolders } from './tree/parent-folders';
-import { persistFile, restoreFiles, refreshSyncIcons, deviceId } from './sync/local-state';
+import { persistFile, restoreFiles, refreshSyncIcons, deviceId, syncStatus } from './sync/local-state';
 import {
     isExternalLocalFile as isExternalLocalFileCore,
     normalizeExternalLocalFileRecord as normalizeExternalLocalFileRecordCore,
@@ -665,6 +665,7 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
         file.content = content; file.contentLoaded = true; file.isSynced = true;
         file.localSyncedContent = content;
         file.serverLastModified = remote.last_modified || remote.serverLastModified || file.serverLastModified;
+        file.lastModified = file.serverLastModified ?? file.lastModified;
         if (remote.content_version != null || remote.contentVersion != null) file.contentVersion = Number(remote.content_version ?? remote.contentVersion);
         g('lastSyncedContent')[file.id] = content;
         markPendingServerSync(file.id, false);
@@ -1696,6 +1697,20 @@ export function installSyncRuntime(global: any, editorRt: EditorRuntimeCtx, hook
                     mergedFiles[index] = canonical;
                     fileMap[localFile.name] = canonical;
                     canonical.createdAt ||= remote.createdAt;
+                    // Refresh clean metadata to repair cached sync-time dates, while
+                    // leaving in-flight saves and unsaved drafts in charge of theirs.
+                    if (canonical.isSynced && !canonical.syncConflict && !unsavedChanges[canonical.id] && !pendingServerSync[canonical.id]
+                        && syncStatus(canonical, true, true) !== 'syncing'
+                        && (!remote.contentVersion || Number(remote.contentVersion) >= Number(canonical.contentVersion || 0))
+                        && (canonical.id !== g('currentFileId') || getCurrentEditorContent(canonical.id, canonical.content) === canonical.content)) {
+                        const modified = remote.serverLastModified ?? remote.lastModified ?? canonical.lastModified;
+                        if (modified !== canonical.lastModified) {
+                            canonical.lastModified = modified;
+                            // Replace stale per-file journals too, so a reload cannot
+                            // restore the old, artificially newer sync timestamp.
+                            try { persistFile(canonical, window.e2eSerializeFiles); } catch (error) { console.warn('File date cache could not be refreshed:', error); }
+                        }
+                    }
                     if (Number(remote.contentVersion) > Number(canonical.contentVersion || 0)) canonical.remoteContentVersion = remote.contentVersion;
                     if (remote.contentLoaded !== false) void global.reconcileRemoteFile(canonical, remote).catch(console.warn);
                 } else {
