@@ -604,8 +604,8 @@ import { createDiffFileWriter } from './conflict/live-files';
     }
 
     function formatFileListModifiedTime(ts) {
-        const value = Number(ts || Date.now());
-        if (!Number.isFinite(value)) return '';
+        const value = noteTimestamp({ lastModified: ts } as any);
+        if (!value) return isEn() ? 'Modification time unavailable' : '修改时间未记录';
         try {
             return new Date(value).toLocaleString();
         } catch (error) {
@@ -1018,15 +1018,15 @@ import { createDiffFileWriter } from './conflict/live-files';
         nodes.sort((a, b) => {
             const orderA = a.data.order;
             const orderB = b.data.order;
-            if (orderA !== orderB) return orderA - orderB;
+            if (defaultSorting !== 'modifiedTime' && orderA !== orderB) return orderA - orderB;
             
             // 如果 order 相同，根据默认排序方式排序
             if (defaultSorting === 'modifiedTime') {
                 // 按修改时间排序（最新的在前）
                 const fileA = g('files').find(f => f.name === a.data.path);
                 const fileB = g('files').find(f => f.name === b.data.path);
-                const timeA = fileA ? fileA.lastModified : 0;
-                const timeB = fileB ? fileB.lastModified : 0;
+                const timeA = fileA ? noteTimestamp(fileA) : 0;
+                const timeB = fileB ? noteTimestamp(fileB) : 0;
                 if (timeA !== timeB) return timeB - timeA; // 最新的在前
             } else if (defaultSorting === 'fileSize') {
                 // 按文件大小排序（大的在前）
@@ -1037,6 +1037,7 @@ import { createDiffFileWriter } from './conflict/live-files';
                 if (sizeA !== sizeB) return sizeB - sizeA; // 大的在前
             }
             // alphabetical 或其他情况：按名称排序
+            if (orderA !== orderB) return orderA - orderB;
 
             return a.text.localeCompare(b.text);
         });

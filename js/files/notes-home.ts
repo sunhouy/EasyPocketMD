@@ -2,15 +2,13 @@ import { bindFolderSwipe } from './folder-swipe';
 import { isOrderMetadataFile } from '../../shared/file-orders';
 import { syncStatus, syncStatusPresentation } from './sync/local-state';
 import { bindFileTreeLongPress } from './tree/details';
+import { fileTimestamp } from './modified-time';
 
 type Note = {id:string;name:string;type:string;content?:string;lastModified?:number|string;last_modified?:number|string;order?:number};
 const parent = (name:string) => name.includes('/') ? name.slice(0,name.lastIndexOf('/')) : '';
 const basename = (name:string) => name.split('/').pop() || name;
 export function noteTimestamp(file:Note):number {
-    const value=file.lastModified ?? file.last_modified;
-    if (!value) return 0;
-    const result=typeof value==='number' ? value : new Date(value).getTime();
-    return Number.isFinite(result) ? result : 0;
+    return fileTimestamp(file.lastModified ?? file.last_modified);
 }
 export function notePreview(content:string):string {
     if (/^EPMD\d*:/.test(content)) return '';
@@ -22,7 +20,7 @@ export function visibleNotes(files:Note[], folder:string|null, query:string):Not
     const q=query.trim().toLocaleLowerCase();
     return files.filter(file=>file.type==='file' && !isOrderMetadataFile(file.name) && (folder===null || parent(file.name)===folder)
         && (!q || (file.name+' '+(/^EPMD\d*:/.test(file.content || '')?'':file.content || '')).toLocaleLowerCase().includes(q)))
-        .sort((a,b)=>(a.order || 0)-(b.order || 0) || noteTimestamp(b)-noteTimestamp(a) || a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
+        .sort((a,b)=>noteTimestamp(b)-noteTimestamp(a) || (a.order || 0)-(b.order || 0) || a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
 }
 
 /** A home view over the same files and tree actions; it owns no copies of drafts. */
