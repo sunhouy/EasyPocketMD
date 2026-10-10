@@ -1,3 +1,4 @@
+import { queueWorkspaceCache, readWorkspaceCache, resetWorkspaceCache } from './files/workspace-cache';
 import { requirePrivacyConsent } from './build-variant';
 /**
  * 用户认证 - 登录、注册、登出、登录模态
@@ -58,6 +59,7 @@ import { requirePrivacyConsent } from './build-variant';
 
     async function clearAccountLocalFileState() {
         if (global.clearAutoSave) global.clearAutoSave();
+        await resetWorkspaceCache();
         if (global.draftRecovery && typeof global.draftRecovery.clearDraft === 'function') {
             global.draftRecovery.clearDraft();
         }
@@ -814,7 +816,7 @@ import { requirePrivacyConsent } from './build-variant';
                         let currentFileContent = null;
 
                         if (currentFileId && vditor) {
-                            const files = JSON.parse(localStorage.getItem('vditor_files') || '[]');
+                            const files = global.files?.length ? global.files.map(file=>({...file})) : await readWorkspaceCache();
                             const currentFile = files.find(f => f.id === currentFileId);
                             if (currentFile) {
                                 currentFileName = currentFile.name;
@@ -822,7 +824,7 @@ import { requirePrivacyConsent } from './build-variant';
                                 // 更新本地存储中的内容
                                 currentFile.content = currentFileContent;
                                 currentFile.lastModified = Date.now();
-                                localStorage.setItem('vditor_files', window.e2eSerializeFiles ? window.e2eSerializeFiles(files) : JSON.stringify(files));
+                                queueWorkspaceCache(files);
                             }
                         }
 
@@ -952,7 +954,7 @@ import { requirePrivacyConsent } from './build-variant';
                             let currentFileContent = null;
 
                             if (currentFileId && vditor) {
-                                const files = JSON.parse(localStorage.getItem('vditor_files') || '[]');
+                                const files = global.files?.length ? global.files.map(file=>({...file})) : await readWorkspaceCache();
                                 const currentFile = files.find(f => f.id === currentFileId);
                                 if (currentFile) {
                                     currentFileName = currentFile.name;
@@ -960,7 +962,7 @@ import { requirePrivacyConsent } from './build-variant';
                                     // 更新本地存储中的内容
                                     currentFile.content = currentFileContent;
                                     currentFile.lastModified = Date.now();
-                                    localStorage.setItem('vditor_files', window.e2eSerializeFiles ? window.e2eSerializeFiles(files) : JSON.stringify(files));
+                                    queueWorkspaceCache(files);
                                 }
                             }
 
@@ -1024,7 +1026,7 @@ import { requirePrivacyConsent } from './build-variant';
                             let currentFileContent = null;
 
                             if (currentFileId && vditor) {
-                                const files = JSON.parse(localStorage.getItem('vditor_files') || '[]');
+                                const files = global.files?.length ? global.files.map(file=>({...file})) : await readWorkspaceCache();
                                 const currentFile = files.find(f => f.id === currentFileId);
                                 if (currentFile) {
                                     currentFileName = currentFile.name;
@@ -1032,7 +1034,7 @@ import { requirePrivacyConsent } from './build-variant';
                                     // 更新本地存储中的内容
                                     currentFile.content = currentFileContent;
                                     currentFile.lastModified = Date.now();
-                                    localStorage.setItem('vditor_files', window.e2eSerializeFiles ? window.e2eSerializeFiles(files) : JSON.stringify(files));
+                                    queueWorkspaceCache(files);
                                 }
                             }
 

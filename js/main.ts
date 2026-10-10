@@ -1,3 +1,4 @@
+import { readWorkspaceCacheSync } from './files/workspace-cache';
 import { isMobileUserAgent } from './main/device-layout';
 import { installEditorHistory, cancelEditorHistoryTimers } from './editor-history';
 import { loadFeature } from './feature-loader';
@@ -334,7 +335,7 @@ document.addEventListener('DOMContentLoaded', function() {
             });
     }
     window.currentFileId = null;
-    window.files = JSON.parse(localStorage.getItem('vditor_files') || '[]');
+    window.files = readWorkspaceCacheSync();
     window.appSessionId = 'session_' + Date.now() + '_' + Math.random().toString(36).slice(2, 10);
     window.autoSaveTimer = null;
     window.syncInterval = null;
@@ -1942,7 +1943,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (window.currentUser) {
                 window.showUserInfo();
                 void initializeFileList(window,async()=>{
-                    if (localStorage.getItem('vditor_files')) window.loadLocalFiles();
+                    await window.loadLocalFiles();
                     window.startAutoSync();
                     await window.loadFilesFromServer();
                 }).catch(handleStartupFailure);
