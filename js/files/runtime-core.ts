@@ -1,7 +1,8 @@
+// @ts-nocheck
+import { queueWorkspaceCache, writeWorkspaceCache, readWorkspaceCache } from './workspace-cache';
 /**
  * 文件管理 - 加载、保存、同步、历史版本、文件夹
  */
-// @ts-nocheck
 import { isMobileUserAgent } from '../main/device-layout';
 import { cancelEditorHistoryTimers } from '../editor-history';
 import { bindFileCreationButton, quickDocumentPath } from './quick-create';
@@ -803,8 +804,8 @@ import { createDiffFileWriter } from './conflict/live-files';
         const roots = originalFiles.filter(file => idSet.has(String(file.id)));
         if (!roots.length) {
             if (!ids.length) throw Error(isEn() ? 'Select a file to delete' : '请先选择要删除的文件');
-            const cached = JSON.parse(localStorage.getItem('vditor_files') || '[]');
-            if (Array.isArray(cached)) localStorage.setItem('vditor_files',JSON.stringify(cached.filter(file => !idSet.has(String(file.id)))));
+            const cached = await readWorkspaceCache();
+            if (Array.isArray(cached) && !await writeWorkspaceCache([], JSON.stringify(cached.filter(file => !idSet.has(String(file.id))))))throw Error('本地保存失败，请重试');
             exitFileListMultiSelectMode();
             returnToListAfterDeletion(global,idSet);
             global.refreshNotesHome?.();
@@ -839,7 +840,7 @@ import { createDiffFileWriter } from './conflict/live-files';
         const files = g('files'), deletedIds = new Set(plan.map(file => file.id));
         const remaining = files.filter(file => !deletedIds.has(String(file.id)));
         // Persist before mutating the visible array: quota/serialization errors remain actionable.
-        localStorage.setItem('vditor_files', window.e2eSerializeFiles ? window.e2eSerializeFiles(remaining) : JSON.stringify(remaining));
+        if(!await writeWorkspaceCache(remaining))throw Error('本地保存失败，请重试');
         files.splice(0,files.length,...remaining);
         for (const id of deletedIds) {
             if (global.lastSyncedContent) delete global.lastSyncedContent[id];
@@ -858,10 +859,14 @@ import { createDiffFileWriter } from './conflict/live-files';
         await deleteFileSelection(Array.from(getFileListMultiSelectedIds()));
     }
 
-    function loadLocalFiles() {
+    async function loadLocalFiles() {
         if (deferFileTreeWorkUntilWasmReady(loadLocalFiles, 'loadLocalFiles')) return;
-        const localFiles = JSON.parse(localStorage.getItem('vditor_files') || '[]');
+        const owner=g('currentUser')?.username;
+        const localFiles = await readWorkspaceCache();
+        if(g('currentUser')?.username!==owner)return;
         restoreFiles(localFiles);
+        await Promise.all(localFiles.map(file=>restoreFileFromDB(file,global.IndexedDBManager)));
+        if(g('currentUser')?.username!==owner)return;
         const pendingServerSync = g('pendingServerSync') || {};
         const unsavedChanges = g('unsavedChanges') || {};
         global.pendingServerSync = pendingServerSync;
@@ -885,7 +890,7 @@ import { createDiffFileWriter } from './conflict/live-files';
         if (localFiles.length === 0) {
             global.files = [];
             if (shouldAutoOpenInitialFile()) {
-                createDefaultFile();
+                await createDefaultFile();
             } else {
                 loadFiles();
             }
@@ -1202,7 +1207,15 @@ import { createDiffFileWriter } from './conflict/live-files';
         });
     }
 
-    function createFileAtPath(path) {
+    async function persistCreatedRecord(files,record) {
+        const owner=g('currentUser');
+        if(await writeWorkspaceCache(files))return global.files===files && g('currentUser')===owner;
+        const index=files.indexOf(record);if(index>=0)files.splice(index,1);
+        queueWorkspaceCache(files);
+        return false;
+    }
+
+    async function createFileAtPath(path) {
         path = normalizePath(path);
         if (!ensureParentFolders(path)) return;
         
@@ -1224,15 +1237,15 @@ import { createDiffFileWriter } from './conflict/live-files';
             isSynced: false
         };
         files.push(newFile);
-        localStorage.setItem('vditor_files', window.e2eSerializeFiles ? window.e2eSerializeFiles(files) : JSON.stringify(files));
-        openFile(newFile.id);
+        if(!await persistCreatedRecord(files,newFile))return;
+        await openFile(newFile.id);
         loadFiles();
         g('lastSyncedContent')[newFile.id] = newFile.content;
         g('unsavedChanges')[newFile.id] = false;
         if (g('currentUser')) global.syncFileToServer(newFile.id);
     }
     
-    function createFolderAtPath(path) {
+    async function createFolderAtPath(path) {
         path = normalizePath(path);
         if (!ensureParentFolders(path)) return;
         const files = g('files');
@@ -1250,7 +1263,7 @@ import { createDiffFileWriter } from './conflict/live-files';
             isSynced: false
         };
         files.push(newFolder);
-        localStorage.setItem('vditor_files', window.e2eSerializeFiles ? window.e2eSerializeFiles(files) : JSON.stringify(files));
+        if(!await persistCreatedRecord(files,newFolder))return;
         loadFiles();
         if (g('currentUser')) global.syncFileToServer(newFolder.id);
     }
@@ -2016,7 +2029,7 @@ import { createDiffFileWriter } from './conflict/live-files';
             });
     }
 
-    function createDefaultFile() {
+    async function createDefaultFile() {
         const defaultFile = {
             id: Date.now().toString(),
             autoCreatedGuestWelcome: !g('currentUser'),
@@ -2030,7 +2043,7 @@ import { createDiffFileWriter } from './conflict/live-files';
             isSynced: false
         };
         global.files.push(defaultFile);
-        localStorage.setItem('vditor_files', window.e2eSerializeFiles ? window.e2eSerializeFiles(global.files) : JSON.stringify(global.files));
+        if(!await persistCreatedRecord(global.files,defaultFile))return;
         global.currentFileId = defaultFile.id;
         refreshE2EUi();
 
@@ -2069,7 +2082,7 @@ import { createDiffFileWriter } from './conflict/live-files';
         const parentPath = (global.isFileManagementMode ? global.notesHomeFolderPath || '' : getSelectedFolderPath()).replace(/\/$/, '');
         const defaultName = getNextAvailableName(baseName, parentPath);
         const defaultPath = parentPath ? parentPath + '/' + defaultName : defaultName;
-        const commitNewFile = function(input) {
+        const commitNewFile = async function(input) {
             if (!input) return;
 
             let path = normalizePath(input);
@@ -2095,8 +2108,8 @@ import { createDiffFileWriter } from './conflict/live-files';
                 order: 0
             };
             files.push(newFile);
-            localStorage.setItem('vditor_files', window.e2eSerializeFiles ? window.e2eSerializeFiles(files) : JSON.stringify(files));
-            openFile(newFile.id);
+            if(!await persistCreatedRecord(files,newFile))return;
+            await openFile(newFile.id);
             loadFiles();
             g('lastSyncedContent')[newFile.id] = newFile.content;
             g('unsavedChanges')[newFile.id] = false;
@@ -2104,10 +2117,9 @@ import { createDiffFileWriter } from './conflict/live-files';
             global.showMessage(isEn() ? 'File created: ' + path : '已创建文件: ' + path);
         };
         if (options.quick) {
-            commitNewFile(quickDocumentPath(g('files'), parentPath, baseName));
-            return;
+            return commitNewFile(quickDocumentPath(g('files'), parentPath, baseName));
         }
-        g('customPrompt')(isEn() ? 'Please enter filename (e.g., docs/note; missing folders are created automatically)' : '请输入文件名（例如 docs/note，缺失的文件夹将自动创建）', { defaultValue: defaultPath }).then(commitNewFile);
+        return g('customPrompt')(isEn() ? 'Please enter filename (e.g., docs/note; missing folders are created automatically)' : '请输入文件名（例如 docs/note，缺失的文件夹将自动创建）', { defaultValue: defaultPath }).then(commitNewFile);
     }
 
     function createNewFolder() {
@@ -2115,7 +2127,7 @@ import { createDiffFileWriter } from './conflict/live-files';
         const parentPath = getSelectedFolderPath().replace(/\/$/, '');
         const defaultName = getNextAvailableName(baseName, parentPath);
         const defaultPath = parentPath ? parentPath + '/' + defaultName : defaultName;
-        g('customPrompt')(isEn() ? 'Please enter folder path (e.g., docs/notes)' : '请输入文件夹路径（例如 docs/notes）', { defaultValue: defaultPath }).then(function(input) {
+        return g('customPrompt')(isEn() ? 'Please enter folder path (e.g., docs/notes)' : '请输入文件夹路径（例如 docs/notes）', { defaultValue: defaultPath }).then(async function(input) {
             if (!input) return;
 
             let path = normalizePath(input);
@@ -2138,7 +2150,7 @@ import { createDiffFileWriter } from './conflict/live-files';
                 order: 0
             };
             files.push(newFolder);
-            localStorage.setItem('vditor_files', window.e2eSerializeFiles ? window.e2eSerializeFiles(files) : JSON.stringify(files));
+            if(!await persistCreatedRecord(files,newFolder))return;
             loadFiles();
             if (g('currentUser')) {
                 global.syncFileToServer(newFolder.id);
@@ -2213,7 +2225,7 @@ import { createDiffFileWriter } from './conflict/live-files';
             refreshE2EUi();
 
             // 记录最后打开的文件
-            localStorage.setItem('vditor_last_opened_file', fileId);
+            try { localStorage.setItem('vditor_last_opened_file', fileId); } catch { /* A preference must not prevent opening a durable file. */ }
 
             const useLongFileMode = shouldUseLongFileMode(content);
             if (typeof global.enterEditorMode === 'function') {
@@ -2332,7 +2344,7 @@ import { createDiffFileWriter } from './conflict/live-files';
         } finally {
             delete file.e2eTransition;
             setEditorInteractionLocked(false);
-            localStorage.setItem('vditor_files', window.e2eSerializeFiles ? window.e2eSerializeFiles(files) : JSON.stringify(files));
+            queueWorkspaceCache(files);
             refreshE2EUi();
         }
     }
@@ -2397,7 +2409,7 @@ import { createDiffFileWriter } from './conflict/live-files';
             if (isManual) showSaveStatus('failed');
             return false;
         }
-        try { localStorage.setItem('vditor_files', window.e2eSerializeFiles ? window.e2eSerializeFiles(files) : JSON.stringify(files)); }
+        try { queueWorkspaceCache(files); }
         catch { /* The current file is already durable in its journal/IndexedDB. */ }
         if (isManual) {
             showSaveStatus('saving');
@@ -2986,7 +2998,7 @@ import { createDiffFileWriter } from './conflict/live-files';
                 files[fileIndex].lastModified = Date.now();
             }
             files[fileIndex].isSynced = g('currentUser') ? false : true;
-            localStorage.setItem('vditor_files', window.e2eSerializeFiles ? window.e2eSerializeFiles(files) : JSON.stringify(files));
+            queueWorkspaceCache(files);
             if (g('currentFileId') === fileId) {
                 setEditorContentForFile(fileId, content);
                 global.showMessage((isEn() ? 'Restored to this version (Version ID: ' : '已恢复到此版本（版本ID: ') + versionId + '）', 'success');
@@ -3237,7 +3249,11 @@ import { createDiffFileWriter } from './conflict/live-files';
         if (newFiles.length > 0) {
             newFiles.forEach(function(f) { ensureParentFolders(f.name); });
             g('files').push.apply(g('files'), newFiles);
-            localStorage.setItem('vditor_files', window.e2eSerializeFiles ? window.e2eSerializeFiles(g('files')) : JSON.stringify(g('files')));
+            if(!await writeWorkspaceCache(g('files'))){
+                const ids=new Set(newFiles.map(file=>file.id));
+                global.files=g('files').filter(file=>!ids.has(file.id));
+                queueWorkspaceCache(global.files);return;
+            }
 
             newFiles.forEach(function(file) {
                 g('lastSyncedContent')[file.id] = file.content;
@@ -3719,11 +3735,11 @@ import { createDiffFileWriter } from './conflict/live-files';
                                 isSynced: false
                             };
                             files.push(newFile);
-                            localStorage.setItem('vditor_files', window.e2eSerializeFiles ? window.e2eSerializeFiles(files) : JSON.stringify(files));
+                            if(!await persistCreatedRecord(files,newFile)){resolve(false);return;}
                             g('lastSyncedContent')[newFile.id] = mergedText;
                             g('unsavedChanges')[newFile.id] = false;
                             loadFiles();
-                            openFile(newFile.id);
+                            await openFile(newFile.id);
                             if (g('currentUser')) global.syncFileToServer(newFile.id);
                             global.showMessage(isEn() ? 'Merged file created' : '已创建合并文件', 'success');
                             resolve(true);

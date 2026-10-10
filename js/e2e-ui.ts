@@ -1,3 +1,4 @@
+import { queueWorkspaceCache } from './files/workspace-cache';
 import * as vault from './e2e-vault';
 import { encryptSync, lazyLoadCrypto, looksLikeE2ECiphertext } from './e2e';
 import './e2e-attachments';
@@ -28,7 +29,7 @@ window.addEventListener('e2e-account-reset',()=>{
             (window.vditor as any)?.setValue?.('');
         }
         const sealed = JSON.parse(serializeFiles(files));
-        localStorage.setItem('vditor_files', JSON.stringify(sealed));
+        queueWorkspaceCache([], JSON.stringify(sealed));
         for (let i=0;i<files.length;i++) {
             if ([true,1,'1','true'].includes((files[i].e2e_enabled ?? files[i].e2eEnabled) as any)) {
                 Object.assign(files[i],sealed[i]);

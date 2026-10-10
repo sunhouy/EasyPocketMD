@@ -1,3 +1,4 @@
+import { queueWorkspaceCache } from './files/workspace-cache';
 /**
  * 草稿恢复模块
  * 仅用于“异常退出/重启后恢复”，不会在当前会话中反向覆盖正在编辑的内容。
@@ -273,7 +274,7 @@ export const draftRecoveryApi = (function(global: Window) {
 
             files[fileIndex].content = draft.content;
             files[fileIndex].lastModified = draft.timestamp || Date.now();
-            localStorage.setItem('vditor_files', window.e2eSerializeFiles ? window.e2eSerializeFiles(files) : JSON.stringify(files));
+            queueWorkspaceCache(files);
 
             if (global.unsavedChanges) {
                 global.unsavedChanges[files[fileIndex].id] = true;

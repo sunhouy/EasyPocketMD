@@ -1,3 +1,4 @@
+import { queueWorkspaceCache } from '../workspace-cache';
 import { isOrderMetadataFile } from '../../../shared/file-orders';
 import SHA256 from 'crypto-js/sha256';
 import { isEditorComposing, waitForEditorCommit, compositionRevision } from '../../editor-composition';
@@ -548,7 +549,7 @@ export function createSyncRuntimeApi(ctx: any) {
                 files[fileIndex].isSynced = false;
                 g('unsavedChanges')[fileId] = true;
                 markPendingServerSync(fileId, true);
-                try { localStorage.setItem('vditor_files', window.e2eSerializeFiles ? window.e2eSerializeFiles(files) : JSON.stringify(files)); } catch { /* The per-file journal is authoritative when the workspace cache is full. */ }
+                try { queueWorkspaceCache(files); } catch { /* The per-file journal is authoritative when the workspace cache is full. */ }
                 if (!await persistFileDurably(file, window.e2eSerializeFiles)) return false;
                 setTimeout(function () {
                   g('unsavedChanges')[fileId] = true;
@@ -562,7 +563,7 @@ export function createSyncRuntimeApi(ctx: any) {
               file.cloudSaveReceipts = [];
               g('unsavedChanges')[fileId] = false;
               markPendingServerSync(fileId, false);
-              try { localStorage.setItem('vditor_files', window.e2eSerializeFiles ? window.e2eSerializeFiles(files) : JSON.stringify(files)); } catch { /* The per-file journal is authoritative when the workspace cache is full. */ }
+              try { queueWorkspaceCache(files); } catch { /* The per-file journal is authoritative when the workspace cache is full. */ }
               if (!await persistFileDurably(file, window.e2eSerializeFiles)) return false;
               if (typeof globalRef.refreshE2EUi === 'function') {
                 globalRef.refreshE2EUi();

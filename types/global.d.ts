@@ -228,7 +228,7 @@ declare global {
         clearAutoSave?: () => void;
         startAutoSync?: () => void;
         stopAutoSync?: () => void;
-        loadLocalFiles?: () => void;
+        loadLocalFiles?: () => void | Promise<void>;
         loadFilesFromServer?: (preferredName?: string) => Promise<void>;
         hideTopNoticeBanner?: () => void;
         showGuestNoticeBanner?: () => void;

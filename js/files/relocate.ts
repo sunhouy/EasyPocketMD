@@ -1,3 +1,4 @@
+import { writeWorkspaceCache } from './workspace-cache';
 /** Change server paths before publishing local paths; never delete/re-upload content. */
 export async function relocateFile(globalRef: any, fileId: string, newPath: string) {
     if (globalRef.fileRelocationInProgress) throw new Error('另一个移动操作正在进行，请稍后重试');
@@ -43,7 +44,7 @@ export async function relocateFile(globalRef: any, fileId: string, newPath: stri
             file.name = name;
             if (!user) file.isSynced = false;
         }
-        localStorage.setItem('vditor_files', window.e2eSerializeFiles ? window.e2eSerializeFiles(files) : JSON.stringify(files));
+        if(!await writeWorkspaceCache(files))throw Error('本地保存失败，请重试');
     } finally {
         globalRef.fileRelocationGeneration++;
         globalRef.fileRelocationInProgress = false;

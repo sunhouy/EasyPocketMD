@@ -1,3 +1,4 @@
+import { writeWorkspaceCache } from './workspace-cache';
 import { relocateFile } from './relocate';
 import { showFileDetails } from './tree/details';
 export interface RenameRule {template:string;start:number;find?:string;replace?:string;prefix?:string;suffix?:string;deduplicate?:boolean;}
@@ -119,7 +120,10 @@ export function installBatchFileActions(app:any,hooks:{reload:()=>void;orders:(o
                         for(const file of descendants){const content=file.type==='file'?await hooks.loadContent(file):'';active();
                             const clone={id:crypto.randomUUID(),name:entry.path+file.name.slice(entry.file.name.length),type:file.type,content,contentLoaded:true,createdAt:Date.now(),lastModified:Date.now(),isSynced:false,e2e_enabled:file.e2e_enabled,e2eEnabled:file.e2eEnabled};
                             files.push(clone);app.unsavedChanges[clone.id]=true;app.markPendingServerSync?.(clone.id,true);
-                            localStorage.setItem('vditor_files',app.e2eSerializeFiles?app.e2eSerializeFiles(files):JSON.stringify(files));
+                            if(!await writeWorkspaceCache([], app.e2eSerializeFiles?app.e2eSerializeFiles(files):JSON.stringify(files))){
+                                files.splice(files.indexOf(clone),1);delete app.unsavedChanges[clone.id];app.markPendingServerSync?.(clone.id,false);
+                                throw Error(t('本地保存失败，请重试','Local save failed; please retry'));
+                            }
                             if(user && !await app.syncFileToServer(clone.id)) pending=true;
                             active();
                         }
