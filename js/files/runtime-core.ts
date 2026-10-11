@@ -1,4 +1,6 @@
 // @ts-nocheck
+import { loadFeature } from '../feature-loader';
+import { loadLegacyFileTree } from '../editor-loader';
 import { queueWorkspaceCache, writeWorkspaceCache, readWorkspaceCache } from './workspace-cache';
 /**
  * 文件管理 - 加载、保存、同步、历史版本、文件夹
@@ -47,11 +49,11 @@ import { createDiffFileWriter } from './conflict/live-files';
         loadContent: async file => file.id === g('currentFileId') ? getCurrentEditorContent(file.id,file.content) : needsServerFileContentFetch(file) ? fetchServerFileContent(file) : resolveE2EFileContent(file.content,file),
         exit: () => exitFileListMultiSelectMode(), delete: () => batchDeleteFileListMultiSelection(),
         upDown: (items,direction) => {
-            const tree = window.$('#fileList').jstree(true); if (!tree) return;
+            const tree = window.$?.fn?.jstree ? window.$('#fileList').jstree(true) : null; if (!tree && !global.isFileManagementMode) return;
             const selected = new Set(items.map(file => file.name)); const groups = new Set(items.map(file => getParentPath(file.name)));
             const orders = {};
             for (const parentPath of groups) {
-                const visible = getJsTreeData().map(node => node.id);
+                const visible = tree ? getJsTreeData().map(node => node.id) : [];
                 const siblings = (g('files') || []).filter(file => getParentPath(file.name) === parentPath).sort((a,b) => document.body.classList.contains('file-management-mode') ? Number(a.order || 0)-Number(b.order || 0) || (a.type==='file' && b.type==='file' ? noteTimestamp(b)-noteTimestamp(a) : a.name.localeCompare(b.name)) : visible.indexOf(a.id)-visible.indexOf(b.id));
                 if (direction === 'up') {for (let i=1;i<siblings.length;i++) if (selected.has(siblings[i].name) && !selected.has(siblings[i-1].name)) [siblings[i-1],siblings[i]]=[siblings[i],siblings[i-1]];}
                 else {for (let i=siblings.length-2;i>=0;i--) if (selected.has(siblings[i].name) && !selected.has(siblings[i+1].name)) [siblings[i],siblings[i+1]]=[siblings[i+1],siblings[i]];}
@@ -348,7 +350,7 @@ import { createDiffFileWriter } from './conflict/live-files';
         let totalMatches = 0;
 
         let nodes = [];
-        const tree = window.$ ? window.$('#fileList').jstree(true) : null;
+        const tree = window.$?.fn?.jstree ? window.$('#fileList').jstree(true) : null;
         if (tree && typeof tree.get_json === 'function') {
             nodes = tree.get_json('#', { flat: true }) || [];
         } else {
@@ -398,7 +400,7 @@ import { createDiffFileWriter } from './conflict/live-files';
 
     function reapplyFileListSearchVisibility() {
         if (fileListSearchState.applyingVisibility || !window.$) return;
-        const tree = window.$('#fileList').jstree(true);
+        const tree = window.$?.fn?.jstree ? window.$('#fileList').jstree(true) : null;
         const root = document.getElementById('fileList');
         if (!tree || !root) return;
 
@@ -618,7 +620,7 @@ import { createDiffFileWriter } from './conflict/live-files';
         if (!anchorEl || !nodeId || !window.$) return;
 
         const $anchor = window.$(anchorEl);
-        const tree = window.$('#fileList').jstree(true);
+        const tree = window.$?.fn?.jstree ? window.$('#fileList').jstree(true) : null;
         if (!tree) return;
 
         const node = tree.get_node(nodeId);
@@ -860,7 +862,6 @@ import { createDiffFileWriter } from './conflict/live-files';
     }
 
     async function loadLocalFiles() {
-        if (deferFileTreeWorkUntilWasmReady(loadLocalFiles, 'loadLocalFiles')) return;
         const owner=g('currentUser')?.username;
         const localFiles = await readWorkspaceCache();
         if(g('currentUser')?.username!==owner)return;
@@ -909,7 +910,7 @@ import { createDiffFileWriter } from './conflict/live-files';
             if (activeFile) return;
         }
 
-        const defaultOpening = g('userSettings') && g('userSettings').defaultFileOpening || 'lastEdited';
+        const defaultOpening = g('userSettings') && g('userSettings').defaultFileOpening || 'fileList';
 
         if (defaultOpening === 'fileList') {
             return;
@@ -1200,7 +1201,7 @@ import { createDiffFileWriter } from './conflict/live-files';
                 event.preventDefault();global.openFileSelectionPanel(resolveNodeIdFromAnchorId(anchor.id));
             };
             bindFileTreeLongPress(list, (anchor, x, y) => {
-                const tree = window.$('#fileList').jstree(true);
+                const tree = window.$?.fn?.jstree ? window.$('#fileList').jstree(true) : null;
                 const node = tree.get_node(resolveNodeIdFromAnchorId(anchor.id));
                 if (node) global.openFileSelectionPanel(node.id);
             });
@@ -1321,9 +1322,27 @@ import { createDiffFileWriter } from './conflict/live-files';
         }
     }
 
+    const legacySidebar = document.getElementById('fileListSidebar');
+    let legacySidebarVisible = false;
+    if (legacySidebar) new MutationObserver(() => {
+        const visible = !global.isFileManagementMode && legacySidebar.classList.contains('show');
+        const opened = visible && !legacySidebarVisible;
+        legacySidebarVisible = visible;
+        if (opened) loadFiles();
+    }).observe(legacySidebar, {attributes: true, attributeFilter: ['class']});
+
     function loadFiles() {
         loadOrders();
         notesHome.render();
+        bindFileManagementFabIfNeeded();
+        notifyInitialFileListRendered();
+        if (global.isFileManagementMode) return;
+        const sidebar = document.getElementById('fileListSidebar');
+        if (!sidebar?.classList.contains('show')) return;
+        if (!window.$?.fn?.jstree) {
+            void loadLegacyFileTree().then(loadFiles).catch(() => {});
+            return;
+        }
         if (deferFileTreeWorkUntilWasmReady(loadFiles, 'loadFiles')) return;
         const fileListSidebar = document.getElementById('fileListSidebar');
         const wasVisible = fileListSidebar && fileListSidebar.classList.contains('show');
@@ -2077,7 +2096,13 @@ import { createDiffFileWriter } from './conflict/live-files';
         return '';
     }
 
-    function createNewFile(options = {}) {
+    async function ensureFileActionReady() {
+        if (global.wasmTextEngineGateway?.getStatus?.().ready) return;
+        await loadFeature('files/engine-ready', () => global.ensureWasmTextEngineReady?.() || Promise.resolve());
+    }
+
+    async function createNewFile(options = {}) {
+        await ensureFileActionReady();
         const baseName = isEn() ? 'New Document' : '新文档';
         const parentPath = (global.isFileManagementMode ? global.notesHomeFolderPath || '' : getSelectedFolderPath()).replace(/\/$/, '');
         const defaultName = getNextAvailableName(baseName, parentPath);
@@ -2122,7 +2147,8 @@ import { createDiffFileWriter } from './conflict/live-files';
         return g('customPrompt')(isEn() ? 'Please enter filename (e.g., docs/note; missing folders are created automatically)' : '请输入文件名（例如 docs/note，缺失的文件夹将自动创建）', { defaultValue: defaultPath }).then(commitNewFile);
     }
 
-    function createNewFolder() {
+    async function createNewFolder() {
+        await ensureFileActionReady();
         const baseName = isEn() ? 'New Folder' : '新文件夹';
         const parentPath = getSelectedFolderPath().replace(/\/$/, '');
         const defaultName = getNextAvailableName(baseName, parentPath);
@@ -2167,6 +2193,11 @@ import { createDiffFileWriter } from './conflict/live-files';
         }
 
         try {
+            // Paint feedback before initializing engines or decoding file content.
+            await new Promise(resolve => requestAnimationFrame(() => setTimeout(resolve, 0)));
+            try { await global.ensureWasmTextEngineReady?.(); }
+            catch (error) { console.warn('Text engine prewarm failed; continue opening the file:', error); }
+            if (requestToken !== fileOpenRequestToken) return;
             // Capture locally before switching. Network work must not block the selected file.
             const previousId = g('currentFileId');
             const previous = (g('files') || []).find(f => f.id === previousId);

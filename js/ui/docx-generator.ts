@@ -79,16 +79,8 @@ async function exportDOCX(content, settings, customFilename) {
             filename = customFilename + '.docx';
         } else {
             filename = isEn() ? 'document' : '文档';
-            if (g('currentFileId') && typeof g('fileTree') !== 'undefined') {
-                try {
-                    var currentNode = g('fileTree').jstree(true).get_node(g('currentFileId'));
-                    if (currentNode) {
-                        filename = currentNode.text.replace(/\.md$/, '');
-                    }
-                } catch (e) {
-                    // 忽略错误，使用默认文件名
-                }
-            }
+            const currentFile = (g('files') || []).find(file => file.id === g('currentFileId'));
+            if (currentFile?.name) filename = currentFile.name.split('/').pop().replace(/\.md$/i, '');
             filename = filename + '_' + new Date().toISOString().slice(0, 10) + '.docx';
         }
 

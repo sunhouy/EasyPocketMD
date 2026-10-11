@@ -19,13 +19,13 @@ body :is(.chart-picker-modal,.insert-picker-modal,.footnote-picker-modal,.mindma
     background:var(--md-surface) !important;color:var(--md-text) !important;border-radius:20px !important;box-shadow:var(--md-elevation);
 }
 /* Menus and navigation share neutral surfaces, including keyboard focus. */
-body :is(.mobile-toolbar-container,.mobile-bottom-bar,.desktop-toolbar,.file-selection-panel) {
+body :is(.mobile-toolbar-container,.desktop-toolbar,.file-selection-panel) {
     background:var(--md-surface) !important;color:var(--md-text);border-color:var(--md-outline);
 }
 body :is(.desktop-dropdown-content,.mobile-dropdown-content,.user-menu-dropdown) {
     background:var(--md-surface) !important;color:var(--md-text);border:1px solid var(--md-outline);border-radius:16px;box-shadow:var(--md-elevation);
 }
-body :is(.desktop-toolbar-btn,.mobile-action-btn,.bottom-btn,.dropdown-item,.desktop-dropdown-item,.file-action-button) {
+body :is(.desktop-toolbar-btn,.mobile-action-btn,.dropdown-item,.desktop-dropdown-item,.file-action-button) {
     border-radius:12px;color:var(--md-text);transition:box-shadow .18s;
 }
 body :is(.modal-btn,.custom-dialog-btn):not(.close):not(.custom-dialog-close) { border-radius:14px !important;min-height:38px; }
@@ -103,15 +103,13 @@ body :is(.epmd-dialog-close,.modal-close-btn,.custom-dialog-close) {
 .md-ripple-layer { position:fixed;pointer-events:none;overflow:hidden;z-index:2147483647;contain:strict; }
 .md-ripple-wave { position:absolute;border-radius:50%;opacity:0;transform:scale(0);animation:md-ripple .55s ease-out forwards; }
 @keyframes md-ripple { 0% { transform:scale(0);opacity:.2; } 65% { opacity:.14; } 100% { transform:scale(1);opacity:0; } }
-@media(hover:hover) { body :is(.desktop-toolbar-btn,.mobile-action-btn,.bottom-btn,.file-action-button,.dropdown-item):hover { box-shadow:inset 0 0 0 100px #80808012; } }
+@media(hover:hover) { body :is(.desktop-toolbar-btn,.mobile-action-btn,.file-action-button,.dropdown-item):hover { box-shadow:inset 0 0 0 100px #80808012; } }
 @media(max-width:768px) { #settingsModalOverlay .settings-modal { padding:16px !important; } }
 @media(prefers-reduced-motion:reduce) { .md-ripple-layer { display:none; } }
 
 /* The same editor actions and grouped More menu on web and native shells. */
 #mobileMenuAIBtn { display:flex; }
-body.ui-mode-desktop .mobile-bottom-bar { display:none !important; }
 body.ui-mode-desktop:not(.mobile-fullscreen) .editor-container { bottom:0; }
-body.ui-mode-desktop .bottom-bar-buttons { max-width:760px;margin:auto; }
 body :is(#mobileDropdown,#desktopMoreDropdown) { width:min(340px,calc(100vw - 24px));padding:12px;max-height:calc(100dvh - var(--top-toolbar-offset) - var(--top-toolbar-height) - 16px);overflow:auto;overscroll-behavior:contain; }
 .more-menu-header { display:flex;align-items:center;justify-content:space-between;padding:0 0 10px; }
 .more-menu-grid,.more-menu-footer { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px; }

@@ -1,12 +1,13 @@
+import { loadEditorConstructor, afterFirstPaint } from './editor-loader';
 import { readWorkspaceCacheSync } from './files/workspace-cache';
 import { isMobileUserAgent } from './main/device-layout';
 import { installEditorHistory, cancelEditorHistoryTimers } from './editor-history';
-import { loadFeature } from './feature-loader';
+import { loadFeature, preloadFeatures } from './feature-loader';
 import { selectionSearchUrl } from './main/selection-search';
 import { installSelectionToolbar } from './main/selection-toolbar';
 import { installSettingsRows, createStorageAccessStatus } from './main/settings-layout';
 import { initializeFileList } from './files/initial-list';
-import { isAndroidApp, defaultBottomButtons, applyAndroidDefaults, installAndroidChrome, orderedBottomButtons } from './main/android-ui';
+import { isAndroidApp, applyStartupDefaults, installAndroidChrome } from './main/android-ui';
 import { installNativeOpenBridge } from './main/native-open';
 import { isMarketBuild } from './build-variant';
 import { createDeploymentRouteStatus } from './main/deployment-route';
@@ -303,7 +304,7 @@ document.addEventListener('DOMContentLoaded', function() {
         var el = getTargetElement(target);
         if (!el) return false;
         if (shouldAllowNativeTextSelection(el)) return false;
-        return !!el.closest('button, .mobile-action-btn, .bottom-btn, .dropdown-item, .mobile-toolbar-container, .mobile-bottom-bar, .file-list-sidebar, .modal-overlay, .sync-status, .jstree-anchor, .file-menu-btn');
+        return !!el.closest('button, .mobile-action-btn, .dropdown-item, .mobile-toolbar-container, .file-list-sidebar, .modal-overlay, .sync-status, .jstree-anchor, .file-menu-btn');
     }
 
     if (isMobileDevice) {
@@ -448,7 +449,7 @@ document.addEventListener('DOMContentLoaded', function() {
             return window.vditorInitPromise;
         }
 
-        window.vditorInitPromise = new Promise(function(resolve, reject) {
+        window.vditorInitPromise = loadEditorConstructor(false).then(() => new Promise<InstanceType<typeof window.Vditor>>(function(resolve, reject) {
             window.__resolveVditorInit = resolve;
             window.__rejectVditorInit = reject;
             try {
@@ -459,26 +460,20 @@ document.addEventListener('DOMContentLoaded', function() {
                 window.__rejectVditorInit = null;
                 reject(error);
             }
+        })).catch(function(error) {
+            window.vditorInitPromise = null;
+            throw error;
         });
 
         return window.vditorInitPromise;
     };
 
     window.onInitialFileListRendered = function() {
-        // 文件列表首屏可见后立即启动编辑器初始化（异步，不阻塞当前视图）。
-        window.ensureVditorInitialized().catch(function(error) {
-            console.error('Failed to initialize Vditor after file list ready:', error);
+        afterFirstPaint(() => {
+            ensureWasmRuntimeBootstrapped();
+            window.ensureVditorInitialized().catch(error => console.warn('Editor preloading failed:', error)).finally(preloadFeatures);
         });
     };
-
-    function isToolbarButtonVisible(btnConfig) {
-        if (!btnConfig || (isMarketBuild && /AIBtn$/.test(btnConfig.id))) return false;
-        return !btnConfig.isEasterEgg;
-    }
-
-    function getVisibleToolbarButtons() {
-        return window.allToolbarButtons.filter(button=>button.id!=='mobileAIBtn' && isToolbarButtonVisible(button));
-    }
 
     var keyboardShortcutActionDefinitions = [
         { id: 'openFileMenu', textKey: 'keyboardShortcutFileMenu', defaultValue: 'F', allowInEditor: false, toolbarButtonId: 'desktopFileBtn', toolbarTextKey: 'fileMenu' },
@@ -920,14 +915,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function buildSettingsDialogSnapshot() {
-        var toolbarButtons = [];
-        var toolbarCheckboxes = document.querySelectorAll('#toolbarButtonsSettings input[type="checkbox"]');
-        toolbarCheckboxes.forEach(function(cb) {
-            if ((cb as HTMLInputElement).checked) {
-                toolbarButtons.push((cb as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement).value);
-            }
-        });
-
         var draftShortcuts = {};
         var shortcutInputs = document.querySelectorAll('#keyboardShortcutsSettings input[data-shortcut-action-id]');
         if (shortcutInputs.length) {
@@ -952,7 +939,6 @@ document.addEventListener('DOMContentLoaded', function() {
         var slashCommandEnabledCheckbox = (document.getElementById('slashCommandEnabledCheckbox') as HTMLInputElement);
         var slashCommandActivationKeySelect = (document.getElementById('slashCommandActivationKeySelect') as HTMLSelectElement);
         var mdAssociationCheckbox = (document.getElementById('mdAssociationCheckbox') as HTMLInputElement);
-        var hideBottomToolbarOnKeyboardCheckbox = (document.getElementById('hideBottomToolbarOnKeyboardCheckbox') as HTMLInputElement);
 
         return {
             editorMode: getCheckedRadioValue('editorMode', 'wysiwyg'),
@@ -967,14 +953,12 @@ document.addEventListener('DOMContentLoaded', function() {
             vditorContentTheme: ((document.getElementById('vditorContentThemeSelect') as HTMLSelectElement) || {}).value || 'auto',
             vditorCodeTheme: ((document.getElementById('vditorCodeThemeSelect') as HTMLSelectElement) || {}).value || 'auto',
             showOutline: !!(showOutlineCheckbox && showOutlineCheckbox.checked),
-            hideBottomToolbarOnKeyboard: !!(hideBottomToolbarOnKeyboardCheckbox && hideBottomToolbarOnKeyboardCheckbox.checked),
             enableDebugMode: !!(debugModeCheckbox && debugModeCheckbox.checked),
             enableSlashCommand: slashCommandEnabledCheckbox ? slashCommandEnabledCheckbox.checked : true,
             slashCommandActivationKey: slashCommandActivationKeySelect ? (slashCommandActivationKeySelect.value || 'Tab') : 'Tab',
-            defaultFileOpening: getCheckedRadioValue('defaultFileOpening', 'lastEdited'),
+            defaultFileOpening: getCheckedRadioValue('defaultFileOpening', 'fileList'),
             defaultSorting: getCheckedRadioValue('defaultSorting', 'modifiedTime'),
             mdFileAssociationEnabled: !!(mdAssociationCheckbox && mdAssociationCheckbox.checked),
-            toolbarButtons: toolbarButtons,
             keyboardShortcuts: draftShortcuts
         };
     }
@@ -1074,7 +1058,7 @@ document.addEventListener('DOMContentLoaded', function() {
         document.addEventListener('keydown', handleGlobalKeyboardShortcuts, true);
     }
 
-    async function handleBottomSave() {
+    async function handleSave() {
         if (window.saveCurrentFile) {
             await window.saveCurrentFile(true);
             var t = function(key) { return window.i18n ? window.i18n.t(key) : key; };
@@ -1115,85 +1099,18 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    async function handleBottomExport() {
-        if (typeof window.exportContent !== 'function') {
-            await loadFeature('ui/export', () => import('./ui/export'));
+    async function showAIAssistant() {
+        if (typeof window.showAIPanel !== 'function') {
+            await loadFeature('ui/ai-assistant', () => import('./ui/ai-assistant'));
         }
-        window.exportContent();
+        if (typeof window.showAIPanel === 'function') window.showAIPanel();
     }
 
-    async function handleBottomShare() {
-        if (typeof window.showShareDialog !== 'function') {
-            await loadFeature('ui/share', () => import('./ui/share'));
-        }
-        window.showShareDialog();
-    }
-
-    function handleBottomFileList() {
-        showPrimaryFileInterface();
-    }
-
-    function renderToolbarButtonSettings() {
-        var toolbarSettings = document.getElementById('toolbarButtonsSettings');
-        if (!toolbarSettings) return;
-        toolbarSettings.innerHTML = '';
-
-        var currentButtons = window.userSettings.toolbarButtons || window.defaultToolbarButtons;
-        getVisibleToolbarButtons().forEach(function(btnConfig) {
-            var label = document.createElement('label');
-            var checkbox = document.createElement('input');
-            checkbox.type = 'checkbox';
-            checkbox.value = btnConfig.id;
-            checkbox.checked = currentButtons.includes(btnConfig.id);
-            if(btnConfig.id==='mobileBottomSaveBtn'){checkbox.checked=true;checkbox.disabled=true;}
-
-            label.appendChild(checkbox);
-            var buttonText = (window.i18n && btnConfig.textKey) ? window.i18n.t(btnConfig.textKey) : btnConfig.text;
-            label.appendChild(document.createTextNode(' ' + buttonText));
-            toolbarSettings.appendChild(label);
-        });
-    }
-
-
-    // 工具栏配置（使用翻译函数）
-    window.allToolbarButtons = [
-        { id: 'mobileInsertBtn', icon: 'fas fa-plus', textKey: 'insert', fn: function() { if (typeof window.showInsertPicker === 'function') window.showInsertPicker(); else window.showInsertMenu(); } },
-        { id: 'mobileBottomSaveBtn', icon: 'fas fa-save', textKey: 'save', fn: handleBottomSave },
-        { id: 'mobileBottomSettingsBtn', icon: 'fas fa-cog', textKey: 'settings', fn: function() { window.showSettingsDialog(); } },
-        { id: 'mobileBottomImportBtn', icon: 'fas fa-file-import', textKey: 'import', fn: function() { window.importFiles(); } },
-        { id: 'mobileBottomExportBtn', icon: 'fas fa-file-export', textKey: 'export', fn: handleBottomExport },
-        { id: 'mobileBottomShareBtn', icon: 'fas fa-share-alt', textKey: 'share', fn: handleBottomShare },
-        { id: 'mobileBottomFileListBtn', icon: 'fas fa-folder-open', textKey: 'fileListTitle', fn: handleBottomFileList },
-        { id: 'mobileFormulaBtn', icon: 'fas fa-superscript', textKey: 'formula', fn: async function() {
-            if (typeof window.showFormulaPicker !== 'function') {
-                await loadFeature('formula-picker', () => import('./formula-picker'));
-            }
-            if (typeof window.showFormulaPicker === 'function') window.showFormulaPicker();
-        } },
-        { id: 'mobileChartBtn', icon: 'fas fa-chart-bar', textKey: 'chart', fn: async function() {
-            if (typeof window.showChartPicker !== 'function') {
-                await loadFeature('ui/chart', () => import('./ui/chart'));
-            }
-            if (typeof window.showChartPicker === 'function') window.showChartPicker();
-        } },
-        { id: 'mobileUndoBtn', icon: 'fas fa-undo', textKey: 'undo', fn: function() { if (window.vditor && window.vditor.vditor && window.vditor.vditor.undo) window.vditor.vditor.undo.undo(window.vditor.vditor); } },
-        { id: 'mobileRedoBtn', icon: 'fas fa-redo', textKey: 'redo', fn: function() { if (window.vditor && window.vditor.vditor && window.vditor.vditor.undo) window.vditor.vditor.undo.redo(window.vditor.vditor); } },
-        { id: 'mobileAIBtn', icon: 'fas fa-robot', textKey: 'aiAssistant', fn: async function() {
-            if (typeof window.showAIPanel !== 'function') {
-                // 懒加载 AI 助手模块
-                await loadFeature('ui/ai-assistant', () => import('./ui/ai-assistant'));
-            }
-            if (typeof window.showAIPanel === 'function') window.showAIPanel();
-        } }
-    ];
-
-    // 默认配置（未登录时显示：插入、公式、图表、撤销、重做、AI助手）
-    window.defaultToolbarButtons = defaultBottomButtons(isAndroidApp());
     installAndroidChrome();
 
     // 加载用户配置
     window.userSettings = JSON.parse(localStorage.getItem('vditor_settings') || '{}');
-    applyAndroidDefaults(window.userSettings,isAndroidApp());
+    applyStartupDefaults(window.userSettings);
     delete (window.userSettings as any).storageLocation; // Retired setting: uploads always use the server.
     const backgroundControls = createBackgroundControls();
     const live2dControls = createLive2DControls();
@@ -1203,9 +1120,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const themeColorControls = createThemeColorControls();
     applyThemeColor(window.userSettings.themeColor);
     applyBackground(window.userSettings.background);
-    if (!window.userSettings.toolbarButtons) {
-        window.userSettings.toolbarButtons = window.defaultToolbarButtons;
-    }
     if (!window.userSettings.themeMode) {
         window.userSettings.themeMode = 'system'; // system, light, dark
     }
@@ -1230,14 +1144,11 @@ document.addEventListener('DOMContentLoaded', function() {
     if (typeof window.userSettings.mdFileAssociationEnabled !== 'boolean') {
         window.userSettings.mdFileAssociationEnabled = true;
     }
-    if (typeof window.userSettings.hideBottomToolbarOnKeyboard !== 'boolean') {
-        window.userSettings.hideBottomToolbarOnKeyboard = false;
-    }
     if (!window.userSettings.uiMode) {
         window.userSettings.uiMode = 'auto'; // auto, mobile, desktop
     }
     if (!window.userSettings.defaultFileOpening) {
-        window.userSettings.defaultFileOpening = 'lastEdited';
+        window.userSettings.defaultFileOpening = 'fileList';
     }
     if (!window.userSettings.vditorContentTheme) {
         window.userSettings.vditorContentTheme = 'auto';
@@ -1306,10 +1217,6 @@ document.addEventListener('DOMContentLoaded', function() {
     var mobileViewportStateBound = false;
     var mobileViewportSyncScheduled = false;
 
-    function isMobileToolbarHideEnabledForKeyboard() {
-        return window.editorInterfaceMode === 'mobile' && !!window.isTauriMobileEnvironment && window.userSettings.hideBottomToolbarOnKeyboard === true;
-    }
-
     function isMobileTextInputActive() {
         var activeEl = document.activeElement;
         if (!activeEl || activeEl === document.body) return false;
@@ -1328,12 +1235,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
         var keyboardVisible = isMobileTextInputActive();
         if (window.editorInterfaceMode !== 'mobile') {
-            document.body.classList.remove('mobile-keyboard-visible', 'hide-mobile-bottom-toolbar-on-keyboard');
+            document.body.classList.remove('mobile-keyboard-visible');
             return;
         }
 
         document.body.classList.toggle('mobile-keyboard-visible', keyboardVisible);
-        document.body.classList.toggle('hide-mobile-bottom-toolbar-on-keyboard', keyboardVisible && isMobileToolbarHideEnabledForKeyboard());
     }
 
     function scheduleMobileViewportSync() {
@@ -1938,14 +1844,16 @@ document.addEventListener('DOMContentLoaded', function() {
         // 初始化顶部提示横幅
         initTopNoticeBanner();
 
-        var bootFileWorkspace = function() {
+        var bootFileWorkspace = async function() {
             if (shareModeActive) { hideTopNoticeBanner(); return; }
             if (window.currentUser) {
                 window.showUserInfo();
-                void initializeFileList(window,async()=>{
+                await initializeFileList(window,async()=>{
                     await window.loadLocalFiles();
-                    window.startAutoSync();
-                    await window.loadFilesFromServer();
+                    afterFirstPaint(() => {
+                        window.startAutoSync();
+                        void window.loadFilesFromServer().catch(handleStartupFailure);
+                    });
                 }).catch(handleStartupFailure);
                 hideTopNoticeBanner();
             } else {
@@ -1955,7 +1863,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (!shareId) {
                     showGuestNoticeBanner();
                 }
-                window.loadLocalFiles();
+                await window.loadLocalFiles();
             }
         };
 
@@ -1973,26 +1881,14 @@ document.addEventListener('DOMContentLoaded', function() {
 
         var bootFileWorkspaceSafely = function() {
             try {
-                bootFileWorkspace();
-                resolveNativeWorkspace();
+                void bootFileWorkspace().then(resolveNativeWorkspace).catch(handleStartupFailure);
             } catch (error) {
                 handleStartupFailure(error);
             }
         };
 
-        var ensureWasmReadyBeforeWorkspaceBoot = function() {
-            if (typeof window.ensureWasmTextEngineReady !== 'function') {
-                return Promise.resolve();
-            }
-            return window.ensureWasmTextEngineReady().catch(function(error) {
-                // 冷启动时 wasm 预热失败不应阻断主流程，继续走 JS 回退能力。
-                console.warn('[startup] wasm prewarm failed, continue with fallback runtime', error);
-            });
-        };
-
-        ensureWasmReadyBeforeWorkspaceBoot()
-            .then(bootFileWorkspaceSafely)
-            .catch(handleStartupFailure);
+        // Local file metadata does not need the editor, WASM or a cloud response.
+        bootFileWorkspaceSafely();
 
         // 初始化账户管理模态窗口事件
         if (window.bindAddAccountModalEvents) window.bindAddAccountModalEvents();
@@ -2181,7 +2077,7 @@ document.addEventListener('DOMContentLoaded', function() {
         var mobileSettingsBtn = (document.getElementById('mobileSettingsBtn') as HTMLButtonElement);
         if (mobileSettingsBtn) mobileSettingsBtn.addEventListener('click', function() { window.showSettingsDialog(); });
         var saveFileBtn = (document.getElementById('saveFileBtn') as HTMLButtonElement);
-        if (saveFileBtn) saveFileBtn.addEventListener('click', handleBottomSave);
+        if (saveFileBtn) saveFileBtn.addEventListener('click', handleSave);
 
         var mobileLoginBtn = (document.getElementById('mobileLoginBtn') as HTMLButtonElement);
         if (mobileLoginBtn) mobileLoginBtn.addEventListener('click', window.handleLoginButtonClick);
@@ -2225,6 +2121,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 window.showAIPanel();
             }
         });
+        bindDesktopButton('mobileUndoBtn', () => window.vditor?.vditor?.undo?.undo(window.vditor.vditor));
+        bindDesktopButton('mobileRedoBtn', () => window.vditor?.vditor?.undo?.redo(window.vditor.vditor));
         bindDesktopButton('desktopEditUndoBtn', function() {
             if (window.vditor && window.vditor.vditor && window.vditor.vditor.undo) {
                 window.vditor.vditor.undo.undo(window.vditor.vditor);
@@ -2238,7 +2136,7 @@ document.addEventListener('DOMContentLoaded', function() {
             closeDesktopEditDrop();
         });
         bindDesktopButton('desktopEditSaveBtn', async function() {
-            await handleBottomSave();
+            await handleSave();
             closeDesktopEditDrop();
         });
         bindDesktopButton('desktopSettingsBtn', function() { window.showSettingsDialog(); });
@@ -2354,8 +2252,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         bindDesktopButton('desktopAboutBtn', function() { window.showAboutDialog(); closeDesktopDrop(); });
 
-        // 渲染底部工具栏
-        window.renderBottomToolbar();
         renderDesktopToolbarShortcutLabels();
     }
 
@@ -2537,7 +2433,7 @@ document.addEventListener('DOMContentLoaded', function() {
         var btns = [
             { id: 'mobileLoginBtn', fn: window.handleLoginButtonClick },
             { id: 'mobileSettingsBtn', fn: window.showSettingsDialog },
-            { id: 'saveFileBtn', fn: handleBottomSave },
+            { id: 'saveFileBtn', fn: handleSave },
             { id: 'modeToggle', fn: window.toggleNightMode },
             { id: 'mobileFileBtn', fn: showPrimaryFileInterface }
         ];
@@ -2550,8 +2446,6 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
 
-        // 重新渲染底部工具栏
-        window.renderBottomToolbar();
         renderDesktopToolbarShortcutLabels();
     }
 
@@ -2559,29 +2453,6 @@ document.addEventListener('DOMContentLoaded', function() {
     if (closeHistoryBtn) closeHistoryBtn.addEventListener('click', function() { var m = document.getElementById('historyModalOverlay'); if (m) m.classList.remove('show'); });
 
     // 页面离开/切后台相关保存逻辑统一由 appLifecycle 管理，避免重复触发。
-
-    // 渲染底部工具栏
-    window.renderBottomToolbar = function() {
-        var toolbarContainer = document.getElementById('bottomBarButtons');
-        if (!toolbarContainer) return;
-
-        toolbarContainer.innerHTML = '';
-        var buttons = window.userSettings.toolbarButtons || window.defaultToolbarButtons;
-        var visibleButtons = getVisibleToolbarButtons();
-
-        orderedBottomButtons(buttons,isAndroidApp()).forEach(function(btnId) {
-            var btnConfig = visibleButtons.find(function(b) { return b.id === btnId; });
-            if (btnConfig) {
-                var btn = document.createElement('button');
-                btn.className = 'bottom-btn';
-                btn.id = btnConfig.id;
-                var buttonText = (window.i18n && btnConfig.textKey) ? window.i18n.t(btnConfig.textKey) : btnConfig.text;
-                btn.innerHTML = '<i class="' + btnConfig.icon + '"></i><span>' + buttonText + '</span>';
-                btn.addEventListener('click', btnConfig.fn);
-                toolbarContainer.appendChild(btn);
-            }
-        });
-    };
 
     // 显示设置对话框
     window.showSettingsDialog = function() {
@@ -2661,10 +2532,6 @@ document.addEventListener('DOMContentLoaded', function() {
             showOutlineCheckbox.checked = window.userSettings.showOutline || false;
         }
 
-        var hideBottomToolbarOnKeyboardCheckbox = (document.getElementById('hideBottomToolbarOnKeyboardCheckbox') as HTMLInputElement);
-        if (hideBottomToolbarOnKeyboardCheckbox) {
-            hideBottomToolbarOnKeyboardCheckbox.checked = window.userSettings.hideBottomToolbarOnKeyboard === true;
-        }
 
         var debugModeCheckbox = (document.getElementById('debugModeCheckbox') as HTMLInputElement);
         if (debugModeCheckbox) {
@@ -2682,7 +2549,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         // 设置默认文件打开方式
-        var currentDefaultFileOpening = window.userSettings.defaultFileOpening || 'lastEdited';
+        var currentDefaultFileOpening = window.userSettings.defaultFileOpening || 'fileList';
         var defaultFileOpeningRadios = document.getElementsByName('defaultFileOpening');
         for (var i = 0; i < defaultFileOpeningRadios.length; i++) {
             if ((defaultFileOpeningRadios[i] as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement).value === currentDefaultFileOpening) {
@@ -2712,8 +2579,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
 
-        // 生成工具栏按钮选择
-        renderToolbarButtonSettings();
+        // 生成快捷键设置
         renderKeyboardShortcutSettings();
 
         // 填充 AI 模型配置
@@ -2739,10 +2605,6 @@ document.addEventListener('DOMContentLoaded', function() {
         var keyboardShortcutsDetails = (document.getElementById('keyboardShortcutsDetails') as HTMLDetailsElement);
         if (keyboardShortcutsDetails) {
             keyboardShortcutsDetails.open = false;
-        }
-        var toolbarButtonsDetails = (document.getElementById('toolbarButtonsDetails') as HTMLDetailsElement);
-        if (toolbarButtonsDetails) {
-            toolbarButtonsDetails.open = false;
         }
 
         // 每次打开设置都默认折叠空间管理详情
@@ -3053,7 +2915,6 @@ document.addEventListener('DOMContentLoaded', function() {
         var newSettings: import("../types/global").UserSettings = {
             searchEngine, customSearchUrl,
             translationMethod:(document.getElementById('selectionTranslationMethod') as HTMLSelectElement).value as import('./main/selection-translation').TranslationMethod,
-            toolbarButtons: [],
             background: backgroundControls.get(),
             themeColor: themeColorControls.get(),
             themeMode: 'system',
@@ -3063,7 +2924,6 @@ document.addEventListener('DOMContentLoaded', function() {
             vditorContentTheme: 'auto',
             vditorCodeTheme: 'auto',
             showOutline: false,
-            hideBottomToolbarOnKeyboard: false,
             enableDebugMode: false,
             enableSlashCommand: window.userSettings.enableSlashCommand !== false,
             slashCommandActivationKey: window.userSettings.slashCommandActivationKey || 'Tab',
@@ -3118,14 +2978,6 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
 
-        // 获取选中的工具栏按钮
-        var toolbarCheckboxes = document.querySelectorAll('#toolbarButtonsSettings input[type="checkbox"]');
-        toolbarCheckboxes.forEach(function(cb) {
-            if ((cb as HTMLInputElement).checked) {
-                newSettings.toolbarButtons.push((cb as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement).value);
-            }
-        });
-
         // 获取字体大小
         var fontSizeSelect = (document.getElementById('fontSizeSelect') as HTMLSelectElement);
         if (fontSizeSelect) {
@@ -3148,10 +3000,6 @@ document.addEventListener('DOMContentLoaded', function() {
             newSettings.showOutline = showOutlineCheckbox.checked;
         }
 
-        var hideBottomToolbarOnKeyboardCheckbox = (document.getElementById('hideBottomToolbarOnKeyboardCheckbox') as HTMLInputElement);
-        if (hideBottomToolbarOnKeyboardCheckbox) {
-            newSettings.hideBottomToolbarOnKeyboard = hideBottomToolbarOnKeyboardCheckbox.checked;
-        }
 
         var debugModeCheckbox = (document.getElementById('debugModeCheckbox') as HTMLInputElement);
         if (debugModeCheckbox) {
@@ -3196,12 +3044,6 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         newSettings.keyboardShortcuts = keyboardShortcuts;
-
-        // 验证按钮数量
-        if (newSettings.toolbarButtons.length < 5 || newSettings.toolbarButtons.length > 7) {
-            window.customAlert(window.i18n ? window.i18n.t('buttonCountError') : '底部工具栏按钮数量必须在 5 到 7 个之间');
-            return;
-        }
 
         // 保存设置
         try {
@@ -3296,7 +3138,6 @@ document.addEventListener('DOMContentLoaded', function() {
         applyTranslations();
         applyInterfaceMode(window.userSettings);
         syncMobileViewportState();
-        window.renderBottomToolbar();
         initMobileFeatures();
         initSlashCommandRuntime();
         applyDebugModeSetting(window.userSettings.enableDebugMode, true);
@@ -3902,7 +3743,7 @@ document.addEventListener('DOMContentLoaded', function() {
     for(const [buttonId,menuId] of [['mobileMenuAIBtn','mobileDropdown'],['desktopMenuAIBtn','desktopMoreDropdown']]){
         const menuAI=document.getElementById(buttonId);
         if(menuAI && isMarketBuild)menuAI.remove();
-        else if(menuAI)menuAI.onclick=()=>{document.getElementById(menuId)?.classList.remove('show');void window.allToolbarButtons.find(button=>button.id==='mobileAIBtn')?.fn();};
+        else if(menuAI)menuAI.onclick=()=>{document.getElementById(menuId)?.classList.remove('show');void showAIAssistant();};
     }
     const todoButton=document.getElementById('mobileAddTodoBtn');
     if(todoButton && isAndroidApp())todoButton.onclick=()=>{document.getElementById('mobileDropdown')?.classList.remove('show');void loadFeature('main/android-todo', () => import('./main/android-todo')).then(module=>module.showAndroidTodo(window)).catch(error=>window.showMessage?.(String(error),'error'));};
@@ -3919,11 +3760,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
     initDesktopModalEscHandler();
 
-    ensureWasmRuntimeBootstrapped();
-
     if (window.startInFileManagementMode) {
         window.enterFileManagementMode();
     } else {
+        ensureWasmRuntimeBootstrapped();
         window.enterEditorMode();
         window.ensureVditorInitialized().catch(function(error) {
             console.error('Failed to initialize Vditor at startup:', error);

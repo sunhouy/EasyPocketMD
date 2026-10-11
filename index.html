@@ -255,14 +255,14 @@
             <button class="tab-btn" id="loginTabBtn" data-i18n="login">登录</button>
         </div>
 
-        <div class="modal-form" id="registerForm">
+        <form autocomplete="on" onsubmit="return false" class="modal-form" id="registerForm">
             <div class="form-group">
                 <label for="registerUsername" data-i18n="username">用户名</label>
-                <input type="text" id="registerUsername" data-i18n-placeholder="enterUsername" placeholder="请输入用户名">
+                <input type="text" id="registerUsername" name="registerUsername" autocomplete="username" disabled data-i18n-placeholder="enterUsername" placeholder="请输入用户名">
             </div>
             <div class="form-group">
                 <label for="registerPassword" data-i18n="password">密码</label>
-                <input type="password" id="registerPassword" data-i18n-placeholder="enterPassword" placeholder="请输入密码">
+                <input type="password" id="registerPassword" name="registerPassword" autocomplete="new-password" disabled data-i18n-placeholder="enterPassword" placeholder="请输入密码">
                 <div class="password-strength-container" id="passwordStrengthContainer" style="margin-top:8px;display:none;">
                     <div class="password-strength-label" data-i18n="passwordStrength">密码强度：</div>
                     <div class="password-strength-bar">
@@ -287,16 +287,16 @@
                     </span>
                 </button>
             </div>
-        </div>
+        </form>
 
-        <div class="modal-form" id="loginForm" style="display: none;">
+        <form autocomplete="on" onsubmit="return false" class="modal-form" id="loginForm" style="display: none;">
             <div class="form-group">
                 <label for="loginUsername" data-i18n="username">用户名</label>
-                <input type="text" id="loginUsername" data-i18n-placeholder="enterUsername" placeholder="请输入用户名">
+                <input type="text" id="loginUsername" name="loginUsername" autocomplete="username" disabled data-i18n-placeholder="enterUsername" placeholder="请输入用户名">
             </div>
             <div class="form-group">
                 <label for="loginPassword" data-i18n="password">密码</label>
-                <input type="password" id="loginPassword" data-i18n-placeholder="enterPassword" placeholder="请输入密码">
+                <input type="password" id="loginPassword" name="loginPassword" autocomplete="current-password" disabled data-i18n-placeholder="enterPassword" placeholder="请输入密码">
             </div>
             <div class="modal-message" id="loginMessage"></div>
             <div class="modal-actions">
@@ -307,7 +307,7 @@
                     </span>
                 </button>
             </div>
-        </div>
+        </form>
     </div>
 </div>
 
@@ -610,29 +610,6 @@
                             </details>
                         </div>
                     </li>
-                    <li class="settings-list-item">
-                        <div class="form-group settings-collapsible-group">
-                            <details id="toolbarButtonsDetails" class="settings-collapsible">
-                                <summary class="settings-collapsible-summary">
-                                    <span data-i18n="bottomToolbarButtons">底部工具栏按钮 (5-7个)</span>
-                                </summary>
-                                <div class="settings-collapsible-body">
-                                    <div class="checkbox-group" id="toolbarButtonsSettings">
-                                        <!-- 动态生成 -->
-                                    </div>
-                                </div>
-                            </details>
-                        </div>
-                    </li>
-                    <li class="settings-list-item">
-                        <div class="form-group">
-                            <label for="hideBottomToolbarOnKeyboardCheckbox" data-i18n="hideBottomToolbarOnKeyboard">手机端输入法切换时隐藏底部工具栏</label>
-                            <div class="checkbox-group">
-                                <label><input type="checkbox" id="hideBottomToolbarOnKeyboardCheckbox"> <span></span></label>
-                            </div>
-                            <div class="settings-hint" data-i18n="hideBottomToolbarOnKeyboardHint">仅在手机样式下生效。键盘弹出时隐藏底部工具栏，便于专注输入。</div>
-                        </div>
-                    </li>
                 </ul>
             </details>
             <details class="settings-section settings-category" aria-labelledby="settingsFileGroupTitle">
@@ -703,7 +680,7 @@
                     <li class="settings-list-item">
                         <div class="form-group">
                             <label for="aiApiKeyInput">API Key</label>
-                            <input type="password" id="aiApiKeyInput" class="form-control" placeholder="sk-..." autocomplete="off" />
+                            <input type="text" id="aiApiKeyInput" class="form-control epmd-secret-field" name="ai-service-key" data-lpignore="true" data-1p-ignore="true" autocapitalize="none" spellcheck="false" placeholder="sk-..." autocomplete="off" />
                             <div class="settings-inline-hint"> <span data-i18n="ui:AI 调用由前端直连发起，密钥仅保存于本地（可选端到端加密同步至云端隐藏文件），云端不提供模型。">AI 调用由前端直连发起，密钥仅保存于本地（可选端到端加密同步至云端隐藏文件），云端不提供模型。</span></div>
                         </div>
                     </li>
@@ -1291,16 +1268,18 @@
             <button class="mobile-action-btn" id="mobileSettingsBtn" data-i18n-title="settings" title="设置">
                 <i class="fas fa-cog"></i>
             </button>
-        </div>
-        <h1 class="mobile-title" data-i18n="mobileTitle">EasyPocketMD</h1>
-        <div class="toolbar-right-actions">
             <span class="current-file-e2e-indicator mobile-e2e-indicator" aria-hidden="true" role="button" tabindex="0" data-i18n-title="ui:此文件已使用端到端加密" title="此文件已使用端到端加密"><i class="fas fa-lock"></i></span>
             <!-- 夜间模式切换按钮 -->
             <button class="mobile-action-btn editor-mode-toggle" id="modeToggle" data-i18n-title="ui:切换夜间模式" title="切换夜间模式">
                 <i class="fas fa-moon"></i>
             </button>
+        </div>
+        <h1 class="mobile-title" data-i18n="mobileTitle">EasyPocketMD</h1>
+        <div class="toolbar-right-actions">
+            <button class="mobile-action-btn" id="mobileUndoBtn" type="button" data-i18n-title="undo" title="撤销" data-i18n-aria-label="undo" aria-label="撤销"><i class="fas fa-undo" aria-hidden="true"></i></button>
+            <button class="mobile-action-btn" id="mobileRedoBtn" type="button" data-i18n-title="redo" title="重做" data-i18n-aria-label="redo" aria-label="重做"><i class="fas fa-redo" aria-hidden="true"></i></button>
             <div class="mobile-dropdown">
-                <button class="mobile-action-btn" id="mobileMenuBtn" data-i18n-title="settings" title="菜单">
+                <button class="mobile-action-btn" id="mobileMenuBtn" data-i18n-title="more" title="更多">
                     <i class="fas fa-ellipsis-v"></i>
                 </button>
                 <div class="mobile-dropdown-content more-menu" id="mobileDropdown">
@@ -1325,13 +1304,6 @@
                 </div>
             </div>
         </div>
-    </div>
-</div>
-
-<!-- 底部操作栏 -->
-<div class="mobile-bottom-bar">
-    <div class="bottom-bar-buttons" id="bottomBarButtons">
-        <!-- 按钮将由 JS 动态生成 -->
     </div>
 </div>
 
@@ -1388,25 +1360,25 @@
         <div class="modal-header" style="flex-shrink:0;">
             <h2 data-i18n="changePassword">修改密码</h2>
         </div>
-        <div class="modal-form account-modal-form">
+        <form class="modal-form account-modal-form" autocomplete="on" onsubmit="return false">
             <div class="form-group">
                 <label for="currentPassword" data-i18n="currentPassword">当前密码</label>
-                <input type="password" id="currentPassword" data-i18n-placeholder="enterCurrentPassword" placeholder="请输入当前密码">
+                <input type="password" id="currentPassword" name="currentPassword" autocomplete="current-password" disabled data-i18n-placeholder="enterCurrentPassword" placeholder="请输入当前密码">
             </div>
             <div class="form-group">
                 <label for="newPassword" data-i18n="newPassword">新密码</label>
-                <input type="password" id="newPassword" data-i18n-placeholder="enterNewPassword" placeholder="请输入新密码">
+                <input type="password" id="newPassword" name="newPassword" autocomplete="new-password" disabled data-i18n-placeholder="enterNewPassword" placeholder="请输入新密码">
             </div>
             <div class="form-group">
                 <label for="confirmNewPassword" data-i18n="confirmNewPassword">确认新密码</label>
-                <input type="password" id="confirmNewPassword" data-i18n-placeholder="enterConfirmNewPassword" placeholder="请再次输入新密码">
+                <input type="password" id="confirmNewPassword" name="confirmNewPassword" autocomplete="new-password" disabled data-i18n-placeholder="enterConfirmNewPassword" placeholder="请再次输入新密码">
             </div>
             <div class="modal-message" id="changePasswordMessage"></div>
             <div class="modal-actions">
                 <button class="modal-btn secondary" id="cancelChangePasswordBtn" data-i18n="cancel">取消</button>
                 <button class="modal-btn primary" id="changePasswordBtn" data-i18n="changePassword">修改密码</button>
             </div>
-        </div>
+        </form>
     </div>
 </div>
 
@@ -1447,11 +1419,11 @@
             <div class="settings-section-hint" data-i18n="addAccountHint">输入已有账户即可登录，账户不存在将自动注册新账户。</div>
             <div class="form-group">
                 <label for="addAccountUsername" data-i18n="username">用户名</label>
-                <input type="text" id="addAccountUsername" data-i18n-placeholder="enterUsername" placeholder="请输入用户名">
+                <input type="text" id="addAccountUsername" name="addAccountUsername" autocomplete="username" disabled data-i18n-placeholder="enterUsername" placeholder="请输入用户名">
             </div>
             <div class="form-group">
                 <label for="addAccountPassword" data-i18n="password">密码</label>
-                <input type="password" id="addAccountPassword" data-i18n-placeholder="enterPassword" placeholder="请输入密码">
+                <input type="password" id="addAccountPassword" name="addAccountPassword" autocomplete="current-password" disabled data-i18n-placeholder="enterPassword" placeholder="请输入密码">
             </div>
             <div class="modal-message" id="addAccountMessage"></div>
             <div class="modal-actions">

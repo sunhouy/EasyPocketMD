@@ -1539,7 +1539,8 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
 
             if (window.nativeFileOps && window.nativeFileOps.isTauriRuntime()) {
                 var currentFileName = isEn() ? 'document' : '文档';
-                var currentNode = g('currentFileId') ? g('fileTree').jstree(true).get_node(g('currentFileId')) : null;
+                var currentFile = (g('files') || []).find(file => file.id === g('currentFileId'));
+                var currentNode = currentFile ? {text: currentFile.name.split('/').pop()} : null;
                 if (currentNode) {
                     currentFileName = currentNode.text.replace(/\.md$/, '');
                 }
@@ -1563,7 +1564,8 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
             a.href = url;
             // Get filename from current file name if available
             var currentFileName = isEn() ? 'document' : '文档';
-            var currentNode = g('currentFileId') ? g('fileTree').jstree(true).get_node(g('currentFileId')) : null;
+            var currentFile = (g('files') || []).find(file => file.id === g('currentFileId'));
+            var currentNode = currentFile ? {text: currentFile.name.split('/').pop()} : null;
             if (currentNode) {
                 currentFileName = currentNode.text.replace(/\.md$/, '');
             }
