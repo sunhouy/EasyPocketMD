@@ -407,9 +407,17 @@ import { requirePrivacyConsent } from './build-variant';
         };
     }
 
+    function setCredentialFields(containerId: string, enabled: boolean) {
+        document.getElementById(containerId)?.querySelectorAll<HTMLInputElement>('input[autocomplete="username"], input[type="password"]').forEach(input => {
+            input.disabled = !enabled;
+            if (!enabled && input.type === 'password') input.value = '';
+        });
+    }
+
     function showChangePasswordModal() {
         const modal = document.getElementById('changePasswordModalOverlay');
         if (!modal) return;
+        setCredentialFields('changePasswordModalOverlay', true);
         modal.classList.add('show');
         bindChangePasswordModalEvents();
         document.addEventListener('keydown', handleChangePasswordModalKeydown);
@@ -419,6 +427,7 @@ import { requirePrivacyConsent } from './build-variant';
         const modal = document.getElementById('changePasswordModalOverlay');
         if (!modal) return;
         modal.classList.remove('show');
+        setCredentialFields('changePasswordModalOverlay', false);
         document.removeEventListener('keydown', handleChangePasswordModalKeydown);
     }
 
@@ -616,6 +625,7 @@ import { requirePrivacyConsent } from './build-variant';
         const modal = document.getElementById('loginModalOverlay');
         if (!modal) return;
         modal.classList.remove('show');
+        setCredentialFields('loginModalOverlay', false);
         document.removeEventListener('keydown', handleModalKeydown);
     }
 
@@ -708,6 +718,8 @@ import { requirePrivacyConsent } from './build-variant';
     }
 
     function switchToLoginTab() {
+        setCredentialFields('registerForm', false);
+        setCredentialFields('loginForm', true);
         const loginTabBtn = (document.getElementById('loginTabBtn') as HTMLButtonElement);
         const registerTabBtn = (document.getElementById('registerTabBtn') as HTMLButtonElement);
         const loginForm = document.getElementById('loginForm');
@@ -729,6 +741,8 @@ import { requirePrivacyConsent } from './build-variant';
     }
 
     function switchToRegisterTab() {
+        setCredentialFields('loginForm', false);
+        setCredentialFields('registerForm', true);
         const loginTabBtn = (document.getElementById('loginTabBtn') as HTMLButtonElement);
         const registerTabBtn = (document.getElementById('registerTabBtn') as HTMLButtonElement);
         const loginForm = document.getElementById('loginForm');
@@ -1466,6 +1480,7 @@ import { requirePrivacyConsent } from './build-variant';
     function showAddAccountModal() {
         const modal = document.getElementById('addAccountModalOverlay');
         if (modal) {
+            setCredentialFields('addAccountModalOverlay', true);
             modal.classList.add('show');
             // 清空输入
             const usernameInput = (document.getElementById('addAccountUsername') as HTMLInputElement);
@@ -1489,6 +1504,7 @@ import { requirePrivacyConsent } from './build-variant';
         const modal = document.getElementById('addAccountModalOverlay');
         if (modal) {
             modal.classList.remove('show');
+            setCredentialFields('addAccountModalOverlay', false);
         }
     }
 

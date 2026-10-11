@@ -75,19 +75,18 @@ export function installEditorRuntime(global: any, ctx: Partial<EditorRuntimeCtx>
         let overlay = document.getElementById('fileSwitchLoadingOverlay');
         if (overlay) return overlay;
 
-        const editorContainer = document.querySelector('.editor-container');
-        if (!editorContainer) return null;
-
         overlay = document.createElement('div');
         overlay.id = 'fileSwitchLoadingOverlay';
         overlay.className = 'file-switch-loading-overlay';
         overlay.style.display = 'none';
+        overlay.setAttribute('role', 'status');
+        overlay.setAttribute('aria-live', 'polite');
         overlay.innerHTML =
             '<div class="file-switch-loading-card">' +
                 '<i class="fas fa-spinner fa-spin" aria-hidden="true"></i>' +
                 '<span id="fileSwitchLoadingText"></span>' +
             '</div>';
-        editorContainer.appendChild(overlay);
+        document.body.appendChild(overlay);
         return overlay;
     }
 

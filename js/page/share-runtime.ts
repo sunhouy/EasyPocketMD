@@ -1757,19 +1757,13 @@ import type { SharedDocumentState } from '../../types/global';
     window.scheduleSharedDocSync = scheduleSharedDocSync;
 
     function hideEditElements() {
-        document.querySelectorAll('.mobile-toolbar-container, .mobile-bottom-bar, #mobileFileBtn, #mobileLoginBtn, #mobileMenuBtn, #modeToggle, #saveFileBtn, .editor-container').forEach(element => {
+        document.querySelectorAll('.mobile-toolbar-container, #mobileFileBtn, #mobileLoginBtn, #mobileMenuBtn, #modeToggle, #saveFileBtn, .editor-container').forEach(element => {
             if (!hiddenEditStyles.has(element)) hiddenEditStyles.set(element, element.getAttribute('style') || '');
         });
         // 隐藏顶部工具栏
         const mobileToolbar = document.querySelector('.mobile-toolbar-container');
         if (mobileToolbar) {
             (mobileToolbar as HTMLElement).style.display = 'none';
-        }
-
-        // 隐藏底部操作栏
-        const mobileBottomBar = document.querySelector('.mobile-bottom-bar');
-        if (mobileBottomBar) {
-            (mobileBottomBar as HTMLElement).style.display = 'none';
         }
 
         // 隐藏文件列表按钮

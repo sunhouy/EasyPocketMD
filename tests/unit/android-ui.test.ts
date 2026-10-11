@@ -1,28 +1,10 @@
 /** @jest-environment jsdom */
-import {applyAndroidDefaults,defaultBottomButtons,legacyBottomButtons,isAndroidApp,installAndroidChrome,orderedBottomButtons} from '../../js/main/android-ui';
-
+import {applyStartupDefaults,isAndroidApp,installAndroidChrome} from '../../js/main/android-ui';
 afterEach(()=>{delete window.__TAURI__;document.body.className='';});
-it('groups Android undo, redo and Save at the right without resetting chosen tools',()=>{
-    const buttons=['mobileBottomSaveBtn','mobileUndoBtn','mobileInsertBtn','mobileRedoBtn','mobileFormulaBtn'];
-    expect(orderedBottomButtons(buttons,true)).toEqual(['mobileInsertBtn','mobileFormulaBtn','mobileUndoBtn','mobileRedoBtn','mobileBottomSaveBtn']);
-    expect(orderedBottomButtons(buttons,false)).toEqual(orderedBottomButtons(buttons,true));
-});
-it('starts fresh Android users in the file list with Save in place of AI',()=>{
-    const settings:any={};applyAndroidDefaults(settings,true);
-    expect(settings.defaultFileOpening).toBe('fileList');
-    expect(settings.toolbarButtons).toContain('mobileBottomSaveBtn');
-    expect(settings.toolbarButtons).not.toContain('mobileAIBtn');
-});
-it('keeps the desktop default and explicit user preferences',()=>{
-    const settings:any={};applyAndroidDefaults(settings,false);
-    expect(settings.defaultFileOpening).toBe('lastEdited');
-    expect(settings.toolbarButtons).toEqual(defaultBottomButtons(false));
-    const custom={defaultFileOpening:'lastEdited',toolbarButtons:['mobileUndoBtn']};
-    applyAndroidDefaults(custom,true);expect(custom).toEqual({defaultFileOpening:'lastEdited',toolbarButtons:['mobileUndoBtn','mobileBottomSaveBtn']});
-});
-it('migrates only the original Android toolbar arrangement',()=>{
-    const settings={toolbarButtons:[...legacyBottomButtons]};applyAndroidDefaults(settings,true);
-    expect(settings.toolbarButtons).toEqual(defaultBottomButtons(true));
+it('defaults every platform to the file home and removes retired bottom-toolbar preferences',()=>{
+ const settings:any={toolbarButtons:['mobileUndoBtn'],hideBottomToolbarOnKeyboard:true};
+ applyStartupDefaults(settings);expect(settings).toEqual({defaultFileOpening:'fileList'});
+ const custom={defaultFileOpening:'lastEdited'};applyStartupDefaults(custom);expect(custom.defaultFileOpening).toBe('lastEdited');
 });
 it('requests native storage access only in the Android shell and handles refusal',async()=>{
     const original=navigator.userAgent;
@@ -32,10 +14,4 @@ it('requests native storage access only in the Android shell and handles refusal
     installAndroidChrome();await Promise.resolve();
     expect(invoke).toHaveBeenCalledWith('request_storage_access');expect(document.body.classList.contains('android-app')).toBe(true);
     Object.defineProperty(navigator,'userAgent',{configurable:true,value:original});
-});
-
-it('replaces AI in web custom toolbars and always provides Save at the right',()=>{
- const settings={toolbarButtons:['mobileAIBtn','mobileInsertBtn','mobileRedoBtn','mobileBottomSaveBtn']};applyAndroidDefaults(settings,false);
- expect(settings.toolbarButtons).toEqual(['mobileInsertBtn','mobileRedoBtn','mobileBottomSaveBtn']);
- expect(orderedBottomButtons(['mobileChartBtn'],false)).toEqual(['mobileChartBtn','mobileBottomSaveBtn']);
 });

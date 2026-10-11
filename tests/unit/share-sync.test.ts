@@ -23,7 +23,7 @@ describe('Shared document acknowledgement and session isolation', () => {
     function receive(payload) { socket.onmessage({ data: JSON.stringify(payload) }); }
     beforeEach(() => {
         jest.useFakeTimers();
-        document.body.innerHTML = '<div id="vditor"><pre contenteditable="true"></pre></div><div class="mobile-bottom-bar" style="display:flex"></div>';
+        document.body.innerHTML = '<div id="vditor"><pre contenteditable="true"></pre></div><div class="mobile-toolbar-container" style="display:flex"></div>';
         const element = document.querySelector('pre');
         editor = { vditor: { currentMode: 'sv', sv: { element } }, getValue: () => element.textContent, setValue: text => { element.textContent = text; } };
         window.vditor = editor; window.WebSocket = FakeSocket; window.currentUser = null;
@@ -65,10 +65,10 @@ describe('Shared document acknowledgement and session isolation', () => {
     it('locks and restores editor and mobile controls upon live permission changes', () => {
         receive({ type: 'permission_changed', can_edit: false });
         expect(document.querySelector('pre').getAttribute('contenteditable')).toBe('false');
-        expect(document.querySelector('.mobile-bottom-bar').style.display).toBe('none');
+        expect(document.querySelector('.mobile-toolbar-container').style.display).toBe('none');
         receive({ type: 'permission_changed', can_edit: true });
         expect(document.querySelector('pre').getAttribute('contenteditable')).toBe('true');
-        expect(document.querySelector('.mobile-bottom-bar').style.display).toBe('flex');
+        expect(document.querySelector('.mobile-toolbar-container').style.display).toBe('flex');
     });
     it('ignores events from a previous document’s socket', () => {
         const old = socket; activate('new document', 'other-share');

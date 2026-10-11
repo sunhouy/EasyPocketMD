@@ -128,6 +128,8 @@ async function exportContent() {
 function getCurrentFileName() {
     var defaultName = isEn() ? 'document' : '文档';
     var currentFileId = g('currentFileId');
+    const currentFile = (g('files') || []).find(file => file.id === currentFileId);
+    if (currentFile?.name) return currentFile.name.split('/').pop().replace(/\.md$/i, '');
     if (!currentFileId || typeof g('fileTree') === 'undefined') {
         return defaultName;
     }

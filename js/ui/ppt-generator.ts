@@ -2385,6 +2385,8 @@ JSON 结构：
     function getDefaultPPTFileName() {
         var defaultName = isEn() ? 'presentation' : '演示文稿';
         var currentFileId = g('currentFileId');
+        const currentFile = (g('files') || []).find(file => file.id === currentFileId);
+        if (currentFile?.name) return currentFile.name.split('/').pop().replace(/\.md$/i, '');
         if (!currentFileId || typeof g('fileTree') === 'undefined') {
             return pptState.topic || defaultName;
         }

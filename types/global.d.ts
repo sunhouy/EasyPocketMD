@@ -42,14 +42,7 @@ export interface SharedDocumentState {
     ws: WebSocket | null;
     [key: string]: any;
 }
-export interface ToolbarButtonDef {
-    id: string;
-    icon?: string;
-    textKey?: string;
-    toolbarTextKey?: string;
-    fn?: () => void;
-    [key: string]: unknown;
-}
+
 export interface I18nApi {
     init: () => string;
     setLanguage: (language: string) => void;
@@ -80,7 +73,6 @@ export interface UserSettings {
     searchEngine?: import('../js/main/selection-search').SearchEngine;
     customSearchUrl?: string;
     translationMethod?: import('../js/main/selection-translation').TranslationMethod;
-    toolbarButtons?: string[];
     themeMode?: string;
     live2d?: import('../js/main/live2d-models').Live2DPreference;
     uiMode?: string;
@@ -88,7 +80,6 @@ export interface UserSettings {
     vditorContentTheme?: string;
     vditorCodeTheme?: string;
     showOutline?: boolean;
-    hideBottomToolbarOnKeyboard?: boolean;
     enableDebugMode?: boolean;
     enableSlashCommand?: boolean;
     slashCommandActivationKey?: string;
@@ -155,7 +146,6 @@ declare global {
         currentFileId: string | null;
         nightMode: boolean;
         userSettings: UserSettings;
-        allToolbarButtons: ToolbarButtonDef[];
         lastSyncedContent: Record<string, string>;
         unsavedChanges: Record<string, boolean>;
         pendingServerSync: Record<string, boolean>;
@@ -211,7 +201,6 @@ declare global {
             detectEnvironment(): unknown;
             checkAndOfferDraftRecovery(): void;
         };
-        defaultToolbarButtons: string[];
         GATUS_ENDPOINT?: string;
         APP_ORIGIN?: string;
         createNewFile: () => void;
@@ -257,7 +246,6 @@ declare global {
         generateTableHtml: (headers: string[], rows: string[][], alignment?: string[]) => string;
         handleLoginButtonClick: (event?: Event) => void | Promise<void>;
         toggleNightMode: () => void;
-        renderBottomToolbar: () => void;
         showMobileActionSheet: (title: string, options: ActionSheetItem[]) => void;
         bindAddAccountModalEvents: () => void;
         bindSwitchAccountConfirmModalEvents: () => void;

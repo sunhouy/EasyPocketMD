@@ -8,14 +8,10 @@ function resetMobileChromeScroll(): void {
 export function enterPresentationMode(): void {
   resetMobileChromeScroll();
   const mobileToolbar = document.querySelector('.mobile-toolbar-container');
-  const mobileBottomBar = document.querySelector('.mobile-bottom-bar');
   const editorContainer = document.querySelector('.editor-container');
 
   if (mobileToolbar) {
     (mobileToolbar as HTMLElement).style.display = 'none';
-  }
-  if (mobileBottomBar) {
-    (mobileBottomBar as HTMLElement).style.display = 'none';
   }
   if (editorContainer) {
     const el = editorContainer as HTMLElement;
@@ -44,14 +40,10 @@ export function enterPresentationMode(): void {
 
 export function exitPresentationMode(): void {
   const mobileToolbar = document.querySelector('.mobile-toolbar-container');
-  const mobileBottomBar = document.querySelector('.mobile-bottom-bar');
   const editorContainer = document.querySelector('.editor-container');
 
   if (mobileToolbar) {
     (mobileToolbar as HTMLElement).style.display = '';
-  }
-  if (mobileBottomBar) {
-    (mobileBottomBar as HTMLElement).style.display = '';
   }
   if (editorContainer) {
     const el = editorContainer as HTMLElement;

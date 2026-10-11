@@ -1,5 +1,4 @@
-import { preloadFeatures, loadFeature } from './js/feature-loader';
-import '@sunhouyun/vditor/dist/index.css';
+import { loadFeature } from './js/feature-loader';
 import '@fortawesome/fontawesome-free/css/all.min.css';
 import 'cropperjs/dist/cropper.css';
 import './css/styles.css';
@@ -10,12 +9,7 @@ installMaterialInteractions();
 import './js/jquery-global';
 import './js/tauri-bridge';
 import './js/native-file';
-import 'jstree/dist/themes/default/style.min.css';
-import 'jstree';
-
-import Vditor from '@sunhouyun/vditor';
-
-window.Vditor = Vditor;
+// Editor and legacy tree dependencies are loaded after the file home is painted.
 
 
 import './js/translations';
@@ -76,6 +70,4 @@ import './js/main';
 
 import './js/code-block-editor-loader';
 
-// Begin silent preloading only after the initial page and app shell have loaded.
-if (document.readyState === 'complete') setTimeout(preloadFeatures, 0);
-else window.addEventListener('load', () => { setTimeout(preloadFeatures, 0); }, {once:true});
+// Feature preloading is scheduled by the file-home first-paint hook.

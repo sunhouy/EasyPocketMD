@@ -203,8 +203,11 @@ export default defineConfig({
         entryFileNames: 'assets/[name]-[hash].js',
         chunkFileNames: 'assets/[name]-[hash].js',
         assetFileNames: 'assets/[name]-[hash].[ext]',
-        manualChunks: {
-          vditor: ['@sunhouyun/vditor']
+        // Keep shared dependencies out of the deferred editor chunk.
+        onlyExplicitManualChunks: true,
+        manualChunks(id) {
+          if (id.includes('commonjsHelpers')) return 'runtime-helpers';
+          if (id.includes('/node_modules/@sunhouyun/vditor/')) return 'vditor';
         }
       },
       external: ['node-fetch']
