@@ -181,6 +181,18 @@ def https_listeners(nginx):
     return '\n'.join('    listen ' + address + ' ssl;' for address in addresses)
 
 
+def http3_settings(nginx, listeners):
+    """Advertise QUIC only when the actual public TLS server supports it."""
+    build = command(nginx, '-V', capture_output=True, text=True)
+    details = ''.join(value for value in (build.stdout, build.stderr) if isinstance(value, str))
+    if '--with-http_v3_module' not in details:
+        print('HTTP/3 unavailable: public nginx requires --with-http_v3_module and UDP/443 ingress; HTTPS remains available', flush=True)
+        return ''
+    addresses = re.findall(r'listen\s+([^;\s]+)\s+ssl;', listeners)
+    # Avoid duplicate reuseport socket options across main/code or existing vhosts.
+    return '\n'.join('    listen ' + address + ' quic;' for address in addresses) + '\n    http3 on;\n    add_header Alt-Svc \'h3=":443"; ma=86400\' always;'
+
+
 def public_https_health(domain, channel, edge):
     """Probe the actual port 443 with SNI, certificate validation and routing."""
     context = ssl.create_default_context() if channel == 'main' else ssl._create_unverified_context()
@@ -308,6 +320,7 @@ def activate(release, channel, slot, current):
         domains = domain
         listeners = https_listeners(nginx)
         print('Managed HTTPS listeners: ' + listeners.strip().replace('\n', ' '), flush=True)
+        quic = http3_settings(nginx, listeners)
         contents = f'''server {{
     listen 80;
     server_name {domains};
@@ -316,6 +329,7 @@ def activate(release, channel, slot, current):
 }}
 server {{
 {listeners}
+{quic}
     server_name {domains};
     ssl_certificate {cert}/fullchain.pem;
     ssl_certificate_key {cert}/privkey.pem;
@@ -326,6 +340,7 @@ server {{
     ssl_ecdh_curve auto;
     client_max_body_size 100m;
     location / {{
+        proxy_hide_header Alt-Svc;
         proxy_pass http://127.0.0.1:{gateway_port};
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;

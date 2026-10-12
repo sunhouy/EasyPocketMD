@@ -94,7 +94,7 @@ body :is(.epmd-dialog-close,.modal-close-btn,.custom-dialog-close) {
 .settings-account-button > i:first-child { font-size:22px;color:var(--md-primary); }
 .settings-account-button > i:last-child { margin-left:auto;font-size:12px;color:var(--md-muted); }
 .file-local-badge { flex-shrink:0;padding:2px 5px;border-radius:6px;font-size:10px;line-height:1.4;color:var(--md-primary-text);background:var(--md-selected); }
-#desktopLoginBtn,#mobileLoginBtn,.notes-account-button { display:none !important; }
+#desktopLoginBtn,#mobileLoginBtn { display:none !important; }
 .android-app #saveFileBtn { display:none !important; }
 #mobileMenuAIBtn,.android-storage-button { display:none; }
 .android-app #mobileMenuAIBtn,.android-app .android-storage-button { display:flex; }

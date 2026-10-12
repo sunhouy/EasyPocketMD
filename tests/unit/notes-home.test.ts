@@ -8,10 +8,10 @@ const files=[
     {id:'sub',type:'folder',name:'学习/子目录'},
     {id:'nested',type:'file',name:'学习/子目录/嵌套.md',content:'完整文档'+'.'.repeat(300)+'深处的关键词',lastModified:5},
 ];
-it('sorts by actual modification time before manual order and handles server date strings',()=>{
+it('puts pinned files before newer files and handles server date strings',()=>{
     const old={id:'old',type:'file',name:'old.md',order:-2000000,lastModified:'2020-01-01T00:00:00Z'};
     const latest={id:'new',type:'file',name:'new.md',order:100,lastModified:String(Date.UTC(2026,9,8))};
-    expect(visibleNotes([old,latest],null,'').map(file=>file.id)).toEqual(['new','old']);
+    expect(visibleNotes([old,latest],null,'').map(file=>file.id)).toEqual(['old','new']);
     expect(noteTimestamp(latest)).toBe(Date.UTC(2026,9,8));expect(noteTimestamp({...old,lastModified:undefined})).toBe(0);
 });
 let app:any,render:()=>void,tree:any;
@@ -30,8 +30,8 @@ it('shows all files including nested notes by most recent modification',()=>{
 it('opens files and preserves account and settings actions',()=>{
     (document.querySelector('.notes-file-card') as HTMLElement).click();expect(app.openFile).toHaveBeenCalledWith('note');
     const tools=document.querySelectorAll<HTMLButtonElement>('.notes-home-tools button');
-    tools[0].click();expect(app.handleLoginButtonClick).toHaveBeenCalledTimes(1);app.currentUser={};tools[0].click();expect(app.handleLoginButtonClick).toHaveBeenCalledTimes(2);
-    tools[1].click();expect(app.showSettingsDialog).toHaveBeenCalled();
+    tools[1].click();expect(app.handleLoginButtonClick).toHaveBeenCalledTimes(1);app.currentUser={};tools[1].click();expect(app.handleLoginButtonClick).toHaveBeenCalledTimes(2);
+    tools[0].click();expect(app.showSettingsDialog).toHaveBeenCalled();
 });
 it('filters folder contents and routes creation to the selected directory',()=>{
     (document.querySelector('.notes-folder-tab[data-file-id="folder"]') as HTMLElement).click();
@@ -93,7 +93,7 @@ it('uses compact product labels, accessible icons and only real folder tabs',()=
     expect([...document.querySelectorAll('.notes-folder-tab')].map(item=>item.textContent)).toEqual(['全部','学习','学习/子目录']);
     const tools=document.querySelectorAll<HTMLButtonElement>('.notes-home-tools button');
     expect(tools[0].textContent).toBe('');expect(tools[0].querySelector('i')).not.toBeNull();
-    expect(tools[0].getAttribute('aria-label')).toBe('账号管理');
+    expect(tools[1].getAttribute('aria-label')).toBe('登录与账户管理');
     app.i18n={getLanguage:()=> 'en'};render();
     expect(document.querySelector<HTMLInputElement>('#notesHomeSearch').placeholder).toBe('Search files');
 });
@@ -143,4 +143,11 @@ it('labels external local documents without marking cloud documents as local',()
     app.files=[{id:'local',type:'file',name:'local.md',localFilePath:'/storage/emulated/0/Documents/local.md',content:'本地',lastModified:2},{id:'cloud',type:'file',name:'cloud.md',content:'云端',lastModified:1}];
     render();expect(document.querySelector('[data-file-id="local"] .file-local-badge').textContent).toBe('本地');
     expect(document.querySelector('[data-file-id="cloud"] .file-local-badge')).toBeNull();
+});
+it('pins folder tabs and cards without moving their children into the pinned group',()=>{
+ app.files.find((file:any)=>file.id==='folder').order=-2000000;render();
+ expect(document.querySelector('.notes-folder-tab[data-file-id="folder"] .notes-pin')).not.toBeNull();
+ expect(document.querySelector('.notes-folder-card[data-file-id="folder"] .notes-pin')).not.toBeNull();
+ expect((document.querySelector('.notes-home-grid > [data-file-id]') as HTMLElement).dataset.fileId).toBe('folder');
+ expect([...document.querySelectorAll('.notes-file-card')].map(card=>(card as HTMLElement).dataset.fileId)).toEqual(['note','nested','old']);
 });

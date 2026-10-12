@@ -6221,3 +6221,18 @@ body.night-mode .delete-warning { color:#ff9ca8; }
 
 /* Mask service credentials without registering them as login passwords. */
 .epmd-secret-field { -webkit-text-security: disc; }
+
+.notes-file-card, .notes-folder-card { position:relative; }
+.notes-file-card { padding-right:38px; }
+.notes-order-handle { display:inline-flex;align-items:center;justify-content:center;min-width:26px;min-height:32px;cursor:grab;touch-action:none;color:var(--md-text,#666); }
+.notes-file-card > .notes-order-handle { position:absolute;right:6px;top:8px; }
+.notes-pin { color:var(--theme-accent,#4a90e2);margin-inline:4px; }
+.order-drag-source { opacity:.55; }
+.order-drop-before { box-shadow:inset 0 3px var(--theme-accent,#4a90e2); }
+.order-drop-after { box-shadow:inset 0 -3px var(--theme-accent,#4a90e2); }
+
+.account-management-modal { position:relative; }
+.account-management-modal #userMenuDropdown { display:block !important;position:static !important;inset:auto !important;box-shadow:none;min-width:0;max-height:60vh;width:100%; }
+.account-management-modal .modal-close-btn { position:absolute;right:12px;top:12px; }
+/* Keep the file-home account controls below visible guest/network notices. */
+body.file-management-mode.has-top-notice .notes-home { padding-top:calc(12px + env(safe-area-inset-top,0px) + var(--top-notice-height,40px)); }

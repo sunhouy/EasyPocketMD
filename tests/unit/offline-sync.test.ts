@@ -93,3 +93,10 @@ test('locked encrypted documents show only the lock and resume status after unlo
     unlocked = true; refreshSyncIcons(app);
     expect((document.querySelector('.file-sync-icon') as HTMLElement).hidden).toBe(false);
 });
+
+it('shows pinned folder markers in the legacy tree and removes them when unpinned',()=>{
+ document.body.innerHTML='<a id="folder_anchor"></a>';
+ const folder={id:'folder',type:'folder',name:'folder',order:-2000000};
+ refreshSyncIcons({files:[folder]});expect(document.querySelector('#folder_anchor .file-pin-indicator')).not.toBeNull();
+ folder.order=0;refreshSyncIcons({files:[folder]});expect(document.querySelector('#folder_anchor .file-pin-indicator')).toBeNull();
+});

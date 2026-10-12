@@ -43,7 +43,7 @@ export function bindFileTreeLongPress(element: HTMLElement, open: (anchor: HTMLE
     let pressed:HTMLElement;
     const cancel = () => {clearTimeout(timer);pressed?.classList.remove('file-press-active');};
     element.addEventListener('pointerdown', event => {
-        if (event.button !== 0) return;
+        if (event.button !== 0 || (event.target as Element).closest('.notes-order-handle')) return;
         cancel(); const anchor = (event.target as Element).closest<HTMLElement>(selector); if (!anchor) return;
         pressed=anchor;anchor.classList.add('file-press-active');
         x = event.clientX; y = event.clientY; opened = false;

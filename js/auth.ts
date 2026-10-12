@@ -1778,6 +1778,37 @@ import { requirePrivacyConsent } from './build-variant';
         }
     }
 
+    function showAccountManagementDialog(event?: Event) {
+        event?.stopPropagation();
+        if (!global.currentUser) { showLoginModal(); switchToLoginTab(); return; }
+        document.querySelector<HTMLElement>('#accountManagementModal .modal-close-btn')?.click();
+        const menu = document.getElementById('userMenuDropdown');
+        if (!menu) return;
+        const savedStyle = menu.getAttribute('style');
+        menu.classList.remove('show');
+        handleLoginButtonClick(event);
+        const marker = document.createComment('account-menu'); menu.replaceWith(marker);
+        const overlay = document.createElement('div'); overlay.id = 'accountManagementModal'; overlay.className = 'modal-overlay show';
+        overlay.setAttribute('role','dialog'); overlay.setAttribute('aria-modal','true'); overlay.setAttribute('aria-labelledby','accountManagementTitle');
+        const content = document.createElement('div'); content.className = 'modal account-management-modal';
+        const title = document.createElement('h2'); title.id = 'accountManagementTitle'; title.textContent = isEn() ? 'Login and accounts' : '登录与账户管理';
+        const close = document.createElement('button'); close.type='button';close.className='modal-close-btn epmd-dialog-close';close.textContent='×';close.setAttribute('aria-label',isEn()?'Close':'关闭');
+        const origin = document.activeElement as HTMLElement;
+        let closed = false;
+        const closeModal = () => {
+            if (closed) return; closed = true;
+            marker.replaceWith(menu);menu.classList.remove('show');
+            if(savedStyle===null)menu.removeAttribute('style');else menu.setAttribute('style',savedStyle);
+            overlay.remove();document.removeEventListener('keydown',onKey);window.removeEventListener('e2e-account-reset',closeModal);origin?.focus?.();
+        };
+        const onKey=(e:KeyboardEvent)=>{if(e.key==='Escape'){e.stopPropagation();closeModal();}};
+        close.onclick=closeModal;overlay.onclick=e=>{if(e.target===overlay)closeModal();};
+        content.onclick=e=>{if((e.target as Element).closest('#userSettingsBtn,#logoutItem,#addAccountItem,.account-item'))closeModal();};
+        content.append(close,title,menu);overlay.append(content);document.body.append(overlay);close.focus();
+        document.addEventListener('keydown',onKey);window.addEventListener('e2e-account-reset',closeModal);
+    }
+
+    global.showAccountManagementDialog = showAccountManagementDialog;
     global.showUserInfo = showUserInfo;
     global.showLoginModal = showLoginModal;
     global.hideLoginModal = hideLoginModal;

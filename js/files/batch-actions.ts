@@ -1,3 +1,4 @@
+import { isPinned } from './global-order';
 import { writeWorkspaceCache } from './workspace-cache';
 import { relocateFile } from './relocate';
 import { showFileDetails } from './tree/details';
@@ -134,8 +135,8 @@ export function installBatchFileActions(app:any,hooks:{reload:()=>void;orders:(o
             hooks.reload();app.showMessage?.(t(copy?'复制完成':'移动完成',copy?'Copied':'Moved'),'success');
         });
     }
-    function pin(){const roots=items();const allPinned=roots.every(file=>Number(app.fileOrders?.[file.name])<=-1000000);const orders:Record<string,number>={};roots.forEach((file,index)=>orders[file.name]=allPinned?0:-2000000+index*10);app.fileOrders={...app.fileOrders,...orders};hooks.orders(orders);hooks.reload();update();}
-    function run(action:string){if(busy)return;if(action==='details')showFileDetails(app,selected());else if(action==='pin')pin();else if(action==='rename')void rename().catch(report);else if(action==='move'||action==='copy')void moveOrCopy(action==='copy').catch(report);else if(action==='up'||action==='down')hooks.upDown(items(),action);else if(action==='history'){const file=selected()[0];if(selected().length===1 && file.type==='file')app.showHistoryModal(file.id,file.name);}else if(action==='delete'){busy=true;update();void Promise.resolve().then(()=>hooks.delete()).catch(report).finally(()=>{busy=false;update();});}else if(action==='import' && selected().length===1 && selected()[0].type==='folder')void hooks.import(selected()[0].name);}
+    function pin(){const roots=selected();const allPinned=roots.every(isPinned);const orders:Record<string,number>={};roots.forEach((file,index)=>{orders[file.name]=allPinned?0:-2000000+index*10;file.order=orders[file.name];});app.fileOrders={...app.fileOrders,...orders};hooks.orders(orders);hooks.reload();update();}
+    function run(action:string){if(busy)return;if(action==='details')showFileDetails(app,selected());else if(action==='pin')pin();else if(action==='rename')void rename().catch(report);else if(action==='move'||action==='copy')void moveOrCopy(action==='copy').catch(report);else if(action==='up'||action==='down')hooks.upDown(selected(),action);else if(action==='history'){const file=selected()[0];if(selected().length===1 && file.type==='file')app.showHistoryModal(file.id,file.name);}else if(action==='delete'){busy=true;update();void Promise.resolve().then(()=>hooks.delete()).catch(report).finally(()=>{busy=false;update();});}else if(action==='import' && selected().length===1 && selected()[0].type==='folder')void hooks.import(selected()[0].name);}
     function toolbar(){const toolbar=document.createElement('div');toolbar.id='fileListMultiSelectToolbar';toolbar.className='file-selection-panel';
         const header=document.createElement('div');header.className='file-selection-header';
         const count=document.createElement('strong');count.id='fileListMultiSelectCount';header.append(count);
@@ -148,7 +149,7 @@ export function installBatchFileActions(app:any,hooks:{reload:()=>void;orders:(o
         const selectAll=toolbar.querySelector<HTMLButtonElement>('[data-select-all]');if(selectAll)selectAll.textContent=t(all?'取消全选':'全选',all?'Deselect all':'Select all');
         for(const button of toolbar.querySelectorAll<HTMLButtonElement>('[data-action]')){const action=button.dataset.action;button.disabled=busy || !files.length || (action==='history' && (files.length!==1 || files[0].type!=='file'));button.hidden=(action==='history' && (files.length!==1 || files[0].type!=='file')) || (action==='import' && (files.length!==1 || files[0].type!=='folder'));
             if(action==='rename')button.querySelector('span')!.textContent=t('重命名','Rename');
-            if(action==='pin')button.querySelector('span')!.textContent=t(files.length && items().every(file=>Number(app.fileOrders?.[file.name])<=-1000000)?'取消置顶':'置顶',files.length && items().every(file=>Number(app.fileOrders?.[file.name])<=-1000000)?'Unpin':'Pin');}
+            if(action==='pin')button.querySelector('span')!.textContent=t(files.length && selected().every(isPinned)?'取消置顶':'置顶',files.length && selected().every(isPinned)?'Unpin':'Pin');}
     }
     return {toolbar,update};
 }

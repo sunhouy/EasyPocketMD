@@ -19,3 +19,10 @@ it('confirmed logout clears the session',async()=>{
 it('does not log out a new session if the account changes while confirmation is open',async()=>{
  let resolve:any;window.customConfirm=jest.fn(()=>new Promise<boolean>(r=>{resolve=r;}));const pending=window.logout();const other={username:'other',token:'other'};window.currentUser=other;resolve(true);await pending;expect(window.currentUser).toBe(other);expect(window.stopAutoSync).not.toHaveBeenCalled();
 });
+it('opens the account management dialog, reuses its actions and restores the menu on close',()=>{
+ const menu=document.getElementById('userMenuDropdown');window.showAccountManagementDialog();
+ expect(document.querySelector('#accountManagementModal #userMenuDropdown')).toBe(menu);
+ expect(document.getElementById('accountManagementTitle').textContent).toBe('登录与账户管理');
+ document.querySelector<HTMLButtonElement>('#accountManagementModal .modal-close-btn').click();
+ expect(document.getElementById('accountManagementModal')).toBeNull();expect(menu.parentElement).toBe(document.body);expect(menu.classList.contains('show')).toBe(false);
+});
