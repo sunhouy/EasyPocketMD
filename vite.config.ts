@@ -1,6 +1,7 @@
 import { defineConfig, normalizePath } from 'vite';
 import { clientDownloadLinks } from './js/client-downloads';
 import { useVditorVectorCharts } from './scripts/vditor-vector-charts';
+import { useVditorAsyncMath } from './scripts/vditor-async-math';
 import { viteStaticCopy } from 'vite-plugin-static-copy';
 import { readFileSync, existsSync, writeFileSync, readFile, cpSync } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -45,7 +46,7 @@ if (existsSync(scopedVditorPackagePath)) {
 }
 
 function localizeVditorAssets(code: string) {
-  return useVditorVectorCharts(code)
+  return useVditorAsyncMath(useVditorVectorCharts(code))
     .replace(
       /public static readonly CDN = `https:\/\/unpkg\.com\/vditor@\$\{VDITOR_VERSION\}`;/,
       'public static readonly CDN = "/vditor";'

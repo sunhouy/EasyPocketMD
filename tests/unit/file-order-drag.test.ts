@@ -10,6 +10,11 @@ beforeEach(()=>{
  const drag=installOrderDrag(surface,app);drag.decorate(a);drag.decorate(b);
 });
 afterEach(()=>{jest.useRealTimers();});
+it('keeps cards draggable without displaying a grip icon',()=>{
+ expect(a.draggable).toBe(true);
+ expect(a.querySelector('.fa-grip-vertical')).toBeNull();
+ expect(a.querySelector('.notes-order-handle')?.getAttribute('aria-label')).toBeTruthy();
+});
 it('persists a desktop drop and prevents its incidental click from opening a note',()=>{
  jest.useFakeTimers();const open=jest.fn();a.onclick=open;
  a.dispatchEvent(event('dragstart',{dataTransfer:{setData:jest.fn()}}));b.dispatchEvent(event('dragover',{clientX:5,clientY:190}));b.dispatchEvent(event('drop'));

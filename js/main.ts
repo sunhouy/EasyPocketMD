@@ -411,9 +411,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 var status = typeof window.wasmTextEngineGateway.getStatus === 'function'
                     ? window.wasmTextEngineGateway.getStatus()
                     : null;
-                if (res && res.code === 200) {
-                    console.info('wasm loaded successfully');
-                } else {
+                if (!res || res.code !== 200) {
                     console.warn('[text-engine] wasm unavailable, fallback to built-in implementation', { init: res, status: status });
                 }
             }).catch(function(error) {
@@ -1569,7 +1567,6 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
 
-            console.log('%c%s', 'font-size: 48px; font-weight: bold; color: #4a90e2; text-shadow: 2px 2px 4px rgba(0,0,0,0.2);', 'EasyPocketMD');
 
             // 应用字体大小设置
             applyFontSize(window.userSettings.fontSize);

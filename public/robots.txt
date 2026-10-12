@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /uploads/
+Disallow: /user_uploads/
+Disallow: /user_files/
+Disallow: /screenshots/
+Disallow: /avatars/

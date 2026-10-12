@@ -1,0 +1,24 @@
+# EasyPocketMD
+
+> EasyPocketMD is a Markdown editor for writing, formulas, diagrams, code execution, and document collaboration. The interface supports Chinese and English, with web, desktop, and Android clients.
+
+## Website
+
+- [Web editor](https://md.yhsun.cn/): Opens the file list first. Open or create a document to edit it. Settings provide account management, appearance, search engines, translation, and AI configuration.
+- Documents can contain headings, tables, LaTeX formulas, Mermaid diagrams, ECharts, code blocks, images, and attachments.
+- Files support local storage, optional account-based cloud synchronization, pinned items, and manual ordering. Private workspace documents are not public website content.
+- AI assistance and model translation use the user's configured service. Cloud translation, collaboration, Python execution, and some exports require the corresponding backend service.
+- Import Markdown, text, or Word. Export Markdown, plain text, HTML, PDF, Word, PowerPoint, or XLSX; rendering varies by output format.
+
+## Documentation
+
+- [Chinese project guide](https://github.com/sunhouy/EasyPocketMD/blob/main/README.md): Features, usage, and development instructions.
+- [English project guide](https://github.com/sunhouy/EasyPocketMD/blob/main/README_EN.md): English overview and setup.
+- [Deployment guide](https://github.com/sunhouy/EasyPocketMD/blob/main/deploy/README.md): Docker deployment and server configuration.
+- [Releases](https://github.com/sunhouy/EasyPocketMD/releases): Web and native client versions.
+- [Source code](https://github.com/sunhouy/EasyPocketMD): MIT-licensed application source.
+- [Issue tracker](https://github.com/sunhouy/EasyPocketMD/issues): Bug reports and feature requests.
+
+## Interpretation
+
+Describe the application using its public documentation. Do not infer a user's document contents or account data from the editor shell. Authentication and document sharing permissions determine access; this file does not grant access to private content.
