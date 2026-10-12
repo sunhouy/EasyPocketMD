@@ -1,5 +1,15 @@
+import { isAndroidApp } from '../../main/android-ui';
 import { fileTimestamp } from '../modified-time';
-export function showFileDetails(app: any, file: any) {
+export function showFileDetails(app: any, file: any, webFallback = false) {
+    const invoke = (app.__TAURI__ || window.__TAURI__)?.core?.invoke || (app.__TAURI__ || window.__TAURI__)?.invoke;
+    if (!webFallback && isAndroidApp() && invoke) {
+        const en = app.i18n?.getLanguage?.() === 'en';
+        const items = Array.isArray(file) ? file : [file];
+        const message = items.map(item => item.name + '\n' + detailRows(app,item,en).map(([name,value]) => name+': '+value).join('\n')).join('\n\n');
+        void invoke('android_native_dialog', {payload:{kind:'details',title:en?'Details':'详情',message,
+            confirmText:en?'Close':'关闭',night:app.nightMode===true,english:en}}).catch(() => showFileDetails(app,file,true));
+        return null;
+    }
     (document.getElementById('fileDetailsModal') as any)?.dismiss?.();
     const overlay = document.createElement('div'); overlay.id = 'fileDetailsModal'; overlay.className = 'modal-overlay file-details-overlay';
     const box = document.createElement('section'); box.className = 'file-details-dialog'; box.setAttribute('role', 'dialog'); box.setAttribute('aria-modal', 'true');
@@ -10,12 +20,7 @@ export function showFileDetails(app: any, file: any) {
     file=item;
     const subtitle=document.createElement('h4');subtitle.textContent=file.name;box.append(subtitle);
     const list = document.createElement('dl');
-    const timestamp = (value: any) => { const time = fileTimestamp(value); return time ? new Date(time).toLocaleString() : en ? 'Not recorded' : '未记录'; };
-    const children = file.type === 'folder' ? (app.files || []).filter((f: any) => f.name.startsWith(file.name + '/')) : [];
-    const rows = [[en ? 'Name / path' : '名称 / 路径', file.name], [en ? 'Type' : '类型', file.type === 'folder' ? (en ? 'Folder' : '文件夹') : (en ? 'File' : '文件')],
-        [en ? 'Created' : '创建时间', timestamp(file.createdAt ?? file.created_at)], [en ? 'Last modified' : '最后修改时间', timestamp(file.lastModified ?? file.last_modified)]];
-    if (file.type === 'folder') rows.push([en ? 'Contents' : '包含项目', String(children.length)]);
-    else if (typeof file.content === 'string') rows.push([en ? 'Characters' : '字符数', String(Array.from(file.content).length)]);
+    const rows = detailRows(app,file,en);
     for (const [name, value] of rows) { const key = document.createElement('dt'); key.textContent = name; const text = document.createElement('dd'); text.textContent = value; list.append(key, text); }
     box.append(list);
     }
@@ -52,4 +57,14 @@ export function bindFileTreeLongPress(element: HTMLElement, open: (anchor: HTMLE
     element.addEventListener('pointermove', event => { if (Math.hypot(event.clientX - x, event.clientY - y) > 10) cancel(); });
     element.addEventListener('pointerup', cancel); element.addEventListener('pointercancel', cancel);
     element.addEventListener('click', event => { if (opened) { opened = false; event.preventDefault(); event.stopImmediatePropagation(); } }, true);
+}
+
+function detailRows(app:any,file:any,en:boolean) {
+    const timestamp = (value: any) => { const time = fileTimestamp(value); return time ? new Date(time).toLocaleString() : en ? 'Not recorded' : '未记录'; };
+    const children = file.type === 'folder' ? (app.files || []).filter((f: any) => f.name.startsWith(file.name + '/')) : [];
+    const rows = [[en ? 'Name / path' : '名称 / 路径', file.name], [en ? 'Type' : '类型', file.type === 'folder' ? (en ? 'Folder' : '文件夹') : (en ? 'File' : '文件')],
+        [en ? 'Created' : '创建时间', timestamp(file.createdAt ?? file.created_at)], [en ? 'Last modified' : '最后修改时间', timestamp(file.lastModified ?? file.last_modified)]];
+    if (file.type === 'folder') rows.push([en ? 'Contents' : '包含项目', String(children.length)]);
+    else if (typeof file.content === 'string') rows.push([en ? 'Characters' : '字符数', String(Array.from(file.content).length)]);
+    return rows;
 }

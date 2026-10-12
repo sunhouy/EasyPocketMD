@@ -51,6 +51,30 @@ class CalendarTodoArgs {
     var rrule:String=""
 }
 
+@InvokeArg
+class NativeDialogArgs {
+    var kind: String = "alert"
+    var title: String = ""
+    var message: String = ""
+    var defaultValue: String = ""
+    var placeholder: String = ""
+    var confirmText: String = "确定"
+    var cancelText: String = "取消"
+    var dismissible: Boolean = true
+    var closeOnEsc: Boolean = true
+    var showCancel: Boolean = true
+    var danger: Boolean = false
+    var night: Boolean = false
+    var english: Boolean = false
+}
+@InvokeArg
+class CalendarEditorArgs {
+    var title: String = ""
+    var description: String = ""
+    var english: Boolean = false
+    var night: Boolean = false
+}
+
 /** Shared by MainActivity and the Rust plugin; independent of platform cache paths. */
 object IncomingDocuments {
     private val queue = ArrayDeque<String>()
@@ -95,21 +119,91 @@ class LocalDocumentsPlugin(private val activity: Activity) : Plugin(activity) {
         if(getPermissionState("calendar")!=PermissionState.GRANTED){requestPermissionForAlias("calendar",invoke,"calendarTodoReady");return}
         val args=invoke.parseArgs(CalendarTodoArgs::class.java)
         io.execute {try {
-            require(args.title.trim().isNotEmpty() && args.title.length<=500){"请输入待办标题（最多500字）"}
-            require(args.calendarId>0 && args.start>0 && args.end>args.start){"请选择日历和有效的开始、结束时间"}
-            require(args.rrule.isEmpty() || args.rrule.matches(Regex("FREQ=(DAILY|WEEKLY|MONTHLY|YEARLY)(;INTERVAL=[0-9]{1,3})?(;BYDAY=(MO,TU,WE,TH,FR))?(;(COUNT=[0-9]{1,4}|UNTIL=[0-9]{8}T[0-9]{6}Z))?"))){"重复规则无效"}
-            val eligible=activity.contentResolver.query(CalendarContract.Calendars.CONTENT_URI,arrayOf(CalendarContract.Calendars._ID),"${CalendarContract.Calendars._ID} = ? AND ${CalendarContract.Calendars.CALENDAR_ACCESS_LEVEL} >= ?",arrayOf(args.calendarId.toString(),CalendarContract.Calendars.CAL_ACCESS_CONTRIBUTOR.toString()),null)?.use {cursor->cursor.moveToFirst()} ?: false
-            require(eligible){"日历不可写或已被删除，请重新选择日历"}
-            val values=ContentValues().apply {
-                put(CalendarContract.Events.CALENDAR_ID,args.calendarId);put(CalendarContract.Events.TITLE,args.title.trim());put(CalendarContract.Events.DESCRIPTION,args.description)
-                put(CalendarContract.Events.DTSTART,args.start);put(CalendarContract.Events.EVENT_TIMEZONE,TimeZone.getDefault().id)
-                if(args.rrule.isEmpty())put(CalendarContract.Events.DTEND,args.end) else {put(CalendarContract.Events.RRULE,args.rrule);put(CalendarContract.Events.DURATION,"PT${(args.end-args.start)/1000}S")}
-            }
-            val operations=arrayListOf(ContentProviderOperation.newInsert(CalendarContract.Events.CONTENT_URI).withValues(values).build())
-            val results=activity.contentResolver.applyBatch(CalendarContract.AUTHORITY,operations)
-            val result=JSObject().put("eventUri",results[0].uri.toString())
+            val result=JSObject().put("eventUri",saveCalendarEvent(args))
             invoke.resolve(result)
         } catch(e:Exception){invoke.reject("添加待办失败："+(e.message?:"请检查日历权限和时间设置"))} }
+    }
+
+    private fun saveCalendarEvent(args: CalendarTodoArgs): String {
+        require(args.title.trim().isNotEmpty() && args.title.length<=500){"请输入待办标题（最多500字）"}
+        require(args.calendarId>0 && args.start>0 && args.end>args.start){"请选择日历和有效的开始、结束时间"}
+        require(args.rrule.isEmpty() || args.rrule.matches(Regex("FREQ=(DAILY|WEEKLY|MONTHLY|YEARLY)(;INTERVAL=[0-9]{1,3})?(;BYDAY=(MO,TU,WE,TH,FR))?(;(COUNT=[0-9]{1,4}|UNTIL=[0-9]{8}T[0-9]{6}Z))?"))){"重复规则无效"}
+        val eligible=activity.contentResolver.query(CalendarContract.Calendars.CONTENT_URI,arrayOf(CalendarContract.Calendars._ID),"${CalendarContract.Calendars._ID} = ? AND ${CalendarContract.Calendars.CALENDAR_ACCESS_LEVEL} >= ?",arrayOf(args.calendarId.toString(),CalendarContract.Calendars.CAL_ACCESS_CONTRIBUTOR.toString()),null)?.use {cursor->cursor.moveToFirst()} ?: false
+        require(eligible){"日历不可写或已被删除，请重新选择日历"}
+        val values=ContentValues().apply {
+            put(CalendarContract.Events.CALENDAR_ID,args.calendarId);put(CalendarContract.Events.TITLE,args.title.trim());put(CalendarContract.Events.DESCRIPTION,args.description)
+            put(CalendarContract.Events.DTSTART,args.start);put(CalendarContract.Events.EVENT_TIMEZONE,TimeZone.getDefault().id)
+            if(args.rrule.isEmpty())put(CalendarContract.Events.DTEND,args.end) else {put(CalendarContract.Events.RRULE,args.rrule);put(CalendarContract.Events.DURATION,"PT${(args.end-args.start)/1000}S")}
+        }
+        val operations=arrayListOf(ContentProviderOperation.newInsert(CalendarContract.Events.CONTENT_URI).withValues(values).build())
+        val results=activity.contentResolver.applyBatch(CalendarContract.AUTHORITY,operations)
+        return results[0].uri?.toString() ?: error("日历未返回保存结果")
+    }
+
+    private fun resolveDialog(invoke: Invoke, result: Map<String, Any?>) {
+        val response = JSObject()
+        result.forEach { (key, value) -> response.put(key, value) }
+        invoke.resolve(response)
+    }
+
+    @Command
+    fun dialog(invoke: Invoke) {
+        val args = invoke.parseArgs(NativeDialogArgs::class.java)
+        if (args.kind !in arrayOf("alert", "confirm", "prompt", "details")) { invoke.reject("Unsupported dialog"); return }
+        activity.runOnUiThread {
+            try {
+                NativeDialogs.show(activity, args.kind, args.title, args.message, args.defaultValue,
+                    args.placeholder, args.confirmText, args.cancelText, args.dismissible, args.closeOnEsc,
+                    args.showCancel, args.danger, args.night, args.english) { resolveDialog(invoke, it) }
+            } catch (error: Exception) { invoke.reject(error.message ?: "Unable to show native dialog") }
+        }
+    }
+
+    @PermissionCallback
+    fun calendarEditorReady(invoke: Invoke) {
+        if (getPermissionState("calendar") == PermissionState.GRANTED) showTodo(invoke)
+        else invoke.reject("未授权日历访问，日程没有写入")
+    }
+
+    @Command
+    fun showTodo(invoke: Invoke) {
+        if (getPermissionState("calendar") != PermissionState.GRANTED) { requestPermissionForAlias("calendar", invoke, "calendarEditorReady"); return }
+        val args = invoke.parseArgs(CalendarEditorArgs::class.java)
+        activity.runOnUiThread {
+            if (activity.isFinishing || activity.isDestroyed) { resolveDialog(invoke, mapOf("canceled" to true)); return@runOnUiThread }
+            var handedOff = false
+            val session = NativeDialogSession(activity) { if (!handedOff) resolveDialog(invoke, it) }
+            val context = NativeDialogs.context(activity, args.night)
+            val loading = android.app.AlertDialog.Builder(context)
+                .setTitle(if (args.english) "Loading calendars…" else "正在读取日历…")
+                .setView(android.widget.ProgressBar(context))
+                .setNegativeButton(if (args.english) "Cancel" else "取消", null).create()
+            session.bind(loading); loading.setCanceledOnTouchOutside(false); loading.show()
+            io.execute {
+                try {
+                    val calendars = mutableListOf<NativeCalendarEditor.WritableCalendar>()
+                    activity.contentResolver.query(CalendarContract.Calendars.CONTENT_URI,
+                        arrayOf(CalendarContract.Calendars._ID, CalendarContract.Calendars.CALENDAR_DISPLAY_NAME),
+                        "${CalendarContract.Calendars.CALENDAR_ACCESS_LEVEL} >= ? AND ${CalendarContract.Calendars.VISIBLE} = 1",
+                        arrayOf(CalendarContract.Calendars.CAL_ACCESS_CONTRIBUTOR.toString()), null)?.use { cursor ->
+                            while (cursor.moveToNext()) calendars.add(NativeCalendarEditor.WritableCalendar(cursor.getLong(0), cursor.getString(1) ?: ""))
+                        }
+                    require(calendars.isNotEmpty()) { if (args.english) "Enable a writable calendar in the system Calendar app first" else "请先在系统日历中添加或启用可写入的日历" }
+                    activity.runOnUiThread {
+                        if (!loading.isShowing) return@runOnUiThread
+                        handedOff = true; loading.dismiss()
+                        try {
+                            NativeCalendarEditor.show(activity, calendars, args.title, args.description, args.english,
+                                args.night, io, ::saveCalendarEvent) { resolveDialog(invoke, it) }
+                        } catch (error: Exception) { invoke.reject(error.message ?: "无法打开日程编辑器") }
+                    }
+                } catch (error: Exception) {
+                    activity.runOnUiThread {
+                        if (loading.isShowing) { handedOff = true; loading.dismiss(); invoke.reject(error.message ?: "无法读取日历") }
+                    }
+                }
+            }
+        }
     }
 
     @Command

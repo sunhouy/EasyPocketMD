@@ -44,3 +44,7 @@ image-cas/
 docker-control/
 
 .native-resources/
+
+# Maintained Kotlin sources must survive Android project regeneration.
+!src-tauri/platform/android/
+!src-tauri/platform/android/**
