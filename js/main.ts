@@ -3737,7 +3737,7 @@ document.addEventListener('DOMContentLoaded', function() {
     window.bindMobileChromeScroll = function() { mobileChromeScroll.bind(); };
 
     const settingsAccount=document.getElementById('settingsAccountBtn');
-    if(settingsAccount)settingsAccount.onclick=event=>window.handleLoginButtonClick?.(event);
+    if(settingsAccount)settingsAccount.onclick=event=>window.showAccountManagementDialog?.(event);
     const storageButton=document.getElementById('settingsStorageBtn');
     if(storageButton)storageButton.onclick=()=>{void refreshStorageAccess(true);};
     for(const [buttonId,menuId] of [['mobileMenuAIBtn','mobileDropdown'],['desktopMenuAIBtn','desktopMoreDropdown']]){

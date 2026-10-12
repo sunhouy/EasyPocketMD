@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { compareFileEntries, moveEntries, dropEntry, isPinned, MANUAL_ORDER_BASE } from './global-order';
 import { loadFeature } from '../feature-loader';
 import { loadLegacyFileTree } from '../editor-loader';
 import { queueWorkspaceCache, writeWorkspaceCache, readWorkspaceCache } from './workspace-cache';
@@ -49,19 +50,18 @@ import { createDiffFileWriter } from './conflict/live-files';
         loadContent: async file => file.id === g('currentFileId') ? getCurrentEditorContent(file.id,file.content) : needsServerFileContentFetch(file) ? fetchServerFileContent(file) : resolveE2EFileContent(file.content,file),
         exit: () => exitFileListMultiSelectMode(), delete: () => batchDeleteFileListMultiSelection(),
         upDown: (items,direction) => {
-            const tree = window.$?.fn?.jstree ? window.$('#fileList').jstree(true) : null; if (!tree && !global.isFileManagementMode) return;
-            const selected = new Set(items.map(file => file.name)); const groups = new Set(items.map(file => getParentPath(file.name)));
-            const orders = {};
-            for (const parentPath of groups) {
-                const visible = tree ? getJsTreeData().map(node => node.id) : [];
-                const siblings = (g('files') || []).filter(file => getParentPath(file.name) === parentPath).sort((a,b) => document.body.classList.contains('file-management-mode') ? Number(a.order || 0)-Number(b.order || 0) || (a.type==='file' && b.type==='file' ? noteTimestamp(b)-noteTimestamp(a) : a.name.localeCompare(b.name)) : visible.indexOf(a.id)-visible.indexOf(b.id));
-                if (direction === 'up') {for (let i=1;i<siblings.length;i++) if (selected.has(siblings[i].name) && !selected.has(siblings[i-1].name)) [siblings[i-1],siblings[i]]=[siblings[i],siblings[i-1]];}
-                else {for (let i=siblings.length-2;i>=0;i--) if (selected.has(siblings[i].name) && !selected.has(siblings[i+1].name)) [siblings[i],siblings[i+1]]=[siblings[i+1],siblings[i]];}
-                siblings.forEach((file,index) => orders[file.name] = (Number(global.fileOrders?.[file.name])<=-1000000 ? -2000000 : 0)+index*10);
-            }
-            orderStore.save(orders);loadFiles();
+            const orders = moveEntries(g('files') || [], items.map(file => file.id), direction);
+            if (orders) { orderStore.save(orders); loadFiles(); }
         }, import: path => pickAndImportFiles(path)
     });
+    global.reorderFileEntries = (source, target, after) => {
+        const orders = dropEntry(g('files') || [], source, target, after);
+        if (orders) { orderStore.save(orders); loadFiles(); }
+    };
+    global.moveFileEntries = (ids, direction) => {
+        const orders = moveEntries(g('files') || [], ids, direction);
+        if (orders) { orderStore.save(orders); loadFiles(); }
+    };
     const notesHome = installNotesHome(global, { loadContent: file => fetchServerFileContent(file), needsContent: file => needsServerFileContentFetch(file) });
 
     function g<K extends keyof Window>(name: K): Window[K] { return global[name]; }
@@ -1019,35 +1019,19 @@ import { createDiffFileWriter } from './conflict/live-files';
             }
         });
 
-        // 按照 order 排序，同级元素比较
-        const defaultSorting = g('userSettings') && g('userSettings').defaultSorting || 'modifiedTime';
+        const records = new Map(files.map(file => [file.name, file]));
+        const preference = g('userSettings')?.defaultSorting || 'modifiedTime';
         nodes.sort((a, b) => {
-            const orderA = a.data.order;
-            const orderB = b.data.order;
-            if (defaultSorting !== 'modifiedTime' && orderA !== orderB) return orderA - orderB;
-            
-            // 如果 order 相同，根据默认排序方式排序
-            if (defaultSorting === 'modifiedTime') {
-                // 按修改时间排序（最新的在前）
-                const fileA = g('files').find(f => f.name === a.data.path);
-                const fileB = g('files').find(f => f.name === b.data.path);
-                const timeA = fileA ? noteTimestamp(fileA) : 0;
-                const timeB = fileB ? noteTimestamp(fileB) : 0;
-                if (timeA !== timeB) return timeB - timeA; // 最新的在前
-            } else if (defaultSorting === 'fileSize') {
-                // 按文件大小排序（大的在前）
-                const fileA = g('files').find(f => f.name === a.data.path);
-                const fileB = g('files').find(f => f.name === b.data.path);
-                const sizeA = fileA && fileA.type === 'file' ? (fileA.content ? fileA.content.length : 0) : 0;
-                const sizeB = fileB && fileB.type === 'file' ? (fileB.content ? fileB.content.length : 0) : 0;
-                if (sizeA !== sizeB) return sizeB - sizeA; // 大的在前
+            const fileA = records.get(a.data.path) || {name:a.data.path,order:a.data.order};
+            const fileB = records.get(b.data.path) || {name:b.data.path,order:b.data.order};
+            if (preference === 'modifiedTime' || isPinned(fileA) || isPinned(fileB) || fileA.order >= MANUAL_ORDER_BASE || fileB.order >= MANUAL_ORDER_BASE) return compareFileEntries(fileA,fileB);
+            if (preference === 'fileSize') {
+                const size = (file) => file.type === 'file' ? (file.content || '').length : 0;
+                if (size(fileA) !== size(fileB)) return size(fileB)-size(fileA);
             }
-            // alphabetical 或其他情况：按名称排序
-            if (orderA !== orderB) return orderA - orderB;
-
             return a.text.localeCompare(b.text);
         });
-        
+
         return nodes;
     }
 

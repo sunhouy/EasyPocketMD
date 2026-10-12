@@ -1,4 +1,5 @@
 /// <reference lib="dom" />
+import { isPinned } from '../global-order';
 export type SyncStatus = 'syncing' | 'synced' | 'remote' | 'conflict' | 'offline' | 'offline-dirty' | 'pending';
 export const syncStatusPresentation: Record<SyncStatus, [string, string]> = {
     syncing: ['fa-arrows-rotate fa-spin', '同步中'], synced: ['fa-circle-check', '已同步'],
@@ -91,8 +92,14 @@ export async function restoreFileFromDB(file: any, manager: any): Promise<void> 
 export function refreshSyncIcons(globalRef: any): void {
     if (typeof document !== 'undefined') document.dispatchEvent(new Event('notes-home-refresh'));
     for (const file of globalRef.files || []) {
-        if (file.type !== 'file') continue;
         const anchor = document.getElementById(file.id + '_anchor'); if (!anchor) continue;
+        let pin = anchor.querySelector('.file-pin-indicator');
+        if (isPinned(file)) {
+            if (!pin) { pin = document.createElement('i'); pin.className = 'fas fa-thumbtack notes-pin file-pin-indicator'; anchor.append(pin); }
+            const label = globalRef.i18n?.getLanguage?.() === 'en' ? 'Pinned' : '已置顶';
+            pin.setAttribute('title',label);pin.setAttribute('aria-label',label);
+        } else pin?.remove();
+        if (file.type !== 'file') continue;
         const status = syncStatus(file, navigator.onLine !== false, !!(globalRef.unsavedChanges?.[file.id] || globalRef.pendingServerSync?.[file.id] || file.isSynced === false));
         let icon = anchor.querySelector<HTMLButtonElement>('.file-sync-icon');
         if (!icon) { icon = document.createElement('button'); icon.type = 'button'; icon.className = 'file-sync-icon';

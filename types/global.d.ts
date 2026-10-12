@@ -244,6 +244,7 @@ declare global {
         showPrintDialog: (mode?: string, callback?: (settings: PrintSettings) => void | Promise<void>) => void;
         showAILayoutDialog: (content: HTMLElement, cleanup: () => void, modal: HTMLElement) => void;
         generateTableHtml: (headers: string[], rows: string[][], alignment?: string[]) => string;
+        showAccountManagementDialog: (event?: Event) => void;
         handleLoginButtonClick: (event?: Event) => void | Promise<void>;
         toggleNightMode: () => void;
         showMobileActionSheet: (title: string, options: ActionSheetItem[]) => void;

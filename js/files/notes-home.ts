@@ -1,3 +1,5 @@
+import { compareFileEntries, isPinned } from './global-order';
+import { installOrderDrag } from './order-drag';
 import { bindFolderSwipe } from './folder-swipe';
 import { isOrderMetadataFile } from '../../shared/file-orders';
 import { syncStatus, syncStatusPresentation } from './sync/local-state';
@@ -20,7 +22,7 @@ export function visibleNotes(files:Note[], folder:string|null, query:string):Not
     const q=query.trim().toLocaleLowerCase();
     return files.filter(file=>file.type==='file' && !isOrderMetadataFile(file.name) && (folder===null || parent(file.name)===folder)
         && (!q || (file.name+' '+(/^EPMD\d*:/.test(file.content || '')?'':file.content || '')).toLocaleLowerCase().includes(q)))
-        .sort((a,b)=>noteTimestamp(b)-noteTimestamp(a) || (a.order || 0)-(b.order || 0) || a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
+        .sort(compareFileEntries);
 }
 
 /** A home view over the same files and tree actions; it owns no copies of drafts. */
@@ -33,11 +35,11 @@ export function installNotesHome(app:any, options:{loadContent?:(file:any)=>Prom
     const tools=document.createElement('div');tools.className='notes-home-tools';
     const button=(className:string, action:()=>void)=>{const element=document.createElement('button');element.type='button';element.className=className;element.onclick=action;return element;};
     const account=button('notes-account-button',()=>{});
-    account.onclick=event=>app.handleLoginButtonClick ? app.handleLoginButtonClick(event) : app.showLoginModal?.();
+    account.onclick=event=>app.showAccountManagementDialog ? app.showAccountManagementDialog(event) : app.handleLoginButtonClick ? app.handleLoginButtonClick(event) : app.showLoginModal?.();
     const settings=button('',()=>app.showSettingsDialog?.());
     account.innerHTML='<i class="fas fa-user-circle" aria-hidden="true"></i>';
     settings.innerHTML='<i class="fas fa-cog" aria-hidden="true"></i>';
-    tools.append(account,settings);header.append(heading,tools);
+    tools.append(settings,account);header.append(heading,tools);
     const search=document.createElement('input');search.type='search';search.className='notes-home-search';search.id='notesHomeSearch';search.name='workspace-file-search';search.autocomplete='off';search.setAttribute('data-lpignore','true');search.setAttribute('data-1p-ignore','true');search.setAttribute('autocapitalize','none');
     const searchForm=document.createElement('form');searchForm.className='notes-home-search-form';searchForm.setAttribute('role','search');searchForm.autocomplete='off';searchForm.onsubmit=event=>event.preventDefault();searchForm.append(search);
     const tabs=document.createElement('nav');tabs.className='notes-home-tabs';
@@ -72,10 +74,12 @@ export function installNotesHome(app:any, options:{loadContent?:(file:any)=>Prom
             }).catch(()=>{if(app.currentUser?.username===username && key(file)===stamp) snapshots.set(stamp,{preview:t('摘要暂不可用，点击打开文件','Preview unavailable. Open the file.'),query,matched:false});}).finally(()=>{running--;render();});
         }
     }
+    const dragging=installOrderDrag(home,app);
+    const addPin=(element:HTMLElement,file:Note)=>{if(isPinned(file)){const pin=document.createElement('i');pin.className='fas fa-thumbtack notes-pin';pin.title=t('已置顶','Pinned');pin.setAttribute('aria-label',pin.title);element.append(pin);}};
     const menu=(id:string,_x:number,_y:number)=>{app.openFileSelectionPanel?.(id);};
     const showFolder=(path:string)=>{view='folder';folder=path;app.notesHomeFolder=path;render();};
     function render() {
-        if (!document.body.classList.contains('file-management-mode')) return;
+        if (!document.body.classList.contains('file-management-mode') || app.fileOrderDragging) return;
         const username=app.currentUser?.username || '';
         if(cachedUser!==username){cachedUser=username;snapshots.clear();attempted.clear();}
         heading.textContent='EasyPocketMD';search.placeholder=t('搜索文件','Search files');
@@ -84,12 +88,12 @@ export function installNotesHome(app:any, options:{loadContent?:(file:any)=>Prom
         home.classList.toggle('is-loading',initializing);
         if(initializing){grid.replaceChildren();empty.hidden=false;empty.textContent=t('正在加载文件…','Loading files…');heading.textContent='EasyPocketMD';return;}
         const files:Note[]=app.files || [];
-        const folders=files.filter(file=>file.type==='folder').sort((a,b)=>(a.order || 0)-(b.order || 0) || a.name.localeCompare(b.name));
+        const folders=files.filter(file=>file.type==='folder').sort(compareFileEntries);
         if (view==='folder' && !folders.some(file=>file.name===folder)) {view='all';folder='';}
         app.notesHomeFolder=view==='folder'?folder:'';
         heading.textContent='EasyPocketMD';
-        account.setAttribute('aria-label',t('账号管理','Account management'));settings.setAttribute('aria-label',t('设置','Settings'));
-        account.title=t('账号管理','Account management');settings.title=t('设置','Settings');
+        account.setAttribute('aria-label',t('登录与账户管理','Login and accounts'));settings.setAttribute('aria-label',t('设置','Settings'));
+        account.title=t('登录与账户管理','Login and accounts');settings.title=t('设置','Settings');
         search.placeholder=t('搜索文件','Search files');search.setAttribute('aria-label',search.placeholder);
         const tabsScrollLeft=tabs.scrollLeft;
         tabs.setAttribute('aria-label',t('文件夹筛选','Filter by folder'));tabs.replaceChildren();
@@ -98,7 +102,7 @@ export function installNotesHome(app:any, options:{loadContent?:(file:any)=>Prom
         const activate=(id:string, action:()=>void)=>multi ? app.toggleFileListMultiSelectItem?.(id) : action();
         const tab=(text:string,active:boolean,action:()=>void,id?:string)=>{
             const element=button('notes-folder-tab'+(active?' active':'')+(multi && id && selected(id)?' selected':''),()=>id ? activate(id,action) : action());element.textContent=(multi && id ? (selected(id)?'☑ ':'☐ '):'')+text;element.title=text;
-            element.setAttribute('aria-pressed',String(active));if(multi && id){element.setAttribute('role','checkbox');element.setAttribute('aria-checked',String(selected(id)));}if(id)element.dataset.fileId=id;tabs.append(element);
+            element.setAttribute('aria-pressed',String(active));if(multi && id){element.setAttribute('role','checkbox');element.setAttribute('aria-checked',String(selected(id)));}if(id){element.dataset.fileId=id;const file=files.find(file=>file.id===id)!;addPin(element,file);dragging.decorate(element);}tabs.append(element);
         };
         app.notesHomeFolderPath=view==='folder'?folder:'';
         tab(t('全部','All'),view==='all',()=>{view='all';render();});
@@ -107,9 +111,9 @@ export function installNotesHome(app:any, options:{loadContent?:(file:any)=>Prom
         const scrollTop=grid.scrollTop;
         grid.replaceChildren();
         const query=search.value.trim().toLocaleLowerCase();
-        const visibleFolders=view==='all'?[]:folders.filter(item=>parent(item.name)===folder && (!query || item.name.toLocaleLowerCase().includes(query)));
+        const visibleFolders=view==='all'?folders.filter(item=>!query || item.name.toLocaleLowerCase().includes(query)):folders.filter(item=>parent(item.name)===folder && (!query || item.name.toLocaleLowerCase().includes(query)));
         for (const item of visibleFolders) {
-            const card=button('notes-folder-card',()=>activate(item.id,()=>showFolder(item.name)));card.dataset.fileId=item.id;card.textContent=(multi?(selected(item.id)?'☑ ':'☐ '):'📁 ')+basename(item.name);card.title=item.name;card.classList.toggle('selected',multi && selected(item.id));grid.append(card);
+            const card=button('notes-folder-card',()=>activate(item.id,()=>showFolder(item.name)));card.dataset.fileId=item.id;card.textContent=(multi?(selected(item.id)?'☑ ':'☐ '):'📁 ')+basename(item.name);card.title=item.name;addPin(card,item);dragging.decorate(card);card.classList.toggle('selected',multi && selected(item.id));grid.append(card);
         }
         const candidates=visibleNotes(files,view==='folder'?folder:null,'');
         const notes=candidates.filter(file=>searchable(file,query));
@@ -132,7 +136,7 @@ export function installNotesHome(app:any, options:{loadContent?:(file:any)=>Prom
             if((file as any).isExternalLocal || (file as any).externalLocalFileId || (file as any).localFilePath){
                 const badge=document.createElement('span');badge.className='file-local-badge';badge.textContent=t('本地','Local');badge.title=t('修改会保存到本地文件','Changes are saved to the local file');titleRow.append(badge);
             }
-            if(Number(file.order)<=-1000000){const pin=document.createElement('i');pin.className='fas fa-thumbtack notes-pin';pin.title=t('已置顶','Pinned');titleRow.append(pin);}
+            if(isPinned(file)){const pin=document.createElement('i');pin.className='fas fa-thumbtack notes-pin';pin.title=t('已置顶','Pinned');titleRow.append(pin);}
             if(encrypted(file)) {
                 const lock=document.createElement('span');lock.className='file-e2e-indicator';lock.title=t('此文件已使用端到端加密','This file is end-to-end encrypted');lock.setAttribute('aria-label',lock.title);
                 lock.innerHTML='<i class="fas fa-lock" aria-hidden="true"></i>';titleRow.append(lock);
@@ -142,8 +146,10 @@ export function installNotesHome(app:any, options:{loadContent?:(file:any)=>Prom
             preview.textContent=locked(file)||/^EPMD\d*:/.test(content)?t('加密文件','Encrypted file'):needs(file)?snapshots.has(key(file))?(snapshots.get(key(file))!.preview || t('暂无内容','No content')):t('摘要加载中…','Loading preview…'):notePreview(content)||t('暂无内容','No content');
             const date=document.createElement('time');const stamp=noteTimestamp(file);
             if(stamp){date.dateTime=new Date(stamp).toISOString();date.textContent=new Intl.DateTimeFormat(en()?'en':'zh-CN',{year:'numeric',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}).format(stamp);}else date.textContent=t('修改时间未记录','Modification time unavailable');
-            card.append(titleRow,preview,date);grid.append(card);
+            card.append(titleRow,preview,date);dragging.decorate(card);grid.append(card);
         }
+        const models=new Map(files.map(file=>[file.id,file]));
+        [...grid.children].sort((a,b)=>compareFileEntries(models.get((a as HTMLElement).dataset.fileId),models.get((b as HTMLElement).dataset.fileId))).forEach(item=>grid.append(item));
         grid.scrollTop=scrollTop;
         loadSnippets(query?candidates:candidates.slice(0,previewLimit),query);
         empty.hidden=!!grid.childElementCount;
@@ -157,7 +163,7 @@ export function installNotesHome(app:any, options:{loadContent?:(file:any)=>Prom
         next.click();
         tabs.querySelector<HTMLButtonElement>('.notes-folder-tab[aria-pressed="true"]')?.scrollIntoView?.({block:'nearest',inline:'nearest',behavior:'smooth'});
         grid.scrollTop=0;
-    },()=>!app.fileListMultiSelectMode && !app.fileListInitializing);
+    },()=>!app.fileListMultiSelectMode && !app.fileListInitializing && !app.fileOrderDragging);
     search.addEventListener('input' ,()=>{clearTimeout(timer);timer=setTimeout(render,120);});
     home.addEventListener('contextmenu',event=>{const target=(event.target as Element).closest<HTMLElement>('[data-file-id]');if(!target)return;event.preventDefault();menu(target.dataset.fileId!,event.clientX,event.clientY);});
     bindFileTreeLongPress(home,(target,x,y)=>menu(target.dataset.fileId!,x,y),'[data-file-id]');
