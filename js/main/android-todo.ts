@@ -1,3 +1,4 @@
+import {nativePalette} from './native-palette';
 import { markdownToPlainText } from '../markdown-plain-text';
 import {isAndroidApp} from './android-ui';
 
@@ -19,7 +20,7 @@ export async function showAndroidTodo(app:any=window) {
         } catch(error) { app.showMessage?.(String((error as Error).message || error),'warning'); }
         const result=await invoke('calendar_action',{action:'showTodo',payload:{
             title:file?.name?.split('/').pop()?.replace(/\.md$/i,'') || t('新日程','New event'),
-            description,english:en,night:app.nightMode===true,
+            description,palette:nativePalette(),english:en,night:app.nightMode===true,
         }});
         if(!result.canceled)app.showMessage?.(t('日程已写入系统日历','Added to system calendar'),'success');
     } catch(error) { app.showMessage?.(String((error as Error).message || error),'error'); }

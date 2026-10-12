@@ -52,7 +52,11 @@ class CalendarTodoArgs {
 }
 
 @InvokeArg
+class WorkspaceArgs { var model: String = "{}" }
+
+@InvokeArg
 class NativeDialogArgs {
+    var palette: String = ""
     var kind: String = "alert"
     var title: String = ""
     var message: String = ""
@@ -69,6 +73,7 @@ class NativeDialogArgs {
 }
 @InvokeArg
 class CalendarEditorArgs {
+    var palette: String = ""
     var title: String = ""
     var description: String = ""
     var english: Boolean = false
@@ -147,11 +152,21 @@ class LocalDocumentsPlugin(private val activity: Activity) : Plugin(activity) {
     }
 
     @Command
+    fun workspace(invoke: Invoke) {
+        val args=invoke.parseArgs(WorkspaceArgs::class.java)
+        activity.runOnUiThread {
+            try {NativeWorkspace.update(activity,org.json.JSONObject(args.model));invoke.resolve(JSObject().put("ready",true))}
+            catch(error:Exception){NativeWorkspace.close();invoke.reject(error.message ?: "Native workspace unavailable")}
+        }
+    }
+
+    @Command
     fun dialog(invoke: Invoke) {
         val args = invoke.parseArgs(NativeDialogArgs::class.java)
         if (args.kind !in arrayOf("alert", "confirm", "prompt", "details")) { invoke.reject("Unsupported dialog"); return }
         activity.runOnUiThread {
             try {
+                NativeMaterial.configure(args.night,args.palette)
                 NativeDialogs.show(activity, args.kind, args.title, args.message, args.defaultValue,
                     args.placeholder, args.confirmText, args.cancelText, args.dismissible, args.closeOnEsc,
                     args.showCancel, args.danger, args.night, args.english) { resolveDialog(invoke, it) }
@@ -171,10 +186,11 @@ class LocalDocumentsPlugin(private val activity: Activity) : Plugin(activity) {
         val args = invoke.parseArgs(CalendarEditorArgs::class.java)
         activity.runOnUiThread {
             if (activity.isFinishing || activity.isDestroyed) { resolveDialog(invoke, mapOf("canceled" to true)); return@runOnUiThread }
+            NativeMaterial.configure(args.night,args.palette)
             var handedOff = false
             val session = NativeDialogSession(activity) { if (!handedOff) resolveDialog(invoke, it) }
             val context = NativeDialogs.context(activity, args.night)
-            val loading = android.app.AlertDialog.Builder(context)
+            val loading = NativeMaterial.dialog(context)
                 .setTitle(if (args.english) "Loading calendars…" else "正在读取日历…")
                 .setView(android.widget.ProgressBar(context))
                 .setNegativeButton(if (args.english) "Cancel" else "取消", null).create()

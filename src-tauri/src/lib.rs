@@ -398,6 +398,14 @@ fn write_local_file(file_path: String, content: String) -> WriteLocalFileRespons
 }
 
 #[tauri::command]
+async fn android_workspace(app: AppHandle, model: String) -> Result<serde_json::Value, String> {
+    #[cfg(target_os = "android")]
+    { android_document(app, "workspace", serde_json::json!({"model":model})).await }
+    #[cfg(not(target_os = "android"))]
+    { let _ = (app, model); Err("Android workspace unavailable".into()) }
+}
+
+#[tauri::command]
 async fn android_native_dialog(app: AppHandle, payload: serde_json::Value) -> Result<serde_json::Value, String> {
     #[cfg(target_os = "android")]
     { android_document(app, "dialog", payload).await }
@@ -602,6 +610,7 @@ pub fn run() {
             request_storage_access,
             set_selection_menu,
             editor_clipboard_action,
+            android_workspace,
             android_native_dialog,
             calendar_action,
             read_local_file,

@@ -11,7 +11,7 @@ afterEach(()=>{ua.mockRestore();delete window.__TAURI__;document.body.replaceChi
 it('opens the Kotlin calendar editor with plain text and no HTML form',async()=>{
  await showAndroidTodo(app);
  expect(invoke).toHaveBeenCalledTimes(1);
- expect(invoke).toHaveBeenCalledWith('calendar_action',{action:'showTodo',payload:{title:'note',description:'标题\n\n完整的文档内容\n完成事项',english:false,night:false}});
+ expect(invoke).toHaveBeenCalledWith('calendar_action',{action:'showTodo',payload:{title:'note',description:'标题\n\n完整的文档内容\n完成事项',english:false,night:false,palette:'{}'}});
  expect(document.getElementById('androidTodoOverlay')).toBeNull();
  expect(app.showMessage).toHaveBeenCalledWith('日程已写入系统日历','success');
 });

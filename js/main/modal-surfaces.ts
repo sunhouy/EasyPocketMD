@@ -1,6 +1,6 @@
 /** Back must consume visible transient surfaces before changing the underlying page. */
 export const modalSurfaceSelector = [
-    '#customDialogContainer', '.vakata-context', '.desktop-dropdown-content.show',
+    '#customDialogContainer', '#selectionToolbar', '.vakata-context', '.desktop-dropdown-content.show',
     '.mobile-dropdown-content.show', '.user-menu-dropdown.show', '#fileManagementFabRing.open',
     '[aria-modal="true"]', '.share-history-overlay', '.modal-overlay', '.mobile-action-sheet-overlay',
     '.insert-picker-modal', '.insert-dialog-modal', '.footnote-picker-modal', '.formula-picker-modal',

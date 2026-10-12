@@ -93,7 +93,7 @@ export function installNotesHome(app:any, options:{loadContent?:(file:any)=>Prom
         const initializing=!!app.fileListInitializing;
         tabs.hidden=initializing;grid.hidden=initializing;
         home.classList.toggle('is-loading',initializing);
-        if(initializing){grid.replaceChildren();empty.hidden=false;empty.textContent=t('正在加载文件…','Loading files…');heading.textContent='EasyPocketMD';return;}
+        if(initializing){app.nativeWorkspace?.renderHome({loading:true,items:[],folders:[],folder:null,query:'',selecting:false,english:en()});grid.replaceChildren();empty.hidden=false;empty.textContent=t('正在加载文件…','Loading files…');heading.textContent='EasyPocketMD';return;}
         const files:Note[]=app.files || [];
         const folders=files.filter(file=>file.type==='folder').sort(compareFileEntries);
         if (view==='folder' && !folders.some(file=>file.name===folder)) {view='all';folder='';}
@@ -102,6 +102,23 @@ export function installNotesHome(app:any, options:{loadContent?:(file:any)=>Prom
         account.setAttribute('aria-label',t('登录与账户管理','Login and accounts'));settings.setAttribute('aria-label',t('设置','Settings'));
         account.title=t('登录与账户管理','Login and accounts');settings.title=t('设置','Settings');
         search.placeholder=t('搜索文件','Search files');search.setAttribute('aria-label',search.placeholder);
+        app.notesHomeFolderPath=view==='folder'?folder:'';
+        if(app.nativeWorkspace) {
+            const q=search.value.trim().toLocaleLowerCase();
+            const potential=files.filter(item=>!isOrderMetadataFile(item.name) && (view==='all' || parent(item.name)===folder)).sort(compareFileEntries);
+            const candidates=potential.filter(item=>searchable(item,q));
+            const native=app.nativeWorkspace.renderHome({loading:initializing,folder:view==='all'?null:folder,query:search.value,
+                folders:folders.map(item=>({id:String(item.id),name:item.name,pinned:isPinned(item)})),
+                items:candidates.map(item=>({id:String(item.id),name:basename(item.name),type:item.type,pinned:isPinned(item),locked:encrypted(item),
+                    status:item.type==='file'?syncStatus(item,navigator.onLine!==false,!!(app.unsavedChanges?.[item.id] || app.pendingServerSync?.[item.id] || (item as any).isSynced===false)):'',
+                    local:!!((item as any).isExternalLocal || (item as any).externalLocalFileId || (item as any).localFilePath),selected:!!app.fileListMultiSelectedIds?.has(String(item.id)),preview:locked(item)?t('加密文件','Encrypted file'):needs(item)?snapshots.get(key(item))?.preview || t('摘要加载中…','Loading preview…'):notePreview(item.content || '') || t('暂无内容','No content'),
+                    date:noteTimestamp(item)?new Date(noteTimestamp(item)).toLocaleString():t('修改时间未记录','Modification time unavailable')})),
+                selecting:!!app.fileListMultiSelectMode,count:app.fileListMultiSelectedIds?.size || 0,
+                actions:[...document.querySelectorAll<HTMLButtonElement>('#fileListMultiSelectToolbar [data-action]')].filter(button=>!button.hidden).map(button=>({action:button.dataset.action,label:button.textContent?.trim(),disabled:button.disabled})),
+                english:en()});
+            loadSnippets(potential.filter(item=>item.type==='file').slice(0,q?potential.length:previewLimit),q);
+            if(native){grid.replaceChildren();return;}
+        }
         const tabsScrollLeft=tabs.scrollLeft;
         tabs.setAttribute('aria-label',t('文件夹筛选','Filter by folder'));tabs.replaceChildren();
         const multi=!!app.fileListMultiSelectMode;
@@ -177,6 +194,8 @@ export function installNotesHome(app:any, options:{loadContent?:(file:any)=>Prom
     grid.addEventListener('scroll',()=>{if(grid.scrollHeight-grid.scrollTop-grid.clientHeight<500 && previewLimit<(app.files || []).length){previewLimit+=40;render();}});
     const clearSnapshots=()=>{snapshots.clear();attempted.clear();render();};
     window.addEventListener('e2e-locked',clearSnapshots);window.addEventListener('e2e-unlocked',clearSnapshots);
+    app.extendNativePreviews=(limit:number)=>{if(Number.isFinite(limit) && limit>previewLimit){previewLimit=Math.min(Math.ceil(limit),(app.files || []).length);render();}};
+    app.setNativeFileFilter=(path:string|null,query:string)=>{view=path===null?'all':'folder';folder=path || '';search.value=query;render();};
     app.refreshNotesHome=render;
     document.addEventListener('notes-home-refresh',render);
     return {render};

@@ -1,3 +1,4 @@
+import {installAndroidWorkspace} from './main/android-workspace';
 import { loadEditorConstructor, afterFirstPaint } from './editor-loader';
 import { readWorkspaceCacheSync } from './files/workspace-cache';
 import { isMobileUserAgent } from './main/device-layout';
@@ -3755,6 +3756,7 @@ document.addEventListener('DOMContentLoaded', function() {
         returnFromFileList: () => returnFromPrimaryFileInterface(window),
     });
 
+    installAndroidWorkspace(window);
     initDesktopModalEscHandler();
 
     if (window.startInFileManagementMode) {

@@ -1,3 +1,4 @@
+import {nativePalette} from '../main/native-palette';
 import { isAndroidApp } from '../main/android-ui';
 
 (function(global) {
@@ -41,7 +42,7 @@ import { isAndroidApp } from '../main/android-ui';
         if (invoke) {
             const english = global.i18n?.getLanguage?.() === 'en';
             void invoke('android_native_dialog', {payload: {
-                kind: type, title: options.title || '', message: String(options.message || ''),
+                palette:nativePalette(), kind: type, title: options.title || '', message: String(options.message || ''),
                 defaultValue: String(options.defaultValue || ''), placeholder: options.placeholder || '',
                 confirmText: options.confirmText || (english ? 'OK' : '确定'),
                 cancelText: options.cancelText || (english ? 'Cancel' : '取消'),
