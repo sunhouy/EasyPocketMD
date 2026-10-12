@@ -13,7 +13,7 @@ afterEach(()=>{jest.useRealTimers();});
 it('keeps cards draggable without displaying a grip icon',()=>{
  expect(a.draggable).toBe(true);
  expect(a.querySelector('.fa-grip-vertical')).toBeNull();
- expect(a.querySelector('.notes-order-handle')?.getAttribute('aria-label')).toBeTruthy();
+ expect(a.querySelector('.notes-order-handle')).toBeNull();
 });
 it('persists a desktop drop and prevents its incidental click from opening a note',()=>{
  jest.useFakeTimers();const open=jest.fn();a.onclick=open;
@@ -24,14 +24,21 @@ it('does not apply a drop to another account or replaced workspace',()=>{
  a.dispatchEvent(event('dragstart'));b.dispatchEvent(event('dragover',{clientX:5,clientY:110}));app.currentUser={username:'two'};b.dispatchEvent(event('drop'));expect(app.reorderFileEntries).not.toHaveBeenCalled();
  a.dispatchEvent(event('dragstart'));b.dispatchEvent(event('dragover',{clientX:5,clientY:110}));app.files=[];b.dispatchEvent(event('drop'));expect(app.reorderFileEntries).not.toHaveBeenCalled();
 });
-it('supports touch handle dragging and leaves ordinary card gestures available',()=>{
- const hit=jest.fn(()=>b);Object.defineProperty(document,'elementFromPoint',{configurable:true,value:hit});
- const normal=event('pointerdown',{pointerType:'touch',pointerId:4,button:0});a.dispatchEvent(normal);expect(normal.defaultPrevented).toBe(false);
- const down=event('pointerdown',{pointerType:'touch',pointerId:5,button:0});a.querySelector('.notes-order-handle')!.dispatchEvent(down);expect(down.defaultPrevented).toBe(true);expect(app.fileOrderDragging).toBe(true);
- a.dispatchEvent(event('pointermove',{pointerId:5,clientX:5,clientY:110}));a.dispatchEvent(event('pointerup',{pointerId:5}));expect(app.reorderFileEntries).toHaveBeenCalledWith('a','b',false);
+it('leaves touch gestures available and blocks touch-initiated dragging',()=>{
+ const down=event('pointerdown',{pointerType:'touch',pointerId:5,button:0});a.dispatchEvent(down);
+ expect(down.defaultPrevented).toBe(false);expect(app.fileOrderDragging).toBeFalsy();
+ const drag=event('dragstart');a.dispatchEvent(drag);expect(drag.defaultPrevented).toBe(true);
+ b.dispatchEvent(event('dragover',{clientX:5,clientY:110}));b.dispatchEvent(event('drop'));
+ expect(app.reorderFileEntries).not.toHaveBeenCalled();
 });
-it('cancels interrupted touch drags and supports keyboard ordering',()=>{
- a.querySelector('.notes-order-handle')!.dispatchEvent(event('pointerdown',{pointerType:'touch',pointerId:5,button:0}));a.dispatchEvent(event('pointercancel',{pointerId:5}));expect(app.fileOrderDragging).toBe(false);expect(app.reorderFileEntries).not.toHaveBeenCalled();
+it('disables native drag on phones even if the event has no pointer information',()=>{
+ const ua=jest.spyOn(navigator,'userAgent','get').mockReturnValue('Mozilla/5.0 (Linux; Android 14) Mobile');
+ const item=document.createElement('article');installOrderDrag(document.createElement('section'),app).decorate(item);
+ expect(item.draggable).toBe(false);
+ const drag=event('dragstart');a.dispatchEvent(drag);expect(drag.defaultPrevented).toBe(true);
+ expect(app.fileOrderDragging).toBeFalsy();ua.mockRestore();
+});
+it('supports desktop keyboard ordering',()=>{
  a.dispatchEvent(new KeyboardEvent('keydown',{bubbles:true,altKey:true,key:'ArrowDown'}));expect(app.moveFileEntries).toHaveBeenCalledWith(['a'],'down');
 });
 

@@ -1,5 +1,5 @@
 import { compareFileEntries, isPinned } from './global-order';
-import { installOrderDrag } from './order-drag';
+import { desktopFileInteraction, installOrderDrag } from './order-drag';
 import { bindFolderSwipe } from './folder-swipe';
 import { isOrderMetadataFile } from '../../shared/file-orders';
 import { syncStatus, syncStatusPresentation } from './sync/local-state';
@@ -43,6 +43,13 @@ export function installNotesHome(app:any, options:{loadContent?:(file:any)=>Prom
     const search=document.createElement('input');search.type='search';search.className='notes-home-search';search.id='notesHomeSearch';search.name='workspace-file-search';search.autocomplete='off';search.setAttribute('data-lpignore','true');search.setAttribute('data-1p-ignore','true');search.setAttribute('autocapitalize','none');
     const searchForm=document.createElement('form');searchForm.className='notes-home-search-form';searchForm.setAttribute('role','search');searchForm.autocomplete='off';searchForm.onsubmit=event=>event.preventDefault();searchForm.append(search);
     const tabs=document.createElement('nav');tabs.className='notes-home-tabs';
+    tabs.addEventListener('wheel',event=>{
+        if(!desktopFileInteraction() || event.ctrlKey || !event.deltaY || Math.abs(event.deltaX)>=Math.abs(event.deltaY))return;
+        const scale=event.deltaMode===1?32:event.deltaMode===2?tabs.clientWidth:1;
+        const before=tabs.scrollLeft;
+        tabs.scrollLeft+=event.deltaY*scale;
+        if(tabs.scrollLeft!==before)event.preventDefault();
+    },{passive:false});
     const grid=document.createElement('div');grid.className='notes-home-grid';
     const empty=document.createElement('p');empty.className='notes-home-empty';
     home.append(header,searchForm,tabs,grid,empty);sidebar.prepend(home);

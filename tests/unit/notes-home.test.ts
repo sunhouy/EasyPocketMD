@@ -151,3 +151,16 @@ it('pins folder tabs and cards without moving their children into the pinned gro
  expect((document.querySelector('.notes-home-grid > [data-file-id]') as HTMLElement).dataset.fileId).toBe('folder');
  expect([...document.querySelectorAll('.notes-file-card')].map(card=>(card as HTMLElement).dataset.fileId)).toEqual(['note','nested','old']);
 });
+
+it('scrolls desktop folder tabs horizontally with the vertical wheel',()=>{
+ const tabs=document.querySelector<HTMLElement>('.notes-home-tabs')!;
+ let position=0;Object.defineProperty(tabs,'scrollLeft',{configurable:true,get:()=>position,set:value=>{position=Math.max(0,Math.min(300,value));}});
+ const wheel=(deltaY:number,options:any={})=>{const e=new WheelEvent('wheel',{bubbles:true,cancelable:true,deltaY,...options});tabs.dispatchEvent(e);return e;};
+ expect(wheel(80).defaultPrevented).toBe(true);expect(position).toBe(80);
+ expect(wheel(-30).defaultPrevented).toBe(true);expect(position).toBe(50);
+ expect(wheel(2,{deltaMode:1}).defaultPrevented).toBe(true);expect(position).toBe(114);
+ expect(wheel(20,{ctrlKey:true}).defaultPrevented).toBe(false);expect(position).toBe(114);
+ position=300;expect(wheel(30).defaultPrevented).toBe(false);
+ const ua=jest.spyOn(navigator,'userAgent','get').mockReturnValue('iPhone Mobile');
+ expect(wheel(-40).defaultPrevented).toBe(false);expect(position).toBe(300);ua.mockRestore();
+});
