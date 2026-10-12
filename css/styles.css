@@ -2202,7 +2202,9 @@ body.night-mode .current-file-e2e-indicator:focus-visible {
     text-overflow: ellipsis;
     text-align: center;
     display: block;
-    height: 100%;
+    height: auto;
+    align-self: center;
+    line-height: 1.25;
     pointer-events: none;
     z-index: 1002;
 }
@@ -6223,8 +6225,6 @@ body.night-mode .delete-warning { color:#ff9ca8; }
 .epmd-secret-field { -webkit-text-security: disc; }
 
 .notes-file-card, .notes-folder-card { position:relative; }
-.notes-order-handle { display:inline-flex;align-items:center;justify-content:center;width:26px;height:32px;cursor:grab;touch-action:none;color:var(--md-text,#666); }
-.notes-file-card > .notes-order-handle, .notes-folder-card > .notes-order-handle, .notes-folder-tab > .notes-order-handle { position:absolute;right:6px;top:8px; }
 .notes-folder-tab { position:relative; }
 .notes-pin { color:var(--theme-accent,#4a90e2);margin-inline:4px; }
 .order-drag-source { opacity:.55; }
