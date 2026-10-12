@@ -7,19 +7,12 @@ import {nativePalette} from './native-palette';
 export function installAndroidWorkspace(app:any=window) {
     if(!isAndroidApp())return;
     const invoke=app.__TAURI__?.core?.invoke || app.__TAURI__?.invoke;if(!invoke)return;
-    let toast:any=null,toastId=0,panelsSupported:boolean|undefined;
+    let toast:any=null,toastId=0;
     let enabled=true,owner=app.currentUser,epoch=1,home:any=null,more:any=null,sending=false,dirty=false;
     const refs=new Map<string,HTMLElement>(),keys=new WeakMap<HTMLElement,string>();let next=0;
     const key=(element:HTMLElement)=>{let id=keys.get(element);if(!id){id='native-'+(++next);keys.set(element,id);}refs.set(id,element);return id;};
     const label=(el:HTMLElement)=>el.getAttribute('aria-label') || el.getAttribute('title') || el.textContent?.trim() || '';
-    const previewImages=new WeakMap<HTMLCanvasElement,string>();
     function node(el:HTMLElement):any {
-        if(el instanceof HTMLCanvasElement && el.width && el.height) {
-            let source=previewImages.get(el);
-            if(!source)try {const bitmap=document.createElement('canvas');bitmap.width=Math.min(1024,el.width);bitmap.height=Math.round(el.height*bitmap.width/el.width);bitmap.getContext('2d')?.drawImage(el,0,0,bitmap.width,bitmap.height);source=bitmap.toDataURL('image/png');previewImages.set(el,source);}catch{return {type:'text',label:app.i18n?.getLanguage?.()==='en'?'Preview unavailable':'预览暂不可用'};}
-            return {type:'image',key:key(el),source,label:el.getAttribute('aria-label') || 'PDF preview'};
-        }
-
         if(el.hidden || el.style.display==='none' || el.matches('script,style,[type=hidden],i,svg,option'))return null;
         if(el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement) {
             if(el.type==='radio')return {type:'radio',key:key(el),label:label(el.closest('label') || el),value:el.value,checked:(el as HTMLInputElement).checked,disabled:el.disabled};
@@ -45,33 +38,11 @@ export function installAndroidWorkspace(app:any=window) {
     function settings() {
         const overlay=document.getElementById('settingsModalOverlay');
         if(!overlay?.classList.contains('show'))return null;
-        return {title:app.i18n?.tOr?.('settings','设置') || '设置',children:[...overlay.querySelector('.modal-form')!.children].map(child=>node(child as HTMLElement)).filter(Boolean),
+        return {title:app.i18n?.tOr?.('settings','设置') || '设置',children:[...overlay.querySelector('.modal-form')!.children].filter(child=>!child.matches('.modal-actions')).map(child=>node(child as HTMLElement)).filter(Boolean),
             save:key(document.getElementById('saveSettingsBtn')!),cancel:key(document.getElementById('cancelSettingsBtn')!),saveLabel:label(document.getElementById('saveSettingsBtn')!),cancelLabel:app.i18n?.tOr?.('cancel','取消') || '取消'};
     }
-    const panelSelector='#aboutModalOverlay,#wordCountModalOverlay,#aiModalOverlay,[data-native-panel]';
-    const nativeOverlays=new Set<HTMLElement>();
     const transientSelector='#selectionToolbar,.vakata-context,.desktop-dropdown-content,.mobile-dropdown-content,.user-menu-dropdown,#fileManagementFabRing';
-    function activeSurface(el:HTMLElement) {
-        return el.isConnected && !el.hidden && el.style.display!=='none' && getComputedStyle(el).display!=='none' &&
-            (el.classList.contains('show') || !!el.style.display && el.style.display!=='none');
-    }
-    function panels() {
-        return [...document.querySelectorAll<HTMLElement>(panelSelector)].filter(activeSurface).map(overlay=>{
-            const root=overlay.querySelector<HTMLElement>(':scope > .modal') || overlay.firstElementChild as HTMLElement || overlay;
-            const heading=root.querySelector<HTMLElement>('h1,h2,.modal-header');
-            const close=root.querySelector<HTMLElement>('.modal-close-btn,.epmd-dialog-close,.share-close-btn,[id*=close i],[id*=cancel i]');
-            return {key:key(overlay),dismissible:overlay.getAttribute('data-esc-closable')!=='false' && !!(close || overlay.id || (overlay as any).epmdCloseByBackPress),title:heading?.textContent?.trim() || overlay.dataset.nativeTitle || 'EasyPocketMD',
-                children:[...root.children].filter(child=>child!==close && child!==heading && !child.matches('.modal-header')).map(child=>node(child as HTMLElement)).filter(Boolean)};
-        });
-    }
-    function closePanel(overlay:HTMLElement) {
-        if(overlay.getAttribute('data-esc-closable')==='false')return;
-        if(overlay.id==='aiModalOverlay' && app.closeAIPanel){app.closeAIPanel();return;}
-        const registered=(overlay as any).epmdCloseByBackPress;if(registered){registered();return;}
-        const close=overlay.querySelector<HTMLElement>('.modal-close-btn,.epmd-dialog-close,.share-close-btn,[id*=close i],[id*=cancel i]');
-        if(close){close.click();return;}
-        if(overlay.id)overlay.classList.remove('show');else overlay.remove();
-    }
+    document.querySelectorAll('[data-native-owned]').forEach(el=>el.removeAttribute('data-native-owned'));
     function openMore() {
         more={title:app.i18n?.tOr?.('more','更多') || '更多',items:[...document.querySelectorAll<HTMLButtonElement>('#mobileDropdown .dropdown-item')]
             .filter(el=>!el.hidden && getComputedStyle(el).display!=='none').map(el=>({key:key(el),label:label(el),id:el.id,disabled:el.disabled,
@@ -91,18 +62,14 @@ export function installAndroidWorkspace(app:any=window) {
         try {
             while(dirty && enabled) {
                 dirty=false;for(const [id,element] of refs)if(!element.isConnected)refs.delete(id);const setting=settings();
-                const nativePanels=panels(),owned=new Set(nativePanels.map(panel=>panel.key));
-                const blocked=[...document.querySelectorAll<HTMLElement>(modalSurfaceSelector)].some(el=>!el.closest('#settingsModalOverlay') && !el.matches(transientSelector) && (panelsSupported===false || !owned.has(key((el.closest(panelSelector) as HTMLElement) || el))) && isVisibleModalSurface(el));
-                const model={toast,epoch,night:!!app.nightMode,palette:nativePalette(),home:document.body.classList.contains('file-management-mode') && !blocked?home:null,settings:blocked?null:setting,more,panels:blocked?[]:nativePanels,toolbar:blocked?null:toolbar()};
+                const blocked=[...document.querySelectorAll<HTMLElement>(modalSurfaceSelector)].some(el=>!el.closest('#settingsModalOverlay') && !el.matches(transientSelector) && isVisibleModalSurface(el));
+                // An empty panel list also closes panels in previously installed native hosts.
+                const model={toast,epoch,night:!!app.nightMode,palette:nativePalette(),home:document.body.classList.contains('file-management-mode') && !blocked?home:null,settings:blocked?null:setting,more,panels:[],toolbar:blocked?null:toolbar()};
                 const response=await invoke('android_workspace',{model:JSON.stringify(model)});
-                const supported=Array.isArray(response?.panelKeys);if(panelsSupported!==supported){panelsSupported=supported;if(nativePanels.length)dirty=true;}
                 if(response?.toolbarReady)app.nativeToolbarAvailable=true;
                 if(model.settings && response?.ready)app.nativeSettingsAvailable=true;
                 // Native chrome owns the base page until command failure, even during child dialogs.
                 document.body.classList.toggle('native-toolbar-ready',!!app.nativeToolbarAvailable && !document.body.classList.contains('file-management-mode'));
-                const acknowledged=new Set<string>(response?.panelKeys || []);
-                for(const overlay of nativeOverlays)if(!activeSurface(overlay) || panelsSupported===false){overlay.removeAttribute('data-native-owned');nativeOverlays.delete(overlay);}
-                for(const panel of model.panels)if(acknowledged.has(panel.key)){const overlay=refs.get(panel.key)!;overlay.setAttribute('data-native-owned','true');nativeOverlays.add(overlay);}
                 app.nativeWorkspaceAvailable=true;
                 if(model.home && !app.nativeWorkspaceReady){app.nativeWorkspaceReady=true;document.body.classList.add('native-workspace-ready');app.refreshNotesHome?.();}
                 const paused=blocked;
@@ -111,7 +78,7 @@ export function installAndroidWorkspace(app:any=window) {
                 document.body.classList.toggle('native-settings-ready',!!app.nativeSettingsAvailable && !!setting);
             }
         } catch(error) {
-            enabled=false;(window as any).enableLegacyAndroidBackRoute?.();app.nativeWorkspaceAvailable=false;app.nativeWorkspaceReady=false;app.nativeToolbarAvailable=false;app.nativeSettingsAvailable=false;for(const overlay of nativeOverlays)overlay.removeAttribute('data-native-owned');nativeOverlays.clear();document.body.classList.remove('native-workspace-ready','native-settings-ready','native-toolbar-ready');app.refreshNotesHome?.();
+            enabled=false;(window as any).enableLegacyAndroidBackRoute?.();app.nativeWorkspaceAvailable=false;app.nativeWorkspaceReady=false;app.nativeToolbarAvailable=false;app.nativeSettingsAvailable=false;document.body.classList.remove('native-workspace-ready','native-settings-ready','native-toolbar-ready');app.refreshNotesHome?.();
             console.warn('Native workspace unavailable; using web UI',error);
         } finally {sending=false;}
     }
@@ -135,7 +102,6 @@ export function installAndroidWorkspace(app:any=window) {
     }
     window.addEventListener('epmd-native-ui',((event:CustomEvent)=>{
         const detail=event.detail;if(!enabled || detail.epoch!==epoch || owner!==app.currentUser)return;
-        if(detail.kind==='close-panel'){const overlay=refs.get(detail.key);if(overlay?.isConnected)closePanel(overlay);void sync();return;}
         if(detail.kind==='toolbar'){const element=refs.get(detail.key);if(!element?.isConnected || (element as HTMLButtonElement).disabled)return;if(element.id==='mobileMenuBtn')openMore();else element.click();void sync();return;}
         if(detail.kind==='close-more'){more=null;void sync();return;}
         if(detail.kind==='viewport'){app.extendNativePreviews?.(Number(detail.limit));return;}
@@ -181,8 +147,8 @@ export function installAndroidWorkspace(app:any=window) {
     window.addEventListener('languagechange',()=>{void sync();});window.addEventListener('e2e-account-reset',()=>{epoch++;owner=app.currentUser;refs.clear();home=null;more=null;void sync();});
     const originalMessage=app.showMessage;
     app.showMessage=function(message:string,...args:any[]){
-        if(enabled && app.nativeWorkspaceAvailable && (document.body.classList.contains('file-management-mode') || settings() || more || nativeOverlays.size)) {toast={id:++toastId,message};void sync();return;}
+        if(enabled && app.nativeWorkspaceAvailable && (document.body.classList.contains('file-management-mode') || settings() || more)) {toast={id:++toastId,message};void sync();return;}
         return originalMessage?.call(app,message,...args);
     };
-    void sync();return {sync,dispose(){enabled=false;observer.disconnect();app.nativeWorkspaceReady=false;app.nativeToolbarAvailable=false;app.nativeSettingsAvailable=false;for(const overlay of nativeOverlays)overlay.removeAttribute('data-native-owned');nativeOverlays.clear();document.body.classList.remove('native-workspace-ready','native-settings-ready','native-toolbar-ready');}};
+    void sync();return {sync,dispose(){enabled=false;observer.disconnect();app.nativeWorkspaceReady=false;app.nativeToolbarAvailable=false;app.nativeSettingsAvailable=false;document.body.classList.remove('native-workspace-ready','native-settings-ready','native-toolbar-ready');}};
 }

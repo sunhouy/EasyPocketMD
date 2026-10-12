@@ -682,7 +682,7 @@ import { createDiffFileWriter } from './conflict/live-files';
 
     global.toggleFileListMultiSelectItem = toggleFileListMultiSelectItem;
 
-    function updateFileListMultiSelectToolbar() { global.refreshNotesHome?.(); batchActions.update(); }
+    function updateFileListMultiSelectToolbar() { batchActions.update(); global.refreshNotesHome?.(); }
 
     function ensureMultiSelectCheckbox(anchor, nodeId) {
         if (!isFileListMultiSelectMode()) return;
@@ -738,6 +738,7 @@ import { createDiffFileWriter } from './conflict/live-files';
     global.getFileListSelectableIds = () => {
         const ids = [];
         if (global.isFileManagementMode) {
+            if(global.getNotesHomeSelectableIds)return global.getNotesHomeSelectableIds();
             document.querySelectorAll<HTMLElement>('#notesHome [data-file-id]').forEach(element => {if(element.dataset.fileId) ids.push(element.dataset.fileId);});
         } else window.$('#fileList .jstree-anchor').each(function(){const id=resolveNodeIdFromAnchorId(this.id);if(id) ids.push(String(id));});
         return [...new Set(ids)].filter(id=>(g('files') || []).some(file=>String(file.id)===id));
@@ -751,8 +752,7 @@ import { createDiffFileWriter } from './conflict/live-files';
     function invertFileListMultiSelection() {
         const set = getFileListMultiSelectedIds();
         if (global.isFileManagementMode) {
-            document.querySelectorAll<HTMLElement>('#notesHome .notes-file-card, #notesHome .notes-folder-card, #notesHome .notes-folder-tab[data-file-id]').forEach(element => {
-                const id = element.dataset.fileId;if (!id) return;
+            global.getFileListSelectableIds().forEach(id => {
                 if (set.has(id)) set.delete(id);else set.add(id);
             });
             updateFileListMultiSelectToolbar();return;

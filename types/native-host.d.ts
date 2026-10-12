@@ -10,7 +10,7 @@ export interface NativeFileResponse {
 }
 export interface NativeCommandMap {
     android_import_files: {canceled?:boolean;files?:{name:string;mime:string;base64:string}[]};
-    android_workspace: {ready:boolean;toolbarReady?:boolean;panelKeys?:string[]};
+    android_workspace: {ready:boolean;toolbarReady?:boolean};
     android_native_dialog: {value?: string | boolean; canceled: boolean};
     request_storage_access: { granted: boolean };
     save_local_file: NativeFileResponse;

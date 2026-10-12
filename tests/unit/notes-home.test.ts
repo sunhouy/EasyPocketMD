@@ -170,3 +170,16 @@ it('passes folder selection to the native tabs while preserving the current fold
  const home=app.nativeWorkspace.renderHome.mock.calls.at(-1)[0];expect(home.folders.find((f:any)=>f.id==='folder').selected).toBe(true);
  app.setNativeFileFilter('学习','');expect(app.nativeWorkspace.renderHome.mock.calls.at(-1)[0].folder).toBe('学习');
 });
+it('provides all selectable ids even after the native renderer clears web cards',()=>{
+ app.nativeWorkspace={renderHome:jest.fn(()=>true)};render();
+ expect(document.querySelectorAll('.notes-file-card')).toHaveLength(0);
+ expect(new Set(app.getNotesHomeSelectableIds())).toEqual(new Set(files.map(f=>f.id)));
+ app.files=[...app.files,{id:'hidden-order',name:'.easypocketmd_orders',type:'file'}];render();
+ expect(app.getNotesHomeSelectableIds()).not.toContain('hidden-order');
+ const current=app.getNotesHomeSelectableIds();current.pop();expect(app.getNotesHomeSelectableIds().length).toBeGreaterThan(current.length);
+});
+it('keeps native selection scope consistent with folder and search filters',()=>{
+ app.nativeWorkspace={renderHome:jest.fn(()=>true)};app.setNativeFileFilter('学习','');
+ expect(new Set(app.getNotesHomeSelectableIds())).toEqual(new Set(['folder','sub','note']));
+ app.setNativeFileFilter(null,'旧笔记');expect(new Set(app.getNotesHomeSelectableIds())).toEqual(new Set(['folder','sub','old']));
+});

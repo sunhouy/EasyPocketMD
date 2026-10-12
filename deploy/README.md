@@ -72,29 +72,14 @@ another hosted site can prevent a global HTTPS configuration check or reload;
 renewal does not repair unrelated sites. Monitor renewal logs and certificate
 expiry dates.
 
-## Two-server delivery
+## Domestic-only delivery
 
-Both main and dev deployments build once, then transfer concurrently to the original
-server and the US edge. Set `IP_US` and `SSHKEY_US` in Actions Secrets; the US SSH
-username is the existing `SERVER_USER`. The US server requires Docker, Python,
-rsync, nginx and the existing `/www/server/panel/vhost/nginx` TLS layout (the vhost
-and certificate directories are created automatically). No MySQL/Redis instance or
-Python sandbox is needed on the edge.
-
-The US gateway serves the same built frontend locally. API requests, WebSocket
-collaboration/sync, and uploaded files proxy over HTTPS to the original server's
-explicit `SERVER_HOST` IP, using the site's hostname for TLS verification. Database,
-Redis, file storage and active sessions stay on the original server, avoiding
-split uploads and missed cross-region sync notifications. `SERVER_HOST` must be an
-IP address, not the geo-routed public hostname. Both regions use the existing main
-TLS Secrets; dev retains its existing self-signed certificate behavior.
-
-Only the gateway image is transferred/imported on the edge, with the same
-incremental objects and obsolete-version cleanup. No database/API credentials are
-copied to the edge. Print client downloads are published to both servers. A failed
-deployment on either destination fails the workflow; a successfully switched
-server is not rolled back automatically. The original server must stay reachable
-from the edge on HTTPS; geo-DNS is managed outside this workflow.
+Main and dev deployments upload only to the domestic server configured by
+`SERVER_HOST`, `SERVER_USER` and its password/SSH configuration. No US edge is
+prepared or uploaded, and `IP_US` / `SSHKEY_US` are no longer required. Print-client
+downloads are also uploaded only to the domestic static directory. Existing
+foreign deployments and their DNS are left in place; these workflows do not
+update or remove them.
 
 ## Stable sandbox builds and transfer diagnostics
 
@@ -109,7 +94,7 @@ When intentionally refreshing a mutable base image without source changes,
 bump the `epmd-sandbox-linux-amd64-v2` cache prefix in both workflows (and change
 or pin the Dockerfile base reference to invalidate its dependency layers).
 
-Deployment logs label the origin/US target, count unique reused/missing compressed
+Deployment logs label the domestic target, count unique reused/missing compressed
 objects and required upload bytes, show rsync progress/speed and time each phase.
 Long phases print a heartbeat every 30 seconds. SSH connection attempts are
 bounded to 30 seconds, and rsync fails after 300 seconds without data transfer;
@@ -117,19 +102,11 @@ these are inactivity limits, not bandwidth limits. Interrupted object transfers
 retain partial data for a retry. Remote logs distinguish cleanup/capacity checks,
 HTTPS setup, archive verification/import and health checks/traffic switching.
 
-## Direct delivery and failed edge diagnostics
+## Direct domestic delivery
 
-GitHub Actions transfers directly to each server over SSH/rsync. The US server is
-never used as a relay to the original server. No route probe or deployment-provider
-variable affects the domestic upload.
-
-The regional proxy permits certificate chain verification to depth four while
-keeping TLS certificate/hostname verification enabled on main. Failed health
-checks record their last HTTP/connection error. Before a failed candidate is
-removed, logs include its running/exit/OOM status and Nginx transport errors
-(with request/query data redacted), plus a pinned-origin HTTPS probe inside the
-gateway to distinguish certificate trust, connectivity and upstream HTTP
-failures. These diagnostics do not log container environment or credentials.
+GitHub Actions transfers directly to the domestic server over SSH/rsync. There is
+no cross-region relay or foreign upload in the active workflow. Historical edge
+configuration/scripts remain for compatibility, but are not invoked by CI.
 
 ## Visible serving route and smaller API runtime
 

@@ -158,7 +158,7 @@ class LocalDocumentsPlugin(private val activity: Activity) : Plugin(activity) {
     fun workspace(invoke: Invoke) {
         val args=invoke.parseArgs(WorkspaceArgs::class.java)
         activity.runOnUiThread {
-            try {val toolbarReady=NativeWorkspace.update(activity,org.json.JSONObject(args.model));invoke.resolve(JSObject().put("ready",true).put("toolbarReady",toolbarReady).put("panelKeys",NativeWorkspace.panelKeys()))}
+            try {val toolbarReady=NativeWorkspace.update(activity,org.json.JSONObject(args.model));invoke.resolve(JSObject().put("ready",true).put("toolbarReady",toolbarReady))}
             catch(error:Exception){NativeWorkspace.close();invoke.reject(error.message ?: "Native workspace unavailable")}
         }
     }

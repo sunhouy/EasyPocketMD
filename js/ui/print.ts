@@ -80,7 +80,6 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
         var nightMode = g('nightMode') === true;
         var modal = document.createElement('div');
         modal.className = 'modal-overlay show';
-        modal.dataset.nativePanel = 'print';
         modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:10010;display:flex;align-items:center;justify-content:center;';
 
         var dialog = document.createElement('div');
@@ -151,7 +150,6 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
         var nightMode = g('nightMode') === true;
         var modal = document.createElement('div');
         modal.className = 'modal-overlay show';
-        modal.dataset.nativePanel = 'print';
         modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:10005;';
 
         var bg = nightMode ? '#2d2d2d' : 'white';
@@ -277,7 +275,6 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
         var nightMode = g('nightMode') === true;
         var printModal = document.createElement('div');
         printModal.className = 'modal-overlay show';
-        printModal.dataset.nativePanel = 'print';
         printModal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:10000;';
 
         var bg = nightMode ? '#2d2d2d' : 'white';
@@ -831,7 +828,6 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
 
             var connectionModal = document.createElement('div');
             connectionModal.className = 'modal-overlay show';
-            connectionModal.dataset.nativePanel = 'print';
             connectionModal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:10001;';
 
             var modalContent = document.createElement('div');
@@ -1524,7 +1520,6 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
         var nightMode = g('nightMode') === true;
         var loadingModal = document.createElement('div');
         loadingModal.className = 'modal-overlay show';
-        loadingModal.dataset.nativePanel = 'print';
         loadingModal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.9);z-index:21000;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;';
         loadingModal.innerHTML = '<div style="background:' + (nightMode ? '#2d2d2d' : 'white') + ';color:' + (nightMode ? '#eee' : '#333') + ';border-radius:12px;padding:30px;text-align:center;"><div style="font-size:24px;margin-bottom:15px;"><i class="fas fa-spinner fa-spin"></i></div><div style="font-size:16px;">' + (isEn() ? 'Generating PDF...' : '正在生成PDF...') + '</div></div>';
         document.body.appendChild(loadingModal);
@@ -1606,7 +1601,6 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
         // 显示加载状态
         loadingModal = document.createElement('div');
         loadingModal.className = 'modal-overlay show';
-        loadingModal.dataset.nativePanel = 'print';
         // Ensure z-index is higher than any mask used in generatePDF (which uses 20000)
         loadingModal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.9);z-index:21000;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;';
         
@@ -1656,7 +1650,6 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
             
             previewModal = document.createElement('div');
             previewModal.className = 'modal-overlay show';
-            previewModal.dataset.nativePanel = 'print';
             previewModal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.9);z-index:10001;display:flex;flex-direction:column;align-items:stretch;justify-content:stretch;padding:0;';
 
             var previewContent = document.createElement('div');
@@ -2109,7 +2102,6 @@ async function downloadGeneratedFile(payload, filename, mimeType) {
         var nightMode = g('nightMode') === true;
         var printModal = document.createElement('div');
         printModal.className = 'modal-overlay show';
-        printModal.dataset.nativePanel = 'print';
         printModal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:10000;';
 
         var bg = nightMode ? '#2d2d2d' : 'white';

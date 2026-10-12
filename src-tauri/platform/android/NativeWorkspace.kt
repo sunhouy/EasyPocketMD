@@ -30,8 +30,6 @@ object NativeWorkspace : android.app.Application.ActivityLifecycleCallbacks {
     private var toolbarSignature=""
     private var setting: AlertDialog?=null
     private var more: AlertDialog?=null
-    private val panels=linkedMapOf<String,AlertDialog>()
-    private val panelSchemas=mutableMapOf<String,String>()
     private val groups=mutableMapOf<String,Boolean>()
     private var homeSignature=""
     private var settingsSignature=""
@@ -65,7 +63,6 @@ object NativeWorkspace : android.app.Application.ActivityLifecycleCallbacks {
             setting?.setOnCancelListener(null);setting?.dismiss();settingsSignature=settingsSchema(config)
             setting=settings(activity,config,oldScroll);setting!!.show()
         }
-        updatePanels(activity,model.optJSONArray("panels") ?: JSONArray())
         val menu=model.optJSONObject("more")
         if(menu==null){more?.setOnDismissListener(null);more?.setOnCancelListener(null);more?.dismiss();more=null;menuSignature=""}
         else if(menu.toString()!=menuSignature){more?.setOnDismissListener(null);more?.dismiss();menuSignature=menu.toString();more=menu(activity,menu);more!!.show()}
@@ -73,7 +70,7 @@ object NativeWorkspace : android.app.Application.ActivityLifecycleCallbacks {
         if(toast!=null && toast.optLong("id")!=lastToast){lastToast=toast.optLong("id");Toast.makeText(activity,toast.optString("message"),Toast.LENGTH_SHORT).show()}
         return toolbarReady
     }
-    fun close() {panels.values.forEach {it.dismiss()};panels.clear();panelSchemas.clear();(toolbar?.parent as? ViewGroup)?.removeView(toolbar);toolbar=null;toolbarSignature="";home?.dismiss();setting?.setOnCancelListener(null);setting?.dismiss();more?.setOnDismissListener(null);more?.setOnCancelListener(null);more?.dismiss();home=null;setting=null;more=null;settingsSignature="";menuSignature=""}
+    fun close() {(toolbar?.parent as? ViewGroup)?.removeView(toolbar);toolbar=null;toolbarSignature="";home?.dismiss();setting?.setOnCancelListener(null);setting?.dismiss();more?.setOnDismissListener(null);more?.setOnCancelListener(null);more?.dismiss();home=null;setting=null;more=null;settingsSignature="";menuSignature=""}
 
     override fun onActivityDestroyed(activity:Activity){if(owner.get()===activity){NativeNavigation.reset();close();application?.unregisterActivityLifecycleCallbacks(this);application=null;owner=WeakReference(null)}}
     override fun onActivityCreated(activity:Activity,state:Bundle?){}
@@ -259,7 +256,7 @@ object NativeWorkspace : android.app.Application.ActivityLifecycleCallbacks {
             footer.removeAllViews();frame.findViewWithTag<View>("create").visibility=if(model.optBoolean("selecting") || model.optBoolean("loading"))View.GONE else View.VISIBLE
             if(model.optBoolean("selecting")) {
                 val controls=row(context);controls.addView(NativeMaterial.label(context,if(model.optBoolean("english"))"${model.optInt("count")} selected" else "${model.optInt("count")} 已选择"),LinearLayout.LayoutParams(0,-2,1f))
-                for(action in listOf("all","cancel"))controls.addView(NativeMaterial.button(context,if(model.optBoolean("english"))if(action=="all")"Select all" else "Cancel" else if(action=="all")"全选" else "取消").apply {setOnClickListener {emit(activity,"home-action",mapOf("action" to action))}})
+                for(action in listOf("all","cancel"))controls.addView(NativeMaterial.button(context,if(model.optBoolean("english"))if(action=="all")model.optString("selectAllLabel","Select all") else "Cancel" else if(action=="all")model.optString("selectAllLabel","全选") else "取消").apply {setOnClickListener {emit(activity,"home-action",mapOf("action" to action))}})
                 footer.addView(controls)
                 val actions=model.optJSONArray("actions") ?: JSONArray();val buttons=GridLayout(context).apply {columnCount=5}
                 for(index in 0 until actions.length()){
@@ -267,48 +264,6 @@ object NativeWorkspace : android.app.Application.ActivityLifecycleCallbacks {
                     buttons.addView(tile(context,id,action.optString("label"),!action.optBoolean("disabled")) {emit(activity,"home-action",mapOf("action" to id))},GridLayout.LayoutParams().apply {width=0;columnSpec=GridLayout.spec(GridLayout.UNDEFINED,1f);setMargins(2,2,2,2)})
                 };footer.addView(buttons)
             }
-        }
-    }
-    fun panelKeys()=JSONArray(panels.keys.toList())
-    private fun panelSchema(model:JSONObject):String {
-        val copy=JSONObject(model.toString())
-        fun clean(node:JSONObject) {
-            if(node.optString("type")=="input")node.remove("value")
-            if(node.optString("type")=="text" && node.optString("key").isNotEmpty())node.remove("label")
-            val children=node.optJSONArray("children") ?: return
-            for(index in 0 until children.length())clean(children.getJSONObject(index))
-        }
-        clean(copy);return copy.toString()
-    }
-    private fun updatePanels(activity:Activity,models:JSONArray) {
-        val keys=(0 until models.length()).map {models.getJSONObject(it).optString("key")}.toSet()
-        for(key in panels.keys.toList())if(key !in keys){panels.remove(key)?.dismiss();panelSchemas.remove(key)}
-        for(index in 0 until models.length()) {
-            val model=models.getJSONObject(index);val key=model.optString("key");val schema=panelSchema(model)
-            if(panelSchemas[key]!=schema || panels[key]?.isShowing!=true) {
-                val position=panels[key]?.window?.decorView?.findViewWithTag<ScrollView>("panel-scroll")?.scrollY ?: 0
-                panels.remove(key)?.dismiss()
-                val context=NativeMaterial.context(activity,dark);val content=vertical(context);padding(content,16)
-                val header=row(context);header.addView(NativeMaterial.label(context,model.optString("title"),22f).apply {setTypeface(typeface,Typeface.BOLD)},LinearLayout.LayoutParams(0,-2,1f))
-                val cancel={if(model.optBoolean("dismissible",true))emit(activity,"close-panel",mapOf("key" to key))}
-                header.addView(NativeMaterial.icon(context,"\ue5cd","关闭",cancel).apply {visibility=if(model.optBoolean("dismissible",true))View.VISIBLE else View.GONE},LinearLayout.LayoutParams(NativeMaterial.dp(context,40),NativeMaterial.dp(context,40)))
-                content.addView(header,LinearLayout.LayoutParams(-1,-2).apply {bottomMargin=NativeMaterial.dp(context,12)})
-                val body=vertical(context);renderNodes(activity,body,model.optJSONArray("children") ?: JSONArray(),key)
-                val scroll=ScrollView(context).apply {tag="panel-scroll";addView(body);post {scrollTo(0,position)}}
-                content.addView(scroll,LinearLayout.LayoutParams(-1,0,1f))
-                val dialog=NativeMaterial.dialog(context).setView(content).create();dialog.setCanceledOnTouchOutside(false);dialog.setCancelable(false)
-                dialog.setOnShowListener {boundWindow(activity,dialog);NativeNavigation.dialogBack(dialog,cancel)}
-                panels[key]=dialog;panelSchemas[key]=schema;dialog.show()
-            }
-            val decor=panels[key]?.window?.decorView ?: continue
-            fun patch(node:JSONObject) {
-                val view=decor.findViewWithTag<TextView>(node.optString("key"))
-                if(node.optString("type")=="text" && view!=null && view.text.toString()!=node.optString("label"))view.text=node.optString("label")
-                if(node.optString("type")=="input" && view is EditText && !view.hasFocus() && view.text.toString()!=node.optString("value"))view.setText(node.optString("value"))
-                val children=node.optJSONArray("children") ?: return
-                for(child in 0 until children.length())patch(children.getJSONObject(child))
-            }
-            patch(model)
         }
     }
     private fun boundWindow(activity:Activity,dialog:AlertDialog) {
@@ -350,18 +305,6 @@ object NativeWorkspace : android.app.Application.ActivityLifecycleCallbacks {
         for(index in 0 until nodes.length()) {
             val node=nodes.getJSONObject(index);val key=node.optString("key");val label=node.optString("label")
             when(node.optString("type")) {
-                "image" -> {
-                    val source=node.optString("source")
-                    if(source.startsWith("data:image/png;base64,")) {
-                        val bytes=android.util.Base64.decode(source.substringAfter(','),android.util.Base64.DEFAULT)
-                        val bitmap=android.graphics.BitmapFactory.decodeByteArray(bytes,0,bytes.size)
-                        if(bitmap!=null) {
-                            val width=(context.resources.displayMetrics.widthPixels-NativeMaterial.dp(context,64)).coerceAtLeast(1)
-                            val height=(width.toLong()*bitmap.height/bitmap.width).toInt().coerceAtLeast(1)
-                            parent.addView(ImageView(context).apply {setImageBitmap(bitmap);scaleType=ImageView.ScaleType.FIT_CENTER;contentDescription=label},LinearLayout.LayoutParams(-1,height).apply {bottomMargin=NativeMaterial.dp(context,12)})
-                        }
-                    }
-                }
                 "container" -> renderNodes(activity,parent,node.optJSONArray("children") ?: JSONArray(),path)
                 "text" -> parent.addView(NativeMaterial.label(context,label,if(node.has("size"))node.optDouble("size",14.0).toFloat() else if(node.optBoolean("heading"))18f else 14f).apply {if(key.isNotEmpty())tag=key;setTextIsSelectable(node.optBoolean("selectable"));setPadding(0,NativeMaterial.dp(context,8),0,NativeMaterial.dp(context,8));if(node.optBoolean("heading"))setTypeface(typeface,Typeface.BOLD)})
                 "section" -> {

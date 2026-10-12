@@ -82,40 +82,17 @@ it('passes the live encryption indicator and its help action to the native toolb
  emit({kind:'toolbar',key:lock.key});expect(show).toHaveBeenCalledTimes(1);
  bar.firstElementChild!.setAttribute('aria-hidden','true');await runtime.sync();expect(model().toolbar.lock).toBeNull();
 });
-it.each(['aboutModalOverlay','wordCountModalOverlay','aiModalOverlay','export','share','print'])('acknowledges and closes the native %s surface through its original handler',async(id)=>{
- invoke.mockImplementation(async(_:string,payload:any)=>({ready:true,panelKeys:JSON.parse(payload.model).panels.map((p:any)=>p.key)}));
- const overlay=document.createElement('div');overlay.className='modal-overlay show';if(id.endsWith('Overlay'))overlay.id=id;else overlay.dataset.nativePanel=id;
- overlay.innerHTML='<div class="modal"><button class="epmd-dialog-close">×</button><h2>标题</h2><label for="nativeName">名称</label><input id="nativeName" value="初始"><button id="nativeApply">应用</button><p>提示 <strong>完整文字</strong></p></div>';
- document.body.append(overlay);await runtime.sync();await flush();
- expect(overlay.getAttribute('data-native-owned')).toBe('true');expect(model().home).toBeNull();expect(app.nativeWorkspacePaused).toBe(false);
- const nodes:any[]=[];const walk=(n:any)=>{nodes.push(n);n.children?.forEach(walk);};model().panels.forEach(walk);
- const input=nodes.find(n=>n.type==='input');expect(input.label).toBe('名称');emit({kind:'input',key:input.key,value:'新名称'});expect((overlay.querySelector('input') as HTMLInputElement).value).toBe('新名称');
- expect(nodes.find(n=>n.type==='text' && n.label.includes('提示')).label).toBe('提示 完整文字');
- const close=jest.fn(()=>overlay.remove());(overlay.querySelector('button') as HTMLElement).onclick=close;
- emit({kind:'close-panel',key:model().panels[0].key});expect(close).toHaveBeenCalledTimes(1);
-});
-it('retains the whole AI response and sends text-only streaming updates',async()=>{
- invoke.mockImplementation(async(_:string,payload:any)=>({ready:true,panelKeys:JSON.parse(payload.model).panels.map((p:any)=>p.key)}));
- const overlay=document.createElement('div');overlay.id='aiModalOverlay';overlay.className='modal-overlay show';overlay.innerHTML='<div class="modal"><h2>AI助手</h2><div class="ai-result-content"></div></div>';document.body.append(overlay);
- const result=overlay.querySelector('.ai-result-content')!;result.textContent='正文'.repeat(2000);await runtime.sync();await flush();const initial=model().panels[0].children[0];expect(initial.label).toHaveLength(4000);
- result.firstChild!.textContent+='追加';await flush();expect(model().panels[0].children[0]).toMatchObject({key:initial.key,label:'正文'.repeat(2000)+'追加'});
-});
-it('keeps a requested panel visible as a web fallback when an older APK lacks panel support',async()=>{
+it.each(['aboutModalOverlay','wordCountModalOverlay','aiModalOverlay','export','share','print'])('keeps %s as a web dialog and pauses native overlays',async(id)=>{
  app.nativeWorkspace.renderHome({items:[]});await flush();
- const overlay=document.createElement('div');overlay.id='aboutModalOverlay';overlay.className='modal-overlay show';overlay.innerHTML='<div class="modal"><h2>关于</h2></div>';document.body.append(overlay);await runtime.sync();await flush();
- expect(overlay.hasAttribute('data-native-owned')).toBe(false);expect(model().home).toBeNull();expect(app.nativeWorkspacePaused).toBe(true);
+ const overlay=document.createElement('div');overlay.className='modal-overlay show';if(id.endsWith('Overlay'))overlay.id=id;else overlay.dataset.nativePanel=id;
+ overlay.innerHTML='<div class="modal"><h2>原网页界面</h2><button>操作</button></div>';document.body.append(overlay);await runtime.sync();await flush();
+ expect(model().panels).toEqual([]);expect(model().home).toBeNull();expect(overlay.hasAttribute('data-native-owned')).toBe(false);expect(app.nativeWorkspacePaused).toBe(true);
+ overlay.remove();await flush();expect(model().home).not.toBeNull();
 });
-it('keeps owned settings and AI web markup hidden under an unsupported child surface',async()=>{
- invoke.mockImplementation(async(_:string,payload:any)=>({ready:true,panelKeys:JSON.parse(payload.model).panels.map((p:any)=>p.key)}));
- const setting=document.getElementById('settingsModalOverlay')!;setting.style.display='flex';setting.classList.add('show');
- const panel=document.createElement('div');panel.id='aiModalOverlay';panel.className='modal-overlay show';panel.innerHTML='<div class="modal"><h2>AI助手</h2><p>结果</p></div>';document.body.append(panel);await runtime.sync();await flush();
- const child=document.createElement('div');child.className='modal-overlay show';document.body.append(child);await flush();
- expect(model().panels).toEqual([]);expect(model().settings).toBeNull();expect(panel.getAttribute('data-native-owned')).toBe('true');expect(document.body.classList.contains('native-settings-ready')).toBe(true);
- child.remove();await flush();expect(model().panels).toHaveLength(1);expect(model().settings).not.toBeNull();
-});
-it('consumes native close for a protected in-progress operation without running cleanup',async()=>{
- invoke.mockImplementation(async(_:string,payload:any)=>({ready:true,panelKeys:JSON.parse(payload.model).panels.map((p:any)=>p.key)}));
- const overlay=document.createElement('div');overlay.dataset.nativePanel='export';overlay.dataset.escClosable='false';overlay.className='modal-overlay show';overlay.innerHTML='<div><h2>导出中</h2><button class="epmd-dialog-close">关闭</button></div>';document.body.append(overlay);
- await runtime.sync();await flush();expect(model().panels[0].dismissible).toBe(false);const close=jest.fn();(overlay.querySelector('button') as HTMLElement).onclick=close;
- emit({kind:'close-panel',key:model().panels[0].key});expect(close).not.toHaveBeenCalled();expect(overlay.isConnected).toBe(true);
+it('serializes settings body without duplicating the shared save action',async()=>{
+ const overlay=document.getElementById('settingsModalOverlay')!;const form=overlay.querySelector('.modal-form')!;
+ form.append(document.getElementById('saveSettingsBtn')!);const action=document.createElement('div');action.className='modal-actions';action.append(document.getElementById('saveSettingsBtn')!);form.append(action);
+ overlay.style.display='flex';overlay.classList.add('show');await runtime.sync();await flush();
+ const settings=model().settings;const nodes:any[]=[];const walk=(n:any)=>{nodes.push(n);n.children?.forEach(walk);};settings.children.forEach(walk);
+ expect(nodes.some(n=>n.key===settings.save)).toBe(false);const save=jest.fn();document.getElementById('saveSettingsBtn')!.onclick=save;emit({kind:'click',key:settings.save});expect(save).toHaveBeenCalledTimes(1);
 });
