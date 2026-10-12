@@ -167,6 +167,9 @@ EOF
 cp "$PROJECT_ROOT/src-tauri/platform/android/LocalDocumentsPlugin.kt" "$ANDROID_MAIN_DIR/LocalDocumentsPlugin.kt"
 cp "$PROJECT_ROOT/src-tauri/platform/android/SelectionMenus.kt" "$ANDROID_MAIN_DIR/SelectionMenus.kt"
 cp "$PROJECT_ROOT/src-tauri/platform/android/EditorClipboardPlugin.kt" "$ANDROID_MAIN_DIR/EditorClipboardPlugin.kt"
+cp "$PROJECT_ROOT/src-tauri/platform/android/NativeDialogs.kt" "$ANDROID_MAIN_DIR/NativeDialogs.kt"
+cp "$PROJECT_ROOT/src-tauri/platform/android/NativeCalendarEditor.kt" "$ANDROID_MAIN_DIR/NativeCalendarEditor.kt"
+cp "$PROJECT_ROOT/src-tauri/platform/android/CalendarRecurrence.kt" "$ANDROID_MAIN_DIR/CalendarRecurrence.kt"
 
 echo "✅ MainActivity.kt 已同步输入法/窗口配置"
 
@@ -259,3 +262,9 @@ fi
 if ! grep -q "cn.yhsun.md.SelectionMenuArgs" "$PROGUARD_RULES"; then
   echo "-keep class cn.yhsun.md.SelectionMenuArgs { *; }" >> "$PROGUARD_RULES"
 fi
+
+for ARGUMENT in NativeDialogArgs CalendarEditorArgs; do
+  if ! grep -q "cn.yhsun.md.$ARGUMENT" "$PROGUARD_RULES"; then
+    echo "-keep class cn.yhsun.md.$ARGUMENT { *; }" >> "$PROGUARD_RULES"
+  fi
+done

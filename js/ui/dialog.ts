@@ -1,3 +1,5 @@
+import { isAndroidApp } from '../main/android-ui';
+
 (function(global) {
     'use strict';
 
@@ -30,11 +32,26 @@
         isDialogShowing = true;
         
         const { type, options, resolve } = dialogQueue.shift();
-        renderDialog(type, options, (result) => {
+        const finish = (result) => {
             resolve(result);
             isDialogShowing = false;
             processDialogQueue();
-        });
+        };
+        const invoke = isAndroidApp() && (global.__TAURI__?.core?.invoke || global.__TAURI__?.invoke);
+        if (invoke) {
+            const english = global.i18n?.getLanguage?.() === 'en';
+            void invoke('android_native_dialog', {payload: {
+                kind: type, title: options.title || '', message: String(options.message || ''),
+                defaultValue: String(options.defaultValue || ''), placeholder: options.placeholder || '',
+                confirmText: options.confirmText || (english ? 'OK' : '确定'),
+                cancelText: options.cancelText || (english ? 'Cancel' : '取消'),
+                dismissible: options.dismissible !== false, closeOnEsc: options.closeOnEsc !== false,
+                showCancel: options.showCancelButton !== false, danger: options.danger === true,
+                night: global.nightMode === true, english,
+            }}).then(result => finish(type === 'prompt' ? (result.canceled ? null : result.value)
+                : type === 'confirm' ? !result.canceled && result.value === true : undefined))
+                .catch(() => renderDialog(type, options, finish));
+        } else renderDialog(type, options, finish);
     }
 
     function renderDialog(type, options, callback) {

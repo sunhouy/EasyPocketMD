@@ -9,6 +9,7 @@ export interface NativeFileResponse {
     localFileMode?: string | null;
 }
 export interface NativeCommandMap {
+    android_native_dialog: {value?: string | boolean; canceled: boolean};
     request_storage_access: { granted: boolean };
     save_local_file: NativeFileResponse;
     get_local_file_path: string;
