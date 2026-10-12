@@ -17,3 +17,7 @@ it('cancels cleanly and retains the older APK fallback',async()=>{
 it('reports read and permission failures instead of silently retrying another picker',async()=>{
  await expect(pickAndroidImportFiles({__TAURI__:{invoke:jest.fn().mockRejectedValue('Permission denied')}})).rejects.toEqual('Permission denied');
 });
+it('passes print/image accept types and single-selection mode to the native picker',async()=>{
+ const invoke=jest.fn().mockResolvedValue({canceled:true});await pickAndroidImportFiles({__TAURI__:{invoke}},{accept:'.pdf,.png,.jpg',multiple:false});
+ expect(invoke).toHaveBeenCalledWith('android_import_files',{mimeTypes:['application/pdf','image/png','image/jpeg'],multiple:false});
+});

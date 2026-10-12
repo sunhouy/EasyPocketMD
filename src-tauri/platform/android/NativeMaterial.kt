@@ -6,6 +6,7 @@ import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.RippleDrawable
 import android.view.ContextThemeWrapper
 import android.view.View
 import android.widget.*
@@ -46,11 +47,15 @@ object NativeMaterial {
     fun background(context: Context, color: Int, radius: Int = 20, border: Boolean = false) = GradientDrawable().apply {
         setColor(color); cornerRadius = dp(context,radius).toFloat(); if(border)setStroke(dp(context,1),outline)
     }
+    fun ripple(context:Context,color:Int=Color.TRANSPARENT,radius:Int=12,border:Boolean=false):RippleDrawable {
+        val ink=Color.argb(if(night)60 else 36,Color.red(primary),Color.green(primary),Color.blue(primary))
+        return RippleDrawable(ColorStateList.valueOf(ink),background(context,color,radius,border).apply {if(border && color==selected)setStroke(dp(context,1),primary)},background(context,Color.WHITE,radius))
+    }
     fun dialog(context: Context) = MaterialAlertDialogBuilder(context).setBackground(background(context,surface))
         .setBackgroundInsetStart(dp(context,16)).setBackgroundInsetEnd(dp(context,16))
     fun label(context: Context, value: String, size: Float = 14f) = TextView(context).apply { text=value; textSize=size; setTextColor(NativeMaterial.text) }
     fun button(context: Context, value: String, filled: Boolean = false) = MaterialButton(context).apply {
-        text=value; isAllCaps=false; cornerRadius=dp(context,14); minHeight=dp(context,44)
+        text=value; isAllCaps=false; cornerRadius=dp(context,14); minHeight=dp(context,44);minimumHeight=dp(context,44);insetTop=0;insetBottom=0;rippleColor=ColorStateList.valueOf(Color.argb(50,Color.red(primary),Color.green(primary),Color.blue(primary)))
         backgroundTintList=ColorStateList.valueOf(if(filled) primary else container)
         setTextColor(if(filled) Color.WHITE else NativeMaterial.text); strokeWidth=if(filled)0 else dp(context,1); strokeColor=ColorStateList.valueOf(outline)
     }
@@ -66,13 +71,15 @@ object NativeMaterial {
     }
     fun dialogButtons(dialog:androidx.appcompat.app.AlertDialog,destructive:Boolean=false) {
         dialog.getButton(androidx.appcompat.app.AlertDialog.BUTTON_POSITIVE)?.apply {
-            background=NativeMaterial.background(context,if(destructive)Color.parseColor("#c62f38") else primary,14);setTextColor(Color.WHITE);isAllCaps=false;minHeight=dp(context,38)
+            background=NativeMaterial.ripple(context,if(destructive)Color.parseColor("#c62f38") else primary,14);setTextColor(Color.WHITE);isAllCaps=false;minHeight=dp(context,38)
         }
         dialog.getButton(androidx.appcompat.app.AlertDialog.BUTTON_NEGATIVE)?.apply {
-            background=NativeMaterial.background(context,container,14,true);setTextColor(NativeMaterial.text);isAllCaps=false;minHeight=dp(context,38)
+            background=NativeMaterial.ripple(context,container,14,true);setTextColor(NativeMaterial.text);isAllCaps=false;minHeight=dp(context,38)
         }
     }
     fun glyph(id:String):String = when {
+        id.contains("account",true) || id.contains("login",true) -> "\ue853"
+        id.contains("storage",true) -> "\ue2c7"
         id.contains("delete",true) || id.contains("clear",true) -> "\ue872"
         id.contains("folder",true) || id.contains("filemanager",true) || id.contains("local",true) -> "\ue2c7"
         id.contains("copy",true) -> "\ue14d"
@@ -112,7 +119,7 @@ object NativeMaterial {
     fun icon(context: Context, glyph: String, description: String, action: () -> Unit) = TextView(context).apply {
         text=glyph; textSize=24f; setTextColor(NativeMaterial.text); gravity=android.view.Gravity.CENTER; contentDescription=description
         typeface=try { iconFont(context) } catch (_: Exception) { Typeface.DEFAULT }
-        isClickable=true; isFocusable=true; val size=dp(context,44); layoutParams=android.view.ViewGroup.LayoutParams(size,size)
+        background=NativeMaterial.ripple(context);isClickable=true; isFocusable=true; val size=dp(context,44); layoutParams=android.view.ViewGroup.LayoutParams(size,size)
         setOnClickListener { action() }
     }
 }

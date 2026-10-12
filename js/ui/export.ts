@@ -51,7 +51,8 @@ async function exportContent() {
 
     // 创建模态框
     var modal = document.createElement('div');
-    modal.className = 'modal-overlay';
+    modal.className = 'modal-overlay show';
+    modal.dataset.nativePanel = 'export';
     modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:100100;';
 
     // 创建内容容器
@@ -152,7 +153,8 @@ function showFilenameDialog(defaultName, ext, callback) {
     var borderColor = nightMode ? '#444' : '#ddd';
 
     var modal = document.createElement('div');
-    modal.className = 'modal-overlay';
+    modal.className = 'modal-overlay show';
+    modal.dataset.nativePanel = 'export';
     modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:100110;';
 
     var container = document.createElement('div');
@@ -274,7 +276,8 @@ async function exportFile(content, ext) {
         global.showPrintDialog('export-pdf', async function(settings) {
             try {
                 var loadingModal = document.createElement('div');
-                loadingModal.className = 'modal-overlay';
+                loadingModal.className = 'modal-overlay show';
+                loadingModal.dataset.nativePanel = 'export';
                 loadingModal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.9);z-index:21000;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;';
                 
                 var isCancelled = false;
@@ -372,7 +375,8 @@ async function exportFile(content, ext) {
         global.showPrintDialog('export-html', async function(settings) {
             try {
                 var loadingModal = document.createElement('div');
-                loadingModal.className = 'modal-overlay';
+                loadingModal.className = 'modal-overlay show';
+                loadingModal.dataset.nativePanel = 'export';
                 loadingModal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.9);z-index:10001;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;';
                 loadingModal.innerHTML = '<div style="background:white;color:#333;border-radius:12px;padding:30px;text-align:center;"><div style="font-size:24px;margin-bottom:15px;"><i class="fas fa-spinner fa-spin"></i></div><div style="font-size:16px;">' + (isEn() ? 'Processing...' : '处理中...') + '</div></div>';
                 document.body.appendChild(loadingModal);

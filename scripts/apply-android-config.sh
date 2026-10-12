@@ -238,7 +238,7 @@ if ! grep -q "cn.yhsun.md.SelectionMenuArgs" "$PROGUARD_RULES"; then
   echo "-keep class cn.yhsun.md.SelectionMenuArgs { *; }" >> "$PROGUARD_RULES"
 fi
 
-for ARGUMENT in NativeDialogArgs CalendarEditorArgs WorkspaceArgs; do
+for ARGUMENT in NativeDialogArgs CalendarEditorArgs WorkspaceArgs ImportPickerArgs; do
   if ! grep -q "cn.yhsun.md.$ARGUMENT" "$PROGUARD_RULES"; then
     echo "-keep class cn.yhsun.md.$ARGUMENT { *; }" >> "$PROGUARD_RULES"
   fi
