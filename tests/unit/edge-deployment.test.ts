@@ -11,32 +11,20 @@ it('activates a stateless edge and excludes origin runtime credentials', () => {
     expect(result.status).toBe(0);
 });
 
-it.each([[0, 0, 0], [1, 0, 1], [0, 1, 1]])('waits for both destinations and reports original=%i / US=%i failures', (original, us, expected) => {
-    const workflow = yaml.load(fs.readFileSync(path.join(root, '.github/workflows/docker-deploy.yml'), 'utf8'));
-    const step = workflow.jobs.deploy.steps.find((s: any) => s.name === 'Transfer missing image objects and activate Docker release');
-    expect(step.env.IP_US).toBe('${{ secrets.IP_US }}');
-    expect(step.env.SSHKEY_US).toBe('${{ secrets.SSHKEY_US }}');
-    expect(step.run).not.toMatch(/select-deploy-route|ProxyCommand|SERVER_SSH_CONFIG_FILE|DOMESTIC_DEPLOY_PROVIDER/);
-    const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'epmd-edge-'));
-    try {
-        fs.mkdirSync(path.join(temp, 'scripts'));
-        fs.writeFileSync(path.join(temp, 'scripts/transfer-docker-release.sh'), `#!/bin/bash
-if [ "$SERVER_HOST" = us ]; then
-  test "$(stat -c %a "$SERVER_SSH_KEY_FILE")" = 600 || exit 9
-  test "$(cat "$SERVER_SSH_KEY_FILE")" = fake-key || exit 9
-  test "$DEPLOY_IMAGE_DIR" = image-cas-us || exit 9
-  echo us >> "$RUNNER_TEMP/completed"
-  exit "$US_STATUS"
-fi
-echo original >> "$RUNNER_TEMP/completed"
+it.each([0,1])('deploys only to the domestic destination and propagates status %i',status=>{
+ const workflow=yaml.load(fs.readFileSync(path.join(root,'.github/workflows/docker-deploy.yml'),'utf8'));
+ const step=workflow.jobs.deploy.steps.find((s:any)=>s.name==='Transfer missing image objects and activate Docker release');
+ expect(step.env.IP_US).toBeUndefined();expect(step.env.SSHKEY_US).toBeUndefined();
+ const temp=fs.mkdtempSync(path.join(os.tmpdir(),'epmd-domestic-'));
+ try {
+  fs.mkdirSync(path.join(temp,'scripts'));fs.writeFileSync(path.join(temp,'scripts/transfer-docker-release.sh'),`#!/bin/bash
+printf '%s' "$SERVER_HOST" > "$RUNNER_TEMP/destination"
 exit "$ORIGINAL_STATUS"
 `);
-        const result = spawnSync('bash', ['-e', '-c', step.run.replaceAll('${{ inputs.channel }}', 'main')], {
-            cwd: temp, encoding: 'utf8', timeout: 10000,
-            env: {...process.env, RUNNER_TEMP: temp, SERVER_HOST: 'original', IP_US: 'us', SSHKEY_US: 'fake-key', ORIGINAL_STATUS: String(original), US_STATUS: String(us)}
-        });
-        expect(result.status).toBe(expected);
-        expect(fs.readFileSync(path.join(temp, 'completed'), 'utf8').trim().split('\n').sort()).toEqual(['original', 'us']);
-        expect(fs.existsSync(path.join(temp, 'epmd-us-key'))).toBe(false);
-    } finally { fs.rmSync(temp, {recursive: true, force: true}); }
+  const result=spawnSync('bash',['-e','-c',step.run.replaceAll('${{ inputs.channel }}','main')],{cwd:temp,encoding:'utf8',timeout:10000,env:{...process.env,RUNNER_TEMP:temp,SERVER_HOST:'domestic',ORIGINAL_STATUS:String(status)}});
+  expect(result.status).toBe(status);expect(fs.readFileSync(path.join(temp,'destination'),'utf8')).toBe('domestic');
+ }finally{fs.rmSync(temp,{recursive:true,force:true});}
+});
+it('has no active workflow upload to the foreign host, including print-client binaries',()=>{
+ for(const name of fs.readdirSync(path.join(root,'.github/workflows'))){const source=fs.readFileSync(path.join(root,'.github/workflows',name),'utf8');expect(source).not.toMatch(/secrets\.(IP_US|SSHKEY_US)|prepare-edge-release/);}
 });

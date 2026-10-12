@@ -197,5 +197,3 @@ body.native-workspace-ready.file-management-mode :is(.notes-home,.file-managemen
 body.native-settings-ready #settingsModalOverlay { visibility:hidden !important;pointer-events:none !important; }
 
 body.native-toolbar-ready .mobile-toolbar-container { visibility:hidden !important;pointer-events:none !important; }
-
-body.android-app [data-native-owned=true] { visibility:hidden !important;pointer-events:none !important; }

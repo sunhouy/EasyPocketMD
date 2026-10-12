@@ -43,3 +43,11 @@ it('shows loading while the engine is pending and clears it after opening',async
     ready({code:200});await opening;
     expect(app.currentFileId).toBe('pending');expect(document.getElementById('fileSwitchLoadingOverlay').style.display).toBe('none');
 });
+it('selects every native home entry and can deselect again without DOM cards',()=>{
+ app.files=[{id:'folder',name:'资料',type:'folder'},{id:'one',name:'资料/a.md',type:'file',content:'一'},{id:'two',name:'b.md',type:'file',content:'二'},{id:'metadata',name:'.easypocketmd_orders',type:'file'}];
+ app.nativeWorkspace={renderHome:jest.fn(()=>true)};app.refreshNotesHome();app.openFileSelectionPanel('one');
+ expect(document.querySelectorAll('.notes-file-card')).toHaveLength(0);
+ app.selectAllFilesForMulti();expect(app.fileListMultiSelectedIds).toEqual(new Set(['folder','one','two']));
+ expect(app.nativeWorkspace.renderHome.mock.calls.at(-1)[0].selectAllLabel).toBe('取消全选');
+ app.selectAllFilesForMulti();expect(app.fileListMultiSelectedIds.size).toBe(0);delete app.nativeWorkspace;
+});
