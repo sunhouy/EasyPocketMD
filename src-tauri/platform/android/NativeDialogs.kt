@@ -1,7 +1,7 @@
 package cn.yhsun.md
 
 import android.app.Activity
-import android.app.AlertDialog
+import androidx.appcompat.app.AlertDialog
 import android.app.Application
 import android.app.Dialog
 import android.os.Bundle
@@ -18,7 +18,7 @@ class NativeDialogSession(private val activity: Activity, private val complete: 
     private val dialogs = mutableListOf<Dialog>()
     init { activity.application.registerActivityLifecycleCallbacks(this) }
     fun attach(dialog: Dialog) { dialogs.add(dialog) }
-    fun bind(dialog: AlertDialog) {
+    fun bind(dialog: Dialog) {
         attach(dialog)
         dialog.setOnDismissListener { finish() }
     }
@@ -40,8 +40,7 @@ class NativeDialogSession(private val activity: Activity, private val complete: 
 }
 
 object NativeDialogs {
-    fun context(activity: Activity, night: Boolean): Context = ContextThemeWrapper(activity,
-        if (night) android.R.style.Theme_Material_Dialog_Alert else android.R.style.Theme_Material_Light_Dialog_Alert)
+    fun context(activity: Activity, night: Boolean): Context = NativeMaterial.context(activity,night)
 
     fun show(activity: Activity, kind: String, title: String, message: String, defaultValue: String,
              placeholder: String, confirmText: String, cancelText: String, dismissible: Boolean,
@@ -49,21 +48,20 @@ object NativeDialogs {
              english: Boolean, complete: (Map<String, Any?>) -> Unit) {
         if (activity.isFinishing || activity.isDestroyed) { complete(mapOf("canceled" to true)); return }
         val context = context(activity, night)
-        val input = if (kind == "prompt") EditText(context).apply {
-            setSingleLine(true); setText(defaultValue); hint = placeholder; selectAll()
-        } else null
+        val holder = android.widget.LinearLayout(context).apply { orientation=android.widget.LinearLayout.VERTICAL; val padding=NativeMaterial.dp(context,24); setPadding(padding,8,padding,8) }
+        val input = if(kind=="prompt") NativeMaterial.field(holder,defaultValue,placeholder).apply { selectAll() } else null
         val warning = if (danger && kind == "confirm") "\n\n" + if (english) "This action cannot be undone." else "此操作不可撤销。" else ""
         val session = NativeDialogSession(activity, complete)
-        val builder = AlertDialog.Builder(context).setTitle(title).setMessage(message + warning)
+        val builder = NativeMaterial.dialog(context).setTitle(title).setMessage(message + warning)
             .setCancelable(dismissible && closeOnEsc)
             .setPositiveButton(confirmText) { _, _ -> session.accept(if (input != null) input.text.toString() else true) }
-        if (input != null) builder.setView(input)
+        if (input != null) builder.setView(holder)
         if (kind in arrayOf("confirm", "prompt") && showCancel) builder.setNegativeButton(cancelText) { _, _ -> }
         val dialog = builder.create()
         session.bind(dialog)
         dialog.setCanceledOnTouchOutside(false)
         dialog.setOnShowListener {
-            if (danger) dialog.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(android.graphics.Color.rgb(190, 35, 35))
+            NativeMaterial.dialogButtons(dialog,danger)
             if (input != null) {
                 input.requestFocus()
                 dialog.window?.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE)

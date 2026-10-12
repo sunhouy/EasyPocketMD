@@ -1,3 +1,4 @@
+import {nativePalette} from '../../main/native-palette';
 import { isAndroidApp } from '../../main/android-ui';
 import { fileTimestamp } from '../modified-time';
 export function showFileDetails(app: any, file: any, webFallback = false) {
@@ -6,7 +7,7 @@ export function showFileDetails(app: any, file: any, webFallback = false) {
         const en = app.i18n?.getLanguage?.() === 'en';
         const items = Array.isArray(file) ? file : [file];
         const message = items.map(item => item.name + '\n' + detailRows(app,item,en).map(([name,value]) => name+': '+value).join('\n')).join('\n\n');
-        void invoke('android_native_dialog', {payload:{kind:'details',title:en?'Details':'详情',message,
+        void invoke('android_native_dialog', {payload:{palette:nativePalette(), kind:'details',title:en?'Details':'详情',message,
             confirmText:en?'Close':'关闭',night:app.nightMode===true,english:en}}).catch(() => showFileDetails(app,file,true));
         return null;
     }

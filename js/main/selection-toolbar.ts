@@ -55,6 +55,7 @@ export function installSelectionToolbar(app:any=window) {
     const observer=new MutationObserver(()=>{if(snapshot && (!snapshot.owner.isConnected || !visible(snapshot.owner)))hide();});
     let observedOwner:HTMLElement|null=null;
     const hide=()=>{caretRequested=false;toolbar.hidden=true;snapshot=null;observer.disconnect();observedOwner=null;};
+    (toolbar as any).epmdCloseByBackPress=()=>{hide();const selection=document.getSelection();if(selection?.rangeCount && !selection.isCollapsed)selection.collapseToEnd();return true;};
     function observeOwner(owner:HTMLElement){
         if(owner===observedOwner)return;observer.disconnect();observedOwner=owner;
         for(let parent:HTMLElement|null=owner;parent;parent=parent.parentElement)observer.observe(parent,{attributes:true,attributeFilter:['hidden','class','style'],childList:true});

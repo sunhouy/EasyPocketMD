@@ -192,3 +192,6 @@ body .code-runner-ui-host .code-output > :first-child { color:var(--md-muted) !i
 
 .selection-translation-modal > .modal-close-btn { position:absolute;top:14px;right:14px;left:auto; }
 .selection-translation-modal .modal-header { padding-right:32px; }
+
+body.native-workspace-ready.file-management-mode :is(.notes-home,.file-management-fab,.file-selection-panel) { visibility:hidden !important;pointer-events:none !important; }
+body.native-settings-ready #settingsModalOverlay { visibility:hidden !important;pointer-events:none !important; }

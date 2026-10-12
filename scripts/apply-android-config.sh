@@ -129,6 +129,15 @@ class MainActivity : TauriActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         handleIntent(intent)
+        onBackPressedDispatcher.addCallback(this, object : androidx.activity.OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                val view = window.decorView
+                val insets = ViewCompat.getRootWindowInsets(view)
+                if (insets?.isVisible(WindowInsetsCompat.Type.ime()) == true) {
+                    androidx.core.view.WindowCompat.getInsetsController(window, view).hide(WindowInsetsCompat.Type.ime())
+                } else NativeNavigation.back(this@MainActivity)
+            }
+        })
 
         val decorView = window.decorView
         val rootView = decorView.findViewById<android.view.View>(android.R.id.content)
@@ -170,6 +179,16 @@ cp "$PROJECT_ROOT/src-tauri/platform/android/EditorClipboardPlugin.kt" "$ANDROID
 cp "$PROJECT_ROOT/src-tauri/platform/android/NativeDialogs.kt" "$ANDROID_MAIN_DIR/NativeDialogs.kt"
 cp "$PROJECT_ROOT/src-tauri/platform/android/NativeCalendarEditor.kt" "$ANDROID_MAIN_DIR/NativeCalendarEditor.kt"
 cp "$PROJECT_ROOT/src-tauri/platform/android/CalendarRecurrence.kt" "$ANDROID_MAIN_DIR/CalendarRecurrence.kt"
+for SOURCE in NativeMaterial NativeWorkspace NativeNavigation NativePickers; do
+  cp "$PROJECT_ROOT/src-tauri/platform/android/$SOURCE.kt" "$ANDROID_MAIN_DIR/$SOURCE.kt"
+done
+cp "$PROJECT_ROOT/src-tauri/platform/android/res/values/epmd-native.xml" "$ANDROID_RES_DIR/values/epmd-native.xml"
+mkdir -p "$ANDROID_RES_DIR/raw"
+cp "$PROJECT_ROOT/src-tauri/platform/android/res/raw/epmd_keep.xml" "$ANDROID_RES_DIR/raw/epmd_keep.xml"
+mkdir -p "$PROJECT_ROOT/src-tauri/gen/android/app/src/main/assets/epmd"
+cp "$PROJECT_ROOT/src-tauri/platform/android/assets/MaterialIcons-Regular.ttf" "$PROJECT_ROOT/src-tauri/gen/android/app/src/main/assets/epmd/MaterialIcons-Regular.ttf"
+cp "$PROJECT_ROOT/src-tauri/platform/android/assets/LICENSE" "$PROJECT_ROOT/src-tauri/gen/android/app/src/main/assets/epmd/MaterialIcons-LICENSE"
+
 
 echo "✅ MainActivity.kt 已同步输入法/窗口配置"
 
@@ -207,7 +226,7 @@ object TauriLifecycleObserver : DefaultLifecycleObserver {
 }
 
 abstract class TauriActivity : WryActivity() {
-    override val handleBackNavigation: Boolean = true
+    override val handleBackNavigation: Boolean = false
 
     fun getPluginManager(): PluginManager {
         return PluginManager
@@ -263,8 +282,19 @@ if ! grep -q "cn.yhsun.md.SelectionMenuArgs" "$PROGUARD_RULES"; then
   echo "-keep class cn.yhsun.md.SelectionMenuArgs { *; }" >> "$PROGUARD_RULES"
 fi
 
-for ARGUMENT in NativeDialogArgs CalendarEditorArgs; do
+for ARGUMENT in NativeDialogArgs CalendarEditorArgs WorkspaceArgs; do
   if ! grep -q "cn.yhsun.md.$ARGUMENT" "$PROGUARD_RULES"; then
     echo "-keep class cn.yhsun.md.$ARGUMENT { *; }" >> "$PROGUARD_RULES"
   fi
 done
+
+# Native UI uses the Material Components already present in the Tauri template.
+# Keep older generated Android projects compatible as well.
+APP_GRADLE_KTS="$PROJECT_ROOT/src-tauri/gen/android/app/build.gradle.kts"
+APP_GRADLE_GROOVY="$PROJECT_ROOT/src-tauri/gen/android/app/build.gradle"
+if [ -f "$APP_GRADLE_KTS" ] && ! grep -q 'com.google.android.material' "$APP_GRADLE_KTS"; then
+  printf '\n%s\n' 'dependencies { implementation("com.google.android.material:material:1.12.0") }' >> "$APP_GRADLE_KTS"
+fi
+if [ -f "$APP_GRADLE_GROOVY" ] && ! grep -q 'com.google.android.material' "$APP_GRADLE_GROOVY"; then
+  printf '\n%s\n' "dependencies { implementation 'com.google.android.material:material:1.12.0' }" >> "$APP_GRADLE_GROOVY"
+fi
