@@ -47,7 +47,7 @@ object NativeMaterial {
         setColor(color); cornerRadius = dp(context,radius).toFloat(); if(border)setStroke(dp(context,1),outline)
     }
     fun dialog(context: Context) = MaterialAlertDialogBuilder(context).setBackground(background(context,surface))
-        .setBackgroundInsetStart(dp(context,12)).setBackgroundInsetEnd(dp(context,12))
+        .setBackgroundInsetStart(dp(context,16)).setBackgroundInsetEnd(dp(context,16))
     fun label(context: Context, value: String, size: Float = 14f) = TextView(context).apply { text=value; textSize=size; setTextColor(NativeMaterial.text) }
     fun button(context: Context, value: String, filled: Boolean = false) = MaterialButton(context).apply {
         text=value; isAllCaps=false; cornerRadius=dp(context,14); minHeight=dp(context,44)

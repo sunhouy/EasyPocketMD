@@ -12,6 +12,8 @@ import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
+import android.view.MotionEvent
+import android.graphics.Typeface
 import android.widget.*
 import androidx.appcompat.app.AlertDialog
 import com.google.android.material.checkbox.MaterialCheckBox
@@ -24,6 +26,8 @@ object NativeWorkspace : android.app.Application.ActivityLifecycleCallbacks {
     private var application:android.app.Application?=null
     private var owner=WeakReference<Activity>(null)
     private var home: Home?=null
+    private var toolbar:LinearLayout?=null
+    private var toolbarSignature=""
     private var setting: AlertDialog?=null
     private var more: AlertDialog?=null
     private val groups=mutableMapOf<String,Boolean>()
@@ -32,6 +36,7 @@ object NativeWorkspace : android.app.Application.ActivityLifecycleCallbacks {
     private var menuSignature=""
     private var epoch=0L
     private var dark=false
+    private var paletteSignature=""
     private var lastToast=0L
     private fun emit(activity:Activity,kind:String,values:Map<String,Any?> = emptyMap()) {
         val data=JSONObject().put("kind",kind).put("epoch",epoch);values.forEach { (key,value)->data.put(key,value) };NativeNavigation.emit(activity,data)
@@ -39,13 +44,14 @@ object NativeWorkspace : android.app.Application.ActivityLifecycleCallbacks {
     private fun vertical(context:Context)=LinearLayout(context).apply { orientation=LinearLayout.VERTICAL }
     private fun row(context:Context)=LinearLayout(context).apply { orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL }
     private fun padding(view:View,size:Int=16) { val p=NativeMaterial.dp(view.context,size);view.setPadding(p,p,p,p) }
-    fun update(activity:Activity,model:JSONObject) {
+    fun update(activity:Activity,model:JSONObject):Boolean {
         if(owner.get()!==activity){application?.unregisterActivityLifecycleCallbacks(this);application=activity.application;application!!.registerActivityLifecycleCallbacks(this)}
         val newEpoch=model.optLong("epoch")
-        if(owner.get()!==activity || dark!=model.optBoolean("night") || epoch!=newEpoch) {
-            close();owner=WeakReference(activity);dark=model.optBoolean("night");epoch=newEpoch
+        if(owner.get()!==activity || dark!=model.optBoolean("night") || epoch!=newEpoch || paletteSignature!=model.optString("palette")) {
+            close();owner=WeakReference(activity);dark=model.optBoolean("night");epoch=newEpoch;paletteSignature=model.optString("palette")
         }
         NativeMaterial.configure(dark,model.optString("palette"))
+        val toolbarReady=updateToolbar(activity,model.optJSONObject("toolbar"))
         val homeModel=model.optJSONObject("home")
         if(homeModel==null){home?.hide()}
         else {if(home==null){home=Home(activity,NativeMaterial.context(activity,dark));homeSignature=""};if(homeSignature!=homeModel.toString()){home!!.update(homeModel);homeSignature=homeModel.toString()};home!!.show()}
@@ -62,8 +68,9 @@ object NativeWorkspace : android.app.Application.ActivityLifecycleCallbacks {
         else if(menu.toString()!=menuSignature){more?.setOnDismissListener(null);more?.dismiss();menuSignature=menu.toString();more=menu(activity,menu);more!!.show()}
         val toast=model.optJSONObject("toast")
         if(toast!=null && toast.optLong("id")!=lastToast){lastToast=toast.optLong("id");Toast.makeText(activity,toast.optString("message"),Toast.LENGTH_SHORT).show()}
+        return toolbarReady
     }
-    fun close() {home?.dismiss();setting?.setOnCancelListener(null);setting?.dismiss();more?.setOnDismissListener(null);more?.setOnCancelListener(null);more?.dismiss();home=null;setting=null;more=null;settingsSignature="";menuSignature=""}
+    fun close() {(toolbar?.parent as? ViewGroup)?.removeView(toolbar);toolbar=null;toolbarSignature="";home?.dismiss();setting?.setOnCancelListener(null);setting?.dismiss();more?.setOnDismissListener(null);more?.setOnCancelListener(null);more?.dismiss();home=null;setting=null;more=null;settingsSignature="";menuSignature=""}
 
     override fun onActivityDestroyed(activity:Activity){if(owner.get()===activity){NativeNavigation.reset();close();application?.unregisterActivityLifecycleCallbacks(this);application=null;owner=WeakReference(null)}}
     override fun onActivityCreated(activity:Activity,state:Bundle?){}
@@ -83,14 +90,44 @@ object NativeWorkspace : android.app.Application.ActivityLifecycleCallbacks {
         clean(copy);return copy.toString()
     }
 
+    private fun updateToolbar(activity:Activity,model:JSONObject?):Boolean {
+        if(model==null){toolbar?.visibility=View.GONE;return false}
+        val host=activity.findViewById<ViewGroup>(android.R.id.content) ?: return false
+        if(host !is FrameLayout)return false
+        if(toolbar==null){toolbar=row(NativeMaterial.context(activity,dark));host.addView(toolbar,FrameLayout.LayoutParams(-1,NativeMaterial.dp(activity,model.optInt("height",54)),Gravity.TOP))}
+        val bar=toolbar!!;bar.visibility=View.VISIBLE
+        if(toolbarSignature!=model.toString()) {
+            toolbarSignature=model.toString();bar.removeAllViews();bar.setBackgroundColor(NativeMaterial.surface);bar.elevation=NativeMaterial.dp(activity,2).toFloat()
+            bar.setPadding(NativeMaterial.dp(activity,6),0,NativeMaterial.dp(activity,6),0)
+            val buttons=model.optJSONArray("buttons") ?: JSONArray()
+            fun action(index:Int) {
+                val data=buttons.optJSONObject(index) ?: return
+                val glyph=when(data.optString("id")){"mobileFileBtn"->"\ue2c8";"mobileSettingsBtn"->"\ue8b8";"modeToggle"->if(dark)"\ue518" else "\ue51c";"mobileUndoBtn"->"\ue166";"mobileRedoBtn"->"\ue15a";else->"\ue5d4"}
+                bar.addView(NativeMaterial.icon(bar.context,glyph,data.optString("label")){emit(activity,"toolbar",mapOf("key" to data.optString("key")))}.apply {
+                    isEnabled=!data.optBoolean("disabled");alpha=if(isEnabled)1f else .35f;textSize=20f;background=NativeMaterial.background(context,NativeMaterial.container,12)
+                },LinearLayout.LayoutParams(NativeMaterial.dp(activity,36),NativeMaterial.dp(activity,36)).apply {setMargins(NativeMaterial.dp(activity,2),0,NativeMaterial.dp(activity,2),0)})
+            }
+            for(index in 0 until minOf(3,buttons.length()))action(index)
+            bar.addView(NativeMaterial.label(bar.context,model.optString("title"),14f).apply {gravity=Gravity.CENTER;maxLines=1;ellipsize=android.text.TextUtils.TruncateAt.END;setTypeface(typeface,Typeface.BOLD);setPadding(4,0,4,0)},LinearLayout.LayoutParams(0,-1,1f))
+            for(index in 3 until buttons.length())action(index)
+        }
+        bar.bringToFront();return true
+    }
+
     private class Home(private val activity:Activity,context:Context):Dialog(context) {
         private val root=vertical(context)
-        private val title=NativeMaterial.label(context,"EasyPocketMD",28f)
-        private val searchHolder=vertical(context)
-        private val search=NativeMaterial.field(searchHolder,"","搜索文件")
+        private val title=NativeMaterial.label(context,"EasyPocketMD",24f)
+        // A plain search field has a single placeholder, never a floating duplicate label.
+        private val search=EditText(context).apply {
+            hint="搜索文件";textSize=16f;setTextColor(NativeMaterial.text);setHintTextColor(NativeMaterial.muted);setSingleLine(true)
+            inputType=InputType.TYPE_CLASS_TEXT;imeOptions=android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH
+            background=NativeMaterial.background(context,NativeMaterial.container,24)
+            setPadding(NativeMaterial.dp(context,16),0,NativeMaterial.dp(context,16),0)
+            if(android.os.Build.VERSION.SDK_INT>=26)importantForAutofill=View.IMPORTANT_FOR_AUTOFILL_NO
+        }
         private val tabs=LinearLayout(context)
         private val tabScroll=HorizontalScrollView(context).apply { isHorizontalScrollBarEnabled=false;addView(tabs) }
-        private val list=ListView(context).apply { divider=null;dividerHeight=0;clipToPadding=false;padding(this,4) }
+        private val list=ListView(context).apply { divider=null;dividerHeight=0;clipToPadding=false;setPadding(0,0,0,NativeMaterial.dp(context,100)) }
         private val footer=vertical(context)
         private val placeholder=vertical(context).apply {gravity=Gravity.CENTER}
         private val empty=NativeMaterial.label(context,"",16f).apply {gravity=Gravity.CENTER}
@@ -108,10 +145,10 @@ object NativeWorkspace : android.app.Application.ActivityLifecycleCallbacks {
                 pair.removeAllViews()
                 for(column in 0..1) {
                     val record=records.optJSONObject(position*2+column)
-                    if(record==null){pair.addView(View(context),LinearLayout.LayoutParams(0,NativeMaterial.dp(context,210),1f));continue}
-                    val card=vertical(context);padding(card)
-                    card.background=NativeMaterial.background(context,if(record.optBoolean("selected"))NativeMaterial.selected else NativeMaterial.container,20,record.optBoolean("selected"))
-                    val name=NativeMaterial.label(context,record.optString("name"),16f).apply {maxLines=2;setTypeface(typeface,android.graphics.Typeface.BOLD)}
+                    if(record==null){pair.addView(View(context),LinearLayout.LayoutParams(0,NativeMaterial.dp(context,224),1f));continue}
+                    val card=vertical(context);card.setPadding(NativeMaterial.dp(context,16),NativeMaterial.dp(context,20),NativeMaterial.dp(context,16),NativeMaterial.dp(context,18))
+                    card.background=NativeMaterial.background(context,if(record.optBoolean("selected"))NativeMaterial.selected else NativeMaterial.container,20,record.optBoolean("selected")).apply {if(record.optBoolean("selected"))setStroke(NativeMaterial.dp(context,1),NativeMaterial.primary)}
+                    val name=NativeMaterial.label(context,record.optString("name"),17f).apply {maxLines=1;ellipsize=android.text.TextUtils.TruncateAt.END;setTypeface(typeface,android.graphics.Typeface.BOLD)}
                     val heading=row(context);heading.addView(name,LinearLayout.LayoutParams(0,-2,1f))
                     if(record.optBoolean("pinned"))heading.addView(NativeMaterial.icon(context,"\uf10d","置顶"){}.apply {textSize=16f;isClickable=false;isFocusable=false},LinearLayout.LayoutParams(NativeMaterial.dp(context,20),NativeMaterial.dp(context,24)))
                     if(record.optBoolean("locked"))heading.addView(NativeMaterial.icon(context,"\ue897","加密"){}.apply {textSize=16f;isClickable=false;isFocusable=false},LinearLayout.LayoutParams(NativeMaterial.dp(context,20),NativeMaterial.dp(context,24)))
@@ -121,11 +158,11 @@ object NativeWorkspace : android.app.Application.ActivityLifecycleCallbacks {
                     }.apply {textSize=16f;isClickable=status=="conflict";setTextColor(if(status=="synced")Color.rgb(70,157,91) else NativeMaterial.muted)},LinearLayout.LayoutParams(NativeMaterial.dp(context,20),NativeMaterial.dp(context,24)))
                     card.addView(heading)
                     if(record.optBoolean("local"))card.addView(NativeMaterial.label(context,if(model.optBoolean("english"))"Local" else "本地",11f).apply {setTextColor(NativeMaterial.primary)})
-                    card.addView(NativeMaterial.label(context,if(record.optString("type")=="folder")if(model.optBoolean("english"))"Folder" else "文件夹" else record.optString("preview"),14f).apply {setTextColor(NativeMaterial.muted);maxLines=5;ellipsize=android.text.TextUtils.TruncateAt.END},LinearLayout.LayoutParams(-1,0,1f))
-                    card.addView(NativeMaterial.label(context,record.optString("date"),11f).apply {setTextColor(NativeMaterial.muted)})
+                    card.addView(NativeMaterial.label(context,if(record.optString("type")=="folder")if(model.optBoolean("english"))"Folder" else "文件夹" else record.optString("preview"),14f).apply {setTextColor(NativeMaterial.muted);maxLines=4;setLineSpacing(0f,1.65f);setPadding(0,NativeMaterial.dp(context,4),0,NativeMaterial.dp(context,12));ellipsize=android.text.TextUtils.TruncateAt.END},LinearLayout.LayoutParams(-1,0,1f))
+                    card.addView(NativeMaterial.label(context,record.optString("date"),12f).apply {setTextColor(NativeMaterial.muted);maxLines=2;ellipsize=android.text.TextUtils.TruncateAt.END})
                     card.setOnClickListener {emit(activity,"file",mapOf("id" to record.optString("id")))}
                     card.setOnLongClickListener {emit(activity,"file",mapOf("id" to record.optString("id"),"longPress" to true));true}
-                    pair.addView(card,LinearLayout.LayoutParams(0,NativeMaterial.dp(context,210),1f).apply {setMargins(6,6,6,6)})
+                    pair.addView(card,LinearLayout.LayoutParams(0,NativeMaterial.dp(context,224),1f).apply {setMargins(if(column==0)0 else NativeMaterial.dp(context,7),0,if(column==0)NativeMaterial.dp(context,7) else 0,NativeMaterial.dp(context,14))})
                 }
                 return pair
             }
@@ -134,13 +171,14 @@ object NativeWorkspace : android.app.Application.ActivityLifecycleCallbacks {
             window?.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE or WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN)
             root.isFocusableInTouchMode=true;root.requestFocus()
             root.setBackgroundColor(NativeMaterial.surface)
-            (search.parent as? com.google.android.material.textfield.TextInputLayout)?.apply {
-                isHintEnabled=false;setBoxCornerRadii(NativeMaterial.dp(context,28).toFloat(),NativeMaterial.dp(context,28).toFloat(),NativeMaterial.dp(context,28).toFloat(),NativeMaterial.dp(context,28).toFloat());boxStrokeWidth=0;boxStrokeWidthFocused=0
-            }
-            val header=row(context);padding(header,12);header.addView(title,LinearLayout.LayoutParams(0,-2,1f))
-            header.addView(NativeMaterial.icon(context,"\ue8b8","设置"){emit(activity,"home-action",mapOf("action" to "settings"))})
-            header.addView(NativeMaterial.icon(context,"\ue853","登录与账户管理"){emit(activity,"home-action",mapOf("action" to "account"))})
-            root.addView(header);padding(searchHolder,12);root.addView(searchHolder);root.addView(tabScroll)
+            root.setPadding(NativeMaterial.dp(context,16),NativeMaterial.dp(context,12),NativeMaterial.dp(context,16),0)
+            title.maxLines=1;title.ellipsize=android.text.TextUtils.TruncateAt.END;title.setTypeface(title.typeface,Typeface.BOLD)
+            val header=row(context);header.addView(title,LinearLayout.LayoutParams(0,-2,1f))
+            header.addView(NativeMaterial.icon(context,"\ue8b8","设置"){emit(activity,"home-action",mapOf("action" to "settings"))},LinearLayout.LayoutParams(NativeMaterial.dp(context,36),NativeMaterial.dp(context,36)))
+            header.addView(NativeMaterial.icon(context,"\ue853","登录与账户管理"){emit(activity,"home-action",mapOf("action" to "account"))},LinearLayout.LayoutParams(NativeMaterial.dp(context,36),NativeMaterial.dp(context,36)).apply {leftMargin=NativeMaterial.dp(context,8)})
+            root.addView(header,LinearLayout.LayoutParams(-1,NativeMaterial.dp(context,36)).apply {bottomMargin=NativeMaterial.dp(context,12)})
+            root.addView(search,LinearLayout.LayoutParams(-1,NativeMaterial.dp(context,44)))
+            tabs.gravity=Gravity.CENTER_VERTICAL;tabs.setPadding(0,NativeMaterial.dp(context,12),0,NativeMaterial.dp(context,12));root.addView(tabScroll)
             list.setOnScrollListener(object:AbsListView.OnScrollListener {
                 override fun onScrollStateChanged(view:AbsListView?,state:Int){}
                 override fun onScroll(view:AbsListView?,first:Int,count:Int,total:Int){emit(activity,"viewport",mapOf("limit" to (first+count)*2+16))}
@@ -157,29 +195,63 @@ object NativeWorkspace : android.app.Application.ActivityLifecycleCallbacks {
                 override fun afterTextChanged(s:Editable?){}
             })
         }
-        override fun onStart(){super.onStart();window?.setBackgroundDrawableResource(android.R.color.transparent);window?.setLayout(-1,-1)}
+        override fun onStart(){super.onStart();window?.setBackgroundDrawableResource(android.R.color.transparent);window?.setLayout(-1,-1);NativeNavigation.dialogBack(this){onBackPressed()}}
         @Deprecated("Compat Back dispatch") override fun onBackPressed() {
             if(model.optBoolean("selecting")){emit(activity,"home-action",mapOf("action" to "cancel"));return}
             if(!model.isNull("folder")){emit(activity,"filter",mapOf("folder" to null,"query" to ""));return}
             NativeNavigation.back(activity)
         }
+        private var touchX=0f
+        private var touchY=0f
+        private var swiping=false
+        private var canSwipe=false
+        override fun dispatchTouchEvent(event:MotionEvent):Boolean {
+            if(event.actionMasked==MotionEvent.ACTION_DOWN) {
+                touchX=event.x;touchY=event.y;swiping=false
+                val location=IntArray(2);list.getLocationInWindow(location)
+                canSwipe=!model.optBoolean("selecting") && event.y>=location[1] && event.y<location[1]+list.height
+            }
+            if(event.pointerCount>1)canSwipe=false
+            if(canSwipe && !swiping && event.actionMasked==MotionEvent.ACTION_MOVE) {
+                val dx=event.x-touchX;val dy=event.y-touchY
+                if(kotlin.math.abs(dy)>NativeMaterial.dp(context,24) && kotlin.math.abs(dy)>kotlin.math.abs(dx))canSwipe=false
+                if(kotlin.math.abs(dx)>NativeMaterial.dp(context,56) && kotlin.math.abs(dx)>kotlin.math.abs(dy)*1.5f) {
+                    val cancel=MotionEvent.obtain(event);cancel.action=MotionEvent.ACTION_CANCEL;super.dispatchTouchEvent(cancel);cancel.recycle();swiping=true
+                    val paths=mutableListOf<String?>(null);val folders=model.optJSONArray("folders") ?: JSONArray()
+                    for(index in 0 until folders.length())paths.add(folders.getJSONObject(index).optString("name"))
+                    val current=model.opt("folder").takeUnless {it==JSONObject.NULL} as? String
+                    val next=paths.indexOf(current)+(if(dx<0)1 else -1)
+                    if(next in paths.indices)emit(activity,"filter",mapOf("folder" to paths[next],"query" to model.optString("query")))
+                }
+            }
+            if(swiping)return true
+            return super.dispatchTouchEvent(event)
+        }
         fun update(value:JSONObject) {
+            val filterChanged=model.optString("folder")!=value.optString("folder") || model.optString("query")!=value.optString("query")
             model=value;applying=true
             progress.visibility=if(model.optBoolean("loading"))View.VISIBLE else View.GONE
             empty.text=if(model.optBoolean("loading"))if(model.optBoolean("english"))"Loading files…" else "正在加载文件…" else if(model.optString("query").isNotBlank())if(model.optBoolean("english"))"No results" else "没有搜索结果" else if(model.optBoolean("english"))"No files yet" else "还没有文件"
             val query=model.optString("query");if(search.text.toString()!=query){search.setText(query);search.setSelection(query.length)}
             search.hint=if(model.optBoolean("english"))"Search files" else "搜索文件"
-            applying=false;val left=tabScroll.scrollX;tabs.removeAllViews()
+            applying=false;val left=tabScroll.scrollX;tabs.removeAllViews();var activeTab:View?=null
             fun tab(name:String,path:String?,pinned:Boolean=false,id:String?=null){val button=NativeMaterial.button(context,name);
                 if(pinned){button.icon=NativeMaterial.drawable(context,"\uf10d",NativeMaterial.primary);button.iconGravity=com.google.android.material.button.MaterialButton.ICON_GRAVITY_TEXT_END;button.iconTint=android.content.res.ColorStateList.valueOf(NativeMaterial.primary)}
-                val current=model.opt("folder").takeUnless {it==JSONObject.NULL};if(current==path){button.backgroundTintList=android.content.res.ColorStateList.valueOf(NativeMaterial.selected);button.setTextColor(NativeMaterial.primaryText)}
+                val current=model.opt("folder").takeUnless {it==JSONObject.NULL};val selected=model.optBoolean("selecting") && id!=null && (model.optJSONArray("folders") ?: JSONArray()).let {folders->(0 until folders.length()).any {folders.getJSONObject(it).optString("id")==id && folders.getJSONObject(it).optBoolean("selected")}}
+                val active=current==path || selected
+                button.backgroundTintList=android.content.res.ColorStateList.valueOf(if(active)NativeMaterial.selected else Color.TRANSPARENT)
+                button.strokeColor=android.content.res.ColorStateList.valueOf(if(active)NativeMaterial.primary else NativeMaterial.outline)
+                button.setTextColor(if(active)NativeMaterial.primaryText else NativeMaterial.text);button.isSelected=active;if(current==path)activeTab=button
+                button.setTypeface(button.typeface,if(active)Typeface.BOLD else Typeface.NORMAL)
+                button.textSize=14f;button.minWidth=0;button.minimumWidth=0;button.minHeight=0;button.minimumHeight=0;button.insetTop=0;button.insetBottom=0
+                button.setPadding(NativeMaterial.dp(context,12),0,NativeMaterial.dp(context,12),0)
                 button.setOnClickListener {if(model.optBoolean("selecting") && id!=null)emit(activity,"file",mapOf("id" to id)) else emit(activity,"filter",mapOf("folder" to path,"query" to model.optString("query")))}
-                if(id!=null)button.setOnLongClickListener {emit(activity,"file",mapOf("id" to id,"longPress" to true));true};tabs.addView(button)}
+                if(id!=null)button.setOnLongClickListener {emit(activity,"file",mapOf("id" to id,"longPress" to true));true};tabs.addView(button,LinearLayout.LayoutParams(-2,NativeMaterial.dp(context,38)).apply {rightMargin=NativeMaterial.dp(context,10)})}
             tab(if(model.optBoolean("english"))"All" else "全部",null)
             val folders=model.optJSONArray("folders") ?: JSONArray();for(index in 0 until folders.length()){val folder=folders.getJSONObject(index);tab(folder.optString("name"),folder.optString("name"),folder.optBoolean("pinned"),folder.optString("id"))}
-            tabScroll.post {tabScroll.scrollTo(left,0)}
+            tabScroll.post {val target=activeTab;if(filterChanged && target!=null)tabScroll.smoothScrollTo((target.left-(tabScroll.width-target.width)/2).coerceAtLeast(0),0) else tabScroll.scrollTo(left,0)}
             val first=list.firstVisiblePosition;val top=list.getChildAt(0)?.top ?: 0
-            records=model.optJSONArray("items") ?: JSONArray();adapter.notifyDataSetChanged();list.setSelectionFromTop(first,top)
+            records=model.optJSONArray("items") ?: JSONArray();adapter.notifyDataSetChanged();list.setSelectionFromTop(if(filterChanged)0 else first,if(filterChanged)0 else top)
             footer.removeAllViews();frame.findViewWithTag<View>("create").visibility=if(model.optBoolean("selecting") || model.optBoolean("loading"))View.GONE else View.VISIBLE
             if(model.optBoolean("selecting")) {
                 val controls=row(context);controls.addView(NativeMaterial.label(context,if(model.optBoolean("english"))"${model.optInt("count")} selected" else "${model.optInt("count")} 已选择"),LinearLayout.LayoutParams(0,-2,1f))
@@ -194,20 +266,37 @@ object NativeWorkspace : android.app.Application.ActivityLifecycleCallbacks {
         }
     }
     private fun settings(activity:Activity,model:JSONObject,position:Int):AlertDialog {
-        val context=NativeMaterial.context(activity,dark);val layout=vertical(context);padding(layout,20)
+        val context=NativeMaterial.context(activity,dark);val content=vertical(context);padding(content,16)
+        val dialog=NativeMaterial.dialog(context).setView(content).create()
+        val header=row(context)
+        header.addView(NativeMaterial.label(context,model.optString("title"),24f).apply {setTypeface(typeface,Typeface.BOLD)},LinearLayout.LayoutParams(0,-2,1f))
+        header.addView(NativeMaterial.icon(context,"\ue5cd",model.optString("cancelLabel","取消")){emit(activity,"click",mapOf("key" to model.optString("cancel")))},LinearLayout.LayoutParams(NativeMaterial.dp(context,36),NativeMaterial.dp(context,36)))
+        content.addView(header,LinearLayout.LayoutParams(-1,-2).apply {bottomMargin=NativeMaterial.dp(context,16)})
+        val layout=vertical(context)
         renderNodes(activity,layout,model.optJSONArray("children") ?: JSONArray())
-        val scroll=ScrollView(context).apply {tag="settings-scroll";addView(layout);post {scrollTo(0,position)}}
-        val dialog=NativeMaterial.dialog(context).setTitle(model.optString("title")).setView(scroll).setPositiveButton(model.optString("saveLabel","保存"),null).setNegativeButton(model.optString("cancelLabel","取消"),null).create()
-        dialog.setCanceledOnTouchOutside(false)
-        dialog.setCancelable(false)
-        dialog.setOnCancelListener {emit(activity,"click",mapOf("key" to model.optString("cancel")))}
-        dialog.setOnShowListener {
-            NativeNavigation.dialogBack(dialog){emit(activity,"click",mapOf("key" to model.optString("cancel")))}
-            NativeMaterial.dialogButtons(dialog)
-            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {emit(activity,"click",mapOf("key" to model.optString("save")))}
-            dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setOnClickListener {emit(activity,"click",mapOf("key" to model.optString("cancel")))}
-        }
+        val scroll=object:ScrollView(context) {
+            override fun onMeasure(width:Int,height:Int){
+                val cap=(resources.displayMetrics.heightPixels*.62f).toInt()
+                val available=if(View.MeasureSpec.getMode(height)==View.MeasureSpec.UNSPECIFIED)cap else View.MeasureSpec.getSize(height)
+                super.onMeasure(width,View.MeasureSpec.makeMeasureSpec(minOf(cap,available),View.MeasureSpec.AT_MOST))
+            }
+        }.apply {tag="settings-scroll";isFillViewport=false;addView(layout);post {scrollTo(0,position)}}
+        content.addView(scroll)
+        val footer=row(context);footer.setPadding(0,NativeMaterial.dp(context,12),0,0)
+        footer.addView(NativeMaterial.button(context,model.optString("cancelLabel","取消")).apply {setOnClickListener {emit(activity,"click",mapOf("key" to model.optString("cancel")))}},LinearLayout.LayoutParams(0,-2,1f).apply {rightMargin=NativeMaterial.dp(context,8)})
+        footer.addView(NativeMaterial.button(context,model.optString("saveLabel","保存"),true).apply {setOnClickListener {emit(activity,"click",mapOf("key" to model.optString("save")))}},LinearLayout.LayoutParams(0,-2,1f))
+        content.addView(footer)
+        dialog.setCanceledOnTouchOutside(false);dialog.setCancelable(false)
+        dialog.setOnShowListener {NativeNavigation.dialogBack(dialog){emit(activity,"click",mapOf("key" to model.optString("cancel")))}}
         return dialog
+    }
+    private fun settingRow(context:Context,label:String,glyph:String="",action:()->Unit):LinearLayout {
+        val line=row(context);line.minimumHeight=NativeMaterial.dp(context,52);padding(line,12)
+        line.background=NativeMaterial.background(context,NativeMaterial.surface,12)
+        if(glyph.isNotEmpty())line.addView(NativeMaterial.icon(context,glyph,label){}.apply {isClickable=false;isFocusable=false;textSize=20f;setTextColor(NativeMaterial.primary)},LinearLayout.LayoutParams(NativeMaterial.dp(context,24),NativeMaterial.dp(context,24)).apply {rightMargin=NativeMaterial.dp(context,12)})
+        line.addView(NativeMaterial.label(context,label,15f),LinearLayout.LayoutParams(0,-2,1f))
+        line.addView(NativeMaterial.icon(context,"\ue5cc",label){}.apply {isClickable=false;isFocusable=false;textSize=18f;setTextColor(NativeMaterial.muted)},LinearLayout.LayoutParams(NativeMaterial.dp(context,20),NativeMaterial.dp(context,24)))
+        line.isFocusable=true;line.setOnClickListener {action()};return line
     }
     private fun renderNodes(activity:Activity,parent:LinearLayout,nodes:JSONArray,path:String="") {
         val context=parent.context
@@ -216,17 +305,27 @@ object NativeWorkspace : android.app.Application.ActivityLifecycleCallbacks {
             when(node.optString("type")) {
                 "container" -> renderNodes(activity,parent,node.optJSONArray("children") ?: JSONArray(),path)
                 "text" -> parent.addView(NativeMaterial.label(context,label).apply {setPadding(0,8,0,8)})
+                "section" -> {
+                    val section=vertical(context);padding(section,16);section.background=NativeMaterial.background(context,NativeMaterial.container,16,true)
+                    section.addView(NativeMaterial.label(context,label,17f).apply {setTypeface(typeface,Typeface.BOLD)},LinearLayout.LayoutParams(-1,-2).apply {bottomMargin=NativeMaterial.dp(context,12)})
+                    renderNodes(activity,section,node.optJSONArray("children") ?: JSONArray(),path+"/"+node.optString("key",label))
+                    parent.addView(section,LinearLayout.LayoutParams(-1,-2).apply {bottomMargin=NativeMaterial.dp(context,14)})
+                }
                 "group" -> {
-                    val groupId=path+"/"+label
+                    val groupId=path+"/"+node.optString("key",label)
                     val opened=groups[groupId] ?: node.optBoolean("expanded")
-                    val children=vertical(context).apply {visibility=if(opened)View.VISIBLE else View.GONE};var built=opened
+                    val box=vertical(context)
+                    val children=vertical(context).apply {padding(this,12);visibility=if(opened)View.VISIBLE else View.GONE};var built=opened
                     if(opened)renderNodes(activity,children,node.optJSONArray("children") ?: JSONArray(),groupId)
-                    val button=NativeMaterial.button(context,label+"  ›");button.setOnClickListener {
+                    val summary=settingRow(context,label) {
                         if(!built){renderNodes(activity,children,node.optJSONArray("children") ?: JSONArray(),groupId);built=true}
                         val show=children.visibility!=View.VISIBLE;groups[groupId]=show;children.visibility=if(show)View.VISIBLE else View.GONE
-                    };parent.addView(button);parent.addView(children)
+                        (box.getChildAt(0) as LinearLayout).getChildAt(1).rotation=if(show)90f else 0f
+                    }
+                    summary.getChildAt(1).rotation=if(opened)90f else 0f
+                    box.addView(summary);box.addView(children);parent.addView(box,LinearLayout.LayoutParams(-1,-2).apply {bottomMargin=NativeMaterial.dp(context,8)})
                 }
-                "button" -> parent.addView(NativeMaterial.button(context,label).apply {isEnabled=!node.optBoolean("disabled");setOnClickListener {emit(activity,"click",mapOf("key" to key))}})
+                "button" -> parent.addView(settingRow(context,label,NativeMaterial.glyph(node.optString("id",key))) {if(!node.optBoolean("disabled"))emit(activity,"click",mapOf("key" to key))}.apply {isEnabled=!node.optBoolean("disabled");alpha=if(isEnabled)1f else .45f},LinearLayout.LayoutParams(-1,-2).apply {bottomMargin=NativeMaterial.dp(context,8)})
                 "radio" -> parent.addView(com.google.android.material.radiobutton.MaterialRadioButton(context).apply {
                     text=label;setTextColor(NativeMaterial.text);buttonTintList=android.content.res.ColorStateList(arrayOf(intArrayOf(android.R.attr.state_checked),intArrayOf()),intArrayOf(NativeMaterial.primary,NativeMaterial.muted));isChecked=node.optBoolean("checked");isEnabled=!node.optBoolean("disabled")
                     setOnCheckedChangeListener {_,checked->if(checked)emit(activity,"change",mapOf("key" to key,"checked" to true))}
@@ -280,17 +379,29 @@ object NativeWorkspace : android.app.Application.ActivityLifecycleCallbacks {
         box.setOnClickListener {if(enabled)action()};return box
     }
     private fun menu(activity:Activity,model:JSONObject):AlertDialog {
-        val context=NativeMaterial.context(activity,dark);val grid=GridLayout(context).apply {columnCount=3;padding(this)}
-        val content=vertical(context);val header=row(context);padding(header)
-        header.addView(NativeMaterial.label(context,model.optString("title"),20f),LinearLayout.LayoutParams(0,-2,1f))
-        val scroll=ScrollView(context).apply {addView(grid)}
-        content.addView(header);content.addView(scroll)
+        val context=NativeMaterial.context(activity,dark)
+        val content=vertical(context);padding(content,16)
+        val header=row(context)
+        header.addView(NativeMaterial.label(context,model.optString("title"),20f).apply {setTypeface(typeface,Typeface.BOLD)},LinearLayout.LayoutParams(0,-2,1f))
+        content.addView(header)
+        val body=vertical(context);val scroll=ScrollView(context).apply {addView(body)};content.addView(scroll)
         val dialog=NativeMaterial.dialog(context).setView(content).create()
         header.addView(NativeMaterial.icon(context,"\ue5cd","关闭"){dialog.dismiss()})
         val items=model.optJSONArray("items") ?: JSONArray()
+        var previous="";var grid:GridLayout?=null
         for(index in 0 until items.length()) {
-            val item=items.getJSONObject(index)
-            grid.addView(tile(context,item.optString("id"),item.optString("label"),!item.optBoolean("disabled")) {dialog.dismiss();emit(activity,"click",mapOf("key" to item.optString("key")))},GridLayout.LayoutParams().apply {width=0;columnSpec=GridLayout.spec(GridLayout.UNDEFINED,1f);setMargins(4,4,4,4)})
+            val item=items.getJSONObject(index);val group=item.optString("group")
+            if(grid==null || group!=previous) {
+                if(group.isNotBlank())body.addView(NativeMaterial.label(context,group,13f).apply {setTextColor(NativeMaterial.muted);setPadding(0,NativeMaterial.dp(context,14),0,NativeMaterial.dp(context,8))})
+                grid=GridLayout(context).apply {columnCount=2};body.addView(grid);previous=group
+            }
+            val line=row(context);padding(line,10);line.minimumHeight=NativeMaterial.dp(context,48)
+            val enabled=!item.optBoolean("disabled");line.alpha=if(enabled)1f else .45f
+            line.background=NativeMaterial.background(context,if(item.optString("id")=="mobileMenuAIBtn")NativeMaterial.selected else Color.TRANSPARENT,12)
+            line.addView(NativeMaterial.icon(context,NativeMaterial.glyph(item.optString("id")),item.optString("label")){}.apply {isClickable=false;isFocusable=false;textSize=18f;setTextColor(NativeMaterial.muted)},LinearLayout.LayoutParams(NativeMaterial.dp(context,20),NativeMaterial.dp(context,24)).apply {rightMargin=NativeMaterial.dp(context,10)})
+            line.addView(NativeMaterial.label(context,item.optString("label"),13f),LinearLayout.LayoutParams(0,-2,1f))
+            line.setOnClickListener {if(enabled){dialog.dismiss();emit(activity,"click",mapOf("key" to item.optString("key")))}}
+            grid!!.addView(line,GridLayout.LayoutParams().apply {width=0;columnSpec=GridLayout.spec(GridLayout.UNDEFINED,1f);setMargins(3,3,3,3)})
         }
         dialog.setOnDismissListener {emit(activity,"close-more")};return dialog
     }

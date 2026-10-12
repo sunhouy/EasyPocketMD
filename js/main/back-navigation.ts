@@ -72,6 +72,10 @@ export function initBackNavigation(options: BackNavigationOptions): void {
     setTimeout(() => toast.remove(), 2000);
     rearm();return true;
   };
+  const resetBack = () => {lastBackTime=0;};
+  document.addEventListener('visibilitychange',resetBack);
+  window.addEventListener('pageshow',resetBack);
+  window.addEventListener('epmd-native-resume',resetBack);
   (window as any).epmdAndroidBack = () => route(true);
   let legacyInstalled=false;
   const legacy = () => {if(legacyInstalled)return;legacyInstalled=true;pushHistory();window.addEventListener('popstate',()=>route(false));};

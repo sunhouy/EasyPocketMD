@@ -398,6 +398,14 @@ fn write_local_file(file_path: String, content: String) -> WriteLocalFileRespons
 }
 
 #[tauri::command]
+async fn android_import_files(app: AppHandle) -> Result<serde_json::Value, String> {
+    #[cfg(target_os = "android")]
+    { android_document(app, "pickImport", serde_json::json!({})).await }
+    #[cfg(not(target_os = "android"))]
+    { let _ = app; Err("Android import unavailable".into()) }
+}
+
+#[tauri::command]
 async fn android_workspace(app: AppHandle, model: String) -> Result<serde_json::Value, String> {
     #[cfg(target_os = "android")]
     { android_document(app, "workspace", serde_json::json!({"model":model})).await }
@@ -611,6 +619,7 @@ pub fn run() {
             set_selection_menu,
             editor_clipboard_action,
             android_workspace,
+            android_import_files,
             android_native_dialog,
             calendar_action,
             read_local_file,

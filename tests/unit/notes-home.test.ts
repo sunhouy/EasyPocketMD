@@ -164,3 +164,9 @@ it('scrolls desktop folder tabs horizontally with the vertical wheel',()=>{
  const ua=jest.spyOn(navigator,'userAgent','get').mockReturnValue('iPhone Mobile');
  expect(wheel(-40).defaultPrevented).toBe(false);expect(position).toBe(300);ua.mockRestore();
 });
+it('passes folder selection to the native tabs while preserving the current folder filter',()=>{
+ app.fileListMultiSelectedIds=new Set(['folder']);app.fileListMultiSelectMode=true;
+ app.nativeWorkspace={renderHome:jest.fn(()=>true)};render();
+ const home=app.nativeWorkspace.renderHome.mock.calls.at(-1)[0];expect(home.folders.find((f:any)=>f.id==='folder').selected).toBe(true);
+ app.setNativeFileFilter('学习','');expect(app.nativeWorkspace.renderHome.mock.calls.at(-1)[0].folder).toBe('学习');
+});

@@ -41,3 +41,24 @@ it('opens native More without invoking the overlapping web menu',async()=>{
  document.getElementById('mobileMenuBtn')!.click();await flush();expect(web).not.toHaveBeenCalled();
  expect(model().more.items[0]).toMatchObject({id:'mobileClearBtn',label:'清空'});
 });
+it('keeps settings categories separate from expandable setting rows',async()=>{
+ const overlay=document.getElementById('settingsModalOverlay')!;
+ overlay.querySelector('.settings-section')!.innerHTML='<div class="settings-section-header">外观与语言</div><details class="settings-setting-row"><summary>主题模式</summary><div class="form-group"><label class="settings-control-label">主题模式</label><label><input type="radio" name="theme" value="dark">夜间模式</label></div></details>';
+ overlay.style.display='flex';overlay.classList.add('show');await runtime.sync();await flush();
+ const category=model().settings.children[0];expect(category.type).toBe('section');expect(category.label).toBe('外观与语言');
+ const setting=category.children[0];expect(setting).toMatchObject({type:'group',label:'主题模式',expanded:false});
+ expect(setting.children[0].children).toEqual([expect.objectContaining({type:'container',children:[expect.objectContaining({type:'radio',label:'夜间模式'})]})]);
+});
+it('acknowledges native toolbar before hiding the web toolbar and delegates undo and More',async()=>{
+ document.body.classList.remove('file-management-mode');
+ const bar=document.createElement('div');bar.className='mobile-toolbar-container';bar.innerHTML='<h1 class="mobile-title">EasyPocketMD</h1><button id="mobileUndoBtn">撤销</button>';document.body.append(bar);
+ invoke.mockResolvedValue({ready:true,toolbarReady:true});await runtime.sync();await flush();
+ expect(document.body.classList.contains('native-toolbar-ready')).toBe(true);
+ const undo=jest.fn();document.getElementById('mobileUndoBtn')!.onclick=undo;
+ const buttons=model().toolbar.buttons;emit({kind:'toolbar',key:buttons.find((b:any)=>b.id==='mobileUndoBtn').key});expect(undo).toHaveBeenCalledTimes(1);
+ emit({kind:'toolbar',key:buttons.find((b:any)=>b.id==='mobileMenuBtn').key});await flush();expect(model().more.items[0].label).toBe('清空');
+});
+it('opens import even after the native create menu closes',async()=>{
+ app.importFiles=jest.fn();await flush();emit({kind:'home-action',action:'create'});await flush();
+ emit({kind:'close-more'});emit({kind:'click',key:'import-file'});expect(app.importFiles).toHaveBeenCalledTimes(1);
+});
