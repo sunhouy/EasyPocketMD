@@ -195,3 +195,5 @@ body .code-runner-ui-host .code-output > :first-child { color:var(--md-muted) !i
 
 body.native-workspace-ready.file-management-mode :is(.notes-home,.file-management-fab,.file-selection-panel) { visibility:hidden !important;pointer-events:none !important; }
 body.native-settings-ready #settingsModalOverlay { visibility:hidden !important;pointer-events:none !important; }
+
+body.native-toolbar-ready .mobile-toolbar-container { visibility:hidden !important;pointer-events:none !important; }

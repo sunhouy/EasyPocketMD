@@ -108,7 +108,7 @@ export function installNotesHome(app:any, options:{loadContent?:(file:any)=>Prom
             const potential=files.filter(item=>!isOrderMetadataFile(item.name) && (view==='all' || parent(item.name)===folder)).sort(compareFileEntries);
             const candidates=potential.filter(item=>searchable(item,q));
             const native=app.nativeWorkspace.renderHome({loading:initializing,folder:view==='all'?null:folder,query:search.value,
-                folders:folders.map(item=>({id:String(item.id),name:item.name,pinned:isPinned(item)})),
+                folders:folders.map(item=>({id:String(item.id),name:item.name,pinned:isPinned(item),selected:!!app.fileListMultiSelectedIds?.has(String(item.id))})),
                 items:candidates.map(item=>({id:String(item.id),name:basename(item.name),type:item.type,pinned:isPinned(item),locked:encrypted(item),
                     status:item.type==='file'?syncStatus(item,navigator.onLine!==false,!!(app.unsavedChanges?.[item.id] || app.pendingServerSync?.[item.id] || (item as any).isSynced===false)):'',
                     local:!!((item as any).isExternalLocal || (item as any).externalLocalFileId || (item as any).localFilePath),selected:!!app.fileListMultiSelectedIds?.has(String(item.id)),preview:locked(item)?t('加密文件','Encrypted file'):needs(item)?snapshots.get(key(item))?.preview || t('摘要加载中…','Loading preview…'):notePreview(item.content || '') || t('暂无内容','No content'),

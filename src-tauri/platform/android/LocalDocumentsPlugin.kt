@@ -155,7 +155,7 @@ class LocalDocumentsPlugin(private val activity: Activity) : Plugin(activity) {
     fun workspace(invoke: Invoke) {
         val args=invoke.parseArgs(WorkspaceArgs::class.java)
         activity.runOnUiThread {
-            try {NativeWorkspace.update(activity,org.json.JSONObject(args.model));invoke.resolve(JSObject().put("ready",true))}
+            try {val toolbarReady=NativeWorkspace.update(activity,org.json.JSONObject(args.model));invoke.resolve(JSObject().put("ready",true).put("toolbarReady",toolbarReady))}
             catch(error:Exception){NativeWorkspace.close();invoke.reject(error.message ?: "Native workspace unavailable")}
         }
     }
@@ -283,6 +283,43 @@ class LocalDocumentsPlugin(private val activity: Activity) : Plugin(activity) {
     }
 
     @Command
+    fun pickImport(invoke:Invoke) {
+        val intent=Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE);type="*/*";putExtra(Intent.EXTRA_ALLOW_MULTIPLE,true)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            putExtra(Intent.EXTRA_MIME_TYPES,arrayOf("text/plain","text/markdown","application/pdf","application/msword","application/vnd.openxmlformats-officedocument.wordprocessingml.document","application/vnd.ms-excel","application/vnd.openxmlformats-officedocument.spreadsheetml.sheet","application/vnd.ms-powerpoint","application/vnd.openxmlformats-officedocument.presentationml.presentation","application/octet-stream"))
+        }
+        startActivityForResult(invoke,intent,"importPicked")
+    }
+
+    @ActivityCallback
+    fun importPicked(invoke:Invoke,result:ActivityResult) {
+        if(result.resultCode!=Activity.RESULT_OK){invoke.resolve(JSObject().put("canceled",true));return}
+        val data=result.data
+        val uris=linkedSetOf<Uri>()
+        data?.clipData?.let {clip->for(index in 0 until clip.itemCount)uris.add(clip.getItemAt(index).uri)}
+        data?.data?.let {uris.add(it)}
+        if(uris.isEmpty()){invoke.resolve(JSObject().put("canceled",true));return}
+        io.execute {
+            try {
+                require(uris.size<=50){"一次最多导入 50 个文件 / Maximum 50 files per import"}
+                val files=org.json.JSONArray();var remaining=20*1024*1024
+                for(uri in uris) {
+                    var name="import.md"
+                    activity.contentResolver.query(uri,arrayOf(OpenableColumns.DISPLAY_NAME),null,null,null)?.use {cursor->if(cursor.moveToFirst())name=cursor.getString(0)}
+                    val buffer=java.io.ByteArrayOutputStream()
+                    activity.contentResolver.openInputStream(uri)?.use {stream->
+                        val chunk=ByteArray(8192)
+                        while(true){val count=stream.read(chunk);if(count<0)break;remaining-=count;require(remaining>=0){"导入文件总大小不能超过 20 MB / Import exceeds 20 MB"};buffer.write(chunk,0,count)}
+                    } ?: throw java.io.IOException("Cannot read $name")
+                    files.put(org.json.JSONObject().put("name",name).put("mime",activity.contentResolver.getType(uri) ?: "application/octet-stream").put("base64",android.util.Base64.encodeToString(buffer.toByteArray(),android.util.Base64.NO_WRAP)))
+                }
+                invoke.resolve(JSObject().put("canceled",false).put("files",files))
+            } catch(error:Exception){invoke.reject(error.message ?: "Cannot import files")}
+        }
+    }
+
+    @Command
     fun pick(invoke: Invoke) {
         val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
             addCategory(Intent.CATEGORY_OPENABLE)
@@ -303,7 +340,7 @@ class LocalDocumentsPlugin(private val activity: Activity) : Plugin(activity) {
         }
         val grants = (data?.flags ?: 0) and (Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
         try { activity.contentResolver.takePersistableUriPermission(uri, grants) } catch (_: SecurityException) { /* Some providers only grant session access; recheck on every open. */ }
-        io.execute { invoke.resolve(readDocument(uri).put("canceled", false)) }
+        io.execute { try {invoke.resolve(readDocument(uri).put("canceled", false))} catch(error:Exception){invoke.reject(error.message ?: "Cannot open local document")} }
     }
 
     @Command

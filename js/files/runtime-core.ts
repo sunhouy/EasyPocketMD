@@ -1,4 +1,5 @@
 // @ts-nocheck
+import {pickAndroidImportFiles} from './android-import';
 import { compareFileEntries, moveEntries, dropEntry, isPinned, MANUAL_ORDER_BASE } from './global-order';
 import { loadFeature } from '../feature-loader';
 import { loadLegacyFileTree } from '../editor-loader';
@@ -3130,14 +3131,14 @@ import { createDiffFileWriter } from './conflict/live-files';
         var borderColor = nightMode ? '#444' : '#ddd';
 
         var modal = document.createElement('div');
-        modal.className = 'modal-overlay';
+        modal.className = 'modal-overlay show';
         modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:10001;';
 
         var container = document.createElement('div');
         container.style.cssText = 'background:' + bg + ';color:' + textColor + ';border-radius:12px;padding:20px;width:92%;max-width:460px;';
 
-        var currentFolder = '';
-        if (g('currentFileId')) {
+        var currentFolder = global.notesHomeFolder || '';
+        if (!document.body.classList.contains('file-management-mode') && g('currentFileId')) {
             var currentNode = g('files').find(function(f) { return f.id === g('currentFileId'); });
             if (currentNode && currentNode.type === 'file') {
                 currentFolder = getParentPath(currentNode.name);
@@ -3190,7 +3191,13 @@ import { createDiffFileWriter } from './conflict/live-files';
         };
     };
 
-    function pickAndImportFiles(targetFolder) {
+    async function pickAndImportFiles(targetFolder) {
+        try {
+            const picked=await pickAndroidImportFiles(global);
+            if(picked!==null){await importFileCollection(picked,targetFolder);return;}
+        } catch(error) {
+            global.showMessage((isEn()?'Import failed: ':'导入失败：')+String(error),'error');return;
+        }
         const fileInput = document.createElement('input');
         fileInput.type = 'file';
         fileInput.multiple = true;

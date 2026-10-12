@@ -24,3 +24,11 @@ it('can arm legacy history routing once for an older Android host',()=>{
  install();const enable=(window as any).enableLegacyAndroidBackRoute;enable();enable();expect(window.history.pushState).toHaveBeenCalledTimes(1);
  app.fileListMultiSelectMode=true;window.dispatchEvent(new PopStateEvent('popstate'));expect(app.exitFileListMultiSelectMode).toHaveBeenCalledTimes(1);
 });
+it('clears the second-back timer after the application resumes',()=>{
+ install();expect(route()).toBe(true);window.dispatchEvent(new Event('epmd-native-resume'));
+ expect(route()).toBe(true);expect(app.showMessage).toHaveBeenCalledTimes(2);expect(route()).toBe(false);
+});
+it('clears the second-back timer when page visibility changes',()=>{
+ install();expect(route()).toBe(true);document.dispatchEvent(new Event('visibilitychange'));
+ expect(route()).toBe(true);expect(route()).toBe(false);
+});

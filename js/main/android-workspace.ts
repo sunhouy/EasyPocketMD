@@ -21,11 +21,12 @@ export function installAndroidWorkspace(app:any=window) {
                 options:el instanceof HTMLSelectElement?[...el.options].map(o=>({label:o.text,value:o.value})):undefined};
         }
         if(getComputedStyle(el).display==='none')return null;
-        if(el instanceof HTMLButtonElement || el instanceof HTMLAnchorElement)return {type:'button',key:key(el),label:label(el),disabled:el instanceof HTMLButtonElement && el.disabled};
+        if(el instanceof HTMLButtonElement || el instanceof HTMLAnchorElement)return {type:'button',key:key(el),id:el.id,label:label(el),disabled:el instanceof HTMLButtonElement && el.disabled};
         if(el.matches('details,.settings-section')) {
             const heading=el.querySelector(':scope > summary,:scope > .settings-section-header');
-            return {type:'group',label:heading?.textContent?.trim() || '',expanded:!(el instanceof HTMLDetailsElement),children:[...el.children].filter(child=>child!==heading).map(child=>node(child as HTMLElement)).filter(Boolean)};
+            return {type:el.matches('.settings-section')?'section':'group',key:key(el),label:heading?.textContent?.trim() || '',expanded:el instanceof HTMLDetailsElement?el.open:true,children:[...el.children].filter(child=>child!==heading).map(child=>node(child as HTMLElement)).filter(Boolean)};
         }
+        if(el.classList.contains('settings-control-label') || el.matches('.settings-row-chevron,.settings-row-icon'))return null;
         if(el.tagName==='LABEL' && el.querySelector('input'))return {type:'container',children:[...el.querySelectorAll('input')].map(child=>node(child)).filter(Boolean)};
         const children=[...el.children].map(child=>node(child as HTMLElement)).filter(Boolean);
         if(children.length)return {type:'container',children};
@@ -37,6 +38,17 @@ export function installAndroidWorkspace(app:any=window) {
         return {title:app.i18n?.tOr?.('settings','设置') || '设置',children:[...overlay.querySelector('.modal-form')!.children].map(child=>node(child as HTMLElement)).filter(Boolean),
             save:key(document.getElementById('saveSettingsBtn')!),cancel:key(document.getElementById('cancelSettingsBtn')!),saveLabel:label(document.getElementById('saveSettingsBtn')!),cancelLabel:app.i18n?.tOr?.('cancel','取消') || '取消'};
     }
+    function openMore() {
+        more={title:app.i18n?.tOr?.('more','更多') || '更多',items:[...document.querySelectorAll<HTMLButtonElement>('#mobileDropdown .dropdown-item')]
+            .filter(el=>!el.hidden && getComputedStyle(el).display!=='none').map(el=>({key:key(el),label:label(el),id:el.id,disabled:el.disabled,
+                group:el.closest('.more-menu-tools')?.querySelector('h3')?.textContent?.trim() || ''}))};void sync();
+    }
+    function toolbar() {
+        if(document.body.classList.contains('file-management-mode'))return null;
+        return {height:Math.round(document.querySelector('.mobile-toolbar-container')?.getBoundingClientRect().height || 54),title:document.querySelector('.mobile-title')?.textContent?.trim() || 'EasyPocketMD',buttons:
+            ['mobileFileBtn','mobileSettingsBtn','modeToggle','mobileUndoBtn','mobileRedoBtn','mobileMenuBtn'].map(id=>document.getElementById(id))
+            .filter((el):el is HTMLElement=>!!el).map(el=>({key:key(el),id:el.id,label:label(el),disabled:(el as HTMLButtonElement).disabled}))};
+    }
     async function sync() {
         if(!enabled)return;
         if(owner!==app.currentUser){owner=app.currentUser;epoch++;refs.clear();more=null;}
@@ -45,8 +57,9 @@ export function installAndroidWorkspace(app:any=window) {
             while(dirty && enabled) {
                 dirty=false;for(const [id,element] of refs)if(!element.isConnected)refs.delete(id);const setting=settings();
                 const blocked=[...document.querySelectorAll(modalSurfaceSelector)].some(el=>!el.closest('#settingsModalOverlay') && isVisibleModalSurface(el));
-                const model={toast,epoch,night:!!app.nightMode,palette:nativePalette(),home:document.body.classList.contains('file-management-mode') && !blocked?home:null,settings:blocked?null:setting,more};
-                await invoke('android_workspace',{model:JSON.stringify(model)});
+                const model={toast,epoch,night:!!app.nightMode,palette:nativePalette(),home:document.body.classList.contains('file-management-mode') && !blocked?home:null,settings:blocked?null:setting,more,toolbar:blocked?null:toolbar()};
+                const response=await invoke('android_workspace',{model:JSON.stringify(model)});
+                document.body.classList.toggle('native-toolbar-ready',!!model.toolbar && response?.toolbarReady===true);
                 app.nativeWorkspaceAvailable=true;
                 if(model.home && !app.nativeWorkspaceReady){app.nativeWorkspaceReady=true;document.body.classList.add('native-workspace-ready');app.refreshNotesHome?.();}
                 const paused=blocked;
@@ -55,21 +68,21 @@ export function installAndroidWorkspace(app:any=window) {
                 document.body.classList.toggle('native-settings-ready',!!model.settings);
             }
         } catch(error) {
-            enabled=false;(window as any).enableLegacyAndroidBackRoute?.();app.nativeWorkspaceAvailable=false;app.nativeWorkspaceReady=false;document.body.classList.remove('native-workspace-ready','native-settings-ready');app.refreshNotesHome?.();
+            enabled=false;(window as any).enableLegacyAndroidBackRoute?.();app.nativeWorkspaceAvailable=false;app.nativeWorkspaceReady=false;document.body.classList.remove('native-workspace-ready','native-settings-ready','native-toolbar-ready');app.refreshNotesHome?.();
             console.warn('Native workspace unavailable; using web UI',error);
         } finally {sending=false;}
     }
     app.nativeWorkspace={renderHome(model:any){home=model;void sync();return !!app.nativeWorkspaceReady && !app.nativeWorkspacePaused;}};
-    const observer=new MutationObserver(records=>{if(records.some(record=>record.target===document.body || record.target===document.documentElement || (record.target instanceof Element && record.target.closest('.modal-overlay,[aria-modal="true"],#customDialogContainer'))))void sync();});observer.observe(document.documentElement,{subtree:true,childList:true,attributes:true,attributeFilter:['class','hidden','style','disabled']});
+    const observer=new MutationObserver(records=>{if(records.some(record=>record.target===document.body || record.target===document.documentElement || (record.target instanceof Element && record.target.closest('.modal-overlay,[aria-modal="true"],#customDialogContainer,.mobile-toolbar-container'))))void sync();});observer.observe(document.documentElement,{subtree:true,childList:true,attributes:true,attributeFilter:['class','hidden','style','disabled']});
     // More is native from the initial click; no overlapping web popup.
     document.addEventListener('click',event=>{
         if(!enabled || !(event.target as Element).closest('#mobileMenuBtn'))return;
         event.preventDefault();event.stopImmediatePropagation();
-        more={title:app.i18n?.tOr?.('more','更多') || '更多',items:[...document.querySelectorAll<HTMLButtonElement>('#mobileDropdown .dropdown-item')]
-            .filter(el=>!el.hidden && getComputedStyle(el).display!=='none').map(el=>({key:key(el),label:label(el),id:el.id,disabled:el.disabled}))};void sync();
+        openMore();
     },true);
     window.addEventListener('epmd-native-ui',((event:CustomEvent)=>{
         const detail=event.detail;if(!enabled || detail.epoch!==epoch || owner!==app.currentUser)return;
+        if(detail.kind==='toolbar'){const element=refs.get(detail.key);if(!element?.isConnected || (element as HTMLButtonElement).disabled)return;if(element.id==='mobileMenuBtn')openMore();else element.click();void sync();return;}
         if(detail.kind==='close-more'){more=null;void sync();return;}
         if(detail.kind==='viewport'){app.extendNativePreviews?.(Number(detail.limit));return;}
         if(detail.kind==='filter'){app.setNativeFileFilter?.(detail.folder,detail.query || '');return;}
@@ -116,5 +129,5 @@ export function installAndroidWorkspace(app:any=window) {
         if(enabled && app.nativeWorkspaceAvailable && (document.body.classList.contains('file-management-mode') || settings() || more)) {toast={id:++toastId,message};void sync();return;}
         return originalMessage?.call(app,message,...args);
     };
-    void sync();return {sync,dispose(){enabled=false;observer.disconnect();app.nativeWorkspaceReady=false;document.body.classList.remove('native-workspace-ready','native-settings-ready');}};
+    void sync();return {sync,dispose(){enabled=false;observer.disconnect();app.nativeWorkspaceReady=false;document.body.classList.remove('native-workspace-ready','native-settings-ready','native-toolbar-ready');}};
 }

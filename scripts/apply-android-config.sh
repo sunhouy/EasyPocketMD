@@ -74,20 +74,25 @@ EOF
 
 echo "✅ Dark mode themes.xml 已应用"
 
-# 为软键盘弹出启用 adjustResize（底部工具栏自动顶到键盘上方）
+# 原生编辑工具栏配合键盘 resize；保持唯一 MainActivity 以避免重复初始化 NDK。
 if [ -f "$ANDROID_MANIFEST_PATH" ]; then
         # Use Perl in slurp mode so both one-line and multi-line <activity ...> tags are handled.
         perl -0777 -i -pe '
             my $done = 0;
             s{<activity\b([^>]*)>} {
                 my $attrs = $1;
-                return "<activity$attrs>" if $done++;
+                if ($attrs !~ /android:name\s*=\s*"[^"]*MainActivity"/ || $done++) { "<activity$attrs>"; }
+                else {
 
+                if ($attrs =~ /android:launchMode\s*=\s*"[^"]*"/) {
+                    $attrs =~ s/android:launchMode\s*=\s*"[^"]*"/android:launchMode="singleTask"/;
+                } else { $attrs .= " android:launchMode=\"singleTask\""; }
                 if ($attrs =~ /android:windowSoftInputMode\s*=\s*"[^"]*"/) {
                     $attrs =~ s/android:windowSoftInputMode\s*=\s*"[^"]*"/android:windowSoftInputMode="adjustResize"/;
                     "<activity$attrs>";
                 } else {
                     "<activity android:windowSoftInputMode=\"adjustResize\"$attrs>";
+                }
                 }
             }gse;
         ' "$ANDROID_MANIFEST_PATH"
@@ -154,6 +159,11 @@ class MainActivity : TauriActivity() {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        NativeNavigation.resume(this)
+    }
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
@@ -192,67 +202,13 @@ cp "$PROJECT_ROOT/src-tauri/platform/android/assets/LICENSE" "$PROJECT_ROOT/src-
 
 echo "✅ MainActivity.kt 已同步输入法/窗口配置"
 
-cat > "$TAURI_ACTIVITY_PATH" << EOF
-// Copyright 2019-2024 Tauri Programme within The Commons Conservancy
-// SPDX-License-Identifier: Apache-2.0
-// SPDX-License-Identifier: MIT
-
-/* THIS FILE IS AUTO-GENERATED. DO NOT MODIFY!! */
-
-package $ANDROID_PACKAGE_NAME
-
-import android.content.Intent
-import android.content.res.Configuration
-import app.tauri.plugin.PluginManager
-import androidx.lifecycle.DefaultLifecycleObserver
-import androidx.lifecycle.LifecycleOwner
-import androidx.lifecycle.ProcessLifecycleOwner
-
-object TauriLifecycleObserver : DefaultLifecycleObserver {
-        override fun onResume(owner: LifecycleOwner) {
-            super.onResume(owner)
-            PluginManager.onResume()
-        }
-
-        override fun onPause(owner: LifecycleOwner) {
-            super.onPause(owner)
-            PluginManager.onPause()
-        }
-
-        override fun onStop(owner: LifecycleOwner) {
-            super.onStop(owner)
-            PluginManager.onStop()
-        }
-}
-
-abstract class TauriActivity : WryActivity() {
-    override val handleBackNavigation: Boolean = false
-
-    fun getPluginManager(): PluginManager {
-        return PluginManager
-    }
-
-    override fun onNewIntent(intent: Intent) {
-        super.onNewIntent(intent)
-        PluginManager.onNewIntent(intent)
-    }
-
-    override fun onRestart() {
-        super.onRestart()
-        PluginManager.onRestart(this)
-    }
-
-    override fun onDestroy() {
-        super.onDestroy()
-        PluginManager.onDestroy(this)
-    }
-
-    override fun onConfigurationChanged(newConfig: Configuration) {
-        super.onConfigurationChanged(newConfig)
-        PluginManager.onConfigurationChanged(newConfig)
-    }
-}
-EOF
+# Keep the runtime-generated plugin lifecycle and ActivityResult launchers intact.
+# Replacing this class with a singleton implementation breaks other Tauri versions.
+if [ ! -f "$TAURI_ACTIVITY_PATH" ]; then
+  echo "TauriActivity.kt missing; run tauri android init before applying configuration" >&2
+  exit 1
+fi
+sed -i -E 's/(override val handleBackNavigation: Boolean = )true/\1false/' "$TAURI_ACTIVITY_PATH"
 
 echo ""
 echo "✨ Android 状态栏配置应用完成！"
@@ -290,6 +246,11 @@ done
 
 # Native UI uses the Material Components already present in the Tauri template.
 # Keep older generated Android projects compatible as well.
+for APP_GRADLE in "$PROJECT_ROOT/src-tauri/gen/android/app/build.gradle.kts" "$PROJECT_ROOT/src-tauri/gen/android/app/build.gradle"; do
+  if [ -f "$APP_GRADLE" ]; then
+    sed -i -E "s/com\.google\.android\.material:material:[0-9][^\"')]*/com.google.android.material:material:1.12.0/g" "$APP_GRADLE"
+  fi
+done
 APP_GRADLE_KTS="$PROJECT_ROOT/src-tauri/gen/android/app/build.gradle.kts"
 APP_GRADLE_GROOVY="$PROJECT_ROOT/src-tauri/gen/android/app/build.gradle"
 if [ -f "$APP_GRADLE_KTS" ] && ! grep -q 'com.google.android.material' "$APP_GRADLE_KTS"; then
