@@ -5,6 +5,14 @@ import { uiMessages, setUiText, uiText } from '../../js/i18n-messages';
 import { floatingRunWindow } from '../../js/code-runner-window';
 
 beforeAll(() => { require('../../js/translations'); window.i18n.init(); });
+it('translates timeline events in both languages without a missing-key warning', () => {
+    const warn=jest.spyOn(console,'warn').mockImplementation(()=>{});
+    for(const language of ['zh','en']) {
+        window.i18n.setLanguage(language);
+        expect(window.i18n.t('events')).toBe(language==='zh'?'事件（每行一个）':'Events (one per line)');
+    }
+    expect(warn).not.toHaveBeenCalled();warn.mockRestore();
+});
 afterEach(() => { document.body.replaceChildren(); window.i18n.setLanguage('zh'); });
 
 it('provides Chinese and English for every static interface translation key', () => {
