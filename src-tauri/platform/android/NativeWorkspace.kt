@@ -30,6 +30,8 @@ object NativeWorkspace : android.app.Application.ActivityLifecycleCallbacks {
     private var toolbarSignature=""
     private var setting: AlertDialog?=null
     private var more: AlertDialog?=null
+    private val panels=linkedMapOf<String,AlertDialog>()
+    private val panelSchemas=mutableMapOf<String,String>()
     private val groups=mutableMapOf<String,Boolean>()
     private var homeSignature=""
     private var settingsSignature=""
@@ -63,6 +65,7 @@ object NativeWorkspace : android.app.Application.ActivityLifecycleCallbacks {
             setting?.setOnCancelListener(null);setting?.dismiss();settingsSignature=settingsSchema(config)
             setting=settings(activity,config,oldScroll);setting!!.show()
         }
+        updatePanels(activity,model.optJSONArray("panels") ?: JSONArray())
         val menu=model.optJSONObject("more")
         if(menu==null){more?.setOnDismissListener(null);more?.setOnCancelListener(null);more?.dismiss();more=null;menuSignature=""}
         else if(menu.toString()!=menuSignature){more?.setOnDismissListener(null);more?.dismiss();menuSignature=menu.toString();more=menu(activity,menu);more!!.show()}
@@ -70,7 +73,7 @@ object NativeWorkspace : android.app.Application.ActivityLifecycleCallbacks {
         if(toast!=null && toast.optLong("id")!=lastToast){lastToast=toast.optLong("id");Toast.makeText(activity,toast.optString("message"),Toast.LENGTH_SHORT).show()}
         return toolbarReady
     }
-    fun close() {(toolbar?.parent as? ViewGroup)?.removeView(toolbar);toolbar=null;toolbarSignature="";home?.dismiss();setting?.setOnCancelListener(null);setting?.dismiss();more?.setOnDismissListener(null);more?.setOnCancelListener(null);more?.dismiss();home=null;setting=null;more=null;settingsSignature="";menuSignature=""}
+    fun close() {panels.values.forEach {it.dismiss()};panels.clear();panelSchemas.clear();(toolbar?.parent as? ViewGroup)?.removeView(toolbar);toolbar=null;toolbarSignature="";home?.dismiss();setting?.setOnCancelListener(null);setting?.dismiss();more?.setOnDismissListener(null);more?.setOnCancelListener(null);more?.dismiss();home=null;setting=null;more=null;settingsSignature="";menuSignature=""}
 
     override fun onActivityDestroyed(activity:Activity){if(owner.get()===activity){NativeNavigation.reset();close();application?.unregisterActivityLifecycleCallbacks(this);application=null;owner=WeakReference(null)}}
     override fun onActivityCreated(activity:Activity,state:Bundle?){}
@@ -104,11 +107,12 @@ object NativeWorkspace : android.app.Application.ActivityLifecycleCallbacks {
                 val data=buttons.optJSONObject(index) ?: return
                 val glyph=when(data.optString("id")){"mobileFileBtn"->"\ue2c8";"mobileSettingsBtn"->"\ue8b8";"modeToggle"->if(dark)"\ue518" else "\ue51c";"mobileUndoBtn"->"\ue166";"mobileRedoBtn"->"\ue15a";else->"\ue5d4"}
                 bar.addView(NativeMaterial.icon(bar.context,glyph,data.optString("label")){emit(activity,"toolbar",mapOf("key" to data.optString("key")))}.apply {
-                    isEnabled=!data.optBoolean("disabled");alpha=if(isEnabled)1f else .35f;textSize=20f;background=NativeMaterial.background(context,NativeMaterial.container,12)
+                    isEnabled=!data.optBoolean("disabled");alpha=if(isEnabled)1f else .35f;textSize=20f;background=NativeMaterial.ripple(context,NativeMaterial.container,12)
                 },LinearLayout.LayoutParams(NativeMaterial.dp(activity,36),NativeMaterial.dp(activity,36)).apply {setMargins(NativeMaterial.dp(activity,2),0,NativeMaterial.dp(activity,2),0)})
             }
             for(index in 0 until minOf(3,buttons.length()))action(index)
             bar.addView(NativeMaterial.label(bar.context,model.optString("title"),14f).apply {gravity=Gravity.CENTER;maxLines=1;ellipsize=android.text.TextUtils.TruncateAt.END;setTypeface(typeface,Typeface.BOLD);setPadding(4,0,4,0)},LinearLayout.LayoutParams(0,-1,1f))
+            model.optJSONObject("lock")?.let {lock->bar.addView(NativeMaterial.icon(bar.context,"\ue897",lock.optString("label")){emit(activity,"toolbar",mapOf("key" to lock.optString("key")))}.apply {textSize=16f;setTextColor(NativeMaterial.primary)},LinearLayout.LayoutParams(NativeMaterial.dp(activity,24),NativeMaterial.dp(activity,36)))}
             for(index in 3 until buttons.length())action(index)
         }
         bar.bringToFront();return true
@@ -147,7 +151,7 @@ object NativeWorkspace : android.app.Application.ActivityLifecycleCallbacks {
                     val record=records.optJSONObject(position*2+column)
                     if(record==null){pair.addView(View(context),LinearLayout.LayoutParams(0,NativeMaterial.dp(context,224),1f));continue}
                     val card=vertical(context);card.setPadding(NativeMaterial.dp(context,16),NativeMaterial.dp(context,20),NativeMaterial.dp(context,16),NativeMaterial.dp(context,18))
-                    card.background=NativeMaterial.background(context,if(record.optBoolean("selected"))NativeMaterial.selected else NativeMaterial.container,20,record.optBoolean("selected")).apply {if(record.optBoolean("selected"))setStroke(NativeMaterial.dp(context,1),NativeMaterial.primary)}
+                    card.background=NativeMaterial.ripple(context,if(record.optBoolean("selected"))NativeMaterial.selected else NativeMaterial.container,20,record.optBoolean("selected"))
                     val name=NativeMaterial.label(context,record.optString("name"),17f).apply {maxLines=1;ellipsize=android.text.TextUtils.TruncateAt.END;setTypeface(typeface,android.graphics.Typeface.BOLD)}
                     val heading=row(context);heading.addView(name,LinearLayout.LayoutParams(0,-2,1f))
                     if(record.optBoolean("pinned"))heading.addView(NativeMaterial.icon(context,"\uf10d","置顶"){}.apply {textSize=16f;isClickable=false;isFocusable=false},LinearLayout.LayoutParams(NativeMaterial.dp(context,20),NativeMaterial.dp(context,24)))
@@ -186,7 +190,7 @@ object NativeWorkspace : android.app.Application.ActivityLifecycleCallbacks {
             list.adapter=adapter;root.addView(list,LinearLayout.LayoutParams(-1,0,1f));placeholder.addView(progress);placeholder.addView(empty);root.addView(placeholder,LinearLayout.LayoutParams(-1,0,1f));list.emptyView=placeholder;root.addView(footer)
             frame.addView(root,FrameLayout.LayoutParams(-1,-1))
             val create=NativeMaterial.icon(context,"\ue145","新建") {emit(activity,"home-action",mapOf("action" to "create"))}
-            create.setTextColor(Color.WHITE);create.background=NativeMaterial.background(context,NativeMaterial.primary,28)
+            create.setTextColor(Color.WHITE);create.background=NativeMaterial.ripple(context,NativeMaterial.primary,28)
             frame.addView(create,FrameLayout.LayoutParams(NativeMaterial.dp(context,56),NativeMaterial.dp(context,56),Gravity.END or Gravity.BOTTOM).apply {setMargins(0,0,NativeMaterial.dp(context,20),NativeMaterial.dp(context,24))});create.tag="create"
             setContentView(frame);setCanceledOnTouchOutside(false)
             search.addTextChangedListener(object:TextWatcher {
@@ -265,6 +269,54 @@ object NativeWorkspace : android.app.Application.ActivityLifecycleCallbacks {
             }
         }
     }
+    fun panelKeys()=JSONArray(panels.keys.toList())
+    private fun panelSchema(model:JSONObject):String {
+        val copy=JSONObject(model.toString())
+        fun clean(node:JSONObject) {
+            if(node.optString("type")=="input")node.remove("value")
+            if(node.optString("type")=="text" && node.optString("key").isNotEmpty())node.remove("label")
+            val children=node.optJSONArray("children") ?: return
+            for(index in 0 until children.length())clean(children.getJSONObject(index))
+        }
+        clean(copy);return copy.toString()
+    }
+    private fun updatePanels(activity:Activity,models:JSONArray) {
+        val keys=(0 until models.length()).map {models.getJSONObject(it).optString("key")}.toSet()
+        for(key in panels.keys.toList())if(key !in keys){panels.remove(key)?.dismiss();panelSchemas.remove(key)}
+        for(index in 0 until models.length()) {
+            val model=models.getJSONObject(index);val key=model.optString("key");val schema=panelSchema(model)
+            if(panelSchemas[key]!=schema || panels[key]?.isShowing!=true) {
+                val position=panels[key]?.window?.decorView?.findViewWithTag<ScrollView>("panel-scroll")?.scrollY ?: 0
+                panels.remove(key)?.dismiss()
+                val context=NativeMaterial.context(activity,dark);val content=vertical(context);padding(content,16)
+                val header=row(context);header.addView(NativeMaterial.label(context,model.optString("title"),22f).apply {setTypeface(typeface,Typeface.BOLD)},LinearLayout.LayoutParams(0,-2,1f))
+                val cancel={if(model.optBoolean("dismissible",true))emit(activity,"close-panel",mapOf("key" to key))}
+                header.addView(NativeMaterial.icon(context,"\ue5cd","关闭",cancel).apply {visibility=if(model.optBoolean("dismissible",true))View.VISIBLE else View.GONE},LinearLayout.LayoutParams(NativeMaterial.dp(context,40),NativeMaterial.dp(context,40)))
+                content.addView(header,LinearLayout.LayoutParams(-1,-2).apply {bottomMargin=NativeMaterial.dp(context,12)})
+                val body=vertical(context);renderNodes(activity,body,model.optJSONArray("children") ?: JSONArray(),key)
+                val scroll=ScrollView(context).apply {tag="panel-scroll";addView(body);post {scrollTo(0,position)}}
+                content.addView(scroll,LinearLayout.LayoutParams(-1,0,1f))
+                val dialog=NativeMaterial.dialog(context).setView(content).create();dialog.setCanceledOnTouchOutside(false);dialog.setCancelable(false)
+                dialog.setOnShowListener {boundWindow(activity,dialog);NativeNavigation.dialogBack(dialog,cancel)}
+                panels[key]=dialog;panelSchemas[key]=schema;dialog.show()
+            }
+            val decor=panels[key]?.window?.decorView ?: continue
+            fun patch(node:JSONObject) {
+                val view=decor.findViewWithTag<TextView>(node.optString("key"))
+                if(node.optString("type")=="text" && view!=null && view.text.toString()!=node.optString("label"))view.text=node.optString("label")
+                if(node.optString("type")=="input" && view is EditText && !view.hasFocus() && view.text.toString()!=node.optString("value"))view.setText(node.optString("value"))
+                val children=node.optJSONArray("children") ?: return
+                for(child in 0 until children.length())patch(children.getJSONObject(child))
+            }
+            patch(model)
+        }
+    }
+    private fun boundWindow(activity:Activity,dialog:AlertDialog) {
+        val host=activity.findViewById<View>(android.R.id.content)
+        val height=if(host!=null && host.height>0)host.height else activity.resources.displayMetrics.heightPixels
+        dialog.window?.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
+        dialog.window?.setLayout(-1,(height*.85f).toInt())
+    }
     private fun settings(activity:Activity,model:JSONObject,position:Int):AlertDialog {
         val context=NativeMaterial.context(activity,dark);val content=vertical(context);padding(content,16)
         val dialog=NativeMaterial.dialog(context).setView(content).create()
@@ -274,25 +326,20 @@ object NativeWorkspace : android.app.Application.ActivityLifecycleCallbacks {
         content.addView(header,LinearLayout.LayoutParams(-1,-2).apply {bottomMargin=NativeMaterial.dp(context,16)})
         val layout=vertical(context)
         renderNodes(activity,layout,model.optJSONArray("children") ?: JSONArray())
-        val scroll=object:ScrollView(context) {
-            override fun onMeasure(width:Int,height:Int){
-                val cap=(resources.displayMetrics.heightPixels*.62f).toInt()
-                val available=if(View.MeasureSpec.getMode(height)==View.MeasureSpec.UNSPECIFIED)cap else View.MeasureSpec.getSize(height)
-                super.onMeasure(width,View.MeasureSpec.makeMeasureSpec(minOf(cap,available),View.MeasureSpec.AT_MOST))
-            }
-        }.apply {tag="settings-scroll";isFillViewport=false;addView(layout);post {scrollTo(0,position)}}
-        content.addView(scroll)
+        // Header/footer reserve their space; only the body may shrink for IME/small screens.
+        val scroll=ScrollView(context).apply {tag="settings-scroll";isFillViewport=false;addView(layout);post {scrollTo(0,position)}}
+        content.addView(scroll,LinearLayout.LayoutParams(-1,0,1f))
         val footer=row(context);footer.setPadding(0,NativeMaterial.dp(context,12),0,0)
-        footer.addView(NativeMaterial.button(context,model.optString("cancelLabel","取消")).apply {setOnClickListener {emit(activity,"click",mapOf("key" to model.optString("cancel")))}},LinearLayout.LayoutParams(0,-2,1f).apply {rightMargin=NativeMaterial.dp(context,8)})
-        footer.addView(NativeMaterial.button(context,model.optString("saveLabel","保存"),true).apply {setOnClickListener {emit(activity,"click",mapOf("key" to model.optString("save")))}},LinearLayout.LayoutParams(0,-2,1f))
-        content.addView(footer)
+        footer.addView(NativeMaterial.button(context,model.optString("cancelLabel","取消")).apply {setOnClickListener {emit(activity,"click",mapOf("key" to model.optString("cancel")))}},LinearLayout.LayoutParams(0,-1,1f).apply {rightMargin=NativeMaterial.dp(context,8)})
+        footer.addView(NativeMaterial.button(context,model.optString("saveLabel","保存"),true).apply {setOnClickListener {emit(activity,"click",mapOf("key" to model.optString("save")))}},LinearLayout.LayoutParams(0,-1,1f))
+        content.addView(footer,LinearLayout.LayoutParams(-1,NativeMaterial.dp(context,60)))
         dialog.setCanceledOnTouchOutside(false);dialog.setCancelable(false)
-        dialog.setOnShowListener {NativeNavigation.dialogBack(dialog){emit(activity,"click",mapOf("key" to model.optString("cancel")))}}
+        dialog.setOnShowListener {boundWindow(activity,dialog);NativeNavigation.dialogBack(dialog){emit(activity,"click",mapOf("key" to model.optString("cancel")))}}
         return dialog
     }
     private fun settingRow(context:Context,label:String,glyph:String="",action:()->Unit):LinearLayout {
         val line=row(context);line.minimumHeight=NativeMaterial.dp(context,52);padding(line,12)
-        line.background=NativeMaterial.background(context,NativeMaterial.surface,12)
+        line.background=NativeMaterial.ripple(context,NativeMaterial.surface,12)
         if(glyph.isNotEmpty())line.addView(NativeMaterial.icon(context,glyph,label){}.apply {isClickable=false;isFocusable=false;textSize=20f;setTextColor(NativeMaterial.primary)},LinearLayout.LayoutParams(NativeMaterial.dp(context,24),NativeMaterial.dp(context,24)).apply {rightMargin=NativeMaterial.dp(context,12)})
         line.addView(NativeMaterial.label(context,label,15f),LinearLayout.LayoutParams(0,-2,1f))
         line.addView(NativeMaterial.icon(context,"\ue5cc",label){}.apply {isClickable=false;isFocusable=false;textSize=18f;setTextColor(NativeMaterial.muted)},LinearLayout.LayoutParams(NativeMaterial.dp(context,20),NativeMaterial.dp(context,24)))
@@ -303,8 +350,20 @@ object NativeWorkspace : android.app.Application.ActivityLifecycleCallbacks {
         for(index in 0 until nodes.length()) {
             val node=nodes.getJSONObject(index);val key=node.optString("key");val label=node.optString("label")
             when(node.optString("type")) {
+                "image" -> {
+                    val source=node.optString("source")
+                    if(source.startsWith("data:image/png;base64,")) {
+                        val bytes=android.util.Base64.decode(source.substringAfter(','),android.util.Base64.DEFAULT)
+                        val bitmap=android.graphics.BitmapFactory.decodeByteArray(bytes,0,bytes.size)
+                        if(bitmap!=null) {
+                            val width=(context.resources.displayMetrics.widthPixels-NativeMaterial.dp(context,64)).coerceAtLeast(1)
+                            val height=(width.toLong()*bitmap.height/bitmap.width).toInt().coerceAtLeast(1)
+                            parent.addView(ImageView(context).apply {setImageBitmap(bitmap);scaleType=ImageView.ScaleType.FIT_CENTER;contentDescription=label},LinearLayout.LayoutParams(-1,height).apply {bottomMargin=NativeMaterial.dp(context,12)})
+                        }
+                    }
+                }
                 "container" -> renderNodes(activity,parent,node.optJSONArray("children") ?: JSONArray(),path)
-                "text" -> parent.addView(NativeMaterial.label(context,label).apply {setPadding(0,8,0,8)})
+                "text" -> parent.addView(NativeMaterial.label(context,label,if(node.has("size"))node.optDouble("size",14.0).toFloat() else if(node.optBoolean("heading"))18f else 14f).apply {if(key.isNotEmpty())tag=key;setTextIsSelectable(node.optBoolean("selectable"));setPadding(0,NativeMaterial.dp(context,8),0,NativeMaterial.dp(context,8));if(node.optBoolean("heading"))setTypeface(typeface,Typeface.BOLD)})
                 "section" -> {
                     val section=vertical(context);padding(section,16);section.background=NativeMaterial.background(context,NativeMaterial.container,16,true)
                     section.addView(NativeMaterial.label(context,label,17f).apply {setTypeface(typeface,Typeface.BOLD)},LinearLayout.LayoutParams(-1,-2).apply {bottomMargin=NativeMaterial.dp(context,12)})
@@ -325,7 +384,14 @@ object NativeWorkspace : android.app.Application.ActivityLifecycleCallbacks {
                     summary.getChildAt(1).rotation=if(opened)90f else 0f
                     box.addView(summary);box.addView(children);parent.addView(box,LinearLayout.LayoutParams(-1,-2).apply {bottomMargin=NativeMaterial.dp(context,8)})
                 }
-                "button" -> parent.addView(settingRow(context,label,NativeMaterial.glyph(node.optString("id",key))) {if(!node.optBoolean("disabled"))emit(activity,"click",mapOf("key" to key))}.apply {isEnabled=!node.optBoolean("disabled");alpha=if(isEnabled)1f else .45f},LinearLayout.LayoutParams(-1,-2).apply {bottomMargin=NativeMaterial.dp(context,8)})
+                "button" -> {
+                    val enabled=!node.optBoolean("disabled")
+                    val action={if(enabled)emit(activity,"click",mapOf("key" to key))}
+                    val button:View=if(node.optBoolean("primary"))NativeMaterial.button(context,label,true).apply {setOnClickListener {action()}}
+                        else settingRow(context,label,NativeMaterial.glyph(node.optString("id",key)),action).apply {if(node.optBoolean("active"))background=NativeMaterial.ripple(context,NativeMaterial.selected,12)}
+                    button.isEnabled=enabled;button.alpha=if(enabled)1f else .45f
+                    parent.addView(button,LinearLayout.LayoutParams(-1,-2).apply {bottomMargin=NativeMaterial.dp(context,8)})
+                }
                 "radio" -> parent.addView(com.google.android.material.radiobutton.MaterialRadioButton(context).apply {
                     text=label;setTextColor(NativeMaterial.text);buttonTintList=android.content.res.ColorStateList(arrayOf(intArrayOf(android.R.attr.state_checked),intArrayOf()),intArrayOf(NativeMaterial.primary,NativeMaterial.muted));isChecked=node.optBoolean("checked");isEnabled=!node.optBoolean("disabled")
                     setOnCheckedChangeListener {_,checked->if(checked)emit(activity,"change",mapOf("key" to key,"checked" to true))}
@@ -354,7 +420,9 @@ object NativeWorkspace : android.app.Application.ActivityLifecycleCallbacks {
                         };parent.addView(slider);continue
                     }
                     val input=NativeMaterial.field(parent,node.optString("value"),label,node.optString("inputType")=="textarea")
-                    input.isEnabled=!node.optBoolean("disabled")
+                    input.tag=key
+                    input.isEnabled=!node.optBoolean("disabled");input.isFocusable=!node.optBoolean("readonly");input.isFocusableInTouchMode=!node.optBoolean("readonly")
+                    if(node.optInt("maxLength",-1)>0)input.filters=arrayOf(android.text.InputFilter.LengthFilter(node.optInt("maxLength")))
                     if(node.optString("inputType") in listOf("number","range"))input.inputType=InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL
                     if(node.optString("inputType")=="password") {
                         input.inputType=InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD;input.isSaveEnabled=false
@@ -371,7 +439,7 @@ object NativeWorkspace : android.app.Application.ActivityLifecycleCallbacks {
     }
     private fun tile(context:Context,id:String,label:String,enabled:Boolean,action:()->Unit):View {
         val box=vertical(context);padding(box,6);box.isEnabled=enabled;box.alpha=if(enabled)1f else .45f
-        box.background=NativeMaterial.background(context,NativeMaterial.container,14)
+        box.background=NativeMaterial.ripple(context,NativeMaterial.container,14)
         val icon=NativeMaterial.icon(context,NativeMaterial.glyph(id),label){if(enabled)action()}
         if(id=="delete")icon.setTextColor(NativeMaterial.danger)
         box.addView(icon,LinearLayout.LayoutParams(-1,NativeMaterial.dp(context,32)))
@@ -397,7 +465,7 @@ object NativeWorkspace : android.app.Application.ActivityLifecycleCallbacks {
             }
             val line=row(context);padding(line,10);line.minimumHeight=NativeMaterial.dp(context,48)
             val enabled=!item.optBoolean("disabled");line.alpha=if(enabled)1f else .45f
-            line.background=NativeMaterial.background(context,if(item.optString("id")=="mobileMenuAIBtn")NativeMaterial.selected else Color.TRANSPARENT,12)
+            line.background=NativeMaterial.ripple(context,if(item.optString("id")=="mobileMenuAIBtn")NativeMaterial.selected else Color.TRANSPARENT,12)
             line.addView(NativeMaterial.icon(context,NativeMaterial.glyph(item.optString("id")),item.optString("label")){}.apply {isClickable=false;isFocusable=false;textSize=18f;setTextColor(NativeMaterial.muted)},LinearLayout.LayoutParams(NativeMaterial.dp(context,20),NativeMaterial.dp(context,24)).apply {rightMargin=NativeMaterial.dp(context,10)})
             line.addView(NativeMaterial.label(context,item.optString("label"),13f),LinearLayout.LayoutParams(0,-2,1f))
             line.setOnClickListener {if(enabled){dialog.dismiss();emit(activity,"click",mapOf("key" to item.optString("key")))}}

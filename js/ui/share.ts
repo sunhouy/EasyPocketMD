@@ -70,7 +70,8 @@
         var nightMode = g('nightMode') === true;
         var isEn = window.i18n && window.i18n.getLanguage() === 'en';
         var resultModal = document.createElement('div');
-        resultModal.className = 'modal-overlay';
+        resultModal.className = 'modal-overlay show';
+        resultModal.dataset.nativePanel = 'share';
         resultModal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:10000;';
         var modalContent = document.createElement('div');
         modalContent.style.cssText = 'background:' + (nightMode ? '#2d2d2d' : 'white') + ';color:' + (nightMode ? '#eee' : '#333') + ';border-radius:12px;padding:25px;width:90%;max-width:500px;';
@@ -127,7 +128,8 @@
 
         // 创建分享对话框
         var shareModal = document.createElement('div');
-        shareModal.className = 'modal-overlay';
+        shareModal.className = 'modal-overlay show';
+        shareModal.dataset.nativePanel = 'share';
         shareModal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:10000;';
         var bg = nightMode ? '#2d2d2d' : 'white';
         var textColor = nightMode ? '#eee' : '#333';

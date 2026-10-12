@@ -398,11 +398,11 @@ fn write_local_file(file_path: String, content: String) -> WriteLocalFileRespons
 }
 
 #[tauri::command]
-async fn android_import_files(app: AppHandle) -> Result<serde_json::Value, String> {
+async fn android_import_files(app: AppHandle, mime_types: Option<Vec<String>>, multiple: Option<bool>) -> Result<serde_json::Value, String> {
     #[cfg(target_os = "android")]
-    { android_document(app, "pickImport", serde_json::json!({})).await }
+    { android_document(app, "pickImport", serde_json::json!({"mimeTypes":mime_types,"multiple":multiple.unwrap_or(true)})).await }
     #[cfg(not(target_os = "android"))]
-    { let _ = app; Err("Android import unavailable".into()) }
+    { let _ = (app, mime_types, multiple); Err("Android import unavailable".into()) }
 }
 
 #[tauri::command]

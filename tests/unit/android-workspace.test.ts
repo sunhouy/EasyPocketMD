@@ -1,7 +1,7 @@
 /** @jest-environment jsdom */
 import {installAndroidWorkspace} from '../../js/main/android-workspace';
 let ua:jest.SpyInstance,invoke:jest.Mock,app:any,runtime:any;
-const flush=()=>new Promise(resolve=>setTimeout(resolve,0));
+const flush=()=>new Promise(resolve=>setTimeout(resolve,25));
 beforeEach(()=>{
  ua=jest.spyOn(navigator,'userAgent','get').mockReturnValue('Android');invoke=jest.fn().mockResolvedValue({ready:true});window.__TAURI__={invoke} as any;
  document.body.className='file-management-mode';document.body.innerHTML='<div id="settingsModalOverlay" style="display:none"><div class="modal-form"><section class="settings-section"><div class="settings-section-header">外观</div><div class="form-group"><label>字体</label><select id="size"><option value="16">16px</option></select></div></section></div><button id="saveSettingsBtn">保存</button><button id="cancelSettingsBtn">取消</button></div><div id="mobileDropdown" style="display:none"><button class="dropdown-item" id="mobileClearBtn">清空</button></div><button id="mobileMenuBtn">更多</button>';
@@ -61,4 +61,61 @@ it('acknowledges native toolbar before hiding the web toolbar and delegates undo
 it('opens import even after the native create menu closes',async()=>{
  app.importFiles=jest.fn();await flush();emit({kind:'home-action',action:'create'});await flush();
  emit({kind:'close-more'});emit({kind:'click',key:'import-file'});expect(app.importFiles).toHaveBeenCalledTimes(1);
+});
+it('keeps native toolbar ownership during text-copy menus and unsupported dialogs',async()=>{
+ document.body.classList.remove('file-management-mode');invoke.mockResolvedValue({ready:true,toolbarReady:true,panelKeys:[]});await runtime.sync();await flush();
+ const selection=document.createElement('div');selection.id='selectionToolbar';selection.style.display='flex';document.body.append(selection);await flush();
+ expect(model().toolbar).not.toBeNull();expect(document.body.classList.contains('native-toolbar-ready')).toBe(true);
+ const dialog=document.createElement('div');dialog.className='modal-overlay show';document.body.append(dialog);await flush();
+ expect(model().toolbar).toBeNull();expect(document.body.classList.contains('native-toolbar-ready')).toBe(true);
+ dialog.remove();await flush();expect(model().toolbar).not.toBeNull();
+});
+it('keeps the old file cards hidden during specialized web subflows',async()=>{
+ app.nativeWorkspace.renderHome({items:[]});await flush();
+ const child=document.createElement('div');child.className='modal-overlay show';document.body.append(child);await flush();
+ expect(model().home).toBeNull();expect(document.body.classList.contains('native-workspace-ready')).toBe(true);
+});
+it('passes the live encryption indicator and its help action to the native toolbar',async()=>{
+ document.body.classList.remove('file-management-mode');const bar=document.createElement('div');bar.className='mobile-toolbar-container';bar.innerHTML='<span class="mobile-e2e-indicator" aria-hidden="false"></span>';document.body.append(bar);
+ invoke.mockResolvedValue({ready:true,toolbarReady:true,panelKeys:[]});await runtime.sync();await flush();
+ const lock=model().toolbar.lock;expect(lock.label).toContain('端到端加密');const show=jest.fn();bar.firstElementChild!.addEventListener('click',show);
+ emit({kind:'toolbar',key:lock.key});expect(show).toHaveBeenCalledTimes(1);
+ bar.firstElementChild!.setAttribute('aria-hidden','true');await runtime.sync();expect(model().toolbar.lock).toBeNull();
+});
+it.each(['aboutModalOverlay','wordCountModalOverlay','aiModalOverlay','export','share','print'])('acknowledges and closes the native %s surface through its original handler',async(id)=>{
+ invoke.mockImplementation(async(_:string,payload:any)=>({ready:true,panelKeys:JSON.parse(payload.model).panels.map((p:any)=>p.key)}));
+ const overlay=document.createElement('div');overlay.className='modal-overlay show';if(id.endsWith('Overlay'))overlay.id=id;else overlay.dataset.nativePanel=id;
+ overlay.innerHTML='<div class="modal"><button class="epmd-dialog-close">×</button><h2>标题</h2><label for="nativeName">名称</label><input id="nativeName" value="初始"><button id="nativeApply">应用</button><p>提示 <strong>完整文字</strong></p></div>';
+ document.body.append(overlay);await runtime.sync();await flush();
+ expect(overlay.getAttribute('data-native-owned')).toBe('true');expect(model().home).toBeNull();expect(app.nativeWorkspacePaused).toBe(false);
+ const nodes:any[]=[];const walk=(n:any)=>{nodes.push(n);n.children?.forEach(walk);};model().panels.forEach(walk);
+ const input=nodes.find(n=>n.type==='input');expect(input.label).toBe('名称');emit({kind:'input',key:input.key,value:'新名称'});expect((overlay.querySelector('input') as HTMLInputElement).value).toBe('新名称');
+ expect(nodes.find(n=>n.type==='text' && n.label.includes('提示')).label).toBe('提示 完整文字');
+ const close=jest.fn(()=>overlay.remove());(overlay.querySelector('button') as HTMLElement).onclick=close;
+ emit({kind:'close-panel',key:model().panels[0].key});expect(close).toHaveBeenCalledTimes(1);
+});
+it('retains the whole AI response and sends text-only streaming updates',async()=>{
+ invoke.mockImplementation(async(_:string,payload:any)=>({ready:true,panelKeys:JSON.parse(payload.model).panels.map((p:any)=>p.key)}));
+ const overlay=document.createElement('div');overlay.id='aiModalOverlay';overlay.className='modal-overlay show';overlay.innerHTML='<div class="modal"><h2>AI助手</h2><div class="ai-result-content"></div></div>';document.body.append(overlay);
+ const result=overlay.querySelector('.ai-result-content')!;result.textContent='正文'.repeat(2000);await runtime.sync();await flush();const initial=model().panels[0].children[0];expect(initial.label).toHaveLength(4000);
+ result.firstChild!.textContent+='追加';await flush();expect(model().panels[0].children[0]).toMatchObject({key:initial.key,label:'正文'.repeat(2000)+'追加'});
+});
+it('keeps a requested panel visible as a web fallback when an older APK lacks panel support',async()=>{
+ app.nativeWorkspace.renderHome({items:[]});await flush();
+ const overlay=document.createElement('div');overlay.id='aboutModalOverlay';overlay.className='modal-overlay show';overlay.innerHTML='<div class="modal"><h2>关于</h2></div>';document.body.append(overlay);await runtime.sync();await flush();
+ expect(overlay.hasAttribute('data-native-owned')).toBe(false);expect(model().home).toBeNull();expect(app.nativeWorkspacePaused).toBe(true);
+});
+it('keeps owned settings and AI web markup hidden under an unsupported child surface',async()=>{
+ invoke.mockImplementation(async(_:string,payload:any)=>({ready:true,panelKeys:JSON.parse(payload.model).panels.map((p:any)=>p.key)}));
+ const setting=document.getElementById('settingsModalOverlay')!;setting.style.display='flex';setting.classList.add('show');
+ const panel=document.createElement('div');panel.id='aiModalOverlay';panel.className='modal-overlay show';panel.innerHTML='<div class="modal"><h2>AI助手</h2><p>结果</p></div>';document.body.append(panel);await runtime.sync();await flush();
+ const child=document.createElement('div');child.className='modal-overlay show';document.body.append(child);await flush();
+ expect(model().panels).toEqual([]);expect(model().settings).toBeNull();expect(panel.getAttribute('data-native-owned')).toBe('true');expect(document.body.classList.contains('native-settings-ready')).toBe(true);
+ child.remove();await flush();expect(model().panels).toHaveLength(1);expect(model().settings).not.toBeNull();
+});
+it('consumes native close for a protected in-progress operation without running cleanup',async()=>{
+ invoke.mockImplementation(async(_:string,payload:any)=>({ready:true,panelKeys:JSON.parse(payload.model).panels.map((p:any)=>p.key)}));
+ const overlay=document.createElement('div');overlay.dataset.nativePanel='export';overlay.dataset.escClosable='false';overlay.className='modal-overlay show';overlay.innerHTML='<div><h2>导出中</h2><button class="epmd-dialog-close">关闭</button></div>';document.body.append(overlay);
+ await runtime.sync();await flush();expect(model().panels[0].dismissible).toBe(false);const close=jest.fn();(overlay.querySelector('button') as HTMLElement).onclick=close;
+ emit({kind:'close-panel',key:model().panels[0].key});expect(close).not.toHaveBeenCalled();expect(overlay.isConnected).toBe(true);
 });

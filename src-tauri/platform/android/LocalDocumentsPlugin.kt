@@ -30,6 +30,9 @@ import app.tauri.plugin.JSObject
 import app.tauri.plugin.Plugin
 
 @InvokeArg
+class ImportPickerArgs {var mimeTypes:Array<String>?=null;var multiple:Boolean=true}
+
+@InvokeArg
 class SelectionMenuArgs { var enabled: Boolean = false }
 
 @InvokeArg
@@ -155,7 +158,7 @@ class LocalDocumentsPlugin(private val activity: Activity) : Plugin(activity) {
     fun workspace(invoke: Invoke) {
         val args=invoke.parseArgs(WorkspaceArgs::class.java)
         activity.runOnUiThread {
-            try {val toolbarReady=NativeWorkspace.update(activity,org.json.JSONObject(args.model));invoke.resolve(JSObject().put("ready",true).put("toolbarReady",toolbarReady))}
+            try {val toolbarReady=NativeWorkspace.update(activity,org.json.JSONObject(args.model));invoke.resolve(JSObject().put("ready",true).put("toolbarReady",toolbarReady).put("panelKeys",NativeWorkspace.panelKeys()))}
             catch(error:Exception){NativeWorkspace.close();invoke.reject(error.message ?: "Native workspace unavailable")}
         }
     }
@@ -284,10 +287,11 @@ class LocalDocumentsPlugin(private val activity: Activity) : Plugin(activity) {
 
     @Command
     fun pickImport(invoke:Invoke) {
+        val args=invoke.parseArgs(ImportPickerArgs::class.java)
         val intent=Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
-            addCategory(Intent.CATEGORY_OPENABLE);type="*/*";putExtra(Intent.EXTRA_ALLOW_MULTIPLE,true)
+            addCategory(Intent.CATEGORY_OPENABLE);type="*/*";putExtra(Intent.EXTRA_ALLOW_MULTIPLE,args.multiple)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            putExtra(Intent.EXTRA_MIME_TYPES,arrayOf("text/plain","text/markdown","application/pdf","application/msword","application/vnd.openxmlformats-officedocument.wordprocessingml.document","application/vnd.ms-excel","application/vnd.openxmlformats-officedocument.spreadsheetml.sheet","application/vnd.ms-powerpoint","application/vnd.openxmlformats-officedocument.presentationml.presentation","application/octet-stream"))
+            putExtra(Intent.EXTRA_MIME_TYPES,args.mimeTypes ?: arrayOf("text/plain","text/markdown","application/pdf","application/msword","application/vnd.openxmlformats-officedocument.wordprocessingml.document","application/vnd.ms-excel","application/vnd.openxmlformats-officedocument.spreadsheetml.sheet","application/vnd.ms-powerpoint","application/vnd.openxmlformats-officedocument.presentationml.presentation","application/octet-stream"))
         }
         startActivityForResult(invoke,intent,"importPicked")
     }
