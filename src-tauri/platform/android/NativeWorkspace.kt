@@ -28,17 +28,19 @@ object NativeWorkspace : android.app.Application.ActivityLifecycleCallbacks {
     private var home: Home?=null
     private var toolbar:LinearLayout?=null
     private var toolbarSignature=""
-    private var setting: AlertDialog?=null
+    private var setting: Settings?=null
     private var more: AlertDialog?=null
     private val groups=mutableMapOf<String,Boolean>()
     private var homeSignature=""
-    private var settingsSignature=""
+    private var settingsModel=JSONObject()
+    private var patching=false
     private var menuSignature=""
     private var epoch=0L
     private var dark=false
     private var paletteSignature=""
     private var lastToast=0L
     private fun emit(activity:Activity,kind:String,values:Map<String,Any?> = emptyMap()) {
+        if(patching)return
         val data=JSONObject().put("kind",kind).put("epoch",epoch);values.forEach { (key,value)->data.put(key,value) };NativeNavigation.emit(activity,data)
     }
     private fun vertical(context:Context)=LinearLayout(context).apply { orientation=LinearLayout.VERTICAL }
@@ -47,21 +49,23 @@ object NativeWorkspace : android.app.Application.ActivityLifecycleCallbacks {
     fun update(activity:Activity,model:JSONObject):Boolean {
         if(owner.get()!==activity){application?.unregisterActivityLifecycleCallbacks(this);application=activity.application;application!!.registerActivityLifecycleCallbacks(this)}
         val newEpoch=model.optLong("epoch")
-        if(owner.get()!==activity || dark!=model.optBoolean("night") || epoch!=newEpoch || paletteSignature!=model.optString("palette")) {
-            close();owner=WeakReference(activity);dark=model.optBoolean("night");epoch=newEpoch;paletteSignature=model.optString("palette")
-        }
-        NativeMaterial.configure(dark,model.optString("palette"))
+        val themeChanged=dark!=model.optBoolean("night") || paletteSignature!=model.optString("palette")
+        if(owner.get()!==activity || epoch!=newEpoch){close();owner=WeakReference(activity);epoch=newEpoch}
+        dark=model.optBoolean("night");paletteSignature=model.optString("palette")
+        NativeMaterial.configure(dark,paletteSignature)
+        if(themeChanged){home?.dismiss();home=null;homeSignature="";toolbarSignature="";menuSignature="";setting?.retint()}
         val toolbarReady=updateToolbar(activity,model.optJSONObject("toolbar"))
         val homeModel=model.optJSONObject("home")
         if(homeModel==null){home?.hide()}
         else {if(home==null){home=Home(activity,NativeMaterial.context(activity,dark));homeSignature=""};if(homeSignature!=homeModel.toString()){home!!.update(homeModel);homeSignature=homeModel.toString()};home!!.show()}
         val config=model.optJSONObject("settings")
-        if(config==null){setting?.dismiss();setting=null;settingsSignature="";groups.clear()}
-        else if(settingsSchema(config)!=settingsSignature || setting?.isShowing!=true) {
-            // Text input events do not rebuild the form; dependent controls refresh on change.
-            val oldScroll=setting?.window?.decorView?.findViewWithTag<ScrollView>("settings-scroll")?.scrollY ?: 0
-            setting?.setOnCancelListener(null);setting?.dismiss();settingsSignature=settingsSchema(config)
-            setting=settings(activity,config,oldScroll);setting!!.show()
+        if(config==null) {
+            if(model.optBoolean("settingsOpen"))setting?.hide()
+            else {setting?.dismiss();setting=null;groups.clear();settingsModel=JSONObject()}
+        } else {
+            settingsModel=config
+            if(setting==null)setting=Settings(activity,NativeMaterial.context(activity,dark))
+            setting!!.update(config);setting!!.show()
         }
         val menu=model.optJSONObject("more")
         if(menu==null){more?.setOnDismissListener(null);more?.setOnCancelListener(null);more?.dismiss();more=null;menuSignature=""}
@@ -70,7 +74,7 @@ object NativeWorkspace : android.app.Application.ActivityLifecycleCallbacks {
         if(toast!=null && toast.optLong("id")!=lastToast){lastToast=toast.optLong("id");Toast.makeText(activity,toast.optString("message"),Toast.LENGTH_SHORT).show()}
         return toolbarReady
     }
-    fun close() {(toolbar?.parent as? ViewGroup)?.removeView(toolbar);toolbar=null;toolbarSignature="";home?.dismiss();setting?.setOnCancelListener(null);setting?.dismiss();more?.setOnDismissListener(null);more?.setOnCancelListener(null);more?.dismiss();home=null;setting=null;more=null;settingsSignature="";menuSignature=""}
+    fun close() {(toolbar?.parent as? ViewGroup)?.removeView(toolbar);toolbar=null;toolbarSignature="";home?.dismiss();setting?.dismiss();more?.setOnDismissListener(null);more?.setOnCancelListener(null);more?.dismiss();home=null;setting=null;more=null;settingsModel=JSONObject();menuSignature=""}
 
     override fun onActivityDestroyed(activity:Activity){if(owner.get()===activity){NativeNavigation.reset();close();application?.unregisterActivityLifecycleCallbacks(this);application=null;owner=WeakReference(null)}}
     override fun onActivityCreated(activity:Activity,state:Bundle?){}
@@ -83,7 +87,8 @@ object NativeWorkspace : android.app.Application.ActivityLifecycleCallbacks {
     private fun settingsSchema(value:JSONObject):String {
         val copy=JSONObject(value.toString())
         fun clean(node:JSONObject) {
-            if(node.optString("type")=="input")node.remove("value")
+            if(node.optString("type") in listOf("input","select"))node.remove("value")
+            if(node.optString("type") in listOf("radio","checkbox"))node.remove("checked")
             val children=node.optJSONArray("children") ?: return
             for(index in 0 until children.length())clean(children.getJSONObject(index))
         }
@@ -127,7 +132,7 @@ object NativeWorkspace : android.app.Application.ActivityLifecycleCallbacks {
             if(android.os.Build.VERSION.SDK_INT>=26)importantForAutofill=View.IMPORTANT_FOR_AUTOFILL_NO
         }
         private val tabs=LinearLayout(context)
-        private val tabScroll=HorizontalScrollView(context).apply { isHorizontalScrollBarEnabled=false;addView(tabs) }
+        private val tabScroll=HorizontalScrollView(context).apply { isHorizontalScrollBarEnabled=false;isHorizontalFadingEdgeEnabled=false;overScrollMode=View.OVER_SCROLL_NEVER;addView(tabs) }
         private val list=ListView(context).apply { divider=null;dividerHeight=0;clipToPadding=false;setPadding(0,0,0,NativeMaterial.dp(context,100)) }
         private val footer=vertical(context)
         private val placeholder=vertical(context).apply {gravity=Gravity.CENTER}
@@ -266,31 +271,84 @@ object NativeWorkspace : android.app.Application.ActivityLifecycleCallbacks {
             }
         }
     }
-    private fun boundWindow(activity:Activity,dialog:AlertDialog) {
-        val host=activity.findViewById<View>(android.R.id.content)
-        val height=if(host!=null && host.height>0)host.height else activity.resources.displayMetrics.heightPixels
-        dialog.window?.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
-        dialog.window?.setLayout(-1,(height*.85f).toInt())
+    /** One full-screen window; values patch in place instead of dismiss/show cycles. */
+    private class Settings(private val activity:Activity,context:Context):Dialog(context) {
+        private val root=vertical(context)
+        private val title=NativeMaterial.label(context,"",24f).apply {setTypeface(typeface,Typeface.BOLD)}
+        private val body=vertical(context)
+        private val scroll=ScrollView(context).apply {tag="settings-scroll";addView(body)}
+        private val cancel=NativeMaterial.button(context,"取消")
+        private val save=NativeMaterial.button(context,"保存",true)
+        private val close=NativeMaterial.icon(context,"\ue5cd","关闭"){cancel.performClick()}
+        private var model=JSONObject()
+        private var schema=""
+        init {
+            window?.requestFeature(android.view.Window.FEATURE_NO_TITLE)
+            root.setBackgroundColor(NativeMaterial.surface);padding(root,16)
+            androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(root) {view,insets->
+                val bars=insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.systemBars());val p=NativeMaterial.dp(context,16)
+                view.setPadding(p+bars.left,p+bars.top,p+bars.right,p+bars.bottom);insets
+            }
+            val header=row(context);header.addView(title,LinearLayout.LayoutParams(0,-2,1f));header.addView(close,LinearLayout.LayoutParams(NativeMaterial.dp(context,40),NativeMaterial.dp(context,40)))
+            root.addView(header,LinearLayout.LayoutParams(-1,-2).apply {bottomMargin=NativeMaterial.dp(context,16)})
+            root.addView(scroll,LinearLayout.LayoutParams(-1,0,1f))
+            val footer=row(context);footer.setPadding(0,NativeMaterial.dp(context,12),0,0)
+            footer.addView(cancel,LinearLayout.LayoutParams(0,-1,1f).apply {rightMargin=NativeMaterial.dp(context,8)})
+            footer.addView(save,LinearLayout.LayoutParams(0,-1,1f));root.addView(footer,LinearLayout.LayoutParams(-1,NativeMaterial.dp(context,60)))
+            cancel.setOnClickListener {emit(activity,"click",mapOf("key" to model.optString("cancel")))}
+            save.setOnClickListener {emit(activity,"click",mapOf("key" to model.optString("save")))}
+            setContentView(root);setCanceledOnTouchOutside(false);setCancelable(false)
+            window?.attributes=window!!.attributes.apply {windowAnimations=0}
+        }
+        override fun onStart() {
+            super.onStart();window?.setBackgroundDrawableResource(android.R.color.transparent);window?.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
+            window?.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);window?.setLayout(-1,-1)
+            tintSystemBars()
+            NativeNavigation.dialogBack(this){cancel.performClick()}
+        }
+        private fun tintSystemBars() {
+            window?.let {window->window.statusBarColor=NativeMaterial.surface;window.navigationBarColor=NativeMaterial.surface;androidx.core.view.WindowCompat.getInsetsController(window,root).apply {isAppearanceLightStatusBars=!dark;isAppearanceLightNavigationBars=!dark}}
+        }
+        fun retint() {
+            tintSystemBars()
+            (context as? android.view.ContextThemeWrapper)?.theme?.applyStyle(NativeMaterial.theme(activity,dark),true)
+            root.setBackgroundColor(NativeMaterial.surface);title.setTextColor(NativeMaterial.text);close.setTextColor(NativeMaterial.text)
+            cancel.setTextColor(NativeMaterial.text);cancel.backgroundTintList=android.content.res.ColorStateList.valueOf(NativeMaterial.container)
+            save.backgroundTintList=android.content.res.ColorStateList.valueOf(NativeMaterial.primary);save.setTextColor(NativeMaterial.onPrimary);schema=""
+        }
+        fun update(value:JSONObject) {
+            model=value;title.text=model.optString("title");cancel.text=model.optString("cancelLabel","取消");save.text=model.optString("saveLabel","保存")
+            val incoming=settingsSchema(model)
+            if(incoming!=schema) {
+                val position=scroll.scrollY;body.removeAllViews();renderNodes(activity,body,model.optJSONArray("children") ?: JSONArray());schema=incoming
+                scroll.post {scroll.scrollTo(0,position)}
+            }
+            patching=true
+            try {patchControls(body,model)}finally{patching=false}
+        }
     }
-    private fun settings(activity:Activity,model:JSONObject,position:Int):AlertDialog {
-        val context=NativeMaterial.context(activity,dark);val content=vertical(context);padding(content,16)
-        val dialog=NativeMaterial.dialog(context).setView(content).create()
-        val header=row(context)
-        header.addView(NativeMaterial.label(context,model.optString("title"),24f).apply {setTypeface(typeface,Typeface.BOLD)},LinearLayout.LayoutParams(0,-2,1f))
-        header.addView(NativeMaterial.icon(context,"\ue5cd",model.optString("cancelLabel","取消")){emit(activity,"click",mapOf("key" to model.optString("cancel")))},LinearLayout.LayoutParams(NativeMaterial.dp(context,36),NativeMaterial.dp(context,36)))
-        content.addView(header,LinearLayout.LayoutParams(-1,-2).apply {bottomMargin=NativeMaterial.dp(context,16)})
-        val layout=vertical(context)
-        renderNodes(activity,layout,model.optJSONArray("children") ?: JSONArray())
-        // Header/footer reserve their space; only the body may shrink for IME/small screens.
-        val scroll=ScrollView(context).apply {tag="settings-scroll";isFillViewport=false;addView(layout);post {scrollTo(0,position)}}
-        content.addView(scroll,LinearLayout.LayoutParams(-1,0,1f))
-        val footer=row(context);footer.setPadding(0,NativeMaterial.dp(context,12),0,0)
-        footer.addView(NativeMaterial.button(context,model.optString("cancelLabel","取消")).apply {setOnClickListener {emit(activity,"click",mapOf("key" to model.optString("cancel")))}},LinearLayout.LayoutParams(0,-1,1f).apply {rightMargin=NativeMaterial.dp(context,8)})
-        footer.addView(NativeMaterial.button(context,model.optString("saveLabel","保存"),true).apply {setOnClickListener {emit(activity,"click",mapOf("key" to model.optString("save")))}},LinearLayout.LayoutParams(0,-1,1f))
-        content.addView(footer,LinearLayout.LayoutParams(-1,NativeMaterial.dp(context,60)))
-        dialog.setCanceledOnTouchOutside(false);dialog.setCancelable(false)
-        dialog.setOnShowListener {boundWindow(activity,dialog);NativeNavigation.dialogBack(dialog){emit(activity,"click",mapOf("key" to model.optString("cancel")))}}
-        return dialog
+    private fun latestChildren(node:JSONObject):JSONArray {
+        fun find(value:JSONObject):JSONObject? {
+            if(value.optString("key")==node.optString("key") && node.optString("key").isNotEmpty())return value
+            val children=value.optJSONArray("children") ?: return null
+            for(index in 0 until children.length())find(children.getJSONObject(index))?.let {return it}
+            return null
+        }
+        return find(settingsModel)?.optJSONArray("children") ?: node.optJSONArray("children") ?: JSONArray()
+    }
+    private fun patchControls(root:View,model:JSONObject) {
+        val key=model.optString("key")
+        val view=if(key.isNotEmpty())root.findViewWithTag<View>(key) else null
+        when(model.optString("type")) {
+            "input" -> {
+                if(view is EditText && !view.hasFocus() && view.text.toString()!=model.optString("value"))view.setText(model.optString("value"))
+                if(view is com.google.android.material.slider.Slider){val value=model.optString("value").toFloatOrNull();if(value!=null)view.value=value.coerceIn(view.valueFrom,view.valueTo)}
+            }
+            "checkbox","radio" -> if(view is CompoundButton)view.isChecked=model.optBoolean("checked")
+            "select" -> if(view is TextView){val entries=model.optJSONArray("options") ?: JSONArray();for(index in 0 until entries.length()){val option=entries.getJSONObject(index);if(option.optString("value")==model.optString("value"))view.text=option.optString("label")}}
+        }
+        val children=model.optJSONArray("children") ?: return
+        for(index in 0 until children.length())patchControls(root,children.getJSONObject(index))
     }
     private fun settingRow(context:Context,label:String,glyph:String="",action:()->Unit):LinearLayout {
         val line=row(context);line.minimumHeight=NativeMaterial.dp(context,52);padding(line,12)
@@ -320,7 +378,7 @@ object NativeWorkspace : android.app.Application.ActivityLifecycleCallbacks {
                     val children=vertical(context).apply {padding(this,12);visibility=if(opened)View.VISIBLE else View.GONE};var built=opened
                     if(opened)renderNodes(activity,children,node.optJSONArray("children") ?: JSONArray(),groupId)
                     val summary=settingRow(context,label) {
-                        if(!built){renderNodes(activity,children,node.optJSONArray("children") ?: JSONArray(),groupId);built=true}
+                        if(!built){renderNodes(activity,children,latestChildren(node),groupId);built=true}
                         val show=children.visibility!=View.VISIBLE;groups[groupId]=show;children.visibility=if(show)View.VISIBLE else View.GONE
                         (box.getChildAt(0) as LinearLayout).getChildAt(1).rotation=if(show)90f else 0f
                     }
@@ -336,10 +394,12 @@ object NativeWorkspace : android.app.Application.ActivityLifecycleCallbacks {
                     parent.addView(button,LinearLayout.LayoutParams(-1,-2).apply {bottomMargin=NativeMaterial.dp(context,8)})
                 }
                 "radio" -> parent.addView(com.google.android.material.radiobutton.MaterialRadioButton(context).apply {
+                    tag=key;
                     text=label;setTextColor(NativeMaterial.text);buttonTintList=android.content.res.ColorStateList(arrayOf(intArrayOf(android.R.attr.state_checked),intArrayOf()),intArrayOf(NativeMaterial.primary,NativeMaterial.muted));isChecked=node.optBoolean("checked");isEnabled=!node.optBoolean("disabled")
                     setOnCheckedChangeListener {_,checked->if(checked)emit(activity,"change",mapOf("key" to key,"checked" to true))}
                 })
                 "checkbox" -> parent.addView(MaterialCheckBox(context).apply {
+                    tag=key;
                     text=label;setTextColor(NativeMaterial.text);buttonTintList=android.content.res.ColorStateList(arrayOf(intArrayOf(android.R.attr.state_checked),intArrayOf()),intArrayOf(NativeMaterial.primary,NativeMaterial.muted));isChecked=node.optBoolean("checked");isEnabled=!node.optBoolean("disabled")
                     setOnCheckedChangeListener {_,checked->emit(activity,"change",mapOf("key" to key,"checked" to checked))}
                 })
@@ -347,8 +407,8 @@ object NativeWorkspace : android.app.Application.ActivityLifecycleCallbacks {
                     parent.addView(NativeMaterial.label(context,label));val options=node.optJSONArray("options") ?: JSONArray()
                     val entries=(0 until options.length()).map {options.getJSONObject(it)}
                     val selector=NativeMaterial.button(context,entries.find {it.optString("value")==node.optString("value")}?.optString("label") ?: "")
-                    selector.isEnabled=!node.optBoolean("disabled");selector.setOnClickListener {
-                        NativeMaterial.dialog(context).setTitle(label).setItems(entries.map {it.optString("label")}.toTypedArray()) {_,which->emit(activity,"change",mapOf("key" to key,"value" to entries[which].optString("value")))}.show()
+                    selector.tag=key;selector.isEnabled=!node.optBoolean("disabled");selector.setOnClickListener {
+                        NativeMaterial.choices(context,label,entries.map {it.optString("label")}) {which->emit(activity,"change",mapOf("key" to key,"value" to entries[which].optString("value")))}
                     };parent.addView(selector)
                 }
                 "input" -> {
@@ -356,6 +416,7 @@ object NativeWorkspace : android.app.Application.ActivityLifecycleCallbacks {
                         parent.addView(NativeMaterial.label(context,label))
                         val from=node.optString("min").toFloatOrNull() ?: 0f;val to=node.optString("max").toFloatOrNull()?.coerceAtLeast(from+1f) ?: 100f
                         val slider=com.google.android.material.slider.Slider(context).apply {
+                            tag=key;
                             valueFrom=from;valueTo=to;value=(node.optString("value").toFloatOrNull() ?: from).coerceIn(from,to);isEnabled=!node.optBoolean("disabled")
                             thumbTintList=android.content.res.ColorStateList.valueOf(NativeMaterial.primary)
                             trackActiveTintList=android.content.res.ColorStateList.valueOf(NativeMaterial.primary)

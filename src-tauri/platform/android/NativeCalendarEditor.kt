@@ -19,14 +19,14 @@ object NativeCalendarEditor {
         val context = NativeDialogs.context(activity, night)
         fun t(zh: String, en: String) = if (english) en else zh
         val layout = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL; val padding = (20 * resources.displayMetrics.density).toInt(); setPadding(padding, padding, padding, padding) }
-        fun label(text: String) { layout.addView(TextView(context).apply { this.text = text }) }
+        fun label(text: String) { layout.addView(NativeMaterial.label(context,text)) }
         fun input(caption: String, value: String, lines: Int = 1): EditText {
             label(caption)
             return NativeMaterial.field(layout,value,"",lines>1)
 
         }
         label(t("日历", "Calendar"))
-        val calendar = Spinner(context).apply { adapter = ArrayAdapter(context, android.R.layout.simple_spinner_dropdown_item, calendars.map { it.name }) }; layout.addView(calendar)
+        val calendar = Spinner(context).apply { adapter = NativeMaterial.spinnerAdapter(context,calendars.map {it.name}) }; layout.addView(calendar)
         val name = input(t("标题", "Title"), title).apply { filters = arrayOf(InputFilter.LengthFilter(500)) }
         val body = input(t("内容（纯文本）", "Details (plain text)"), description, 4)
         val useDocument = NativeMaterial.button(context,"").apply { text = t("使用当前文档内容", "Use document content"); setOnClickListener { body.setText(description) } }; layout.addView(useDocument)
@@ -53,10 +53,10 @@ object NativeCalendarEditor {
         timeButton(t("开始时间", "Start"), start); timeButton(t("结束时间", "End"), end)
         label(t("重复规则", "Repeat"))
         val frequencies = listOf("", "DAILY", "WEEKLY", "WEEKLY", "MONTHLY", "YEARLY")
-        val repeat = Spinner(context).apply { adapter = ArrayAdapter(context, android.R.layout.simple_spinner_dropdown_item,
+        val repeat = Spinner(context).apply { adapter = NativeMaterial.spinnerAdapter(context,
             if (english) listOf("Never", "Daily", "Weekdays", "Weekly", "Monthly", "Yearly") else listOf("不重复", "每天", "工作日", "每周", "每月", "每年")) }; layout.addView(repeat); editable.add(repeat)
         val repeatOptions = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL; visibility = View.GONE }; layout.addView(repeatOptions)
-        repeatOptions.addView(TextView(context).apply { text = t("重复间隔（1–365）", "Repeat interval (1–365)") })
+        repeatOptions.addView(NativeMaterial.label(context,t("重复间隔（1–365）", "Repeat interval (1–365)")))
         val interval = NativeMaterial.field(repeatOptions,"1","").apply { inputType=InputType.TYPE_CLASS_NUMBER }; editable.add(interval)
         var until: Calendar? = null
         val cutoff = NativeMaterial.button(context,"").apply { text = t("重复截止日期（可选）", "Repeat until (optional)") }; repeatOptions.addView(cutoff); editable.add(cutoff)
@@ -72,7 +72,7 @@ object NativeCalendarEditor {
             override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) { repeatOptions.visibility = if (position == 0) View.GONE else View.VISIBLE }
             override fun onNothingSelected(parent: AdapterView<*>?) {}
         }
-        val error = TextView(context).apply { setTextColor(android.graphics.Color.rgb(190, 35, 35)); accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE }; layout.addView(error)
+        val error = TextView(context).apply { setTextColor(NativeMaterial.danger); accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE }; layout.addView(error)
         val scroll = ScrollView(context).apply { addView(layout) }
         val dialog = NativeMaterial.dialog(context).setTitle(t("添加日程", "Add to calendar")).setView(scroll)
             .setPositiveButton(t("写入日历", "Add to calendar"), null).setNegativeButton(t("取消", "Cancel"), null).create()

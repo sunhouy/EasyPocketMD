@@ -1,2 +1,2 @@
 <resources xmlns:tools="http://schemas.android.com/tools"
-    tools:keep="@style/Theme.EpmdNative.Light,@style/Theme.EpmdNative.Dark" />
+    tools:keep="@style/Theme.EpmdNative.Light,@style/Theme.EpmdNative.Dark,@style/Theme.EpmdNative.Dialog.Light,@style/Theme.EpmdNative.Dialog.Dark,@style/Theme.EpmdNative.Calendar.Light,@style/Theme.EpmdNative.Calendar.Dark,@style/Theme.EpmdNative.Time.Light,@style/Theme.EpmdNative.Time.Dark" />

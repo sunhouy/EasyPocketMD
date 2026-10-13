@@ -96,3 +96,33 @@ it('serializes settings body without duplicating the shared save action',async()
  const settings=model().settings;const nodes:any[]=[];const walk=(n:any)=>{nodes.push(n);n.children?.forEach(walk);};settings.children.forEach(walk);
  expect(nodes.some(n=>n.key===settings.save)).toBe(false);const save=jest.fn();document.getElementById('saveSettingsBtn')!.onclick=save;emit({kind:'click',key:settings.save});expect(save).toHaveBeenCalledTimes(1);
 });
+it('hides web settings before native opening completes and restores fallback after failure',async()=>{
+ runtime.dispose();app.showSettingsDialog=jest.fn(()=>{const overlay=document.getElementById('settingsModalOverlay')!;overlay.style.display='flex';overlay.classList.add('show');});
+ runtime=installAndroidWorkspace(app);await flush();
+ let acknowledge:(value:any)=>void;invoke.mockImplementationOnce(()=>new Promise(resolve=>{acknowledge=resolve;}));
+ app.showSettingsDialog();expect(document.body.classList.contains('native-settings-opening')).toBe(true);expect(model().settings).not.toBeNull();
+ acknowledge!({ready:true});await flush();expect(document.body.classList.contains('native-settings-ready')).toBe(true);expect(document.body.classList.contains('native-settings-opening')).toBe(false);
+ invoke.mockRejectedValueOnce(new Error('host unavailable'));app.showSettingsDialog();await flush();expect(document.body.classList.contains('native-settings-opening')).toBe(false);expect(document.body.classList.contains('native-settings-ready')).toBe(false);
+});
+it('preserves semantic settings-open state during a web child dialog',async()=>{
+ const overlay=document.getElementById('settingsModalOverlay')!;overlay.style.display='flex';overlay.classList.add('show');await runtime.sync();await flush();
+ const child=document.createElement('div');child.className='modal-overlay show';document.body.append(child);await runtime.sync();await flush();
+ expect(model().settings).toBeNull();expect(model().settingsOpen).toBe(true);
+ child.remove();await runtime.sync();expect(model().settings).not.toBeNull();expect(model().settingsOpen).toBe(true);
+});
+it('keeps opaque settings control keys stable across radio/checkbox/value changes',async()=>{
+ const overlay=document.getElementById('settingsModalOverlay')!;overlay.style.display='flex';overlay.classList.add('show');
+ overlay.querySelector('.settings-section')!.innerHTML='<div class="settings-section-header">外观</div><label><input type="checkbox" id="nativeCheck">启用</label><input id="nativeValue" value="第一项">';
+ await runtime.sync();await flush();const nodes:any[]=[];const walk=(n:any)=>{nodes.push(n);n.children?.forEach(walk);};walk(model().settings);
+ const check=nodes.find(n=>n.type==='checkbox');const input=nodes.find(n=>n.type==='input');emit({kind:'change',key:check.key,checked:true});emit({kind:'input',key:input.key,value:'第二项'});await runtime.sync();
+ const latest:any[]=[];const inspect=(n:any)=>{latest.push(n);n.children?.forEach(inspect);};inspect(model().settings);
+ expect(latest.find(n=>n.key===check.key).checked).toBe(true);expect(latest.find(n=>n.key===input.key).value).toBe('第二项');expect(model().settingsOpen).toBe(true);
+});
+it('does not expose web settings when an older pending workspace response finishes first',async()=>{
+ runtime.dispose();app.showSettingsDialog=()=>{const overlay=document.getElementById('settingsModalOverlay')!;overlay.style.display='flex';overlay.classList.add('show');};runtime=installAndroidWorkspace(app);await flush();
+ let previous:(value:any)=>void,next:(value:any)=>void;
+ invoke.mockImplementationOnce(()=>new Promise(resolve=>{previous=resolve;})).mockImplementationOnce(()=>new Promise(resolve=>{next=resolve;}));
+ void runtime.sync();app.showSettingsDialog();previous!({ready:true});await new Promise(resolve=>setTimeout(resolve,0));
+ expect(document.body.classList.contains('native-settings-opening')).toBe(true);expect(model().settings).not.toBeNull();
+ next!({ready:true});await flush();expect(document.body.classList.contains('native-settings-opening')).toBe(false);
+});
