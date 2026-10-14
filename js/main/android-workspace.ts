@@ -64,7 +64,7 @@ export function installAndroidWorkspace(app:any=window) {
                 dirty=false;for(const [id,element] of refs)if(!element.isConnected)refs.delete(id);const setting=settings();
                 const blocked=[...document.querySelectorAll<HTMLElement>(modalSurfaceSelector)].some(el=>!el.closest('#settingsModalOverlay') && !el.matches(transientSelector) && isVisibleModalSurface(el));
                 // An empty panel list also closes panels in previously installed native hosts.
-                const model={toast,epoch,night:!!app.nightMode,palette:nativePalette(),home:document.body.classList.contains('file-management-mode') && !blocked?home:null,settings:blocked?null:setting,more,panels:[],toolbar:blocked?null:toolbar()};
+                const model={toast,epoch,night:!!app.nightMode,palette:nativePalette(),home:document.body.classList.contains('file-management-mode') && !blocked?home:null,settings:blocked?null:setting,settingsOpen:!!setting,more,panels:[],toolbar:blocked?null:toolbar()};
                 const response=await invoke('android_workspace',{model:JSON.stringify(model)});
                 if(response?.toolbarReady)app.nativeToolbarAvailable=true;
                 if(model.settings && response?.ready)app.nativeSettingsAvailable=true;
@@ -76,12 +76,19 @@ export function installAndroidWorkspace(app:any=window) {
                 if(app.nativeWorkspacePaused!==paused){app.nativeWorkspacePaused=paused;app.refreshNotesHome?.();}
                 document.body.classList.toggle('native-workspace-ready',!!app.nativeWorkspaceReady);
                 document.body.classList.toggle('native-settings-ready',!!app.nativeSettingsAvailable && !!setting);
+                if(model.settings || !settings())document.body.classList.remove('native-settings-opening');
             }
         } catch(error) {
-            enabled=false;(window as any).enableLegacyAndroidBackRoute?.();app.nativeWorkspaceAvailable=false;app.nativeWorkspaceReady=false;app.nativeToolbarAvailable=false;app.nativeSettingsAvailable=false;document.body.classList.remove('native-workspace-ready','native-settings-ready','native-toolbar-ready');app.refreshNotesHome?.();
+            enabled=false;(window as any).enableLegacyAndroidBackRoute?.();app.nativeWorkspaceAvailable=false;app.nativeWorkspaceReady=false;app.nativeToolbarAvailable=false;app.nativeSettingsAvailable=false;document.body.classList.remove('native-workspace-ready','native-settings-ready','native-toolbar-ready','native-settings-opening');app.refreshNotesHome?.();
             console.warn('Native workspace unavailable; using web UI',error);
         } finally {sending=false;}
     }
+    const showSettings=app.showSettingsDialog;
+    if(typeof showSettings==='function')app.showSettingsDialog=function(...args:any[]) {
+        if(enabled && app.nativeWorkspaceAvailable)document.body.classList.add('native-settings-opening');
+        try {const result=showSettings.apply(app,args);void sync();return result;}
+        catch(error){document.body.classList.remove('native-settings-opening');throw error;}
+    };
     app.nativeWorkspace={renderHome(model:any){home=model;void sync();return !!app.nativeWorkspaceReady && !app.nativeWorkspacePaused;}};
     let syncScheduled=false;const scheduleSync=()=>{if(syncScheduled)return;syncScheduled=true;setTimeout(()=>{syncScheduled=false;void sync();},16);};
     const observer=new MutationObserver(records=>{if(records.some(record=>record.target===document.body || record.target===document.documentElement || ((record.target instanceof Element?record.target:record.target.parentElement)?.closest('.modal-overlay,[aria-modal="true"],#customDialogContainer,.mobile-toolbar-container,#selectionToolbar'))))scheduleSync();});observer.observe(document.documentElement,{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:['class','hidden','style','disabled']});
@@ -150,5 +157,5 @@ export function installAndroidWorkspace(app:any=window) {
         if(enabled && app.nativeWorkspaceAvailable && (document.body.classList.contains('file-management-mode') || settings() || more)) {toast={id:++toastId,message};void sync();return;}
         return originalMessage?.call(app,message,...args);
     };
-    void sync();return {sync,dispose(){enabled=false;observer.disconnect();app.nativeWorkspaceReady=false;app.nativeToolbarAvailable=false;app.nativeSettingsAvailable=false;document.body.classList.remove('native-workspace-ready','native-settings-ready','native-toolbar-ready');}};
+    void sync();return {sync,dispose(){enabled=false;observer.disconnect();app.nativeWorkspaceReady=false;app.nativeToolbarAvailable=false;app.nativeSettingsAvailable=false;document.body.classList.remove('native-workspace-ready','native-settings-ready','native-toolbar-ready','native-settings-opening');}};
 }

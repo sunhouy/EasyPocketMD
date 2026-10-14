@@ -11,4 +11,38 @@
         <item name="android:colorBackground">#202124</item><item name="android:textColorPrimary">#ECEEF2</item>
         <item name="android:windowLightStatusBar">false</item><item name="android:windowSoftInputMode">adjustResize</item>
     </style>
+    <style name="Theme.EpmdNative.Dialog.Light" parent="Theme.MaterialComponents.Light.Dialog.Alert">
+        <item name="android:textColorPrimary">#24262B</item><item name="android:textColorSecondary">#686B73</item>
+        <item name="colorSurface">#FFFFFF</item><item name="colorOnSurface">#24262B</item>
+        <item name="android:windowIsFloating">true</item>
+    </style>
+    <style name="Theme.EpmdNative.Dialog.Dark" parent="Theme.MaterialComponents.Dialog.Alert">
+        <item name="android:textColorPrimary">#ECEEF2</item><item name="android:textColorSecondary">#B0B3BB</item>
+        <item name="colorSurface">#202124</item><item name="colorOnSurface">#ECEEF2</item>
+        <item name="android:windowIsFloating">true</item>
+    </style>
+    <style name="Theme.EpmdNative.Calendar.Light" parent="ThemeOverlay.MaterialComponents.MaterialCalendar">
+        <item name="colorPrimary">#3478E5</item><item name="colorOnPrimary">#FFFFFF</item>
+        <item name="colorSurface">#FFFFFF</item><item name="colorOnSurface">#24262B</item>
+        <item name="android:textColorPrimary">#24262B</item><item name="android:textColorSecondary">#686B73</item>
+        <item name="android:colorBackground">#FFFFFF</item>
+    </style>
+    <style name="Theme.EpmdNative.Calendar.Dark" parent="ThemeOverlay.MaterialComponents.MaterialCalendar">
+        <item name="colorPrimary">#3478E5</item><item name="colorOnPrimary">#FFFFFF</item>
+        <item name="colorSurface">#202124</item><item name="colorOnSurface">#ECEEF2</item>
+        <item name="android:textColorPrimary">#ECEEF2</item><item name="android:textColorSecondary">#B0B3BB</item>
+        <item name="android:colorBackground">#202124</item>
+    </style>
+    <style name="Theme.EpmdNative.Time.Light" parent="ThemeOverlay.MaterialComponents.TimePicker">
+        <item name="colorPrimary">#3478E5</item><item name="colorOnPrimary">#FFFFFF</item>
+        <item name="colorSurface">#FFFFFF</item><item name="colorOnSurface">#24262B</item>
+        <item name="android:textColorPrimary">#24262B</item><item name="android:textColorSecondary">#686B73</item>
+        <item name="android:colorBackground">#FFFFFF</item>
+    </style>
+    <style name="Theme.EpmdNative.Time.Dark" parent="ThemeOverlay.MaterialComponents.TimePicker">
+        <item name="colorPrimary">#3478E5</item><item name="colorOnPrimary">#FFFFFF</item>
+        <item name="colorSurface">#202124</item><item name="colorOnSurface">#ECEEF2</item>
+        <item name="android:textColorPrimary">#ECEEF2</item><item name="android:textColorSecondary">#B0B3BB</item>
+        <item name="android:colorBackground">#202124</item>
+    </style>
 </resources>

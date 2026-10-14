@@ -197,7 +197,7 @@ class LocalDocumentsPlugin(private val activity: Activity) : Plugin(activity) {
                 .setTitle(if (args.english) "Loading calendars…" else "正在读取日历…")
                 .setView(android.widget.ProgressBar(context))
                 .setNegativeButton(if (args.english) "Cancel" else "取消", null).create()
-            session.bind(loading); loading.setCanceledOnTouchOutside(false); loading.show()
+            session.bind(loading); loading.setCanceledOnTouchOutside(false);loading.setOnShowListener {NativeMaterial.dialogButtons(loading)}; loading.show()
             io.execute {
                 try {
                     val calendars = mutableListOf<NativeCalendarEditor.WritableCalendar>()

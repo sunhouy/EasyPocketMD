@@ -15,7 +15,7 @@ object NativePickers {
         val owner=activity as? FragmentActivity ?: return
         if(owner.supportFragmentManager.isStateSaved)return
         val utc=Calendar.getInstance(TimeZone.getTimeZone("UTC")).apply {clear();set(date.get(Calendar.YEAR),date.get(Calendar.MONTH),date.get(Calendar.DAY_OF_MONTH))}
-        val theme=NativeMaterial.theme(activity,NativeMaterial.night)
+        val theme=NativeMaterial.pickerTheme(activity,"Calendar")
         val builder=MaterialDatePicker.Builder.datePicker().setTitleText(title).setSelection(utc.timeInMillis)
         if(theme!=0)builder.setTheme(theme)
         val picker=builder.build()
@@ -31,7 +31,7 @@ object NativePickers {
         if(owner.supportFragmentManager.isStateSaved)return
         val builder=MaterialTimePicker.Builder().setTitleText(title).setHour(date.get(Calendar.HOUR_OF_DAY)).setMinute(date.get(Calendar.MINUTE))
             .setTimeFormat(if(android.text.format.DateFormat.is24HourFormat(activity))TimeFormat.CLOCK_24H else TimeFormat.CLOCK_12H)
-        val theme=NativeMaterial.theme(activity,NativeMaterial.night)
+        val theme=NativeMaterial.pickerTheme(activity,"Time")
         if(theme!=0)builder.setTheme(theme)
         val picker=builder.build()
         picker.addOnPositiveButtonClickListener {chosen(picker.hour,picker.minute)}
