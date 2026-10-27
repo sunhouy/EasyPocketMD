@@ -7,7 +7,6 @@ const { promisify } = require('util');
 
 // JWT 密钥，从环境变量获取或使用默认值
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
-const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
 
 class User {
     declare adminConfig: {username:string;password:string};
@@ -32,9 +31,10 @@ class User {
         return await bcrypt.compare(password, hashedPassword);
     }
 
-    // Generate JWT token
+    // Generate a JWT token without an expiration claim. Login always calls this
+    // method, so existing users receive a non-expiring token on their next login.
     generateToken(username) {
-        return jwt.sign({ username }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+        return jwt.sign({ username }, JWT_SECRET);
     }
 
     // Verify JWT token
